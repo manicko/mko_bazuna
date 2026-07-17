@@ -1,0 +1,35 @@
+# For multi-stage tasks (cross-module, medium+ risk):
+# create a separate verification task at the end of the stage.
+# Use the verification task template below.
+
+---
+# Verification task template (only for multi-stage work)
+
+id: verify_task_template
+
+title: Verify — <implementation task title>
+
+type: verification
+
+status: pending
+
+depends_on:
+  - task_XXX_implementation_task
+
+verifies:
+  - task_XXX_implementation_task
+  - task_YYY_implementation_task
+
+verification_steps:
+  - build: <command to build, e.g. "docker compose build">
+  - test: <test command, e.g. "pytest tests/test_user_creation.py -v">
+  - smoke_check: <minimal check, e.g. "curl /health or lint">
+
+pass_criteria:
+  - build succeeds
+  - all tests pass
+  - smoke_check returns expected result
+
+failure_action: return task_XXX_implementation_task to rework
+
+rollback_task: task_YYY_rollback_if_applicable  # optional

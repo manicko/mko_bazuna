@@ -1,0 +1,344 @@
+- id: 4141f45a
+  file: C:/py_dev/mkobi/frontend/src/app/providers.tsx
+  symbol_path:
+    - App
+  type: component
+  value: App
+  stable_hash: 4141f45a
+- id: 33a8eb8c
+  file: C:/py_dev/mkobi/frontend/src/app/routes.tsx
+  symbol_path:
+    - LoadingFallback
+  type: component
+  value: LoadingFallback
+  stable_hash: 33a8eb8c
+- id: db6976ee
+  file: C:/py_dev/mkobi/frontend/src/app/routes.tsx
+  symbol_path:
+    - RootRedirect
+  type: component
+  value: RootRedirect
+  stable_hash: db6976ee
+- id: 7077cf72
+  file: C:/py_dev/mkobi/frontend/src/app/routes.tsx
+  symbol_path:
+    - AppRoutes
+  type: component
+  value: AppRoutes
+  stable_hash: 7077cf72
+- id: be6e2715
+  file: C:/py_dev/mkobi/frontend/src/shared/components/AccessDenied.tsx
+  symbol_path:
+    - AccessDenied
+  type: component
+  value: AccessDenied
+  stable_hash: be6e2715
+- id: 62d296a6
+  file: C:/py_dev/mkobi/frontend/src/shared/components/ConfirmDialog.tsx
+  symbol_path:
+    - ConfirmDialog
+  type: component
+  value: ConfirmDialog
+  stable_hash: 62d296a6
+- id: 18b40241
+  file: C:/py_dev/mkobi/frontend/src/shared/components/ErrorPage.tsx
+  symbol_path:
+    - ErrorPage
+  type: component
+  value: ErrorPage
+  stable_hash: 18b40241
+- id: ae8ca5e0
+  file: C:/py_dev/mkobi/frontend/src/shared/components/NotFound.tsx
+  symbol_path:
+    - NotFound
+  type: component
+  value: NotFound
+  stable_hash: ae8ca5e0
+- id: 1b328f33
+  file: C:/py_dev/mkobi/frontend/src/shared/components/PlotlyComponent.tsx
+  symbol_path:
+    - PlotlyChart
+  type: component
+  value: PlotlyChart
+  stable_hash: 1b328f33
+- id: 733d7c37
+  file: C:/py_dev/mkobi/frontend/src/shared/components/ProtectedRoute.tsx
+  symbol_path:
+    - ProtectedRoute
+  type: component
+  value: ProtectedRoute
+  stable_hash: 733d7c37
+- id: 64bcf966
+  file: C:/py_dev/mkobi/frontend/src/shared/components/RoleBasedAccess.tsx
+  symbol_path:
+    - RoleBasedAccess
+  type: component
+  value: RoleBasedAccess
+  stable_hash: 64bcf966
+- id: e2fdd50d
+  file: C:/py_dev/mkobi/frontend/src/shared/hooks/useApiError.ts
+  symbol_path:
+    - useApiError
+  type: hook
+  value: useApiError
+  stable_hash: e2fdd50d
+- id: 0e8e2505
+  file: C:/py_dev/mkobi/frontend/src/shared/hooks/useConfirmDialog.ts
+  symbol_path:
+    - useConfirmDialog
+  type: hook
+  value: useConfirmDialog
+  stable_hash: 0e8e2505
+- id: af839b08
+  file: C:/py_dev/mkobi/frontend/src/shared/hooks/useDebounce.ts
+  symbol_path:
+    - useDebounce
+  type: hook
+  value: useDebounce
+  stable_hash: af839b08
+- id: 194efc11
+  file: C:/py_dev/mkobi/frontend/src/shared/hooks/useDebounce.ts
+  symbol_path:
+    - useDebouncedCallback
+  type: hook
+  value: useDebouncedCallback
+  stable_hash: 194efc11
+- id: 8c604949
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/AdminPanel.tsx
+  symbol_path:
+    - AdminPanel
+  type: component
+  value: AdminPanel
+  stable_hash: 8c604949
+- id: 1f4bffdf
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/DashboardManagement.tsx
+  symbol_path:
+    - DashboardManagement
+  type: component
+  value: DashboardManagement
+  stable_hash: 1f4bffdf
+- id: 062d59f6
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/LogViewer.tsx
+  symbol_path:
+    - LogViewer
+  type: component
+  value: LogViewer
+  stable_hash: 062d59f6
+- id: c4aefeb2
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/RegistrationRequests.tsx
+  symbol_path:
+    - RetrievePasswordDialog
+  type: component
+  value: RetrievePasswordDialog
+  stable_hash: c4aefeb2
+- id: 981bcfb9
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/RegistrationRequests.tsx
+  symbol_path:
+    - RegistrationRequests
+  type: component
+  value: RegistrationRequests
+  stable_hash: 981bcfb9
+- id: 16dda3fb
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/ResetPasswordResultDialog.tsx
+  symbol_path:
+    - ResetPasswordResultDialog
+  type: component
+  value: ResetPasswordResultDialog
+  stable_hash: 16dda3fb
+- id: abdcfcaf
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/UserManagement.tsx
+  symbol_path:
+    - RetrievePasswordDialog
+  type: component
+  value: RetrievePasswordDialog
+  stable_hash: abdcfcaf
+- id: 4cbe3e4d
+  file: C:/py_dev/mkobi/frontend/src/features/admin/ui/UserManagement.tsx
+  symbol_path:
+    - UserManagement
+  type: component
+  value: UserManagement
+  stable_hash: 4cbe3e4d
+- id: 9d4eb940
+  file: C:/py_dev/mkobi/frontend/src/features/auth/model/authToken.ts
+  symbol_path:
+    - useAuthToken
+  type: hook
+  value: useAuthToken
+  stable_hash: 9d4eb940
+- id: 9151f52f
+  file: C:/py_dev/mkobi/frontend/src/features/auth/model/useAuth.ts
+  symbol_path:
+    - useAuth
+  type: hook
+  value: useAuth
+  stable_hash: 9151f52f
+- id: 504dc174
+  file: C:/py_dev/mkobi/frontend/src/features/auth/ui/LoginForm.tsx
+  symbol_path:
+    - LoginForm
+  type: component
+  value: LoginForm
+  stable_hash: 504dc174
+- id: 9900df6d
+  file: C:/py_dev/mkobi/frontend/src/features/auth/ui/RegisterForm.tsx
+  symbol_path:
+    - RegisterForm
+  type: component
+  value: RegisterForm
+  stable_hash: 9900df6d
+- id: 2825121a
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/api/dashboardApi.ts
+  symbol_path:
+    - useMyDashboards
+  type: hook
+  value: useMyDashboards
+  stable_hash: 2825121a
+- id: caaae3d5
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/api/dashboardApi.ts
+  symbol_path:
+    - useDashboard
+  type: hook
+  value: useDashboard
+  stable_hash: caaae3d5
+- id: 5e57d03a
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/api/dashboardApi.ts
+  symbol_path:
+    - useAggregatedData
+  type: hook
+  value: useAggregatedData
+  stable_hash: 5e57d03a
+- id: c17c0660
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/api/dashboardApi.ts
+  symbol_path:
+    - useInvalidateDashboard
+  type: hook
+  value: useInvalidateDashboard
+  stable_hash: c17c0660
+- id: 6c0e4ed9
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/api/dashboardApi.ts
+  symbol_path:
+    - useFilterValues
+  type: hook
+  value: useFilterValues
+  stable_hash: 6c0e4ed9
+- id: dbc96dec
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/DashboardFilters.tsx
+  symbol_path:
+    - DashboardFilters
+  type: component
+  value: DashboardFilters
+  stable_hash: dbc96dec
+- id: 8c713693
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/DashboardFilters.tsx
+  symbol_path:
+    - FilterField
+  type: component
+  value: FilterField
+  stable_hash: 8c713693
+- id: '07870943'
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/DashboardList.tsx
+  symbol_path:
+    - DashboardList
+  type: component
+  value: DashboardList
+  stable_hash: '07870943'
+- id: cc67603f
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/DashboardView.tsx
+  symbol_path:
+    - DashboardView
+  type: component
+  value: DashboardView
+  stable_hash: cc67603f
+- id: d3d705fa
+  file: C:/py_dev/mkobi/frontend/src/features/upload/api/uploadApi.ts
+  symbol_path:
+    - useProcessingStatus
+  type: hook
+  value: useProcessingStatus
+  stable_hash: d3d705fa
+- id: 1f16405d
+  file: C:/py_dev/mkobi/frontend/src/features/upload/ui/FileDropzone.tsx
+  symbol_path:
+    - FileDropzone
+  type: component
+  value: FileDropzone
+  stable_hash: 1f16405d
+- id: e4c50459
+  file: C:/py_dev/mkobi/frontend/src/features/upload/ui/UploadModal.tsx
+  symbol_path:
+    - UploadModal
+  type: component
+  value: UploadModal
+  stable_hash: e4c50459
+- id: 93aeffe8
+  file: C:/py_dev/mkobi/frontend/src/features/users/ui/ChangePasswordPage.tsx
+  symbol_path:
+    - ChangePasswordPage
+  type: component
+  value: ChangePasswordPage
+  stable_hash: 93aeffe8
+- id: ace8f0fa
+  file: C:/py_dev/mkobi/frontend/src/features/users/ui/UserProfile.tsx
+  symbol_path:
+    - UserProfile
+  type: component
+  value: UserProfile
+  stable_hash: ace8f0fa
+- id: 5cf687c2
+  file: C:/py_dev/mkobi/frontend/src/shared/components/Layout/AppLayout.tsx
+  symbol_path:
+    - TrailingSlashRedirect
+  type: component
+  value: TrailingSlashRedirect
+  stable_hash: 5cf687c2
+- id: a750a420
+  file: C:/py_dev/mkobi/frontend/src/shared/components/Layout/AppLayout.tsx
+  symbol_path:
+    - AppLayout
+  type: component
+  value: AppLayout
+  stable_hash: a750a420
+- id: df29c216
+  file: C:/py_dev/mkobi/frontend/src/shared/components/Layout/Header.tsx
+  symbol_path:
+    - Header
+  type: component
+  value: Header
+  stable_hash: df29c216
+- id: e88d88d5
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/charts/ChartRenderer.tsx
+  symbol_path:
+    - ChartRenderer
+  type: component
+  value: ChartRenderer
+  stable_hash: e88d88d5
+- id: 54ea06b6
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/charts/LineChart.tsx
+  symbol_path:
+    - LineChart
+  type: component
+  value: LineChart
+  stable_hash: 54ea06b6
+- id: 8fedc7fc
+  file: >-
+    C:/py_dev/mkobi/frontend/src/features/dashboards/ui/charts/PlotlyChart.test.tsx
+  symbol_path:
+    - MockPlot
+  type: component
+  value: MockPlot
+  stable_hash: 8fedc7fc
+- id: 3c09f53c
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/charts/SkeletonChart.tsx
+  symbol_path:
+    - SkeletonChart
+  type: component
+  value: SkeletonChart
+  stable_hash: 3c09f53c
+- id: 1e6e2b62
+  file: C:/py_dev/mkobi/frontend/src/features/dashboards/ui/charts/TableChart.tsx
+  symbol_path:
+    - TableChart
+  type: component
+  value: TableChart
+  stable_hash: 1e6e2b62

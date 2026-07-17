@@ -1,0 +1,48 @@
+# docker-compose.yml
+services:
+  db:                           # PostgreSQL
+    image: postgres:17          #  любая актуальная
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"             # 5433 на хосте → чтобы не конфликтовать с локальным postgres, если есть
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:                          # Django
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: uv run python src/backend/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app                  # монтируем весь проект
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - UV_LINK_MODE=copy
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=${DEBUG}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - DATABASE_ENGINE=${DATABASE_ENGINE}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USERNAME=${DATABASE_USERNAME}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:

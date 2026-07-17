@@ -1,0 +1,151 @@
+[project]
+name = "mko-bazuna"
+version = "0.1.0"
+authors = [
+    { name = "mko", email = "manicko@yandex.ru" },
+]
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.0.1",
+    "psycopg2-binary>=2.9.11",
+    "python-dotenv>=1.2.1",
+]
+
+
+classifiers = [
+    "Programming Language :: Python",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/manicko/mko_bazuna"
+Repository = "https://github.com/manicko/mko_bazuna"
+Issues = "https://github.com/manicko/mko_bazuna/issues"
+
+[tool.setuptools]
+platforms = ["Linux", "Windows"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mko_bazuna*", "mko_bazuna.src", "mko_bazuna.core"]
+exclude = ["tests/.pytest_cache*"]
+namespaces = false
+
+
+# Black configuration
+[tool.black]
+line-length = 88
+skip-string-normalization = false
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.venv
+  | build
+  | dist
+  | migrations
+  | __pycache__
+)/
+'''
+
+# isort configuration (used by isort hook)
+[tool.isort]
+profile = "black"
+known_first_party = ["mko_bazuna", "settings", "core"]
+combine_as_imports = true
+
+# Ruff top-level global settings
+[tool.ruff]
+line-length = 88
+fix = false   # IMPORTANT: do NOT auto-fix by default
+# global excludes (keeps ruff from checking virtual envs and build artifacts)
+exclude = [
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".mypy_cache",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+# Newer Ruff config: put lint-specific options under [tool.ruff.lint]
+[tool.ruff.lint]
+select = [
+    "E",  # PEP8 errors
+    "F",  # Pyflakes
+    "I",  # import-sorted checks (ruff checks imports)
+    "B",  # bugbear (best practices)
+    "UP", # pyupgrade rules
+]
+# We ignore line length because Black enforces it
+ignore = [
+    "E501",
+    # optionally ignore import-sort warning which is handled by isort:
+    "I001",  # "Import block is un-sorted or un-formatted" if you prefer isort to run
+]
+
+# Specific ruff.isort-related options (only ruff-supported keys)
+# Note: do NOT set profile here (ruff doesn't accept "profile" key)
+[tool.ruff.lint.isort]
+known-first-party = ["mko_bazuna", "settings", "core"]
+combine-as-imports = true
+
+# Ruff formatting section
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+
+# MyPy config (project-level)
+[tool.mypy]
+# If sources live in package root, mypy_path not needed; if you use src/ layout set mypy_path.
+# mypy_path = "./src"
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+python_files = ["tests.py", "test_*.py"]
+addopts = ["--import-mode=importlib","-ra", "-q"]
+console_output_style = "classic"
+# register custom markers to avoid PytestUnknownMarkWarning
+markers = [
+  "slow: marks tests as slow (use -m slow to run)",
+]
+[tool.basedpyright]
+typeCheckingMode = "standard"
+reportMissingTypeStubs = "none"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.39.9",
+    "hypothesis>=6.156.1",
+    "pyright>=1.1.411",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=7.1.0",
+    "radon>=6.0.1",
+    "ruff>=0.15.20",
+]

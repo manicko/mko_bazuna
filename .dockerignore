@@ -1,0 +1,31 @@
+# Локальные виртуальные окружения (uv, venv, poetry и т.д.)
+.venv
+venv
+env
+.env*
+
+# Python кэш и временные файлы
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Локальные данные и медиа (если есть)
+media/
+staticfiles/   # если collectstatic уже делал локально
+
+# IDE / редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи и временные
+*.log
+
+# uv кэш (если есть)
+.uv/

@@ -1,0 +1,74 @@
+# For simple tasks (single function, trivial/small effort, low risk):
+# verification is INLINE — implementor runs tests_to_run and checks
+# acceptance_criteria before marking the task complete.
+# Do NOT create a separate verification task.
+
+id: task_template
+
+title: Add audit logging for user creation
+
+priority: high
+
+depends_on:
+  - task_003
+  - task_007
+
+# ── Plan/Audit report source (REQUIRED when task originates from a plan or audit) ──
+# source_reference: .ai\plans\PLAN_XX.md
+# source_section: TX — Task Title
+# source_file: .kilo/commands/audit/...           # if extracting from existing file
+# source_blocks:                                  # if extracting specific blocks
+#   - "BLOCK N — Block Name"
+
+description: >
+  Add audit logging after successful user creation.
+
+goals:
+  - create audit log record
+  - avoid affecting transaction flow
+  - preserve backward compatibility
+
+# ── Extra context from plan (verbatim, do not summarize) ──
+# Include full checklists, YAML frontmatter, file paths, agent instructions,
+# runtime steps, anti-patterns — everything from the plan's XML <details> block.
+# extra_context:
+#  
+
+files:
+  - path: app/services/user_service.py
+
+    targets:
+      - type: class
+        name: UserService
+
+      - type: method
+        name: create_user
+
+    semantic_anchors:
+
+      insert_after:
+        type: function_call
+        value: validate_email
+
+      insert_before:
+        type: return_statement
+
+changes:
+
+  - action: add_code
+
+    description: >
+      Call audit_service.log_user_created()
+
+    code_hint: |
+      audit_service.log_user_created(
+          user_id=user.id,
+          created_by=admin.id
+      )
+
+acceptance_criteria:
+  - audit log created
+  - no transaction rollback issues
+  - tests pass
+
+
