@@ -31,12 +31,12 @@ These decisions are locked for downstream research and planning.
 - **Result ordering:** Buyer-selectable sort — by date or by price.
 - **Result scope:** Only `published` ads; search covers title and description.
 - **Language and search basis:** Ads are stored in **one base language — Russian**. UI language switch (Russian / Bosnian Latin) translates only the interface chrome; ad text is shown translated on display. Search is Russian-based for now.
-- **City matching:** Exact match to the preset city list by default. Use a ready-made, free, well-established fuzzy-match library **only if** one is trivially available; otherwise keep exact match.
+- **City matching:** Exact match to the preset city list by default. On typo/variant, show a "did you mean" (did-you-mean) suggestion using Python stdlib `difflib.get_close_matches` (no external fuzzy library needed for MVP — see RESEARCH_02_fuzzy_city.md). Adopt RapidFuzz only later if user testing shows typo tolerance is a real friction point.
 - **Zero results:** Friendly "no results" empty state with a suggestion to broaden filters.
 
 ### Deferred to research (search/lang)
-- Cross-language / multilingual search approach used by large classifieds (e.g. AliExpress-style): how to index and query ads stored in a single base language while serving a second UI language. Research before planning multilingual search.
-- Identify a concrete, free, mature fuzzy-match library for city names (if exact match is deemed insufficient later).
+- **Multilingual search of single-base-language ads:** research done — recommended approach is *query translation* (translate Bosnian query → Russian at search time, search Russian-indexed content). See RESEARCH_01_multilingual_search.md. Full multilingual indexing of translated content is a post-MVP enhancement.
+- **Fuzzy city matching:** research done — for ~50-60 Bosnia cities, exact match + stdlib `difflib` "did you mean" is sufficient; RapidFuzz deferred. See RESEARCH_02_fuzzy_city.md.
 
 ---
 
@@ -62,15 +62,22 @@ These decisions are locked for downstream research and planning.
 
 ## Deferred Ideas (out of Phase 1 scope — captured, not acted on)
 
-- **Multilingual search/indexing** of single-base-language ads (see section 3 deferred).
-- **Fuzzy city matching** beyond exact match (gated on a trivially available free library).
+- **Multilingual index of translated content** — query-translation approach chosen for MVP instead (RESEARCH_01); full multilingual indexing is post-MVP.
+- **Fuzzy city matching via external lib** — deferred; MVP uses exact match + stdlib `difflib` did-you-mean (RESEARCH_02).
 - **Resumable drafts** in the bot (currently auto-discarded on idle).
 - **Group/channel monitoring** (decision B) — separate future phase with its own API.
 - **Multi-item ads** (several products in one post) — explicitly out of Phase 1.
 
 ---
 
+## Research Outputs
+
+- `RESEARCH_01_multilingual_search.md` — recommends query-translation (Bosnian query → Russian) over multilingual indexing for MVP.
+- `RESEARCH_02_fuzzy_city.md` — recommends exact match + stdlib `difflib` did-you-mean; RapidFuzz only if needed later.
+
+---
+
 ## Open Questions for Research Phase
 
-1. Which free, mature fuzzy-match library fits city-name matching (if adopted)?
-2. How do large classifieds implement search when content is stored in one base language but served in a second UI language? (drives section 3 multilingual search design)
+1. ~~Which free, mature fuzzy-match library fits city-name matching?~~ → Answered: stdlib `difflib` sufficient; RapidFuzz if needed (RESEARCH_02).
+2. ~~How do large classifieds implement search when content is stored in one base language but served in a second UI language?~~ → Answered: query-translation pattern (RESEARCH_01).

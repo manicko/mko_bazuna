@@ -30,7 +30,7 @@
    All fixed values and settings must use `Enum` or `StrEnum` instead of dicts and lists. Keep them separately in models. 
 
 11. **Pydantic**  
-    All data processing must use Polars. All models and validation — through Pydantic.
+    All models and validation use Pydantic v2 (DTO/validation layer at system boundaries: bot input, settings schemas, future API). Django ORM remains the persistence layer for standard CRUD operations. 
 
 12. **No `print()` Statements**  
     Use proper logging: `logger = logging.getLogger(__name__)`.
