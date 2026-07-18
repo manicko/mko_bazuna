@@ -6,20 +6,24 @@
 *  API: Django Templates + HTMX + Alpine.js MPA for phase 1
 *  Telegram bot (phase 1): aiogram 3.x — Bot API bot for login/contact/publish (needs @bot_username + t.me deep links; free built-in FSM for the US-S2 dialog). Telethon is NOT used in phase 1.
 *  Background jobs: Django management commands + systemd timer / cron (Celery + Redis deferred)
-*  Frontend: Django Templates + HTMX + Alpine.js, Tailwind CSS + daisyUI
-*  Query translation: deep-translator (Bosnian -> Russian at search time)
+*  **Асинхронный бот + синхронный Django ORM (зона C5):** бот запускает `django.setup()` и использует общий ORM. Блокирующие ORM-вызовы и скачивание фото Telegram оборачиваются в `sync_to_async` (thread-sensitivity по умолчанию для ORM). Каждый процесс держит СВОЙ пул psycopg3 (`CONN_MAX_AGE=0`); рекомендуется общий PgBouncer (transaction mode) как внешний пул. Миграции запускаются один раз до старта обоих процессов (см. 03_structure.md).
+*  Query translation: deep-translator (Bosnian -> Russian at search time; твёрдый timeout ~500ms + fallback на оригинальный запрос против GIN `search_vector`, зона C7/D5)
 
 ```
 # Core / Web
 django==5.1.2                    
 
 # Database / Drivers
-psycopg2-binary==2.9.9            
+psycopg[binary]>=3.2.0            # psycopg 3 (Django 5.1+ native support; connection pooling requires psycopg 3). Replaces psycopg2-binary.
 
 # Authentication
 # Login by Telegram: site issues LoginToken (random, TTL 5min), bot sets telegram_id via shared ORM
 # on /start login_<token>. See docs/wiki/01_technical_specification.md decision H / US-S1.
 # django-allauth is intentionally NOT used (no OAuth/social flow in phase 1).
+
+# Environment handling
+django-environ>=0.11.0            # Typed .env casting (env.bool, env.db, env.int) — prevents "False"→True string bugs.
+                                 # python-dotenv becomes a transitive dependency.
 
 # Models / Utils
 django-mptt==0.16.0               # Древовидные категории
@@ -52,7 +56,7 @@ deep-translator>=1.11.0
 
 
 # Frontend / Styling 
-django-tailwind==4.4.2            # Tailwind + daisyUI + standalone CLI 
+django-tailwind==4.4.2            # Tailwind CSS + daisyUI; standalone CLI mode needs NO Node.js (npm mode needs Node only at CSS build time; runtime needs NO Node)
 django-htmx==1.19.0               
 
 
@@ -60,6 +64,10 @@ django-htmx==1.19.0
 django-storages==1.14.4            # storage abstraction: local MEDIA_ROOT (phase 1) -> S3/R2/MinIO later via DEFAULT_FILE_STORAGE
 boto3==1.35.0                     # for later S3/R2 swap (not used in phase 1)
 pillow>=10.4.0                    # image handling (download from Telegram, later thumbnails)                    
+
+# Analytics
+# Web analytics: Plausible (cookieless, EU-hosted SaaS, ~$9/mo for 10k pageviews) — JS snippet only, NO Python dep.
+# Fallback: self-host Plausible CE / Umami via Docker. Product metrics = internal AnalyticsEvent model (see spec decision L).
 
 # Testing / Dev tools
 pytest==8.3.3                     # Тесты
