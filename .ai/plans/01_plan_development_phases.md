@@ -5,6 +5,23 @@
 
 ---
 
+## Foundation. Docker Environment (runs FIRST)
+
+> **Source plan:** `00_detailed_plan_docker_environment.md`. This is cross-cutting infrastructure, NOT a feature phase. It MUST be completed before Phases 1–4 because it is the **sole owner** of the Dockerfile, compose files, nginx config, settings package, and PostgreSQL 17 / Python 3.14 / Django 5.2 LTS stack that every feature phase depends on.
+
+**Deliverables (sole ownership — feature phases must NOT recreate these):**
+- `pyproject.toml` / `uv.lock` reconciled to `docs/wiki/02_packages.md` (Django `>=5.2.16,<6.0`, psycopg3, Python 3.14)
+- `docker/Dockerfile` (python:3.14-slim, non-root, collectstatic), `docker/entrypoint.sh`
+- `docker-compose.yml` (+ `.dev.override`, `.test`, `.prod`), `db`/`web`/`bot`/`nginx`/`migrate`/`scheduler` services
+- `src/backend/config/settings/` package (base/dev/prod/test)
+- `docker/nginx/nginx.conf` (zone R8 media hardening)
+- `.env.example`, Makefile, GitHub Actions CI, PgBouncer opt-in, backup/restore runbook
+- Scheduler service wiring all 7 management commands (`archive_sweep`, `delete_sweep`, `purge_failed_ads`, `purge_rejected_ads`, `consent_hard_delete`, `sweep_drafts`, `cleanup_login_tokens`)
+
+**Sequence rule:** Tasks 0–8 and 10–13 (pure infra) can run independently first; Task 9 (scheduler jobs) requires the Django apps from Phase 1. **Phases 1–4 depend on this Foundation.**
+
+---
+
 ## Phase 1. Minimal Publish-to-Discover Flow
 **Goal:** End-to-end: seller → bot → ad → auto-publish → appears on site.
 
@@ -15,8 +32,7 @@
 - Triggers: `sync_category_name()`, `update_search_vector()` (PostgreSQL)
 - Indexes: `IX_ads_pub_listing`, `IX_ads_search_gin`, `IX_users_erasure_sweep`, `IX_ads_purge_failed`, `IX_ads_rejected_sweep`
 - Telegram bot: aiogram 3.x FSM (category → city → title → description → price → photos → preview), login via `/start login_<token>`
-- Settings: TLS-ready (`SESSION_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`), psycopg[binary]>=3.2.0
-- docker-compose: db, web, bot, nginx; `media_volume` shared
+- **Reuses Foundation infra** (Docker Environment plan, NOT recreated here): settings package (TLS-ready `SESSION_COOKIE_SECURE`/`SECURE_SSL_REDIRECT`), `psycopg[binary]>=3.2.0`, `docker-compose` (db/web/bot/nginx, `media_volume` shared). Phase 1 only contributes feature `INSTALLED_APPS`/urls and the async-safety `CONN_MAX_AGE=0` + `prepare_threshold=None` settings.
 
 **Doc updates:** `docs/wiki/01_technical_specification.md`, `docs/wiki/02_packages.md`, `docs/wiki/03_structure.md`, `docs/wiki/04_db_structure.md`
 
@@ -83,6 +99,10 @@
 
 ## Dependency Graph
 ```
+Docker Environment (Foundation, 00_detailed_plan_docker_environment.md)
+        │  owns Dockerfile / compose / nginx / settings / pyproject / postgres:17 / scheduler
+        │  Phases 1–4 must NOT recreate these (single-owner rule)
+        ↓
 Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
            └─────┬─────┘
                  ↓

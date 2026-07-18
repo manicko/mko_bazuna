@@ -231,8 +231,8 @@
   - `purge_failed_ads` (7 days after `moderation_failed_at`, zone C4) — defined in Phase 2 Task 4
   - `purge_rejected_ads` (90 days after `rejected_at`, zone D4) — defined in Phase 2 Task 5
   - `consent_hard_delete` (30 days after `consent_revoked_at`, zone R1) — defined in Phase 4 Task 2
-  - `sweep_drafts` (30 minutes idle FSM-draft timeout, zone C8/I) — defined in Phase 1 Task 9 (bot) + this scheduler
-  - `cleanup_login_tokens` (expired/consumed tokens, zone C1) — NEW, owned by Phase 1
+  - `sweep_drafts` (30 minutes idle FSM-draft timeout, zone C8/I) — bot idle-timeout logic in Phase 1 Task 9; the sweep *command* is defined in Phase 4 Task 2
+  - `cleanup_login_tokens` (expired/consumed tokens, zone C1) — defined in Phase 4 Task 2
 - Each job is idempotent (can run multiple times safely) and wrapped in a per-job lock.
 - Verification: `docker compose exec scheduler python manage.py archive_sweep --dry-run` shows candidates
 - Verification: Job lock prevents concurrent runs: stop+restart doesn't duplicate work

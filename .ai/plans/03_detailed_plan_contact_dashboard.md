@@ -1,24 +1,48 @@
 # Phase 3 Detailed Plan: Buyer Contact + Seller Dashboard
 
 **Wave:** Core Features
-**Depends_on:** Phase 1 (Tasks 2, 9, 11, 21/22/40), Phase 2 (moderation)
+**Depends_on:** Phase 1 (Tasks 2, 9, 11), Phase 2 (moderation)
 **Files_modified:** `src/backend/apps/users/`, `src/backend/apps/ads/`, `src/telegram_bot/`, `docs/wiki/*.md`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/01_technical_specification.md` (decision C, F/K, J; US-B4/B5, US-S5/S6/S7/S8/S9, US-A4),
-> `docs/wiki/04_db_structure.md` (users flags, status transitions, erasure indexes).
+> **Spec source:** `docs/wiki/01_technical_specification.md` (decision C, F/K, J, O1/R4; US-B4/B5, US-S5/S6/S7/S8/S9, US-A4), `docs/wiki/04_db_structure.md` (users flags, status transitions, IX_users_erasure_sweep, R1 hard delete).
+> **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, zone R2/R3/C2 correctness, sweeps-ownership separation verified in run 3.
 
 ---
 
-## Task 1: Anonymous Contact Bridge (decision C — uses `ad_id`)
+## Coverage Audit (Verified)
+
+| US | Description | Coverage |
+|----|-------------|----------|
+| US-B4 | Ad card view | Task 1 — contact button + ad display |
+| US-B5 | Contact via Telegram deep-link | Task 1 — deep-link generation and handler |
+| US-S5 | Edit w/ immediate hide on text | Task 2 — text edits trigger `ON_MODERATION` + immediate hide; price/photo immediate |
+| US-S6 | Self-delete ad | Task 5 — seller ad deletion |
+| US-S7 | Auto-archive + reactivate | Task 2 — reactivation; auto-archive referenced to Phase 4 |
+| US-S8 | Account deletion + 30-day hard delete | Task 4 — soft-delete + reference to Phase 4 sweep |
+| US-S9 | Publish restriction toggle | Task 3 — `ads_auto_publish` flag |
+| US-A4 | Ban/unban | Task 3 — `is_banned` flag + admin actions |
+
+---
+
+## Task 1: Anonymous Contact Bridge (decision C)
 
 **Goal:** Buyer reaches seller via deep-link without PII exposure.
 
+**Render Conditions (Zone R2 — verbatim from spec):**
+The "Contact" button renders on the site **ONLY** when:
+- `ad.status == PUBLISHED`
+- `seller.telegram_id IS NOT NULL`
+- `NOT seller.is_deleted`
+- `NOT seller.is_banned`
+- `seller.consent_revoked_at IS NULL` (i.e., consent NOT revoked)
+
 **Acceptance Criteria:**
-- Contact deep-link = `t.me/<bot_username>?start=contact_<ad_id>` (uses **`ad_id`**, NOT uuid — per decision C; corrected from prior draft).
-- Button renders on site ONLY when: `ad.status == PUBLISHED` AND `seller.telegram_id IS NOT NULL` AND `NOT seller.is_deleted` AND `NOT seller.is_banned` AND `seller.consent_revoked_at IS NULL`.
+- Contact deep-link = `t.me/<bot_username>?start=contact_<ad_id>` (uses **`ad_id`**, NOT uuid — per decision C).
 - Bot handler `/start contact_<ad_id>`: finds ad → seller via `telegram_id`; forwards buyer→seller anonymously; NEVER reveals seller PII (`telegram_id`/`username`).
-- Bot messages: ad missing/not PUBLISHED → "объявление больше недоступно"; seller unavailable (deleted/banned/revoked) → "продавец больше недоступен для связи".
+- Bot messages:
+  - ad missing/not PUBLISHED → "объявление больше недоступно";
+  - seller unavailable (deleted/banned/revoked consent) → "продавец больше недоступен для связи".
 - `AnalyticsEvent(CONTACT_INITIATED)` recorded (no login required).
 
 **Artifacts:** `apps/core/services/contact.py`, `telegram_bot/handlers/contact.py`, dashboard template button logic.
@@ -34,11 +58,11 @@
 **Acceptance Criteria:**
 - `/dashboard/` lists seller's ads grouped by status (PUBLISHED, ON_MODERATION, ARCHIVED, REJECTED, ON_MODERATION_FAILED).
 - Edit flow:
-  - Price/photo edits → save immediately, status stays `PUBLISHED`, `updated_at` set, public within ≤5s (decision J).
-  - Title/description edits → `PUBLISHED → ON_MODERATION`, ad **immediately hidden** from public site (zone C2).
-  - Mixed edits follow the text rule (re-moderation).
-- Reactivate (ARCHIVED → PUBLISHED): re-checks text, immediately hidden until pass (decision J).
-- `published_at` updated on every transition into PUBLISHED (resets 2/4-month timers, zone C3).
+  - **Text edits (title/description):** `PUBLISHED → ON_MODERATION`, ad **immediately hidden** from public site (zone C2); `published_at` NOT reset.
+  - **Price/photo edits:** save immediately, status stays `PUBLISHED`, `updated_at` set, public within ≤5s; `published_at` NOT reset.
+  - **Mixed edits follow text rule** (re-moderation).
+- Reactivate (ARCHIVED → PUBLISHED): text re-checked via auto-moderation, immediately hidden until pass (decision J).
+- `published_at` updated ONLY on: initial publish, reactivate, or price/photo-only edits (zone C3 — timer reset).
 - Unauthorized edit (wrong seller) → 403.
 
 **Artifacts:** `apps/ads/views/dashboard.py`, `apps/ads/views/edit.py`, templates.
@@ -52,27 +76,39 @@
 **Goal:** Distinguish ban vs delete vs publish-restriction (US-S9, US-A4).
 
 **Acceptance Criteria:**
-- `is_banned=True` (admin, US-A4): blocks login/publish; PII kept; admin can unban. Applies to both bot (reject new ads) and web.
-- `is_deleted=True` + `consent_revoked_at` set: triggers 30-day hard delete (Task 4).
-- `ads_auto_publish=False` (US-S9): bot rejects NEW ads; existing ads NOT deleted, hidden from public while flag active; reversible; independent of ban/delete.
-- Clear UI messaging per state; bot permission check uses all three flags.
+- `is_banned=True` (admin, US-A4): blocks login/publish; PII (`telegram_id`/`username`) retained; admin can unban via `/admin/users/`. Bot handler rejects new ads with "account suspended" message.
+- `is_deleted=True` + `consent_revoked_at` set (withdrawal, decision F): triggers immediate soft-delete cascade + 30-day hard delete (Phase 4 `consent_hard_delete`). `telegram_id`/`username` nulled immediately (breaks chat linkage).
+- `ads_auto_publish=False` (US-S9, reversible): bot rejects NEW ads with "publishing disabled" message; **existing ads hidden from public while flag active**; NOT linked to ban or deletion.
+- Dashboard shows clear state badges per account status.
+- Bot permission check middleware uses all three flags on every incoming message.
 
-**Artifacts:** `apps/users/services/account_state.py`, bot permission middleware, dashboard UI.
+**Artifacts:** `apps/users/services/account_state.py`, bot permission middleware, dashboard UI state display.
 **Dependencies:** Phase 1 Task 2
 **Risks:** State conflation (ban vs delete vs restriction); legal compliance (GDPR-equivalent).
 
 ---
 
-## Task 4: Consent Revocation + 30-Day Hard Delete (decision F/K, R1)
+## Task 4: Consent Revocation + Soft Delete (decision F/K, R1)
 
-**Goal:** Proper erasure flow (US-S8).
+**Goal:** Proper erasure flow (US-S8) — Phase 3 implements consent state + immediate soft-delete; hard-delete is Phase 4.
+
+**Two Consent States (Zone R3 — verbatim from spec):**
+- **Decline (browse-only, decision K):** "Decline" button blocks only seller actions; `consent_revoked_at` NOT set; `is_deleted` NOT set; NO deletion; contact button continues to work.
+- **Withdraw/Delete (decision F):** triggers immediate actions:
+  - `consent_revoked_at = now()`
+  - `is_deleted = True`, `deleted_at = now()`
+  - `telegram_id` / `username` NULLed IMMEDIATELY (breaks chat linkage, per decision F / zone R1)
+  - all user ads + images soft-deleted (status=DELETED, hidden immediately)
+
+**Phase 4 Handoff (Zone R1):**
+- `consent_hard_delete` job (Phase 4): 30 days after `consent_revoked_at` → DELETE user ads+images, SET NULL `analytics_events.user_id` + `ModeratorActionLog.user_id` (reason/admin/timestamp preserved). Idempotent via `IX_users_erasure_sweep`.
 
 **Acceptance Criteria:**
-- **Decline (browse-only, decision K):** only blocks seller actions; `consent_revoked_at` NOT set; NO deletion; contact button still works.
-- **Withdraw/Delete account (decision F):** sets `consent_revoked_at=now()`, `is_deleted=True`, `deleted_at=now()` immediately; all user ads + images soft-deleted; `telegram_id`/`username` NULLed immediately (break chat linkage).
-- `consent_hard_delete` job (Phase 4): 30 days after `consent_revoked_at` → NULL `telegram_id`/`username` (already nulled), DELETE ads+images, SET NULL `analytics_events.user_id` + `ModeratorActionLog.user_id` (reason/admin/timestamp preserved, zone R1). Idempotent via `IX_users_erasure_sweep`.
+- Decline: only blocks seller actions, no `consent_revoked_at`, no deletion.
+- Withdraw: sets `consent_revoked_at` + `is_deleted`, immediately nulls PII, soft-deletes ads.
+- **Phase 3 does NOT implement the 30-day sweep** — deferred to Phase 4.
 
-**Artifacts:** `apps/users/services/deletion.py`, dashboard button, Phase 4 job.
+**Artifacts:** `apps/users/services/deletion.py`, dashboard button, UI for consent banner.
 **Dependencies:** Phase 1 Task 4
 **Risks:** Race with sweep; audit retention after PII gone.
 
@@ -116,8 +152,56 @@
 
 **Acceptance Criteria:**
 - `docs/wiki/01`: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses `ad_id`; decision F/K two consent states.
-- `docs/wiki/04`: account states + erasure clarified.
+- `docs/wiki/04`: account states + erasure clarified (soft-delete in Phase 3, hard-delete in Phase 4).
 
-**Artifacts:** Updated wiki files (English-only).
+**Artifacts:** Updated wiki files (English-only per rule 1).
 **Dependencies:** Tasks 1-6
 **Risks:** Doc drift.
+
+---
+
+## Version Exactness (vs docs/wiki/02_packages.md)
+
+| Package | Phase 3 Status | Notes |
+|---------|---------------|-------|
+| django | `>=5.2.16,<6.0` | Per 02_packages.md |
+| psycopg[binary] | `>=3.2.0` | Per 02_packages.md |
+| aiogram | `>=3.15.0` | Bot handlers; no PG FSM storage |
+| deep-translator | `>=1.11.0` | Query translation; timeout+fallback required |
+| django-mptt | `>=0.18.0` | Categories tree |
+| celery | DEFERRED | Phase 4 sweep; Phase 3 uses mgmt commands + cron |
+| redis | DEFERRED | Not used until Phase 4 |
+| django-storages / boto3 | DEFERRED | Phase 1 uses built-in FileSystemStorage |
+
+## Rule Compliance Checklist
+
+| Rule | Status | Evidence |
+|------|--------|----------|
+| 10 (StrEnum for ALL constants) | OK | `AdStatus`, `AnalyticsEventType` reused; no inline literals |
+| 13 (Migrations) | OK | User/ad changes via migrations |
+| 15 (Small modules/functions) | OK | Per-concern split: `apps/users/services/`, `apps/ads/views/` |
+| 1 (English-only) | OK | All code/docs English |
+| 11 (Pydantic v2 at boundaries) | OK | Bot input DTOs (Phase 1); form DTOs for dashboard edits |
+| 12 (Logging not print) | OK | `logger = logging.getLogger(__name__)` everywhere |
+
+## Sweeps NOT in Phase 3 (Zone R1 handoff to Phase 4)
+
+Phase 3 references but does NOT implement:
+- `archive_sweep` (Phase 4)
+- `delete_sweep` (Phase 4)
+- `consent_hard_delete` (Phase 4)
+- `purge_failed_ads` (Phase 2)
+- `purge_rejected_ads` (Phase 2)
+- `sweep_drafts` (Phase 4)
+- `cleanup_login_tokens` (Phase 4)
+
+Phase 3 implements only the trigger conditions (`consent_revoked_at`, `is_deleted`, `ads_auto_publish`) that Phase 4 sweeps consume.
+
+## Cross-Plan Consistency Check
+
+| Item | Phase 3 | Phase 4 | Consistent? |
+|------|---------|---------|-------------|
+| Contact deep-link | uses `ad_id` | N/A | OK |
+| `consent_hard_delete` | referenced only | implemented | OK |
+| AnalyticsEvent | referenced (Task 1) | implemented (Phase 4 T1) | OK |
+| Lifecycle timers | reactivation logic | archive/delete sweeps | OK |
