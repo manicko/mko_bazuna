@@ -1,6 +1,6 @@
 ## Принципы
 - Одна таблица объявлений
-- Дерево категорий (django-mptt — единственный источник истины, без денормализованных path/level)
+- Дерево категорий (django-mptt>=0.18.0 — единственный источник истины, без денормализованных path/level)
 - Атрибуты зависят от категории — DEFERRED (EAV вне scope фазы 1, плоские поля объявления)
 - Теги — DEFERRED (нет источника генерации в фазе 1)
 - Поиск — нативный PostgreSQL FTS (search_vector TSVECTOR + GIN + pg_trgm, russian config)
@@ -123,7 +123,7 @@ categories
 ├── parent_id (FK → categories.id, NULL)
 └── is_active (BOOL)
 ```
-Реализация — **django-mptt** (единственный источник истины: `lft`/`rght`/`tree_id`/`level`).
+Реализация — **django-mptt>=0.18.0** (единственный источник истины: `lft`/`rght`/`tree_id`/`level`).
 Денормализованные `path` / `level` колонки НЕ храним (риск рассинхрона, решение — mptt).
 Фильтрация по поддереву — через `get_descendants()`. Имя для UI берётся `get_name(locale)` с русским fallback (боснийский — только в UI-оболочке). Русское `name` денормализуется в `ads.category_name` и индексируется в `search_vector` (зона D1, hybrid C) — поиск по слову-категории работает.
 
@@ -152,7 +152,9 @@ cities
 ### ad_images
 ├── id (PK)
 ├── ad_id (FK → ads.id)
-├── image (VARCHAR / storage key)   # отдаваемый URL фото (наш storage: MEDIA_ROOT или S3/R2 через django-storages). Ключ НЕ содержит user_id/telegram_id/username — только ad_id + UUID v4 (зона R6: анонимность по URL)
+├── image (VARCHAR / storage key)   # отдаваемый URL фото (наш storage). Фаза 1: локальный MEDIA_ROOT через
+                                  #   встроенный Django FileSystemStorage (django-storages ОТЛОЖЕН до S3/R2-свопа, см. 02_packages.md — YAGNI).
+                                  #   Ключ НЕ содержит user_id/telegram_id/username — только ad_id + UUID v4 (зона R6: анонимность по URL)
 ├── telegram_file_id (VARCHAR, nullable)  # метаданные для дедупа/повторной выкачки, НЕ используется в <img src>
 └── position (INT)
 ```

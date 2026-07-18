@@ -19,7 +19,7 @@ mko_bazuna/                        # корень репозитория
 │   │   │   │
 │   │   │   ├── users/             # пользователи, OTP-авторизация (telegram_id), telegram-binding
 │   │   │   ├── ads/               # объявления, фото, статусы
-│   │   │   ├── categories/        # mptt-дерево категорий (django-mptt — единственный источник истины; без отдельных path/level колонок)
+│   │   │   ├── categories/        # mptt-дерево категорий (django-mptt>=0.18.0 — единственный источник истины; без отдельных path/level колонок)
 │   │   │   ├── locations/         # города / регионы
 │   │   │   ├── moderation/        # логи модерации, правила, статусы
 │   │   │   ├── search/            # PostgreSQL FTS (search_vector, GIN, russian config) — haystack/whoosh НЕ используется
@@ -35,6 +35,8 @@ mko_bazuna/                        # корень репозитория
 │       │                         #   НЕ userbot. Telethon мог бы вести бота (bot-token login, deep-link работают), но у
 │       │                         #   Telethon НЕТ встроенного FSM — диалог US-S2 пришлось бы писать вручную. По правилу
 │       │                         #   владельца (если бот в Telethon сложнее -> aiogram) выбран aiogram.
+│       │                         #   NOTE: aiogram has NO built-in PostgreSQL FSM storage (built-in: Memory/Redis/Mongo).
+│       │                         #   Диалог US-S2 хранится как черновик Ad(DRAFT) в общем Django ORM (см. 02_packages.md, зона C5).
 │       │   ├── handlers/
 │       │   ├── states/
 │       │   ├── filters/
@@ -61,10 +63,11 @@ mko_bazuna/                        # корень репозитория
 │   ├── js/
 │   └── img/
 │
-├── media/                         # Phase 1 storage: локальный MEDIA_ROOT (Docker volume `media_volume`) за nginx, завёрнут в django-storages
-                                  #   (абстракция DEFAULT_FILE_STORAGE) для последующего переключения на S3/R2/MinIO без переписывания кода.
-                                  #   Бот скачивает фото из Telegram и кладёт сюда; отдаём через свой <img src>. НЕ Telegram CDN
-                                  #   (file_id/URL не помещаются в <img src> и содержат токен бота). nginx отдаёт /media/ напрямую (whitenoise — только /static/).
+├── media/                         # Phase 1 storage: локальный MEDIA_ROOT (Docker volume `media_volume`) за nginx.
+                                  #   Фаза 1 использует встроенный Django FileSystemStorage через STORAGES (django-storages
+                                  #   ОТЛОЖЕН до S3/R2-свопа, см. 02_packages.md — YAGNI). Бот скачивает фото из Telegram и
+                                  #   кладёт сюда; отдаём через свой <img src>. НЕ Telegram CDN (file_id/URL не помещаются в
+                                  #   <img src> и содержат токен бота). nginx отдаёт /media/ напрямую (whitenoise — только /static/).
 ├── tests/                         # pytest, разделён по apps
 ├── docs/
 ├── docker/                        # docker/Dockerfile (python:3.14-slim + uv; non-root USER, RUN collectstatic)
@@ -102,5 +105,7 @@ volumes: postgres_data, media_volume, static_volume
   - `Content-Disposition: inline`;
   - ключи медиа — UUID v4 (неугадываемые, см. 04_db_structure.md `ad_images`).
 - **PgBouncer (рекомендуется, зона C5):** общий внешний пул в transaction mode между web+bot и Postgres; каждый процесс держит `CONN_MAX_AGE=0`.
-- **Миграции (зона C5/D7):** запускаются ровно один раз ДО старта web и bot (dedicated step / ordering guard в entrypoint), чтобы два процесса не мигрировали конкурентно. aiogram FSM-таблицы (SQLStorage) — отдельный владелец миграций; доменные записи (ads/LoginToken) пишутся в ОДНУ Django-транзакцию, FSM очищается после успеха (без 2PC).
+  При использовании psycopg3 + PgBouncer transaction mode задайте `OPTIONS={"prepare_threshold": None}`, чтобы
+  избежать конфликта server-side prepared statements с пулером.
+- **Миграции (зона C5/D7):** запускаются ровно один раз ДО старта web и bot (dedicated step / ordering guard в entrypoint), чтобы два процесса не мигрировали конкурентно. Доменные записи (ads/LoginToken) пишутся в ОДНУ Django-транзакцию. **aiogram has NO built-in PostgreSQL FSM storage** (built-in backends: Memory/Redis/Mongo), поэтому пошаговый диалог US-S2 хранится как черновик `Ad` со статусом `DRAFT` в той же БД через общий Django ORM (см. 02_packages.md, зона C5) — никаких отдельных FSM-таблиц и отдельного владельца миграций. "Очистка FSM" = перевод `DRAFT → ON_MODERATION` в одной транзакции.
 - **Секреты**: `.env` (BOT_TOKEN, DB, SECRET_KEY) через `env_file: .env`; позже — Docker secrets при оркестрации. `API_ID`/`API_HASH` (MTProto/userbot) в фазе 1 НЕ нужны и из `.env` УДАЛЕНЫ (только aiogram Bot API, см. 02_packages.md, зона R7).
