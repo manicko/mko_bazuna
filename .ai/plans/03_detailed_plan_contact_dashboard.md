@@ -2,10 +2,10 @@
 
 **Wave:** Core Features
 **Depends_on:** Phase 1 (Tasks 2, 9, 11), Phase 2 (moderation)
-**Files_modified:** `src/backend/apps/users/`, `src/backend/apps/ads/`, `src/telegram_bot/`, `docs/wiki/*.md`
+**Files_modified:** `src/backend/apps/users/`, `src/backend/apps/ads/`, `src/telegram_bot/`, `docs/01-spec/`, `docs/02-database/`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/technical-specification.md` (decision C, F/K, J, O1/R4; US-B4/B5, US-S5/S6/S7/S8/S9, US-A4), `docs/wiki/db-structure.md` (users flags, status transitions, IX_users_erasure_sweep, R1 hard delete).
+> **Spec source:** `docs/01-spec/technical-specification.md` (decision C, F/K, J, O1/R4; US-B4/B5, US-S5/S6/S7/S8/S9, US-A4), `docs/02-database/db-schema.md` (users flags, status transitions, IX_users_erasure_sweep, R1 hard delete).
 > **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, zone R2/R3/C2 correctness, sweeps-ownership separation verified in run 3.
 
 ---
@@ -151,8 +151,8 @@ The "Contact" button renders on the site **ONLY** when:
 **Goal:** Contact + dashboard spec sync.
 
 **Acceptance Criteria:**
-- `docs/wiki/technical-specification.md`: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses `ad_id`; decision F/K two consent states.
-- `docs/wiki/db-structure.md`: account states + erasure clarified (soft-delete in Phase 3, hard-delete in Phase 4).
+- `docs/01-spec/technical-specification.md`: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses `ad_id`; decision F/K two consent states.
+- `docs/02-database/db-schema.md`: account states + erasure clarified (soft-delete in Phase 3, hard-delete in Phase 4).
 
 **Artifacts:** Updated wiki files (English-only per rule 1).
 **Dependencies:** Tasks 1-6
@@ -160,12 +160,12 @@ The "Contact" button renders on the site **ONLY** when:
 
 ---
 
-## Version Exactness (vs docs/wiki/packages.md)
+## Version Exactness (vs `docs/03-packages/packages-list.md`)
 
 | Package | Phase 3 Status | Notes |
 |---------|---------------|-------|
-| django | `>=5.2.16,<6.0` | Per docs/wiki/packages.md |
-| psycopg[binary] | `>=3.2.0` | Per docs/wiki/packages.md |
+| django | `>=5.2.16,<6.0` | Per docs/03-packages/packages-list.md |
+| psycopg[binary] | `>=3.2.0` | Per docs/03-packages/packages-list.md |
 | aiogram | `>=3.15.0` | Bot handlers; no PG FSM storage |
 | deep-translator | `>=1.11.0` | Query translation; timeout+fallback required |
 | django-mptt | `>=0.18.0` | Categories tree |

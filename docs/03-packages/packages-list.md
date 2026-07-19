@@ -1,6 +1,6 @@
 ---
-id: packages
-domain: spec
+id: packages-list
+domain: packages
 tags:
   - stack
   - dependencies
@@ -8,7 +8,8 @@ tags:
 related:
   - technical-specification
   - architecture-structure
-  - db-structure
+  - db-schema
+  - dependency-collisions
 ---
 
 ## Purpose
@@ -29,13 +30,9 @@ django-mptt is not yet validated against Django 6.0.
 - Search: PostgreSQL native FTS (`search_vector` TSVECTOR + GIN + pg_trgm, russian config)
 - UI: Django Templates + HTMX + Alpine.js MPA (phase 1)
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
-- Background jobs: Django management commands + systemd timer / cron (Celery + Redis deferred)
-- **Async bot + sync Django ORM (zone C5):** bot runs `django.setup()` and shares the ORM.
-  Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds
-  its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
-  Migrations run exactly once before both processes start.
-- Query translation: deep-translator (Bosnian → Russian at search time; hard timeout ~500ms +
-  fallback to original query).
+- Background jobs: Django management commands + systemd timer / cron (Celery deferred)
+- **Async bot + sync Django ORM:** bot runs `django.setup()` and shares the ORM. Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
+- Query translation: deep-translator (Bosnian → Russian at search time; hard timeout ~500ms + fallback to original query).
 
 ## Package List (pyproject.toml)
 
@@ -50,7 +47,7 @@ django-tailwind>=4.4.0            # Tailwind standalone CLI (NO Node.js). daisyU
 django-htmx>=1.19.0               # HTMX for the MPA.
 pillow>=10.4.0                    # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1.
 aiogram>=3.15.0                   # Bot API bot (login/contact/publish). NO built-in PG FSM storage — draft Ad stored via ORM.
-deep-translator>=1.11.0           # Bosnian→Russian query translation. Fragile backend → hard timeout + fallback required.
+deep-translator>=1.11.0           # Bosnian→Russian query translation. Fragile backend → hard timeout + fallback wrapper.
 # Search: native PostgreSQL FTS only (no haystack/Whoosh).
 # API (DRF): DEFERRED to post-MVP.
 # Tasks (celery/redis): DEFERRED to post-MVP (management commands + cron instead).
@@ -71,13 +68,12 @@ whitenoise>=6.12.0                # /static/ only (NOT media). Add if used in pr
 
 Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 5.2 + Python 3.14 + psycopg3.
 
-- **PostgreSQL 17 → 18:** PG 18.4 GA/stable. FTS stack (TSVECTOR + GIN + pg_trgm + plpgsql triggers + `to_tsvector('russian')`) fully compatible. ACTION: bump `postgres:17` → `postgres:18` (reindex GIN + pg_trgm after upgrade).
+- **PostgreSQL 18:** FTS stack (TSVECTOR + GIN + pg_trgm + plpgsql triggers + `to_tsvector('russian')`) fully compatible.
 - **uv:** pin `uv>=0.11.28` in Dockerfile.
-- **gunicorn:** pin `gunicorn>=26.0`, add to `[project].dependencies` (sync WSGI).
-- **whitenoise:** add `whitenoise>=6.12.0` if used for `/static/` (media still needs nginx).
-- **PgBouncer:** pin `pgbouncer>=1.25.2` (avoids SCRAM regression in 1.25.1 w/ PG18). Keep `prepare_threshold=None`.
-- **nginx:** `nginx:alpine` tracks 1.30.x (1.28.x EOL).
-- **Deferred (phase 2 / swap):** django-storages, boto3, celery, redis-py, telethon — keep deferred per YAGNI.
+- **gunicorn:** pin `gunicorn>=26.0`.
+- **whitenoise:** add if used for `/static/` (media still needs nginx).
+- **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None`.
+- **nginx:** `nginx:alpine` tracks 1.30.x.
 
 ## Key Compatibility Decisions
 

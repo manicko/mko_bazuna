@@ -12,7 +12,7 @@ source_reference: .ai/plans/02_detailed_plan_moderation.md
 source_section: Task 1 — ModerationCriteria Singleton (exact fields)
 
 description: >
-  Admin-editable thresholds matching docs/wiki/db-structure.md exactly. Singleton enforced via
+  Admin-editable thresholds matching docs/02-database/db-schema.md exactly. Singleton enforced via
   migration RunPython. Cached in Django cache (5-min TTL) key moderation_criteria:v1.
 
 goals:

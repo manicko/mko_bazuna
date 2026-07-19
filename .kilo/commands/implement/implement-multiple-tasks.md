@@ -54,7 +54,7 @@ For each task file in `{TASKS_FILES_TO_IMPLEMENT}` one at a time:
 
 ## What To Do
 1. Read the task file {TASK_FILE_ABS_PATH}. Understand scope, affected files, acceptance criteria.
-2. Read `docs/99-reference/ast-editor.md` for proper tools usage. Always use replace_function  to avoid indentation errors.
+2. Read `docs/98-reference/ast-editor.md` for proper tools usage. Always use replace_function  to avoid indentation errors.
 2. Validate preconditions: semantic targets exist, depends_on tasks are done.
   If already implemented: rename to *_DONE.yaml, move to done/, return IMPLEMENTATION_COMPLETE.
 3. Implement: edit only required files.  

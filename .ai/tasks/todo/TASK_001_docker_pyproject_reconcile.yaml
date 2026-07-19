@@ -11,7 +11,7 @@ source_section: Task 0 — pyproject.toml Reconciliation + psycopg3/Django 5.2 V
 
 description: >
   Fix critical version contradictions in pyproject.toml to enable a buildable Docker
-  environment. Align the manifest with the canonical dependency set in docs/wiki/packages.md.
+  environment. Align the manifest with the canonical dependency set in docs/03-packages/packages-list.md.
 
 goals:
   - 'requires-python = ">=3.14,<3.15" (mirrors aiogram ceiling)'

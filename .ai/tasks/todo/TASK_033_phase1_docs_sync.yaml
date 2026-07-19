@@ -25,28 +25,28 @@ description: >
   Reconcile wiki with implemented decisions (English-only per doc-maintenance-rules).
 
 goals:
-  - `docs/wiki/technical-specification.md`: decisions H,C,F,G,I,J; US-S1/S2, US-B1/B2/B3/B6/B7, US-A1/A2/A3/A7/A10/A11
-  - `docs/wiki/packages.md`: canonical stack confirmed
-  - `docs/wiki/architecture-structure.md`: deployment section complete
-  - `docs/wiki/db-structure.md`: schema confirmed against implementation
+  - `docs/01-spec/technical-specification.md`: decisions H,C,F,G,I,J; US-S1/S2, US-B1/B2/B3/B6/B7, US-A1/A2/A3/A7/A10/A11
+  - `docs/03-packages/packages-list.md`: canonical stack confirmed
+  - `docs/01-spec/architecture-structure.md`: deployment section complete
+  - `docs/02-database/db-schema.md`: schema confirmed against implementation
 
 files:
-  - path: docs/wiki/technical-specification.md
-  targets:
+  - path: docs/01-spec/technical-specification.md
+    targets:
   - type: file
-  name: docs/wiki/technical-specification.md
-  - path: docs/wiki/packages.md
-  targets:
+    name: docs/01-spec/technical-specification.md
+  - path: docs/03-packages/packages-list.md
+    targets:
   - type: file
-  name: docs/wiki/packages.md
-  - path: docs/wiki/architecture-structure.md
-  targets:
+    name: docs/03-packages/packages-list.md
+  - path: docs/01-spec/architecture-structure.md
+    targets:
   - type: file
-  name: docs/wiki/architecture-structure.md
-  - path: docs/wiki/db-structure.md
-  targets:
+    name: docs/01-spec/architecture-structure.md
+  - path: docs/02-database/db-schema.md
+    targets:
   - type: file
-  name: docs/wiki/db-structure.md
+    name: docs/02-database/db-schema.md
 
 changes:
   - action: edit_content

@@ -2,10 +2,10 @@
 
 **Wave:** Infrastructure
 **Depends_on:** Phases 1-3
-**Files_modified:** `src/backend/apps/analytics/`, `src/backend/apps/core/management/commands/`, `docker/nginx/nginx.conf`, `.github/workflows/ci.yml`, `docs/wiki/*.md`
+Files_modified: `src/backend/apps/analytics/`, `src/backend/apps/core/management/commands/`, `docker/nginx/nginx.conf`, `.github/workflows/ci.yml`, `docs/01-spec/`, `docs/02-database/`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/technical-specification.md` (decision L, J; US-A5, US-A9), `docs/wiki/packages.md` (Plausible = JS snippet NO python dep; celery/redis/django-storages DEFERRED), `docs/wiki/architecture-structure.md` (zone R8 nginx, systemd/cron), `docs/wiki/db-structure.md` (analytics_events, lifecycle indexes, IX_users_erasure_sweep).
+> **Spec source:** `docs/01-spec/technical-specification.md` (decision L, J; US-A5, US-A9), `docs/03-packages/packages-list.md` (Plausible = JS snippet NO python dep; celery/redis/django-storages DEFERRED), `docs/01-spec/architecture-structure.md` (zone R8 nginx, systemd/cron), `docs/02-database/db-schema.md` (analytics_events, lifecycle indexes, IX_users_erasure_sweep).
 > **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, command-name contract with Docker plan, advisory-lock spec, zone R8 headers verified in run 3.
 
 ---
@@ -158,9 +158,9 @@
 **Goal:** Final wiki + deployment docs.
 
 **Acceptance Criteria:**
-- `docs/wiki/technical-specification.md`: Decision L (Plausible + AnalyticsEvent) finalized; Decision J (lifecycle timers) confirmed.
-- `docs/wiki/architecture-structure.md`: Deployment section complete (systemd/cron examples, nginx hardening).
-- `docs/wiki/db-structure.md`: Lifecycle indexes verified; `IX_users_erasure_sweep` documented.
+- `docs/01-spec/technical-specification.md`: Decision L (Plausible + AnalyticsEvent) finalized; Decision J (lifecycle timers) confirmed.
+- `docs/01-spec/architecture-structure.md`: Deployment section complete (systemd/cron examples, nginx hardening).
+- `docs/02-database/db-schema.md`: Lifecycle indexes verified; `IX_users_erasure_sweep` documented.
 - All docs English-only with proper frontmatter (doc-maintenance-rules).
 
 **Artifacts:** Updated wiki files.
@@ -207,7 +207,7 @@ Lock IDs per command (must NOT collide — allocated by the Docker plan):
 - `sweep_drafts`: 4
 - `cleanup_login_tokens`: 5
 
-## Version Exactness (vs docs/wiki/packages.md)
+## Version Exactness (vs `docs/03-packages/packages-list.md`)
 
 - `django>=5.2.16,<6.0` — Django 5.2 LTS
 - `psycopg[binary]>=3.2.0` — psycopg3 only (no psycopg2-binary)

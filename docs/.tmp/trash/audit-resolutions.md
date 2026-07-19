@@ -1,6 +1,7 @@
 ---
 id: audit-resolutions
 domain: spec
+domain-order: 5
 tags:
   - audit
   - decisions
@@ -9,13 +10,23 @@ related:
   - technical-specification
   - db-structure
   - architecture-structure
+status: deprecated-archived
+note: >
+  ARCHIVED to docs/.tmp/trash on 2026-07-19. This file was the OLD single-source for owner
+  decisions O1-O5 and the zone-resolution summary. It is NO LONGER a source of truth.
+  Owner decisions O1-O5 now live ONLY in ../05-owner-decisions/index.md.
+  Zone resolutions now live inline in technical-specification.md, db-schema.md, db-indexes.md,
+  and architecture-structure.md. Do not link to this file from active docs.
 ---
 
 ## Purpose
 
 Consolidated outcome of the MVP architecture audit (zones C1–C8, R1–R9, D1–D12). Each zone passed
 3× research + validation. All decisions are mirrored inline in the spec/DB docs by zone ID. This file
-is the single source for **owner decisions O1–O5** and the zone-resolution summary.
+was the single source for **owner decisions O1–O5** and the zone-resolution summary.
+
+> DEPRECATED: See `../05-owner-decisions/index.md` for owner decisions and the domain docs for
+> zone resolutions. This copy is retained only as an archive.
 
 ## Owner Decisions (O1–O5)
 
@@ -25,7 +36,7 @@ is the single source for **owner decisions O1–O5** and the zone-resolution sum
 | **O2** (R3) | "Decline" vs "Delete" banner | DIFFERENT states. Decline blocks login, does NOT erase, does NOT hide contact. Delete/withdraw — `consent_revoked_at` + full erasure. |
 | **O3** (R1) | Erasure completeness | Full erasure: after 30d — DELETE ads (+`ad_images`), NULL `telegram_id`+`username`, SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`. |
 | **O4** (D3/D4) | Moderation criteria | 2 layers: auto (text/lengths/fields/duplicates in `moderation_criteria`) + manual admin (photos/content, future ML). No versioning. `min_text_length` removed. |
-| **O5** (D1/D2) | Category search | REQUIRED (hybrid C): `ads.category_name` + `search_vector` (weight 'C') + fuzzy `category_id` detect. |
+| **O5** (D1/D2) | Category search | REQUIRED (hybrid D1): `ads.category_name` + `search_vector` (weight 'C') + fuzzy `category_id` detect. |
 
 ## Zone Resolution Summary
 
@@ -39,7 +50,7 @@ is the single source for **owner decisions O1–O5** and the zone-resolution sum
 | **R2 / R3** | Contact only when PUBLISHED + telegram_id NOT NULL + not deleted/banned/withdrawn. Decline≠Withdrawal. |
 | **R4** | Three states (O1). |
 | **R5** | `analytics_events.user_id` SET NULL on erasure. |
-| **R6 / R8** | `ad_images.image` ad-scoped + UUID v4. JPEG validation. nginx nosniff/whitelist/inline. |
+| **R6 / R8** | `ad_images.image` ad-scoped + UUID v4. JPEG validated. nginx nosniff/whitelist/inline. |
 | **R7** | `API_ID`/`API_HASH` removed from `.env`. |
 | **R9** | BANNED keeps telegram_id; DELETED post-30d reuses row. |
 | **D1 / D2** | O5. `name_i18n` JSONB ru/bs, `get_name(locale)`. |

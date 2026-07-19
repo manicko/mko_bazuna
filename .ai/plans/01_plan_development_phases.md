@@ -10,7 +10,7 @@
 > **Source plan:** `00_detailed_plan_docker_environment.md`. This is cross-cutting infrastructure, NOT a feature phase. It MUST be completed before Phases 1–4 because it is the **sole owner** of the Dockerfile, compose files, nginx config, settings package, and PostgreSQL 18 / Python 3.14 / Django 5.2 LTS stack that every feature phase depends on.
 
 **Deliverables (sole ownership — feature phases must NOT recreate these):**
-- `pyproject.toml` / `uv.lock` reconciled to `docs/wiki/packages.md` (Django `>=5.2.16,<6.0`, psycopg3, Python 3.14)
+- `pyproject.toml` / `uv.lock` reconciled to `docs/03-packages/packages-list.md` (Django `>=5.2.16,<6.0`, psycopg3, Python 3.14)
 - `docker/Dockerfile` (python:3.14-slim, non-root, collectstatic), `docker/entrypoint.sh`
 - `docker-compose.yml` (+ `.dev.override`, `.test`, `.prod`), `db`/`web`/`bot`/`nginx`/`migrate`/`scheduler` services
 - `src/backend/config/settings/` package (base/dev/prod/test)
@@ -34,7 +34,7 @@
 - Telegram bot: aiogram 3.x FSM (category → city → title → description → price → photos → preview), login via `/start login_<token>`
 - **Reuses Foundation infra** (Docker Environment plan, NOT recreated here): settings package (TLS-ready `SESSION_COOKIE_SECURE`/`SECURE_SSL_REDIRECT`), `psycopg[binary]>=3.2.0`, `docker-compose` (db/web/bot/nginx, `media_volume` shared). Phase 1 only contributes feature `INSTALLED_APPS`/urls and the async-safety `CONN_MAX_AGE=0` + `prepare_threshold=None` settings.
 
-**Doc updates:** `docs/wiki/technical-specification.md`, `docs/wiki/packages.md`, `docs/wiki/architecture-structure.md`, `docs/wiki/db-structure.md`
+**Doc updates:** `docs/01-spec/technical-specification.md`, `docs/03-packages/packages-list.md`, `docs/01-spec/architecture-structure.md`, `docs/02-database/db-schema.md`
 
 ---
 
@@ -49,7 +49,7 @@
 - Auto-moderation: length checks, banned words, photo count, user ad limit
 - Status: ON_MODERATION → PUBLISHED (auto) or ON_MODERATION_FAILED (auto) or REJECTED (manual)
 
-**Doc updates:** `docs/wiki/technical-specification.md`, `docs/wiki/db-structure.md`
+**Doc updates:** `docs/01-spec/technical-specification.md`, `docs/02-database/db-schema.md`
 
 ---
 
@@ -64,9 +64,9 @@
   - `is_deleted=True` + `consent_revoked_at`: 30-day hard delete (telegram_id nulled)
   - `ads_auto_publish=False`: cannot create new ads, existing ads unaffected
 - Archive: 2-month auto-archive, reactivate (text re-checked)
-- `consent_hard_delete` job: 30 days after withdrawal
+- `consent_hard_delete` job: 30 days after `consent_revoked_at`
 
-**Doc updates:** `docs/wiki/technical-specification.md`, `docs/wiki/db-structure.md`
+**Doc updates:** `docs/01-spec/technical-specification.md`, `docs/02-database/db-schema.md`
 
 ---
 
@@ -80,7 +80,7 @@
 - nginx: `X-Content-Type-Options: nosniff`, script execution blocked, rate limiting
 - CI: ruff + basedpyright config
 
-**Doc updates:** `docs/wiki/technical-specification.md`, `docs/wiki/architecture-structure.md`
+**Doc updates:** `docs/01-spec/technical-specification.md`, `docs/01-spec/architecture-structure.md`
 
 ---
 
@@ -93,7 +93,7 @@
 - UI: RU/BOS switcher, `name_i18n` display, query translation (Bosnian → Russian)
 - Content invariant confirmed: stored content is Russian, UI may translate
 
-**Doc updates:** `docs/wiki/technical-specification.md`, `docs/wiki/packages.md`, `docs/wiki/architecture-structure.md`, `docs/wiki/db-structure.md`
+**Doc updates:** `docs/01-spec/technical-specification.md`, `docs/03-packages/packages-list.md`, `docs/01-spec/architecture-structure.md`, `docs/02-database/db-schema.md`
 
 ---
 

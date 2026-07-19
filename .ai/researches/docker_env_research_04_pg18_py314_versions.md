@@ -131,7 +131,7 @@ FROM python:3.14-slim  # or python:3.14-alpine if using ICU
 ### 3. `docker-compose.yml` DB Image
 
 ```yaml
-# BEFORE (per docs/wiki/architecture-structure.md line 84):
+# BEFORE (per `docs/01-spec/architecture-structure.md` line 84):
 db:
   image: postgres:17-alpine
 

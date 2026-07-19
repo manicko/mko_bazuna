@@ -7,8 +7,9 @@ tags:
   - deployment
 related:
   - technical-specification
-  - db-structure
-  - packages
+  - db-schema
+  - db-indexes
+  - packages-list
 ---
 
 ## Purpose
@@ -70,7 +71,15 @@ Volumes: `postgres_data`, `media_volume`, `static_volume`.
 - **nginx is REQUIRED in phase 1:** whitenoise does NOT serve user-uploaded media; local MEDIA_ROOT needs nginx. Plus TLS termination (HTTPS mandatory: login deep-link tokens, Secure cookies). Web service is not exposed.
 - **Dockerfile:** `python:3.14-slim` + `uv` (pin `uv>=0.11.28`); non-root user; `RUN uv run python manage.py collectstatic --noinput`.
 - **Django settings:** `USE_X_FORWARDED_HOST=True`, `SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO','https')`, `SECURE_SSL_REDIRECT=True`.
-- **/media/ security (zone R8):** nginx blocks script execution (`location ~* /media/.*\.(php|py|cgi)$ { deny all; }`); `X-Content-Type-Options: nosniff`; whitelist `image/jpeg`, default `application/octet-stream`; `Content-Disposition: inline`; media keys are UUID v4 (unguessable).
-- **PgBouncer (recommended, zone C5):** shared external pool in transaction mode between web+bot; each process keeps `CONN_MAX_AGE=0`. With psycopg3 + PgBouncer tx mode set `OPTIONS={"prepare_threshold": None}`.
-- **Migrations (zone C5/D7):** run exactly ONCE before web and bot start (dedicated step / ordering guard) so the two processes don't migrate concurrently. Domain writes (`ads`/`LoginToken`) go in ONE Django transaction. The aiogram FSM has NO built-in PG storage — the step-by-step dialog is persisted as an `Ad` row with status `DRAFT` via the shared ORM. "FSM clear" = `DRAFT → ON_MODERATION` in one transaction.
+- **/media/ security:** nginx blocks script execution (`location ~* /media/.*\.(php|py|cgi)$ { deny all; }`); `X-Content-Type-Options: nosniff`; whitelist `image/jpeg`, default `application/octet-stream`, `Content-Disposition: inline`; media keys are UUID v4 (unguessable, non-sequential).
+- **PgBouncer (recommended):** shared external pool in transaction mode between web+bot; each process holds `CONN_MAX_AGE=0`. With psycopg3 + PgBouncer tx mode set `OPTIONS={"prepare_threshold": None}`.
+- **Migrations (zone C5/D7):** run exactly ONCE before web and bot start (dedicated step / ordering guard) so the two processes don't migrate concurrently. Domain writes (`ads`/`LoginToken`) go in ONE Django transaction.
 - **Secrets:** `.env` (`BOT_TOKEN`, DB, `SECRET_KEY`) via `env_file: .env`. `API_ID`/`API_HASH` (MTProto/userbot) are NOT needed in phase 1 and removed from `.env`.
+
+## Audit Zone References
+
+Architecture-level audit zones resolved here (full reasoning distributed across the spec/DB docs):
+
+- **C5 / C7** — async/sync boundary, per-process pool, PgBouncer, migrations run exactly once (see Migrations rule). Price index added only after EXPLAIN ANALYZE at 500k rows (see [db-indexes.md](../02-database/db-indexes.md)).
+- **D7 / D9 / D10** — FSM has a separate migration owner; category cache is app-level; web is a sync WSGI process (see Source Structure).
+- **R8** — `/media/` security (nosniff, whitelist `image/jpeg`, inline) and storage-key anonymity rules live in [db-schema.md](../02-database/db-schema.md).

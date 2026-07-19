@@ -19,23 +19,23 @@ description: >
   Final wiki + deployment docs (English-only per doc-maintenance-rules).
 
 goals:
-  - `docs/wiki/technical-specification.md`: Decision L (Plausible + AnalyticsEvent) finalized; Decision J (lifecycle timers) confirmed
-  - `docs/wiki/architecture-structure.md`: deployment section complete (systemd/cron examples, nginx hardening)
-  - `docs/wiki/db-structure.md`: lifecycle indexes verified; IX_users_erasure_sweep documented
+  - `docs/01-spec/technical-specification.md`: Decision L (Plausible + AnalyticsEvent) finalized; Decision J (lifecycle timers) confirmed
+  - `docs/01-spec/architecture-structure.md`: deployment section complete (systemd/cron examples, nginx hardening)
+  - `docs/02-database/db-schema.md`: lifecycle indexes verified; IX_users_erasure_sweep documented
 
 files:
-  - path: docs/wiki/technical-specification.md
-  targets:
+  - path: docs/01-spec/technical-specification.md
+    targets:
   - type: file
-  name: docs/wiki/technical-specification.md
-  - path: docs/wiki/architecture-structure.md
-  targets:
+    name: docs/01-spec/technical-specification.md
+  - path: docs/01-spec/architecture-structure.md
+    targets:
   - type: file
-  name: docs/wiki/architecture-structure.md
-  - path: docs/wiki/db-structure.md
-  targets:
+    name: docs/01-spec/architecture-structure.md
+  - path: docs/02-database/db-schema.md
+    targets:
   - type: file
-  name: docs/wiki/db-structure.md
+    name: docs/02-database/db-schema.md
 
 changes:
   - action: edit_content

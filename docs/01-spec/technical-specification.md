@@ -6,18 +6,17 @@ tags:
   - domain
   - requirements
 related:
-  - db-structure
+  - db-schema
+  - db-indexes
+  - db-enums
   - architecture-structure
-  - packages
-  - audit-resolutions
+  - packages-list
+  - user-stories-index
 ---
 
 ## Purpose
 
-Authoritative phase-1 product & domain specification for **Mko Bazuna** — a Telegram-driven
-classifieds board (Avito-like) with a Django website. This is the single source of truth for
-product behavior. Technical implementation details live in `db-structure.md`, `architecture-structure.md`,
-and `packages.md`.
+Authoritative phase-1 product & domain specification for **Mko Bazuna** — a Telegram-driven classifieds board (Avito-like) with a Django website. This is the single source of truth for product behavior. Technical implementation details live in [`../02-database/db-schema.md`](../02-database/db-schema.md), `architecture-structure.md`, and [`../03-packages/packages-list.md`](../03-packages/packages-list.md).
 
 ## Product Summary
 
@@ -25,11 +24,16 @@ and `packages.md`.
 - Buyers browse/search/filter without registration.
 - Launch geography: **Bosnia & Herzegovina**. Target languages: **Russian (content base)** + **Bosnian (UI shell)**.
 - Scale targets: ~300 daily users, up to 500k ads, server response < 2s.
-- Stack: Python 3.14 + Django 5.2 LTS + PostgreSQL 18 (see `packages.md`).
+- Stack: Python 3.14 + Django 5.2 LTS + PostgreSQL 18 (see [`../03-packages/packages-list.md`](../03-packages/packages-list.md)).
 
 ## Fixed Domain Decisions (A–L)
 
-These are product decisions taken outside code. Each letter is referenced from other docs as "decision X".
+Product decisions taken outside code. Each letter is referenced from other docs as "decision X".
+Zone-resolution evidence (C1–C8, R1–R9, D1–D12) is distributed inline by zone ID across the domain
+docs ([db-schema.md](../02-database/db-schema.md), [db-indexes.md](../02-database/db-indexes.md),
+[architecture-structure.md](architecture-structure.md)). Owner decisions O1–O5 live in
+[`../05-owner-decisions/index.md`](../05-owner-decisions/index.md). This file links zones rather than
+repeating them.
 
 ### A. Moderation model
 - Automatic check (US-A10) is the **only** automatic gate before `PUBLISHED`.
@@ -54,7 +58,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Launch geography: Bosnia & Herzegovina. Languages: Russian + Bosnian (latin).
 - **City:** seller picks from a preset closed list of Bosnia/Herzegovina cities. Unrecognized city → "general / no city", not searchable by city.
 - **Categories are NOT user-defined.** Closed tree set by admin (django-mptt is the single source of truth). Bot suggests top 3–5 by keyword, requires explicit seller confirmation. Free-text as new category is **rejected**; choice only from suggested or full tree.
-- i18n names (zone D2): base `name` in Russian; Bosnian in `name_i18n` (JSONB `{"ru","bs"}`). UI uses `get_name(locale)` with Russian fallback.
+- i18n names (zone D2): `name` in Russian; Bosnian in `name_i18n` JSONB — see column detail in [db-schema.md](../02-database/db-schema.md). UI uses `get_name(locale)` with Russian fallback.
 - **Category-name search is REQUIRED in phase 1 (zone D1 / O5, hybrid C):** `category_name` is denormalized into `ads.category_name` and included in `search_vector` (weight 'C') + app-level fuzzy detect (`difflib`) sets `category_id` filter for single-word queries. Bosnian query is translated to Russian before search, so it matches the Russian category name.
 - Preset tree (recommendation):
   - **Goods:** Electronics, Clothing, Children, Furniture, Tools, Sport, Books, Other
@@ -74,15 +78,19 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Jurisdiction: Bosnia & Herzegovina (GDPR-equivalent). Collect minimum: `telegram_id`, optional `username`.
 - Users are maximally anonymous; nothing beyond Telegram login is stored.
 - **Privacy policy / Terms required from launch** (visible to buyers without login).
-- **Two distinct consent states (zone R3):**
-  - **DECLINE (browse-only, decision K):** banner "Decline" only blocks seller login/actions. `consent_given_at` stays NULL, `consent_revoked_at` NOT set — no deletion/erase; "Contact seller" keeps working.
-  - **WITHDRAW (account deletion, decision F):** sets `consent_revoked_at` and triggers soft-delete immediately. The ONLY state that triggers cascade erasure.
-- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent background task, zone R1; index `IX_users_erasure_sweep` on users):
-  - NULL `telegram_id` and `username`
-  - DELETE user's ad rows (+ `ad_images`)
-  - SET NULL `analytics_events.user_id` (aggregates kept)
-  - SET NULL `ModeratorActionLog.user_id` (reason/admin/timestamp kept for audit)
+- **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
+- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent task, zone R1; index `IX_users_erasure_sweep`):
+  - NULL `telegram_id` + `username`; DELETE user's ad rows (+ `ad_images`)
+  - SET NULL `analytics_events.user_id` (aggregates kept) and `ModeratorActionLog.user_id` (reason/admin/timestamp kept for audit)
 - Failed-check logs auto-purged after 7 days (separate sweep, zone D12).
+
+### K. Consent banner & privacy behavior (zone R3, see O2)
+- Browse before consent: buyer freely views published ads before accepting the banner.
+- **DECLINE = browse-only:** blocks only seller login/actions. `consent_revoked_at` NOT set, no erasure, external "Contact seller" keeps working.
+- **WITHDRAW/delete = WITHDRAW:** sets `consent_revoked_at`, triggers soft-delete + 30-day PII erasure (decision F). NOT the same as "decline".
+- After accept, banner stays hidden on return.
+- Site banner consent covers all PII processing including the bot; **no separate bot confirmation** required.
+- Consent acceptance time recorded; withdrawal/deletion per decision F.
 
 ### G. Content language, search, city match (US-B2/B3/B7, US-B9)
 - **Content stored in Russian.** UI language switch (ru/bs-latin) translates only the site shell; ad text is shown translated on display.
@@ -115,14 +123,6 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Reactivation:** seller can reactivate `ARCHIVED` ad from dashboard; re-publishes (text re-checked).
 - **Independent timers:** failed-auto-check deletion (1 week, decision A, `moderation_failed_at`) and consent-withdrawal hard-delete (30 days, decision F) are separate from the archive/delete timers above.
 
-### K. Consent banner & privacy behavior (decision F)
-- Browse before consent: buyer freely views published ads before accepting banner.
-- **Decline = DECLINE (browse-only, zone R3):** blocks only seller login/actions. `consent_revoked_at` NOT set, no erasure. External "Contact seller" (`t.me/<bot_username>?start=contact_<ad_id>`) keeps working.
-- **Withdraw/delete = WITHDRAW:** sets `consent_revoked_at`, triggers soft-delete + 30-day PII erasure (decision F). NOT the same as "decline".
-- After accept, banner stays hidden on return.
-- Site banner consent covers all PII processing including the bot; **no separate bot confirmation** required.
-- Logging: consent acceptance time recorded; withdrawal/deletion per decision F.
-
 ### L. Usage analytics (phase 1)
 - **Web traffic:** Plausible (cookieless, <1KB JS, EU-hosted SaaS) — JS snippet only, no Python dep, no consent banner needed (legitimate interest). Fallback: self-host Plausible CE / Umami via Docker.
 - **Product metrics:** internal `AnalyticsEvent` model — `event_type` (StrEnum: `REGISTRATION_CREATED`, `AD_PUBLISHED`, `SEARCH_PERFORMED`, `CONTACT_INITIATED`), `timestamp`, optional `user_id`. Aggregated via ORM; admin/CLI `show_metrics` access.
@@ -130,35 +130,26 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 
 ## Functional Stories by Role
 
-### Seller
-- **US-S1** Login & Telegram binding (see decision H).
-- **US-S2** Create ad via bot (see decision I); on submit → `ON_MODERATION`, not visible until checks pass. Multi-ad posts out of scope.
-- **US-S5** Edit ad: description/price/photos; text edits → `PUBLISHED → ON_MODERATION` + immediate hide (zone C2); mixed edit follows text rule. Updated within ≤5s for instant price/photo edits.
-- **US-S6** Delete own ad → `DELETED` (soft), hidden from site.
-- **US-S7** Auto-archive: 2 months after last publish/edit → `ARCHIVED`; 4 months → permanently removed. Seller sees archived ads in dashboard.
-- **US-S8** Delete account: confirm on site; ads soft-deleted; `telegram_id`/`username` nulled exactly 30 days after `consent_revoked_at` (decision F / zone R1). NOT tied to `ads_auto_publish` flag (US-S9). Re-registration only after 30-day null (zone R9).
-- **US-S9** Publishing ban: `ads_auto_publish=False` blocks new ads, hides old ads (not deleted); reversible, independent of account deletion/ban.
+Full user stories (acceptance behavior per role) are the single source of truth in
+[../04-user-stories/index.md](../04-user-stories/index.md):
 
-### Buyer
-- **US-B1** Browse without registration (status `PUBLISHED`).
-- **US-B2** Search by keyword over title+description, `PUBLISHED` only, ≤2s. Sort by date/price. Bosnian query translated to Russian. Friendly empty state.
-- **US-B3** Filter by category/subcategory/city/price range; combinable; no full reload. Exact city match + "did you mean".
-- **US-B4** Ad card shows full details + "Contact seller" only (no seller identity).
-- **US-B5** Contact via deep-link to our bot (decision C); seller contact never shown in plaintext.
-- **US-B6** Browse by category (hierarchy supported).
-- **US-B7** Browse by city; exact match; "did you mean" on typos; city saved in session.
-- **US-B8** Responsive (mobile/tablet/desktop).
-- **US-B9** Multilingual UI switch (ru / bs-latin), persisted across sessions.
+- [Seller stories](../04-user-stories/seller-stories.md) — US-S1, S2, S5, S6, S7, S8, S9
+- [Buyer stories](../04-user-stories/buyer-stories.md) — US-B1–B9
+- [Admin stories](../04-user-stories/admin-stories.md) — US-A1–A11
 
-### Admin
-- **US-A1** Admin auth (separate login or Telegram with confirmed role); unauthorized attempts logged.
-- **US-A2** List all ads (ID, title, category, city, status, published date); filter by status/category/city/date.
-- **US-A3** Moderate: unpublish, delete, change status, ban all of a user's ads; actions instant + logged.
-- **US-A4** Manage users: block/unblock/delete; blocked user cannot post but may browse.
-- **US-A5** Auto-remove stale ads (archive@2mo, delete@4mo); logged.
-- **US-A6** Delete inactive users (configurable threshold); deactivates their ads.
-- **US-A7** Manage categories & cities (add/edit/deactivate; used entities not deletable).
-- **US-A8** Manage consent: view fact, revoke (triggers decision F flow).
-- **US-A9** View system logs/events (admin-only); filter by type/date.
-- **US-A10** Automatic ad check at submit against `moderation_criteria` (see decision O4); on fail → `ON_MODERATION_FAILED` + bot message (no reason). On pass → `PUBLISHED` within ≤5s.
-- **US-A11** View failed/rejected lists + edit `moderation_criteria` at runtime; manual photo review (Layer 2) with categories logged to `ModeratorActionLog` (never shown to seller).
+## Owner Decisions (O1–O5)
+
+Owner-level decisions are **owned by the product owner** and recorded in plain, owner-readable
+language in [`../05-owner-decisions/index.md`](../05-owner-decisions/index.md) (single source of
+truth). That file holds the full Decision / Technical-consequence split; this spec only links to it to
+avoid duplicating owner decisions.
+
+Each owner decision maps to one or more audit zones resolved inline above and in the database docs:
+
+| Owner decision | Resolves audit zone(s) |
+|----------------|------------------------|
+| **O1** — turn-off-posting vs. delete vs. ban | R4 |
+| **O2** — decline banner ≠ delete account | R3 |
+| **O3** — full erasure 30 days after account deletion | R1 |
+| **O4** — automated + manual moderation criteria | D3 / D4 |
+| **O5** — category-name search in phase 1 | D1 / D2 |

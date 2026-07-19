@@ -1,6 +1,6 @@
 # Mko Bazuna
 
-> Documents the target specification/architecture (source of truth: `docs/wiki/`). Implementation is in progress.
+> Documents the target specification/architecture (source of truth: `docs/01-spec/`). Implementation is in progress.
 
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a
 Telegram bot; published ads appear on the site. Buyers browse, search, and filter without login.
@@ -31,12 +31,31 @@ Web is served behind nginx (ports 80/443); the web container is not exposed dire
 ## Documentation
 | Doc | Purpose |
 |-----|---------|
-| `docs/SPEC.md` | Concise technical summary for agents/developers |
-| `docs/wiki/technical-specification.md` | Product & domain spec (decisions A–L) |
-| `docs/wiki/db-structure.md` | Database schema, FTS triggers, indexes |
-| `docs/wiki/architecture-structure.md` | Source layout & Docker deployment |
-| `docs/wiki/packages.md` | Dependency set & versions |
-| `docs/wiki/audit-resolutions.md` | Owner decisions (O1–O5) & audit zone summaries |
+| `docs/01-spec/spec-index.md` | Concise technical summary for agents/developers |
+| `docs/01-spec/technical-specification.md` | Product & domain spec (decisions A–L) |
+| `docs/05-owner-decisions/index.md` | Owner decisions O1–O5 (plain, owner-readable) |
+| `docs/01-spec/architecture-structure.md` | Source layout & Docker deployment |
+| `docs/02-database/db-schema.md` | Tables, columns, relationships, enums reference |
+| `docs/02-database/db-indexes.md` | Indexes & `search_vector` trigger SQL |
+| `docs/02-database/db-enums.md` | `StrEnum` types (AdStatus, EventType, etc.) |
+| `docs/03-packages/packages-list.md` | Dependency set & versions |
+| `docs/03-packages/dependency-collisions.md` | Package version-coupling & collision risks |
+| `docs/04-user-stories/index.md` | User stories by role (seller/buyer/admin) |
+| `docs/99-agent/architecture.md` · `rules.md` · `references.md` | Agent guidelines & references |
+| `docs/00-overview/doc-maintenance-rules.md` | Documentation governance rules |
+
+### Docs structure
+```
+docs/
+├── 00-overview/        doc-maintenance-rules.md
+├── 01-spec/            spec-index.md · technical-specification.md · architecture-structure.md
+├── 02-database/        db-schema.md · db-indexes.md · db-enums.md
+├── 03-packages/        packages-list.md · dependency-collisions.md
+├── 04-user-stories/    index.md · seller-stories.md · buyer-stories.md · admin-stories.md
+├── 05-owner-decisions/ index.md
+├── 99-agent/           architecture.md · rules.md · references.md
+└── 98-reference/       ast-editor.md
+```
 
 ## Commands
 | Task | Command |

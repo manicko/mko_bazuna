@@ -39,7 +39,7 @@ Do NOT update for:
 - Numbered prefixes: `00-overview/`, `01-auth/`, `02-dashboards/`, etc.
 - Flat structure preferred; max depth 2 levels.
 - Group related docs by number prefix and domain folder.
-- Use `99-reference/` for guides and external docs.
+- Use `98-reference/` for guides and external docs.
 
 ## Naming Conventions
 

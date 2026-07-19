@@ -11,7 +11,7 @@ source_reference: .ai/plans/01_detailed_plan_publish_discover.md
 source_section: Task 2 — Core Models — User, LoginToken, Ad, AdImage
 
 description: >
-  Implement authentication and ad data models exactly per docs/wiki/db-structure.md.
+  Implement authentication and ad data models exactly per docs/02-database/db-schema.md.
 
 goals:
   - users model: telegram_id, username, is_banned, is_deleted, ads_auto_publish, deleted_at, consent_given_at, consent_revoked_at, hard_delete_at

@@ -15,23 +15,23 @@ description: >
   spec no longer contradicts pyproject.toml/compose.
 
 goals:
-  - `docs/wiki/packages.md`: Django >=5.2.16,<6.0, psycopg3 only, Python 3.14
-  - `docs/wiki/architecture-structure.md`: python:3.14-slim, postgres:18-alpine; remove static_volume refs; extend R8 regex to php|py|cgi|pl|sh
-  - `docs/wiki/db-structure.md`: FTS/triggers unchanged; PG18 confirmed; add GIN/pg_trgm reindex note
+  - `docs/03-packages/packages-list.md`: Django >=5.2.16,<6.0, psycopg3 only, Python 3.14
+  - `docs/01-spec/architecture-structure.md`: python:3.14-slim, postgres:18-alpine; remove static_volume refs; extend R8 regex to php|py|cgi|pl|sh
+  - `docs/02-database/db-schema.md`: FTS/triggers unchanged; PG18 confirmed; add GIN/pg_trgm reindex note
 
 files:
-  - path: docs/wiki/packages.md
-  targets:
+  - path: docs/03-packages/packages-list.md
+    targets:
   - type: file
-  name: docs/wiki/packages.md
-  - path: docs/wiki/architecture-structure.md
-  targets:
+    name: docs/03-packages/packages-list.md
+  - path: docs/01-spec/architecture-structure.md
+    targets:
   - type: file
-  name: docs/wiki/architecture-structure.md
-  - path: docs/wiki/db-structure.md
-  targets:
+    name: docs/01-spec/architecture-structure.md
+  - path: docs/02-database/db-schema.md
+    targets:
   - type: file
-  name: docs/wiki/db-structure.md
+    name: docs/02-database/db-schema.md
 
 changes:
   - action: edit_content
@@ -39,4 +39,4 @@ changes:
 
 acceptance_criteria:
   - wiki no longer contradicts pyproject.toml/compose
-  - R8 regex updated to php|py|cgi|pl|sh in docs/wiki/architecture-structure.md
+  - R8 regex updated to php|py|cgi|pl|sh in docs/01-spec/architecture-structure.md

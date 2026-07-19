@@ -7,10 +7,14 @@ tags:
   - code-editing
 related:
   - doc-maintenance-rules
-  - morfx-tools
 ---
 
 # ast-editor — Quick Reference
+
+## Purpose
+
+Quick reference for the `ast-editor` tooling used to edit Python source files safely. Summarizes the
+format conventions and the pre/post-edit checklists. Not project-spec content — a tooling aid.
 
 **Target format:** `ClassName.method` for methods, bare name for top-level functions. Case-sensitive.
 **Always run first:** `list_symbols` to discover exact names.

@@ -2,12 +2,12 @@
 
 **Wave:** Foundation
 **Depends_on:** `00_detailed_plan_docker_environment.md` (Docker Environment plan — owns Dockerfile, compose files, nginx.conf, settings package, pyproject stack). Phase 1 does NOT recreate infra; it only consumes it and adds feature-specific wiring.
-**Files_modified:** `src/backend/`, `src/telegram_bot/`, `docs/wiki/`
+- Files_modified: `src/backend/`, `src/telegram_bot/`, `docs/01-spec/`, `docs/02-database/`, `docs/03-packages/`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/technical-specification.md` (decisions H, C, F, G, I, J),
-> `docs/wiki/db-structure.md` (schema, triggers, indexes), `docs/wiki/architecture-structure.md` (deployment),
-> `docs/wiki/packages.md` (stack). Enums per project rule 10.
+> **Spec source:** `docs/01-spec/technical-specification.md` (decisions H, C, F, G, I, J),
+> `docs/02-database/db-schema.md` (schema, triggers, indexes), `docs/01-spec/architecture-structure.md` (deployment),
+> `docs/03-packages/packages-list.md` (stack). Enums per project rule 10.
 > **Pydantic boundary validation:** All bot message payloads validated via Pydantic v2 DTOs (rule 11).
 
 > **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, version exactness,
@@ -26,7 +26,7 @@
   - `AdSource`: `TELEGRAM`
   - `AnalyticsEventType`: `REGISTRATION_CREATED`, `AD_PUBLISHED`, `SEARCH_PERFORMED`, `CONTACT_INITIATED`
   - `ModeratorActionType`: `REJECT`, `BAN_ACCOUNT`, `SOFT_DELETE`, `CRITERIA_CHANGE`, `OTHER`
-  - `CategoryRejectReason` (Layer-2 manual checklist vocabulary, decision A/zone D8): `ADULT_CONTENT`, `VIOLENCE_GORE`, `DRUGS_WEAPONS`, `HATE_SPEECH`, `COUNTERFEIT_GOODS`, `ILLEGAL_GOODS`, `SPAM_SCAM`, `OFF_TOPIC`. NOTE: this enum is a UI/admin *vocabulary* only — `ModeratorActionLog.reason` remains TEXT per `docs/wiki/db-structure.md` (free TEXT + one of the checklist categories as guidance). The enum is NOT stored as a column; it constrains the admin reject dropdown. Validator WARN resolved: model schema stays TEXT, enum is reference-only.
+  - `CategoryRejectReason` (Layer-2 manual checklist vocabulary, decision A/zone D8): `ADULT_CONTENT`, `VIOLENCE_GORE`, `DRUGS_WEAPONS`, `HATE_SPEECH`, `COUNTERFEIT_GOODS`, `ILLEGAL_GOODS`, `SPAM_SCAM`, `OFF_TOPIC`. NOTE: this enum is a UI/admin *vocabulary* only — `ModeratorActionLog.reason` remains TEXT per `docs/02-database/db-schema.md` (free TEXT + one of the checklist categories as guidance). The enum is NOT stored as a column; it constrains the admin reject dropdown. Validator WARN resolved: model schema stays TEXT, enum is reference-only.
 - `uv run manage.py check` passes; `uv run ruff check` passes.
 - All models import enums from `apps.core.enums` (no inline string literals for fixed values — rule 10).
 
@@ -38,7 +38,7 @@
 
 ## Task 2: Core Models — User, LoginToken, Ad, AdImage
 
-**Goal:** Implement the authentication and ad data models exactly per `docs/wiki/db-structure.md`.
+**Goal:** Implement the authentication and ad data models exactly per `docs/02-database/db-schema.md`.
 
 **Acceptance Criteria:**
 - `apps/users/models.py`: `telegram_id` (BIGINT, UNIQUE, nullable), `username` (nullable), `is_staff`/`is_superuser` (from `AbstractUser`), `is_banned`, `is_deleted`, `ads_auto_publish` (default True), `deleted_at`, `consent_given_at`, `consent_revoked_at`, `hard_delete_at` (all nullable).
@@ -126,7 +126,7 @@
 
 ## Task 6: Publication + Lifecycle Indexes
 
-**Goal:** Performance indexes per `docs/wiki/db-structure.md`.
+**Goal:** Performance indexes per `docs/02-database/db-schema.md`.
 
 **Acceptance Criteria:**
 - `IX_ads_pub_listing`: partial B-tree `fields=['status','category_id','city_id','-published_at']`, `condition=Q(status=AdStatus.PUBLISHED)`.
@@ -153,7 +153,7 @@
 - These values are supplied to the Docker plan's `settings/base.py` (Task 6): `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, `SECURE_SSL_REDIRECT=True`, `SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO','https')`, `USE_X_FORWARDED_HOST=True`.
 - `CONN_MAX_AGE=0` (each process owns its pool; PgBouncer transaction-mode recommended, zone C5).
 - **PgBouncer async safety:** `OPTIONS={"prepare_threshold": None}` for psycopg3 compatibility (spec zone C5).
-- `DEFAULT_FILE_STORAGE` uses Django's **built-in `FileSystemStorage` via the `STORAGES` setting** (local `MEDIA_ROOT` behind nginx in phase 1). The `STORAGES` contract allows later swap to `django-storages` + S3/R2/MinIO **without code rewrites** — but `django-storages`/`boto3` are DEFERRED (YAGNI) per canonical `docs/wiki/packages.md`.
+- DEFAULT_FILE_STORAGE uses Django's **built-in `FileSystemStorage` via the `STORAGES` setting** (local `MEDIA_ROOT` behind nginx in phase 1). The `STORAGES` contract allows later swap to `django-storages` + S3/R2/MinIO **without code rewrites** — but `django-storages`/`boto3` are DEFERRED (YAGNI) per canonical `docs/03-packages/packages-list.md`.
 - `psycopg[binary]>=3.2.0` pin is owned by Docker plan Task 0 (Phase 1 only adds feature deps on top).
 
 **Artifacts:** Feature contribution to Docker plan's `settings/base.py` (no new settings module created).
@@ -240,10 +240,10 @@
 **Goal:** Reconcile wiki with implemented decisions.
 
 **Acceptance Criteria:**
-- `docs/wiki/technical-specification.md`: decisions H, C, F, G, I, J reflected; US-S1/S2, US-B1/B2/B3/B6/B7, US-A1/A2/A3/A7/A10/A11.
-- `docs/wiki/packages.md`: canonical stack confirmed (Django 5.2 LTS, psycopg3, aiogram 3.15, deep-translator, django-mptt 0.18, django-filter 26.1, django-tailwind 4.4, django-htmx, pillow; django-storages/boto3/redis/celery DEFERRED).
-- `docs/wiki/architecture-structure.md`: deployment section complete (db/web/bot/nginx, migration guard, async safety).
-- `docs/wiki/db-structure.md`: schema confirmed against implementation.
+- `docs/01-spec/technical-specification.md`: decisions H, C, F, G, I, J reflected; US-S1/S2, US-B1/B2/B3/B6/B7, US-A1/A2/A3/A7/A10/A11.
+- `docs/03-packages/packages-list.md`: canonical stack confirmed (Django 5.2 LTS, psycopg3, aiogram 3.15, deep-translator, django-mptt 0.18, django-filter 26.1, django-tailwind 4.4, django-htmx, pillow; django-storages/boto3/redis/celery DEFERRED).
+- `docs/01-spec/architecture-structure.md`: deployment section complete (db/web/bot/nginx, migration guard, async safety).
+- `docs/02-database/db-schema.md`: schema confirmed against implementation.
 
 **Artifacts:** Updated wiki files (English-only per doc-maintenance-rules).
 **Dependencies:** Tasks 1-11
@@ -269,7 +269,7 @@
 | US-A10 (auto-moderation) | T10 | Layer-1 synchronous validation |
 | US-A11 (failed queue + criteria) | T4, T10, T3.5 | Criteria singleton + failed ad list |
 
-## Version Exactness (Canonical: docs/wiki/packages.md)
+## Version Exactness (Canonical: `docs/03-packages/packages-list.md`)
 
 **Phase 1 Core Stack (CONFIRMED):**
 - `django>=5.2.16,<6.0` — LTS 5.2, upper bound blocks 6.0 drift
@@ -283,7 +283,7 @@
 - `django-htmx>=1.19.0` — HTMX MPA
 - `pillow>=10.4.0` — Image validation (JPEG)
 
-**Deferred (NOT in Phase 1 per docs/wiki/packages.md):**
+**Deferred (NOT in Phase 1 per `docs/03-packages/packages-list.md`):**
 - `django-storages>=1.14.6` — YAGNI until S3/R2 swap
 - `boto3>=1.35.0` — YAGNI until S3/R2 swap
 - `celery>=5.4.0` — Deferred to post-MVP
@@ -300,7 +300,7 @@
 | 1 (English-only in code+docs) | OK | All task artifacts specified as English; doc-maintenance-rules applied |
 | 11 (Pydantic v2 at boundaries) | OK | Task 9 adds Pydantic DTOs for bot message payloads (rule 11 explicit) |
 
-## DB Structure Consistency (vs docs/wiki/db-structure.md)
+## DB Structure Consistency (vs `docs/02-database/db-schema.md`)
 
 | Decision | Status | Evidence |
 |----------|--------|----------|

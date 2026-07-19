@@ -1,5 +1,5 @@
 ---
-mode: primary
+mode: all
 description: Focus on writing documentation, markdown files, and other text-based files
 options:
   displayName: Documentation Specialist

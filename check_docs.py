@@ -109,10 +109,10 @@ def check_file_structure():
     if not rules_path.exists():
         issues.append("doc-maintenance-rules.md not found in 00-overview")
     
-    # Check that 99-reference/ast-editor.md exists
-    ast_editor_path = Path("docs/99-reference/ast-editor.md")
+    # Check that 98-reference/ast-editor.md exists
+    ast_editor_path = Path("docs/98-reference/ast-editor.md")
     if not ast_editor_path.exists():
-        issues.append("ast-editor.md not found in 99-reference")
+        issues.append("ast-editor.md not found in 98-reference")
     
     # Check frontmatter patterns
     yaml_files = list(Path("docs").rglob("*.md"))

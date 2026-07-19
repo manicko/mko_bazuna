@@ -4,42 +4,29 @@ description: Mandatory rules and context for the project
 alwaysApply: true
 ---
 
-# Agent Guidelines
+# Mko Bazuna — Agent Guidelines
 
-## Project
-Django 5.2 LTS + Telegram bot (aiogram 3.x) classifieds board (Avito-like) for the Bosnia & Herzegovina market; content in Russian, UI Russian + Bosnian. Sellers post via Telegram bot; buyers browse/search on the Django site (HTMX MPA). Two long-lived processes (web gunicorn WSGI + bot) share one Django project + PostgreSQL.
+A Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a **Telegram bot**; published ads appear on the site. Buyers browse, search, and filter without login.
 
-## Commands
+## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Test | `uv run pytest <path>` |
-| Lint | `uv run ruff check <path>` |
-| Type check | `uv run basedpyright <path>` |
-| Add dependency | `uv add <package>` |
+- **Package Manager:** `uv` (Python)
+- **Test:** `uv run pytest <path>`
+- **Lint:** `uv run ruff check <path>`
+- **Typecheck:** `uv run basedpyright <path>`
+- **Add dep:** `uv add <package>`
 
-## Architecture
+## Core Context
 
-- Fixed values: `StrEnum` only — never plain strings/dicts/lists for constants.
-- Small modules and functions.
-- Two processes, one DB; migrations run once before web+bot.
-- Search: native PostgreSQL FTS.
+- **Stack:** Python 3.14 · Django 5.2 LTS (`>=5.2.16,<6.0`) · PostgreSQL 18 · aiogram 3.x · native PostgreSQL FTS.
+- **Two processes, one DB:** web (gunicorn sync WSGI, HTMX MPA) + bot (aiogram, `django.setup()` + shared ORM). Migrations run exactly once before both start.
+- **Fixed values:** use `StrEnum` — never plain strings/dicts for constants.
+- **Bot FSM:** no built-in PG storage — the ad dialog is persisted as an `Ad` row (`DRAFT`) via the ORM.
 
-## Rules
+## Detailed Instructions
 
-- Type hints on all public functions. `logger = logging.getLogger(__name__)` — never `print()`.
-- Custom exceptions from `core/errors.py`. Never silently swallow errors. (Note: core/errors.py is planned per spec; keep the rule.)
-- Clean up temp files with `try/finally` — never leave orphaned cache files.
-- English only in code, comments, logs.
-- Production code is king — if tests conflict with architecture/business logic, fix or remove tests; never distort production code for tests.
-- Write audit reports incrementally — append blocks of ≤100 lines per tool call.
-- 4-space indentation, never tabs; read full function/class before rewriting; after edits run `uv run ruff check <path>` and `uv run basedpyright <path>`.
-
-## References
-
-- [Specification summary](docs/SPEC.md)
-- [Readme](README.md)
-- [Doc maintenance rules](docs/00-overview/doc-maintenance-rules.md)
-- [Technical specification (wiki)](docs/wiki/technical-specification.md)
-- [DB structure (wiki)](docs/wiki/db-structure.md)
-- [Architecture (wiki)](docs/wiki/architecture-structure.md)
+For specific guidelines, see:
+- [Architecture](docs/99-agent/architecture.md)
+- [Rules](docs/99-agent/rules.md)
+- [References](docs/99-agent/references.md)
+- [Spec summary](docs/01-spec/spec-index.md) · [User stories](docs/04-user-stories/index.md) · [Doc rules](docs/00-overview/doc-maintenance-rules.md)
