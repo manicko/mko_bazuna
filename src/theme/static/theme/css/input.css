@@ -1,0 +1,4 @@
+/* Tailwind input stylesheet */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
