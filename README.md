@@ -28,6 +28,16 @@ docker compose up --build   # db + web + bot + nginx
 
 Web is served behind nginx (ports 80/443); the web container is not exposed directly.
 
+### PgBouncer (optional connection pooling)
+PgBouncer service is available for connection pooling via profile:
+```bash
+docker compose --profile pgbouncer up --build
+```
+Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in production when:
+- High database connection count from multiple app instances
+- Need to reduce PostgreSQL memory usage
+- CONN_MAX_AGE=0 is already set in Django settings for async safety
+
 ## Documentation
 | Doc | Purpose |
 |-----|---------|

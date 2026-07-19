@@ -52,6 +52,7 @@ services:
       - PGBOUNCER_DATABASE=${POSTGRES_DB:-postgres}
       - PGBOUNCER_USER=${POSTGRES_USER:-postgres}
       - PGBOUNCER_AUTH_TYPE=md5
+      - PGBOUNCER_POOL_MODE=transaction
     ports:
       - "6432:6432"
     depends_on:
