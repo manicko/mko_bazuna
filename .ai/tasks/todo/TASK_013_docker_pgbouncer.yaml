@@ -1,0 +1,42 @@
+id: task_013_docker_pgbouncer
+
+title: PgBouncer opt-in profile + documentation
+
+priority: low
+
+depends_on:
+  - task_012_docker_prod_override
+  - task_009_docker_scheduler_advisory_locks
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 12 — PgBouncer Opt-In Profile + Documentation
+
+description: >
+  Optional PgBouncer service for connection pooling (transaction mode). README documents when/why.
+  Uses edoburu/pgbouncer:1.25.2 (bitnami deprecated). Async safety via CONN_MAX_AGE=0 +
+  prepare_threshold=None (already in base settings).
+
+goals:
+  - 'pgbouncer service under profiles:["pgbouncer"]'
+  - transaction-mode pooling
+  - env vars for auth
+  - healthcheck pg_isready -h localhost -p 6432
+  - README section
+
+files:
+  - path: docker-compose.prod.yml
+    targets:
+      - type: file
+        name: docker-compose.prod.yml
+  - path: README.md
+    targets:
+      - type: file
+        name: README.md
+
+changes:
+  - action: edit_content
+    description: Add pgbouncer service block + README section.
+
+acceptance_criteria:
+  - '"--profile pgbouncer up" starts PgBouncer'
+  - README describes when/why to enable

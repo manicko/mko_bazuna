@@ -1,0 +1,39 @@
+id: task_039_phase2_cache_invalidation
+
+title: Auto-moderation cache invalidation signal
+
+priority: medium
+
+depends_on:
+  - task_034_phase2_criteria_singleton
+  - task_035_phase2_action_log
+  - task_031_phase1_auto_moderation
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 6 — Auto-Moderation Cache Invalidation Signal
+
+description: >
+  Cache invalidation hook when admin edits moderation criteria; verify bot submit path logs
+  correctly. Phase 1 Task 10 owns the rules; Phase 2 only wires cache-invalidation + verifies.
+
+goals:
+  - post_save signal on ModerationCriteria invalidates cache key used by auto_moderation.check()
+  - bot submit (Phase 1 Task 9) calls auto_moderation.check(ad); on fail sets moderation_failed_at + ON_MODERATION_FAILED + log
+  - case-insensitive banned-words; price_required enforced; photo count; duplicate-title difflib
+  - returns seller-safe error (no specific reason, US-A11)
+  - no celery/redis; Django built-in dispatches
+
+files:
+  - path: src/backend/apps/moderation/signals.py
+    targets:
+      - type: module
+        name: apps.moderation.signals
+
+changes:
+  - action: add_code
+    description: Add post_save signal invalidating moderation_criteria cache; verify auto_moderation wiring.
+
+acceptance_criteria:
+  - saving ModerationCriteria invalidates moderation_criteria:v1 cache
+  - auto_moderation.check(ad) returns structured seller-safe error on fail
+  - no celery/redis dependency

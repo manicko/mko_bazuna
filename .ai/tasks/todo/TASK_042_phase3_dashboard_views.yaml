@@ -1,0 +1,45 @@
+id: task_042_phase3_dashboard_views
+
+title: Seller dashboard views (US-S5/S7)
+
+priority: high
+
+depends_on:
+  - task_032_phase1_web_search_views
+
+source_reference: .ai/plans/03_detailed_plan_contact_dashboard.md
+source_section: Task 2 — Seller Dashboard Views
+
+description: >
+  Ad management — list, edit, archive, reactivate (US-S5/S7). Text edits hide immediately;
+  price/photo edits immediate.
+
+goals:
+  - /dashboard/ lists seller ads grouped by status
+  - text edits (title/description): PUBLISHED -> ON_MODERATION, immediately hidden, published_at NOT reset
+  - price/photo edits: save immediate, status stays PUBLISHED, published_at NOT reset
+  - mixed edits follow text rule
+  - reactivate (ARCHIVED -> PUBLISHED): text re-checked, immediately hidden until pass
+  - published_at updated ONLY on initial publish / reactivate / price-photo-only edits
+  - unauthorized edit (wrong seller) -> 403
+
+files:
+  - path: src/backend/apps/ads/views/dashboard.py
+    targets:
+      - type: module
+        name: apps.ads.views.dashboard
+  - path: src/backend/apps/ads/views/edit.py
+    targets:
+      - type: module
+        name: apps.ads.views.edit
+
+changes:
+  - action: add_code
+    description: Implement dashboard + edit views with zone C2 hide-on-text-edit behavior.
+
+acceptance_criteria:
+  - text edit transitions PUBLISHED -> ON_MODERATION and hides immediately
+  - price/photo edit stays PUBLISHED, public within <=5s
+  - reactivation re-checks text, hides until pass
+  - wrong-seller edit returns 403
+  - published_at reset rules per decision J / zone C3

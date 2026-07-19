@@ -1,0 +1,39 @@
+id: task_004_docker_compose_dev
+
+title: Development override (docker-compose.dev.override.yml)
+
+priority: medium
+
+depends_on:
+  - task_003_docker_compose_base
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 3 — Development Override (docker-compose.dev.override.yml)
+
+description: >
+  Enable hot-reloading development workflow with bind-mounts and runserver.
+
+goals:
+  - extend base compose
+  - web uses runserver, DEBUG=True
+  - web+bot bind-mount .:/app
+  - nginx optional via profile
+  - Windows/WSL2 media permissions handled
+
+files:
+  - path: docker-compose.dev.override.yml
+    targets:
+      - type: file
+        name: docker-compose.dev.override.yml
+  - path: docker/entrypoint.sh
+    targets:
+      - type: file
+        name: docker/entrypoint.sh
+
+changes:
+  - action: add_code
+    description: Add dev override compose + entrypoint dev handling.
+
+acceptance_criteria:
+  - '"docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up" starts web on 8000 hot-reload'
+  - file changes reflect immediately in container

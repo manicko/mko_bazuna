@@ -1,0 +1,48 @@
+id: task_053_phase4_docs_sync
+
+title: Documentation updates (analytics + hardening)
+
+priority: low
+
+depends_on:
+  - task_048_phase4_analytics_tracking
+  - task_049_phase4_lifecycle_sweeps
+  - task_050_phase4_index_verification
+  - task_051_phase4_nginx_hardening
+  - task_052_phase4_ci_quality_gates
+  - task_047_phase3_docs_sync
+
+source_reference: .ai/plans/04_detailed_plan_analytics_harden.md
+source_section: Task 6 — Documentation Updates (English-only per rule 1)
+
+description: >
+  Final wiki + deployment docs (English-only per doc-maintenance-rules).
+
+goals:
+  - 01: Decision L (Plausible + AnalyticsEvent) finalized; Decision J (lifecycle timers) confirmed
+  - 03: deployment section complete (systemd/cron examples, nginx hardening)
+  - 04: lifecycle indexes verified; IX_users_erasure_sweep documented
+
+files:
+  - path: docs/wiki/01_technical_specification.md
+    targets:
+      - type: file
+        name: docs/wiki/01_technical_specification.md
+  - path: docs/wiki/03_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/03_structure.md
+  - path: docs/wiki/04_db_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/04_db_structure.md
+
+changes:
+  - action: edit_content
+    description: Sync analytics/hardening decisions to wiki.
+
+acceptance_criteria:
+  - Decision L and J reflected
+  - deployment + nginx hardening documented
+  - lifecycle indexes documented
+  - docs English-only, frontmatter intact

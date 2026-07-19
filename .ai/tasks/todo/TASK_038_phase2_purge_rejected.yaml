@@ -1,0 +1,39 @@
+id: task_038_phase2_purge_rejected
+
+title: 90-day REJECTED purge command
+
+priority: high
+
+depends_on:
+  - task_035_phase2_action_log
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 5 — 90-Day REJECTED Purge
+
+description: >
+  Clean manually-rejected ads after retention window (zone D4). MUST wrap in advisory lock 7 and
+  import advisory_lock from core utils.
+
+goals:
+  - management command purge_rejected_ads: WHERE status=REJECTED AND rejected_at < now()-90d
+  - --dry-run flag
+  - delete ad + images CASCADE; preserve ModeratorActionLog (ad_id SET NULL)
+  - idempotent; uses IX_ads_rejected_sweep
+  - advisory lock pg_advisory_xact_lock(7) via core util
+
+files:
+  - path: src/backend/apps/core/management/commands/purge_rejected_ads.py
+    targets:
+      - type: module
+        name: apps.core.management.commands.purge_rejected_ads
+
+changes:
+  - action: add_code
+    description: Implement purge_rejected_ads command wrapping advisory_lock(7).
+
+acceptance_criteria:
+  - queries only REJECTED + 90-day window
+  - --dry-run prints count without deleting
+  - ModeratorActionLog.ad_id SET NULL on delete (audit preserved)
+  - imports advisory_lock from apps.core.utils.advisory_lock (lock id 7)
+  - idempotent; logs via logger

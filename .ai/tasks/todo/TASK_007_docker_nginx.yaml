@@ -1,0 +1,38 @@
+id: task_007_docker_nginx
+
+title: nginx configuration with media hardening (zone R8)
+
+priority: high
+
+depends_on:
+  - task_003_docker_compose_base
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 7 — nginx Configuration with Media Hardening (zone R8)
+
+description: >
+  Implement nginx reverse proxy with strict /media/ security controls (zone R8): script-execution
+  block, nosniff, inline disposition, JPEG-only MIME whitelist, CSP, TLS-ready.
+
+goals:
+  - /static/ from whitenoise in image (30d cache)
+  - /media/ hardening: deny php|py|cgi|pl|sh; X-Content-Type-Options nosniff; Content-Disposition inline; X-Frame-Options DENY; CSP none
+  - MIME whitelist image/jpeg only
+  - reverse proxy to web:8000 with forwarded headers
+  - TLS listen 443 http2; HTTP→HTTPS redirect (commented in dev)
+
+files:
+  - path: docker/nginx/nginx.conf
+    targets:
+      - type: file
+        name: docker/nginx/nginx.conf
+
+changes:
+  - action: add_code
+    description: Write nginx.conf with hardening.
+
+acceptance_criteria:
+  - '"curl -I http://localhost/media/test.jpg" returns correct headers'
+  - '"curl -I http://localhost/media/test.php" returns 403'
+  - '"curl -I http://localhost/media/test.sh" returns 403'
+  - docker compose config validates with nginx service

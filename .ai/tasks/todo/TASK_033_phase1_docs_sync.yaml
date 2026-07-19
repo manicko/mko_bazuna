@@ -1,0 +1,57 @@
+id: task_033_phase1_docs_sync
+
+title: Documentation updates (wiki sync)
+
+priority: low
+
+depends_on:
+  - task_021_phase1_structure_enums
+  - task_022_phase1_core_models
+  - task_023_phase1_categories_locations
+  - task_025_phase1_moderation_analytics_models
+  - task_026_phase1_search_triggers
+  - task_027_phase1_lifecycle_indexes
+  - task_028_phase1_settings_security
+  - task_029_phase1_deployment_wiring
+  - task_030_phase1_bot_fsm
+  - task_031_phase1_auto_moderation
+  - task_032_phase1_web_search_views
+  - task_015_docker_wiki_alignment
+
+source_reference: .ai/plans/01_detailed_plan_publish_discover.md
+source_section: Task 12 — Documentation Updates (wiki sync)
+
+description: >
+  Reconcile wiki with implemented decisions (English-only per doc-maintenance-rules).
+
+goals:
+  - 01_technical_specification.md: decisions H,C,F,G,I,J; US-S1/S2, US-B1/B2/B3/B6/B7, US-A1/A2/A3/A7/A10/A11
+  - 02_packages.md: canonical stack confirmed
+  - 03_structure.md: deployment section complete
+  - 04_db_structure.md: schema confirmed against implementation
+
+files:
+  - path: docs/wiki/01_technical_specification.md
+    targets:
+      - type: file
+        name: docs/wiki/01_technical_specification.md
+  - path: docs/wiki/02_packages.md
+    targets:
+      - type: file
+        name: docs/wiki/02_packages.md
+  - path: docs/wiki/03_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/03_structure.md
+  - path: docs/wiki/04_db_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/04_db_structure.md
+
+changes:
+  - action: edit_content
+    description: Sync wiki to implemented Phase 1 decisions.
+
+acceptance_criteria:
+  - all referenced decisions/user-stories reflected in wiki
+  - docs remain English-only with frontmatter intact

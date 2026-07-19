@@ -1,0 +1,31 @@
+tasks:
+  - id: task_034_phase2_criteria_singleton
+    depends_on:
+      - task_025_phase1_moderation_analytics_models
+  - id: task_035_phase2_action_log
+    depends_on:
+      - task_025_phase1_moderation_analytics_models
+  - id: task_036_phase2_admin_ui
+    depends_on:
+      - task_032_phase1_web_search_views
+      - task_035_phase2_action_log
+  - id: task_037_phase2_purge_failed
+    depends_on:
+      - task_027_phase1_lifecycle_indexes
+      - task_035_phase2_action_log
+  - id: task_038_phase2_purge_rejected
+    depends_on:
+      - task_035_phase2_action_log
+  - id: task_039_phase2_cache_invalidation
+    depends_on:
+      - task_034_phase2_criteria_singleton
+      - task_035_phase2_action_log
+      - task_031_phase1_auto_moderation
+  - id: task_040_phase2_docs_sync
+    depends_on:
+      - task_034_phase2_criteria_singleton
+      - task_035_phase2_action_log
+      - task_036_phase2_admin_ui
+      - task_037_phase2_purge_failed
+      - task_038_phase2_purge_rejected
+      - task_039_phase2_cache_invalidation

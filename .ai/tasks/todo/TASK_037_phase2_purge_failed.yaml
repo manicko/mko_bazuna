@@ -1,0 +1,40 @@
+id: task_037_phase2_purge_failed
+
+title: 7-day failed-moderation purge command
+
+priority: high
+
+depends_on:
+  - task_027_phase1_lifecycle_indexes
+  - task_035_phase2_action_log
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 4 — 7-Day Failed-Moderation Purge
+
+description: >
+  Auto-clean ads that failed auto-moderation (decision A, zone C4). MUST wrap in advisory lock 6
+  and import advisory_lock from apps.core.utils (DO NOT recreate the util).
+
+goals:
+  - management command purge_failed_ads: WHERE status=ON_MODERATION_FAILED AND moderation_failed_at < now()-7d
+  - --dry-run flag (print count, no delete)
+  - atomic delete ad + ad_images (CASCADE); log count via logger
+  - idempotent; uses IX_ads_purge_failed partial index
+  - advisory lock pg_advisory_xact_lock(6) via core util
+
+files:
+  - path: src/backend/apps/core/management/commands/purge_failed_ads.py
+    targets:
+      - type: module
+        name: apps.core.management.commands.purge_failed_ads
+
+changes:
+  - action: add_code
+    description: Implement purge_failed_ads command wrapping advisory_lock(6).
+
+acceptance_criteria:
+  - queries only ON_MODERATION_FAILED + 7-day window
+  - --dry-run prints count without deleting
+  - uses IX_ads_purge_failed
+  - imports advisory_lock from apps.core.utils.advisory_lock (lock id 6)
+  - idempotent; logs via logger (no print)

@@ -1,0 +1,40 @@
+id: task_026_phase1_search_triggers
+
+title: PostgreSQL triggers + GIN index (search_vector)
+
+priority: high
+
+depends_on:
+  - task_022_phase1_core_models
+  - task_023_phase1_categories_locations
+
+source_reference: .ai/plans/01_detailed_plan_publish_discover.md
+source_section: Task 5 — PostgreSQL Triggers + GIN Index (search_vector)
+
+description: >
+  Maintain search_vector (title A + description B + category_name C, russian config) and
+  denormalized category_name via plpgsql triggers (zone D1).
+
+goals:
+  - function ads_search_vector_fn() computes category_name from categories.name + search_vector
+  - trigger ads_search_vector_update BEFORE INSERT OR UPDATE on ads
+  - function categories_name_propagate() + trigger on_category_name_update AFTER UPDATE OF name
+  - GinIndex(name='IX_ads_search_gin', fields=['search_vector']) NOT models.Index
+  - one-time backfill for existing rows
+  - PostgreSQL 17
+
+files:
+  - path: src/backend/apps/ads/migrations
+    targets:
+      - type: module
+        name: apps.ads.migrations.search_vector_triggers
+
+changes:
+  - action: add_code
+    description: Create migration with trigger SQL + GIN index + backfill.
+
+acceptance_criteria:
+  - GinIndex used (NOT models.Index) for search_vector
+  - trigger computes category_name + search_vector (russian config)
+  - renaming a category propagates to dependent ads
+  - '"uv run manage.py migrate" succeeds on PostgreSQL 17'

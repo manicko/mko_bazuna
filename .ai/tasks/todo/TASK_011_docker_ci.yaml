@@ -1,0 +1,36 @@
+id: task_011_docker_ci
+
+title: CI pipeline (GitHub Actions)
+
+priority: medium
+
+depends_on:
+  - task_005_docker_compose_test
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 11 — CI Pipeline (GitHub Actions)
+
+description: >
+  Automated build + test workflow with real PostgreSQL. Jobs: build, test, lint, typecheck.
+
+goals:
+  - .github/workflows/ci.yml with jobs build/test/lint/typecheck
+  - ubuntu-latest docker build
+  - postgres:17 service with healthcheck
+  - pytest inside container against real PostgreSQL
+  - ruff check + basedpyright
+  - uv cache via astral-sh/setup-uv@v5
+
+files:
+  - path: .github/workflows/ci.yml
+    targets:
+      - type: file
+        name: .github/workflows/ci.yml
+
+changes:
+  - action: add_code
+    description: Write CI workflow.
+
+acceptance_criteria:
+  - workflow triggers on push to main/develop
+  - CI passes with green on successful run

@@ -1,0 +1,37 @@
+id: task_035_phase2_action_log
+
+title: ModeratorActionLog population
+
+priority: high
+
+depends_on:
+  - task_025_phase1_moderation_analytics_models
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 2 — ModeratorActionLog Population
+
+description: >
+  Audit trail for auto-fail + manual reject (zone D8, zone R1).
+
+goals:
+  - auto-fail: ON_MODERATION_FAILED creates log action_type=OTHER (auto), auto reason; moderated_by NULL
+  - manual reject: action_type=REJECT, reason from Layer-2 checklist + free TEXT; moderated_by set
+  - ads.published_by/moderated_by FKs populated on manual actions (NULL for auto)
+  - reason NEVER shown to seller (US-A11)
+  - on erasure (zone R1): user_id SET NULL, reason/created_at/action_type preserved
+
+files:
+  - path: src/backend/apps/moderation/services/moderation_log.py
+    targets:
+      - type: module
+        name: apps.moderation.services.moderation_log
+
+changes:
+  - action: add_code
+    description: Implement log-writing service for auto + manual actions.
+
+acceptance_criteria:
+  - auto-fail writes ModeratorActionLog (OTHER, NULL moderated_by)
+  - manual reject writes REJECT + reason + moderated_by
+  - reason column TEXT, never surfaced to seller
+  - erasure sets user_id NULL, preserves reason/admin/timestamp

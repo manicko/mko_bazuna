@@ -1,0 +1,51 @@
+id: task_021_phase1_structure_enums
+
+title: Django project structure + StrEnums
+
+priority: high
+
+depends_on:
+  - task_006_docker_settings_package
+
+source_reference: .ai/plans/01_detailed_plan_publish_discover.md
+source_section: Task 1 — Django Project Structure + StrEnums
+
+description: >
+  Scaffold the Django project skeleton and centralize all fixed values as StrEnum (rule 10).
+  Settings package is owned by the Docker plan; Phase 1 only adds feature INSTALLED_APPS/
+  MIDDLEWARE/urls to base.py and config/urls.py routing.
+
+goals:
+  - apps/core/enums.py with AdStatus, AdSource, AnalyticsEventType, ModeratorActionType, CategoryRejectReason
+  - no inline string literals for fixed values
+  - config/urls.py routing
+  - manage.py check + ruff pass
+
+files:
+  - path: src/backend/apps/core/enums.py
+    targets:
+      - type: module
+        name: apps.core.enums
+  - path: src/backend/config/urls.py
+    targets:
+      - type: module
+        name: config.urls
+  - path: src/backend/config/settings/base.py
+    targets:
+      - type: file
+        name: src/backend/config/settings/base.py
+
+changes:
+  - action: add_code
+    description: >
+      Create apps/core/enums.py with all StrEnums. Add feature apps to INSTALLED_APPS in base.py
+      and wire config/urls.py include()s.
+
+acceptance_criteria:
+  - AdStatus has DRAFT/ON_MODERATION/PUBLISHED/REJECTED/ON_MODERATION_FAILED/ARCHIVED/DELETED
+  - AdSource has TELEGRAM
+  - AnalyticsEventType has REGISTRATION_CREATED/AD_PUBLISHED/SEARCH_PERFORMED/CONTACT_INITIATED
+  - ModeratorActionType has REJECT/BAN_ACCOUNT/SOFT_DELETE/CRITERIA_CHANGE/OTHER
+  - CategoryRejectReason enum exists (reference-only; ModeratorActionLog.reason stays TEXT)
+  - '"uv run manage.py check" passes; "uv run ruff check" passes'
+  - all models import enums from apps.core.enums

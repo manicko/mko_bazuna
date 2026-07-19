@@ -1,0 +1,45 @@
+id: task_016_roadmap_foundation_gate
+
+title: Execute Foundation (Docker Environment) before feature phases
+
+priority: high
+
+depends_on:
+  - task_007_docker_nginx
+  - task_008_docker_env_templates
+  - task_010_docker_makefile
+  - task_011_docker_ci
+  - task_009_docker_scheduler_advisory_locks
+  - task_013_docker_pgbouncer
+  - task_014_docker_backup
+  - task_015_docker_wiki_alignment
+
+source_reference: .ai/plans/01_plan_development_phases.md
+source_section: Foundation. Docker Environment (runs FIRST)
+
+description: >
+  The Docker Environment plan (00_detailed_plan_docker_environment.md) is the SOLE OWNER of the
+  Dockerfile, compose files, nginx.conf, settings package, pyproject stack, and scheduler wiring.
+  Feature phases (1-4) MUST NOT recreate these. This task is the rollout gate that confirms all
+  Foundation tasks are complete before Phase 1 begins.
+
+goals:
+  - all 15 Foundation tasks merged and implemented
+  - single-owner rule verified (no feature phase recreates infra files)
+  - advisory_lock.py exists as the lock single source of truth
+
+files:
+  - path: .ai/plans/00_detailed_plan_docker_environment.md
+    targets:
+      - type: file
+        name: .ai/plans/00_detailed_plan_docker_environment.md
+
+changes:
+  - action: no_op_gate
+    description: >
+      Coordination gate. No code change; verifies Foundation completeness before Phase 1.
+
+acceptance_criteria:
+  - Foundation tasks 001-015 implemented and merged
+  - Dockerfile/compose/nginx/settings owned only by Foundation plan
+  - pyproject reconciled to docs/wiki/02_packages.md

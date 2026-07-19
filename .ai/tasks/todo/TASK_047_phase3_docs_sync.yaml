@@ -1,0 +1,44 @@
+id: task_047_phase3_docs_sync
+
+title: Documentation updates (contact + dashboard)
+
+priority: low
+
+depends_on:
+  - task_041_phase3_contact_bridge
+  - task_042_phase3_dashboard_views
+  - task_043_phase3_account_states
+  - task_044_phase3_consent_soft_delete
+  - task_045_phase3_self_delete_ad
+  - task_046_phase3_consent_banner
+  - task_040_phase2_docs_sync
+
+source_reference: .ai/plans/03_detailed_plan_contact_dashboard.md
+source_section: Task 7 — Documentation Updates
+
+description: >
+  Contact + dashboard spec sync (English-only per rule 1).
+
+goals:
+  - 01: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses ad_id; decision F/K two consent states
+  - 04: account states + erasure clarified (soft-delete Phase 3, hard-delete Phase 4)
+
+files:
+  - path: docs/wiki/01_technical_specification.md
+    targets:
+      - type: file
+        name: docs/wiki/01_technical_specification.md
+  - path: docs/wiki/04_db_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/04_db_structure.md
+
+changes:
+  - action: edit_content
+    description: Sync contact/dashboard/consent decisions to wiki.
+
+acceptance_criteria:
+  - two consent states documented distinctly
+  - contact deep-link uses ad_id
+  - account-state separation (ban/delete/restriction) documented
+  - docs English-only, frontmatter intact

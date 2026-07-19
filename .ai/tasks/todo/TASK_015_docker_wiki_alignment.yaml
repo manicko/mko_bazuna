@@ -1,0 +1,42 @@
+id: task_015_docker_wiki_alignment
+
+title: Verify wiki spec files alignment
+
+priority: medium
+
+depends_on:
+  - task_001_docker_pyproject_reconcile
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 14 — Verify Wiki Spec Files Alignment
+
+description: >
+  Confirm the spec source-of-truth agrees with the approved stack, closing the loop so the repo
+  spec no longer contradicts pyproject.toml/compose.
+
+goals:
+  - 02_packages.md: Django >=5.2.16,<6.0, psycopg3 only, Python 3.14
+  - 03_structure.md: python:3.14-slim, postgres:17-alpine; remove static_volume refs; extend R8 regex to php|py|cgi|pl|sh
+  - 04_db_structure.md: FTS/triggers unchanged; PG17 confirmed; add GIN/pg_trgm reindex note
+
+files:
+  - path: docs/wiki/02_packages.md
+    targets:
+      - type: file
+        name: docs/wiki/02_packages.md
+  - path: docs/wiki/03_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/03_structure.md
+  - path: docs/wiki/04_db_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/04_db_structure.md
+
+changes:
+  - action: edit_content
+    description: Edit wiki files to match reconciled stack.
+
+acceptance_criteria:
+  - wiki no longer contradicts pyproject.toml/compose
+  - R8 regex updated to php|py|cgi|pl|sh in 03_structure.md

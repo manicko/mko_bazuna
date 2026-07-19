@@ -1,0 +1,46 @@
+id: task_034_phase2_criteria_singleton
+
+title: ModerationCriteria singleton (exact fields)
+
+priority: high
+
+depends_on:
+  - task_025_phase1_moderation_analytics_models
+  - task_024_phase1_admin_registration
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 1 — ModerationCriteria Singleton (exact fields)
+
+description: >
+  Admin-editable thresholds matching docs/wiki/04_db_structure.md exactly. Singleton enforced via
+  migration RunPython. Cached in Django cache (5-min TTL) key moderation_criteria:v1.
+
+goals:
+  - ModerationCriteria fields EXACTLY (no min_price/max_price): title_min/max_length, description_min/max_length, price_required, min_images, max_images, banned_words (JSONB []), max_ads_per_user, duplicate_title_threshold, updated_at, updated_by FK
+  - singleton (exactly one active row) via migration RunPython
+  - admin inline for runtime editing; updated_by set on save
+  - uses ModeratorActionType StrEnum from Phase 1
+
+files:
+  - path: src/backend/apps/moderation/models.py
+    targets:
+      - type: class
+        name: ModerationCriteria
+  - path: src/backend/apps/moderation/admin.py
+    targets:
+      - type: module
+        name: apps.moderation.admin
+  - path: src/backend/apps/core/utils/cache.py
+    targets:
+      - type: module
+        name: apps.core.utils.cache
+
+changes:
+  - action: add_code
+    description: Ensure ModerationCriteria model + singleton migration + admin inline + cache helper.
+
+acceptance_criteria:
+  - ModerationCriteria has EXACTLY the 12 documented fields (no min_price/max_price)
+  - exactly one active row enforced
+  - cache key moderation_criteria:v1 with 5-min TTL
+  - '"uv run ruff check" + "uv run basedpyright" pass'

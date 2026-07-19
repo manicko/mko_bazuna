@@ -1,0 +1,45 @@
+id: task_008_docker_env_templates
+
+title: .env.example + .env.dev templates
+
+priority: medium
+
+depends_on:
+  - task_006_docker_settings_package
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 8 — .env.example + .env.dev Templates
+
+description: >
+  Provide env var templates without API_ID/API_HASH (aiogram Bot API only). Fail-fast on missing
+  .env. Commit .env.example + .env.dev.example; gitignore .env and .env.dev.
+
+goals:
+  - DJANGO_SECRET_KEY, DEBUG, ALLOWED_HOSTS, DATABASE_URL (single source of truth)
+  - BOT_TOKEN required
+  - NO API_ID / API_HASH
+  - missing .env fails container startup
+  - gitignore entries
+
+files:
+  - path: .env.example
+    targets:
+      - type: file
+        name: .env.example
+  - path: .env.dev.example
+    targets:
+      - type: file
+        name: .env.dev.example
+  - path: .gitignore
+    targets:
+      - type: file
+        name: .gitignore
+
+changes:
+  - action: add_code
+    description: Write env templates + gitignore entries.
+
+acceptance_criteria:
+  - .env.example contains required vars, no secrets, no API_ID/API_HASH
+  - container fails fast when .env missing
+  - .env and .env.dev gitignored; .env.example + .env.dev.example committed

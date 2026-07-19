@@ -1,0 +1,46 @@
+id: task_009_docker_scheduler_advisory_locks
+
+title: Scheduled-jobs scheduler service + advisory locks (wiring only)
+
+priority: high
+
+depends_on:
+  - task_003_docker_compose_base
+  - task_006_docker_settings_package
+  - task_012_docker_prod_override
+
+source_reference: .ai/plans/00_detailed_plan_docker_environment.md
+source_section: Task 9 — Scheduled-Jobs Scheduler Service + Advisory Locks (Wiring Only)
+
+description: >
+  Wire the scheduler service that runs 7 management commands, each wrapped in a per-job PostgreSQL
+  advisory lock. Command implementations live in feature phases (Phase 2 Tasks 4-5, Phase 4 Task 2).
+  Scheduler gated by profiles:["scheduler"] to avoid import crash before commands exist.
+  Provide advisory_lock util (transaction-scoped, PgBouncer-safe) — the single source of truth.
+
+goals:
+  - advisory_lock.py util with pg_advisory_xact_lock(lock_id) context manager
+  - scheduler exec loop with 7 jobs wired (lock IDs MUST not collide)
+  - Phase 4 owns locks 1-5; Phase 2 owns 6-7; migrate uses session lock 100
+  - 'scheduler service gated by profiles:["scheduler"]'
+  - lock ID allocation documented
+
+files:
+  - path: src/backend/apps/core/utils/advisory_lock.py
+    targets:
+      - type: file
+        name: src/backend/apps/core/utils/advisory_lock.py
+  - path: docker-compose.prod.yml
+    targets:
+      - type: file
+        name: docker-compose.prod.yml
+
+changes:
+  - action: add_code
+    description: Add advisory_lock util + gated scheduler service block.
+
+acceptance_criteria:
+  - scheduler starts only with --profile scheduler after commands exist
+  - advisory_lock uses pg_advisory_xact_lock (transaction-scoped)
+  - lock IDs: archive_sweep=1, delete_sweep=2, consent_hard_delete=3, sweep_drafts=4, cleanup_login_tokens=5, purge_failed_ads=6, purge_rejected_ads=7, migrate=100
+  - each job idempotent and lock-wrapped

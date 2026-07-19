@@ -1,0 +1,43 @@
+id: task_041_phase3_contact_bridge
+
+title: Anonymous contact bridge (decision C)
+
+priority: high
+
+depends_on:
+  - task_030_phase1_bot_fsm
+  - task_032_phase1_web_search_views
+
+source_reference: .ai/plans/03_detailed_plan_contact_dashboard.md
+source_section: Task 1 — Anonymous Contact Bridge (decision C)
+
+description: >
+  Buyer reaches seller via deep-link without PII exposure. Render conditions (zone R2) enforced.
+
+goals:
+  - contact button renders ONLY when: ad.status==PUBLISHED, seller.telegram_id NOT NULL, NOT is_deleted, NOT is_banned, consent_revoked_at IS NULL
+  - deep-link = t.me/<bot_username>?start=contact_<ad_id> (uses ad_id, NOT uuid)
+  - bot handler finds ad -> seller via telegram_id; forwards anonymously; NEVER reveals PII
+  - 'bot messages: not PUBLISHED -> "объявление больше недоступно"; seller unavailable -> "продавец больше недоступен для связи"'
+  - AnalyticsEvent(CONTACT_INITIATED) recorded (no login)
+
+files:
+  - path: src/backend/apps/core/services/contact.py
+    targets:
+      - type: module
+        name: apps.core.services.contact
+  - path: src/telegram_bot/handlers/contact.py
+    targets:
+      - type: module
+        name: telegram_bot.handlers.contact
+
+changes:
+  - action: add_code
+    description: Implement contact render-condition service + bot deep-link handler.
+
+acceptance_criteria:
+  - render gated by all 5 zone R2 conditions
+  - deep-link uses ad_id (decision C)
+  - bot never reveals seller telegram_id/username
+  - CONTACT_INITIATED event recorded
+  - '"uv run ruff check" passes'

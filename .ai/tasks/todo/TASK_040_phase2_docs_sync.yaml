@@ -1,0 +1,44 @@
+id: task_040_phase2_docs_sync
+
+title: Documentation updates (moderation)
+
+priority: low
+
+depends_on:
+  - task_034_phase2_criteria_singleton
+  - task_035_phase2_action_log
+  - task_036_phase2_admin_ui
+  - task_037_phase2_purge_failed
+  - task_038_phase2_purge_rejected
+  - task_039_phase2_cache_invalidation
+  - task_033_phase1_docs_sync
+
+source_reference: .ai/plans/02_detailed_plan_moderation.md
+source_section: Task 7 — Documentation Updates
+
+description: >
+  Consolidate moderation spec (English-only per rule 1).
+
+goals:
+  - 01_technical_specification.md: decision A, US-A3/A4/A10/A11; clarify ModerationCriteria has NO min_price/max_price
+  - 04_db_structure.md: ModerationCriteria fields exact; ModeratorActionLog.reason TEXT never to seller; IX_ads_purge_failed, IX_ads_rejected_sweep documented
+
+files:
+  - path: docs/wiki/01_technical_specification.md
+    targets:
+      - type: file
+        name: docs/wiki/01_technical_specification.md
+  - path: docs/wiki/04_db_structure.md
+    targets:
+      - type: file
+        name: docs/wiki/04_db_structure.md
+
+changes:
+  - action: edit_content
+    description: Sync moderation decisions to wiki.
+
+acceptance_criteria:
+  - ModerationCriteria no-price-range fields documented
+  - ModeratorActionLog.reason TEXT, never seller-visible
+  - purge indexes documented
+  - docs English-only, frontmatter intact

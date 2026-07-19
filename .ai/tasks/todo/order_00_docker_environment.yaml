@@ -1,0 +1,54 @@
+tasks:
+  - id: task_001_docker_pyproject_reconcile
+    depends_on: []
+  - id: task_002_docker_dockerfile
+    depends_on:
+      - task_001_docker_pyproject_reconcile
+  - id: task_006_docker_settings_package
+    depends_on:
+      - task_001_docker_pyproject_reconcile
+  - id: task_003_docker_compose_base
+    depends_on:
+      - task_002_docker_dockerfile
+  - id: task_004_docker_compose_dev
+    depends_on:
+      - task_003_docker_compose_base
+  - id: task_005_docker_compose_test
+    depends_on:
+      - task_002_docker_dockerfile
+      - task_006_docker_settings_package
+  - id: task_007_docker_nginx
+    depends_on:
+      - task_003_docker_compose_base
+  - id: task_008_docker_env_templates
+    depends_on:
+      - task_006_docker_settings_package
+  - id: task_009_docker_scheduler_advisory_locks
+    depends_on:
+      - task_003_docker_compose_base
+      - task_006_docker_settings_package
+  - id: task_012_docker_prod_override
+    depends_on:
+      - task_003_docker_compose_base
+      - task_006_docker_settings_package
+  - id: task_010_docker_makefile
+    depends_on:
+      - task_004_docker_compose_dev
+  - id: task_011_docker_ci
+    depends_on:
+      - task_005_docker_compose_test
+  - id: task_009_docker_scheduler_advisory_locks
+    depends_on:
+      - task_003_docker_compose_base
+      - task_006_docker_settings_package
+      - task_012_docker_prod_override
+  - id: task_013_docker_pgbouncer
+    depends_on:
+      - task_012_docker_prod_override
+      - task_009_docker_scheduler_advisory_locks
+  - id: task_014_docker_backup
+    depends_on:
+      - task_013_docker_pgbouncer
+  - id: task_015_docker_wiki_alignment
+    depends_on:
+      - task_001_docker_pyproject_reconcile

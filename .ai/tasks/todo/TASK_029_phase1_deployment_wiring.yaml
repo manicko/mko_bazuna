@@ -1,0 +1,47 @@
+id: task_029_phase1_deployment_wiring
+
+title: Deployment wiring (consume Docker Environment plan)
+
+priority: medium
+
+depends_on:
+  - task_021_phase1_structure_enums
+  - task_002_docker_dockerfile
+  - task_003_docker_compose_base
+  - task_006_docker_settings_package
+  - task_007_docker_nginx
+
+source_reference: .ai/plans/01_detailed_plan_publish_discover.md
+source_section: Task 8 — Deployment Wiring (consume Docker Environment plan)
+
+description: >
+  Wire Phase 1 feature code into infrastructure owned solely by 00_detailed_plan_docker_environment.md.
+  Does NOT create Dockerfile/compose/nginx/settings. Verifies contracts hold.
+
+goals:
+  - migration guard: Docker plan migrate service runs before web+bot
+  - async safety: bot ORM/photo ops in sync_to_async; CONN_MAX_AGE=0
+  - nginx /media/ contract: nosniff, jpeg whitelist, inline, script block
+  - Dockerfile contract: python:3.14-slim + uv, non-root, collectstatic, media_volume rw
+  - pyproject contract: only feature deps added on top of Docker base
+
+files: []
+
+verifies:
+  - task_002_docker_dockerfile
+  - task_003_docker_compose_base
+  - task_006_docker_settings_package
+  - task_007_docker_nginx
+  - task_028_phase1_settings_security
+
+changes:
+  - action: no_op_verify
+    description: >
+      Verification-only task. Confirms Docker plan contracts (Task 1/2/6/7) satisfy Phase 1
+      requirements; adds only feature settings contribution. No infra file creation.
+
+acceptance_criteria:
+  - Docker plan migrate service ordered before web/bot (already in compose)
+  - bot sets django.setup() + shared ORM; sync_to_async wrapping
+  - nginx /media/ hardening present in Docker plan nginx.conf
+  - feature deps (aiogram, deep-translator, django-mptt, django-filter, django-tailwind, django-htmx, pillow) added to pyproject

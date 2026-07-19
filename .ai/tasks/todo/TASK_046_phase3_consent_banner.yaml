@@ -1,0 +1,40 @@
+id: task_046_phase3_consent_banner
+
+title: Consent banner (decision F/K)
+
+priority: medium
+
+depends_on:
+  - task_028_phase1_settings_security
+  - task_042_phase3_dashboard_views
+
+source_reference: .ai/plans/03_detailed_plan_contact_dashboard.md
+source_section: Task 6 — Consent Banner (decision F/K)
+
+description: >
+  Site-wide privacy banner implementing the two consent states.
+
+goals:
+  - banner shown to visitors who have not acted
+  - Accept: sets consent_given_at (covers all processing incl. bot)
+  - Decline (browse-only, decision K): blocks only seller actions; consent_revoked_at NOT set; NO deletion; contact button still works
+  - after acceptance, banner stays hidden (persisted)
+  - buyer may browse PUBLISHED ads before any action
+  - Plausible snippet needs NO banner (cookieless legitimate interest)
+
+files:
+  - path: src/backend/templates/components/consent_banner.html
+    targets:
+      - type: file
+        name: templates/components/consent_banner.html
+
+changes:
+  - action: add_code
+    description: Implement consent banner view/handler + template.
+
+acceptance_criteria:
+  - Accept sets consent_given_at
+  - Decline blocks seller actions only, no deletion
+  - banner hidden after acceptance, not re-shown
+  - buyer browses PUBLISHED ads pre-consent
+  - '"uv run ruff check" passes'

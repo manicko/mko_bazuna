@@ -1,0 +1,42 @@
+id: task_051_phase4_nginx_hardening
+
+title: nginx security hardening (zone R8)
+
+priority: high
+
+depends_on:
+  - task_029_phase1_deployment_wiring
+
+source_reference: .ai/plans/04_detailed_plan_analytics_harden.md
+source_section: Task 4 — nginx Security Hardening (zone R8)
+
+description: >
+  Production media + rate limiting with exact headers. Edits the Docker plan's nginx.conf (single
+  owner per Foundation rule) — coordinates via depends_on on task_007.
+
+goals:
+  - X-Content-Type-Options: nosniff always
+  - X-Frame-Options: DENY always
+  - CSP: default-src 'none'; img-src 'self' data:; object-src 'none'
+  - MIME whitelist image/jpeg only for /media/; default application/octet-stream
+  - Content-Disposition: inline
+  - script block: location ~* /media/.*\.(php|py|cgi|pl|sh)$ { deny all; return 403; }
+  - rate limit login_limit 10r/s burst 20 on /login/
+  - rate limit search_limit 20r/s burst 40 on /search/
+  - media key UUID v4
+
+files:
+  - path: docker/nginx/nginx.conf
+    targets:
+      - type: file
+        name: docker/nginx/nginx.conf
+
+changes:
+  - action: edit_content
+    description: Add hardening headers + rate-limit zones to nginx.conf.
+
+acceptance_criteria:
+  - all listed headers present
+  - script execution blocked (403)
+  - rate-limit zones defined for /login/ and /search/
+  - '"docker compose config" validates'
