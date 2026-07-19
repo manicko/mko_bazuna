@@ -1,11 +1,27 @@
 """
-Core StrEnum types for Mko Bazuna.
+Core enum types for Mko Bazuna.
 
-All fixed value sets are modeled as StrEnum per project rule 10.
+All fixed value sets are modeled as Enum or StrEnum per project rule 10.
 No inline string literals for constants anywhere in the codebase.
 """
 
-from enum import StrEnum
+from enum import IntEnum, StrEnum
+
+
+class AdvisoryLockId(IntEnum):
+    """PostgreSQL advisory lock IDs for idempotent scheduled jobs."""
+
+    ARCHIVE_SWEEP = 1
+    DELETE_SWEEP = 2
+    CONSENT_HARD_DELETE = 3
+    SWEEP_DRAFTS = 4
+    CLEANUP_LOGIN_TOKENS = 5
+    PURGE_FAILED_ADS = 6
+    PURGE_REJECTED_ADS = 7
+    MIGRATE = 100
+
+
+__all__ = ["AdvisoryLockId", "AdStatus", "AdSource", "AnalyticsEventType", "ModeratorActionType", "CategoryRejectReason"]
 
 
 class AdStatus(StrEnum):
