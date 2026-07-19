@@ -174,6 +174,7 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 - `search_vector` on `ads` (trigger-maintained: title + description + category_name).
 - `GIN index` on `search_vector` (`IX_ads_search_gin`) — see [db-indexes.md](db-indexes.md).
 - `pg_trgm` for typos (optional).
+- **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN and `pg_trgm` indexes after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
 - Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Bosnian query translated to Russian before search (decision G), so it matches the Russian category name.
 
