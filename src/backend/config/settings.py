@@ -12,12 +12,21 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-load_dotenv()
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Initialize django-environ
+env = environ.Env(
+    DEBUG=(bool, False),
+    SECRET_KEY=(str, "django-insecure-CHANGE_ME"),
+    DATABASE_URL=(str, None),
+)
+
+# Read .env file (django-environ uses python-dotenv internally)
+environ.Env.read_env(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
