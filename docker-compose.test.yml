@@ -1,0 +1,51 @@
+# Test override for docker-compose.yml
+# Ephemeral PostgreSQL for CI-compatible testing (NOT SQLite)
+# Uses postgres:18-alpine with no persistent volume - DB destroyed after run
+
+services:
+  # Override db service for test: ephemeral database (no persistent volume)
+  db:
+    image: postgres:18-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: mko_bazuna
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    # No persistent volume for ephemeral test database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mko_bazuna"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Override migrate service for test: uses test settings
+  migrate:
+    environment:
+      POSTGRES_DB: mko_bazuna
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
+      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+      DJANGO_SETTINGS_MODULE: config.settings.test
+    env_file: []
+
+  # Test service: one-shot run migrate + pytest
+  test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: /app/entrypoint-test.sh
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+      - POSTGRES_DB=mko_bazuna
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
+      - DJANGO_SECRET_KEY=test-secret-key-for-testing-only
+    # One-shot service: exits with pytest exit code
+    profiles: ["test"]
+

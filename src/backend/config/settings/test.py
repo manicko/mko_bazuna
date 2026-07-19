@@ -8,9 +8,9 @@ from .base import *  # noqa: F403, F401
 
 DEBUG = True
 
-# Use real PostgreSQL for testing (per spec zone C5)
-# The base settings already configure PostgreSQL, but we ensure test DB is used
-DATABASES["default"]["NAME"] = "mko_bazuna_test"  # noqa: F405
+# pytest-django creates/destroys test database automatically
+# Base database connection is for pytest to create test_<name> database
+DATABASES["default"]["NAME"] = "mko_bazuna"  # noqa: F405
 
 # Faster password hasher for tests
 PASSWORD_HASHERS = [  # noqa: F405
