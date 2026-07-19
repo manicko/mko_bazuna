@@ -1,5 +1,7 @@
 # Mko Bazuna
 
+> Documents the target specification/architecture (source of truth: `docs/wiki/`). Implementation is in progress.
+
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a
 Telegram bot; published ads appear on the site. Buyers browse, search, and filter without login.
 

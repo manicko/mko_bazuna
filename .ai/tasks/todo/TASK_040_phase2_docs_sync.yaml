@@ -20,18 +20,18 @@ description: >
   Consolidate moderation spec (English-only per rule 1).
 
 goals:
-  - 01_technical_specification.md: decision A, US-A3/A4/A10/A11; clarify ModerationCriteria has NO min_price/max_price
-  - 04_db_structure.md: ModerationCriteria fields exact; ModeratorActionLog.reason TEXT never to seller; IX_ads_purge_failed, IX_ads_rejected_sweep documented
+  - `docs/wiki/technical-specification.md`: decision A, US-A3/A4/A10/A11; clarify ModerationCriteria has NO min_price/max_price
+  - `docs/wiki/db-structure.md`: ModerationCriteria fields exact; ModeratorActionLog.reason TEXT never to seller; IX_ads_purge_failed, IX_ads_rejected_sweep documented
 
 files:
-  - path: docs/wiki/01_technical_specification.md
-    targets:
-      - type: file
-        name: docs/wiki/01_technical_specification.md
-  - path: docs/wiki/04_db_structure.md
-    targets:
-      - type: file
-        name: docs/wiki/04_db_structure.md
+  - path: docs/wiki/technical-specification.md
+  targets:
+  - type: file
+  name: docs/wiki/technical-specification.md
+  - path: docs/wiki/db-structure.md
+  targets:
+  - type: file
+  name: docs/wiki/db-structure.md
 
 changes:
   - action: edit_content

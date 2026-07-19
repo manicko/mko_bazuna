@@ -11,7 +11,7 @@ source_reference: .ai/plans/01_detailed_plan_publish_discover.md
 source_section: Task 6 — Publication + Lifecycle Indexes
 
 description: >
-  Performance indexes per docs/wiki/04_db_structure.md.
+  Performance indexes per docs/wiki/db-structure.md.
 
 goals:
   - IX_ads_pub_listing: partial B-tree (status, category_id, city_id, -published_at) condition PUBLISHED

@@ -18,7 +18,7 @@
 **Files_modified:** `pyproject.toml`, `uv.lock`, `docker/Dockerfile`, `docker/entrypoint.sh`, `docker-compose.yml`, `docker-compose.dev.override.yml`, `docker-compose.test.yml`, `docker-compose.prod.yml`, `src/backend/config/settings/__init__.py`, `src/backend/config/settings/base.py`, `src/backend/config/settings/dev.py`, `src/backend/config/settings/prod.py`, `src/backend/config/settings/test.py`, `docker/nginx/nginx.conf`, `.env.example`, `.env.dev.example`, `Makefile`, `.github/workflows/ci.yml`, `src/backend/apps/core/utils/advisory_lock.py`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/01_technical_specification.md` (decisions A-L, zones C1-C12, R1-R9), `docs/wiki/02_packages.md`, `docs/wiki/03_structure.md`, `docs/wiki/04_db_structure.md`
+> **Spec source:** `docs/wiki/technical-specification.md` (decisions A-L, zones C1-C12, R1-R9), `docs/wiki/packages.md`, `docs/wiki/architecture-structure.md`, `docs/wiki/db-structure.md`
 > **Advisory Lock ID allocation:** Phase 4 = 1-5 (`archive_sweep`, `delete_sweep`, `consent_hard_delete`, `sweep_drafts`, `cleanup_login_tokens`); Phase 2 = 6-7 (`purge_failed_ads`, `purge_rejected_ads`); migrate service = 100 (distinct, non-colliding).
 
 ---
@@ -28,13 +28,13 @@
 **Goal:** Fix critical version contradictions in `pyproject.toml` to enable a buildable Docker environment.
 
 **Acceptance Criteria:**
-- `pyproject.toml` contains `requires-python = ">=3.14,<3.15"` (aiogram CalVer upper bound: `Python >=3.10,<3.15` per `docs/wiki/02_packages.md`)
-- `pyproject.toml` contains `django>=5.2.16,<6.0` (Django 5.2.x LTS; corrected from `>=5.2.8` per canonical `docs/wiki/02_packages.md`)
+- `pyproject.toml` contains `requires-python = ">=3.14,<3.15"` (aiogram CalVer upper bound: `Python >=3.10,<3.15` per `docs/wiki/packages.md`)
+- `pyproject.toml` contains `django>=5.2.16,<6.0` (Django 5.2.x LTS; corrected from `>=5.2.8` per canonical `docs/wiki/packages.md`)
 - `pyproject.toml` contains `psycopg[binary]>=3.2.0` (line corrected from `psycopg2-binary>=2.9.11`)
 - `pyproject.toml` removes `psycopg[pool]>=3.2.0` — YAGNI (rule 5). PgBouncer is the external pooler; psycopg `[pool]` extra provides native client-side pooling which is not used.
-- `pyproject.toml` includes all spec dependencies (versions per canonical `docs/wiki/02_packages.md`): `django-environ>=0.11.0`, `django-mptt>=0.18.0`, `django-filter>=26.1`, `aiogram>=3.15.0`, `deep-translator>=1.11.0`, `django-tailwind>=4.4.0`, `django-htmx>=1.19.0`, `pillow>=10.4.0`
+- `pyproject.toml` includes all spec dependencies (versions per canonical `docs/wiki/packages.md`): `django-environ>=0.11.0`, `django-mptt>=0.18.0`, `django-filter>=26.1`, `aiogram>=3.15.0`, `deep-translator>=1.11.0`, `django-tailwind>=4.4.0`, `django-htmx>=1.19.0`, `pillow>=10.4.0`
 - `pyproject.toml` removes `psycopg2-binary` completely
-- **NO `python-dotenv` declared directly** — it is TRANSITIVE via `django-environ` (per `02_packages.md`)
+- **NO `python-dotenv` declared directly** — it is TRANSITIVE via `django-environ` (per `docs/wiki/packages.md`)
 - `pyproject.toml` `[tool.pytest.ini_options]` contains `asyncio_mode="strict"` and `minversion="8.4"` (required for `pytest-asyncio>=1.4.0`)
 - `uv.lock` regenerated with `uv lock --refresh` after changes
 - Verification: `uv run python -c "import psycopg; print(psycopg.__version__)"` outputs psycopg3 version (>=3.2.0)
@@ -167,7 +167,7 @@
 - `src/backend/config/settings/` package created with `__init__.py`, `base.py`, `dev.py`, `prod.py`, `test.py`
 - `base.py` contains common settings: INSTALLED_APPS, MIDDLEWARE, DATABASES, TEMPLATES, STORAGES (FileSystemStorage contract for later S3 swap)
 - `base.py` sets `CONN_MAX_AGE=0` and `OPTIONS={"prepare_threshold": None}` for psycopg3 PgBouncer compatibility (zone C5)
-- `base.py` uses PostgreSQL engine ONLY — NO SQLite fallback per `03_structure.md` C5
+- `base.py` uses PostgreSQL engine ONLY — NO SQLite fallback per `docs/wiki/architecture-structure.md` C5
 - `dev.py` inherits from base: `DEBUG=True`, console logging, no SSL redirect
 - `prod.py` inherits from base: `DEBUG=False`, `SECURE_SSL_REDIRECT=True`, `SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO','https')`, `USE_X_FORWARDED_HOST=True`, secure cookies (`SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`)
 - `test.py` inherits from base: `DEBUG=True`, test database config, faster password hasher, **uses REAL PostgreSQL (NOT SQLite)**
@@ -192,7 +192,7 @@
 - `/static/` location served from whitenoise in the image (NOT from a volume); 30d cache headers
 - `/media/` location served from `/media_volume/` with zone R8 hardening:
   - Script execution blocked: `location ~* /media/.*\.(php|py|cgi|pl|sh)$ { deny all; return 403; }`
-  - NOTE: this extends the `03_structure.md` regex (`php|py|cgi`) with `pl|sh` as an intentional hardening extension (defense-in-depth against any interpreted script upload). `03_structure.md` will be updated to match.
+  - NOTE: this extends the `docs/wiki/architecture-structure.md` regex (`php|py|cgi`) with `pl|sh` as an intentional hardening extension (defense-in-depth against any interpreted script upload). `docs/wiki/architecture-structure.md` will be updated to match.
   - Header: `X-Content-Type-Options: nosniff always`
   - Header: `Content-Disposition: inline`
   - Header: `X-Frame-Options: DENY always`
@@ -350,14 +350,14 @@
 
 ## Task 14: Verify Wiki Spec Files Alignment
 
-**Goal:** Confirm the spec source-of-truth (`docs/wiki/02_packages.md`, `03_structure.md`, `04_db_structure.md`) agrees with the approved stack.
+**Goal:** Confirm the spec source-of-truth (`docs/wiki/packages.md`, `docs/wiki/architecture-structure.md`, `docs/wiki/db-structure.md`) agrees with the approved stack.
 
 **Acceptance Criteria:**
-- `docs/wiki/02_packages.md`: confirms Django `>=5.2.16,<6.0`, psycopg3 only (no psycopg2-binary), Python 3.14 compatible.
-- `docs/wiki/03_structure.md`: confirms `python:3.14-slim` base image and `postgres:18-alpine`; removes `static_volume` references (static served by whitenoise from image, nginx serves `media_volume` only); extends R8 script-block regex to `php|py|cgi|pl|sh` to match this plan's zone R8 hardening.
-- `docs/wiki/04_db_structure.md`: FTS/triggers unchanged; PostgreSQL 18 confirmed. Add a one-line note that GIN/`pg_trgm` indexes should be reindexed after any major PG collation-provider upgrade.
+- `docs/wiki/packages.md`: confirms Django `>=5.2.16,<6.0`, psycopg3 only (no psycopg2-binary), Python 3.14 compatible.
+- `docs/wiki/architecture-structure.md`: confirms `python:3.14-slim` base image and `postgres:18-alpine`; removes `static_volume` references (static served by whitenoise from image, nginx serves `media_volume` only); extends R8 script-block regex to `php|py|cgi|pl|sh` to match this plan's zone R8 hardening.
+- `docs/wiki/db-structure.md`: FTS/triggers unchanged; PostgreSQL 18 confirmed. Add a one-line note that GIN/`pg_trgm` indexes should be reindexed after any major PG collation-provider upgrade.
 
-**Artifacts:** `docs/wiki/02_packages.md`, `docs/wiki/03_structure.md`, `docs/wiki/04_db_structure.md` (verified/edited if needed)
+**Artifacts:** `docs/wiki/packages.md`, `docs/wiki/architecture-structure.md`, `docs/wiki/db-structure.md` (verified/edited if needed)
 **Dependencies:** Task 0 (version facts)
 **Risks:** Editing spec source-of-truth must be reviewed; this task closes the loop so the repo spec no longer contradicts `pyproject.toml`/compose.
 
@@ -431,10 +431,10 @@ This section preserves the audit trail (the standalone audit file was removed). 
 - **H-4:** migrate lock documented as pre-PgBouncer session lock (safe).
 - **M-6:** `psycopg[pool]` dropped (YAGNI; PgBouncer is the pooler).
 - **M-7:** backup uses `pg_dump -F c` + `pg_restore` (custom format consistent).
-- **M-4:** `static_volume` removed from this plan; Task 14 mandates removing it from `03_structure.md`.
+- **M-4:** `static_volume` removed from this plan; Task 14 mandates removing it from `docs/wiki/architecture-structure.md`.
 
 **Advisory notes (carried forward, apply at implementation):**
-- **M-1 (single-host media):** local `media_volume` is single-host only. Document in `03_structure.md`/runbook: S3/R2 swap (already in `STORAGES` contract) is required before horizontal scaling.
+- **M-1 (single-host media):** local `media_volume` is single-host only. Document in `docs/wiki/architecture-structure.md`/runbook: S3/R2 swap (already in `STORAGES` contract) is required before horizontal scaling.
 - **M-2 (scheduler robustness):** add a per-job `statement_timeout` (or `signal`-based timeout) and stagger job schedules to avoid a lock-ordering stampede / hung-job block.
 - **M-3 (DB config precedence):** derive `DATABASES` from `DATABASE_URL` only (12-factor); if both `DATABASE_URL` and discrete vars are present, `DATABASE_URL` wins (Task 8 updated accordingly).
 - **M-5 (.env naming):** commit `.env.example` + `.env.dev.example`; gitignore `.env` and `.env.dev`. Standardized in Task 8.
@@ -442,7 +442,7 @@ This section preserves the audit trail (the standalone audit file was removed). 
 - **L-4 (lock util SSOT):** Phase 2/4 commands MUST `from apps.core.utils.advisory_lock import advisory_lock` and MUST NOT inline a session-scoped snippet (perpetuates C-1). The util is the single source of truth.
 - **L-5 (dev nginx):** dev profile disables nginx by default; the HTTP→HTTPS redirect caveat is moot there (already the case).
 
-**Cross-plan contradiction matrix (verified consistent):** base image `python:3.14-slim`, `postgres:18(-alpine)`, whitenoise `/static/` + nginx `/media/`, R8 regex (Docker extends to `php|py|cgi|pl|sh`; `03_structure.md` to be updated via Task 14), advisory-lock IDs (Phase4=1-5, Phase2=6-7, migrate=100), `CONN_MAX_AGE=0` + `prepare_threshold=None`, pyproject versions, scheduler command names, no-SQLite — all consistent across plans.
+**Cross-plan contradiction matrix (verified consistent):** base image `python:3.14-slim`, `postgres:18(-alpine)`, whitenoise `/static/` + nginx `/media/`, R8 regex (Docker extends to `php|py|cgi|pl|sh`; `docs/wiki/architecture-structure.md` to be updated via Task 14), advisory-lock IDs (Phase4=1-5, Phase2=6-7, migrate=100), `CONN_MAX_AGE=0` + `prepare_threshold=None`, pyproject versions, scheduler command names, no-SQLite — all consistent across plans.
 
 ---
 

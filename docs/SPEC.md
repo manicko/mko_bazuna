@@ -6,16 +6,17 @@ tags:
   - summary
   - agent-reference
 related:
-  - wiki/technical-specification
-  - wiki/db-structure
-  - wiki/architecture-structure
-  - wiki/packages
-  - wiki/audit-resolutions
+  - technical-specification
+  - db-structure
+  - architecture-structure
+  - packages
+  - audit-resolutions
 ---
 
 # Mko Bazuna — Technical Specification (Agent Summary)
 
-> Concise reference for agents and developers. Full detail in `docs/wiki/`.
+> Documents the target specification/architecture (source of truth: `docs/01-spec/`). Implementation is in progress.
+> Concise reference for agents and developers. Full detail in `docs/01-spec/`.
 
 ## What the system is
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a **Telegram bot**; published ads appear on the site. Buyers browse/search/filter without login.

@@ -6,7 +6,7 @@ tags:
   - governance
   - rules
 related:
-  - wiki/technical-specification
+  - technical-specification
 ---
 
 ## Purpose

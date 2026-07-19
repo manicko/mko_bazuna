@@ -92,7 +92,7 @@ environment:
 - **Mitigation**: Fresh DB for MVP; document reindex step for future upgrades (`REINDEX DATABASE dbname;`).
 
 ### 5. PG18 Data Checksums Enabled by Default (LOW for greenfield / MED for future upgrades)
-- **Change**: Databases initialized with PostgreSQL 18 `initdb` have **data page checksums enabled by default** (previously off). This is not a problem for a fresh MVP cluster, but it IS a consideration when restoring/upgrading from an older (checksum-disabled) cluster: `pg_upgrade` requires matching checksum settings (use `--copy`/`pg_checksums` or enable checksums on the old cluster first).
+- **Change**: Databases initialized with PostgreSQL 18 `initdb` have **data page checksums enabled by default** (previously off). This is not a problem for a fresh MVP cluster, but it IS a consideration when restoring/upgrading from an older (checksum-disabled) cluster: `pg_upgrade` requires matching checksum settings (use `--copy`/`pg_checksums` or enable checksums on old cluster first).
 - **Mitigation**: Greenfield MVP starts on PG18 with checksums on (a positive — silent-corruption detection at ~small overhead). Document that any future in-place upgrade or `pg_dump`/restore across checksum boundaries must account for this.
 
 ---
@@ -131,7 +131,7 @@ FROM python:3.14-slim  # or python:3.14-alpine if using ICU
 ### 3. `docker-compose.yml` DB Image
 
 ```yaml
-# BEFORE (per 03_structure.md line 84):
+# BEFORE (per docs/wiki/architecture-structure.md line 84):
 db:
   image: postgres:17-alpine
 
@@ -143,19 +143,19 @@ db:
   # Note: PG18 initdb enables data page checksums by default (fresh MVP cluster = fine).
 ```
 
-### 4. `docs/wiki/02_packages.md` Updates
+### 4. `docs/wiki/packages.md` Updates
 
 - Line 14: Change `django==5.1.2` to `django>=5.2.8,<6.0` (Django 5.2.x LTS — first series supporting Python 3.14; LTS to April 2028).
 - Line 17: `psycopg[binary]>=3.2.0` is already the intended dependency in the wiki; ensure `pyproject.toml` matches it (current `pyproject.toml` has the conflicting `psycopg2-binary` — must be swapped).
 - Add note: "Django 5.2.8+ (5.2.x LTS) required for Python 3.14. Django 6.0 also supports 3.14 but is not LTS; MVP stays on 5.2 LTS."
 
-### 5. `docs/wiki/03_structure.md` Updates
+### 5. `docs/wiki/architecture-structure.md` Updates
 
 - Line 96: `python:3.14-slim` — acceptable; keep.
 - Line 84: `postgres:17-alpine` — change to `postgres:18` with `POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=ru-RU"`.
 - Line 104: PgBouncer note remains optional; psycopg3 native pool via OPTIONS supports both.
 
-### 6. `docs/wiki/04_db_structure.md` Updates
+### 6. `docs/wiki/db-structure.md` Updates
 
 - No structural changes needed; the plpgsql triggers and FTS logic remain valid.
 - Add note in search_vector section: "On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN and `pg_trgm` indexes after any PG18 collation-provider change/upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex."

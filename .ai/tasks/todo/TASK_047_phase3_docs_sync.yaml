@@ -20,18 +20,18 @@ description: >
   Contact + dashboard spec sync (English-only per rule 1).
 
 goals:
-  - 01: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses ad_id; decision F/K two consent states
-  - 04: account states + erasure clarified (soft-delete Phase 3, hard-delete Phase 4)
+  - `docs/wiki/technical-specification.md`: US-B4/B5, US-S5..S9 with O1/R4 state separation; decision C contact uses ad_id; decision F/K two consent states
+  - `docs/wiki/db-structure.md`: account states + erasure clarified (soft-delete Phase 3, hard-delete Phase 4)
 
 files:
-  - path: docs/wiki/01_technical_specification.md
-    targets:
-      - type: file
-        name: docs/wiki/01_technical_specification.md
-  - path: docs/wiki/04_db_structure.md
-    targets:
-      - type: file
-        name: docs/wiki/04_db_structure.md
+  - path: docs/wiki/technical-specification.md
+  targets:
+  - type: file
+  name: docs/wiki/technical-specification.md
+  - path: docs/wiki/db-structure.md
+  targets:
+  - type: file
+  name: docs/wiki/db-structure.md
 
 changes:
   - action: edit_content

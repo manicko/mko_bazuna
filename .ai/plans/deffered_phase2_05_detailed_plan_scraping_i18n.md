@@ -5,7 +5,7 @@
 **Files_modified:** `scraping_service/`, `src/backend/apps/`, `docs/wiki/*.md`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/01_technical_specification.md` (decision B — scraping separate process/API, NOT in bot; decision G — content Russian + query/UI translation; decision D2 — name_i18n; US-B9 RU/BS UI), `docs/wiki/02_packages.md` (telethon deferred), `docs/wiki/03_structure.md` (scraping_service/ separate process), `docs/wiki/04_db_structure.md` (telegram_message_id for dedup).
+> **Spec source:** `docs/wiki/technical-specification.md` (decision B — scraping separate process/API, NOT in bot; decision G — content Russian + query/UI translation; decision D2 — name_i18n; US-B9 RU/BS UI), `docs/wiki/packages.md` (telethon deferred), `docs/wiki/architecture-structure.md` (scraping_service/ separate process), `docs/wiki/db-structure.md` (telegram_message_id for dedup).
 > **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, decision B strictness, zone R7, decision G invariant verified in run 3.
 
 ---
@@ -98,9 +98,9 @@
 **Goal:** Finalize scraping + i18n spec in wiki.
 
 **Acceptance Criteria:**
-- `docs/wiki/02_packages.md`: Add `telethon>=1.44.0` to package list under "Deferred Packages" section (not runtime).
-- `docs/wiki/03_structure.md`: Document `scraping_service/` entrypoint structure and that API_ID/API_HASH are phase-5 additions to `.env`.
-- `docs/wiki/04_db_structure.md`: Document `telegram_message_id` column purpose; clarify `AdSource` remains `TELEGRAM` in phase 1 (scraping uses same value with message_id for distinction).
+- `docs/wiki/packages.md`: Add `telethon>=1.44.0` to package list under "Deferred Packages" section (not runtime).
+- `docs/wiki/architecture-structure.md`: Document `scraping_service/` entrypoint structure and that API_ID/API_HASH are phase-5 additions to `.env`.
+- `docs/wiki/db-structure.md`: Document `telegram_message_id` column purpose; clarify `AdSource` remains `TELEGRAM` in phase 1 (scraping uses same value with message_id for distinction).
 
 **Artifacts:** Updated wiki files (English-only per rule 1).
 **Dependencies:** Tasks 1-5.
@@ -119,7 +119,7 @@
 | Zone R7 (API_ID/API_HASH) | Task 2 | Added in phase 5 only; removed from phase 1 |
 | telegram_message_id migration | Task 1 | Nullable BIGINT UNIQUE, CONCURRENTLY index, AdSource=TELEGRAM only |
 
-## Version Exactness (vs docs/wiki/02_packages.md)
+## Version Exactness (vs docs/wiki/packages.md)
 
 - `telethon>=1.44.0` — **ADDED** in Phase 5 (was deferred in phase 1)
 - `deep-translator>=1.11.0` — **REUSED** (existing from Phase 1)

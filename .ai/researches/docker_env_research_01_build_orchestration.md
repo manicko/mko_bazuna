@@ -8,22 +8,21 @@
 
 ## 1. Constraints Extracted from Wiki
 
-### From `docs/wiki/02_packages.md` (packages specification):
+### From `docs/wiki/packages.md` (packages specification):
 - **Django 5.1.2** (exact version specified, line 14)
 - **psycopg[binary] >= 3.2.0** — psycopg3 (line 17)
 - **aiogram >= 3.15.0** — Telegram bot framework (line 41)
 - **uv** for dependency management (lines 25, 79)
 - **django-tailwind, django-storages, deep-translator, pytest** in the stack (lines 59, 64, 49, 73)
 
-### From `docs/wiki/03_structure.md` (deployment sketch):
+### From `docs/wiki/architecture-structure.md` (deployment sketch):
 - **Services:** db (postgres:17-alpine), web (Django + gunicorn sync WSGI), bot (same image, different command), nginx (ports 80/443) — lines 83-88
 - **Volumes:** postgres_data, media_volume, static_volume — line 91
 - **gunicorn sync WSGI** for phase 1, NOT ASGI/Uvicorn (line 85)
 - **PgBouncer recommended** in transaction mode for shared connection pooling (line 104)
 - **Migrations run once before web and bot start** (ordering guard required) — lines 105-106
-- **Dockerfile:** python:3.14-slim + uv, non-root USER, RUN collectstatic — line 96
 
-### From `docs/wiki/04_db_structure.md` (database requirements):
+### From `docs/wiki/db-structure.md` (database requirements):
 - **PostgreSQL Russian FTS config** (`to_tsvector('russian', ...)`) — line 6, 183-184
 - **Search vector triggers** managed via plpgsql functions — lines 186-218
 - **Category name denormalization** into ads table for FTS — line 74
@@ -34,8 +33,8 @@
 
 ### Critical Drifts Observed:
 
-| Component | Spec Requirement (02_packages.md) | Actual State (pyproject.toml) | Impact |
-|-----------|----------------------------------|-------------------------------|--------|
+| Component | Spec Requirement (docs/wiki/packages.md) | Actual State (pyproject.toml) | Impact |
+|-----------|------------------------------------------|-------------------------------|--------|
 | Django | `django==5.1.2` (exact) | `django>=6.0.1` (looser, newer) | **Breaks compatibility** |
 | psycopg | `psycopg[binary]>=3.2.0` (psycopg3) | `psycopg2-binary>=2.9.11` (psycopg2) | **Breaks compatibility** |
 | Python version | Implied 3.12-3.13 (Django 5.1 support) | `requires-python = ">=3.14"` | **Pre-release Python** |
@@ -361,7 +360,7 @@ services:
 
 ### 3.5 Static/Media Volume Strategy
 
-Per spec (03_structure.md lines 64-67, 94-96):
+Per spec (docs/wiki/architecture-structure.md lines 64-67, 94-96):
 
 - **static_volume:** Built during Docker image (collectstatic), mounted read-only into nginx. Nginx serves `/static/` directly.
 - **media_volume:** Written by bot at runtime (photo uploads), served by nginx at `/media/` with security headers.
@@ -382,7 +381,7 @@ location /media/ {
 
 ### 3.6 Async Bot + Sync ORM Coexistence
 
-The spec (02_packages.md line 9) requires:
+The spec (docs/wiki/packages.md line 9) requires:
 - **aiogram 3.x** for async Telegram bot (Bot API)
 - **sync Django ORM** wrapped in `sync_to_async`
 - **Separate processes** (shared image, separate containers)
@@ -478,7 +477,7 @@ PgBouncer (recommended) sits between both and PostgreSQL
 
 ## References
 
-- `docs/wiki/01_technical_specification.md` — Lines 18-21 (traffic/load requirements)
-- `docs/wiki/02_packages.md` — Lines 14-17, 41, 59, 64, 73, 9 (exact package versions)
-- `docs/wiki/03_structure.md` — Lines 64-67, 83-106 (deployment sketch)
-- `docs/wiki/04_db_structure.md` — Lines 6, 183-184 (FTS triggers, Russian config)
+- `docs/wiki/technical-specification.md` — Lines 18-21 (traffic/load requirements)
+- `docs/wiki/packages.md` — Lines 14-17, 41, 59, 64, 73, 9 (exact package versions)
+- `docs/wiki/architecture-structure.md` — Lines 64-67, 83-106 (deployment sketch)
+- `docs/wiki/db-structure.md` — Lines 6, 183-184 (FTS triggers, Russian config)

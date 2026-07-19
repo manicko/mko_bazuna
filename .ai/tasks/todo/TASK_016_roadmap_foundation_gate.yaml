@@ -49,4 +49,4 @@ changes:
 acceptance_criteria:
   - Foundation tasks 001-015 implemented and merged
   - Dockerfile/compose/nginx/settings owned only by Foundation plan
-  - pyproject reconciled to docs/wiki/02_packages.md
+  - pyproject reconciled to docs/wiki/packages.md

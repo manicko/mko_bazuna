@@ -5,14 +5,14 @@
 **Files_modified:** `src/backend/apps/moderation/`, `src/backend/apps/ads/`, `src/backend/apps/core/management/commands/`, `docs/wiki/*.md`
 **Autonomous:** Yes
 
-> **Spec source:** `docs/wiki/01_technical_specification.md` (decision A, US-A3/A10/A11), `docs/wiki/04_db_structure.md` (exact ModerationCriteria fields, ModeratorActionLog, R1 erasure, IX_ads_purge_failed/IX_ads_rejected_sweep), `docs/wiki/03_structure.md` (management commands only, NOT Celery).
+> **Spec source:** `docs/wiki/technical-specification.md` (decision A, US-A3/A10/A11), `docs/wiki/db-structure.md` (exact ModerationCriteria fields, ModeratorActionLog, R1 erasure, IX_ads_purge_failed/IX_ads_rejected_sweep), `docs/wiki/architecture-structure.md` (management commands only, NOT Celery).
 > **Planner note:** Produced via 3 iterative Planner runs. Coverage audit, version exactness, rule-compliance, DB-structure consistency verified in run 3.
 
 ---
 
 ## Task 1: ModerationCriteria Singleton (exact fields)
 
-**Goal:** Admin-editable thresholds matching `04_db_structure.md` exactly.
+**Goal:** Admin-editable thresholds matching `docs/wiki/db-structure.md` exactly.
 
 **Acceptance Criteria:**
 - `apps/moderation/models.py` — `ModerationCriteria` fields EXACTLY (no min_price/max_price):
@@ -131,8 +131,8 @@
 **Goal:** Consolidate moderation spec (English-only per rule 1).
 
 **Acceptance Criteria:**
-- `docs/wiki/01_technical_specification.md`: decision A (single auto-gate), US-A3/A4/A10/A11 covered; clarify `ModerationCriteria` has NO min_price/max_price/price-range fields.
-- `docs/wiki/04_db_structure.md`: `ModerationCriteria` field list confirmed exact; `ModeratorActionLog.reason` TEXT, never shown to seller; indexes `IX_ads_purge_failed`, `IX_ads_rejected_sweep` documented.
+- `docs/wiki/technical-specification.md`: decision A (single auto-gate), US-A3/A4/A10/A11 covered; clarify `ModerationCriteria` has NO min_price/max_price/price-range fields.
+- `docs/wiki/db-structure.md`: `ModerationCriteria` field list confirmed exact; `ModeratorActionLog.reason` TEXT, never shown to seller; indexes `IX_ads_purge_failed`, `IX_ads_rejected_sweep` documented.
 - All docs English-only, frontmatter intact (doc-maintenance-rules).
 
 **Artifacts:** Updated wiki files.
@@ -150,7 +150,7 @@
 | US-A10 (auto-moderation) | Phase 1 Task 10 + Task 6 | Phase 1 owns rules; Phase 2 wires cache-invalidation + verifies logging |
 | US-A11 (failed queue + criteria editing) | Tasks 1, 3, 7 | Criteria singleton edit + failed queue UI + criteria fields documented |
 
-## Version Exactness (vs docs/wiki/02_packages.md)
+## Version Exactness (vs docs/wiki/packages.md)
 
 **Phase 2 uses SAME packages as Phase 1 (CONFIRMED):**
 - `django>=5.2.16,<6.0`
@@ -180,7 +180,7 @@
 | 12 (Logging not print) | OK | Task 4, 5 specify `logger` for output; no `print()` statements. |
 | 11 (Pydantic at boundaries) | N/A | Phase 2 reads cached criteria; no new input boundaries. Phase 1 Task 9 already covers bot message DTOs. |
 
-## DB Structure Consistency (vs 04_db_structure.md)
+## DB Structure Consistency (vs docs/wiki/db-structure.md)
 
 | Decision | Status | Evidence |
 |----------|--------|----------|
