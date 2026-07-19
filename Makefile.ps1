@@ -1,6 +1,20 @@
 # Makefile.ps1 — PowerShell equivalent for Mko Bazuna Docker workflow
 # Windows/WSL2 primary development path - provides parity to Makefile targets
 
+# Load environment variables from .env file
+$envContent = Get-Content -Path ".env" -ErrorAction SilentlyContinue
+if ($envContent) {
+    foreach ($line in $envContent) {
+        if ($line -match "^([^#=]+)=(.*)$") {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            if (-not $env:$name) {
+                $env:$name = $value
+            }
+        }
+    }
+}
+
 # Show help
 function Show-Help {
     Write-Host "Mko Bazuna - Development Commands" -ForegroundColor Cyan
@@ -20,6 +34,7 @@ function Show-Help {
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
     Write-Host "  restore        Restore database from backup file"
     Write-Host "  prune-backups  Manually prune backups older than 7 days"
+    Write-Host "  clean          Stop containers and remove volumes"
 }
 
 # Start development environment
@@ -67,7 +82,7 @@ function Invoke-Logs {
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml logs -f
 }
 
-# Create database backup with timestamp and 7-day rotation
+# Create database backup with 7-day rotation
 function Invoke-Backup {
     $backupsDir = "./backups"
     if (-not (Test-Path $backupsDir)) {
@@ -77,7 +92,15 @@ function Invoke-Backup {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backupFile = "$backupsDir\dump_$timestamp.dump"
 
-    docker compose exec -T db pg_dump -U $env:POSTGRES_USER -d $env:POSTGRES_DB -F c > $backupFile
+    $pgUser = $env:POSTGRES_USER
+    $pgDb = $env:POSTGRES_DB
+
+    if (-not $pgUser -or -not $pgDb) {
+        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env or environment" -ForegroundColor Red
+        exit 1
+    }
+
+    docker compose exec -T db pg_dump -U $pgUser -d $pgDb -F c > $backupFile
     Write-Host "Backup created: $backupFile" -ForegroundColor Green
 
     # Prune backups older than 7 days
@@ -100,7 +123,15 @@ function Invoke-Restore {
         exit 1
     }
 
-    docker compose exec -T db pg_restore -U $env:POSTGRES_USER -d $env:POSTGRES_DB --clean --if-exists $BackupFile
+    $pgUser = $env:POSTGRES_USER
+    $pgDb = $env:POSTGRES_DB
+
+    if (-not $pgUser -or -not $pgDb) {
+        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env or environment" -ForegroundColor Red
+        exit 1
+    }
+
+    docker compose exec -T db pg_restore -U $pgUser -d $pgDb --clean --if-exists $BackupFile
 }
 
 # Manual prune of old backups
@@ -117,6 +148,14 @@ function Invoke-PruneBackups {
         Write-Host "Pruned old backup: $($file.Name)" -ForegroundColor Yellow
     }
     Write-Host "Old backups (7+ days) pruned" -ForegroundColor Green
+}
+
+# Clean - stop containers and remove volumes
+function Invoke-Clean {
+    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+    if (Test-Path "./backups") {
+        Remove-Item "./backups/*.dump" -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # Main entry point
@@ -139,6 +178,7 @@ switch ($Target.ToLower()) {
     "backup" { Invoke-Backup }
     "restore" { Invoke-Restore }
     "prune-backups" { Invoke-PruneBackups }
+    "clean" { Invoke-Clean }
     default {
         Write-Host "Unknown target: $Target" -ForegroundColor Red
         Show-Help

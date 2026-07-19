@@ -42,6 +42,40 @@ services:
     profiles:
       - scheduler
 
+  # Backup service: daily database dumps with 7-day retention
+  # Opt-in via --profile backup to prevent storage consumption before needed
+  backup:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./backups:/backups
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e;
+        until pg_isready -h $$POSTGRES_HOST -p $$POSTGRES_PORT; do sleep 5; done;
+        while true; do
+          date=$$(date +%Y%m%d);
+          pg_dump -h $$POSTGRES_HOST -p $$POSTGRES_PORT
+            -U $$POSTGRES_USER -d $$POSTGRES_DB -F c
+            -f /backups/dump_$$date.dump;
+          echo "Backup completed: dump_$$date.dump";
+          find /backups -name 'dump_*.dump' -mtime +7 -delete 2>/dev/null || true;
+          sleep 86400;
+        done
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - backup
+
   # PgBouncer opt-in via --profile pgbouncer
   pgbouncer:
     image: edoburu/pgbouncer:1.25.2
