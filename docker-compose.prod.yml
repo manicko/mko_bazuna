@@ -1,0 +1,66 @@
+# Production override for docker-compose.yml
+# Immutable image deployment with TLS hardening and scheduler
+
+services:
+  # Override web for production: add restart policy
+  web:
+    restart: unless-stopped
+
+  # Override bot for production: add restart policy (already has command)
+  bot:
+    restart: unless-stopped
+
+  # Override nginx for production: TLS certificate mount
+  nginx:
+    volumes:
+      - media_volume:/media_volume:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # TLS certificates from environment variable
+      - ${TLS_CERT_PATH:-/etc/nginx/certs}:/etc/nginx/certs:ro
+
+  # Scheduler service: runs management commands in loop (hourly)
+  # Gated by profiles:["scheduler"] to prevent import crash before commands exist
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: /app/entrypoint-scheduler.sh
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.prod
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/postgres}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-placeholder}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - scheduler
+
+  # PgBouncer opt-in via --profile pgbouncer
+  pgbouncer:
+    image: edoburu/pgbouncer:1.25.2
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - PGBOUNCER_DATABASE=${POSTGRES_DB:-postgres}
+      - PGBOUNCER_USER=${POSTGRES_USER:-postgres}
+      - PGBOUNCER_AUTH_TYPE=md5
+    ports:
+      - "6432:6432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - pgbouncer

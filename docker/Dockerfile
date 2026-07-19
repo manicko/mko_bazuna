@@ -62,7 +62,8 @@ COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
 # Copy entrypoint scripts
 COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
 COPY --chown=app:app docker/entrypoint-test.sh /app/entrypoint-test.sh
-RUN chmod +x /app/entrypoint-test.sh
+COPY --chown=app:app docker/entrypoint-scheduler.sh /app/entrypoint-scheduler.sh
+RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh
 
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:$PATH"
