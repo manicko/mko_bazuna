@@ -1,48 +1,90 @@
-# docker-compose.yml
+# Base docker-compose.yml for Mko Bazuna
+# Services: db, migrate, web, bot, nginx
+# Static served by whitenoise in image; media served by nginx from media_volume
+
 services:
-  db:                           # PostgreSQL
-    image: postgres:18        # latest stable (18.4, GA). See docs/wiki/02_packages.md Infrastructure & Runtime.
+  db:
+    image: postgres:18-alpine
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5433:5432"             # 5433 на хосте → чтобы не конфликтовать с локальным postgres, если есть
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  web:                          # Django
+  migrate:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: uv run python src/backend/manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app                  # монтируем весь проект
-    ports:
-      - "8000:8000"
+    command: uv run python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - UV_PROJECT_ENVIRONMENT=/opt/venv
-      - UV_LINK_MODE=copy
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DEBUG=${DEBUG}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - DATABASE_ENGINE=${DATABASE_ENGINE}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_USERNAME=${DATABASE_USERNAME}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_HOST=${DATABASE_HOST}
-      - DATABASE_PORT=${DATABASE_PORT}
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@db:5432/postgres}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-placeholder}
     env_file:
       - .env
+    # One-shot service: runs migrations with advisory lock (ID 100), then exits
+    # Idempotent: advisory lock prevents concurrent runs
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.prod
+    env_file:
+      - .env
+    volumes:
+      - media_volume:/app/media
+    # Port 8000 NOT published - nginx proxies internally
+
+  bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m telegram_bot.main
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.prod
+    env_file:
+      - .env
+    volumes:
+      - media_volume:/app/media
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - media_volume:/media_volume:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  media_volume:
