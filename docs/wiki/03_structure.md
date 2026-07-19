@@ -84,8 +84,8 @@ mko_bazuna/                        # корень репозитория
 
 ```
 docker-compose.yml (root) сервисы:
-  db      postgres:17-alpine  + volume postgres_data  + healthcheck (pg_isready)
-  web     Django + gunicorn (sync WSGI) из docker/Dockerfile; команда `gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers N`  # зона D10: фаза 1 = СИНХРОННЫЙ WSGI (HTMX MPA сервер-рендерится синхронно). `[+UvicornWorker]`/`asgi:application` — НЕ используется в фазе 1 (ASGI зарезервирован для будущего).
+  db      postgres:18-alpine  + volume postgres_data  + healthcheck (pg_isready)
+  web     Django + gunicorn (sync WSGI) из docker/Dockerfile; команда `gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers N`  # зона D10: фаза 1 = СИНХРОННЫЙ WSGI (HTMX MPA сервер-рендерится синхронно). `[+UvicornWorker]`/`asgi:application` — НЕ используется в фазе 1 (ASGI зарезервирован для будущего). gunicorn pin: `gunicorn>=26.0` (Django 5.2 + py3.14 OK).
           монтирует media_volume:/app/media; env_file: .env; depends_on db (healthy); порт 8000 НЕ публикуется наружу
   bot     тот же образ, команда `python -m telegram_bot.main`; монтирует media_volume; depends_on db; restart: unless-stopped
   nginx   nginx:alpine; порты 80/443; монтирует static_volume (ro) + media_volume (ro); proxy_pass → web:8000;
@@ -96,7 +96,7 @@ volumes: postgres_data, media_volume, static_volume
 
 - **nginx ОБЯЗАТЕЛЕН в фазе 1**: whitenoise НЕ отдаёт user-uploaded media; локальный MEDIA_ROOT требует nginx (или S3).
   Плюс TLS-терминация (HTTPS обязателен: токены входа в deep-link, Secure-куки). web-сервис не торчит наружу.
-- **Dockerfile** (`docker/Dockerfile`): `python:3.14-slim` + `uv`; создать non-root пользователя; `RUN uv run python manage.py collectstatic --noinput`.
+- **Dockerfile** (`docker/Dockerfile`): `python:3.14-slim` (3.14.6 current stable) + `uv` (pin `uv>=0.11.28`); создать non-root пользователя; `RUN uv run python manage.py collectstatic --noinput`.
 - **Статические файлы**: whitenoise (в образе) ИЛИ nginx (static_volume). Для медиа — только nginx.
 - **Настройки Django**: `USE_X_FORWARDED_HOST = True`, `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO','https')`, `SECURE_SSL_REDIRECT = True`.
 - **Безопасность /media/ (зона R8):** в nginx блокировать исполнение скриптов (`location ~* /media/.*\.(php|py|cgi)$ { deny all; }`); плюс:

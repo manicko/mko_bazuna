@@ -7,7 +7,7 @@
 
 ## Foundation. Docker Environment (runs FIRST)
 
-> **Source plan:** `00_detailed_plan_docker_environment.md`. This is cross-cutting infrastructure, NOT a feature phase. It MUST be completed before Phases 1–4 because it is the **sole owner** of the Dockerfile, compose files, nginx config, settings package, and PostgreSQL 17 / Python 3.14 / Django 5.2 LTS stack that every feature phase depends on.
+> **Source plan:** `00_detailed_plan_docker_environment.md`. This is cross-cutting infrastructure, NOT a feature phase. It MUST be completed before Phases 1–4 because it is the **sole owner** of the Dockerfile, compose files, nginx config, settings package, and PostgreSQL 18 / Python 3.14 / Django 5.2 LTS stack that every feature phase depends on.
 
 **Deliverables (sole ownership — feature phases must NOT recreate these):**
 - `pyproject.toml` / `uv.lock` reconciled to `docs/wiki/02_packages.md` (Django `>=5.2.16,<6.0`, psycopg3, Python 3.14)
@@ -100,7 +100,7 @@
 ## Dependency Graph
 ```
 Docker Environment (Foundation, 00_detailed_plan_docker_environment.md)
-        │  owns Dockerfile / compose / nginx / settings / pyproject / postgres:17 / scheduler
+        │  owns Dockerfile / compose / nginx / settings / pyproject / postgres:18 / scheduler
         │  Phases 1–4 must NOT recreate these (single-owner rule)
         ↓
 Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5

@@ -83,6 +83,7 @@
 - **--dry-run flag:** when set, prints affected count without deletion (idempotent verification).
 - Atomically deletes ad + related `ad_images` (CASCADE); logs count to stdout via `logger`.
 - Idempotent; safe to re-run. Uses `IX_ads_purge_failed` partial index.
+- **Wrapped in `pg_advisory_xact_lock(6)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`.** Lock ID 6 is owned by Phase 2 (Phase 4 owns 1-5, migrate uses 100); do NOT reuse other IDs.
 - Hooked into systemd/cron scheduler (Phase 4).
 
 **Artifacts:** `apps/core/management/commands/purge_failed_ads.py`.
@@ -99,6 +100,7 @@
 - `apps/core/management/commands/purge_rejected_ads.py`: queries `ads` WHERE `status=REJECTED` AND `rejected_at < now() - interval '90 days'`.
 - **--dry-run flag:** when set, prints affected count without deletion (idempotent verification).
 - Deletes ad + images cascade; preserves `ModeratorActionLog` (`ad_id` SET NULL). Idempotent. Uses `IX_ads_rejected_sweep` partial index.
+- **Wrapped in `pg_advisory_xact_lock(7)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`.** Lock ID 7 is owned by Phase 2 (Phase 4 owns 1-5, migrate uses 100); do NOT reuse other IDs.
 - Hooked into systemd/cron scheduler (Phase 4).
 
 **Artifacts:** `apps/core/management/commands/purge_rejected_ads.py`.

@@ -115,8 +115,8 @@
 - Trigger `ads_search_vector_update` BEFORE INSERT OR UPDATE on `ads`.
 - Function `categories_name_propagate()` + trigger `on_category_name_update` AFTER UPDATE OF name ON categories (re-touches dependent ads; spec zone D1).
 - **`GinIndex(name='IX_ads_search_gin', fields=['search_vector'])`** applied (NOT `models.Index` — that would build a BTREE, zone D12).
-- Runs on PostgreSQL 17; one-time backfill for existing rows.
-- `uv run manage.py migrate` succeeds against PostgreSQL 17.
+- Runs on PostgreSQL 18; one-time backfill for existing rows.
+- `uv run manage.py migrate` succeeds against PostgreSQL 18.
 
 **Artifacts:** `apps/ads/migrations/000X_search_vector_triggers.py`, trigger SQL.
 **Dependencies:** Tasks 2, 3

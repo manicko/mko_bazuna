@@ -1,8 +1,8 @@
 # Dockerfile
 FROM python:3.14-slim
 
-# Устанавливаем uv
-RUN pip install --no-cache-dir uv
+# Устанавливаем uv (pinned для воспроизводимости)
+RUN pip install --no-cache-dir "uv>=0.11.28"
 
 WORKDIR /app
 

@@ -17,7 +17,7 @@
 **Acceptance Criteria:**
 - Add `telegram_message_id` (BIGINT, nullable, UNIQUE, indexed) to `ads` table via Phase 5 migration.
 - Phase 1 `AdSource` remains `TELEGRAM` only (decision B: scraping is a SEPARATE future phase with its own ingestion path, not merged into the bot's source enum). Both bot and scraping service write `source=TELEGRAM`, distinguished by `telegram_message_id IS NOT NULL` for scraped content.
-- Migration is online-safe: nullable column addition, then `CREATE INDEX CONCURRENTLY` via Django `AddIndexConcurrently` (PostgreSQL 17 compatible).
+- Migration is online-safe: nullable column addition, then `CREATE INDEX CONCURRENTLY` via Django `AddIndexConcurrently` (PostgreSQL 18 compatible).
 - UNIQUE constraint allows multiple NULL values (PostgreSQL behavior), ensuring no conflicts with existing rows.
 
 **Artifacts:** `apps/ads/migrations/000X_add_telegram_message_id.py`.

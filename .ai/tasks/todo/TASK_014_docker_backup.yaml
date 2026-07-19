@@ -5,7 +5,7 @@ title: DB backup script + restore runbook
 priority: medium
 
 depends_on:
-  - task_013_docker_pgbouncer
+  - task_002_docker_dockerfile
 
 source_reference: .ai/plans/00_detailed_plan_docker_environment.md
 source_section: Task 13 — DB Backup Script + Restore Runbook
@@ -38,3 +38,4 @@ changes:
 acceptance_criteria:
   - '"make backup" creates dump in ./backups/'
   - backup script idempotent
+

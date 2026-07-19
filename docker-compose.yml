@@ -1,7 +1,7 @@
 # docker-compose.yml
 services:
   db:                           # PostgreSQL
-    image: postgres:17          #  любая актуальная
+    image: postgres:18        # latest stable (18.4, GA). See docs/wiki/02_packages.md Infrastructure & Runtime.
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB}

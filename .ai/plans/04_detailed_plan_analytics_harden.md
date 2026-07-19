@@ -53,7 +53,7 @@
   - Uses `IX_ads_archive_sweep` partial index
   - Transitions matched ads to `ARCHIVED` status, sets `archived_at=now()`
   - `--dry-run` flag for safe verification (prints count only)
-  - **Wrapped in `pg_advisory_lock(1)` released in finally block**
+  - **Wrapped in `pg_advisory_xact_lock(1)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`**
   - Logs count to stdout via `logger = logging.getLogger(__name__)` (rule 12)
 
 - `apps/core/management/commands/delete_sweep.py`:
@@ -61,7 +61,7 @@
   - Uses `IX_ads_delete_sweep` partial index
   - Deletes matched ads + CASCADE to `ad_images`
   - `--dry-run` flag for safe verification
-  - **Wrapped in `pg_advisory_lock(2)` released in finally block**
+  - **Wrapped in `pg_advisory_xact_lock(2)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`**
   - Logs count via `logger`
 
 - `apps/core/management/commands/consent_hard_delete.py`:
@@ -72,17 +72,17 @@
   - SET NULL `analytics_events.user_id` (preserves aggregates)
   - SET NULL `ModeratorActionLog.user_id` (preserves reason/admin/timestamp for audit)
   - `--dry-run` flag for safe verification
-  - **Wrapped in `pg_advisory_lock(3)` released in finally block**
+  - **Wrapped in `pg_advisory_xact_lock(3)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`**
   - Logs via `logger`
 
 - `apps/core/management/commands/sweep_drafts.py`:
   - Purges `Ad` rows with `status=DRAFT` where `created_at < now() - interval '30 minutes'` (zone C8/I)
-  - **Wrapped in `pg_advisory_lock(4)` released in finally block**
+  - **Wrapped in `pg_advisory_xact_lock(4)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`**
   - `--dry-run` flag, logs via `logger`
 
 - `apps/core/management/commands/cleanup_login_tokens.py`:
   - DELETE `login_tokens` where `expires_at < now()` OR (`consumed_at IS NOT NULL` AND `created_at < now() - interval '1 day'`) (zone C1)
-  - **Wrapped in `pg_advisory_lock(5)` released in finally block**
+  - **Wrapped in `pg_advisory_xact_lock(5)` released at transaction commit/rollback (PgBouncer-safe, per Docker plan Task 9); use `from apps.core.utils.advisory_lock import advisory_lock`**
   - `--dry-run` flag, logs via `logger`
 
 **Artifacts:** 5 management command files in `apps/core/management/commands/`
@@ -174,11 +174,11 @@
 **Phase 4 commands (this file):**
 | Command | Purpose | Advisory Lock |
 |---------|---------|---------------|
-| `archive_sweep` | PUBLISHED → ARCHIVED after 2 months | `pg_advisory_lock(1)` |
-| `delete_sweep` | ARCHIVED → DELETED after 4 months | `pg_advisory_lock(2)` |
-| `consent_hard_delete` | User erasure after 30 days | `pg_advisory_lock(3)` |
-| `sweep_drafts` | DRAFT cleanup after 30 min idle | `pg_advisory_lock(4)` |
-| `cleanup_login_tokens` | Expired/consumed token cleanup | `pg_advisory_lock(5)` |
+| `archive_sweep` | PUBLISHED → ARCHIVED after 2 months | `pg_advisory_xact_lock(1)` |
+| `delete_sweep` | ARCHIVED → DELETED after 4 months | `pg_advisory_xact_lock(2)` |
+| `consent_hard_delete` | User erasure after 30 days | `pg_advisory_xact_lock(3)` |
+| `sweep_drafts` | DRAFT cleanup after 30 min idle | `pg_advisory_xact_lock(4)` |
+| `cleanup_login_tokens` | Expired/consumed token cleanup | `pg_advisory_xact_lock(5)` |
 
 **Phase 2 commands (owned by 02_detailed_plan_moderation.md):**
 | Command | Purpose | Advisory Lock |
@@ -190,24 +190,17 @@ All 7 commands wired to scheduler service in `docker-compose.prod.yml` per Docke
 
 ## Advisory Lock Specification
 
-Each sweep command implements PostgreSQL advisory lock pattern:
+Each sweep command MUST use the shared transaction-scoped advisory-lock utility owned by the Docker Environment plan (Task 9, `apps/core/utils/advisory_lock.py`). The lock is `pg_advisory_xact_lock(lock_id)` — transaction-scoped, released automatically on commit/rollback, and PgBouncer-safe (session-scoped `pg_advisory_lock`/`pg_advisory_unlock` inline snippets are FORBIDDEN per the Docker plan's resolved C-1 finding and L-4 note).
 
 ```python
-from django.db import connection
-from contextlib import contextmanager
+# In each management command — DO NOT inline a session-scoped snippet.
+from apps.core.utils.advisory_lock import advisory_lock
 
-@contextmanager
-def advisory_lock(lock_id: int):
-    with connection.cursor() as cur:
-        cur.execute("SELECT pg_advisory_lock(%s)", [lock_id])
-    try:
-        yield
-    finally:
-        with connection.cursor() as cur:
-            cur.execute("SELECT pg_advisory_unlock(%s)", [lock_id])
+with advisory_lock(lock_id):  # lock_id per table below; released at txn end
+    # ... query + mutate within a single DB transaction ...
 ```
 
-Lock IDs per command:
+Lock IDs per command (must NOT collide — allocated by the Docker plan):
 - `archive_sweep`: 1
 - `delete_sweep`: 2
 - `consent_hard_delete`: 3

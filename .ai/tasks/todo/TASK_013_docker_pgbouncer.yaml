@@ -6,7 +6,6 @@ priority: low
 
 depends_on:
   - task_012_docker_prod_override
-  - task_009_docker_scheduler_advisory_locks
 
 source_reference: .ai/plans/00_detailed_plan_docker_environment.md
 source_section: Task 12 — PgBouncer Opt-In Profile + Documentation
@@ -40,3 +39,4 @@ changes:
 acceptance_criteria:
   - '"--profile pgbouncer up" starts PgBouncer'
   - README describes when/why to enable
+

@@ -32,7 +32,7 @@ dependency set. Every version here was validated against PyPI stable releases (a
 
 ## Stack Summary
 
-*  Django 5.2 LTS + PostgreSQL 17
+*  Django 5.2 LTS + PostgreSQL 18 (upgrade from 17 — see Infrastructure & Runtime section)
 *  Django Admin
 *  Filtration: django-filter, django-mptt
 *  Search: PostgreSQL native FTS (search_vector TSVECTOR + GIN + pg_trgm, russian config)
@@ -76,7 +76,7 @@ django-filter>=26.1              # List/API filters. 26.1 requires Django>=5.2 (
 # Native PostgreSQL full-text search (no external engine). No django-haystack / Whoosh.
 
 # API
-# djangorestframework==3.15.2  # DEFERRED to post-MVP (HTMX MPA in phase 1)
+# djangorestframework>=3.15.2  # DEFERRED to post-MVP (HTMX MPA in phase 1)
 
 # Telegram integration (phase 1)
 aiogram>=3.15.0                  # Bot API bot: login (decision H/Z25), contact (decision C),
@@ -104,7 +104,7 @@ deep-translator>=1.11.0           # Pure-Python; last release 2023 but works on 
                                    # interface so the backend can be swapped later (official API / LibreTranslate).
 
 # Tasks
-# celery==5.4.0 / redis==5.1.1  # DEFERRED to post-MVP.
+# celery>=5.4.0 / redis>=5.1.1  # DEFERRED to post-MVP.
 # Phase-1 scheduled jobs (archive@2mo, delete@4mo, 7-day purge, 30-day consent hard-delete,
 # 30-min draft sweep) run as Django management commands via systemd timer / cron.
 
@@ -179,7 +179,42 @@ Latest stable release found on PyPI at audit time, with the recommended floor fr
 | ruff | `>=0.15.20` | 0.15.22 | `>=0.15.20` | VALID | Lint/format; py3.14 OK. |
 | radon | `>=6.0.1` | 6.0.1 | `>=6.0.1` | VALID | Complexity metrics (2023, still works). |
 | python-dotenv | (transitive) | 1.2.2 | transitive | VALID | NOT a direct dep — pulled in by django-environ. |
+| postgres (image) | `postgres:17` / `postgres:17-alpine` | 18.4 | `postgres:18` / `postgres:18-alpine` | VALID | PG 18 GA/stable (Sep 2025). Safe upgrade: plpgsql triggers, GIN, `to_tsvector('russian')`, `pg_trgm` all compatible; reindex FTS/trgm after upgrade. |
+| python (base image) | `python:3.14-slim` | 3.14.6 | `python:3.14-slim` | VALID | 3.14 is current stable; supported to 2030. |
+| uv | unpinned (`pip install uv`) | 0.11.28 | `uv>=0.11.28` | VALID | Pin for reproducibility in Dockerfile. |
+| nginx | `nginx:alpine` | 1.30.4 | `nginx:stable` or `nginx:alpine` | VALID | 1.28.x now EOL; alpine tracks 1.30.x. |
+| gunicorn | unpinned (not in pyproject) | 26.0.0 | `gunicorn>=26.0` | VALID | Sync WSGI; Django 5.2 + py3.14 OK. Add to deps. |
+| whitenoise | implied for /static/ | 6.12.0 | `whitenoise>=6.12.0` | VALID | Used for /static/; NOT yet in pyproject — add. Media still needs nginx. |
+| pgbouncer | unpinned (recommended) | 1.25.2 | `pgbouncer>=1.25.2` | VALID | Transaction-mode pooler. Use >=1.25.2 (SCRAM regression in 1.25.1 w/ PG18). |
+| django-storages | `>=1.14.6` (deferred) | 1.14.6 | DEFERRED | VALID | Django 5.2 OK; re-validate at S3/R2 swap. |
+| boto3 | `>=1.35.0` (deferred) | 1.43.46 | DEFERRED | VALID | Python 3.14 OK; only for S3/R2 swap. |
+| celery | `==5.4.0` (deferred) | 5.6.2 | DEFERRED | VALID | Python 3.14 + Django 5.2 OK; post-MVP. |
+| redis-py | `==5.1.1` (deferred) | 8.0.1 | DEFERRED | VALID | 8.x uses RESP3 by default (breaking); only for celery broker, post-MVP. |
+| telethon | phase-2 only | 1.44.0 | DEFERRED (phase 2) | VALID | Python 3.14 OK; userbot scraping, NOT phase 1. Latest stable 1.44.0 (released 2026-06-15); phase-5 plan pins `telethon>=1.44.0`. |
 
+## Infrastructure & Runtime
+
+These are non-PyPI components pinned in `docker/Dockerfile`, `docker-compose.yml`, and the
+structure docs. They were added to the audit on 2026-07-19 after the initial PyPI-only pass.
+All are compatible with Django 5.2 + Python 3.14 + psycopg3.
+
+* **PostgreSQL 17 -> 18:** PG 18.4 is GA and stable. The project's FTS stack
+  (`TSVECTOR` + GIN + `pg_trgm` + plpgsql triggers + `to_tsvector('russian')`) is fully
+  compatible. Breaking-change notes: page checksums on by default for NEW clusters, MD5 auth
+deprecated (use SCRAM), `VACUUM`/`ANALYZE` now include inheritance children by default.
+  ACTION: bump `postgres:17` -> `postgres:18` in `docker-compose.yml` and `postgres:17-alpine`
+  -> `postgres:18-alpine` in `03_structure.md`; plan a `pg_upgrade`/dump-restore + reindex of
+  GIN and `pg_trgm` indexes.
+* **uv:** pin `uv>=0.11.28` in the Dockerfile instead of unpinned `pip install uv`.
+* **gunicorn:** pin `gunicorn>=26.0` and add to `[project].dependencies` (web is sync WSGI).
+* **whitenoise:** docs reference it for `/static/` but it is absent from `pyproject.toml`;
+  add `whitenoise>=6.12.0` if used in production (media still served by nginx).
+* **PgBouncer:** when deployed, pin `pgbouncer>=1.25.2` (>=1.25.2 avoids the SCRAM regression
+  with PG 18 present in 1.25.1). The `prepare_threshold=None` psycopg3 recipe stays.
+* **nginx:** `nginx:alpine` now tracks 1.30.x (1.28.x EOL) — acceptable; `nginx:stable` is
+  the explicit alternative.
+* **Deferred (phase 2 / swap):** django-storages, boto3, celery, redis-py, telethon — keep
+  deferred per YAGNI; their latest stable versions are noted above for when they are adopted.
 ## Compatibility Decisions (audit outcome)
 
 | Package | Old doc | Recommended | Status | Note |

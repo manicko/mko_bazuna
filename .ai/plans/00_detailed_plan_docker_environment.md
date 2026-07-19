@@ -76,7 +76,7 @@
 
 **Acceptance Criteria:**
 - `docker-compose.yml` omits obsolete `version:` key (decision C7)
-- Contains services: `db` (postgres:17-alpine, healthcheck via `pg_isready`), `migrate` (one-shot service), `web`, `bot`, `nginx`
+- Contains services: `db` (postgres:18-alpine, healthcheck via `pg_isready`), `migrate` (one-shot service), `web`, `bot`, `nginx`
 - Volume `postgres_data` defined for PostgreSQL persistence
 - Volume `media_volume` defined for user-uploaded media
 - `/static/` is served from whitenoise in the image (NO `static_volume`); `/media/` served by nginx from `media_volume` (read-only)
@@ -122,7 +122,7 @@
 
 **Acceptance Criteria:**
 - `docker-compose.test.yml` defines test-specific services
-- Uses `postgres:17` (NOT SQLite — Russian FTS + plpgsql triggers require real PG per decision A6)
+- Uses `postgres:18` (NOT SQLite — Russian FTS + plpgsql triggers require real PG per decision A6)
 - `test` service is one-shot: runs migrate then `pytest --tb=short`
 - NO persistent volume for test database (ephemeral)
 - Environment variable `DJANGO_SETTINGS_MODULE=config.settings.test` set
@@ -293,7 +293,7 @@
 **Acceptance Criteria:**
 - `.github/workflows/ci.yml` exists with jobs: `build`, `test`, `lint`, `typecheck`
 - Build runs on `ubuntu-latest` with `docker build`
-- Test job uses `postgres:17` service with healthcheck
+- Test job uses `postgres:18` service with healthcheck
 - Test runs pytest inside container against real PostgreSQL
 - Lint runs `uv run ruff check src/`
 - Typecheck runs `uv run basedpyright src/`
@@ -354,8 +354,8 @@
 
 **Acceptance Criteria:**
 - `docs/wiki/02_packages.md`: confirms Django `>=5.2.16,<6.0`, psycopg3 only (no psycopg2-binary), Python 3.14 compatible.
-- `docs/wiki/03_structure.md`: confirms `python:3.14-slim` base image and `postgres:17-alpine`; removes `static_volume` references (static served by whitenoise from image, nginx serves `media_volume` only); extends R8 script-block regex to `php|py|cgi|pl|sh` to match this plan's zone R8 hardening.
-- `docs/wiki/04_db_structure.md`: FTS/triggers unchanged; PostgreSQL 17 confirmed. Add a one-line note that GIN/`pg_trgm` indexes should be reindexed after any major PG collation-provider upgrade.
+- `docs/wiki/03_structure.md`: confirms `python:3.14-slim` base image and `postgres:18-alpine`; removes `static_volume` references (static served by whitenoise from image, nginx serves `media_volume` only); extends R8 script-block regex to `php|py|cgi|pl|sh` to match this plan's zone R8 hardening.
+- `docs/wiki/04_db_structure.md`: FTS/triggers unchanged; PostgreSQL 18 confirmed. Add a one-line note that GIN/`pg_trgm` indexes should be reindexed after any major PG collation-provider upgrade.
 
 **Artifacts:** `docs/wiki/02_packages.md`, `docs/wiki/03_structure.md`, `docs/wiki/04_db_structure.md` (verified/edited if needed)
 **Dependencies:** Task 0 (version facts)
@@ -391,7 +391,7 @@ Task 13 (backup) ← Task 2
 | Compose files | base + `dev.override` | `test` overlay | base + `prod` |
 | Source | bind-mount (`.:/app`) | ephemeral | baked in image (immutable) |
 | Server | `runserver` | pytest runner | `gunicorn` sync WSGI |
-| DB | `db` (persistent volume) | ephemeral postgres:17 (no volume) | `db` (persistent volume) |
+| DB | `db` (persistent volume) | ephemeral postgres:18 (no volume) | `db` (persistent volume) |
 | Migrations | on-demand / `migrate` svc | in test entrypoint | one-shot `migrate` svc (locked, ID 100) |
 | nginx | optional | none | mandatory, TLS + R8 hardening |
 | DEBUG | True | True (test settings) | False |
@@ -442,7 +442,7 @@ This section preserves the audit trail (the standalone audit file was removed). 
 - **L-4 (lock util SSOT):** Phase 2/4 commands MUST `from apps.core.utils.advisory_lock import advisory_lock` and MUST NOT inline a session-scoped snippet (perpetuates C-1). The util is the single source of truth.
 - **L-5 (dev nginx):** dev profile disables nginx by default; the HTTP→HTTPS redirect caveat is moot there (already the case).
 
-**Cross-plan contradiction matrix (verified consistent):** base image `python:3.14-slim`, `postgres:17(-alpine)`, whitenoise `/static/` + nginx `/media/`, R8 regex (Docker extends to `php|py|cgi|pl|sh`; `03_structure.md` to be updated via Task 14), advisory-lock IDs (Phase4=1-5, Phase2=6-7, migrate=100), `CONN_MAX_AGE=0` + `prepare_threshold=None`, pyproject versions, scheduler command names, no-SQLite — all consistent across plans.
+**Cross-plan contradiction matrix (verified consistent):** base image `python:3.14-slim`, `postgres:18(-alpine)`, whitenoise `/static/` + nginx `/media/`, R8 regex (Docker extends to `php|py|cgi|pl|sh`; `03_structure.md` to be updated via Task 14), advisory-lock IDs (Phase4=1-5, Phase2=6-7, migrate=100), `CONN_MAX_AGE=0` + `prepare_threshold=None`, pyproject versions, scheduler command names, no-SQLite — all consistent across plans.
 
 ---
 
