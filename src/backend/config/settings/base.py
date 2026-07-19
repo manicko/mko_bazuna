@@ -4,6 +4,7 @@ Shared across all environments (dev, prod, test).
 """
 
 import os
+import sys
 from pathlib import Path
 
 import environ
@@ -18,18 +19,27 @@ env = environ.Env(
 )
 
 # Read .env file (django-environ uses python-dotenv internally)
-environ.Env.read_env(BASE_DIR / ".env")
+# Fail fast if .env is missing (only in container environment)
+env_path = BASE_DIR / ".env"
+if not env_path.exists():
+    # Only fail in production-like environments (not during collectstatic in builder)
+    if os.getenv("DJANGO_SETTINGS_MODULE") and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", ""):
+        print("ERROR: .env file not found. Copy .env.example to .env and configure values.", file=sys.stderr)
+        sys.exit(1)
+else:
+    environ.Env.read_env(env_path)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-CHANGE_ME")
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+# ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
 
 # Application definition
 INSTALLED_APPS = [
@@ -40,7 +50,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Third-party
-    "django_tailwind",
+    "tailwind",
     "django_htmx",
     # Theme app for Tailwind
     "theme",
@@ -86,22 +96,28 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Database - PostgreSQL ONLY (no SQLite fallback per zone C5)
-# Use DATABASE_URL for 12-factor config
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "mko_bazuna"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        # PgBouncer async safety (zone C5)
-        "CONN_MAX_AGE": 0,
-        "OPTIONS": {
-            "prepare_threshold": None,
-        },
+# Use DATABASE_URL for 12-factor config (single source of truth)
+# If DATABASE_URL is set, use it; otherwise fall back to discrete POSTGRES_* vars
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    # Parse DATABASE_URL using django-environ's built-in parsing
+    DATABASES = {"default": env.db()}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "mko_bazuna"),
+            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            # PgBouncer async safety (zone C5)
+            "CONN_MAX_AGE": 0,
+            "OPTIONS": {
+                "prepare_threshold": None,
+            },
+        }
     }
-}
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"

@@ -4,6 +4,17 @@
 
 set -e
 
+# Fail fast if .env file is missing (container environment check)
+# Note: Test environment sets variables directly via compose, no .env needed
+check_env_file() {
+    if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "/app/.env" ]; then
+        if [ "$DJANGO_SETTINGS_MODULE" != "config.settings.test" ]; then
+            echo "ERROR: /app/.env file not found. Copy .env.example to .env and configure values." >&2
+            exit 1
+        fi
+    fi
+}
+
 # Fix volume permissions for Windows/WSL2 bind mounts (dev mode)
 fix_volume_permissions() {
     # Only needed in development with bind mounts
@@ -33,6 +44,7 @@ wait_for_db() {
 }
 
 # Execute logic
+check_env_file
 fix_volume_permissions
 wait_for_db
 
