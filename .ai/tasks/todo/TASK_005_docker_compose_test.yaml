@@ -16,7 +16,7 @@ description: >
   plpgsql triggers require real PG). One-shot test service runs migrate then pytest.
 
 goals:
-  - postgres:17 (no persistent volume)
+  - postgres:18 (no persistent volume)
   - test service runs migrate + pytest --tb=short
   - DJANGO_SETTINGS_MODULE=config.settings.test
   - 'asyncio_mode="strict" + minversion="8.4" (set in Task 0)'

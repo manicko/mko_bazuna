@@ -16,7 +16,7 @@ description: >
 goals:
   - .github/workflows/ci.yml with jobs build/test/lint/typecheck
   - ubuntu-latest docker build
-  - postgres:17 service with healthcheck
+  - postgres:18 service with healthcheck
   - pytest inside container against real PostgreSQL
   - ruff check + basedpyright
   - uv cache via astral-sh/setup-uv@v5

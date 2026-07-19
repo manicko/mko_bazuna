@@ -13,6 +13,7 @@ tasks:
       - task_027_phase1_lifecycle_indexes
   - id: task_051_phase4_nginx_hardening
     depends_on:
+      - task_007_docker_nginx
       - task_029_phase1_deployment_wiring
   - id: task_052_phase4_ci_quality_gates
     depends_on:

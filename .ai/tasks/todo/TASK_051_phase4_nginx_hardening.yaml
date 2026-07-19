@@ -5,6 +5,7 @@ title: nginx security hardening (zone R8)
 priority: high
 
 depends_on:
+  - task_007_docker_nginx
   - task_029_phase1_deployment_wiring
 
 source_reference: .ai/plans/04_detailed_plan_analytics_harden.md
