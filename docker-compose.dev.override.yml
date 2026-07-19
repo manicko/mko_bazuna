@@ -1,0 +1,21 @@
+# Development override for docker-compose.yml
+# Enables hot-reloading with bind-mounts and runserver
+
+services:
+  web:
+    command: uv run python src/backend/manage.py runserver 0.0.0.0:8000
+    environment:
+      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=config.settings.dev
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+
+  bot:
+    volumes:
+      - .:/app
+
+  nginx:
+    profiles:
+      - use-nginx  # Optional in dev; omit to run without nginx

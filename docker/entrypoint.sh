@@ -1,12 +1,21 @@
 #!/bin/bash
 # Entrypoint script for Mko Bazuna containers
-# Handles database wait and command execution
+# Handles database wait, volume permissions, and command execution
 
 set -e
 
+# Fix volume permissions for Windows/WSL2 bind mounts (dev mode)
+fix_volume_permissions() {
+    # Only needed in development with bind mounts
+    if [ "$DEBUG" = "True" ] || [ "$FIX_PERMISSIONS" = "1" ]; then
+        echo "Fixing media volume permissions..."
+        chown -R 1000:1000 /app/media 2>/dev/null || true
+    fi
+}
+
 # Wait for database to be ready
 wait_for_db() {
-    # Skip DB wait if no DATABASE_URL configured
+    # Skip DB wait if no DATABASE_URL configured (e.g., for static-only builds)
     if [ -z "$DATABASE_URL" ]; then
         return 0
     fi
@@ -24,6 +33,7 @@ wait_for_db() {
 }
 
 # Execute logic
+fix_volume_permissions
 wait_for_db
 
 exec "$@"
