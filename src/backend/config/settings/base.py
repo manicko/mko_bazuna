@@ -3,11 +3,14 @@ Base Django settings for Mko Bazuna.
 Shared across all environments (dev, prod, test).
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
 
 import environ
+
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -24,7 +27,7 @@ env_path = BASE_DIR / ".env"
 if not env_path.exists():
     # Only fail in production-like environments (not during collectstatic in builder)
     if os.getenv("DJANGO_SETTINGS_MODULE") and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", ""):
-        print("ERROR: .env file not found. Copy .env.example to .env and configure values.", file=sys.stderr)
+        logger.error("ERROR: .env file not found. Copy .env.example to .env and configure values.")
         sys.exit(1)
 else:
     environ.Env.read_env(env_path)
@@ -40,6 +43,13 @@ DEBUG = env("DEBUG")
 
 # ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
+
+# Security settings (TLS/SSL ready)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 # Application definition
 INSTALLED_APPS = [
