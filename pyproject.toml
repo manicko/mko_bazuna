@@ -147,6 +147,10 @@ markers = [
 [tool.basedpyright]
 typeCheckingMode = "standard"
 reportMissingTypeStubs = "none"
+reportArgumentType = "none"  # Django model field defaults are valid at runtime but not type-checkable
+reportIncompatibleVariableOverride = "none"  # Django Meta inheritance pattern
+reportAttributeAccessIssue = "none"  # Django adds 'id' at runtime via metaclass
+reportMissingImports = "none"  # Django apps namespace imports resolved at runtime
 
 [dependency-groups]
 dev = [
