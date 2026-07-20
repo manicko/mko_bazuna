@@ -7,10 +7,16 @@ Validates ads against criteria and transitions status accordingly.
 
 import logging
 from difflib import SequenceMatcher
-from functools import lru_cache
 from typing import Final
 
 from django.utils import timezone
+
+from apps.core.utils.cache import (
+    CRITERIA_CACHE_KEY,  # noqa: F401 - re-exported for external use
+    invalidate_criteria_cache,  # noqa: F401 - re-exported for external use
+    get_cached_criteria,
+    set_cached_criteria,
+)
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
@@ -19,18 +25,46 @@ from apps.moderation.models import ModeratorActionLog
 
 logger = logging.getLogger(__name__)
 
-CRITERIA_CACHE_SECONDS: Final[int] = 300  # 5 minutes
+CRITERIA_CACHE_SECONDS: Final[int] = 300  # 5 minutes (TTL)
 
 
-@lru_cache(maxsize=1)
 def _get_cached_criteria() -> tuple:
     """
-    Get cached ModerationCriteria as a tuple for lru_cache compatibility.
+    Get cached ModerationCriteria as a tuple for cache compatibility.
 
-    Returns criteria values as tuple for caching (lru_cache requires hashable return).
-    Cache invalidated when criteria changes (or after 5 minutes naturally).
+    Returns criteria values as tuple for caching.
+    Uses Django cache with key 'moderation_criteria:v1' and 5-minute TTL.
+    Cache invalidated when criteria changes via signal.
     """
+    cached = get_cached_criteria()
+    if cached is not None:
+        return (
+            cached["title_min_length"],
+            cached["title_max_length"],
+            cached["description_min_length"],
+            cached["description_max_length"],
+            cached["price_required"],
+            cached["min_images"],
+            cached["max_images"],
+            tuple(cached["banned_words"]),
+            cached["max_ads_per_user"],
+            cached["duplicate_title_threshold"],
+        )
+
     criteria = _get_criteria_uncached()
+    cached = {
+        "title_min_length": criteria.title_min_length,
+        "title_max_length": criteria.title_max_length,
+        "description_min_length": criteria.description_min_length,
+        "description_max_length": criteria.description_max_length,
+        "price_required": criteria.price_required,
+        "min_images": criteria.min_images,
+        "max_images": criteria.max_images,
+        "banned_words": criteria.banned_words,
+        "max_ads_per_user": criteria.max_ads_per_user,
+        "duplicate_title_threshold": criteria.duplicate_title_threshold,
+    }
+    set_cached_criteria(cached)
     return (
         criteria.title_min_length,
         criteria.title_max_length,
@@ -53,7 +87,7 @@ def _get_criteria_uncached():
 
 def _invalidate_criteria_cache() -> None:
     """Invalidate the cached criteria to force refresh on next access."""
-    _get_cached_criteria.cache_clear()
+    invalidate_criteria_cache()
 
 
 def auto_moderate(ad: Ad) -> bool:
