@@ -21,7 +21,9 @@ user_link.short_description = "User (telegram_id)"  # type: ignore[attr-defined]
 
 def rejected_reason(obj: Ad) -> str:
     """Display rejection reason from moderation log (INTERNAL ONLY)."""
-    log = obj.moderation_logs.filter(action_type="reject").last()
+    from apps.core.enums import ModeratorActionType
+
+    log = obj.moderation_logs.filter(action_type=ModeratorActionType.REJECT).last()
     if log:
         return log.reason[:100] if len(log.reason) > 100 else log.reason
     return "-"
@@ -81,8 +83,20 @@ class AdAdmin(admin.ModelAdmin):
     @admin.action(description="Ban user from selected ads")
     def action_ban_user(self, request, queryset):
         """Bulk ban users from selected ads."""
-        user_ids = set(queryset.values_list("user_id", flat=True))
         from apps.users.models import User
+
+        user_ids = set(queryset.values_list("user_id", flat=True))
+
+        # Log ban actions for each user
+        for user_id in user_ids:
+            if user_id:
+                from apps.moderation.services.moderation_log import log_ban_account
+
+                log_ban_account(
+                    user_id=user_id,
+                    moderator_id=request.user.id,
+                    reason="Bulk ban via admin action",
+                )
 
         User.objects.filter(telegram_id__in=user_ids).update(is_banned=True)
 

@@ -9,7 +9,6 @@ import logging
 from difflib import SequenceMatcher
 from typing import Final
 
-from django.utils import timezone
 
 from apps.core.utils.cache import (
     CRITERIA_CACHE_KEY,  # noqa: F401 - re-exported for external use
@@ -20,8 +19,7 @@ from apps.core.utils.cache import (
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdStatus, AnalyticsEventType, ModeratorActionType
-from apps.moderation.models import ModeratorActionLog
+from apps.core.enums import AdStatus, AnalyticsEventType
 
 logger = logging.getLogger(__name__)
 
@@ -220,28 +218,16 @@ def _is_duplicate_title(title: str, user_id: int, ad_id: int, threshold: int) ->
 
 def _fail_moderation(ad: Ad) -> None:
     """Set ad to ON_MODERATION_FAILED with timestamp and log action."""
-    ad.status = AdStatus.ON_MODERATION_FAILED
-    ad.moderation_failed_at = timezone.now()
-    ad.save(update_fields=["status", "moderation_failed_at"])
+    from apps.moderation.services.moderation_log import set_moderation_failed
 
-    ModeratorActionLog.objects.create(
-        ad_id=ad.id,
-        user_id=ad.user_id,
-        action_type=ModeratorActionType.OTHER,
-        reason="Auto-moderation failed",
-    )
-
-    logger.info(f"Auto-moderation failed for ad {ad.id}")
+    set_moderation_failed(ad)
 
 
 def _pass_moderation(ad: Ad) -> None:
-    """Set ad to PUBLISHED with timestamp and create analytics event."""
-    now = timezone.now()
-    ad.status = AdStatus.PUBLISHED
-    ad.published_at = now
-    if ad.original_published_at is None:
-        ad.original_published_at = now
-    ad.save(update_fields=["status", "published_at", "original_published_at"])
+    """Set ad to PUBLISHED with timestamp, log action, and create analytics event."""
+    from apps.moderation.services.moderation_log import set_published
+
+    set_published(ad)
 
     AnalyticsEvent.objects.create(
         event_type=AnalyticsEventType.AD_PUBLISHED,
