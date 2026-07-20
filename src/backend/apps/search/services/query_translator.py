@@ -6,6 +6,7 @@ Implements timeout (~500ms), fallback, and 5-minute cache.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from functools import lru_cache
 from typing import Final
 
@@ -34,11 +35,13 @@ def translate_query_bs_to_ru(query: str) -> str:
         return query
 
     try:
-        result = translate_cached(query)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(translate_cached, query)
+            result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
         if result:
             logger.debug(f"Translated query '{query}' -> '{result}'")
             return result
-    except (RequestException, Exception) as e:
+    except (TimeoutError, RequestException, Exception) as e:
         logger.warning(f"Translation failed for query '{query}': {e}")
 
     # Fallback: return original query if translation fails

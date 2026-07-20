@@ -1,0 +1,32 @@
+id: task_072_verify_login
+
+title: Verify — end-to-end Telegram deep-link login flow
+
+type: verification
+
+status: pending
+
+depends_on:
+  - task_025_token_issuance
+  - task_026_web_consumption
+  - task_027_web_session_poll
+  - task_028_claim_toctou_fix
+
+verifies:
+  - task_025_token_issuance
+  - task_026_web_consumption
+  - task_027_web_session_poll
+  - task_028_claim_toctou_fix
+
+verification_steps:
+  - build: "docker compose build"
+  - test: "uv run pytest src/telegram_bot/tests/test_login_claim.py src/backend/apps/users/tests/ -q"
+  - smoke_check: "issue token -> deep-link -> bot claim -> status-poll returns 200 with session cookie; re-claim returns 410/None; concurrent claims cannot both win"
+
+pass_criteria:
+  - token issuance mints hashed, expiring token
+  - claim sets consumed_at and establishes web session
+  - replay/expiry/already-used all rejected
+  - atomic claim prevents double-claim under concurrency
+
+failure_action: return task_025_token_issuance to rework

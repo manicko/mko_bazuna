@@ -1,0 +1,34 @@
+id: task_002_research_bot_bootstrap
+
+title: Research — bot bootstrap import-order restructure
+
+priority: high
+
+depends_on: []
+
+type: research
+
+description: >
+  ENT-002: telegram_bot/__init__.py eagerly imports handler modules at
+  package-import time, and main.py imports telegram_bot.middlewares BEFORE
+  django.setup() is called, so Django models are imported under an unready
+  app registry. Research must map every module that currently relies on the
+  eager __init__ imports (handlers, middlewares, states) and confirm moving
+  django.setup() earlier + removing eager imports will not break hidden
+  consumers (e.g. other modules doing `import telegram_bot` expecting side
+  effects, or aiogram router registration order).
+
+goals:
+  - enumerate all modules importing from telegram_bot package at import time
+  - confirm safe reorder: django.setup() before any telegram_bot.* import
+  - produce go / go-with-changes recommendation for task_007
+
+files:
+  - path: src/telegram_bot/__init__.py
+  - path: src/telegram_bot/main.py
+  - path: src/telegram_bot/handlers/__init__.py
+
+acceptance_criteria:
+  - list of eager-import dependents documented
+  - recommended import-order sequence provided
+  - explicit go / go-with-changes verdict emitted

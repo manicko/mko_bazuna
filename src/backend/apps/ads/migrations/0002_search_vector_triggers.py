@@ -2,7 +2,6 @@
 
 from django.db import migrations
 
-
 # SQL for the ads search vector trigger function
 SEARCH_VECTOR_FN_SQL = """
 CREATE OR REPLACE FUNCTION ads_search_vector_fn() RETURNS TRIGGER AS $$

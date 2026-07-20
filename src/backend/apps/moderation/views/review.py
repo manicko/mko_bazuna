@@ -6,11 +6,10 @@ Views for admin-only moderation interface: review queue, approve, reject, ban, d
 
 import logging
 
-from django.http import HttpRequest, HttpResponse, Http404
-from django.shortcuts import get_object_or_404, redirect, render
-
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 
 logger = logging.getLogger(__name__)
 

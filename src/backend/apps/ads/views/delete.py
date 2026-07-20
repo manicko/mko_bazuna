@@ -10,13 +10,11 @@ Implements US-S6 self-delete ad flow:
 
 import logging
 
+from apps.ads.models import Ad
+from apps.core.enums import AdStatus
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
-from django.utils import timezone
-
-from apps.ads.models import Ad
-from apps.core.enums import AdStatus
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +43,9 @@ def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
         )
         return HttpResponseForbidden("You do not have permission to delete this ad.")
 
-    # Set status to DELETED and set timestamp
+    # Transition to DELETED (transition_to handles deleted_at timestamp)
     if ad.status != AdStatus.DELETED:
-        ad.status = AdStatus.DELETED
-        ad.deleted_at = timezone.now()
-        ad.save(update_fields=["status", "deleted_at"])
+        ad.transition_to(AdStatus.DELETED)
         logger.info(f"Ad {ad_id} deleted by user {request.user.id}")
 
     return redirect("ads:dashboard")

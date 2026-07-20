@@ -1,0 +1,30 @@
+id: task_073_verify_media
+
+title: Verify — media access gate & physical-file lifecycle
+
+type: verification
+
+status: pending
+
+depends_on:
+  - task_044_media_access_gate
+  - task_045_sweep_photo_unlink
+  - task_046_media_security_tests
+
+verifies:
+  - task_044_media_access_gate
+  - task_045_sweep_photo_unlink
+  - task_046_media_security_tests
+
+verification_steps:
+  - build: "docker compose build"
+  - test: "uv run pytest src/backend/apps/ads/tests/test_media_security.py -q"
+  - smoke_check: "unpublished/deleted ad photo returns 403/404 via direct URL; published served via internal redirect; swept ads leave no files in MEDIA_ROOT; stored JPEG has no EXIF"
+
+pass_criteria:
+  - access control enforced at the media gate
+  - EXIF stripped on store
+  - sweeps/erasure remove physical files
+  - path-traversal keys rejected
+
+failure_action: return task_044_media_access_gate to rework

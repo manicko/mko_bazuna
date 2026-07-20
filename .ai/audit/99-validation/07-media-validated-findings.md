@@ -89,11 +89,12 @@ validated: true
 | **Validation Status** | **VALIDATED** |
 
 > **Validation Note:**
-> > - **Action:** validated (confirmed)
-> > - **Detail:** Evidence is accurate. `save_photo` writes to disk immediately (`ad_create.py:431-437`), but `AdImage` rows are created only on successful commit (`ad_create.py:548-554`). If the user cancels, the bot crashes, or moderation fails before commit, the already-written files are orphaned in `MEDIA_ROOT`. `sweep_drafts` does not address this because it runs 30 minutes later and targets DRAFT ads only, not the files written during an aborted photo upload. The `cmd_cancel` handler (`ad_create.py:73-82`) calls `delete_draft` which deletes the ORM row but not physical files.
-> > - **See also:** MED-003 (physical deletion), MED-005 (storage keys)
+> * **Action:** validated (confirmed)
+> * **Detail:** Evidence is accurate. `save_photo` writes to disk immediately (`ad_create.py:431-437`), but `AdImage` rows are created only on successful commit (`ad_create.py:548-554`). If the user cancels, the bot crashes, or moderation fails before commit, the already-written files are orphaned in `MEDIA_ROOT`. `sweep_drafts` does not address this because it runs 30 minutes later and targets DRAFT ads only, not the files written during an aborted photo upload. The `cmd_cancel` handler (`ad_create.py:73-82`) calls `delete_draft` which deletes the ORM row but not physical files.
 
-**Recommendation:** Track `storage_key`s in FSM state; on cancel/timeout, unlink each key. Alternatively defer physical write until commit (temp staging → move to `MEDIA_ROOT` only when `AdImage` rows are created). Effort: small. Priority: recommended (HIGH).
+**Recommendation:** Track photo `storage_key`s in FSM state (`photos` list already contains `storage_key` per `ad_create.py:285-288`). Add `delete_photo(storage_key)` in `media.py` that calls `os.remove(os.path.join(settings.MEDIA_ROOT, storage_key))`. Wire it into `delete_draft` to unlink files before ORM deletion, and into `cmd_cancel` for explicit cancellations. Also wire into sweep commands (`sweep_drafts`, `delete_sweep`, `purge_*`) to unlink DRAFT ad images before CASCADE deletion. Effort: small. Priority: mandatory (HIGH).
+
+> **Alternative (secondary):** Defer physical write to commit time via temp staging directory, moving to MEDIA_ROOT only when `AdImage` rows are created. This avoids tracking in FSM but adds complexity; use only if immediate-write pattern is redesigned.
 
 ---
 
@@ -109,11 +110,11 @@ validated: true
 | **Validation Status** | **VALIDATED** |
 
 > **Validation Note:**
-> > - **Action:** validated (confirmed)
-> > - **Detail:** Evidence is accurate. `AdImage.generate_storage_key()` (`models.py:340-342`) returns `str(uuid.uuid4())` without extension; `telegram_bot.services.media.generate_storage_key()` (`media.py:71-73`) returns `f"{uuid.uuid4()}.jpg"`. Both differ from the docstring claim ("ad_id + UUID v4"). The model's version lacks `.jpg`, which would cause nginx to serve `application/octet-stream` (forced download) per the MIME whitelist (`nginx.conf:71-73`). The bot version's `.jpg` form is what production uses. This is a maintenance trap and latent serving bug.
-> > - **See also:** MED-002 (EXIF), MED-006 (collision)
+> * **Action:** validated (confirmed)
+> * **Detail:** Evidence is accurate. `AdImage.generate_storage_key()` (`models.py:360-362`) returns `str(uuid.uuid4())` without extension; `telegram_bot.services.media.generate_storage_key()` (`media.py:71-73`) returns `<uuid>.jpg`. Both differ from the docstring claim ("ad_id + UUID v4"). The model's version lacks `.jpg`, which would cause nginx to serve `application/octet-stream` (forced download) per the MIME whitelist (`nginx.conf:71-73`). The bot version's `.jpg` form is what production uses. This is a maintenance trap and latent serving bug.
+> * **See also:** MED-002 (EXIF), MED-006 (collision)
 
-**Recommendation:** Unify to the bot version's `<uuid>.jpg` format and have `AdImage.generate_storage_key` delegate, or remove the unused model method. Update docstrings to state the true format (bare UUID v4 + `.jpg`, no `ad_id` prefix). Effort: trivial. Priority: recommended.
+**Recommendation:** Since `AdImage.generate_storage_key()` is unused in production code (only referenced in test fixtures), delete the model method entirely. All production photo writes use `telegram_bot.services.media.generate_storage_key`, which already produces `<uuid>.jpg`. Update the `AdImage.image` field docstring (`models.py:330-333`) to state the true format: "bare UUID v4 + `.jpg` extension, no ad_id/user/telegram PII prefix". Effort: trivial. Priority: recommended.
 
 ---
 
@@ -214,14 +215,12 @@ None
    - Modifies `save_photo` / `validate_photo` to re-encode
    - Also mitigates malicious-JPEG decoder hardening
 
-3. **MED-003 (Physical deletion)** depends on MED-005/MED-006 for the helper (`delete_photo` function):
-   - Should be implemented as a shared utility in `media.py`
-   - Wire into all 5 sweep commands
+3. **MED-003 (Physical deletion) + MED-004 (Orphan cleanup)** share the same `delete_photo` helper:
+   - Implement `delete_photo(storage_key)` in `media.py`
+   - Wire into sweep commands for DRAFT image cleanup
+   - Wire into `delete_draft`/`cmd_cancel` for in-flight cleanup
 
-4. **MED-004 (Orphan cleanup)** depends on MED-003:
-   - Needs a `delete_photo` helper to call on cancel
-
-5. **MED-005 (Unified storage key)** should be addressed before MED-006:
+4. **MED-005 (Unified storage key)** should be addressed before MED-006:
    - Eliminates confusion between the two generators
    - Use the bot version (`{uuid}.jpg`) as canonical
 
@@ -229,13 +228,12 @@ None
 
 | Priority | Recommendation | Depends on |
 |----------|----------------|------------|
-| 1 | MED-005: Unify `generate_storage_key` (trivial) | — |
+| 1 | MED-005: Delete unused `AdImage.generate_storage_key` (trivial) | — |
 | 2 | MED-002: Strip EXIF on store (small) | — |
-| 3 | MED-003: Add `delete_photo` helper + wire sweeps | — (MED-005 for consistency) |
-| 4 | MED-004: Track keys in FSM, cleanup on cancel | MED-003 (helper function) |
-| 5 | MED-006: O_EXCL guard against collision | — |
-| 6 | MED-001: App-level media gate (medium) | — (blocks access to fixes 2-4) |
-| 7 | MED-008: Add security tests | All fixes verified |
+| 3 | MED-003 + MED-004: Add `delete_photo` helper, wire to sweeps/cancel | — (after MED-005 for consistency) |
+| 4 | MED-006: O_EXCL guard against collision | — |
+| 5 | MED-001: App-level media gate (medium) | — (blocks access to fixes 2-4) |
+| 6 | MED-008: Add security tests | All fixes verified |
 
 ---
 
@@ -255,4 +253,4 @@ None detected. MED-001-004 are consistent with AD-004 (orphaned files in sweep_d
 
 ### Documentation Consistency
 
-The docstring in `AdImage.generate_storage_key` and `architecture-structure.md` claim keys are "ad-scoped + UUID v4" — reality is bare UUID v4 + `.jpg`. This is a DOC-UPDATE requirement once MED-005 is fixed.
+Since MED-005 removes `AdImage.generate_storage_key`, delete the docstring; update `architecture-structure.md` to state storage key format is bare UUID v4 + `.jpg` extension, no ad_id prefix.

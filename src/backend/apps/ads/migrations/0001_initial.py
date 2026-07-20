@@ -1,8 +1,8 @@
 # Generated migration for ads app
 
-from django.db import migrations, models
-import django.contrib.postgres.search
 import django.contrib.postgres.indexes
+import django.contrib.postgres.search
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):

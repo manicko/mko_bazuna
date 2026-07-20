@@ -1,11 +1,10 @@
 """Ads app URLs."""
 
-from django.urls import path
-
 from apps.ads.views.dashboard import dashboard
 from apps.ads.views.delete import ad_delete
 from apps.ads.views.edit import ad_archive, ad_edit, ad_reactivate
 from apps.ads.views.listings import ad_detail, listings
+from django.urls import path
 
 app_name = "ads"
 

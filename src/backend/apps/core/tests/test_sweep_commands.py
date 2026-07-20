@@ -11,16 +11,16 @@ execution (mutating) modes, and assertions verify idempotency and
 correct retention-window filtering.
 """
 
-import pytest
 from datetime import timedelta
-from django.core.management import call_command
-from django.utils import timezone
 
+import pytest
 from apps.ads.models import Ad, AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import LoginToken, User
+from django.core.management import call_command
+from django.utils import timezone
 
 pytestmark = pytest.mark.django_db
 
@@ -354,6 +354,48 @@ class TestConsentHardDelete:
 
     def test_lock_id_is_consent_hard_delete(self):
         assert AdvisoryLockId.CONSENT_HARD_DELETE == 3
+
+    def test_crash_between_updates_and_delete_rolls_back(self, seller, monkeypatch):
+        """Crash during mutation rolls back atomically - user and history preserved."""
+        seller.consent_revoked_at = timezone.now() - timedelta(days=60)
+        seller.save()
+        event = AnalyticsEvent.objects.create(event_type="search_performed", user=seller)
+        log = ModeratorActionLog.objects.create(
+            user=seller,
+            action_type="ban_account",
+            reason="internal",
+        )
+
+        # Patch User.objects.filter to return a mock that crashes on delete
+        # but allows count() and values_list()
+        class _CrashOnDeleteQuerySet:
+            def __init__(self, target_pk):
+                self._target_pk = target_pk
+
+            def count(self):
+                return 1
+
+            def values_list(self, *args, **kwargs):
+                return [self._target_pk]
+
+            def delete(self):
+                raise RuntimeError("Simulated crash during delete")
+
+        monkeypatch.setattr(
+            User.objects,
+            "filter",
+            lambda *args, **kwargs: _CrashOnDeleteQuerySet(seller.pk),
+        )
+
+        with pytest.raises(RuntimeError, match="Simulated crash during delete"):
+            call_command("consent_hard_delete")
+
+        # Verify atomicity: user still exists, history not nulled
+        assert User.objects.filter(pk=seller.pk).exists()
+        event.refresh_from_db()
+        assert event.user_id == seller.pk
+        log.refresh_from_db()
+        assert log.user_id == seller.pk
 
 
 class TestPurgeFailedAds:

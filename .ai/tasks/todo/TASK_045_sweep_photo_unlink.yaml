@@ -1,0 +1,37 @@
+id: task_045_sweep_photo_unlink
+
+title: Unlink physical media in sweep commands (MED-003)
+
+priority: high
+
+depends_on:
+  - task_021_media_delete_helper
+  - task_018_atomic_sweeps
+
+source_reference: .ai/audit/99-validation/07-media-validated-findings.md
+source_section: "MED-003"
+
+description: >
+  delete_sweep, sweep_drafts, purge_rejected_ads, purge_failed_ads, and
+  consent_hard_delete use queryset.delete() (CASCCADE handles ad_images rows)
+  but never unlink files. Collect AdImage storage keys before delete and call
+  delete_photo() for each, so orphaned PII files are removed.
+
+goals:
+  - sweep/erasure removes both rows and physical files
+  - no indefinite orphaned media
+
+files:
+  - path: src/backend/apps/core/management/commands/delete_sweep.py
+  - path: src/backend/apps/core/management/commands/sweep_drafts.py
+  - path: src/backend/apps/core/management/commands/purge_rejected_ads.py
+  - path: src/backend/apps/core/management/commands/purge_failed_ads.py
+  - path: src/backend/apps/core/management/commands/consent_hard_delete.py
+
+changes:
+  - action: add_code
+    description: Before queryset.delete(), gather AdImage.image values and call delete_photo() for each.
+
+acceptance_criteria:
+  - swept/deleted ads leave no files in MEDIA_ROOT
+  - DB deletion behavior unchanged

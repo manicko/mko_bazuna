@@ -9,14 +9,14 @@ Uses advisory lock 3 for idempotent, safe concurrent execution.
 import logging
 from datetime import timedelta
 
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +62,15 @@ class Command(BaseCommand):
             # Collect user IDs for logging before processing
             user_ids = list(queryset.values_list("id", flat=True))
 
-            # Null out analytics_events.user_id (preserves aggregate history)
-            AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                # Null out analytics_events.user_id (preserves aggregate history)
+                AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
 
-            # Null out moderation_action_logs.user_id (preserves history)
-            ModeratorActionLog.objects.filter(user_id__in=user_ids).update(user_id=None)
+                # Null out moderation_action_logs.user_id (preserves history)
+                ModeratorActionLog.objects.filter(user_id__in=user_ids).update(user_id=None)
 
-            # Delete users - CASCADE will handle their ads (and ad_images via ORM)
-            deleted_count, _ = queryset.delete()
+                # Delete users - CASCADE will handle their ads (and ad_images via ORM)
+                deleted_count, _ = queryset.delete()
 
             logger.info(
                 "Hard-deleted %d users with consent revoked over 30 days ago",

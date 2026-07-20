@@ -1,0 +1,32 @@
+id: task_070_test_markers
+
+title: Tag integration/slow tests with markers (TST-012)
+
+priority: low
+
+depends_on:
+  - task_059_ci_coverage
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-012"
+
+description: >
+  The `slow` marker is defined but unused and there is no `integration` marker,
+  so DB-backed two-process bot tests cannot be separated from fast units. Tag
+  DB-backed/integration tests with slow/integration markers; allow
+  `pytest -m "not slow"` for fast local runs.
+
+goals:
+  - marker strategy for fast vs integration runs
+
+files:
+  - path: pyproject.toml
+  - path: src/telegram_bot/tests/
+
+changes:
+  - action: add_code
+    description: Register/use slow + integration markers; tag DB-backed tests.
+
+acceptance_criteria:
+  - slow/integration markers defined and used
+  - pytest -m "not slow" excludes heavy tests

@@ -8,14 +8,13 @@ HTMX-compatible MPA (no login required).
 import logging
 from difflib import get_close_matches
 
-from django.http import HttpRequest, HttpResponse, Http404
-from django.shortcuts import render
-
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.views.consent import is_consent_given
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 

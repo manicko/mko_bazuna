@@ -5,11 +5,11 @@ Provides metrics view aggregating AnalyticsEvent by type and date.
 """
 
 import logging
+
+from apps.analytics.models import AnalyticsEvent
 from django.contrib import admin
 from django.db.models import Count
 from django.db.models.functions import TruncDate
-
-from apps.analytics.models import AnalyticsEvent
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +57,9 @@ class AnalyticsEventAdmin(admin.ModelAdmin):
         ).order_by("-count")
 
         # Aggregate events by date (last 30 days)
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
 
         thirty_days_ago = timezone.now() - timedelta(days=30)
         date_aggregates = AnalyticsEvent.objects.filter(

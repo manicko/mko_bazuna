@@ -4,7 +4,7 @@ title: Wire ad edit/delete views and moderation_log to Ad.transition_to()
 
 priority: high
 
-status: blocked
+status: completed
 
 blocked_by:
   - task_005_add_ad_transition_to

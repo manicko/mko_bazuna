@@ -1,0 +1,38 @@
+id: task_005_research_login_flow
+
+title: Research — end-to-end Telegram deep-link login flow integration
+
+priority: critical
+
+depends_on: []
+
+type: research
+
+description: >
+  AUT-001/002/003 + EXT-001/002 describe the full deep-link login flow that is
+  currently broken: token issuance is entirely missing (AUT-001/EXT-001), web
+  consumption (consumed_at) does not exist (AUT-002), web session is never
+  established (AUT-003), and the bot claim has a TOCTOU race + false
+  hmac.compare_digest docstring (EXT-002/AUT-004). Research must design the
+  integrated contract: issuance view generating secrets.token_urlsafe + sha256
+  hash + 5-min expiry + deep-link via BOT_USERNAME; status-poll endpoint
+  (GET /login/status/) that atomically sets consumed_at and calls auth.login +
+  session.cycle_key; and the atomic single-UPDATE claim (update returning=True).
+  Assess cross-process coupling, nginx /login/ rate-limit zone wiring, and
+  downstream consumers (consent views, dashboard).
+
+goals:
+  - design issuance + status-poll + atomic claim contract
+  - map downstream consumers and nginx route wiring
+  - produce go / go-with-changes recommendation for tasks 025-029
+
+files:
+  - path: src/backend/apps/users/urls.py
+  - path: src/backend/apps/users/views/consent.py
+  - path: src/telegram_bot/handlers/login.py
+  - path: docker/nginx/nginx.conf
+
+acceptance_criteria:
+  - integrated flow design with endpoints and atomic guarantees
+  - list of consumers / nginx wiring provided
+  - explicit go / go-with-changes verdict emitted

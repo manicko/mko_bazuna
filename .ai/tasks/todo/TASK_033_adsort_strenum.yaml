@@ -1,0 +1,41 @@
+id: task_033_adsort_strenum
+
+title: Model listing sort options as StrEnum (QLT-004)
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/10-code-quality-validated-findings.md
+source_section: "QLT-004"
+
+description: >
+  listings.py defines sort options as raw module-level string constants and
+  compares them as raw strings, the only fixed-value set in src/ not modeled as
+  StrEnum (project rule 10). Introduce AdSort(StrEnum) in core/enums.py and use
+  its members for default + branch comparisons; templates reference the same
+  values.
+
+goals:
+  - sort tokens are StrEnum members, not raw strings
+  - no drift between view and template ?sort= contract
+
+files:
+  - path: src/backend/apps/ads/views/listings.py
+    targets:
+      - type: module
+        name: SORT_* constants
+    semantic_anchors:
+      replace_block:
+        type: assignment
+        value: "SORT_DATE_NEW = \"date_desc\""
+
+  - path: src/backend/apps/core/enums.py
+
+changes:
+  - action: add_code
+    description: Add AdSort(StrEnum) and replace raw-string constants/comparisons with members.
+
+acceptance_criteria:
+  - listings sort uses StrEnum members
+  - template ?sort= values still match

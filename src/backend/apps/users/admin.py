@@ -4,9 +4,8 @@ Django admin registration for users app.
 Custom admin with restricted access and consents visibility.
 """
 
+from apps.users.models import LoginToken, User
 from django.contrib import admin
-
-from apps.users.models import User, LoginToken
 
 
 @admin.register(User)

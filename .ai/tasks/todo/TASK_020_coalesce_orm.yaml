@@ -1,0 +1,35 @@
+id: task_020_coalesce_orm
+
+title: Coalesce adjacent ORM ops into single sync_to_async (DB-003)
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/03-db-concurrency-validated-findings.md
+source_section: "DB-003"
+
+description: >
+  With CONN_MAX_AGE=0 every sync_to_async call opens/closes its own Postgres
+  connection; login/contact flows wrap each ORM statement in its own
+  sync_to_async, amplifying connection churn under burst. Coalesce adjacent ORM
+  operations inside a single sync_to_async call (as already done for
+  update_ad_and_moderate), without raising CONN_MAX_AGE.
+
+goals:
+  - fewer per-call DB connections in bot login/contact flows
+  - reduced connection-budget pressure under load
+
+files:
+  - path: src/telegram_bot/handlers/login.py
+  - path: src/telegram_bot/handlers/contact.py
+
+changes:
+  - action: refactor
+    description: >
+      Group adjacent ORM reads/writes in login and contact handlers into single
+      sync_to_async calls instead of one wrapper per statement.
+
+acceptance_criteria:
+  - login/contact handlers perform fewer DB round-trips per update
+  - behavior unchanged; CONN_MAX_AGE left at 0

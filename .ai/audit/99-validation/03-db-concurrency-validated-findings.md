@@ -28,7 +28,9 @@
 
 **Consequence:** Two simultaneously-triggered instances of the same sweep can interleave between `count()` and the destructive `delete()`/`update()`. The second instance observes the same candidate set and both proceed — defeating the idempotency/serialization guarantee the lock is documented to provide.
 
-**Recommendation:** Wrap each sweep command body in `transaction.atomic()` (or set `ATOMIC_REQUESTS` for the management-command path) so the transaction-scoped lock is acquired once and held across `count()` → `delete()`/`update()`. Alternatively, switch to a `session`-scoped lock (`advisory_lock(session=True)`) held for the whole `with` block. Either guarantees the lock spans the entire sweep.
+**Recommendation:** Wrap the body of each sweep command — the code inside the `with advisory_lock(..., session=False):` block from the first queryset operation to the final `count()`/`update()`/`delete()` — in `transaction.atomic()` so the `pg_advisory_xact_lock` spans the entire count→mutate sequence without autocommit releases. *(Alternative: use session-scoped lock with `session=True`, but this requires explicit unlock calls and is not the minimal fix.)*
+
+*Resolved by research: 2026-07-20*
 
 > **Validation Note:**
 > - **Action:** validated
@@ -109,7 +111,9 @@
 
 **Consequence:** Two near-simultaneous `/start` logins for a brand-new user can hit the `IntegrityError` branch and surface as an unhandled error to the user (lost login attempt), rather than a clean idempotent grab. Low likelihood and low blast radius.
 
-**Recommendation:** Adopt the same atomic single-statement claim pattern used in `claim_login_token`, or wrap `get_or_create` in `transaction.atomic()` with an `IntegrityError` retry/get on conflict.
+**Recommendation:** Wrap `_get_or_create()` in `transaction.atomic()` and on `IntegrityError`, perform a `User.objects.get(telegram_id=telegram_id)` to return the existing user — mirroring the retry-on-conflict pattern used in similar atomic claim logic elsewhere in the codebase.
+
+*Resolved by research: 2026-07-20*
 
 > **Validation Note:**
 > - **Action:** validated
@@ -192,7 +196,7 @@
 
 | ID | Description |
 |----|-------------|
-| DB-001 | Wrap each sweep command body in `transaction.atomic()` OR switch to `session=True` for advisory lock. |
+| DB-001 | Wrap the body of each sweep command — the code inside `with advisory_lock(..., session=False):` — in `transaction.atomic()` so `pg_advisory_xact_lock` spans count→mutate. |
 | DB-002 | Wrap `update_ad_and_moderate`'s inner function and `consent_hard_delete`'s mutate section in `transaction.atomic()`. |
 
 ---
@@ -202,7 +206,7 @@
 | ID | Description |
 |----|-------------|
 | DB-003 | Coalesce ORM operations inside single `sync_to_async` wrappers in login/contact flows. |
-| DB-004 | Add `IntegrityError` handling or use atomic claim pattern for `get_or_create_user`. |
+| DB-004 | Wrap `_get_or_create()` in `transaction.atomic()`; on `IntegrityError`, re-`get(telegram_id)` to return existing user. |
 
 ---
 

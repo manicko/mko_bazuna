@@ -8,12 +8,11 @@ Uses advisory lock 5 for idempotent, safe concurrent execution.
 import logging
 from datetime import timedelta
 
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.users.models import LoginToken
+from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 

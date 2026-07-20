@@ -1,3 +1,12 @@
+# ─── REJECTED (validation 2026-07-20) ───
+# Stale leftover from the superseded `order.yaml` plan. NOT referenced by
+# `order_2.yaml`. Its `depends_on`/`verifies` reference obsolete task IDs
+# (task_002_fix_query_translator_timeout, task_005_add_ad_transition_to,
+# task_008_invalidate_tokens_on_withdraw, etc.) that do not exist in the current
+# plan. It duplicates the role of the active verification tasks
+# (task_071..task_075). Renamed (not deleted) to preserve history and to remove
+# the task-ID collision with the active `task_009_postgres_password_failfast`.
+# ───────────────────────────────────────
 id: task_009_verify_rollout
 
 title: Verify — mandatory-findings rollout (T002, T003, T005, T006, T007, T008)

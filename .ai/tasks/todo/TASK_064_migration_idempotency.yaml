@@ -1,0 +1,34 @@
+id: task_064_migration_idempotency
+
+title: Add migration reproducibility/idempotency check (TST-005)
+
+priority: high
+
+depends_on:
+  - task_034_pii_chat_id
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-005"
+
+description: >
+  No test verifies migrations apply cleanly / are idempotent, so schema drift
+  goes undetected (the custom 0001_verify_lifecycle_indexes is never asserted
+  no-op on re-run). Add a CI step/test asserting `makemigrations --check
+  --dry-run` produces no new migrations and that re-applying migrations is
+  idempotent.
+
+goals:
+  - schema drift detected in CI
+  - idempotent migration application verified
+
+files:
+  - path: .github/workflows/ci.yml
+  - path: src/backend/apps/core/tests/test_migrations.py
+
+changes:
+  - action: add_code
+    description: Add makemigrations --check CI step + idempotency test.
+
+acceptance_criteria:
+  - CI fails if missing migrations exist
+  - migrations re-apply without drift

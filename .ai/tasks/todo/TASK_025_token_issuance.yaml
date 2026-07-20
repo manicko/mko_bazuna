@@ -1,0 +1,65 @@
+id: task_025_token_issuance
+
+title: Implement web-side login-token issuance (AUT-001, EXT-001)
+
+priority: critical
+
+status: blocked
+
+blocked_by: task_005_research_login_flow
+
+depends_on:
+  - task_005_research_login_flow
+  - task_006_fix_container_boot
+
+source_reference: .ai/audit/99-validation/04-auth-login-validated-findings.md
+source_section: "AUT-001"
+source_reference_2: .ai/audit/99-validation/09-external-api-validated-findings.md
+source_section_2: "EXT-001"
+
+description: >
+  The login-token claim side exists but issuance is entirely missing: no view,
+  URL, template, or command mints a LoginToken. Implement the issuance half per
+  research_005: generate secrets.token_urlsafe(32), store only its sha256 hash,
+  set expires_at = now + 5min, and render the deep-link
+  https://t.me/<BOT_USERNAME>?start=login_<token>. Wire the route into
+  users/urls.py + config/urls.py and point the (currently dead) nginx /login/
+  rate-limit zone at the real route.
+
+goals:
+  - tokens are minted, hashed, and expired server-side
+  - deep-link deliverable to the user
+  - nginx /login/ rate-limit guards the real issuance route
+
+files:
+  - path: src/backend/apps/users/views/consent.py
+    targets:
+      - type: function
+        name: login token issuance view
+    semantic_anchors:
+      insert_after:
+        type: function
+        value: "consent_accept"
+
+  - path: src/backend/apps/users/urls.py
+    targets:
+      - type: module
+        name: users urlpatterns
+    semantic_anchors:
+      insert_after:
+        type: path
+        value: "consent/decline/"
+
+  - path: src/backend/config/urls.py
+  - path: docker/nginx/nginx.conf
+
+changes:
+  - action: add_code
+    description: >
+      Add issuance view + URL + config wiring + nginx route; use secrets for
+      token, sha256 for storage, 5-min expiry.
+
+acceptance_criteria:
+  - a LoginToken row is created (hash only) on issuance
+  - deep-link URL rendered using BOT_USERNAME
+  - nginx /login/ rate-limit applies to the real route

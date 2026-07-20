@@ -4,9 +4,8 @@ Moderation models for Mko Bazuna.
 ModerationCriteria singleton and ModeratorActionLog for audit trail.
 """
 
-from django.db import models
-
 from apps.core.enums import ModeratorActionType
+from django.db import models
 
 
 class ModerationCriteria(models.Model):

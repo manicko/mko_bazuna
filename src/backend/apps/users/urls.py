@@ -1,8 +1,7 @@
 """Users app URLs."""
 
-from django.urls import path
-
 from apps.users.views.consent import consent_accept, consent_decline
+from django.urls import path
 
 app_name = "consent"
 

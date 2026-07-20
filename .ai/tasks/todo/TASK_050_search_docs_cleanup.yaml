@@ -1,0 +1,38 @@
+id: task_050_search_docs_cleanup
+
+title: Fix search doc accuracy (lru_cache TTL, pg_trgm) (SRH-004, SRH-008)
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/08-search-fts-validated-findings.md
+source_section: "SRH-004 / SRH-008"
+
+description: >
+  Two DOC-UPDATE findings: (SRH-004) query_translator docstring claims a
+  "5-minute cache" but uses functools.lru_cache with no TTL — correct the
+  docstring. (SRH-008) db-schema.md / packages-list.md / spec-index.md claim
+  pg_trgm in the FTS stack, but fuzzy matching uses difflib — remove pg_trgm
+  references to match the implementation.
+
+goals:
+  - documentation matches implemented behavior
+  - no false FTS-stack claims
+
+files:
+  - path: src/backend/apps/search/services/query_translator.py
+    targets:
+      - type: function
+        name: translate_query_bs_to_ru docstring
+  - path: docs/02-database/db-schema.md
+  - path: docs/03-packages/packages-list.md
+  - path: docs/01-spec/spec-index.md
+
+changes:
+  - action: replace_docstring
+    description: Correct lru_cache docstring; remove pg_trgm claims from the three docs.
+
+acceptance_criteria:
+  - docstring describes LRU (no TTL), not a 5-minute cache
+  - no pg_trgm references remain in the listed docs

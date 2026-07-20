@@ -1,0 +1,37 @@
+id: task_001_research_boot_packaging
+
+title: Research — container boot & Python packaging strategy
+
+priority: critical
+
+depends_on: []
+
+type: research
+
+description: >
+  Investigate the safest way to make all three container processes (web, bot,
+  migrate/scheduler) importable. ENT-001 proves the image never installs the
+  project package and sets no PYTHONPATH; ENT-007 proves pyproject package
+  discovery does not match the real layout (src/backend/{apps,config,theme},
+  src/telegram_bot). Two strategies exist: (a) install via `uv sync` without
+  `--no-install-project` plus corrected `[tool.setuptools.packages.find]`, or
+  (b) set PYTHONPATH=/app/src/backend:/app/src in the Dockerfile ENV. Decide
+  per-process import roots and any pyproject changes, and enumerate every
+  process entrypoint (manage.py, telegram_bot.main, migrate/scheduler commands)
+  that depends on the chosen layout.
+
+goals:
+  - confirm whether pyproject install or PYTHONPATH is the lower-risk fix
+  - identify all entrypoints that resolve config/apps/telegram_bot imports
+  - produce go / go-with-changes recommendation for task_006
+
+files:
+  - path: docker/Dockerfile
+  - path: docker-compose.yml
+  - path: pyproject.toml
+  - path: src/backend/config/settings/base.py
+
+acceptance_criteria:
+  - recommendation document lists chosen strategy and affected entrypoints
+  - no hidden consumers of the current (broken) import root identified
+  - explicit go / go-with-changes verdict emitted

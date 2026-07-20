@@ -7,13 +7,12 @@ Requires authentication via Telegram login.
 
 import logging
 
-from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
-
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.users.views.consent import is_consent_given
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 

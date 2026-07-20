@@ -8,11 +8,10 @@ Implements decision F/K consent states (zone R3):
 
 import logging
 
+from apps.users.services import decline_consent, give_consent
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
-
-from apps.users.services import decline_consent, give_consent
 
 logger = logging.getLogger(__name__)
 

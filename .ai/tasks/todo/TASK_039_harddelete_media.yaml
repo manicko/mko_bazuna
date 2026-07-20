@@ -1,0 +1,41 @@
+id: task_039_harddelete_media
+
+title: Erase media files on consent hard-delete (PII-004)
+
+priority: high
+
+depends_on:
+  - task_017_atomic_domain_writes
+  - task_021_media_delete_helper
+  - task_034_pii_chat_id
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-004"
+
+description: >
+  consent_hard_delete deletes the User row (ORM-CASCADE to ads/ad_images) but
+  never unlinks the physical JPEGs from MEDIA_ROOT. Add a media-cleanup step
+  that, before/after deleting ad_images rows, unlinks each MEDIA_ROOT file via
+  the shared delete_photo() helper for the target users' ads.
+
+goals:
+  - physical PII-bearing media removed on erasure
+  - no orphaned files after hard-delete sweep
+
+files:
+  - path: src/backend/apps/core/management/commands/consent_hard_delete.py
+    targets:
+      - type: function
+        name: handle (erasure cascade)
+    semantic_anchors:
+      insert_before:
+        type: statement
+        value: "queryset.delete()"
+
+changes:
+  - action: add_code
+    description: Iterate target users' AdImage storage keys and call delete_photo() before/after the ORM delete.
+
+acceptance_criteria:
+  - hard-deleted users' ad images removed from MEDIA_ROOT
+  - no residual PII files after sweep

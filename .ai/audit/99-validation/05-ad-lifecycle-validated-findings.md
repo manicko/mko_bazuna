@@ -87,7 +87,9 @@
 > - **Detail:** Evidence is accurate. `save_photo` (ad_create.py:431-437) writes photo bytes to `media/` filesystem immediately. `delete_draft` (ad_create.py:372-380) deletes the `Ad` ORM row without removing the already-written physical files. The `sweep_drafts` command (sweep_drafts.py:58) uses `queryset.delete()` which only removes DB rows, relying on CASCADE for `ad_images`. The `AdImage` CASCADE on `ad_images` table would delete the `AdImage` rows, but not the actual file content in `media/`. This is an operational hygiene issue per the spec note about deferred physical cleanup.
 > - **See also:** ---
 
-**Recommendation:** Track pending `storage_key`s in FSM state and unlink them on cancel; or store uploaded bytes transiently and only persist to `media/` at confirm. Effort: small. Priority: advisory (operational hygiene; orphaned files accumulate).
+**Recommendation:** Track the list of `storage_key`s written during the FSM photo step in FSM state (e.g. a `photo_keys` list), and on cancel/timeout/`delete_draft` unlink each file under MEDIA_ROOT via a small `delete_photo(storage_key)` helper in `media.py`. This reuses the existing immediate-write pattern (no temp-staging redesign) and is minimal. Also ensure `sweep_drafts` unlinks DRAFT ad images by iterating deleted AdImage rows before CASCADE deletion. Effort: small. Priority: advisory (operational hygiene; orphaned files accumulate).
+
+> **Alternative (more invasive):** Transitionally store uploaded bytes in a temp buffer (e.g. in-memory or cache) and only write to `media/` at confirm time. This would eliminate orphaned files during FSM but requires significant refactoring of the immediate-write pattern. Not recommended unless redesigning the photo handling flow.
 
 ---
 

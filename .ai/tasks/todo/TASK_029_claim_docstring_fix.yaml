@@ -1,0 +1,40 @@
+id: task_029_claim_docstring_fix
+
+title: Correct misleading hmac.compare_digest claim docstring (AUT-004)
+
+priority: low
+
+depends_on:
+  - task_028_claim_toctou_fix
+
+source_reference: .ai/audit/99-validation/04-auth-login-validated-findings.md
+source_section: "AUT-004"
+
+description: >
+  claim_login_token's docstring claims "constant-time comparison via
+  hmac.compare_digest", but the implementation validates via indexed hash
+  equality in SQL (no import, no call). Update the docstring to state the
+  token is validated by a unique indexed SHA-256 equality lookup (secure and
+  simpler), removing the misleading claim. Docs may be updated likewise.
+
+goals:
+  - documentation matches implementation
+  - no implied constant-time comparison that does not exist
+
+files:
+  - path: src/telegram_bot/handlers/login.py
+    targets:
+      - type: function
+        name: claim_login_token
+    semantic_anchors:
+      edit_block:
+        type: docstring
+        value: "Uses constant-time comparison via hmac.compare_digest"
+
+changes:
+  - action: replace_docstring
+    description: Replace the misleading docstring lines with an accurate description of indexed hash-equality validation.
+
+acceptance_criteria:
+  - docstring no longer claims hmac.compare_digest usage
+  - accurately describes indexed hash lookup

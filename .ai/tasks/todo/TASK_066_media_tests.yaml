@@ -1,0 +1,33 @@
+id: task_066_media_tests
+
+title: Test media validation / storage-key generation (TST-007)
+
+priority: high
+
+depends_on:
+  - task_021_media_delete_helper
+  - task_016_exif_strip
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-007"
+
+description: >
+  The media service (validate_jpeg_bytes, validate_photo, generate_storage_key,
+  save_photo) is untested. Add unit tests for validate_jpeg_bytes
+  (valid/invalid), validate_photo (oversize, oversize-dimensions, non-JPEG), and
+  generate_storage_key (UUID v4 + .jpg, no PII), using an isolated temp
+  MEDIA_ROOT for any write path.
+
+goals:
+  - media validation/key generation regression-guarded
+
+files:
+  - path: src/telegram_bot/tests/test_media.py
+
+changes:
+  - action: add_code
+    description: Add media service unit tests with isolated MEDIA_ROOT.
+
+acceptance_criteria:
+  - validation + storage-key tests pass
+  - no real MEDIA_ROOT pollution

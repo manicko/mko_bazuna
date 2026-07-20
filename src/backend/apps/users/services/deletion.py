@@ -13,7 +13,7 @@ from datetime import datetime
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from apps.users.models import User
+from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ def withdraw_consent(user: User) -> None:
     - Sets consent_revoked_at = now()
     - Sets is_deleted = True, deleted_at = now()
     - NULLs telegram_id and username immediately (breaks chat linkage)
+    - Invalidates/deletes all active LoginTokens (prevents re-linking after withdrawal)
     - Soft-deletes all user ads (status=DELETED, hidden immediately)
     - Ads' images are cascade-deleted via AdImage.on_delete=CASCADE
 
@@ -52,6 +53,11 @@ def withdraw_consent(user: User) -> None:
         user: The user withdrawing consent.
     """
     now = datetime.now()
+    user_telegram_id = user.telegram_id
+
+    # Invalidate active login tokens BEFORE nulling telegram_id
+    # This prevents re-linking via a still-valid token after withdrawal
+    LoginToken.objects.filter(telegram_id=user_telegram_id).delete()
 
     # Set consent revocation timestamp and soft-delete flags
     user.consent_revoked_at = now
@@ -100,6 +106,7 @@ def soft_delete_user_ads(user: User) -> int:
 
     logger.info(f"Soft-deleted {ads_deleted} ads for user {user.id}")
     return ads_deleted
+
 
 def give_consent(user: User) -> None:
     """

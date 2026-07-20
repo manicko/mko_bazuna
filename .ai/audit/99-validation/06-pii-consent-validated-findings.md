@@ -37,7 +37,7 @@ alwaysApply: false
 - `models.py:72` — `telegram_id` is `USERNAME_FIELD` and unique login key.
 - `technical-specification.md:93` — "Site banner consent covers all PII processing including the bot; no separate bot confirmation required."
 
-**Recommendation:** Decouple the gate from the mutable `telegram_id`. Persist an immutable internal identity key (or a separate `consent_state`/`is_deleted` lookup by a non-nullable id) and have the bot middleware reject `is_deleted`/`consent_revoked` users even when `telegram_id` is NULL. At minimum, after NULLing `telegram_id`, keep a separate indexed `banned_or_deleted` resolution path (e.g., a `LoginToken`-free bot-side mapping keyed by a stable chat id that is cleared only at hard-delete). Effort: medium. Priority: mandatory for compliance.
+**Recommendation:** Add a `chat_id` BigInteger column to `User` (unique, indexed, NOT NULL) that is set on first bot contact and never nullified on withdraw/deletion. Update the bot middleware in `permissions.py` to look up users by `chat_id` instead of `telegram_id`, then check `is_deleted` and `consent_revoked_at` to block withdrawn users. The `telegram_id` remains available for web login only. Create a migration for the new field; update `_check_user_state` to use the stable `chat_id` lookup. Effort: medium. Priority: mandatory for compliance.
 
 ---
 
@@ -59,7 +59,7 @@ alwaysApply: false
 - `deletion.py:38` — `withdraw_consent` defined but orphaned.
 - `technical-specification.md:83-84` — describes WITHDRAW behavior but no implementation exists.
 
-**Recommendation:** Wire WITHDRAW into the consent banner/account page and bot settings menu (recommended if the product intends to offer GDPR deletion to users), or if withdrawal is admin-only by design, update the spec/docs to say so and add an explicit admin action that calls `withdraw_consent`. Per Dead-Code policy, investigate the intended trigger before deleting. Effort: small (wire a view) / tiny (doc update). Priority: mandatory for the documented GDPR flow.
+**Recommendation:** Add a `consent/withdraw/` URL route and view that calls `withdraw_consent`, surfaced from the consent banner and user account page. Additionally, add a Django admin action in `users/admin.py` to call `withdraw_consent` for operator-triggered deletions. This ensures GDPR-compliant user-initiated withdrawal while providing admin fallback. Effort: small. Priority: mandatory for the documented GDPR flow.
 
 ---
 
@@ -81,7 +81,7 @@ alwaysApply: false
 - `permissions.py:133` — bot only blocks `/post`, not login.
 - `technical-specification.md:90` — "blocks only seller login/actions".
 
-**Recommendation:** Decide the intended semantics. If DECLINE must block seller login, add an explicit `is_declined`/`cannot_login` check to `can_login` (web) and to the bot middleware, and reflect it in `AccountState`. If the spec is wrong, update the doc to match current browse-only-publishing behavior. Effort: small. Priority: recommended.
+**Recommendation:** Add an `is_declined` boolean field or check `consent_declined` status (e.g., `has_consented=False`) to `can_login()` in `account_state.py` to return `False` for declined users, blocking web dashboard access. Update the bot middleware in `permissions.py` to reject all non-browse commands for declined users (not just `/post`). Align with spec decision K's "browse-only: blocks seller login/actions" semantics. Effort: small. Priority: mandatory.
 
 ---
 
@@ -124,7 +124,7 @@ alwaysApply: false
 - `main.py:26` — `MemoryStorage()` holds FSM state; no purge hook on withdrawal.
 - No signal connects user withdrawal to bot FSM (grep confirms no `post_save`/`pre_delete` signals for withdrawal).
 
-**Recommendation:** When a user is withdrawn, purge any DRAFT ads' media files and clear the bot FSM state for that user (e.g., keyed by `user_id`). Given the bot runs as a separate process, route the purge through a shared signal or a scheduled reconciliation (sweep picks up DRAFT rows belonging to `is_deleted` users). Effort: medium. Priority: recommended.
+**Recommendation:** Implement a scheduled reconciliation sweep that (a) queries DRAFT/ads belonging to `is_deleted=True` users, deletes their associated media files from `MEDIA_ROOT`, and removes the corresponding `Ad` and `AdImage` rows; (b) documents that in-memory FSM state in `MemoryStorage` is ephemeral and is cleared automatically on bot restart. Since the bot uses `MemoryStorage` (in-process memory), real-time cross-process FSM purge is infeasible without shared storage; add a comment to `main.py` noting this limitation and optionally emit a Django signal that can be adopted later if Redis-backed FSM storage is implemented. Effort: small-meduim. Priority: mandatory.
 
 ---
 
@@ -228,7 +228,7 @@ alwaysApply: false
 - `deletion.py:62-63` — only `telegram_id` and `username` set to None.
 - `models.py:24-25` (AbstractUser inheritance) — `first_name`/`last_name` retained.
 
-**Recommendation:** Null `first_name`/`last_name` at withdrawal (mirror the `telegram_id` handling), or document explicitly that names are retained until the 30-day hard-delete. Effort: trivial. Priority: recommended.
+**Recommendation:** Null `first_name` and `last_name` at withdrawal in `withdraw_consent()`, mirroring the existing `telegram_id`/`username` nulling. This aligns with GDPR data minimization principles and ensures PII is removed immediately rather than retained for 30 days. Effort: trivial. Priority: mandatory.
 
 ---
 

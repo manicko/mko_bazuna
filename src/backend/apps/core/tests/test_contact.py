@@ -1,93 +1,167 @@
 """
 Tests for contact service render conditions (zone R2).
 
-Unit tests for can_contact_seller logic without database dependencies.
+Tests the real can_contact_seller predicate using persisted User+Ad fixtures.
 """
+
+import re
+
+import pytest
+from apps.ads.models import Ad
+from apps.core.enums import AdStatus
+from apps.core.services.contact import can_contact_seller
+from apps.users.models import User
+from django.utils import timezone
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def seller() -> User:
+    """Create a seller user for ad fixtures."""
+    return User.objects.create(
+        telegram_id=900000001,
+        password="x",
+    )
+
+
+@pytest.fixture
+def category():
+    """Create a leaf category for ad fixtures."""
+    from apps.categories.models import Category
+
+    return Category.objects.create(
+        name="Test Category",
+        slug="test-category",
+    )
+
+
+@pytest.fixture
+def city():
+    """Create a city for ad fixtures."""
+    from apps.locations.models import City
+
+    return City.objects.create(
+        country_code="BA",
+        name="Test City",
+        region="Test Region",
+        slug="test-city",
+    )
+
+
+def _make_ad(seller, category, city, **kwargs) -> Ad:
+    """Create an Ad with required FK fields, overriding any kwargs."""
+    defaults = {
+        "user": seller,
+        "title": "Valid Title",
+        "description": "Valid description text",
+        "category": category,
+        "city": city,
+        "category_name": category.name,
+        "status": AdStatus.PUBLISHED,
+    }
+    defaults.update(kwargs)
+    return Ad.objects.create(**defaults)
 
 
 class TestCanContactSellerLogic:
-    """Tests for can_contact_seller render condition logic."""
+    """Tests for can_contact_seller render condition logic (zone R2)."""
 
-    def test_all_conditions_required_for_contact(self):
-        """Contact requires all 5 zone R2 conditions to be true."""
-        # Test that all conditions must be met
-        # Simulating the logic from can_contact_seller:
-        # - ad.status == PUBLISHED
-        # - seller.telegram_id IS NOT NULL
-        # - NOT seller.is_deleted
-        # - NOT seller.is_banned
-        # - seller.consent_revoked_at IS NULL
+    def test_all_conditions_true_returns_true(self, seller, category, city):
+        """All 5 R2 conditions true -> can_contact_seller returns True."""
+        ad = _make_ad(seller, category, city)
+        assert can_contact_seller(ad) is True
 
-        # All conditions true -> contact allowed
-        conditions_all_true = {
-            "status_published": True,
-            "telegram_id_not_null": True,
-            "not_deleted": True,
-            "not_banned": True,
-            "consent_not_revoked": True,
-        }
-        result = all(conditions_all_true.values())
-        assert result is True
+    def test_archived_ad_returns_false(self, seller, category, city):
+        """ARCHIVED/non-PUBLISHED ad -> can_contact_seller returns False."""
+        ad = _make_ad(seller, category, city, status=AdStatus.ARCHIVED)
+        assert can_contact_seller(ad) is False
 
-        # Any condition false -> contact blocked
-        conditions_one_false = {
-            "status_published": True,
-            "telegram_id_not_null": False,  # This one fails
-            "not_deleted": True,
-            "not_banned": True,
-            "consent_not_revoked": True,
-        }
-        result = all(conditions_one_false.values())
-        assert result is False
+    def test_draft_ad_returns_false(self, seller, category, city):
+        """DRAFT status -> can_contact_seller returns False."""
+        ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
+        assert can_contact_seller(ad) is False
 
-    def test_status_must_be_published(self):
-        """Only PUBLISHED status allows contact."""
-        from apps.core.enums import AdStatus
+    def test_on_moderation_ad_returns_false(self, seller, category, city):
+        """ON_MODERATION status -> can_contact_seller returns False."""
+        ad = _make_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        assert can_contact_seller(ad) is False
 
-        # Check that we're using StrEnum correctly
-        for status in AdStatus:
-            is_published = status == AdStatus.PUBLISHED
-            if status == AdStatus.PUBLISHED:
-                assert is_published is True
-            else:
-                assert is_published is False
+    def test_rejected_ad_returns_false(self, seller, category, city):
+        """REJECTED status -> can_contact_seller returns False."""
+        ad = _make_ad(seller, category, city, status=AdStatus.REJECTED)
+        assert can_contact_seller(ad) is False
 
-    def test_telegram_id_required(self):
-        """telegram_id must not be None for contact."""
-        # None telegram_id blocks contact
-        telegram_id_none = None
-        assert telegram_id_none is None  # Would block contact
+    def test_telegram_id_none_returns_false(self):
+        """Seller telegram_id is None OR seller is None -> can_contact_seller returns False.
 
-        # Valid telegram_id allows contact
-        telegram_id_valid = 123456789
-        assert telegram_id_valid is not None
+        Note: The User model enforces telegram_id NOT NULL and the Ad model
+        enforces user NOT NULL, but the function has defensive checks. We exercise
+        these paths via mock objects to test the actual function logic without
+        DB constraint changes.
+        """
+
+        class MockSeller:
+            telegram_id = None
+            is_deleted = False
+            is_banned = False
+            consent_revoked_at = None
+
+        class MockAdWithSellerNone:
+            status = AdStatus.PUBLISHED
+            user = None
+
+        class MockAdWithTelegramIdNone:
+            status = AdStatus.PUBLISHED
+            user = MockSeller()
+
+        # Test seller is None returns False
+        assert can_contact_seller(MockAdWithSellerNone()) is False
+        # Test telegram_id is None returns False
+        assert can_contact_seller(MockAdWithTelegramIdNone()) is False
+
+    def test_seller_deleted_returns_false(self, seller, category, city):
+        """Seller is_deleted flag -> can_contact_seller returns False."""
+        seller.is_deleted = True
+        seller.save(update_fields=["is_deleted"])
+        ad = _make_ad(seller, category, city)
+        assert can_contact_seller(ad) is False
+
+    def test_seller_banned_returns_false(self, seller, category, city):
+        """Seller is_banned flag -> can_contact_seller returns False."""
+        seller.is_banned = True
+        seller.save(update_fields=["is_banned"])
+        ad = _make_ad(seller, category, city)
+        assert can_contact_seller(ad) is False
+
+    def test_consent_revoked_returns_false(self, seller, category, city):
+        """Seller consent_revoked_at set -> can_contact_seller returns False."""
+        seller.consent_revoked_at = timezone.now()
+        seller.save(update_fields=["consent_revoked_at"])
+        ad = _make_ad(seller, category, city)
+        assert can_contact_seller(ad) is False
 
 
 class TestContactPattern:
-    """Tests for contact deep-link pattern matching."""
+    """Tests for contact deep-link pattern matching (from bot handler)."""
+
+    # Deep-link pattern from telegram_bot/handlers/contact.py
+    CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 
     def test_contact_pattern_matches_ad_id(self):
         """Contact pattern matches contact_<ad_id> format."""
-        import re
-
-        CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
-
         # Valid patterns
-        assert CONTACT_PATTERN.match("contact_123") is not None
-        assert CONTACT_PATTERN.match("contact_1") is not None
-        assert CONTACT_PATTERN.match("contact_999999") is not None
+        assert self.CONTACT_PATTERN.match("contact_123") is not None
+        assert self.CONTACT_PATTERN.match("contact_1") is not None
+        assert self.CONTACT_PATTERN.match("contact_999999") is not None
 
         # Invalid patterns
-        assert CONTACT_PATTERN.match("login_abc123") is None
-        assert CONTACT_PATTERN.match("contact_abc") is None
-        assert CONTACT_PATTERN.match("contact_123abc") is None
+        assert self.CONTACT_PATTERN.match("login_abc123") is None
+        assert self.CONTACT_PATTERN.match("contact_abc") is None
+        assert self.CONTACT_PATTERN.match("contact_123abc") is None
 
     def test_contact_pattern_extracts_ad_id(self):
         """Contact pattern correctly extracts ad_id from deep-link."""
-        import re
-
-        CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
-
-        match = CONTACT_PATTERN.match("contact_456")
+        match = self.CONTACT_PATTERN.match("contact_456")
         assert match is not None
         assert int(match.group(1)) == 456

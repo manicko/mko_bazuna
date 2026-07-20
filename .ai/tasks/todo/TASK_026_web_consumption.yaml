@@ -1,0 +1,56 @@
+id: task_026_web_consumption
+
+title: Implement web consumption (set consumed_at) + fix cleanup window (AUT-002, AUT-006)
+
+priority: high
+
+status: blocked
+
+blocked_by: task_005_research_login_flow
+
+depends_on:
+  - task_025_token_issuance
+  - task_005_research_login_flow
+
+source_reference: .ai/audit/99-validation/04-auth-login-validated-findings.md
+source_section: "AUT-002 / AUT-006"
+
+description: >
+  consumed_at is never assigned in production, so the "consumed-once /
+  replay-protected" property is never realized and the cleanup command keys the
+  consumed branch on created_at instead of consumed_at. Implement the web
+  consumption step (atomic UPDATE consumed_at) and fix cleanup_login_tokens to
+  filter on consumed_at__lt=consumed_cutoff.
+
+goals:
+  - claimed token is marked consumed exactly once
+  - cleanup retention measured from consumption time
+
+files:
+  - path: src/backend/apps/users/views/consent.py
+    targets:
+      - type: function
+        name: token consumption (status-poll endpoint)
+    semantic_anchors:
+      insert_after:
+        type: function
+        value: "login token issuance view"
+
+  - path: src/backend/apps/core/management/commands/cleanup_login_tokens.py
+    targets:
+      - type: function
+        name: handle (consumed branch)
+    semantic_anchors:
+      edit_line:
+        type: filter
+        value: "created_at__lt=consumed_cutoff"
+
+changes:
+  - action: replace
+    description: >
+      Atomically set consumed_at in the consumption step; change the cleanup
+      consumed branch to consumed_at__lt=consumed_cutoff.
+
+acceptance_criteria:
+  - consumed_at is set on claim completion
+  - cleanup deletes consumed>24h tokens measured from consumed_at

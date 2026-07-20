@@ -1,0 +1,38 @@
+id: task_048_category_descendants
+
+title: Expand single-word category match to descendants (SRH-002)
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/08-search-fts-validated-findings.md
+source_section: "SRH-002"
+
+description: >
+  The search view applies an exact category=category_filter filter with no
+  subtree expansion, while listings.py correctly uses
+  get_descendants(include_self=True). Make the search view expand the matched
+  category to its descendants (factor a shared helper if useful).
+
+goals:
+  - search category filter respects the category tree
+  - consistent with listings behavior (US-B6)
+
+files:
+  - path: src/backend/apps/search/views/search.py
+    targets:
+      - type: function
+        name: search (category filter)
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "ads.filter(category=category_filter)"
+
+changes:
+  - action: replace
+    description: Replace exact category filter with descendant-id expansion.
+
+acceptance_criteria:
+  - searching a parent category returns descendant-category ads
+  - listings and search behave consistently

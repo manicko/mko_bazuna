@@ -1,0 +1,39 @@
+id: task_031_approve_original_published
+
+title: Set original_published_at on first publish in approve_ad (AD-003)
+
+priority: medium
+
+depends_on:
+  - task_030_bot_publish_via_service
+
+source_reference: .ai/audit/99-validation/05-ad-lifecycle-validated-findings.md
+source_section: "AD-003"
+
+description: >
+  approve_ad sets status=PUBLISHED, published_at, published_by_id but omits
+  original_published_at, while set_published correctly sets it when None.
+  Update approve_ad to set original_published_at from published_at when None
+  (mirroring set_published), or route approve_ad through set_published.
+
+goals:
+  - original_published_at consistent across all publish paths
+  - audit field immutability preserved
+
+files:
+  - path: src/backend/apps/moderation/admin_actions.py
+    targets:
+      - type: function
+        name: approve_ad
+    semantic_anchors:
+      insert_before:
+        type: statement
+        value: "ad.save()"
+
+changes:
+  - action: add_code
+    description: Set original_published_at = published_at when original_published_at is None in approve_ad.
+
+acceptance_criteria:
+  - first publish via admin sets original_published_at
+  - value is immutable thereafter

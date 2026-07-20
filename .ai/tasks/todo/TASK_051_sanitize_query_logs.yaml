@@ -1,0 +1,43 @@
+id: task_051_sanitize_query_logs
+
+title: Sanitize/truncate buyer query strings in logs (SRH-005)
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/08-search-fts-validated-findings.md
+source_section: "SRH-005"
+
+description: >
+  The search view and query_translator log the raw, unbounded buyer query at
+  INFO/WARNING. Unauthenticated users can inject PII/control chars into logs.
+  Sanitize/truncate query strings before logging and gate verbose logging
+  behind DEBUG.
+
+goals:
+  - no raw user input written to logs
+  - no log-injection / PII sink
+
+files:
+  - path: src/backend/apps/search/views/search.py
+    targets:
+      - type: function
+        name: search (logging)
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "logger.info(f\"Empty search results for query '{query}'\")"
+
+  - path: src/backend/apps/search/services/query_translator.py
+    targets:
+      - type: function
+        name: translate_query_bs_to_ru (logging)
+
+changes:
+  - action: replace
+    description: Truncate/sanitize query before logging; gate verbose logs behind DEBUG.
+
+acceptance_criteria:
+  - logged queries are sanitized/truncated
+  - no control chars / raw PII in logs

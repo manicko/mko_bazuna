@@ -1,0 +1,32 @@
+id: task_046_media_security_tests
+
+title: Add media security tests (access control, EXIF, deletion) (MED-008)
+
+priority: low
+
+depends_on:
+  - task_044_media_access_gate
+  - task_045_sweep_photo_unlink
+  - task_016_exif_strip
+
+source_reference: .ai/audit/99-validation/07-media-validated-findings.md
+source_section: "MED-008"
+
+description: >
+  No media-security tests exist. Add tests/test_media_security.py using an
+  isolated MEDIA_ROOT asserting: unpublished-ad photo not served, EXIF stripped
+  after store, sweep unlinks files, and path-traversal keys are rejected.
+
+goals:
+  - media access-control, EXIF stripping, and deletion are regression-guarded
+
+files:
+  - path: src/backend/apps/ads/tests/test_media_security.py
+
+changes:
+  - action: add_code
+    description: Add media security tests with isolated MEDIA_ROOT.
+
+acceptance_criteria:
+  - tests fail before MED-001/MED-002/MED-003 fixes, pass after
+  - path-traversal keys rejected

@@ -10,14 +10,12 @@ Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
 
 import logging
 
-from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
-
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.moderation.services.auto_moderation import auto_moderate
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +100,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad.description = new_description
         if price_value is not None:
             ad.price = price_value
-        ad.status = AdStatus.ON_MODERATION
-        ad.archived_at = None  # Clear archive timestamp on reactivation
-        ad.save(update_fields=["title", "description", "price", "status", "archived_at"])
+        ad.save(update_fields=["title", "description", "price"])
+
+        # Transition to ON_MODERATION (clears archived_at via transition_to)
+        ad.transition_to(AdStatus.ON_MODERATION)
 
         # Run auto-moderation check
         passed = auto_moderate(ad)
@@ -131,15 +130,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             ad.description = new_description
             if price_value is not None:
                 ad.price = price_value
-            ad.status = AdStatus.ON_MODERATION
-            ad.save(
-                update_fields=[
-                    "title",
-                    "description",
-                    "price",
-                    "status",
-                ]
-            )
+            ad.save(update_fields=["title", "description", "price", "updated_at"])
+
+            # Use transition_to for status change to ON_MODERATION
+            ad.transition_to(AdStatus.ON_MODERATION)
             logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
         else:
             # Price/photo only edit: stay published
@@ -185,9 +179,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         return HttpResponseForbidden("You do not have permission to archive this ad.")
 
     if ad.status == AdStatus.PUBLISHED:
-        ad.status = AdStatus.ARCHIVED
-        ad.archived_at = timezone.now()
-        ad.save(update_fields=["status", "archived_at"])
+        ad.transition_to(AdStatus.ARCHIVED)
         logger.info(f"Ad {ad_id} archived by user {request.user.id}")
 
     return redirect("ads:dashboard")
@@ -218,10 +210,8 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
         return HttpResponseForbidden("You do not have permission to reactivate this ad.")
 
     if ad.status == AdStatus.ARCHIVED:
-        # Update status to ON_MODERATION for re-check
-        ad.status = AdStatus.ON_MODERATION
-        ad.archived_at = None
-        ad.save(update_fields=["status", "archived_at"])
+        # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
+        ad.transition_to(AdStatus.ON_MODERATION)
 
         # Run auto-moderation check
         auto_moderate(ad)

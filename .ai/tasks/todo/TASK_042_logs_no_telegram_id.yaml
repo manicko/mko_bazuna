@@ -1,0 +1,48 @@
+id: task_042_logs_no_telegram_id
+
+title: Stop logging raw telegram_id (PII-008)
+
+priority: medium
+
+depends_on:
+  - task_036_decline_blocks_login
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-008"
+
+description: >
+  account_state.py logs user.telegram_id at INFO in several places and
+  contact.py logs the buyer telegram_id. Log the internal user.id instead and
+  drop the raw telegram_id from the contact log line, per the no-raw-identifier
+  logging rule.
+
+goals:
+  - no raw external identifier in logs
+  - internal PK used for diagnostics
+
+files:
+  - path: src/backend/apps/users/services/account_state.py
+    targets:
+      - type: module
+        name: account_state logging
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "logger.info(f\"User {user.telegram_id} ...\")"
+
+  - path: src/backend/apps/core/services/contact.py
+    targets:
+      - type: function
+        name: record_contact_initiated
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "logger.info(f\"Contact initiated event recorded for buyer {buyer_telegram_id}\")"
+
+changes:
+  - action: replace
+    description: Replace telegram_id with user.id in logs; drop raw buyer telegram_id from contact log.
+
+acceptance_criteria:
+  - no raw telegram_id in application logs
+  - diagnostics still reference internal PK

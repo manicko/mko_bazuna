@@ -153,7 +153,7 @@ Critically, the bot's inline copy is a SUBSET of the shared logic: it omits the 
 - `grep print\()` → 8 hits, all in repo-root `main.py`/`count_*.py`; zero hits in `src/`.
 - `src/backend/manage.py` and `src/telegram_bot/main.py` use `logger`, not `print()`.
 
-**Recommendation:** Remove `main.py` (template stub) and the `count_*.py` scratch scripts, or move them under a clearly-named `scripts/` / `tools/` directory excluded from production packaging and add a `ruff`/`basedpyright` target that lints them so the no-`print()` rule is enforced project-wide. Effort: trivial. Priority: recommended.
+**Recommendation:** Delete `main.py` and the `count_*.py` scratch scripts from the repo root. These are unused template/scaffold files not referenced by any application code or command. If counting logic is needed later, reintroduce it as a proper Django management command under `src/backend/apps/`. Effort: trivial. Priority: recommended.
 
 > **Validation Note:**
 > - **Action:** Validated

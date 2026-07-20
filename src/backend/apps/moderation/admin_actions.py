@@ -7,8 +7,6 @@ Used by moderation review views and admin actions.
 
 import logging
 
-from django.utils import timezone
-
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.moderation.services.moderation_log import (
@@ -18,6 +16,7 @@ from apps.moderation.services.moderation_log import (
     log_soft_delete,
 )
 from apps.users.models import User
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 

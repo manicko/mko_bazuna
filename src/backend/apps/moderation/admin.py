@@ -4,9 +4,8 @@ Django admin registration for moderation app.
 Singleton criteria editing and read-only action logs.
 """
 
-from django.contrib import admin
-
 from apps.moderation.models import ModerationCriteria, ModeratorActionLog
+from django.contrib import admin
 
 
 def log_ad_link(obj: ModeratorActionLog) -> str:

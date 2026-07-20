@@ -1,0 +1,40 @@
+id: task_067_automod_test_coupling
+
+title: De-couple auto-moderation test from private internals (TST-009)
+
+priority: medium
+
+depends_on:
+  - task_030_bot_publish_via_service
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-009"
+
+description: >
+  TestCheckFunction monkeypatches four private helpers of check(), so the test
+  breaks on refactor without behavior change. Replace internal monkeypatching
+  with a real fixture: a ModerationCriteria singleton row + persisted Ad/User,
+  so check() runs end-to-end against the ORM. Assert on the returned
+  (passed, error) contract, not private call counts.
+
+goals:
+  - test resilient to internal refactors
+  - asserts behavior, not implementation
+
+files:
+  - path: src/backend/apps/moderation/tests/test_auto_moderation.py
+    targets:
+      - type: class
+        name: TestCheckFunction
+    semantic_anchors:
+      edit_block:
+        type: statement
+        value: "monkeypatch.setattr(auto_moderation, \"_get_cached_criteria\", ...)"
+
+changes:
+  - action: replace
+    description: Replace private monkeypatching with ORM-backed fixture + contract assertions.
+
+acceptance_criteria:
+  - test passes against real ORM fixture
+  - survives private-helper rename/refactor

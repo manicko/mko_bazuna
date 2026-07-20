@@ -1,0 +1,57 @@
+id: task_044_media_access_gate
+
+title: App-level media access gate (X-Accel-Redirect) (MED-001)
+
+priority: critical
+
+status: blocked
+
+blocked_by: task_004_research_media_gate
+
+depends_on:
+  - task_004_research_media_gate
+  - task_021_media_delete_helper
+
+source_reference: .ai/audit/99-validation/07-media-validated-findings.md
+source_section: "MED-001"
+
+description: >
+  nginx serves /media/ directly with no per-request access control, so
+  unpublished/withdrawn/deleted ad photos are fetchable by URL. Per
+  research_004: add an internal nginx location + a Django view that looks up
+  AdImage -> Ad, asserts status == PUBLISHED (and staff moderation queue),
+  then X-Accel-Redirect to the internal location.
+
+goals:
+  - unpublished/deleted photos not directly fetchable
+  - published media still served efficiently via internal redirect
+
+files:
+  - path: docker/nginx/nginx.conf
+    targets:
+      - type: location
+        name: "location /media/ (internal handoff)"
+    semantic_anchors:
+      edit_block:
+        type: directive
+        value: "alias /media_volume/;"
+
+  - path: src/backend/config/urls.py
+  - path: src/backend/apps/ads/urls.py
+  - path: src/backend/apps/ads/views/listings.py
+    targets:
+      - type: function
+        name: media gate view
+    semantic_anchors:
+      insert_after:
+        type: function
+        value: "ad_detail"
+
+changes:
+  - action: add_code
+    description: Add internal nginx location + media gate view with status check + X-Accel-Redirect.
+
+acceptance_criteria:
+  - unpublished/withdrawn/deleted ad photos return 403/404 via direct URL
+  - published ad photos served via internal redirect
+  - admin moderation preview still works

@@ -1,0 +1,39 @@
+id: task_047_query_timeout_nonblock
+
+title: Make translation timeout actually bound request latency (SRH-001)
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/08-search-fts-validated-findings.md
+source_section: "SRH-001"
+
+description: >
+  query_translator wraps translate_cached in a ThreadPoolExecutor using a `with`
+  block; on TimeoutError the context __exit__ calls executor.shutdown(wait=True)
+  which blocks until the translator finishes, so the 500ms budget does not bound
+  latency. Create a module-level EXECUTOR and call future.result(timeout=0.5)
+  without a `with` block; on timeout abandon the thread and return promptly.
+
+goals:
+  - request latency bounded by the timeout
+  - no blocking shutdown wait on translator slowness
+
+files:
+  - path: src/backend/apps/search/services/query_translator.py
+    targets:
+      - type: function
+        name: translate_query_bs_to_ru
+    semantic_anchors:
+      edit_block:
+        type: statement
+        value: "with ThreadPoolExecutor(max_workers=1) as executor:"
+
+changes:
+  - action: replace
+    description: Use a module-level EXECUTOR; drop the `with` block; return on timeout without waiting for shutdown.
+
+acceptance_criteria:
+  - timeout returns control promptly (no blocking shutdown)
+  - successful/fallback translation still works

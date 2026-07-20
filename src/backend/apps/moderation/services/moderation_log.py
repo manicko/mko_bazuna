@@ -8,8 +8,6 @@ Reason field is TEXT and NEVER shown to seller (US-A11).
 import logging
 from typing import TYPE_CHECKING
 
-from django.utils import timezone
-
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.models import ModeratorActionLog
 
@@ -175,9 +173,7 @@ def set_moderation_failed(ad: Ad, reason: str = "Auto-moderation failed") -> Non
         ad: The Ad instance that failed moderation.
         reason: The reason for failure (default: auto-moderation).
     """
-    ad.status = AdStatus.ON_MODERATION_FAILED
-    ad.moderation_failed_at = timezone.now()
-    ad.save(update_fields=["status", "moderation_failed_at"])
+    ad.transition_to(AdStatus.ON_MODERATION_FAILED)
 
     log_auto_fail(ad_id=ad.id, user_id=ad.user_id)
 
@@ -191,10 +187,7 @@ def set_rejected(ad: Ad, moderator_id: int, reason: str) -> None:
         moderator_id: The moderator user ID performing the rejection.
         reason: The rejection reason (INTERNAL ONLY - never shown to seller).
     """
-    ad.status = AdStatus.REJECTED
-    ad.rejected_at = timezone.now()
-    ad.moderated_by_id = moderator_id
-    ad.save(update_fields=["status", "rejected_at", "moderated_by"])
+    ad.transition_to(AdStatus.REJECTED, moderator_id=moderator_id)
 
     log_manual_reject(
         ad_id=ad.id,
@@ -212,14 +205,7 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
         ad: The Ad instance to publish.
         moderator_id: The moderator user ID (None for auto-publish).
     """
-    now = timezone.now()
-    ad.status = AdStatus.PUBLISHED
-    ad.published_at = now
-    if ad.original_published_at is None:
-        ad.original_published_at = now
-    if moderator_id:
-        ad.published_by_id = moderator_id
-    ad.save(update_fields=["status", "published_at", "original_published_at", "published_by"])
+    ad.transition_to(AdStatus.PUBLISHED, moderator_id=moderator_id)
 
     if moderator_id:
         log_manual_publish(ad_id=ad.id, moderator_id=moderator_id)

@@ -7,12 +7,11 @@ Aggregates events by type and date, outputs to stdout.
 import logging
 from datetime import timedelta
 
+from apps.analytics.models import AnalyticsEvent
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
-
-from apps.analytics.models import AnalyticsEvent
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,41 @@
+id: task_037_deletion_timezone
+
+title: Use timezone.now() in consent/deletion service (PII-007, QLT-005)
+
+priority: medium
+
+depends_on:
+  - task_035_withdraw_route
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-007"
+source_reference_2: .ai/audit/99-validation/10-code-quality-validated-findings.md
+source_section_2: "QLT-005"
+
+description: >
+  withdrawal/give_consent/soft_delete use datetime.now() (naive) while the
+  sweep commands use timezone.now() (aware), risking a timezone-skewed 30-day
+  window. Replace datetime.now() with django.utils.timezone.now() throughout
+  deletion.py.
+
+goals:
+  - consistent timezone-aware timestamps
+  - 30-day hard-delete window measured correctly
+
+files:
+  - path: src/backend/apps/users/services/deletion.py
+    targets:
+      - type: module
+        name: deletion.py (datetime imports/usages)
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "now = datetime.now()"
+
+changes:
+  - action: replace
+    description: Swap datetime.now() for timezone.now() in withdrawal/give/soft_delete.
+
+acceptance_criteria:
+  - no naive datetime.now() remains in deletion.py
+  - sweep comparisons use consistent aware timestamps

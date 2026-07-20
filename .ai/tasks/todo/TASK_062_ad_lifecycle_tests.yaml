@@ -1,0 +1,33 @@
+id: task_062_ad_lifecycle_tests
+
+title: Test ad-lifecycle transitions (TST-002)
+
+priority: critical
+
+depends_on:
+  - task_030_bot_publish_via_service
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-002"
+
+description: >
+  The core lifecycle (create_draft_ad -> DRAFT; update_ad_and_moderate ->
+  PUBLISHED or ON_MODERATION_FAILED, setting published_at + immutable
+  original_published_at) is untested. Add backend tests invoking the bot
+  publish path (post-refactor via shared service) asserting transitions and
+  immutable audit fields.
+
+goals:
+  - ad lifecycle transitions regression-guarded
+  - immutability of original_published_at asserted
+
+files:
+  - path: src/telegram_bot/tests/test_ad_lifecycle.py
+
+changes:
+  - action: add_code
+    description: Add ad-lifecycle transition tests against the real ORM.
+
+acceptance_criteria:
+  - DRAFT->PUBLISHED and DRAFT->ON_MODERATION_FAILED asserted
+  - original_published_at immutability asserted

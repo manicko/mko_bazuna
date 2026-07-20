@@ -1,0 +1,35 @@
+id: task_075_verify_final
+
+title: Verify — full rollout integration & CI
+
+type: verification
+
+status: pending
+
+depends_on:
+  - task_071_verify_boot
+  - task_072_verify_login
+  - task_073_verify_media
+  - task_074_verify_pii
+  - task_059_ci_coverage
+  - task_060_bot_test_package
+
+verifies:
+  - task_071_verify_boot
+  - task_072_verify_login
+  - task_073_verify_media
+  - task_074_verify_pii
+  - task_059_ci_coverage
+  - task_060_bot_test_package
+
+verification_steps:
+  - build: "docker compose build"
+  - test: "uv run pytest -q  (full suite incl. bot package, coverage gate)"
+  - smoke_check: "CI green with coverage report; all entrypoints boot; login flow, media gate, and PII cascade verified end-to-end"
+
+pass_criteria:
+  - full test suite passes including bot package
+  - coverage threshold met
+  - all four domain verifications green
+
+failure_action: return dependent failing tasks to rework

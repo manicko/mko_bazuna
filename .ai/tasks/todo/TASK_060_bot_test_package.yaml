@@ -1,0 +1,36 @@
+id: task_060_bot_test_package
+
+title: Bootstrap bot test package (Django + aiogram, real ORM) (TST-003)
+
+priority: critical
+
+depends_on:
+  - task_006_fix_container_boot
+  - task_007_fix_bot_import_order
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-003"
+
+description: >
+  The entire telegram_bot package has zero tests and is not collected by pytest.
+  Add a dedicated test package that boots Django + aiogram with pytest-asyncio
+  (already a dev dependency) and drives FSM/handlers against the real Postgres
+  ORM, sharing the migration/DB fixture with web tests to prove the two-process
+  contract. Start with create_draft_ad -> DRAFT persistence and claim_login_token.
+
+goals:
+  - bot handlers collected and run by pytest
+  - bot tested against the shared ORM (two-process contract)
+
+files:
+  - path: src/telegram_bot/tests/__init__.py
+  - path: src/telegram_bot/tests/conftest.py
+  - path: pyproject.toml
+
+changes:
+  - action: add_code
+    description: Scaffold bot test package with Django+aiogram bootstrap and shared DB fixture.
+
+acceptance_criteria:
+  - pytest collects bot tests
+  - create_draft_ad persists DRAFT against real ORM

@@ -1,0 +1,40 @@
+id: task_041_hard_delete_at_doc
+
+title: Resolve hard_delete_at dead field (doc or drop) (PII-006)
+
+priority: medium
+
+depends_on:
+  - task_034_pii_chat_id
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-006"
+
+description: >
+  User.hard_delete_at is documented as the 30-day sweep target but is never
+  written; the sweep uses consent_revoked_at. Either remove the field (with a
+  migration) and fix docs, or implement it (set in withdraw_consent, filter in
+  the sweep). Per validation, simpler is to drop it and align docs.
+
+goals:
+  - docs match implemented sweep logic
+  - no dead/contradictory schema documented
+
+files:
+  - path: src/backend/apps/users/models.py
+    targets:
+      - type: field
+        name: hard_delete_at
+  - path: src/backend/apps/users/admin.py
+    targets:
+      - type: field
+        name: hard_delete_at readonly
+  - path: docs/02-database/db-schema.md
+
+changes:
+  - action: delete_symbol
+    description: Remove hard_delete_at field + migration + admin readonly; update db-schema.md to reflect consent_revoked_at-based sweep.
+
+acceptance_criteria:
+  - hard_delete_at removed and docs aligned, OR implemented consistently
+  - no doc claims a non-existent sweep target

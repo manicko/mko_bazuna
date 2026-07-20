@@ -275,7 +275,7 @@ validated: true
 
 | Priority | Finding | Action |
 |----------|---------|--------|
-| HIGH | SRH-001 | Use module-level executor without `with` context or accept orphaned thread on timeout |
+| HIGH | SRH-001 | Create module-level `EXECUTOR = ThreadPoolExecutor(max_workers=1)`; call `future.result(timeout=0.5)` without `with` block — on timeout, the translator thread is abandoned but request returns promptly |
 | HIGH | SRH-002 | Add `get_descendants(include_self=True)` or factor shared helper with listings |
 | HIGH | SRH-003 | Add Django Paginator (20-40 per page) to search and listings views |
 
@@ -285,9 +285,9 @@ validated: true
 
 | Priority | Finding | Action |
 |----------|---------|--------|
-| MEDIUM | SRH-004 | Update docstring to remove "5-minute cache" claim OR implement Django cache with TTL |
+| MEDIUM | SRH-004 | Update docstring to remove "5-minute cache" claim; describe LRU as maxsize=128 in-process cache with no TTL (Django cache with TTL is a future option) |
 | MEDIUM | SRH-005 | Sanitize/truncate query strings before logging; gate verbose logging behind DEBUG |
 | LOW | SRH-006 | Remove broad `Exception` catch; log at ERROR for genuine bugs |
 | LOW | SRH-007 | Move analytics event creation after successful search execution |
 | MEDIUM | SRH-008 | Remove `pg_trgm` from FTS stack documentation in db-schema.md, packages-list.md, spec-index.md |
-| LOW | SRH-009 | Implement HTMX partial (split list.html) OR remove dead branch entirely |
+| LOW | SRH-009 | Split list.html: create `ads/partials/ad_list.html` fragment and render partial on `HX-Request` header; remove dead branch after HTMX partial implemented |

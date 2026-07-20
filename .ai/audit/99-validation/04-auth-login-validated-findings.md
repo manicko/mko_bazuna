@@ -90,7 +90,13 @@ validated: yes
 > - **Action:** Validated
 > - **Detail:** Verified finding is accurate. Session middleware is configured correctly but no login view or session establishment code exists. Consent views require `@login_required` decorator, proving the web app expects authenticated sessions, but the login flow is non-functional.
 
-**Recommendation:** Add a web endpoint (e.g. polling/redirect) that, given the `token_hash` (or a short-lived session key handed back from the bot flow), performs phase 2 (AUT-002) and then `auth.login(request, user)` with `session.cycle_key()` to defeat session fixation. Decide the bot↔web handoff (callback URL vs. status poll) and document it. Until then the entire auth surface is non-functional on the web side.
+**Recommendation:** Implement a **status-poll endpoint** at `GET /login/status/` that eliminates cross-process coupling. The web issuance page displays the deep-link (`https://t.me/<bot_username>?start=login_<token>`) and polls this endpoint with the raw token (or opaque session key derived from it). The endpoint checks `LoginToken` for `telegram_id` being set and `consumed_at IS NULL`, then performs phase 2: atomically sets `consumed_at=now()`, retrieves/creates the `User` via `telegram_id`, calls `django.contrib.auth.login(request, user)`, and invokes `session.cycle_key()` to defeat session fixation. Returns HTTP 200 with session cookie once claimed, or HTTP 204 while pending, or HTTP 410 for expired/invalid tokens.
+
+> **Why status-poll over callback:** Callback URL would require the bot to know the web base URL and make outbound HTTP calls — adding configuration coupling and failure modes. Status polling keeps both processes decoupled: web initiates, bot never needs web configuration. This is the simplest robust pattern for Telegram deep-link UX.
+>
+>**Implementation note:** The issuance page already renders the token; polling can use the raw token directly (SHA-256 hashed server-side for lookup) or an opaque short-lived session key to avoid exposing the token in query parameters during polling.
+>
+>Until this endpoint exists, the web login flow is non-functional despite the bot claim working correctly.
 
 ---
 

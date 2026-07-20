@@ -1,8 +1,7 @@
 """Search app URLs."""
 
-from django.urls import path
-
 from apps.search.views.search import search
+from django.urls import path
 
 app_name = "search"
 

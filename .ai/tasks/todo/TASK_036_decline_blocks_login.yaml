@@ -1,0 +1,55 @@
+id: task_036_decline_blocks_login
+
+title: DECLINE blocks seller login/actions (PII-003)
+
+priority: high
+
+depends_on:
+  - task_034_pii_chat_id
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-003"
+
+description: >
+  Spec decision K: DECLINE = browse-only, blocks seller login/actions.
+  decline_consent only sets ads_auto_publish=False; can_login() only checks
+  is_banned; the bot middleware only blocks /post. Add is_declined / consent
+  check to can_login() (return False for declined) and reject all non-browse
+  bot commands for declined users, not just /post.
+
+goals:
+  - declined sellers cannot log in to the dashboard
+  - declined users blocked from non-browse bot commands
+
+files:
+  - path: src/backend/apps/users/services/account_state.py
+    targets:
+      - type: function
+        name: can_login
+    semantic_anchors:
+      insert_before:
+        type: statement
+        value: "return True  # unless is_banned"
+
+  - path: src/backend/apps/users/services/deletion.py
+    targets:
+      - type: function
+        name: decline_consent
+    semantic_anchors:
+      insert_after:
+        type: statement
+        value: "ads_auto_publish=False"
+
+  - path: src/telegram_bot/middlewares/permissions.py
+    targets:
+      - type: function
+        name: command gating
+
+changes:
+  - action: add_code
+    description: Gate can_login on declined consent; block non-browse bot commands for declined users.
+
+acceptance_criteria:
+  - declined user cannot authenticate to the dashboard
+  - bot rejects non-browse commands for declined users
+  - browse-only semantics enforced

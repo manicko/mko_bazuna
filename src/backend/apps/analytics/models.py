@@ -4,9 +4,8 @@ Analytics models for Mko Bazuna.
 AnalyticsEvent for product metrics.
 """
 
-from django.db import models
-
 from apps.core.enums import AnalyticsEventType
+from django.db import models
 
 
 class AnalyticsEvent(models.Model):

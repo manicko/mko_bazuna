@@ -4,10 +4,9 @@ Django admin registration for categories app.
 Uses django-mptt admin for hierarchical category tree.
 """
 
+from apps.categories.models import Category
 from django.contrib import admin
 from mptt.admin import MPTTModelAdmin
-
-from apps.categories.models import Category
 
 
 @admin.register(Category)

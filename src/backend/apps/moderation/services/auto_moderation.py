@@ -9,17 +9,15 @@ import logging
 from difflib import SequenceMatcher
 from typing import Final
 
-
-from apps.core.utils.cache import (
-    CRITERIA_CACHE_KEY,  # noqa: F401 - re-exported for external use
-    invalidate_criteria_cache,  # noqa: F401 - re-exported for external use
-    get_cached_criteria,
-    set_cached_criteria,
-)
-
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.utils.cache import (
+    CRITERIA_CACHE_KEY,  # noqa: F401 - re-exported for external use
+    get_cached_criteria,
+    invalidate_criteria_cache,  # noqa: F401 - re-exported for external use
+    set_cached_criteria,
+)
 
 logger = logging.getLogger(__name__)
 

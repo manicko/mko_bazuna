@@ -1,0 +1,34 @@
+id: task_068_account_state_tests
+
+title: Test account-state gating + deletion/PII services (TST-010)
+
+priority: medium
+
+depends_on:
+  - task_036_decline_blocks_login
+  - task_037_deletion_timezone
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-010"
+
+description: >
+  can_publish_ad / can_login (ban vs delete vs publish-restriction) and
+  deletion.py / consent view are untested. Add unit tests for the flag matrix
+  (banned, deleted, ads_auto_publish=False, declined, combinations) and a
+  consent-withdrawal view test.
+
+goals:
+  - gating logic regression-guarded
+  - deletion/consent services tested
+
+files:
+  - path: src/backend/apps/users/tests/test_account_state.py
+  - path: src/backend/apps/users/tests/test_consent.py
+
+changes:
+  - action: add_code
+    description: Add account-state flag-matrix tests + consent withdrawal test.
+
+acceptance_criteria:
+  - flag combinations covered
+  - consent withdrawal view tested

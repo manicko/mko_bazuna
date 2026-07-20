@@ -1,0 +1,37 @@
+id: task_063_web_view_tests
+
+title: Add web-view request/response tests (TST-004)
+
+priority: high
+
+depends_on:
+  - task_027_web_session_poll
+  - task_048_category_descendants
+  - task_049_search_pagination_htmx
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-004"
+
+description: >
+  No Django test client usage exists; FTS visibility, contact gating, consent,
+  and moderation are untested at the view layer. Add tests.py per app using the
+  test Client covering: search view returns only PUBLISHED ads (with descendant
+  categories + pagination), anonymous contact gate, consent withdraw view, and
+  moderation review action.
+
+goals:
+  - view-layer behavior regression-guarded
+  - web/bot consistency covered
+
+files:
+  - path: src/backend/apps/search/tests.py
+  - path: src/backend/apps/users/tests/test_consent.py
+  - path: src/backend/apps/moderation/tests.py
+
+changes:
+  - action: add_code
+    description: Add Django test Client view tests for search/contact/consent/moderation.
+
+acceptance_criteria:
+  - search view filters PUBLISHED + descendant categories + paginates
+  - consent withdraw + moderation actions tested

@@ -1,0 +1,43 @@
+id: task_021_media_delete_helper
+
+title: Add shared delete_photo(storage_key) media helper (MED-003/MED-004 base)
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/07-media-validated-findings.md
+source_section: "MED-003 / MED-004"
+
+description: >
+  No media-deletion helper exists anywhere (grep: no os.remove/unlink for
+  media). Add delete_photo(storage_key) to telegram_bot.services.media that
+  calls os.remove(os.path.join(settings.MEDIA_ROOT, storage_key)), ignoring
+  missing files. This is the shared primitive consumed by sweep unlink wiring
+  (MED-003), cancel/draft cleanup (MED-004/AD-004), and consent hard-delete
+  (PII-004/005).
+
+goals:
+  - single reusable media-unlink primitive
+  - safe no-op when the file is already absent
+
+files:
+  - path: src/telegram_bot/services/media.py
+    targets:
+      - type: function
+        name: delete_photo
+    semantic_anchors:
+      insert_after:
+        type: function
+        value: "generate_storage_key"
+
+changes:
+  - action: add_code
+    description: >
+      Add delete_photo(storage_key) using os.remove under MEDIA_ROOT, catching
+      FileNotFoundError.
+
+acceptance_criteria:
+  - delete_photo removes the targeted file
+  - missing file does not raise
+  - importable from media service

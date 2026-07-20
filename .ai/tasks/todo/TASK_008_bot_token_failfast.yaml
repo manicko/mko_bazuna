@@ -1,0 +1,50 @@
+id: task_008_bot_token_failfast
+
+title: Bot BOT_TOKEN fail-fast via settings schema (CFG-003)
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/02-config-secrets-validated-findings.md
+source_section: "CFG-003"
+
+description: >
+  The bot reads BOT_TOKEN via raw os.getenv and silently returns (exit 0) when
+  missing, defeating the restart policy. Move token loading into the validated
+  environ.Env schema so a missing/invalid token raises ImproperlyConfigured at
+  django.setup(), matching SECRET_KEY behavior on the web side.
+
+goals:
+  - unify secret loading across web and bot processes
+  - missing BOT_TOKEN becomes an explicit boot failure, not silent exit 0
+
+files:
+  - path: src/backend/config/settings/base.py
+    targets:
+      - type: class
+        name: environ.Env schema
+    semantic_anchors:
+      insert_after:
+        type: assignment
+        value: "DEBUG = env(...)"
+
+  - path: src/telegram_bot/main.py
+    targets:
+      - type: function
+        name: main
+    semantic_anchors:
+      insert_before:
+        type: function_call
+        value: "os.getenv(\"BOT_TOKEN\")"
+
+changes:
+  - action: replace
+    description: >
+      Define BOT_TOKEN = env("BOT_TOKEN") in the Env schema; replace the
+      os.getenv + silent-return block in main() with usage of the schema value.
+
+acceptance_criteria:
+  - missing BOT_TOKEN raises ImproperlyConfigured at startup
+  - present BOT_TOKEN still boots the bot
+  - web and bot share one secret-loading mechanism

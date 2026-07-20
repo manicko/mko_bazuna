@@ -1,0 +1,32 @@
+id: task_059_ci_coverage
+
+title: Enable coverage reporting + threshold in CI (TST-008)
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/99-validation/11-test-coverage-validated-findings.md
+source_section: "TST-008"
+
+description: >
+  CI runs pytest with no --cov and no fail-under, so the security-critical gaps
+  (bot, login claim, views) stay at 0% unseen. Add --cov + xml/term reports and
+  a conservative fail_under threshold (start ~70%, raise over time), surfacing
+  the artifact.
+
+goals:
+  - coverage visible in CI
+  - threshold gate prevents silent regression of coverage
+
+files:
+  - path: .github/workflows/ci.yml
+  - path: pyproject.toml
+
+changes:
+  - action: add_code
+    description: Add pytest-cov flags to CI and a fail_under threshold in pyproject.
+
+acceptance_criteria:
+  - CI emits coverage report
+  - fail_under threshold configured

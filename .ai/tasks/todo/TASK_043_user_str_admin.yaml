@@ -1,0 +1,44 @@
+id: task_043_user_str_admin
+
+title: Stop exposing telegram_id in User.__str__/admin (PII-009)
+
+priority: low
+
+depends_on:
+  - task_034_pii_chat_id
+
+source_reference: .ai/audit/99-validation/06-pii-consent-validated-findings.md
+source_section: "PII-009"
+
+description: >
+  User.__str__ returns f"User {self.telegram_id or self.id}" and admin
+  list_display/search_fields surface telegram_id, emitting the raw identifier
+  into repr/log paths. Change __str__ to use self.id only; keep telegram_id in
+  admin search if operationally needed but avoid printing it in repr/log paths.
+
+goals:
+  - __str__ uses internal PK, not raw identifier
+  - reduced raw-identifier leakage from admin/repr
+
+files:
+  - path: src/backend/apps/users/models.py
+    targets:
+      - type: method
+        name: User.__str__
+    semantic_anchors:
+      edit_line:
+        type: statement
+        value: "return f\"User {self.telegram_id or self.id}\""
+
+  - path: src/backend/apps/users/admin.py
+    targets:
+      - type: class
+        name: UserAdmin
+
+changes:
+  - action: replace
+    description: Use self.id in __str__; review admin display/search to avoid printing telegram_id.
+
+acceptance_criteria:
+  - User.__str__ emits only internal id
+  - admin no longer surfaces raw telegram_id in repr/log paths

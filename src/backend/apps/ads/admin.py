@@ -6,8 +6,6 @@ Admin with status/category/city/date filters and reject/ban actions.
 
 import logging
 
-from django.contrib import admin
-
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import (
@@ -16,6 +14,7 @@ from apps.moderation.admin_actions import (
     bulk_delete,
     bulk_reject,
 )
+from django.contrib import admin
 
 logger = logging.getLogger(__name__)
 

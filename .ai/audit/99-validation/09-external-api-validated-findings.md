@@ -105,7 +105,7 @@ src/telegram_bot/handlers/login.py:109-124
 Docstring line 106 claims "constant-time comparison via hmac.compare_digest" but no such call exists in the function.
 ```
 
-**Recommendation:** Make the claim a single atomic operation. Either (a) use `select_for_update()` inside a transaction so the UPDATE and the returned row are the same locked row, or (b) return the updated instance via `UPDATE ... RETURNING` (Django 3.1+ `returning=` on `QuerySet.update`), avoiding the second `get()`. Drop or correct the `hmac.compare_digest` claim in the docstring since the comparison is done in SQL. Effort: small. Priority: recommended (hardening; close the race before a web claim side is added).
+**Recommendation:** Use Django's `QuerySet.update(..., returning=True)` (Django 3.1+) to return the updated `LoginToken` row from a single atomic UPDATE, eliminating the separate `get()` call. Wrap the operation in `transaction.atomic()` for explicit transaction scoping under `CONN_MAX_AGE=0`. Remove the `hmac.compare_digest` claim from the docstring since the comparison is performed in SQL, not Python — the DB index already provides efficient equality lookup. Effort: small. Priority: recommended (hardening; close the race before a web claim side is added).
 
 > **Validation Note:**
 > - **Action:** validated
@@ -186,7 +186,7 @@ contact.py:89  buyer_name = _get_buyer_display_name(message.from_user)
 contact.py:94  f"Покупатель: {buyer_name}\n"   # real first/last name delivered to seller
 ```
 
-**Recommendation:** Either (a) send a fixed anonymous label (e.g. "Покупатель" / "Buyer") and let the buyer type their own identity if they choose, matching the documented design, or (b) explicitly document that the buyer's display name is shared by design and drop the "anonymous / no PII" claims. Per the dead-code/intent policy, first reconcile the design intent (discuss with owner) — but the code currently contradicts its own docstring, which is a defect. Effort: trivial. Priority: recommended (privacy/PII-to-third-party).
+**Recommendation:** Replace `buyer_name = _get_buyer_display_name(message.from_user)` with a fixed anonymous label (`"Покупатель"`/`"Buyer"`) in the seller notification. The buyer may voluntarily disclose their identity in the free-text message if they choose. Update the contact.py module docstring to reflect that anonymous forwarding is the default behavior and real names are no longer transmitted. (Secondary option: if the design intent is to share real names, update the docstring to remove anonymous/no-PII claims and add explicit consent wording). Effort: trivial. Priority: recommended (privacy/PII-to-third-party).
 
 > **Validation Note:**
 > - **Action:** validated
@@ -223,7 +223,7 @@ pyproject.toml:17          "deep-translator>=1.11.0"
 # throttled it repeatedly; limits undocumented.
 ```
 
-**Recommendation:** Add a circuit-breaker (e.g. `pybreaker` or a small token-bucket + failure counter) around translation so a degraded upstream stops being called for a cooldown window, and surface a metric/log when the breaker trips. Consider a fallback translator or a configured Google Cloud Translation API key for production SLAs. Track daily character volume to bound cost if moving to the paid API. Effort: medium. Priority: recommended.
+**Recommendation:** Add a lightweight in-process circuit-breaker in `query_translator.py` — maintain a failure counter with a cooldown window (e.g., after N consecutive failures, short-circuit to original-query fallback for T seconds and log a warning). This avoids adding the `pybreaker` dependency while providing basic resilience. Also add a hard timeout to `ad_create.py`'s `translate_to_russian()` using `sync_to_async` with `asyncio.wait_for`. Defer Google Cloud Translation API integration and quota tracking to a later hardening pass. Effort: small. Priority: recommended.
 
 > **Validation Note:**
 > - **Action:** validated
@@ -354,7 +354,7 @@ query_translator.py:50  translated_query = translate_query_bs_to_ru(query)  # se
 # No privacy notice / consent linkage for translation egress anywhere.
 ```
 
-**Recommendation:** Document the translation egress in the privacy/consent material, and consider making translation opt-in or at least disclosed. Keep it best-effort (already is). This is LOW because the content is not identity PII, but it should be acknowledged in the data-flow documentation. Effort: small. Priority: recommended.
+**Recommendation:** Add a short data-flow note to the privacy/consent documentation stating that ad title/description and search queries are sent to Google Translate for language normalization, that this is best-effort and non-identifying content, and that users may disable auto-translation via a settings toggle in a future release. No code change required for MVP — treat as disclosed-by-default. Effort: small. Priority: recommended.
 
 > **Validation Note:**
 > - **Action:** validated

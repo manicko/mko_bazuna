@@ -8,16 +8,14 @@ One-word queries trigger fuzzy category detection.
 import logging
 import re
 
+from apps.ads.models import Ad
+from apps.analytics.models import AnalyticsEvent
+from apps.categories.models import Category
+from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.search.services.query_translator import translate_query_bs_to_ru
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
-
-from apps.ads.models import Ad
-from apps.categories.models import Category
-from apps.core.enums import AdStatus
-from apps.search.services.query_translator import translate_query_bs_to_ru
-from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AnalyticsEventType
 
 logger = logging.getLogger(__name__)
 
