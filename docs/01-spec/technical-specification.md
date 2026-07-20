@@ -42,6 +42,7 @@ repeating them.
 - Moderator powers: unpublish, review failed ads, **edit moderation criteria** (US-A11), ban all of a user's ads.
 - Launch with a moderator from day one.
 - Seller rejection path: bot replies "ad failed moderation" + rules link; **no specific reason disclosed**.
+- **ModerationCriteria has no price-range fields** (no min_price/max_price); criteria are length, count, and text-based only (zone D3/D4, US-A11, O4).
 
 ### B. Third-party group monitoring — OUT OF PHASE 1
 Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitoring is a separate future phase.

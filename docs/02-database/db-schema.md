@@ -92,8 +92,8 @@ published_at (TIMESTAMP, nullable)      # drives archive/delete timers; UPDATED 
 original_published_at (TIMESTAMP, nullable) # set once on FIRST publish; IMMUTABLE, audit only
 archived_at (TIMESTAMP, nullable)
 deleted_at (TIMESTAMP, nullable)
-moderation_failed_at (TIMESTAMP, nullable) # zone C4/D12: drives 7-day purge. Mutually exclusive with rejected_at
-rejected_at (TIMESTAMP, nullable)        # zone D4: drives 90-day cleanup. Mutually exclusive with moderation_failed_at
+moderation_failed_at (TIMESTAMP, nullable) # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
+rejected_at (TIMESTAMP, nullable)        # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
 search_vector (TSVECTOR)                 # NOT GENERATED ALWAYS — maintained by trigger (needs FK-lookup of category_name)
 published_by (FK → users.id, nullable, SET_NULL)  # moderator who manually published
 moderated_by (FK → users.id, nullable, SET_NULL)  # moderator who manually rejected
@@ -113,9 +113,9 @@ moderated_by (FK → users.id, nullable, SET_NULL)  # moderator who manually rej
 > Zone C2 / C3: `PUBLISHED → ON_MODERATION` (text edits, hidden). Timers on `published_at`;
 > `original_published_at` is the IMMUTABLE first-publish audit marker.
 
-> Zone C4 / D12: `moderation_failed_at` drives the 7-day purge; `rejected_at` (zone D4) drives the
-> 90-day cleanup. The two are mutually exclusive. Sweeps and partial indexes are defined in
-> [db-indexes.md](db-indexes.md).
+> Zone C4 / D12: `moderation_failed_at` drives the 7-day purge via `IX_ads_purge_failed`;
+> `rejected_at` (zone D4) drives the 90-day cleanup via `IX_ads_rejected_sweep`. The two are
+> mutually exclusive. See [db-indexes.md](db-indexes.md) for the partial index definitions.
 
 ---
 
@@ -151,7 +151,7 @@ City match is EXACT against the closed list; unrecognized city → "general / no
 id (PK)
 ad_id (FK → ads.id)
 image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: local MEDIA_ROOT via FileSystemStorage.
-                                      #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
+                                       #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
 position (INT)
 ```
@@ -211,7 +211,7 @@ duplicate_title_threshold (INT, default 85)  # % title similarity for duplicate-
 updated_at (TIMESTAMP)
 updated_by (FK → users.id, nullable, SET_NULL)
 ```
-Field `min_text_length` (old aggregate) REMOVED — duplicated by `title_min_length`/`description_min_length`.
+**Note:** `ModerationCriteria` has no `min_price`/`max_price` or price-range fields. Criteria are length, count, and text-based only.
 
 **Layer 2 — Manual moderation by admin** (photos + prohibited content, US-A11; future ML/OCR). Admin checklist + basis for future ML, NOT table columns. Prohibited-content categories (logged as `reason` in `ModeratorActionLog`, NEVER shown to seller): `adult_content`, `violence_gore`, `drugs_weapons`, `hate_speech`, `counterfeit_goods`, `illegal_goods`, `spam_scam`, `off_topic`.
 
