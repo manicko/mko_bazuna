@@ -4,9 +4,20 @@ Django admin registration for ads app.
 Admin with status/category/city/date filters and reject/ban actions.
 """
 
+import logging
+
 from django.contrib import admin
 
 from apps.ads.models import Ad, AdImage
+from apps.core.enums import AdStatus, ModeratorActionType
+from apps.moderation.admin_actions import (
+    bulk_approve,
+    bulk_ban_users,
+    bulk_delete,
+    bulk_reject,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def user_link(obj: Ad) -> str:
@@ -21,8 +32,6 @@ user_link.short_description = "User (telegram_id)"  # type: ignore[attr-defined]
 
 def rejected_reason(obj: Ad) -> str:
     """Display rejection reason from moderation log (INTERNAL ONLY)."""
-    from apps.core.enums import ModeratorActionType
-
     log = obj.moderation_logs.filter(action_type=ModeratorActionType.REJECT).last()
     if log:
         return log.reason[:100] if len(log.reason) > 100 else log.reason
@@ -56,6 +65,7 @@ class AdAdmin(admin.ModelAdmin):
         "city",
         user_link,
         "published_at",
+        rejected_reason,
     ]
     list_filter = ["status", "category", "city", "created_at", "published_at"]
     search_fields = ["title", "description"]
@@ -66,39 +76,57 @@ class AdAdmin(admin.ModelAdmin):
         "moderated_by",
     ]
     date_hierarchy = "created_at"
-    actions = ["action_reject", "action_ban_user"]
+    actions = ["action_reject", "action_ban_user", "action_soft_delete", "action_approve"]
 
     def get_queryset(self, request):
         """Optimize queryset with related select."""
         qs = super().get_queryset(request)
         return qs.select_related("user", "category", "city")
 
+    def has_view_permission(self, request, obj=None) -> bool:
+        """Restrict view to staff/superuser only."""
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        """Restrict change to staff/superuser only."""
+        return request.user.is_staff or request.user.is_superuser
+
     @admin.action(description="Reject selected ads")
     def action_reject(self, request, queryset):
         """Bulk reject action for moderation."""
-        # This is a placeholder - actual rejection logic would require a reason
-        # and would trigger ModeratorActionLog creation
-        pass
+        count = bulk_reject(queryset, request.user.id, "Bulk rejection via admin action")
+        self.message_user(request, f"Rejected {count} ad(s).", level="success")
 
-    @admin.action(description="Ban user from selected ads")
+    @admin.action(description="Approve selected ads")
+    def action_approve(self, request, queryset):
+        """Bulk approve action for moderation."""
+        count = bulk_approve(queryset, request.user.id)
+        self.message_user(request, f"Approved {count} ad(s) for publication.", level="success")
+
+    @admin.action(description="Ban users from selected ads")
     def action_ban_user(self, request, queryset):
         """Bulk ban users from selected ads."""
-        from apps.users.models import User
+        count = bulk_ban_users(queryset, request.user.id, "Bulk ban via admin action")
+        self.message_user(request, f"Banned {count} user(s).", level="success")
 
-        user_ids = set(queryset.values_list("user_id", flat=True))
+    @admin.action(description="Soft delete selected ads")
+    def action_soft_delete(self, request, queryset):
+        """Bulk soft delete action for moderation."""
+        count = bulk_delete(queryset, request.user.id, "Bulk deletion via admin action")
+        self.message_user(request, f"Deleted {count} ad(s).", level="success")
 
-        # Log ban actions for each user
-        for user_id in user_ids:
-            if user_id:
-                from apps.moderation.services.moderation_log import log_ban_account
+    def changelist_view(self, request, extra_context=None):
+        """Custom changelist with moderation queue presets."""
+        extra_context = extra_context or {}
 
-                log_ban_account(
-                    user_id=user_id,
-                    moderator_id=request.user.id,
-                    reason="Bulk ban via admin action",
-                )
+        # Add quick filter links for moderation queues
+        extra_context["moderation_queues"] = [
+            {"name": "On Moderation", "status": AdStatus.ON_MODERATION},
+            {"name": "Failed", "status": AdStatus.ON_MODERATION_FAILED},
+            {"name": "Rejected", "status": AdStatus.REJECTED},
+        ]
 
-        User.objects.filter(telegram_id__in=user_ids).update(is_banned=True)
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.register(AdImage)
@@ -116,4 +144,10 @@ class AdImageAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None) -> bool:
         return False

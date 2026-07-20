@@ -1,0 +1,261 @@
+{#
+    Moderation review template for Mko Bazuna.
+    
+    Detail view for moderators to review ads in moderation queues.
+    Shows photo grid (lazy load), metadata, and reject/approve actions with Layer-2 checklist.
+#}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderate Ad {{ ad.id }} - Mko Bazuna Admin</title>
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/admin/">Mko Bazuna Admin</a>
+            </h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <div class="mb-4">
+            <a href="../" class="text-blue-600 hover:underline">&larr; Back to moderation queue</a>
+        </div>
+
+        <article class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h1 class="text-2xl font-bold">{{ ad.title }}</h1>
+                    <span class="px-3 py-1 text-sm font-semibold rounded-full 
+                        {% if ad.status == 'on_moderation' %}bg-yellow-100 text-yellow-800
+                        {% elif ad.status == 'on_moderation_failed' %}bg-red-100 text-red-800
+                        {% elif ad.status == 'rejected' %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ ad.get_status_display }}
+                    </span>
+                </div>
+
+                {% if ad.price %}
+                    <p class="text-blue-600 font-bold text-2xl mb-4">{{ ad.price }} BAM</p>
+                {% endif %}
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <h3 class="font-semibold text-sm text-gray-600 mb-1">Category</h3>
+                        <p>{{ ad.category.get_name|default:ad.category.name }}</p>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-sm text-gray-600 mb-1">Location</h3>
+                        <p>{{ ad.city.name }}</p>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-sm text-gray-600 mb-1">User</h3>
+                        <p>Telegram ID: {{ ad.user.telegram_id }}</p>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="font-semibold text-sm text-gray-600 mb-2">Description</h3>
+                    <div class="prose max-w-none">
+                        <p class="text-gray-700 whitespace-pre-wrap">{{ ad.description }}</p>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="font-semibold text-sm text-gray-600 mb-2">Photos ({{ ad.images.count }})</h3>
+                    {% if ad.images.all %}
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {% for image in ad.images.all %}
+                                <div class="aspect-square">
+                                    <img 
+                                        src="{{ image.image_url }}" 
+                                        alt="Photo {{ forloop.counter }}"
+                                        loading="lazy"
+                                        class="w-full h-full object-cover rounded-lg cursor-pointer"
+                                        onclick="openLightbox('{{ image.image_url }}', {{ forloop.counter }})"
+                                    >
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500">No photos</p>
+                    {% endif %}
+                </div>
+
+                {% if ad.status == 'on_moderation' %}
+                    <div class="border-t pt-6">
+                        <h3 class="font-semibold mb-3">Moderation Actions</h3>
+                        
+                        <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                            {% csrf_token %}
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2"
+                            >
+                                Approve
+                            </button>
+                        </form>
+
+                        <button 
+                            type="button"
+                            onclick="openRejectModal()"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2"
+                        >
+                            Reject
+                        </button>
+
+                        <button 
+                            type="button"
+                            onclick="openBanModal()"
+                            class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
+                        >
+                            Ban User
+                        </button>
+                    </div>
+                {% elif ad.status == 'on_moderation_failed' %}
+                    <div class="border-t pt-6">
+                        <h3 class="font-semibold mb-3">Failed Auto-Moderation</h3>
+                        <p class="text-gray-600 mb-4">This ad failed automatic checks. You can approve, reject, or ban the user.</p>
+                        
+                        <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                            {% csrf_token %}
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2"
+                            >
+                                Approve
+                            </button>
+                        </form>
+
+                        <button 
+                            type="button"
+                            onclick="openRejectModal()"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2"
+                        >
+                            Reject
+                        </button>
+
+                        <button 
+                            type="button"
+                            onclick="openBanModal()"
+                            class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
+                        >
+                            Ban User
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </article>
+
+        <!-- Reject Modal -->
+        <div id="rejectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg max-w-lg w-full mx-4">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold mb-4">Reject Ad {{ ad.id }}</h3>
+                    <form method="post" action="../reject/{{ ad.id }}/">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Reject Reason (Layer-2 Checklist)</label>
+                            <select name="reason_category" class="w-full px-3 py-2 border rounded-lg mb-2" required>
+                                <option value="">Select a reason...</option>
+                                <option value="adult_content">Adult content</option>
+                                <option value="violence_gore">Violence / Gore</option>
+                                <option value="drugs_weapons">Drugs / Weapons</option>
+                                <option value="hate_speech">Hate speech</option>
+                                <option value="counterfeit_goods">Counterfeit goods</option>
+                                <option value="illegal_goods">Illegal goods</option>
+                                <option value="spam_scam">Spam / Scam</option>
+                                <option value="off_topic">Off-topic</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Additional Details (optional)</label>
+                            <textarea 
+                                name="reason_text" 
+                                rows="3" 
+                                class="w-full px-3 py-2 border rounded-lg"
+                                placeholder="Add more details about the rejection..."
+                            ></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button 
+                                type="button" 
+                                onclick="closeRejectModal()"
+                                class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            >
+                                Reject Ad
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ban User Modal -->
+        <div id="banModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg max-w-lg w-full mx-4">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold mb-4">Ban User (Telegram ID: {{ ad.user.telegram_id }})</h3>
+                    <form method="post" action="../ban/{{ ad.id }}/">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Ban Reason</label>
+                            <textarea 
+                                name="ban_reason" 
+                                rows="3" 
+                                class="w-full px-3 py-2 border rounded-lg"
+                                placeholder="Reason for banning this user..."
+                                required
+                            ></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button 
+                                type="button" 
+                                onclick="closeBanModal()"
+                                class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                            >
+                                Ban User
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function openRejectModal() {
+            document.getElementById('rejectModal').classList.remove('hidden');
+        }
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.add('hidden');
+        }
+        function openBanModal() {
+            document.getElementById('banModal').classList.remove('hidden');
+        }
+        function closeBanModal() {
+            document.getElementById('banModal').classList.add('hidden');
+        }
+        function openLightbox(url, index) {
+            alert('Photo ' + index + ': ' + url);
+        }
+    </script>
+</body>
+</html>
