@@ -38,11 +38,16 @@ Issues = "https://github.com/manicko/mko_bazuna/issues"
 platforms = ["Linux", "Windows"]
 include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["mko_bazuna*", "mko_bazuna.src", "mko_bazuna.core"]
-exclude = ["tests/.pytest_cache*"]
-namespaces = false
+# Project is NOT installed in the image; import roots are provided via
+# ENV PYTHONPATH=/app/src/backend:/app/src (see docker/Dockerfile).
+# If installation is ever enabled, discover the real split layout:
+[[tool.setuptools.packages.find]]
+where = ["src/backend"]
+include = ["apps*", "config*", "theme*"]
+
+[[tool.setuptools.packages.find]]
+where = ["src"]
+include = ["telegram_bot*"]
 
 
 # Black configuration
@@ -138,6 +143,7 @@ ignore_missing_imports = true
 minversion = "8.4"
 asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]
+pythonpath = ["src/backend", "src"]
 addopts = ["--import-mode=importlib","-ra", "-q"]
 console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning

@@ -4,7 +4,7 @@ title: Fix container boot — import paths / package install (ENT-001, ENT-007)
 
 priority: critical
 
-status: blocked
+status: done
 
 blocked_by: task_001_research_boot_packaging
 
