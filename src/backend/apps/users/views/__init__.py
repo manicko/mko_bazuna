@@ -1,0 +1,1 @@
+"""Consent views for Mko Bazuna."""

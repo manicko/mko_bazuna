@@ -15,6 +15,7 @@ from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
+from apps.users.views.consent import is_consent_given
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     context = {
         "ad": ad,
+        "consent_shown": is_consent_given(request),
     }
 
     return render(request, "ads/detail.html", context)
@@ -157,6 +159,7 @@ def listings(
         "current_city": city_slug,
         "current_sort": sort,
         "has_results": has_results,
+        "consent_shown": is_consent_given(request),
     }
 
     # HTMX partial rendering support

@@ -13,6 +13,7 @@ from django.shortcuts import render
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
+from apps.users.views.consent import is_consent_given
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             AdStatus.ARCHIVED: "Archived",
             AdStatus.REJECTED: "Rejected",
         },
+        "consent_shown": is_consent_given(request),
     }
 
     return render(request, "ads/dashboard.html", context)

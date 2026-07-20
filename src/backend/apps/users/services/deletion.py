@@ -100,3 +100,17 @@ def soft_delete_user_ads(user: User) -> int:
 
     logger.info(f"Soft-deleted {ads_deleted} ads for user {user.id}")
     return ads_deleted
+
+def give_consent(user: User) -> None:
+    """
+    Give consent (decision F).
+
+    Sets consent_given_at to now() for the user. This covers all processing
+    including bot interactions.
+
+    Args:
+        user: The user giving consent.
+    """
+    user.consent_given_at = datetime.now()
+    user.save(update_fields=["consent_given_at"])
+    logger.info(f"User {user.id} gave consent - consent_given_at set")
