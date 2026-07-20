@@ -8,6 +8,10 @@ depends_on: []
 
 type: research
 
+status: COMPLETE
+
+verdict: GO-WITH-CHANGES
+
 description: >
   ENT-002: telegram_bot/__init__.py eagerly imports handler modules at
   package-import time, and main.py imports telegram_bot.middlewares BEFORE
@@ -32,3 +36,9 @@ acceptance_criteria:
   - list of eager-import dependents documented
   - recommended import-order sequence provided
   - explicit go / go-with-changes verdict emitted
+
+outcome:
+  - report: .ai/researches/T002_bot_bootstrap_import_order.md
+  - eager-import dependents enumerated (main.py top-level middleware import + handler chain)
+  - recommended sequence: django.setup() first, then telegram_bot.* imports; drop eager __init__ imports
+  - verdict: GO-WITH-CHANGES — reorder necessary/safe, no hidden consumers, router registration unaffected
