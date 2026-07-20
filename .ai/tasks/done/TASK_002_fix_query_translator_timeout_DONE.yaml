@@ -4,10 +4,7 @@ title: Implement real 500ms timeout in query translation with safe fallback
 
 priority: high
 
-status: blocked
-
-blocked_by:
-  - task_001_research_query_translator_timeout
+status: complete
 
 depends_on:
   - task_001_research_query_translator_timeout

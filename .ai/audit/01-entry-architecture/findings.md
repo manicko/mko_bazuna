@@ -69,7 +69,7 @@ conftest.py:15: in <module>  django.setup()
 ```
 
 **Recommendation:** Make the import roots explicit and uniform across all entrypoints.
-Either (a) install the project as an editable/installed package in the image
+Either (a) install the project as an installed package in the image
 (`uv sync --frozen` without `--no-install-project`, with `pyproject.toml`
 `[tool.setuptools.packages.find]` corrected to discover `apps`, `config`,
 `telegram_bot`), or (b) set `PYTHONPATH=/app/src/backend:/app/src` in the Dockerfile
@@ -197,3 +197,154 @@ translation cannot indefinitely block the loop. Consider making translation best
 and non-blocking to submission latency.
 
 ---
+
+### ENT-005: Inconsistent / undefined restart policy for the long-lived web process
+
+| Field | Value |
+|-------|-------|
+| **ID** | ENT-005 |
+| **Severity** | MEDIUM |
+| **Type** | SPEC-DEVIATION |
+| **Affected Modules** | docker-compose.yml |
+| **Classification** | advisory |
+
+**Description:** The cross-cutting concern "restart-policy expectations" requires defined
+restart semantics for long-lived processes. In `docker-compose.yml` the `bot` and `nginx`
+services declare `restart: unless-stopped`, but the `web` (gunicorn) service has **no**
+`restart` key. If the web process crashes or is OOM-killed, Docker will not restart it and
+the site goes down silently while the bot keeps running — a split-brain where Telegram can
+still post ads that the website cannot serve.
+
+**Evidence:**
+```
+# docker-compose.yml
+  web:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # <-- no `restart:` key here
+
+  bot:
+    ...
+    restart: unless-stopped   # present
+```
+Production override (`docker-compose.prod.yml:6-7`) adds `restart: unless-stopped` to
+`web`, so the gap is dev/base-only — but base compose is what `docker compose up` runs by
+default and is what the audit's runtime model describes.
+
+**Recommendation:** Give `web` an explicit `restart: unless-stopped` (or `on-failure`)
+in the base `docker-compose.yml` so the web and bot processes share consistent restart
+semantics. This also satisfies the audit's restart-policy expectation uniformly.
+
+---
+
+### ENT-006: Test suite is un-runnable from the CI/test entrypoint (same root cause as ENT-001)
+
+| Field | Value |
+|-------|-------|
+| **ID** | ENT-006 |
+| **Severity** | MEDIUM |
+| **Type** | BEST-PRACTICE |
+| **Affected Modules** | conftest.py, docker/entrypoint-test.sh, docker-compose.test.yml |
+| **Classification** | advisory |
+
+**Description:** The `test` compose service runs `docker/entrypoint-test.sh`, which does
+`uv run pytest` from `WORKDIR /app`. `conftest.py:7,13` sets `DJANGO_SETTINGS_MODULE` and
+calls `django.setup()` at import time, which imports `config.settings.test` →
+`ModuleNotFoundError: No module named 'config'` (identical to ENT-001). The test container
+therefore fails at collection, so R4 (test-suite run) cannot pass in CI. Locally the suite
+collects 62 tests only after manually adding `src/backend` (and `src`) to `PYTHONPATH`.
+
+**Evidence:**
+```
+# Without path fix (mirrors container):
+$ uv run pytest tests -q -x --co
+conftest.py:15: in <module>  django.setup()
+E   ModuleNotFoundError: No module named 'config'
+
+# With PYTHONPATH=src/backend;src (62 tests collected):
+$ uv run pytest src/backend --co
+62 tests collected in 0.23s
+```
+
+**Recommendation:** Resolving ENT-001 (install the project / set PYTHONPATH) also fixes
+the CI test entry. Additionally, point the test runner at the real test tree
+(`src/backend`, not the empty top-level `tests/`) and add a smoke check that `import config`
+succeeds inside the built image before invoking pytest.
+
+---
+
+### ENT-007: `pyproject.toml` package discovery does not match the actual source layout
+
+| Field | Value |
+|-------|-------|
+| **ID** | ENT-007 |
+| **Severity** | LOW |
+| **Type** | DOC-UPDATE |
+| **Affected Modules** | pyproject.toml |
+| **Classification** | advisory |
+
+**Description:** `[tool.setuptools.packages.find]` declares `where = ["."]` and
+`include = ["mko_bazuna*", "mko_bazuna.src", "mko_bazuna.core"]`, but the repository has
+no `mko_bazuna*` package — the importable top-level names are `apps`, `config`,
+`telegram_bot`. Combined with `uv sync --no-install-project` in the Dockerfile, the project
+is never placed on `sys.path` by installation. This is the root-cause config defect behind
+ENT-001/ENT-006 and should be reconciled with the real layout (or replaced by an explicit
+`PYTHONPATH`).
+
+**Evidence:**
+```
+# pyproject.toml:41-45
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mko_bazuna*", "mko_bazuna.src", "mko_bazuna.core"]
+exclude = ["tests/.pytest_cache*"]
+# Actual top-level packages: src/backend/{apps,config}, src/telegram_bot
+```
+
+**Recommendation:** Update the packaging config to reflect reality (set `where` to the
+directory containing `apps`/`config`/`telegram_bot`, or switch to an explicit `PYTHONPATH`
+in the image), and document the chosen import-root strategy so the deployment contract is
+clear. Mark as DOC-UPDATE because the layout works locally only by accident of `uv run`
+cwd injection, which the container does not replicate.
+
+---
+
+## Summary
+
+| Severity | Count |
+|----------|-------|
+| CRITICAL | 2 |
+| HIGH | 2 |
+| MEDIUM | 2 |
+| LOW | 1 |
+
+## Mandatory Fixes
+
+- **ENT-001** (CRITICAL) — Container processes cannot boot: missing import paths for `config`/`apps`/`telegram_bot`.
+- **ENT-002** (CRITICAL) — Bot imports Django models before `django.setup()` → `AppRegistryNotReady`; bot cannot boot.
+- **ENT-003** (HIGH) — Blocking filesystem write on the async bot event loop (`save_photo`).
+- **ENT-004** (HIGH) — Blocking network IO (synchronous translation) on the async bot event loop (`translate_to_russian`).
+
+## Advisory Recommendations
+
+- **ENT-005** (MEDIUM) — Give the `web` service an explicit `restart` policy in base compose.
+- **ENT-006** (MEDIUM) — Fix CI test entry path so the test suite can run in-container (same root cause as ENT-001).
+- **ENT-007** (LOW) — Reconcile `pyproject.toml` package discovery with the actual `src` layout / document the import-root strategy.
+
+## Doc Updates Needed
+
+- **ENT-007** — Update packaging/layout docs to reflect how `apps`/`config`/`telegram_bot` become importable in the container (currently only works locally by `uv run` cwd injection).
+
+---
+
+## Runtime Verification Notes
+
+- **R1 (Import):** `import config` / `import telegram_bot.main` fail from repo root (ENT-001); `telegram_bot.main` import raises `AppRegistryNotReady` even with paths fixed (ENT-002). Both captured as tracebacks.
+- **R2 (Boot):** Not reached — processes abort at import before any boot/init sequence (ENT-001/ENT-002).
+- **R3 (Lint/Type):** `ruff check` → "All checks passed!"; `basedpyright` → 0 errors/warnings. No async/sync type errors surfaced (the blocking calls in ENT-003/ENT-004 are untyped `async def` wrappers, invisible to the checker).
+- **R4 (Tests):** Suite cannot run from repo root / container (`ModuleNotFoundError: config`); collects 62 tests only after `PYTHONPATH=src/backend;src` is set (ENT-006).
+- **R5 (Migration guard):** Advisory lock in `migrate_locked.py` is session-scoped and held on the parent connection for the whole subprocess duration; a second container blocks at `pg_advisory_lock(100)` until release, so concurrent migrate containers are serialized. **No defect found** in the migration-once guarantee — omitted from findings per problems-only rules.
+- **R6 (Process isolation):** Shared state correctly lives only in DB / media FS (FSM in `MemoryStorage`, ad draft in ORM). No process-local-state assumption detected in entry layers.

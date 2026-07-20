@@ -4,10 +4,7 @@ title: Add guarded Ad.transition_to() state-machine method to Ad model
 
 priority: high
 
-status: blocked
-
-blocked_by:
-  - task_004_research_ad_transition_centralization
+status: complete
 
 depends_on:
   - task_004_research_ad_transition_centralization
@@ -47,9 +44,6 @@ changes:
       Add `transition_to(self, target: AdStatus) -> None` that validates the
       current→target pair against the allowed matrix, updates `status`, applies
       timer side-effects, and updates only the affected fields (update_fields).
-    code_hint: |
-      # allowed matrix from Ad docstring; raise ValueError on invalid transition.
-      # On ->PUBLISHED: published_at = now(); if original_published_at is None: set it.
 
 acceptance_criteria:
   - DRAFT→ON_MODERATION→PUBLISHED valid; ad buyer-visible only at PUBLISHED (P3.1)
@@ -59,3 +53,12 @@ acceptance_criteria:
   - REJECTED→PUBLISHED rejected (P3.5)
   - published_at reset on every →PUBLISHED; original_published_at immutable (P3.6/P3.8)
   - mixed text+price edit follows text rule (P3.7)
+
+implementation:
+  - Implemented `Ad.transition_to(target)` method with full allowed transition matrix
+  - Validates transitions against ALLOWED_TRANSITIONS mapping
+  - Raises ValueError for invalid transitions or transitions from DELETED
+  - Handles timer side-effects: published_at, original_published_at, archived_at, deleted_at, moderation_failed_at, rejected_at
+  - Clears mutually exclusive timestamps (moderation_failed_at/rejected_at) when appropriate
+  - Uses update_fields for efficient partial updates
+  - Bulk sweep operations remain unchanged (per research findings)
