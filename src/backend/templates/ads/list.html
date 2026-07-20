@@ -12,6 +12,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if query %}Search: {{ query }}{% elif current_category %}Category{% else %}Ads{% endif %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    {% if PLAUSIBLE_HOST %}
+    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+    {% endif %}
 </head>
 <body class="bg-gray-50 min-h-screen">
     <header class="bg-white shadow-sm border-b">

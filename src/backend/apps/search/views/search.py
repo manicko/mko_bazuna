@@ -16,6 +16,8 @@ from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.search.services.query_translator import translate_query_bs_to_ru
+from apps.analytics.models import AnalyticsEvent
+from apps.core.enums import AnalyticsEventType
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ def search(request: HttpRequest) -> HttpResponse:
         - Bosnian query translated to Russian before search
         - One-word queries apply fuzzy category detection
         - GIN index used for search_vector (Task 5)
+        - Records SEARCH_PERFORMED analytics event
 
     Args:
         request: HTTP request with 'q' query parameter
@@ -39,6 +42,12 @@ def search(request: HttpRequest) -> HttpResponse:
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
 
     if query:
+        # Record search event (analytics)
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.SEARCH_PERFORMED,
+            user_id=request.user.id if request.user.is_authenticated else None,
+        )
+
         # Translate Bosnian query to Russian
         translated_query = translate_query_bs_to_ru(query)
 

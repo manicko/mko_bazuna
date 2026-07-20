@@ -98,6 +98,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.plausible_host",
             ],
         },
     },
@@ -165,3 +166,7 @@ LOGOUT_REDIRECT_URL = "/"
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
+
+# Plausible analytics host (cookieless, no consent banner needed)
+# Format: hostname only, e.g., "analytics.example.com" or "plausible.io"
+PLAUSIBLE_HOST = os.getenv("PLAUSIBLE_HOST", "")

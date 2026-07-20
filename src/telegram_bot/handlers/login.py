@@ -15,6 +15,8 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 
 from apps.users.models import User, LoginToken
+from apps.analytics.models import AnalyticsEvent
+from apps.core.enums import AnalyticsEventType
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +135,7 @@ async def get_or_create_user(
     """
     Get existing user or create new one.
 
-    Uses sync_to_async for ORM operations.
+    Uses sync_to_async for ORM operations. On user creation, records REGISTRATION_CREATED event.
     """
     @sync_to_async
     def _get_or_create() -> tuple[User, bool]:
@@ -145,6 +147,12 @@ async def get_or_create_user(
                 "last_name": last_name,
             },
         )
+        if created:
+            AnalyticsEvent.objects.create(
+                event_type=AnalyticsEventType.REGISTRATION_CREATED,
+                user_id=user.id,
+            )
+            logger.info(f"Registration event recorded for user {user.id}")
         return user, created
 
     return await _get_or_create()
