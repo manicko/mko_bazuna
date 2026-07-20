@@ -44,14 +44,20 @@ telegram_id (BIGINT, UNIQUE, nullable)   # nullable for admin-created accounts
 username (VARCHAR, nullable)             # optional public @username; NOT used for t.me link or publishing (decision C)
 is_staff / is_superuser                  # admin/moderator role (decision A)
 is_banned (BOOL)                          # account block (US-A4)
-is_deleted (BOOL)                         # soft delete (US-S8)
+is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 deleted_at (TIMESTAMP, nullable)
 consent_given_at (TIMESTAMP, nullable)    # US-A8 / decision F
-consent_revoked_at (TIMESTAMP, nullable)
-hard_delete_at (TIMESTAMP, nullable)      # telegram_id nulled 30 days after consent withdrawal
+consent_revoked_at (TIMESTAMP, nullable)    # Phase 3: triggers immediate soft-delete cascade
+hard_delete_at (TIMESTAMP, nullable)        # Phase 4: 30-day hard-delete sweep target (zone R1/O3)
 created_at (TIMESTAMP)
 ```
+
+> Account State Separation (O1/R4): Three independent states:
+> 1. `ads_auto_publish=False` — reversible publish restriction; existing ads hidden while active.
+> 2. `is_banned=True` — admin action; `telegram_id`/`username` retained for enforcement; reversible.
+> 3. `is_deleted=True` + `consent_revoked_at` — consent withdrawal; Phase 3: soft-delete + PII null;
+>    Phase 4: `hard_delete_at` column targeted by `consent_hard_delete` sweep.
 
 **`login_tokens`** (decision H / US-S1, zone C1) — separate table for atomic Telegram login. Bot and web are two processes; token claimed exactly once under shared lock.
 ```

@@ -153,3 +153,13 @@ Each owner decision maps to one or more audit zones resolved inline above and in
 | **O3** — full erasure 30 days after account deletion | R1 |
 | **O4** — automated + manual moderation criteria | D3 / D4 |
 | **O5** — category-name search in phase 1 | D1 / D2 |
+
+### Account State Separation (O1/R4)
+
+Phase 3 introduces three distinct account states that must not be conflated (zone R4):
+
+| State | Field | Effect | Reversible | Phase 3 Implementation |
+|-------|-------|--------|-----------|------------------------|
+| **Publish restriction** | `ads_auto_publish = False` | Bot rejects NEW ads; existing ads hidden from public while active | Yes | Toggle via dashboard or admin; no deletion triggered |
+| **Account ban** | `is_banned = True` | Blocks login and ALL ad actions; `telegram_id`/`username` retained for enforcement | Yes (admin unban) | Admin sets via `/admin/users/` |
+| **Account deletion** | `is_deleted = True`, `consent_revoked_at = now()` | Triggers immediate soft-delete cascade + 30-day hard delete (Phase 4) | No | `telegram_id`/`username` nulled immediately; Phase 4 sweep handles final erasure |
