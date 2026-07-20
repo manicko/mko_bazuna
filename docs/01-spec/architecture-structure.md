@@ -77,6 +77,64 @@ Volumes: `postgres_data`, `media_volume`. Static files baked into image via whit
 - **Migrations (zone C5/D7):** run exactly ONCE before web and bot start (dedicated step / ordering guard) so the two processes don't migrate concurrently. Domain writes (`ads`/`LoginToken`) go in ONE Django transaction.
 - **Secrets:** `.env` (`BOT_TOKEN`, DB, `SECRET_KEY`) via `env_file: .env`. `API_ID`/`API_HASH` (MTProto/userbot) are NOT needed in phase 1 and removed from `.env`.
 
+### Scheduler Configuration (Phase 4)
+
+**Docker production mode:** Use `entrypoint-scheduler.sh` with the `scheduler` profile in `docker-compose.prod.yml`:
+
+```bash
+# Start scheduler alongside web and bot
+# Scheduler runs all sweep commands hourly
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile scheduler up -d
+```
+
+The scheduler runs all sweep commands hourly: `archive_sweep`, `delete_sweep`, `consent_hard_delete`, `sweep_drafts`, `cleanup_login_tokens`, `purge_failed_ads`, `purge_rejected_ads`.
+
+**Systemd alternative (bare metal):**
+
+```ini
+# /etc/systemd/system/mko-bazuna-scheduler.service
+[Unit]
+Description=Mko Bazuna lifecycle sweep scheduler
+After=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mko-bazuna
+ExecStart=/opt/venv/bin/python manage.py shell -c "
+import time, sys, subprocess;
+commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'cleanup_login_tokens'];
+while True:
+    for cmd in commands: subprocess.run([sys.executable, 'manage.py', cmd]);
+    time.sleep(3600)
+"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Cron alternative (bare metal):**
+
+```cron
+# /etc/cron.d/mko-bazuna-sweeps
+0 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py archive_sweep
+5 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py delete_sweep
+10 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py consent_hard_delete
+```
+
+### NGINX Hardening (Zone R8)
+
+The production nginx configuration (`docker/nginx/nginx.conf`) implements:
+
+- **Security headers (all responses):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; object-src 'none'`
+- **Script execution blocked:** `location ~* /media/.*\.(php|py|cgi|pl|sh)$ { deny all; return 403; }` in `/media/` location
+- **MIME whitelist:** Only `image/jpeg` served for `/media/` uploads; default `application/octet-stream`
+- **Media behavior:** `Content-Disposition: inline` for all media responses
+- **Rate limiting:**
+  - `/login/`: 10 req/s burst 20 (`login_limit` zone)
+  - `/search/`: 20 req/s burst 40 (`search_limit` zone)
+- **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var)
+
 ## Audit Zone References
 
 Architecture-level audit zones resolved here (full reasoning distributed across the spec/DB docs):
