@@ -1,82 +1,118 @@
 # Makefile for Mko Bazuna Docker workflow
-# Provides ergonomic developer commands for container-based workflow
 
-.PHONY: help up down test lint typecheck shell migrate makemigrations logs backup restore prune-backups
+.PHONY: help up down build restart test lint typecheck shell migrate makemigrations logs \
+        backup restore prune-backups db-shell clean
 
-# Default target: show help
+# ====================== Settings ======================
+
+COMPOSE_FILES := -f docker-compose.yml -f docker-compose.dev.override.yml
+COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
+
+# ====================== Main Commands ======================
+
 help:
 	@echo "Mko Bazuna - Development Commands"
 	@echo ""
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "Targets:"
-	@echo "  up             Start development environment (web on :8000, hot-reload)"
+	@echo "Main:"
+	@echo "  up             Start dev environment (hot-reload)"
 	@echo "  down           Stop and remove containers"
-	@echo "  test           Run pytest in test container (ephemeral PostgreSQL)"
-	@echo "  lint           Run ruff linter inside web container"
-	@echo "  typecheck      Run basedpyright type checker inside web container"
-	@echo "  shell          Open bash shell in web container"
-	@echo "  migrate        Run database migrations (one-shot, advisory-locked)"
-	@echo "  makemigrations Create Django migrations from model changes"
-	@echo "  logs           Follow logs from all services"
-	@echo "  backup         Create PostgreSQL backup with 7-day rotation"
-	@echo "  restore        Restore database from backup file"
-	@echo "  prune-backups  Manually prune backups older than 7 days"
+	@echo "  restart        Restart web service"
+	@echo "  build          Rebuild images without cache"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  test           Run tests"
+	@echo "  lint           Ruff"
+	@echo "  typecheck      Basedpyright"
+	@echo ""
+	@echo "Django:"
+	@echo "  migrate        Apply migrations"
+	@echo "  makemigrations Create migrations"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  shell          Bash in web container"
+	@echo "  db-shell       psql in database"
+	@echo "  logs           Follow logs"
+	@echo "  backup         Create database backup"
+	@echo "  restore        Restore database (make restore BACKUP_FILE=...)"
+	@echo "  prune-backups  Delete old backups (7+ days)"
 
-# Start development environment
 up:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+	docker compose $(COMPOSE_FILES) up -d
 
-# Stop and remove containers
 down:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down
+	docker compose $(COMPOSE_FILES) down
 
-# Run tests in test container (ephemeral PostgreSQL)
+build:
+	docker compose $(COMPOSE_FILES) build --no-cache
+
+restart:
+	docker compose $(COMPOSE_FILES) restart web
+
+# ====================== Code Quality ======================
+
 test:
-	docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test
+	docker compose $(COMPOSE_TEST) run --rm test
 
-# Run linter inside web container
 lint:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check src/
+	docker compose $(COMPOSE_FILES) run --rm web uv run ruff check src/
 
-# Run type checker inside web container
 typecheck:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run basedpyright src/
+	docker compose $(COMPOSE_FILES) run --rm web uv run basedpyright src/
 
-# Open shell in web container
-shell:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web /bin/bash
+# ====================== Django ======================
 
-# Run migrations (one-shot service)
 migrate:
 	docker compose run --rm migrate
 
-# Create migrations from model changes
 makemigrations:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py makemigrations
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemigrations
 
-# Follow logs from all services
+# ====================== Utilities ======================
+
+shell:
+	docker compose $(COMPOSE_FILES) run --rm web /bin/bash
+
+db-shell:
+	docker compose $(COMPOSE_FILES) exec db psql -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+
 logs:
-	docker compose -f docker-compose.yml -f docker-compose.dev.override.yml logs -f
+	docker compose $(COMPOSE_FILES) logs -f
 
-# Create database backup with timestamp and 7-day rotation
+# ====================== Backups ======================
+
+BACKUPS_DIR := ./backups
+
 backup:
-	@mkdir -p ./backups
+	@mkdir -p $(BACKUPS_DIR)
 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
-	docker compose exec -T db pg_dump -U $$(POSTGRES_USER) -d $$(POSTGRES_DB) -F c > ./backups/dump_$${TIMESTAMP}.dump && \
-	echo "Backup created: ./backups/dump_$${TIMESTAMP}.dump"
-	@find ./backups -name "dump_*.dump" -mtime +7 -delete -print
-	@echo "Old backups (7+ days) pruned"
+		docker compose $(COMPOSE_FILES) exec -T db \
+			pg_dump -U $${POSTGRES_USER} -d $${POSTGRES_DB} -F c \
+			> $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump && \
+		echo "✓ Backup created: $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump"
+	@$(MAKE) prune-backups
 
-# Restore database from backup file
 restore:
 	@if [ -z "$(BACKUP_FILE)" ]; then \
-		echo "Error: BACKUP_FILE not set. Usage: make restore BACKUP_FILE=./backups/filename.dump"; \
+		echo "Error: BACKUP_FILE not specified"; \
+		echo "Example: make restore BACKUP_FILE=./backups/dump_20250719_143022.dump"; \
 		exit 1; \
 	fi
-	docker compose exec -T db pg_restore -U $(POSTGRES_USER) -d $(POSTGRES_DB) --clean --if-exists $(BACKUP_FILE)
+	@if [ ! -f "$(BACKUP_FILE)" ]; then \
+		echo "Error: file $(BACKUP_FILE) not found"; \
+		exit 1; \
+	fi
+	docker compose $(COMPOSE_FILES) exec -T db \
+		pg_restore -U $${POSTGRES_USER} -d $${POSTGRES_DB} --clean --if-exists $(BACKUP_FILE)
+	@echo "✓ Restore completed from $(BACKUP_FILE)"
 
-# Manual prune of old backups
 prune-backups:
-	find ./backups -name "dump_*.dump" -mtime +7 -delete -print
-	@echo "Old backups (7+ days) pruned"
+	@find $(BACKUPS_DIR) -name "dump_*.dump" -mtime +7 -delete -print
+	@echo "✓ Old backups (older than 7 days) pruned"
+
+# ====================== Cleanup ======================
+
+clean:
+	docker compose $(COMPOSE_FILES) down -v --remove-orphans
+	rm -rf $(BACKUPS_DIR)/*.dump

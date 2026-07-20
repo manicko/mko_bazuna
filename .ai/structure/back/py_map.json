@@ -1,0 +1,1071 @@
+[
+  {
+    "path": "__init__.py",
+    "module": "__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/__init__.py",
+    "module": "backend.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/__init__.py",
+    "module": "backend.apps.ads.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/admin.py",
+    "module": "backend.apps.ads.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "apps.ads.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "AdAdmin",
+      "AdImageAdmin"
+    ],
+    "functions": [
+      "user_link",
+      "rejected_reason",
+      "action_ad_link",
+      "get_queryset",
+      "action_reject",
+      "action_ban_user",
+      "has_add_permission",
+      "has_change_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/apps.py",
+    "module": "backend.apps.ads.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "AdsConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/0001_initial.py",
+    "module": "backend.apps.ads.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/0002_search_vector_triggers.py",
+    "module": "backend.apps.ads.migrations.0002_search_vector_triggers",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/__init__.py",
+    "module": "backend.apps.ads.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/models.py",
+    "module": "backend.apps.ads.models",
+    "layer": "model",
+    "imports": [
+      "django.contrib.postgres.indexes",
+      "django.contrib.postgres.search",
+      "django.db",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "Ad",
+      "Meta",
+      "AdImage",
+      "Meta"
+    ],
+    "functions": [
+      "__str__",
+      "__str__",
+      "generate_storage_key"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/urls.py",
+    "module": "backend.apps.ads.urls",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/__init__.py",
+    "module": "backend.apps.analytics.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/apps.py",
+    "module": "backend.apps.analytics.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "AnalyticsConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/migrations/0001_initial.py",
+    "module": "backend.apps.analytics.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/migrations/__init__.py",
+    "module": "backend.apps.analytics.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/models.py",
+    "module": "backend.apps.analytics.models",
+    "layer": "model",
+    "imports": [
+      "django.db",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "AnalyticsEvent",
+      "Meta"
+    ],
+    "functions": [
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/__init__.py",
+    "module": "backend.apps.categories.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/admin.py",
+    "module": "backend.apps.categories.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "mptt.admin",
+      "apps.categories.models"
+    ],
+    "classes": [
+      "CategoryAdmin"
+    ],
+    "functions": [
+      "has_change_permission",
+      "has_delete_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/apps.py",
+    "module": "backend.apps.categories.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "CategoriesConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/migrations/0001_initial.py",
+    "module": "backend.apps.categories.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/migrations/0002_seed_categories.py",
+    "module": "backend.apps.categories.migrations.0002_seed_categories",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": [
+      "create_categories"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/migrations/__init__.py",
+    "module": "backend.apps.categories.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/models.py",
+    "module": "backend.apps.categories.models",
+    "layer": "model",
+    "imports": [
+      "django.db",
+      "mptt.models"
+    ],
+    "classes": [
+      "Category",
+      "MPTTMeta",
+      "Meta"
+    ],
+    "functions": [
+      "get_name",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/urls.py",
+    "module": "backend.apps.categories.urls",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/__init__.py",
+    "module": "backend.apps.core.__init__",
+    "layer": "other",
+    "imports": [
+      "apps.core.enums"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/apps.py",
+    "module": "backend.apps.core.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "CoreConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/enums.py",
+    "module": "backend.apps.core.enums",
+    "layer": "other",
+    "imports": [
+      "enum"
+    ],
+    "classes": [
+      "AdvisoryLockId",
+      "AdStatus",
+      "AdSource",
+      "AnalyticsEventType",
+      "ModeratorActionType",
+      "CategoryRejectReason"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/utils/__init__.py",
+    "module": "backend.apps.core.utils.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/utils/advisory_lock.py",
+    "module": "backend.apps.core.utils.advisory_lock",
+    "layer": "other",
+    "imports": [
+      "contextlib",
+      "django.db"
+    ],
+    "classes": [],
+    "functions": [
+      "advisory_lock"
+    ]
+  },
+  {
+    "path": "backend/apps/core/utils/migrate_locked.py",
+    "module": "backend.apps.core.utils.migrate_locked",
+    "layer": "other",
+    "imports": [
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [],
+    "functions": [
+      "main"
+    ]
+  },
+  {
+    "path": "backend/apps/locations/__init__.py",
+    "module": "backend.apps.locations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/locations/admin.py",
+    "module": "backend.apps.locations.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "apps.locations.models"
+    ],
+    "classes": [
+      "CityAdmin"
+    ],
+    "functions": [
+      "has_change_permission",
+      "has_delete_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/locations/apps.py",
+    "module": "backend.apps.locations.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "LocationsConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/locations/migrations/0001_initial.py",
+    "module": "backend.apps.locations.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/locations/migrations/0002_seed_cities.py",
+    "module": "backend.apps.locations.migrations.0002_seed_cities",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": [
+      "create_cities"
+    ]
+  },
+  {
+    "path": "backend/apps/locations/migrations/__init__.py",
+    "module": "backend.apps.locations.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/locations/models.py",
+    "module": "backend.apps.locations.models",
+    "layer": "model",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "City",
+      "Meta"
+    ],
+    "functions": [
+      "get_name",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/locations/urls.py",
+    "module": "backend.apps.locations.urls",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/__init__.py",
+    "module": "backend.apps.moderation.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/admin.py",
+    "module": "backend.apps.moderation.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "apps.moderation.models"
+    ],
+    "classes": [
+      "ModerationCriteriaAdmin",
+      "ModeratorActionLogAdmin"
+    ],
+    "functions": [
+      "log_ad_link",
+      "log_user_link",
+      "has_add_permission",
+      "has_delete_permission",
+      "save_model",
+      "has_add_permission",
+      "has_change_permission",
+      "has_delete_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/apps.py",
+    "module": "backend.apps.moderation.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "ModerationConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/migrations/0001_initial.py",
+    "module": "backend.apps.moderation.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/migrations/__init__.py",
+    "module": "backend.apps.moderation.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/models.py",
+    "module": "backend.apps.moderation.models",
+    "layer": "model",
+    "imports": [
+      "django.db",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "ModerationCriteria",
+      "Meta",
+      "ModeratorActionLog",
+      "Meta"
+    ],
+    "functions": [
+      "__str__",
+      "get_singleton",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/services/__init__.py",
+    "module": "backend.apps.moderation.services.__init__",
+    "layer": "service",
+    "imports": [
+      "auto_moderation"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/services/auto_moderation.py",
+    "module": "backend.apps.moderation.services.auto_moderation",
+    "layer": "service",
+    "imports": [
+      "difflib",
+      "functools",
+      "typing",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.moderation.models",
+      "apps.moderation.models"
+    ],
+    "classes": [],
+    "functions": [
+      "_get_cached_criteria",
+      "_get_criteria_uncached",
+      "_invalidate_criteria_cache",
+      "auto_moderate",
+      "_validate_title_length",
+      "_validate_description_length",
+      "_validate_image_count",
+      "_contains_banned_words",
+      "_validate_max_ads_per_user",
+      "_is_duplicate_title",
+      "_fail_moderation",
+      "_pass_moderation"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/tests/__init__.py",
+    "module": "backend.apps.moderation.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/tests/test_auto_moderation.py",
+    "module": "backend.apps.moderation.tests.test_auto_moderation",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.moderation.models",
+      "apps.moderation.services",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models"
+    ],
+    "classes": [
+      "TestTitleLengthValidation",
+      "TestDescriptionLengthValidation",
+      "TestPriceRequiredValidation",
+      "TestImageCountValidation",
+      "TestBannedWordsValidation",
+      "TestMaxAdsPerUserValidation",
+      "TestDuplicateTitleValidation",
+      "TestModerationFailureLogging",
+      "TestModerationSuccessAnalytics",
+      "TestOriginalPublishedAtSetOnce"
+    ],
+    "functions": [
+      "criteria",
+      "user",
+      "category",
+      "city",
+      "ad",
+      "ad_with_images",
+      "test_title_too_short_fails",
+      "test_title_too_long_fails",
+      "test_title_valid_length_passes",
+      "test_description_too_short_fails",
+      "test_description_too_long_fails",
+      "test_description_valid_length_passes",
+      "test_price_required_missing_fails",
+      "test_price_required_present_passes",
+      "test_too_few_images_fails",
+      "test_too_many_images_fails",
+      "test_valid_image_count_passes",
+      "test_banned_word_in_title_fails",
+      "test_banned_word_in_description_fails",
+      "test_banned_word_case_insensitive_fails",
+      "test_no_banned_words_passes",
+      "test_user_exceeds_max_ads_fails",
+      "test_user_within_limit_passes",
+      "test_duplicate_title_fails",
+      "test_similar_title_above_threshold_fails",
+      "test_unique_title_passes",
+      "test_failure_creates_log",
+      "test_failure_no_specific_reason_to_seller",
+      "test_success_creates_analytics_event",
+      "test_original_published_at_set_on_first_publish",
+      "test_original_published_at_unchanged_on_re_publish"
+    ]
+  },
+  {
+    "path": "backend/apps/search/__init__.py",
+    "module": "backend.apps.search.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/apps.py",
+    "module": "backend.apps.search.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "SearchConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/urls.py",
+    "module": "backend.apps.search.urls",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/__init__.py",
+    "module": "backend.apps.users.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/admin.py",
+    "module": "backend.apps.users.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "apps.users.models"
+    ],
+    "classes": [
+      "UserAdmin",
+      "LoginTokenAdmin"
+    ],
+    "functions": [
+      "has_add_permission",
+      "has_change_permission",
+      "has_delete_permission",
+      "has_view_permission",
+      "has_add_permission",
+      "has_change_permission",
+      "has_delete_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/users/apps.py",
+    "module": "backend.apps.users.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "UsersConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/migrations/0001_initial.py",
+    "module": "backend.apps.users.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/migrations/__init__.py",
+    "module": "backend.apps.users.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/models.py",
+    "module": "backend.apps.users.models",
+    "layer": "model",
+    "imports": [
+      "django.contrib.auth.models",
+      "django.db"
+    ],
+    "classes": [
+      "User",
+      "Meta",
+      "LoginToken",
+      "Meta"
+    ],
+    "functions": [
+      "__str__",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/config/__init__.py",
+    "module": "backend.config.__init__",
+    "layer": "config",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/asgi.py",
+    "module": "backend.config.asgi",
+    "layer": "config",
+    "imports": [
+      "django.core.asgi"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/__init__.py",
+    "module": "backend.config.settings.__init__",
+    "layer": "config",
+    "imports": [
+      "base"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/base.py",
+    "module": "backend.config.settings.base",
+    "layer": "config",
+    "imports": [
+      "pathlib"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/dev.py",
+    "module": "backend.config.settings.dev",
+    "layer": "config",
+    "imports": [
+      "base"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/prod.py",
+    "module": "backend.config.settings.prod",
+    "layer": "config",
+    "imports": [
+      "base"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/test.py",
+    "module": "backend.config.settings.test",
+    "layer": "config",
+    "imports": [
+      "base"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/urls.py",
+    "module": "backend.config.urls",
+    "layer": "config",
+    "imports": [
+      "django.contrib",
+      "django.urls"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/wsgi.py",
+    "module": "backend.config.wsgi",
+    "layer": "config",
+    "imports": [
+      "django.core.wsgi"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/manage.py",
+    "module": "backend.manage",
+    "layer": "other",
+    "imports": [
+      "django.core.management"
+    ],
+    "classes": [],
+    "functions": [
+      "main"
+    ]
+  },
+  {
+    "path": "backend/theme/__init__.py",
+    "module": "backend.theme.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/theme/apps.py",
+    "module": "backend.theme.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "ThemeConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/__init__.py",
+    "module": "telegram_bot.__init__",
+    "layer": "other",
+    "imports": [
+      "states",
+      "handlers"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/handlers/__init__.py",
+    "module": "telegram_bot.handlers.__init__",
+    "layer": "other",
+    "imports": [
+      "login",
+      "ad_create"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/handlers/ad_create.py",
+    "module": "telegram_bot.handlers.ad_create",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "aiogram.filters",
+      "aiogram.fsm.context",
+      "aiogram.fsm.state",
+      "django.conf",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
+      "telegram_bot.schemas.message_payloads",
+      "telegram_bot.services.media",
+      "telegram_bot.states",
+      "asgiref.sync",
+      "asgiref.sync",
+      "asgiref.sync",
+      "asgiref.sync",
+      "asgiref.sync",
+      "asgiref.sync",
+      "asgiref.sync",
+      "deep_translator",
+      "asgiref.sync"
+    ],
+    "classes": [
+      "AdCreateForm"
+    ],
+    "functions": [
+      "cmd_post",
+      "cmd_cancel",
+      "process_category",
+      "process_city",
+      "process_title",
+      "process_description",
+      "process_price",
+      "process_photos",
+      "show_preview",
+      "process_preview",
+      "create_draft_ad",
+      "_create",
+      "delete_draft",
+      "_delete",
+      "search_categories",
+      "_search",
+      "get_city_by_name",
+      "_get",
+      "get_all_cities",
+      "_get",
+      "download_photo",
+      "save_photo",
+      "get_category",
+      "_get",
+      "get_city",
+      "_get",
+      "translate_to_russian",
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ]
+  },
+  {
+    "path": "telegram_bot/handlers/login.py",
+    "module": "telegram_bot.handlers.login",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "aiogram.filters",
+      "aiogram.fsm.context",
+      "django.utils",
+      "apps.users.models",
+      "asgiref.sync",
+      "asgiref.sync"
+    ],
+    "classes": [],
+    "functions": [
+      "handle_login_deep_link",
+      "claim_login_token",
+      "_claim",
+      "get_or_create_user",
+      "_get_or_create"
+    ]
+  },
+  {
+    "path": "telegram_bot/main.py",
+    "module": "telegram_bot.main",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "aiogram.fsm.storage.memory",
+      "telegram_bot.handlers"
+    ],
+    "classes": [],
+    "functions": [
+      "main"
+    ]
+  },
+  {
+    "path": "telegram_bot/schemas/__init__.py",
+    "module": "telegram_bot.schemas.__init__",
+    "layer": "other",
+    "imports": [
+      "message_payloads"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/schemas/message_payloads.py",
+    "module": "telegram_bot.schemas.message_payloads",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "pydantic"
+    ],
+    "classes": [
+      "TitlePayload",
+      "DescriptionPayload",
+      "PricePayload",
+      "PhotoCountPayload"
+    ],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/services/__init__.py",
+    "module": "telegram_bot.services.__init__",
+    "layer": "service",
+    "imports": [
+      "media"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/services/media.py",
+    "module": "telegram_bot.services.media",
+    "layer": "service",
+    "imports": [
+      "PIL"
+    ],
+    "classes": [],
+    "functions": [
+      "validate_jpeg_bytes",
+      "validate_photo",
+      "generate_storage_key"
+    ]
+  },
+  {
+    "path": "telegram_bot/states.py",
+    "module": "telegram_bot.states",
+    "layer": "other",
+    "imports": [
+      "enum"
+    ],
+    "classes": [
+      "AdCreateState"
+    ],
+    "functions": []
+  },
+  {
+    "path": "theme/__init__.py",
+    "module": "theme.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "theme/apps.py",
+    "module": "theme.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "ThemeConfig"
+    ],
+    "functions": []
+  }
+]

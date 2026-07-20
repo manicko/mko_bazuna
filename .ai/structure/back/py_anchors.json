@@ -1,0 +1,8275 @@
+[
+  {
+    "id": "2b3780e9",
+    "symbol_path": [
+      "user_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2b3780e9",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "2ec73894",
+    "symbol_path": [
+      "user_link"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "2ec73894",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "2b3780e9",
+    "symbol_path": [
+      "user_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2b3780e9",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "83e11494",
+    "symbol_path": [
+      "rejected_reason"
+    ],
+    "type": "function_call",
+    "value": "last",
+    "stable_hash": "83e11494",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "14ee4222",
+    "symbol_path": [
+      "rejected_reason"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "14ee4222",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "f687c17a",
+    "symbol_path": [
+      "rejected_reason"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f687c17a",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "f2e6ac1b",
+    "symbol_path": [
+      "rejected_reason"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "f2e6ac1b",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "f687c17a",
+    "symbol_path": [
+      "rejected_reason"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f687c17a",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "7f831b0e",
+    "symbol_path": [
+      "action_ad_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "7f831b0e",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "46ee27e3",
+    "symbol_path": [
+      "action_ad_link"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "46ee27e3",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "b82a6d29",
+    "symbol_path": [
+      "AdAdmin",
+      "get_queryset"
+    ],
+    "type": "function_call",
+    "value": "get_queryset",
+    "stable_hash": "b82a6d29",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "28a50db9",
+    "symbol_path": [
+      "AdAdmin",
+      "get_queryset"
+    ],
+    "type": "function_call",
+    "value": "super",
+    "stable_hash": "28a50db9",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "e7cd4cd7",
+    "symbol_path": [
+      "AdAdmin",
+      "get_queryset"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e7cd4cd7",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "ec90c7ef",
+    "symbol_path": [
+      "AdAdmin",
+      "get_queryset"
+    ],
+    "type": "function_call",
+    "value": "select_related",
+    "stable_hash": "ec90c7ef",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "d799e01b",
+    "symbol_path": [
+      "AdAdmin",
+      "action_reject"
+    ],
+    "type": "function_call",
+    "value": "action",
+    "stable_hash": "d799e01b",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "da9c0857",
+    "symbol_path": [
+      "AdAdmin",
+      "action_ban_user"
+    ],
+    "type": "function_call",
+    "value": "set",
+    "stable_hash": "da9c0857",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "a1372c9e",
+    "symbol_path": [
+      "AdAdmin",
+      "action_ban_user"
+    ],
+    "type": "function_call",
+    "value": "values_list",
+    "stable_hash": "a1372c9e",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "8ef4a39e",
+    "symbol_path": [
+      "AdAdmin",
+      "action_ban_user"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "8ef4a39e",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "5acca681",
+    "symbol_path": [
+      "AdAdmin",
+      "action_ban_user"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "5acca681",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "6fcfd308",
+    "symbol_path": [
+      "AdAdmin",
+      "action_ban_user"
+    ],
+    "type": "function_call",
+    "value": "action",
+    "stable_hash": "6fcfd308",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "89416b86",
+    "symbol_path": [
+      "AdAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "89416b86",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "74f499fc",
+    "symbol_path": [
+      "AdImageAdmin",
+      "has_add_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "74f499fc",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "5338662e",
+    "symbol_path": [
+      "AdImageAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "5338662e",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "4bad0b2e",
+    "symbol_path": [
+      "AdImageAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "4bad0b2e",
+    "file": "backend/apps/ads/admin.py"
+  },
+  {
+    "id": "126c1343",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "126c1343",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "6064960f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "6064960f",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "6debfe51",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "TextField",
+    "stable_hash": "6debfe51",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "bd62523f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "bd62523f",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "03a4a6e6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "03a4a6e6",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "1328a945",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "SearchVectorField",
+    "stable_hash": "1328a945",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "126c1343",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "126c1343",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "6064960f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "6064960f",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "18b301a0",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "18b301a0",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "bd62523f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "bd62523f",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "fde0b1fd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "fde0b1fd",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "8777ecb3",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "GinIndex",
+    "stable_hash": "8777ecb3",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "a2082afa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "a2082afa",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "b2a7cc7c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "b2a7cc7c",
+    "file": "backend/apps/ads/migrations/0001_initial.py"
+  },
+  {
+    "id": "c33f8dfa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunSQL",
+    "stable_hash": "c33f8dfa",
+    "file": "backend/apps/ads/migrations/0002_search_vector_triggers.py"
+  },
+  {
+    "id": "c33f8dfa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunSQL",
+    "stable_hash": "c33f8dfa",
+    "file": "backend/apps/ads/migrations/0002_search_vector_triggers.py"
+  },
+  {
+    "id": "c33f8dfa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunSQL",
+    "stable_hash": "c33f8dfa",
+    "file": "backend/apps/ads/migrations/0002_search_vector_triggers.py"
+  },
+  {
+    "id": "c33f8dfa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunSQL",
+    "stable_hash": "c33f8dfa",
+    "file": "backend/apps/ads/migrations/0002_search_vector_triggers.py"
+  },
+  {
+    "id": "c33f8dfa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunSQL",
+    "stable_hash": "c33f8dfa",
+    "file": "backend/apps/ads/migrations/0002_search_vector_triggers.py"
+  },
+  {
+    "id": "031486fd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "031486fd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0b22d249",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "0b22d249",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "187abac8",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "TextField",
+    "stable_hash": "187abac8",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "bb1b2bba",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "bb1b2bba",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "031486fd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "031486fd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "031486fd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "031486fd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0b22d249",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "0b22d249",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0b22d249",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "0b22d249",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0b22d249",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "0b22d249",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "5f1b0eae",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "5f1b0eae",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "129824bd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "SearchVectorField",
+    "stable_hash": "129824bd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "031486fd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "031486fd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "031486fd",
+    "symbol_path": [
+      "Ad"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "031486fd",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "b187260f",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "GinIndex",
+    "stable_hash": "b187260f",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4928913e",
+    "symbol_path": [
+      "Ad",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4928913e",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "2a272971",
+    "symbol_path": [
+      "Ad",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2a272971",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "88046a89",
+    "symbol_path": [
+      "Ad",
+      "__str__"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "88046a89",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "e7f0dbe4",
+    "symbol_path": [
+      "AdImage"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "e7f0dbe4",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "63f3ccc5",
+    "symbol_path": [
+      "AdImage"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "63f3ccc5",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "63f3ccc5",
+    "symbol_path": [
+      "AdImage"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "63f3ccc5",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "e1803f24",
+    "symbol_path": [
+      "AdImage"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "e1803f24",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "1775e582",
+    "symbol_path": [
+      "AdImage",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1775e582",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "10ffe0c2",
+    "symbol_path": [
+      "AdImage",
+      "generate_storage_key"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "10ffe0c2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "2648a8d5",
+    "symbol_path": [
+      "AdImage",
+      "generate_storage_key"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "2648a8d5",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "193efc64",
+    "symbol_path": [
+      "AdImage",
+      "generate_storage_key"
+    ],
+    "type": "function_call",
+    "value": "uuid4",
+    "stable_hash": "193efc64",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "c64ccd32",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "c64ccd32",
+    "file": "backend/apps/analytics/migrations/0001_initial.py"
+  },
+  {
+    "id": "c8d323d4",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "c8d323d4",
+    "file": "backend/apps/analytics/migrations/0001_initial.py"
+  },
+  {
+    "id": "09b8779a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "09b8779a",
+    "file": "backend/apps/analytics/migrations/0001_initial.py"
+  },
+  {
+    "id": "9de5d3d6",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "9de5d3d6",
+    "file": "backend/apps/analytics/migrations/0001_initial.py"
+  },
+  {
+    "id": "b6b66ef4",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "b6b66ef4",
+    "file": "backend/apps/analytics/migrations/0001_initial.py"
+  },
+  {
+    "id": "7e803265",
+    "symbol_path": [
+      "AnalyticsEvent"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "7e803265",
+    "file": "backend/apps/analytics/models.py"
+  },
+  {
+    "id": "e5acb51b",
+    "symbol_path": [
+      "AnalyticsEvent"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "e5acb51b",
+    "file": "backend/apps/analytics/models.py"
+  },
+  {
+    "id": "1fd5e233",
+    "symbol_path": [
+      "AnalyticsEvent"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "1fd5e233",
+    "file": "backend/apps/analytics/models.py"
+  },
+  {
+    "id": "3967135b",
+    "symbol_path": [
+      "AnalyticsEvent",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3967135b",
+    "file": "backend/apps/analytics/models.py"
+  },
+  {
+    "id": "30684cf9",
+    "symbol_path": [
+      "CategoryAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "30684cf9",
+    "file": "backend/apps/categories/admin.py"
+  },
+  {
+    "id": "8b8e3f20",
+    "symbol_path": [
+      "CategoryAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "8b8e3f20",
+    "file": "backend/apps/categories/admin.py"
+  },
+  {
+    "id": "a1f06f54",
+    "symbol_path": [
+      "CategoryAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "a1f06f54",
+    "file": "backend/apps/categories/admin.py"
+  },
+  {
+    "id": "72b6477b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "72b6477b",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "1e5e93b8",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "1e5e93b8",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "23757bee",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "23757bee",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "4a68bc8e",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "4a68bc8e",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "9c70acd5",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "SlugField",
+    "stable_hash": "9c70acd5",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "1de0daeb",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "1de0daeb",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "6278e11e",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "6278e11e",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "37414c82",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "37414c82",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "37414c82",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "37414c82",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "37414c82",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "37414c82",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "37414c82",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "37414c82",
+    "file": "backend/apps/categories/migrations/0001_initial.py"
+  },
+  {
+    "id": "ab37e13c",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "cursor",
+    "stable_hash": "ab37e13c",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d2a691db",
+    "symbol_path": [
+      "create_categories"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "d2a691db",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "d3db3311",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunPython",
+    "stable_hash": "d3db3311",
+    "file": "backend/apps/categories/migrations/0002_seed_categories.py"
+  },
+  {
+    "id": "ffbb2fce",
+    "symbol_path": [
+      "Category"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "ffbb2fce",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "15af702c",
+    "symbol_path": [
+      "Category"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "15af702c",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "178dae74",
+    "symbol_path": [
+      "Category"
+    ],
+    "type": "function_call",
+    "value": "SlugField",
+    "stable_hash": "178dae74",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "6a4e0e4b",
+    "symbol_path": [
+      "Category"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "6a4e0e4b",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "d7632c5f",
+    "symbol_path": [
+      "Category"
+    ],
+    "type": "function_call",
+    "value": "TreeForeignKey",
+    "stable_hash": "d7632c5f",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "d2510d0c",
+    "symbol_path": [
+      "Category",
+      "get_name"
+    ],
+    "type": "function_call",
+    "value": "getattr",
+    "stable_hash": "d2510d0c",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "6062715a",
+    "symbol_path": [
+      "Category",
+      "get_name"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6062715a",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "6062715a",
+    "symbol_path": [
+      "Category",
+      "get_name"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6062715a",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "b55e76ae",
+    "symbol_path": [
+      "Category",
+      "get_name"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "b55e76ae",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "ddb697e2",
+    "symbol_path": [
+      "Category",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "ddb697e2",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "a1b5c079",
+    "symbol_path": [
+      "Category",
+      "__str__"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "a1b5c079",
+    "file": "backend/apps/categories/models.py"
+  },
+  {
+    "id": "a3e6c07d",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "a3e6c07d",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "d11e85b7",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "cursor",
+    "stable_hash": "d11e85b7",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "9fecc7a4",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "9fecc7a4",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "53351481",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "53351481",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "9fecc7a4",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "9fecc7a4",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "53351481",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "53351481",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "9fecc7a4",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "execute",
+    "stable_hash": "9fecc7a4",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "53351481",
+    "symbol_path": [
+      "advisory_lock"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "53351481",
+    "file": "backend/apps/core/utils/advisory_lock.py"
+  },
+  {
+    "id": "797e788b",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "advisory_lock",
+    "stable_hash": "797e788b",
+    "file": "backend/apps/core/utils/migrate_locked.py"
+  },
+  {
+    "id": "815132ed",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "run",
+    "stable_hash": "815132ed",
+    "file": "backend/apps/core/utils/migrate_locked.py"
+  },
+  {
+    "id": "2b999d26",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2b999d26",
+    "file": "backend/apps/core/utils/migrate_locked.py"
+  },
+  {
+    "id": "c2f325c2",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "exit",
+    "stable_hash": "c2f325c2",
+    "file": "backend/apps/core/utils/migrate_locked.py"
+  },
+  {
+    "id": "34c175f7",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "main",
+    "stable_hash": "34c175f7",
+    "file": "backend/apps/core/utils/migrate_locked.py"
+  },
+  {
+    "id": "3b575497",
+    "symbol_path": [
+      "CityAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3b575497",
+    "file": "backend/apps/locations/admin.py"
+  },
+  {
+    "id": "6f3abd18",
+    "symbol_path": [
+      "CityAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6f3abd18",
+    "file": "backend/apps/locations/admin.py"
+  },
+  {
+    "id": "dd12fd23",
+    "symbol_path": [
+      "CityAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "dd12fd23",
+    "file": "backend/apps/locations/admin.py"
+  },
+  {
+    "id": "c3a186bd",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "c3a186bd",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "ccf43392",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "ccf43392",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "8a733795",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "8a733795",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "8a733795",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "8a733795",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "412f58e9",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "412f58e9",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "8a733795",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "8a733795",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "e3aef4a8",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "SlugField",
+    "stable_hash": "e3aef4a8",
+    "file": "backend/apps/locations/migrations/0001_initial.py"
+  },
+  {
+    "id": "961bc6dd",
+    "symbol_path": [
+      "create_cities"
+    ],
+    "type": "function_call",
+    "value": "get_model",
+    "stable_hash": "961bc6dd",
+    "file": "backend/apps/locations/migrations/0002_seed_cities.py"
+  },
+  {
+    "id": "dd23ea58",
+    "symbol_path": [
+      "create_cities"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "dd23ea58",
+    "file": "backend/apps/locations/migrations/0002_seed_cities.py"
+  },
+  {
+    "id": "a19b5a36",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "RunPython",
+    "stable_hash": "a19b5a36",
+    "file": "backend/apps/locations/migrations/0002_seed_cities.py"
+  },
+  {
+    "id": "ce06f6af",
+    "symbol_path": [
+      "City"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "ce06f6af",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "ce06f6af",
+    "symbol_path": [
+      "City"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "ce06f6af",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "0f5207d4",
+    "symbol_path": [
+      "City"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "0f5207d4",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "ce06f6af",
+    "symbol_path": [
+      "City"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "ce06f6af",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "86244a50",
+    "symbol_path": [
+      "City"
+    ],
+    "type": "function_call",
+    "value": "SlugField",
+    "stable_hash": "86244a50",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "a14a8538",
+    "symbol_path": [
+      "City",
+      "get_name"
+    ],
+    "type": "function_call",
+    "value": "getattr",
+    "stable_hash": "a14a8538",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "4e8b042c",
+    "symbol_path": [
+      "City",
+      "get_name"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4e8b042c",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "4e8b042c",
+    "symbol_path": [
+      "City",
+      "get_name"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4e8b042c",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "91452c35",
+    "symbol_path": [
+      "City",
+      "get_name"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "91452c35",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "80b29b57",
+    "symbol_path": [
+      "City",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "80b29b57",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "9e716d96",
+    "symbol_path": [
+      "City",
+      "__str__"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "9e716d96",
+    "file": "backend/apps/locations/models.py"
+  },
+  {
+    "id": "89e627c3",
+    "symbol_path": [
+      "log_ad_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "89e627c3",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "3a376080",
+    "symbol_path": [
+      "log_ad_link"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "3a376080",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "620ff85a",
+    "symbol_path": [
+      "log_user_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "620ff85a",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "e4be40c9",
+    "symbol_path": [
+      "log_user_link"
+    ],
+    "type": "function_call",
+    "value": "str",
+    "stable_hash": "e4be40c9",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "620ff85a",
+    "symbol_path": [
+      "log_user_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "620ff85a",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "45af7faa",
+    "symbol_path": [
+      "ModerationCriteriaAdmin",
+      "has_add_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "45af7faa",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "47b89646",
+    "symbol_path": [
+      "ModerationCriteriaAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "47b89646",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "a9e58471",
+    "symbol_path": [
+      "ModerationCriteriaAdmin",
+      "save_model"
+    ],
+    "type": "function_call",
+    "value": "save_model",
+    "stable_hash": "a9e58471",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "2decd5b1",
+    "symbol_path": [
+      "ModerationCriteriaAdmin",
+      "save_model"
+    ],
+    "type": "function_call",
+    "value": "super",
+    "stable_hash": "2decd5b1",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "08252d04",
+    "symbol_path": [
+      "ModerationCriteriaAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "08252d04",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "891e4a76",
+    "symbol_path": [
+      "ModeratorActionLogAdmin",
+      "has_add_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "891e4a76",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "6ccb09d8",
+    "symbol_path": [
+      "ModeratorActionLogAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6ccb09d8",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "d9f556bc",
+    "symbol_path": [
+      "ModeratorActionLogAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "d9f556bc",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "ed38aad5",
+    "symbol_path": [
+      "ModeratorActionLogAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "ed38aad5",
+    "file": "backend/apps/moderation/admin.py"
+  },
+  {
+    "id": "7a0503cb",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "7a0503cb",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "ccfb66b4",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "ccfb66b4",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "1ab3a0fe",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "1ab3a0fe",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "cd9961b5",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "cd9961b5",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "f189f30a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "f189f30a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "eecd8163",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "eecd8163",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "e7844d8a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "e7844d8a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "7a0503cb",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "7a0503cb",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "ccfb66b4",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "ccfb66b4",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "b39ff238",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "b39ff238",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "dd960e9a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "TextField",
+    "stable_hash": "dd960e9a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "eecd8163",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "eecd8163",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "e7844d8a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "e7844d8a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "e7844d8a",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "e7844d8a",
+    "file": "backend/apps/moderation/migrations/0001_initial.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "d3a321d4",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "d3a321d4",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "4abeeebf",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "JSONField",
+    "stable_hash": "4abeeebf",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "cd3f124d",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "PositiveIntegerField",
+    "stable_hash": "cd3f124d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "819c3a4b",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "819c3a4b",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "23c24256",
+    "symbol_path": [
+      "ModerationCriteria"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "23c24256",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "6caf7d46",
+    "symbol_path": [
+      "ModerationCriteria",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6caf7d46",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "1b90224d",
+    "symbol_path": [
+      "ModerationCriteria",
+      "get_singleton"
+    ],
+    "type": "function_call",
+    "value": "get_or_create",
+    "stable_hash": "1b90224d",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "f88d58d5",
+    "symbol_path": [
+      "ModerationCriteria",
+      "get_singleton"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f88d58d5",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "c66c89d8",
+    "symbol_path": [
+      "ModeratorActionLog"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "c66c89d8",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "c66c89d8",
+    "symbol_path": [
+      "ModeratorActionLog"
+    ],
+    "type": "function_call",
+    "value": "ForeignKey",
+    "stable_hash": "c66c89d8",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "8e07c432",
+    "symbol_path": [
+      "ModeratorActionLog"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "8e07c432",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "c1108573",
+    "symbol_path": [
+      "ModeratorActionLog"
+    ],
+    "type": "function_call",
+    "value": "TextField",
+    "stable_hash": "c1108573",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "1f8f15c1",
+    "symbol_path": [
+      "ModeratorActionLog"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "1f8f15c1",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "beab7e2e",
+    "symbol_path": [
+      "ModeratorActionLog",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "beab7e2e",
+    "file": "backend/apps/moderation/models.py"
+  },
+  {
+    "id": "2f883284",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "2f883284",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "842a462a",
+    "symbol_path": [
+      "_get_cached_criteria"
+    ],
+    "type": "function_call",
+    "value": "_get_criteria_uncached",
+    "stable_hash": "842a462a",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "9a53398e",
+    "symbol_path": [
+      "_get_cached_criteria"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "9a53398e",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "666ad44c",
+    "symbol_path": [
+      "_get_cached_criteria"
+    ],
+    "type": "function_call",
+    "value": "tuple",
+    "stable_hash": "666ad44c",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "d8bad163",
+    "symbol_path": [
+      "_get_cached_criteria"
+    ],
+    "type": "function_call",
+    "value": "lru_cache",
+    "stable_hash": "d8bad163",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "a48e9abf",
+    "symbol_path": [
+      "_get_criteria_uncached"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "a48e9abf",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "bca08b14",
+    "symbol_path": [
+      "_get_criteria_uncached"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "bca08b14",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "3dbd66ea",
+    "symbol_path": [
+      "_invalidate_criteria_cache"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "3dbd66ea",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "469d2793",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_get_cached_criteria",
+    "stable_hash": "469d2793",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "5c91e9b9",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_validate_title_length",
+    "stable_hash": "5c91e9b9",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2f31c850",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_validate_description_length",
+    "stable_hash": "2f31c850",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "dbed3fda",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_validate_image_count",
+    "stable_hash": "dbed3fda",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "b836e4ae",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_contains_banned_words",
+    "stable_hash": "b836e4ae",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "4ed473bd",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_validate_max_ads_per_user",
+    "stable_hash": "4ed473bd",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "5c8ce4ee",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_is_duplicate_title",
+    "stable_hash": "5c8ce4ee",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ddbf719f",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_fail_moderation",
+    "stable_hash": "ddbf719f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2afc85e4",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "function_call",
+    "value": "_pass_moderation",
+    "stable_hash": "2afc85e4",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2904cb29",
+    "symbol_path": [
+      "auto_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2904cb29",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "ac7883c1",
+    "symbol_path": [
+      "_validate_title_length"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "ac7883c1",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "9b49c406",
+    "symbol_path": [
+      "_validate_title_length"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "9b49c406",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "f7336f14",
+    "symbol_path": [
+      "_validate_description_length"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f7336f14",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "87b698d4",
+    "symbol_path": [
+      "_validate_description_length"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "87b698d4",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "750b1740",
+    "symbol_path": [
+      "_validate_image_count"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "750b1740",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "a2f85f2c",
+    "symbol_path": [
+      "_validate_image_count"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "a2f85f2c",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "59c8ed88",
+    "symbol_path": [
+      "_contains_banned_words"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "59c8ed88",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "95eff7f9",
+    "symbol_path": [
+      "_contains_banned_words"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "95eff7f9",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "95eff7f9",
+    "symbol_path": [
+      "_contains_banned_words"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "95eff7f9",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "59c8ed88",
+    "symbol_path": [
+      "_contains_banned_words"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "59c8ed88",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "59c8ed88",
+    "symbol_path": [
+      "_contains_banned_words"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "59c8ed88",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "5473b4db",
+    "symbol_path": [
+      "_validate_max_ads_per_user"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "5473b4db",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "9a626212",
+    "symbol_path": [
+      "_validate_max_ads_per_user"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "9a626212",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "b3b3144d",
+    "symbol_path": [
+      "_validate_max_ads_per_user"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "b3b3144d",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "9d800e5f",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "exclude",
+    "stable_hash": "9d800e5f",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "66b5915c",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "66b5915c",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "192448cc",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "ratio",
+    "stable_hash": "192448cc",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "f57e374e",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "SequenceMatcher",
+    "stable_hash": "f57e374e",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "30951105",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "30951105",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "30951105",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "30951105",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2e0d9e25",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2e0d9e25",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "2e0d9e25",
+    "symbol_path": [
+      "_is_duplicate_title"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2e0d9e25",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "533be56c",
+    "symbol_path": [
+      "_fail_moderation"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "533be56c",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "787c7838",
+    "symbol_path": [
+      "_fail_moderation"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "787c7838",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "b95f95ea",
+    "symbol_path": [
+      "_fail_moderation"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "b95f95ea",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "c1ee105d",
+    "symbol_path": [
+      "_fail_moderation"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "c1ee105d",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "dc5c4283",
+    "symbol_path": [
+      "_pass_moderation"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "dc5c4283",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "96c8b2f0",
+    "symbol_path": [
+      "_pass_moderation"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "96c8b2f0",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "6d59445d",
+    "symbol_path": [
+      "_pass_moderation"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "6d59445d",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "dda36207",
+    "symbol_path": [
+      "_pass_moderation"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "dda36207",
+    "file": "backend/apps/moderation/services/auto_moderation.py"
+  },
+  {
+    "id": "1fb9f49e",
+    "symbol_path": [
+      "criteria"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1fb9f49e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "322956ff",
+    "symbol_path": [
+      "criteria"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "322956ff",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d3def20f",
+    "symbol_path": [
+      "user"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "d3def20f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "23796396",
+    "symbol_path": [
+      "user"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "23796396",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "db5906c3",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "db5906c3",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "8beeb816",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "8beeb816",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "557edfc0",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "557edfc0",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "5d045f14",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "5d045f14",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "dde330b0",
+    "symbol_path": [
+      "ad"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "dde330b0",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "9af33789",
+    "symbol_path": [
+      "ad"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "9af33789",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "8b23dcc9",
+    "symbol_path": [
+      "ad_with_images"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "8b23dcc9",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "842c9c33",
+    "symbol_path": [
+      "ad_with_images"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "842c9c33",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "53e494de",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "53e494de",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "e78d6d9f",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "e78d6d9f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a5ea6df6",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "a5ea6df6",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "9e8e377c",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "9e8e377c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "893da522",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "893da522",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "059a453c",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "059a453c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "65adf622",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "65adf622",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "b64759d1",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "b64759d1",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "56a8184d",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "56a8184d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "9a72a45b",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "9a72a45b",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "87b9ef71",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "87b9ef71",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "126dd725",
+    "symbol_path": [
+      "TestTitleLengthValidation",
+      "test_title_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "126dd725",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "26842062",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "26842062",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "14a898ed",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "14a898ed",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "1eb1298e",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "1eb1298e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "641aad0d",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_short_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "641aad0d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "980a4870",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "980a4870",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "8496ed13",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "8496ed13",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d6aef741",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "d6aef741",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d180cbda",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_too_long_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "d180cbda",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d058e642",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "d058e642",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "609bcb23",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "609bcb23",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "17b3a4d9",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "17b3a4d9",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "3b8fe543",
+    "symbol_path": [
+      "TestDescriptionLengthValidation",
+      "test_description_valid_length_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "3b8fe543",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "042df1e2",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_missing_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "042df1e2",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "97b5868c",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_missing_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "97b5868c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "4806f054",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_missing_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "4806f054",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "7747637c",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_missing_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "7747637c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "379f8496",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_present_passes"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "379f8496",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "cd9e3123",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_present_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "cd9e3123",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "114f9cee",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_present_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "114f9cee",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "67c18cd4",
+    "symbol_path": [
+      "TestPriceRequiredValidation",
+      "test_price_required_present_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "67c18cd4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "aaff805a",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_few_images_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "aaff805a",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d9d683a2",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_few_images_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "d9d683a2",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "811de933",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_few_images_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "811de933",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "291beb30",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_few_images_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "291beb30",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "fbec5972",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_many_images_fails"
+    ],
+    "type": "function_call",
+    "value": "range",
+    "stable_hash": "fbec5972",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a71c8fd1",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_many_images_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "a71c8fd1",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "8151c2fa",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_many_images_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "8151c2fa",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "5a06ae56",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_many_images_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "5a06ae56",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "e0db3a0c",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_too_many_images_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "e0db3a0c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "2b4540b4",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_valid_image_count_passes"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "2b4540b4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a1dd791d",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_valid_image_count_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "a1dd791d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "2d503f14",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_valid_image_count_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "2d503f14",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "16a588ad",
+    "symbol_path": [
+      "TestImageCountValidation",
+      "test_valid_image_count_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "16a588ad",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "e7aa0788",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_title_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "e7aa0788",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "1a8ead1f",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_title_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "1a8ead1f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "da739cf1",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_title_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "da739cf1",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "4e22a25b",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_title_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "4e22a25b",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "2bffc312",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_description_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "2bffc312",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "5581de53",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_description_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "5581de53",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a361422e",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_description_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "a361422e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "6f3f6ab0",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_in_description_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "6f3f6ab0",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "0f84e845",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_case_insensitive_fails"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "0f84e845",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "10b7c997",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_case_insensitive_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "10b7c997",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a5aad46c",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_case_insensitive_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "a5aad46c",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a143bed7",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_banned_word_case_insensitive_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "a143bed7",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "613ebdf6",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_no_banned_words_passes"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "613ebdf6",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "c5f338af",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_no_banned_words_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "c5f338af",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "10f0e8c0",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_no_banned_words_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "10f0e8c0",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d3536c80",
+    "symbol_path": [
+      "TestBannedWordsValidation",
+      "test_no_banned_words_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "d3536c80",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "3653471e",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_exceeds_max_ads_fails"
+    ],
+    "type": "function_call",
+    "value": "range",
+    "stable_hash": "3653471e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "1f47ce4d",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_exceeds_max_ads_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "1f47ce4d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "5a4866b9",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_exceeds_max_ads_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "5a4866b9",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "256e8e0b",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_exceeds_max_ads_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "256e8e0b",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "ccd982da",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_exceeds_max_ads_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "ccd982da",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "b0c33312",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "delete",
+    "stable_hash": "b0c33312",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "c4229012",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "c4229012",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "53a39062",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "53a39062",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "2037a5da",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "2037a5da",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "7d114dfa",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "7d114dfa",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "360671f2",
+    "symbol_path": [
+      "TestMaxAdsPerUserValidation",
+      "test_user_within_limit_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "360671f2",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "dfc08fd7",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_duplicate_title_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "dfc08fd7",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "93d15049",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_duplicate_title_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "93d15049",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "0fbab703",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_duplicate_title_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "0fbab703",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "ec6cb336",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_duplicate_title_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "ec6cb336",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d682229f",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "d682229f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d682229f",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "d682229f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d682229f",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "d682229f",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "fcb9dbff",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "fcb9dbff",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "7d2c4c5d",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "7d2c4c5d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "08f8bba4",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_similar_title_above_threshold_fails"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "08f8bba4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "4434ef8d",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_unique_title_passes"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "4434ef8d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "4434ef8d",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_unique_title_passes"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "4434ef8d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "6d6f9a44",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_unique_title_passes"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "6d6f9a44",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "f5b0f2ad",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_unique_title_passes"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "f5b0f2ad",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "ce91bacb",
+    "symbol_path": [
+      "TestDuplicateTitleValidation",
+      "test_unique_title_passes"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "ce91bacb",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "97b1d032",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "97b1d032",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "afd2b0f4",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "afd2b0f4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "6e5a45b1",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "6e5a45b1",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "ed3450df",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "ed3450df",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "6a6b316e",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "6a6b316e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "53d67270",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_creates_log"
+    ],
+    "type": "function_call",
+    "value": "first",
+    "stable_hash": "53d67270",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "583c76e1",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "583c76e1",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d33bb94a",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "d33bb94a",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "bd44db76",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "bd44db76",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "4bdaa667",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4bdaa667",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "c1b34650",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "c1b34650",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "76019564",
+    "symbol_path": [
+      "TestModerationFailureLogging",
+      "test_failure_no_specific_reason_to_seller"
+    ],
+    "type": "function_call",
+    "value": "first",
+    "stable_hash": "76019564",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "49973941",
+    "symbol_path": [
+      "TestModerationSuccessAnalytics",
+      "test_success_creates_analytics_event"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "49973941",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "2a10d6a4",
+    "symbol_path": [
+      "TestModerationSuccessAnalytics",
+      "test_success_creates_analytics_event"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "2a10d6a4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "0c1dd81d",
+    "symbol_path": [
+      "TestModerationSuccessAnalytics",
+      "test_success_creates_analytics_event"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "0c1dd81d",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "91e3cbcd",
+    "symbol_path": [
+      "TestModerationSuccessAnalytics",
+      "test_success_creates_analytics_event"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "91e3cbcd",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "9ab204f4",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_set_on_first_publish"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "9ab204f4",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "7165637b",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_set_on_first_publish"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "7165637b",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "c7bdd525",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_set_on_first_publish"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "c7bdd525",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a7dedd5e",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "a7dedd5e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "0dd163e3",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "0dd163e3",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d559a478",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "d559a478",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "f6c1cf24",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "f6c1cf24",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "a7dedd5e",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "cache_clear",
+    "stable_hash": "a7dedd5e",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "0dd163e3",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "auto_moderate",
+    "stable_hash": "0dd163e3",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "d559a478",
+    "symbol_path": [
+      "TestOriginalPublishedAtSetOnce",
+      "test_original_published_at_unchanged_on_re_publish"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "d559a478",
+    "file": "backend/apps/moderation/tests/test_auto_moderation.py"
+  },
+  {
+    "id": "28e16342",
+    "symbol_path": [
+      "UserAdmin",
+      "has_add_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "28e16342",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "37374d6a",
+    "symbol_path": [
+      "UserAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "37374d6a",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "b180faf2",
+    "symbol_path": [
+      "UserAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "b180faf2",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "4ec3af91",
+    "symbol_path": [
+      "UserAdmin",
+      "has_view_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4ec3af91",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "8068fbc1",
+    "symbol_path": [
+      "UserAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "8068fbc1",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "1771429e",
+    "symbol_path": [
+      "LoginTokenAdmin",
+      "has_add_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1771429e",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "a7f224b0",
+    "symbol_path": [
+      "LoginTokenAdmin",
+      "has_change_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "a7f224b0",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "7d7bf61e",
+    "symbol_path": [
+      "LoginTokenAdmin",
+      "has_delete_permission"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "7d7bf61e",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "1a629901",
+    "symbol_path": [
+      "LoginTokenAdmin"
+    ],
+    "type": "function_call",
+    "value": "register",
+    "stable_hash": "1a629901",
+    "file": "backend/apps/users/admin.py"
+  },
+  {
+    "id": "6f8fd1fc",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "6f8fd1fc",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "9722d2c8",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "9722d2c8",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "fedf33ea",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "fedf33ea",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "fedf33ea",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "fedf33ea",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "1da70490",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "UnicodeUsernameValidator",
+    "stable_hash": "1da70490",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "fedf33ea",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "fedf33ea",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "fedf33ea",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "fedf33ea",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "cc6ecd59",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "EmailField",
+    "stable_hash": "cc6ecd59",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "a205079c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigIntegerField",
+    "stable_hash": "a205079c",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "ee52a815",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "ee52a815",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "9e1f5f6f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ManyToManyField",
+    "stable_hash": "9e1f5f6f",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "9e1f5f6f",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "ManyToManyField",
+    "stable_hash": "9e1f5f6f",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "6f8fd1fc",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CreateModel",
+    "stable_hash": "6f8fd1fc",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "9722d2c8",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigAutoField",
+    "stable_hash": "9722d2c8",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "fedf33ea",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "fedf33ea",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "a205079c",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "BigIntegerField",
+    "stable_hash": "a205079c",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "9441b7fa",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "AddIndex",
+    "stable_hash": "9441b7fa",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "8ee5cf4e",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "8ee5cf4e",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
+    "id": "b70056ae",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "b70056ae",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "c9d7c70f",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "BigIntegerField",
+    "stable_hash": "c9d7c70f",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "6843da9d",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "6843da9d",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "6843da9d",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "6843da9d",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "6843da9d",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "BooleanField",
+    "stable_hash": "6843da9d",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "d1e55a85",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "d1e55a85",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "d1e55a85",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "d1e55a85",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "d1e55a85",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "d1e55a85",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "d1e55a85",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "d1e55a85",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "e5441bb6",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "ManyToManyField",
+    "stable_hash": "e5441bb6",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "e5441bb6",
+    "symbol_path": [
+      "User"
+    ],
+    "type": "function_call",
+    "value": "ManyToManyField",
+    "stable_hash": "e5441bb6",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "4a2ddc9e",
+    "symbol_path": [
+      "User",
+      "Meta"
+    ],
+    "type": "function_call",
+    "value": "Index",
+    "stable_hash": "4a2ddc9e",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "cb4befc0",
+    "symbol_path": [
+      "User",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "cb4befc0",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "31c147e9",
+    "symbol_path": [
+      "LoginToken"
+    ],
+    "type": "function_call",
+    "value": "CharField",
+    "stable_hash": "31c147e9",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "2de2d71f",
+    "symbol_path": [
+      "LoginToken"
+    ],
+    "type": "function_call",
+    "value": "BigIntegerField",
+    "stable_hash": "2de2d71f",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "b800f162",
+    "symbol_path": [
+      "LoginToken"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "b800f162",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "b800f162",
+    "symbol_path": [
+      "LoginToken"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "b800f162",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "b800f162",
+    "symbol_path": [
+      "LoginToken"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "b800f162",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "d13e707b",
+    "symbol_path": [
+      "LoginToken",
+      "__str__"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "d13e707b",
+    "file": "backend/apps/users/models.py"
+  },
+  {
+    "id": "7a604d08",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "setdefault",
+    "stable_hash": "7a604d08",
+    "file": "backend/config/asgi.py"
+  },
+  {
+    "id": "37a35f45",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "get_asgi_application",
+    "stable_hash": "37a35f45",
+    "file": "backend/config/asgi.py"
+  },
+  {
+    "id": "7bd2e34f",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "7bd2e34f",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "1be5fd9a",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "resolve",
+    "stable_hash": "1be5fd9a",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "2d9a6677",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "Path",
+    "stable_hash": "2d9a6677",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "379de711",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "Env",
+    "stable_hash": "379de711",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "43fade66",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "43fade66",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "1fda429a",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "error",
+    "stable_hash": "1fda429a",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4c1519c3",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "exit",
+    "stable_hash": "4c1519c3",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "3c645691",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "read_env",
+    "stable_hash": "3c645691",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "47c89bcd",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "env",
+    "stable_hash": "47c89bcd",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "47c89bcd",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "env",
+    "stable_hash": "47c89bcd",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "cd2af8a8",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "split",
+    "stable_hash": "cd2af8a8",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "83b53ea4",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "db",
+    "stable_hash": "83b53ea4",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "4b00aa05",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "4b00aa05",
+    "file": "backend/config/settings/base.py"
+  },
+  {
+    "id": "92dff7b8",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "ValueError",
+    "stable_hash": "92dff7b8",
+    "file": "backend/config/settings/prod.py"
+  },
+  {
+    "id": "202db351",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "path",
+    "stable_hash": "202db351",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "202db351",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "path",
+    "stable_hash": "202db351",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "56433399",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "include",
+    "stable_hash": "56433399",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "202db351",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "path",
+    "stable_hash": "202db351",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "56433399",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "include",
+    "stable_hash": "56433399",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "202db351",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "path",
+    "stable_hash": "202db351",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "56433399",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "include",
+    "stable_hash": "56433399",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "202db351",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "path",
+    "stable_hash": "202db351",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "56433399",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "include",
+    "stable_hash": "56433399",
+    "file": "backend/config/urls.py"
+  },
+  {
+    "id": "a4a04371",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "setdefault",
+    "stable_hash": "a4a04371",
+    "file": "backend/config/wsgi.py"
+  },
+  {
+    "id": "d963351d",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "get_wsgi_application",
+    "stable_hash": "d963351d",
+    "file": "backend/config/wsgi.py"
+  },
+  {
+    "id": "a6de3f37",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "setdefault",
+    "stable_hash": "a6de3f37",
+    "file": "backend/manage.py"
+  },
+  {
+    "id": "8fdfa2f1",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "ImportError",
+    "stable_hash": "8fdfa2f1",
+    "file": "backend/manage.py"
+  },
+  {
+    "id": "41d015f9",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "execute_from_command_line",
+    "stable_hash": "41d015f9",
+    "file": "backend/manage.py"
+  },
+  {
+    "id": "53db06df",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "main",
+    "stable_hash": "53db06df",
+    "file": "backend/manage.py"
+  },
+  {
+    "id": "ff78eb92",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "ff78eb92",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5b0e081e",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "Router",
+    "stable_hash": "5b0e081e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a6036580",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "a6036580",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "fbdc98c9",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "get_data",
+    "stable_hash": "fbdc98c9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7244ae6b",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "7244ae6b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a6036580",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "a6036580",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5e93e18c",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "create_draft_ad",
+    "stable_hash": "5e93e18c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f52e6718",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "f52e6718",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "06a5e4e0",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "06a5e4e0",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7244ae6b",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "7244ae6b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6059638d",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "6059638d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ae731c94",
+    "symbol_path": [
+      "cmd_post"
+    ],
+    "type": "function_call",
+    "value": "Command",
+    "stable_hash": "ae731c94",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "539d1882",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "get_data",
+    "stable_hash": "539d1882",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "53cf7e0f",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "delete_draft",
+    "stable_hash": "53cf7e0f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ff7f8722",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "clear",
+    "stable_hash": "ff7f8722",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "39d7637c",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "39d7637c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "816ceb62",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "816ceb62",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "40575584",
+    "symbol_path": [
+      "cmd_cancel"
+    ],
+    "type": "function_call",
+    "value": "Command",
+    "stable_hash": "40575584",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "497416e9",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "497416e9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "935c0ba6",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "935c0ba6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7e46b904",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "7e46b904",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e581e366",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "strip",
+    "stable_hash": "e581e366",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "89fdd275",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "search_categories",
+    "stable_hash": "89fdd275",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "497416e9",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "497416e9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "935c0ba6",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "935c0ba6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "cbe098ed",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "cbe098ed",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "590f65fe",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "590f65fe",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "444eeb92",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "444eeb92",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "497416e9",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "497416e9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "935c0ba6",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "935c0ba6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "282c8c27",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "join",
+    "stable_hash": "282c8c27",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e0d5eb93",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "enumerate",
+    "stable_hash": "e0d5eb93",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "497416e9",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "497416e9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "78b39b40",
+    "symbol_path": [
+      "process_category"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "78b39b40",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "8794b847",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "8794b847",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b87ea701",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "b87ea701",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "debbc9b6",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "strip",
+    "stable_hash": "debbc9b6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3e6a844a",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "get_city_by_name",
+    "stable_hash": "3e6a844a",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6cf569df",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "get_all_cities",
+    "stable_hash": "6cf569df",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "81b1d01f",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "get_close_matches",
+    "stable_hash": "81b1d01f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3e6a844a",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "get_city_by_name",
+    "stable_hash": "3e6a844a",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "8794b847",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "8794b847",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b87ea701",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "b87ea701",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7be3755b",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "7be3755b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "52f77ad5",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "52f77ad5",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "8794b847",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "8794b847",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "47e12dda",
+    "symbol_path": [
+      "process_city"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "47e12dda",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "51c09d7e",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "51c09d7e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "1b499d2c",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1b499d2c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9b1ffaad",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "TitlePayload",
+    "stable_hash": "9b1ffaad",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "51c09d7e",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "51c09d7e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "1b499d2c",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1b499d2c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6b0cea40",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "6b0cea40",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6e660335",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "6e660335",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "51c09d7e",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "51c09d7e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3c9dfa74",
+    "symbol_path": [
+      "process_title"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "3c9dfa74",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e8180b23",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "e8180b23",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f2272e66",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f2272e66",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "567b3d09",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "DescriptionPayload",
+    "stable_hash": "567b3d09",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e8180b23",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "e8180b23",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f2272e66",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "f2272e66",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "8b14ac21",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "8b14ac21",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7741ce9c",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "7741ce9c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e8180b23",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "e8180b23",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4eea5a1e",
+    "symbol_path": [
+      "process_description"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "4eea5a1e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f32f6df2",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "f32f6df2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e03c3acb",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e03c3acb",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3d2bbbd1",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "3d2bbbd1",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "bf1a2d0c",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "strip",
+    "stable_hash": "bf1a2d0c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "acd4e57d",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "acd4e57d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "2bb66be2",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "int",
+    "stable_hash": "2bb66be2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "12654e0f",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "PricePayload",
+    "stable_hash": "12654e0f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "acd4e57d",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "acd4e57d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f32f6df2",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "f32f6df2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e03c3acb",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e03c3acb",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "adff91c6",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "adff91c6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f32f6df2",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "f32f6df2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "25811e2b",
+    "symbol_path": [
+      "process_price"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "25811e2b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ab767476",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "get_data",
+    "stable_hash": "ab767476",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a19cae3e",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "a19cae3e",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4b1b5fde",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "4b1b5fde",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "bae588da",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "strip",
+    "stable_hash": "bae588da",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "88ea6bca",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "88ea6bca",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "20e7ff38",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "PhotoCountPayload",
+    "stable_hash": "20e7ff38",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3ab4a70c",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "3ab4a70c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e4f44249",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e4f44249",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f3164f63",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "set_state",
+    "stable_hash": "f3164f63",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6d48c644",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "show_preview",
+    "stable_hash": "6d48c644",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e4f44249",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e4f44249",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3ab4a70c",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "3ab4a70c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e4f44249",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e4f44249",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "30c244f4",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "download_photo",
+    "stable_hash": "30c244f4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3ab4a70c",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "3ab4a70c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e4f44249",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e4f44249",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "524aa622",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "validate_photo",
+    "stable_hash": "524aa622",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3ab4a70c",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "3ab4a70c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e4f44249",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e4f44249",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b7fb9541",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "generate_storage_key",
+    "stable_hash": "b7fb9541",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "bb658120",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "save_photo",
+    "stable_hash": "bb658120",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9447beb4",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "9447beb4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "88ea6bca",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "88ea6bca",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4ee7c53f",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "4ee7c53f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3ab4a70c",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "3ab4a70c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "88ea6bca",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "88ea6bca",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "dec2b427",
+    "symbol_path": [
+      "process_photos"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "dec2b427",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f81a4298",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get_category",
+    "stable_hash": "f81a4298",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "27dfbb8b",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "27dfbb8b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "91c111f2",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get_city",
+    "stable_hash": "91c111f2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "27dfbb8b",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "27dfbb8b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "27dfbb8b",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "27dfbb8b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "27dfbb8b",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "27dfbb8b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "27dfbb8b",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "27dfbb8b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "d76ad712",
+    "symbol_path": [
+      "show_preview"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "d76ad712",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4d20cfb4",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4d20cfb4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "782661b9",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "lower",
+    "stable_hash": "782661b9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "290408ab",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "strip",
+    "stable_hash": "290408ab",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "0c709af5",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get_data",
+    "stable_hash": "0c709af5",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "829d5312",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "translate_to_russian",
+    "stable_hash": "829d5312",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "fb34e0d4",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "update_ad_and_moderate",
+    "stable_hash": "fb34e0d4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c51da508",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "c51da508",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "95c4663c",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "95c4663c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "95c4663c",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "95c4663c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b519c386",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "clear",
+    "stable_hash": "b519c386",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4d20cfb4",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4d20cfb4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "15d06f1b",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "cmd_cancel",
+    "stable_hash": "15d06f1b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "95c4663c",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "95c4663c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "51689140",
+    "symbol_path": [
+      "process_preview"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "51689140",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "61e9600c",
+    "symbol_path": [
+      "create_draft_ad",
+      "_create"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "61e9600c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5eac1391",
+    "symbol_path": [
+      "create_draft_ad",
+      "_create"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "5eac1391",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "d16e19f7",
+    "symbol_path": [
+      "create_draft_ad"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "d16e19f7",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "853c3bfb",
+    "symbol_path": [
+      "create_draft_ad"
+    ],
+    "type": "function_call",
+    "value": "_create",
+    "stable_hash": "853c3bfb",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b39b677d",
+    "symbol_path": [
+      "delete_draft",
+      "_delete"
+    ],
+    "type": "function_call",
+    "value": "delete",
+    "stable_hash": "b39b677d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3561b691",
+    "symbol_path": [
+      "delete_draft",
+      "_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "3561b691",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "2906d03d",
+    "symbol_path": [
+      "delete_draft"
+    ],
+    "type": "function_call",
+    "value": "_delete",
+    "stable_hash": "2906d03d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6931cece",
+    "symbol_path": [
+      "search_categories",
+      "_search"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6931cece",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c4ab6247",
+    "symbol_path": [
+      "search_categories",
+      "_search"
+    ],
+    "type": "function_call",
+    "value": "list",
+    "stable_hash": "c4ab6247",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c6157385",
+    "symbol_path": [
+      "search_categories",
+      "_search"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "c6157385",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7ad5b3d2",
+    "symbol_path": [
+      "search_categories"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "7ad5b3d2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ceeee092",
+    "symbol_path": [
+      "search_categories"
+    ],
+    "type": "function_call",
+    "value": "_search",
+    "stable_hash": "ceeee092",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "da437ba8",
+    "symbol_path": [
+      "get_city_by_name",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "da437ba8",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b4da7c11",
+    "symbol_path": [
+      "get_city_by_name",
+      "_get"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "b4da7c11",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "da437ba8",
+    "symbol_path": [
+      "get_city_by_name",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "da437ba8",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5bdc50d3",
+    "symbol_path": [
+      "get_city_by_name"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "5bdc50d3",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "918ec283",
+    "symbol_path": [
+      "get_city_by_name"
+    ],
+    "type": "function_call",
+    "value": "_get",
+    "stable_hash": "918ec283",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6b820b13",
+    "symbol_path": [
+      "get_all_cities",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6b820b13",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "7014f611",
+    "symbol_path": [
+      "get_all_cities",
+      "_get"
+    ],
+    "type": "function_call",
+    "value": "list",
+    "stable_hash": "7014f611",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9f3a6e80",
+    "symbol_path": [
+      "get_all_cities",
+      "_get"
+    ],
+    "type": "function_call",
+    "value": "all",
+    "stable_hash": "9f3a6e80",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "17e80088",
+    "symbol_path": [
+      "get_all_cities"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "17e80088",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "101e9643",
+    "symbol_path": [
+      "get_all_cities"
+    ],
+    "type": "function_call",
+    "value": "_get",
+    "stable_hash": "101e9643",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "86b7e480",
+    "symbol_path": [
+      "download_photo"
+    ],
+    "type": "function_call",
+    "value": "download",
+    "stable_hash": "86b7e480",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "80e6f972",
+    "symbol_path": [
+      "download_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "80e6f972",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "b8aeab02",
+    "symbol_path": [
+      "download_photo"
+    ],
+    "type": "function_call",
+    "value": "read",
+    "stable_hash": "b8aeab02",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6373f779",
+    "symbol_path": [
+      "download_photo"
+    ],
+    "type": "function_call",
+    "value": "error",
+    "stable_hash": "6373f779",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "80e6f972",
+    "symbol_path": [
+      "download_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "80e6f972",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a18b4270",
+    "symbol_path": [
+      "save_photo"
+    ],
+    "type": "function_call",
+    "value": "join",
+    "stable_hash": "a18b4270",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "1e6c753d",
+    "symbol_path": [
+      "save_photo"
+    ],
+    "type": "function_call",
+    "value": "makedirs",
+    "stable_hash": "1e6c753d",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "56b2671b",
+    "symbol_path": [
+      "save_photo"
+    ],
+    "type": "function_call",
+    "value": "dirname",
+    "stable_hash": "56b2671b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ff472987",
+    "symbol_path": [
+      "save_photo"
+    ],
+    "type": "function_call",
+    "value": "open",
+    "stable_hash": "ff472987",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "363b11d6",
+    "symbol_path": [
+      "save_photo"
+    ],
+    "type": "function_call",
+    "value": "write",
+    "stable_hash": "363b11d6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6756dd6f",
+    "symbol_path": [
+      "get_category",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6756dd6f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "2172ec4c",
+    "symbol_path": [
+      "get_category",
+      "_get"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "2172ec4c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6756dd6f",
+    "symbol_path": [
+      "get_category",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6756dd6f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "6db11c8c",
+    "symbol_path": [
+      "get_category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "6db11c8c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "96acd0e2",
+    "symbol_path": [
+      "get_category"
+    ],
+    "type": "function_call",
+    "value": "_get",
+    "stable_hash": "96acd0e2",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "0bbb77d7",
+    "symbol_path": [
+      "get_city",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "0bbb77d7",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "95bef53b",
+    "symbol_path": [
+      "get_city",
+      "_get"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "95bef53b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "0bbb77d7",
+    "symbol_path": [
+      "get_city",
+      "_get"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "0bbb77d7",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3756267b",
+    "symbol_path": [
+      "get_city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3756267b",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a3e76bac",
+    "symbol_path": [
+      "get_city"
+    ],
+    "type": "function_call",
+    "value": "_get",
+    "stable_hash": "a3e76bac",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c7bfabc6",
+    "symbol_path": [
+      "translate_to_russian"
+    ],
+    "type": "function_call",
+    "value": "translate",
+    "stable_hash": "c7bfabc6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "cece0dff",
+    "symbol_path": [
+      "translate_to_russian"
+    ],
+    "type": "function_call",
+    "value": "GoogleTranslator",
+    "stable_hash": "cece0dff",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "c7bfabc6",
+    "symbol_path": [
+      "translate_to_russian"
+    ],
+    "type": "function_call",
+    "value": "translate",
+    "stable_hash": "c7bfabc6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "cece0dff",
+    "symbol_path": [
+      "translate_to_russian"
+    ],
+    "type": "function_call",
+    "value": "GoogleTranslator",
+    "stable_hash": "cece0dff",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "ea54cdb9",
+    "symbol_path": [
+      "translate_to_russian"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "ea54cdb9",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "3f226a75",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "3f226a75",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "70c40a83",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70c40a83",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "2beb6e24",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "get_singleton",
+    "stable_hash": "2beb6e24",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9062d784",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "9062d784",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e6051a7c",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "e6051a7c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9062d784",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "9062d784",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e6051a7c",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "e6051a7c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e6051a7c",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "e6051a7c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "9062d784",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "9062d784",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e6051a7c",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "e6051a7c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "f5e9efe4",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "f5e9efe4",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e00c13eb",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "e00c13eb",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "e6051a7c",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "e6051a7c",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5878227f",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "5878227f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5d2709e6",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "5d2709e6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "70c40a83",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70c40a83",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "139833b6",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "139833b6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5878227f",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "5878227f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5878227f",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "5878227f",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "5d2709e6",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "5d2709e6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "139833b6",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "139833b6",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "70c40a83",
+    "symbol_path": [
+      "update_ad_and_moderate",
+      "_update_and_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70c40a83",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "d4914e22",
+    "symbol_path": [
+      "update_ad_and_moderate"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "d4914e22",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "a644a9e0",
+    "symbol_path": [
+      "update_ad_and_moderate"
+    ],
+    "type": "function_call",
+    "value": "_update_and_moderate",
+    "stable_hash": "a644a9e0",
+    "file": "telegram_bot/handlers/ad_create.py"
+  },
+  {
+    "id": "4bb9e556",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "4bb9e556",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "977a9d4f",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "compile",
+    "stable_hash": "977a9d4f",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "91bf8e18",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "Router",
+    "stable_hash": "91bf8e18",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "02a55915",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "02a55915",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "986f542f",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "split",
+    "stable_hash": "986f542f",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "01f4a74f",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "01f4a74f",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "482fe4c1",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "482fe4c1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "02a55915",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "02a55915",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "9e938086",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "match",
+    "stable_hash": "9e938086",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "482fe4c1",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "482fe4c1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "02a55915",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "02a55915",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "b5c8c10a",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "group",
+    "stable_hash": "b5c8c10a",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "0226d8f2",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "hexdigest",
+    "stable_hash": "0226d8f2",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "23bdff4e",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "sha256",
+    "stable_hash": "23bdff4e",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e1d7ca9b",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "encode",
+    "stable_hash": "e1d7ca9b",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "1ad98fa2",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "claim_login_token",
+    "stable_hash": "1ad98fa2",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "482fe4c1",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "482fe4c1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "02a55915",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "02a55915",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "54dd0e00",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "get_or_create_user",
+    "stable_hash": "54dd0e00",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "3502685b",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "update_data",
+    "stable_hash": "3502685b",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "482fe4c1",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "482fe4c1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "482fe4c1",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "answer",
+    "stable_hash": "482fe4c1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "3f369a3e",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "message",
+    "stable_hash": "3f369a3e",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e8792d6d",
+    "symbol_path": [
+      "handle_login_deep_link"
+    ],
+    "type": "function_call",
+    "value": "Command",
+    "stable_hash": "e8792d6d",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e0c4d308",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "e0c4d308",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "dda32f42",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "dda32f42",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "1bae2449",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "1bae2449",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e8b1911d",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e8b1911d",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e8b1911d",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e8b1911d",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "e5a6dae1",
+    "symbol_path": [
+      "claim_login_token",
+      "_claim"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "e5a6dae1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "5770326e",
+    "symbol_path": [
+      "claim_login_token"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "5770326e",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "3854ee34",
+    "symbol_path": [
+      "claim_login_token"
+    ],
+    "type": "function_call",
+    "value": "_claim",
+    "stable_hash": "3854ee34",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "87dabf99",
+    "symbol_path": [
+      "get_or_create_user",
+      "_get_or_create"
+    ],
+    "type": "function_call",
+    "value": "get_or_create",
+    "stable_hash": "87dabf99",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "47fc724a",
+    "symbol_path": [
+      "get_or_create_user",
+      "_get_or_create"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "47fc724a",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "ae7941d1",
+    "symbol_path": [
+      "get_or_create_user"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "ae7941d1",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "df0c6e69",
+    "symbol_path": [
+      "get_or_create_user"
+    ],
+    "type": "function_call",
+    "value": "_get_or_create",
+    "stable_hash": "df0c6e69",
+    "file": "telegram_bot/handlers/login.py"
+  },
+  {
+    "id": "561178df",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "561178df",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "6506c515",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "setdefault",
+    "stable_hash": "6506c515",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "d3cb4de2",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "setup",
+    "stable_hash": "d3cb4de2",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "276d6768",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "getenv",
+    "stable_hash": "276d6768",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "369fe540",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "warning",
+    "stable_hash": "369fe540",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "b54cb80f",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "b54cb80f",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "9a02e715",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "MemoryStorage",
+    "stable_hash": "9a02e715",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "4b68310b",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "Dispatcher",
+    "stable_hash": "4b68310b",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "09f7b51a",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "include_router",
+    "stable_hash": "09f7b51a",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "09f7b51a",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "include_router",
+    "stable_hash": "09f7b51a",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "a93b5e64",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "Bot",
+    "stable_hash": "a93b5e64",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "ff9fb3ae",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "info",
+    "stable_hash": "ff9fb3ae",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "a17938ca",
+    "symbol_path": [
+      "main"
+    ],
+    "type": "function_call",
+    "value": "run_polling",
+    "stable_hash": "a17938ca",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "16266529",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "main",
+    "stable_hash": "16266529",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "b9ac448c",
+    "symbol_path": [
+      "TitlePayload"
+    ],
+    "type": "function_call",
+    "value": "Field",
+    "stable_hash": "b9ac448c",
+    "file": "telegram_bot/schemas/message_payloads.py"
+  },
+  {
+    "id": "3dd88a23",
+    "symbol_path": [
+      "DescriptionPayload"
+    ],
+    "type": "function_call",
+    "value": "Field",
+    "stable_hash": "3dd88a23",
+    "file": "telegram_bot/schemas/message_payloads.py"
+  },
+  {
+    "id": "52eae62e",
+    "symbol_path": [
+      "PricePayload"
+    ],
+    "type": "function_call",
+    "value": "Field",
+    "stable_hash": "52eae62e",
+    "file": "telegram_bot/schemas/message_payloads.py"
+  },
+  {
+    "id": "da6d1f2d",
+    "symbol_path": [
+      "PhotoCountPayload"
+    ],
+    "type": "function_call",
+    "value": "Field",
+    "stable_hash": "da6d1f2d",
+    "file": "telegram_bot/schemas/message_payloads.py"
+  },
+  {
+    "id": "aa49ce48",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "aa49ce48",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "867e2906",
+    "symbol_path": [
+      "validate_jpeg_bytes"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "867e2906",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "3b824b23",
+    "symbol_path": [
+      "validate_jpeg_bytes"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3b824b23",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "3b824b23",
+    "symbol_path": [
+      "validate_jpeg_bytes"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3b824b23",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "d8e2d11a",
+    "symbol_path": [
+      "validate_jpeg_bytes"
+    ],
+    "type": "function_call",
+    "value": "any",
+    "stable_hash": "d8e2d11a",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "f64ee1a6",
+    "symbol_path": [
+      "validate_jpeg_bytes"
+    ],
+    "type": "function_call",
+    "value": "startswith",
+    "stable_hash": "f64ee1a6",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "cab166af",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "function_call",
+    "value": "validate_jpeg_bytes",
+    "stable_hash": "cab166af",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "70bad4ad",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70bad4ad",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "141c1c25",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "function_call",
+    "value": "len",
+    "stable_hash": "141c1c25",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "70bad4ad",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70bad4ad",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "e3dee320",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "function_call",
+    "value": "open",
+    "stable_hash": "e3dee320",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "9fd78c7b",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "function_call",
+    "value": "BytesIO",
+    "stable_hash": "9fd78c7b",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "70bad4ad",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70bad4ad",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "16a3125e",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "function_call",
+    "value": "warning",
+    "stable_hash": "16a3125e",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "70bad4ad",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70bad4ad",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "70bad4ad",
+    "symbol_path": [
+      "validate_photo"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "70bad4ad",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "078bbff7",
+    "symbol_path": [
+      "generate_storage_key"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "078bbff7",
+    "file": "telegram_bot/services/media.py"
+  },
+  {
+    "id": "fdb72a20",
+    "symbol_path": [
+      "generate_storage_key"
+    ],
+    "type": "function_call",
+    "value": "uuid4",
+    "stable_hash": "fdb72a20",
+    "file": "telegram_bot/services/media.py"
+  }
+]

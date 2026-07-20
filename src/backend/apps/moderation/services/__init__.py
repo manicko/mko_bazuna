@@ -1,6 +1,6 @@
 """Moderation services package."""
 
-from .auto_moderation import auto_moderate
+from .auto_moderation import auto_moderate, check
 from .moderation_log import (
     log_auto_fail,
     log_auto_publish,
@@ -15,6 +15,7 @@ from .moderation_log import (
 
 __all__ = [
     "auto_moderate",
+    "check",
     "log_auto_fail",
     "log_auto_publish",
     "log_ban_account",

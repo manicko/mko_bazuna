@@ -38,5 +38,5 @@ changes:
     description: Edit wiki files to match reconciled stack.
 
 acceptance_criteria:
-  - wiki no longer contradicts pyproject.toml/compose
+  - doc no longer contradicts pyproject.toml/compose
   - R8 regex updated to php|py|cgi|pl|sh in docs/01-spec/architecture-structure.md
