@@ -6,6 +6,7 @@ import os
 import django
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from telegram_bot.middlewares import AccountStateMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ def main() -> None:
     # Storage: MemoryStorage (FSM state in memory, Ad.DRAFT in ORM)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+
+    # Register account state middleware
+    dp.message.middleware(AccountStateMiddleware())
 
     # Include routers
     from telegram_bot.handlers import login_router, ad_create_router
