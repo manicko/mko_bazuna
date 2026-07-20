@@ -1,0 +1,143 @@
+{#
+    Ad edit template for Mko Bazuna.
+
+    Edit form for seller's own ads. Handles text vs price/photo edit behavior.
+    Zone C2: text edits trigger moderation, price/photo edits stay published.
+#}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Ad - Mko Bazuna</title>
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/">Mko Bazuna</a>
+                <span class="text-gray-400 mx-2">/</span>
+                <a href="{% url 'ads:dashboard' %}" class="text-blue-600 hover:underline">Dashboard</a>
+                <span class="text-gray-400 mx-2">/</span>
+                <span class="text-gray-700">Edit Ad</span>
+            </h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6 max-w-2xl">
+        <h2 class="text-xl font-semibold mb-4">Edit Ad</h2>
+
+        {% if error %}
+            <div class="mb-4 p-4 bg-red-100 text-red-800 rounded-lg">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="bg-white rounded-lg shadow p-6">
+            {% csrf_token %}
+
+            <div class="mb-4">
+                <label for="title" class="block font-medium mb-2">Title</label>
+                <input 
+                    type="text" 
+                    id="title" 
+                    name="title" 
+                    value="{{ ad.title }}"
+                    maxlength="200"
+                    required
+                    class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+            </div>
+
+            <div class="mb-4">
+                <label for="description" class="block font-medium mb-2">Description</label>
+                <textarea 
+                    id="description" 
+                    name="description" 
+                    rows="6"
+                    required
+                    class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >{{ ad.description }}</textarea>
+            </div>
+
+            <div class="mb-4">
+                <label for="price" class="block font-medium mb-2">Price (BAM)</label>
+                <input 
+                    type="number" 
+                    id="price" 
+                    name="price" 
+                    value="{{ ad.price|default:'' }}"
+                    min="0"
+                    class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+            </div>
+
+            <div class="mb-4">
+                <label class="block font-medium mb-2">Current Photos</label>
+                {% if ad.images.all %}
+                    <div class="grid grid-cols-3 gap-2 mb-2">
+                        {% for image in ad.images.all %}
+                            <img 
+                                src="{{ image.image_url }}" 
+                                alt="Photo {{ forloop.counter }}"
+                                class="w-full h-24 object-cover rounded-lg"
+                            >
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm mb-2">No photos</p>
+                {% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label for="images" class="block font-medium mb-2">Add Photos</label>
+                <input 
+                    type="file" 
+                    id="images" 
+                    name="images" 
+                    accept="image/*"
+                    multiple
+                    class="w-full px-3 py-2 border rounded-lg"
+                >
+                <p class="text-xs text-gray-500 mt-1">Select multiple files to add more photos</p>
+            </div>
+
+            <div class="border-t pt-4 mt-6">
+                <p class="text-xs text-gray-600 mb-4">
+                    Editing text (title/description) will send this ad for re-moderation and temporarily hide it from public view.
+                    Price/photo changes will be published immediately.
+                </p>
+
+                <div class="flex gap-3">
+                    <button 
+                        type="submit"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                    >
+                        Save Changes
+                    </button>
+
+                    {% if ad.status == 'archived' %}
+                        <input type="hidden" name="reactivate" value="1">
+                    {% endif %}
+
+                    <a 
+                        href="{% url 'ads:dashboard' %}"
+                        class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
+                    >
+                        Cancel
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        <div class="mt-6">
+            <a href="{% url 'ads:dashboard' %}" class="text-blue-600 hover:underline text-sm">
+                &larr; Back to Dashboard
+            </a>
+        </div>
+    </main>
+</body>
+</html>
