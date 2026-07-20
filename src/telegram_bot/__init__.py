@@ -1,2 +1,6 @@
-# Telegram bot entrypoint - aiogram 3.x with Django ORM.
-# This module is a minimal stub. Full implementation in Phase 1 Task 9.
+"""Telegram bot package for Mko Bazuna."""
+
+from .states import AdCreateState
+from .handlers import login_router, ad_create_router
+
+__all__ = ["AdCreateState", "login_router", "ad_create_router"]

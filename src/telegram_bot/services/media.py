@@ -1,0 +1,73 @@
+"""
+Media service for Telegram bot photo handling.
+
+Validates photos and generates storage keys per spec.
+"""
+
+import io
+import logging
+import uuid
+
+from PIL import Image
+
+logger = logging.getLogger(__name__)
+
+
+# JPEG magic bytes for validation
+JPEG_MAGIC_BYTES = [b"\xff\xd8\xff"]
+
+
+def validate_jpeg_bytes(data: bytes) -> bool:
+    """Validate that bytes represent a valid JPEG image by magic bytes."""
+    if len(data) < 3:
+        return False
+    return any(data.startswith(magic) for magic in JPEG_MAGIC_BYTES)
+
+
+def validate_photo(
+    photo_bytes: bytes, max_width: int = 2560, max_height: int = 2560
+) -> tuple[bool, str | None]:
+    """
+    Validate a photo meets requirements.
+
+    Returns (is_valid, error_message) tuple.
+    - JPEG format validation
+    - Dimensions check (max 2560px)
+    - Size check (~2MB max)
+
+    Args:
+        photo_bytes: Raw photo bytes from Telegram
+        max_width: Maximum width in pixels
+        max_height: Maximum height in pixels
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Check magic bytes
+    if not validate_jpeg_bytes(photo_bytes):
+        return False, "Invalid image format. Only JPEG photos are accepted."
+
+    # Check approximate size (~2MB max)
+    if len(photo_bytes) > 2 * 1024 * 1024:
+        return False, "Photo too large. Maximum size is approximately 2MB."
+
+    try:
+        # Validate dimensions using PIL
+        img = Image.open(io.BytesIO(photo_bytes))
+        width, height = img.size
+
+        if width > max_width or height > max_height:
+            return (
+                False,
+                f"Photo too large. Maximum dimensions: {max_width}x{max_height} pixels.",
+            )
+    except Exception as e:
+        logger.warning(f"Failed to open image for validation: {e}")
+        return False, "Failed to process image."
+
+    return True, None
+
+
+def generate_storage_key() -> str:
+    """Generate a UUID v4 storage key for anonymity."""
+    return f"{uuid.uuid4()}.jpg"
