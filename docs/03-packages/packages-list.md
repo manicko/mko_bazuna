@@ -82,6 +82,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 | django | `>=5.2.16,<6.0` | LTS; `<6.0` protects unmaintained django-mptt. |
 | psycopg3 | `>=3.2.0` | Recommended driver; `prepare_threshold=None` for PgBouncer. |
 | django-mptt | `>=0.18.0` | First Django 5.2-compatible. Plan replacement before any Django 6.0 move. |
+| django-filter | `>=26.1` | List filters. Requires Django>=5.2. |
 | aiogram FSM | use `Ad.DRAFT` in ORM | No built-in PG FSM storage; never Redis/Mongo. |
 | django-tailwind | `>=4.4.0` | daisyUI excluded (standalone has no plugin support). |
 | deep-translator | `>=1.11.0` | Google-scrape fragility → enforce timeout + fallback wrapper. |

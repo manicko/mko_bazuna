@@ -59,3 +59,18 @@ Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-s
 | `SOFT_DELETE` | ad soft-deleted |
 | `CRITERIA_CHANGE` | moderation criteria edited at runtime |
 | `OTHER` | other moderator action |
+
+## CategoryRejectReason
+UI/admin vocabulary enum for moderator reject dropdown. Used as guidance for
+reason text in `ModeratorActionLog` (never shown to seller, US-A11).
+
+| Value | Meaning |
+|-------|---------|
+| `ADULT_CONTENT` | adult/pornographic content |
+| `VIOLENCE_GORE` | violence or gore |
+| `DRUGS_WEAPONS` | drugs or weapons |
+| `HATE_SPEECH` | hate speech |
+| `COUNTERFEIT_GOODS` | counterfeit goods |
+| `ILLEGAL_GOODS` | illegal goods |
+| `SPAM_SCAM` | spam or scam |
+| `OFF_TOPIC` | off-topic content |

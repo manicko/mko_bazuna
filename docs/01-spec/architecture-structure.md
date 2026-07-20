@@ -28,15 +28,16 @@ src/
 │   │   ├── users/                 # users, telegram binding (telegram_id)
 │   │   ├── ads/                   # ads, images, statuses
 │   │   ├── categories/            # mptt tree (django-mptt>=0.18.0, single source of truth)
-│   │   ├── locations/              # cities / regions
-│   │   ├── moderation/             # moderation logs, criteria, statuses
+│   │   ├── locations/             # cities / regions
+│   │   ├── moderation/            # moderation logs, criteria, statuses
 │   │   ├── search/                # PostgreSQL FTS (search_vector, GIN, russian) — no haystack/whoosh
 │   │   └── api/                   # DRF API — DEFERRED to post-MVP (phase 1 = HTMX MPA)
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
-│   ├── bot/                       # aiogram 3.x handlers, FSM, middlewares (Bot API, NOT userbot)
-│   ├── parsers/                   # DEFERRED to phase 2 (group monitoring, decision B)
-│   ├── services/                  # business logic (create_ad_from_message, etc.)
+│   ├── states.py                  # AdCreateState FSM states (aiogram 3.x)
+│   ├── handlers/                  # aiogram 3.x handlers (login, ad_create)
+│   ├── schemas/                   # pydantic v2 DTOs for bot message payloads (rule 11)
+│   ├── services/                  # business logic (media.py for photo handling)
 │   ├── config.py
 │   └── main.py
 ├── scraping_service/              # DEFERRED to phase 2 (decision B). Separate Telethon userbot process.

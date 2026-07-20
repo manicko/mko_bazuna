@@ -216,8 +216,8 @@ ad_id (FK → ads.id, nullable, SET_NULL)
 user_id (FK → users.id, nullable, SET_NULL)  # NULL after erasure, reason text retained (zone D8)
 action_type (StrEnum: REJECT, BAN_ACCOUNT, SOFT_DELETE, CRITERIA_CHANGE, OTHER)  # see db-enums.md
 reason (TEXT)                                # NEVER shown to seller
-generated_at (TIMESTAMP, default now)
+created_at (TIMESTAMP, default now)
 ```
 
 > Zone D8: `ModeratorActionLog` keeps `ad_id`, `user_id` (SET NULL on erasure, reason text
-> retained), `action_type`, `reason`, `generated_at`.
+> retained), `action_type`, `reason`, `created_at`.
