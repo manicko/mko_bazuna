@@ -1,4 +1,4 @@
-"""
+﻿"""
 Ad and AdImage models for Mko Bazuna.
 
 Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
@@ -9,6 +9,7 @@ import uuid
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
+from django.db.models import Q
 
 from apps.core.enums import AdSource, AdStatus
 
@@ -18,11 +19,11 @@ class Ad(models.Model):
     Single ad table with lifecycle status and search support.
 
     Lifecycle transitions:
-    - DRAFT → ON_MODERATION
-    - ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED
-    - PUBLISHED → ARCHIVED → PUBLISHED (reactivation)
-    - PUBLISHED → ON_MODERATION (text edits, hidden)
-    - any → DELETED
+    - DRAFT -> ON_MODERATION
+    - ON_MODERATION -> PUBLISHED | REJECTED | ON_MODERATION_FAILED
+    - PUBLISHED -> ARCHIVED -> PUBLISHED (reactivation)
+    - PUBLISHED -> ON_MODERATION (text edits, hidden)
+    - any -> DELETED
 
     published_at resets on every PUBLISHED transition; original_published_at immutable.
     moderation_failed_at and rejected_at are mutually exclusive.
@@ -153,6 +154,7 @@ class Ad(models.Model):
             models.Index(
                 name="IX_ads_pub_listing",
                 fields=["status", "category_id", "city_id", "-published_at"],
+                condition=Q(status=AdStatus.PUBLISHED),
             ),
             models.Index(
                 name="IX_ads_user_status",
@@ -161,18 +163,22 @@ class Ad(models.Model):
             models.Index(
                 name="IX_ads_archive_sweep",
                 fields=["status", "published_at"],
+                condition=Q(status=AdStatus.PUBLISHED),
             ),
             models.Index(
                 name="IX_ads_delete_sweep",
                 fields=["status", "published_at"],
+                condition=Q(status=AdStatus.ARCHIVED),
             ),
             models.Index(
                 name="IX_ads_purge_failed",
                 fields=["status", "moderation_failed_at"],
+                condition=Q(status=AdStatus.ON_MODERATION_FAILED),
             ),
             models.Index(
                 name="IX_ads_rejected_sweep",
                 fields=["status", "rejected_at"],
+                condition=Q(status=AdStatus.REJECTED),
             ),
         ]
 
@@ -204,7 +210,7 @@ class AdImage(models.Model):
         help_text="Telegram file_id; NOT used in <img src>",
     )
     position = models.PositiveIntegerField(
-        default=0,  # pyright: ignore[reportArgumentType]
+        default=0,
         help_text="Image order in gallery",
     )
 
