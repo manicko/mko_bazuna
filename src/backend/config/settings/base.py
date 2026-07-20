@@ -114,6 +114,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
     # Parse DATABASE_URL using django-environ's built-in parsing
     DATABASES = {"default": env.db()}
+    # PgBouncer async safety (zone C5) - also needed for DATABASE_URL path
+    DATABASES["default"]["CONN_MAX_AGE"] = 0
+    DATABASES["default"]["OPTIONS"] = {"prepare_threshold": None}
 else:
     DATABASES = {
         "default": {

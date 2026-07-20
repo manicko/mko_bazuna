@@ -21,9 +21,6 @@ class AdvisoryLockId(IntEnum):
     MIGRATE = 100
 
 
-__all__ = ["AdvisoryLockId", "AdStatus", "AdSource", "AnalyticsEventType", "ModeratorActionType", "CategoryRejectReason"]
-
-
 class AdStatus(StrEnum):
     """Ad lifecycle status. Buyer-visible only when PUBLISHED."""
 
@@ -77,3 +74,6 @@ class CategoryRejectReason(StrEnum):
     ILLEGAL_GOODS = "illegal_goods"
     SPAM_SCAM = "spam_scam"
     OFF_TOPIC = "off_topic"
+
+
+__all__ = ["AdvisoryLockId", "AdStatus", "AdSource", "AnalyticsEventType", "ModeratorActionType", "CategoryRejectReason"]
