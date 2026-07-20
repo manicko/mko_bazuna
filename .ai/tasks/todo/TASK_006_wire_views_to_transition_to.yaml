@@ -1,0 +1,95 @@
+id: task_006_wire_views_to_transition_to
+
+title: Wire ad edit/delete views and moderation_log to Ad.transition_to()
+
+priority: high
+
+status: blocked
+
+blocked_by:
+  - task_005_add_ad_transition_to
+
+depends_on:
+  - task_005_add_ad_transition_to
+
+source_reference: .ai/plans/architecture_testing_plan.md
+source_section: "Part 3 — Ad Lifecycle State Machine (P3.6 HIGH risk); Part 1 contact-window note"
+source_file: src/backend/apps/ads/views/edit.py
+
+description: >
+  Re-point the legitimate single-ad transition call sites to the new guarded
+  `Ad.transition_to()` so transitions are centralized. Per TASK_004 research, bulk
+  sweep `.update()` calls stay as-is (no transition_to). Map decided by research:
+  - `views/edit.py::ad_archive`  (PUBLISHED→ARCHIVED)
+  - `views/edit.py::ad_reactivate` (ARCHIVED→PUBLISHED, re-runs re-check)
+  - `views/delete.py::ad_delete` (any→DELETED, sets deleted_at)
+  - `moderation_log.py::set_published` / `set_moderation_failed` / `set_rejected`
+    delegate status change to `transition_to()` while keeping their extra logging.
+
+  NOTE file-based dependency: `views/edit.py` is modified ONLY by this task in the
+  rollout, but `moderation_log.py` is shared with the auto-moderation path. This task
+  must execute after TASK_005 (model method exists) and is the single writer of these
+  view files in this plan.
+
+goals:
+  - single-ad status changes go through transition_to
+  - timer side-effects (published_at reset on re-publish) preserved via transition_to
+  - moderation_log helpers keep their ModeratorActionLog writes, delegate status only
+  - bulk sweep commands untouched
+
+files:
+  - path: src/backend/apps/ads/views/edit.py
+    targets:
+      - type: function
+        name: ad_archive
+      - type: function
+        name: ad_reactivate
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: ad_edit
+      insert_before:
+        type: return_statement
+    depends_on_previous_task_in_chain: false
+
+  - path: src/backend/apps/ads/views/delete.py
+    targets:
+      - type: function
+        name: ad_delete
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: get_object_or_404
+      insert_before:
+        type: return_statement
+    depends_on_previous_task_in_chain: false
+
+  - path: src/backend/apps/moderation/services/moderation_log.py
+    targets:
+      - type: function
+        name: set_published
+      - type: function
+        name: set_moderation_failed
+      - type: function
+        name: set_rejected
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: log_auto_publish
+      insert_before:
+        type: return_statement
+    depends_on_previous_task_in_chain: false
+
+changes:
+  - action: modify_code
+    description: >
+      Replace direct `ad.status = AdStatus.X; ad.save()` assignments in the listed
+      view functions and moderation_log helpers with `ad.transition_to(AdStatus.X)`
+      (keeping any extra timestamp/log writes the helpers perform).
+
+acceptance_criteria:
+  - all valid transitions still reachable through the UI/admin paths
+  - invalid transitions now raise instead of silently persisting
+  - re-publish from ARCHIVED resets published_at (P3.3)
+  - public listing still filters status=PUBLISHED (no hidden-ad leak)
+  - existing sweep command tests (test_sweep_commands.py) still pass unchanged

@@ -30,7 +30,8 @@
     "imports": [
       "django.contrib",
       "apps.ads.models",
-      "apps.users.models"
+      "apps.core.enums",
+      "apps.moderation.admin_actions"
     ],
     "classes": [
       "AdAdmin",
@@ -41,10 +42,17 @@
       "rejected_reason",
       "action_ad_link",
       "get_queryset",
+      "has_view_permission",
+      "has_change_permission",
       "action_reject",
+      "action_approve",
       "action_ban_user",
+      "action_soft_delete",
+      "changelist_view",
       "has_add_permission",
-      "has_change_permission"
+      "has_change_permission",
+      "has_view_permission",
+      "has_delete_permission"
     ]
   },
   {
@@ -84,6 +92,18 @@
     "functions": []
   },
   {
+    "path": "backend/apps/ads/migrations/0003_add_index_conditions.py",
+    "module": "backend.apps.ads.migrations.0003_add_index_conditions",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
     "path": "backend/apps/ads/migrations/__init__.py",
     "module": "backend.apps.ads.migrations.__init__",
     "layer": "other",
@@ -99,7 +119,9 @@
       "django.contrib.postgres.indexes",
       "django.contrib.postgres.search",
       "django.db",
-      "apps.core.enums"
+      "django.db.models",
+      "apps.core.enums",
+      "django.conf"
     ],
     "classes": [
       "Ad",
@@ -110,6 +132,7 @@
     "functions": [
       "__str__",
       "__str__",
+      "image_url",
       "generate_storage_key"
     ]
   },
@@ -117,9 +140,100 @@
     "path": "backend/apps/ads/urls.py",
     "module": "backend.apps.ads.urls",
     "layer": "other",
+    "imports": [
+      "django.urls",
+      "apps.ads.views.dashboard",
+      "apps.ads.views.delete",
+      "apps.ads.views.edit",
+      "apps.ads.views.listings"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/views/__init__.py",
+    "module": "backend.apps.ads.views.__init__",
+    "layer": "other",
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/ads/views/dashboard.py",
+    "module": "backend.apps.ads.views.dashboard",
+    "layer": "other",
+    "imports": [
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.users.views.consent"
+    ],
+    "classes": [],
+    "functions": [
+      "dashboard"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/views/delete.py",
+    "module": "backend.apps.ads.views.delete",
+    "layer": "other",
+    "imports": [
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums"
+    ],
+    "classes": [],
+    "functions": [
+      "ad_delete"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/views/edit.py",
+    "module": "backend.apps.ads.views.edit",
+    "layer": "other",
+    "imports": [
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.services.auto_moderation"
+    ],
+    "classes": [],
+    "functions": [
+      "_text_fields_changed",
+      "ad_edit",
+      "ad_archive",
+      "ad_reactivate"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/views/listings.py",
+    "module": "backend.apps.ads.views.listings",
+    "layer": "other",
+    "imports": [
+      "difflib",
+      "django.http",
+      "django.shortcuts",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.views.consent"
+    ],
+    "classes": [],
+    "functions": [
+      "ad_detail",
+      "listings",
+      "_suggest_category",
+      "_suggest_city"
+    ]
   },
   {
     "path": "backend/apps/analytics/__init__.py",
@@ -128,6 +242,29 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/admin.py",
+    "module": "backend.apps.analytics.admin",
+    "layer": "other",
+    "imports": [
+      "django.contrib",
+      "django.db.models",
+      "django.db.models.functions",
+      "apps.analytics.models",
+      "django.utils",
+      "datetime"
+    ],
+    "classes": [
+      "AnalyticsEventAdmin"
+    ],
+    "functions": [
+      "user_link",
+      "has_add_permission",
+      "has_change_permission",
+      "has_delete_permission",
+      "changelist_view"
+    ]
   },
   {
     "path": "backend/apps/analytics/apps.py",
@@ -140,6 +277,42 @@
       "AnalyticsConfig"
     ],
     "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/management/__init__.py",
+    "module": "backend.apps.analytics.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/management/commands/__init__.py",
+    "module": "backend.apps.analytics.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/management/commands/show_metrics.py",
+    "module": "backend.apps.analytics.management.commands.show_metrics",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.db.models",
+      "django.db.models.functions",
+      "django.utils",
+      "apps.analytics.models"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
   },
   {
     "path": "backend/apps/analytics/migrations/0001_initial.py",
@@ -297,6 +470,18 @@
     "functions": []
   },
   {
+    "path": "backend/apps/core/context_processors.py",
+    "module": "backend.apps.core.context_processors",
+    "layer": "other",
+    "imports": [
+      "django.conf"
+    ],
+    "classes": [],
+    "functions": [
+      "plausible_host"
+    ]
+  },
+  {
     "path": "backend/apps/core/enums.py",
     "module": "backend.apps.core.enums",
     "layer": "other",
@@ -312,6 +497,261 @@
       "CategoryRejectReason"
     ],
     "functions": []
+  },
+  {
+    "path": "backend/apps/core/management/__init__.py",
+    "module": "backend.apps.core.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/management/commands/__init__.py",
+    "module": "backend.apps.core.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/management/commands/archive_sweep.py",
+    "module": "backend.apps.core.management.commands.archive_sweep",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/cleanup_login_tokens.py",
+    "module": "backend.apps.core.management.commands.cleanup_login_tokens",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "apps.users.models"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/consent_hard_delete.py",
+    "module": "backend.apps.core.management.commands.consent_hard_delete",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "apps.moderation.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/delete_sweep.py",
+    "module": "backend.apps.core.management.commands.delete_sweep",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/purge_failed_ads.py",
+    "module": "backend.apps.core.management.commands.purge_failed_ads",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/purge_rejected_ads.py",
+    "module": "backend.apps.core.management.commands.purge_rejected_ads",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/sweep_drafts.py",
+    "module": "backend.apps.core.management.commands.sweep_drafts",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "django.core.management.base",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/migrations/0001_verify_lifecycle_indexes.py",
+    "module": "backend.apps.core.migrations.0001_verify_lifecycle_indexes",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/migrations/__init__.py",
+    "module": "backend.apps.core.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/services/__init__.py",
+    "module": "backend.apps.core.services.__init__",
+    "layer": "service",
+    "imports": [
+      "contact"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/services/contact.py",
+    "module": "backend.apps.core.services.contact",
+    "layer": "service",
+    "imports": [
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "can_contact_seller",
+      "get_seller_for_contact",
+      "record_contact_initiated"
+    ]
+  },
+  {
+    "path": "backend/apps/core/templatetags/__init__.py",
+    "module": "backend.apps.core.templatetags.__init__",
+    "layer": "other",
+    "imports": [
+      "contact_tags"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/templatetags/contact_tags.py",
+    "module": "backend.apps.core.templatetags.contact_tags",
+    "layer": "other",
+    "imports": [
+      "django",
+      "apps.core.services.contact"
+    ],
+    "classes": [],
+    "functions": [
+      "can_contact"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/__init__.py",
+    "module": "backend.apps.core.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/tests/test_contact.py",
+    "module": "backend.apps.core.tests.test_contact",
+    "layer": "other",
+    "imports": [
+      "apps.core.enums"
+    ],
+    "classes": [
+      "TestCanContactSellerLogic",
+      "TestContactPattern"
+    ],
+    "functions": [
+      "test_all_conditions_required_for_contact",
+      "test_status_must_be_published",
+      "test_telegram_id_required",
+      "test_contact_pattern_matches_ad_id",
+      "test_contact_pattern_extracts_ad_id"
+    ]
   },
   {
     "path": "backend/apps/core/utils/__init__.py",
@@ -332,6 +772,21 @@
     "classes": [],
     "functions": [
       "advisory_lock"
+    ]
+  },
+  {
+    "path": "backend/apps/core/utils/cache.py",
+    "module": "backend.apps.core.utils.cache",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "django.core.cache"
+    ],
+    "classes": [],
+    "functions": [
+      "get_cached_criteria",
+      "set_cached_criteria",
+      "invalidate_criteria_cache"
     ]
   },
   {
@@ -473,6 +928,29 @@
     ]
   },
   {
+    "path": "backend/apps/moderation/admin_actions.py",
+    "module": "backend.apps.moderation.admin_actions",
+    "layer": "other",
+    "imports": [
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.services.moderation_log",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "approve_ad",
+      "reject_ad",
+      "ban_user_for_ad",
+      "soft_delete_ad",
+      "bulk_approve",
+      "bulk_reject",
+      "bulk_ban_users",
+      "bulk_delete"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/apps.py",
     "module": "backend.apps.moderation.apps",
     "layer": "other",
@@ -482,7 +960,9 @@
     "classes": [
       "ModerationConfig"
     ],
-    "functions": []
+    "functions": [
+      "ready"
+    ]
   },
   {
     "path": "backend/apps/moderation/migrations/0001_initial.py",
@@ -495,6 +975,20 @@
       "Migration"
     ],
     "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/migrations/0002_singleton_enforcement.py",
+    "module": "backend.apps.moderation.migrations.0002_singleton_enforcement",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": [
+      "ensure_singleton"
+    ]
   },
   {
     "path": "backend/apps/moderation/migrations/__init__.py",
@@ -529,7 +1023,8 @@
     "module": "backend.apps.moderation.services.__init__",
     "layer": "service",
     "imports": [
-      "auto_moderation"
+      "auto_moderation",
+      "moderation_log"
     ],
     "classes": [],
     "functions": []
@@ -540,14 +1035,14 @@
     "layer": "service",
     "imports": [
       "difflib",
-      "functools",
       "typing",
-      "django.utils",
+      "apps.core.utils.cache",
       "apps.ads.models",
       "apps.analytics.models",
       "apps.core.enums",
       "apps.moderation.models",
-      "apps.moderation.models"
+      "apps.moderation.services.moderation_log",
+      "apps.moderation.services.moderation_log"
     ],
     "classes": [],
     "functions": [
@@ -562,7 +1057,47 @@
       "_validate_max_ads_per_user",
       "_is_duplicate_title",
       "_fail_moderation",
-      "_pass_moderation"
+      "_pass_moderation",
+      "check"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/services/moderation_log.py",
+    "module": "backend.apps.moderation.services.moderation_log",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.utils",
+      "apps.core.enums",
+      "apps.moderation.models",
+      "apps.ads.models"
+    ],
+    "classes": [],
+    "functions": [
+      "log_auto_fail",
+      "log_manual_reject",
+      "log_auto_publish",
+      "log_manual_publish",
+      "log_ban_account",
+      "log_soft_delete",
+      "set_moderation_failed",
+      "set_rejected",
+      "set_published"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/signals.py",
+    "module": "backend.apps.moderation.signals",
+    "layer": "other",
+    "imports": [
+      "django.db.models.signals",
+      "django.dispatch",
+      "apps.moderation.models",
+      "apps.moderation.services.auto_moderation"
+    ],
+    "classes": [],
+    "functions": [
+      "invalidate_criteria_cache_on_save"
     ]
   },
   {
@@ -578,59 +1113,103 @@
     "module": "backend.apps.moderation.tests.test_auto_moderation",
     "layer": "other",
     "imports": [
-      "apps.ads.models",
-      "apps.analytics.models",
-      "apps.core.enums",
-      "apps.moderation.models",
-      "apps.moderation.services",
-      "apps.users.models",
-      "apps.categories.models",
-      "apps.locations.models"
+      "apps.moderation.services.auto_moderation",
+      "apps.moderation.services.auto_moderation",
+      "apps.moderation.services.auto_moderation"
     ],
     "classes": [
-      "TestTitleLengthValidation",
-      "TestDescriptionLengthValidation",
-      "TestPriceRequiredValidation",
-      "TestImageCountValidation",
-      "TestBannedWordsValidation",
-      "TestMaxAdsPerUserValidation",
-      "TestDuplicateTitleValidation",
-      "TestModerationFailureLogging",
-      "TestModerationSuccessAnalytics",
-      "TestOriginalPublishedAtSetOnce"
+      "TestValidateTitleLength",
+      "TestValidateDescriptionLength",
+      "TestValidateImageCount",
+      "MockImagesQuerySet",
+      "MockAd",
+      "MockImagesQuerySet",
+      "MockAd",
+      "MockImagesQuerySet",
+      "MockAd",
+      "TestContainsBannedWords",
+      "TestCheckFunction",
+      "MockAd",
+      "MockQuerySet",
+      "MockAd",
+      "MockQuerySet"
     ],
     "functions": [
-      "criteria",
-      "user",
-      "category",
-      "city",
-      "ad",
-      "ad_with_images",
-      "test_title_too_short_fails",
-      "test_title_too_long_fails",
-      "test_title_valid_length_passes",
-      "test_description_too_short_fails",
-      "test_description_too_long_fails",
-      "test_description_valid_length_passes",
-      "test_price_required_missing_fails",
-      "test_price_required_present_passes",
-      "test_too_few_images_fails",
-      "test_too_many_images_fails",
-      "test_valid_image_count_passes",
-      "test_banned_word_in_title_fails",
-      "test_banned_word_in_description_fails",
-      "test_banned_word_case_insensitive_fails",
-      "test_no_banned_words_passes",
-      "test_user_exceeds_max_ads_fails",
-      "test_user_within_limit_passes",
-      "test_duplicate_title_fails",
-      "test_similar_title_above_threshold_fails",
-      "test_unique_title_passes",
-      "test_failure_creates_log",
-      "test_failure_no_specific_reason_to_seller",
-      "test_success_creates_analytics_event",
-      "test_original_published_at_set_on_first_publish",
-      "test_original_published_at_unchanged_on_re_publish"
+      "test_title_too_short_returns_false",
+      "test_title_too_long_returns_false",
+      "test_title_min_boundary_returns_true",
+      "test_title_max_boundary_returns_true",
+      "test_title_within_range_returns_true",
+      "test_description_too_short_returns_false",
+      "test_description_too_long_returns_false",
+      "test_description_min_boundary_returns_true",
+      "test_description_max_boundary_returns_true",
+      "test_no_images_returns_false",
+      "count",
+      "images",
+      "test_too_many_images_returns_false",
+      "count",
+      "images",
+      "test_valid_image_count_returns_true",
+      "count",
+      "images",
+      "test_banned_word_in_title_returns_true",
+      "test_banned_word_in_description_returns_true",
+      "test_banned_word_case_insensitive_returns_true",
+      "test_no_banned_words_returns_false",
+      "test_empty_banned_words_returns_false",
+      "test_check_returns_passed_on_valid_ad",
+      "images",
+      "count",
+      "mock_get_cached",
+      "test_check_returns_seller_safe_error_on_fail",
+      "images",
+      "count",
+      "mock_get_cached"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/urls.py",
+    "module": "backend.apps.moderation.urls",
+    "layer": "other",
+    "imports": [
+      "django.urls",
+      "apps.moderation.views"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/views/__init__.py",
+    "module": "backend.apps.moderation.views.__init__",
+    "layer": "other",
+    "imports": [
+      "apps.moderation.views.review"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/views/review.py",
+    "module": "backend.apps.moderation.views.review",
+    "layer": "other",
+    "imports": [
+      "django.http",
+      "django.shortcuts",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.admin_actions",
+      "apps.moderation.admin_actions",
+      "apps.moderation.admin_actions"
+    ],
+    "classes": [],
+    "functions": [
+      "_staff_required",
+      "wrapper",
+      "moderation_review",
+      "approve_ad",
+      "reject_ad",
+      "ban_user"
     ]
   },
   {
@@ -654,12 +1233,71 @@
     "functions": []
   },
   {
+    "path": "backend/apps/search/services/__init__.py",
+    "module": "backend.apps.search.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/services/query_translator.py",
+    "module": "backend.apps.search.services.query_translator",
+    "layer": "service",
+    "imports": [
+      "functools",
+      "typing",
+      "deep_translator",
+      "requests.exceptions"
+    ],
+    "classes": [],
+    "functions": [
+      "translate_query_bs_to_ru",
+      "translate_cached",
+      "invalidate_translation_cache"
+    ]
+  },
+  {
     "path": "backend/apps/search/urls.py",
     "module": "backend.apps.search.urls",
+    "layer": "other",
+    "imports": [
+      "django.urls",
+      "apps.search.views.search"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/views/__init__.py",
+    "module": "backend.apps.search.views.__init__",
     "layer": "other",
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/search/views/search.py",
+    "module": "backend.apps.search.views.search",
+    "layer": "other",
+    "imports": [
+      "django.contrib.postgres.search",
+      "django.http",
+      "django.shortcuts",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.search.services.query_translator",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "difflib"
+    ],
+    "classes": [],
+    "functions": [
+      "search",
+      "_is_single_word",
+      "_fuzzy_category_match"
+    ]
   },
   {
     "path": "backend/apps/users/__init__.py",
@@ -740,6 +1378,89 @@
     "functions": [
       "__str__",
       "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/users/services/__init__.py",
+    "module": "backend.apps.users.services.__init__",
+    "layer": "service",
+    "imports": [
+      "account_state",
+      "deletion"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/services/account_state.py",
+    "module": "backend.apps.users.services.account_state",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "apps.users.models"
+    ],
+    "classes": [
+      "AccountState"
+    ],
+    "functions": [
+      "get_account_state",
+      "can_publish_ad",
+      "can_login",
+      "get_state_badge"
+    ]
+  },
+  {
+    "path": "backend/apps/users/services/deletion.py",
+    "module": "backend.apps.users.services.deletion",
+    "layer": "service",
+    "imports": [
+      "datetime",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "decline_consent",
+      "withdraw_consent",
+      "soft_delete_user_ads",
+      "give_consent"
+    ]
+  },
+  {
+    "path": "backend/apps/users/urls.py",
+    "module": "backend.apps.users.urls",
+    "layer": "other",
+    "imports": [
+      "django.urls",
+      "apps.users.views.consent"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/views/__init__.py",
+    "module": "backend.apps.users.views.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/views/consent.py",
+    "module": "backend.apps.users.views.consent",
+    "layer": "other",
+    "imports": [
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts",
+      "apps.users.services"
+    ],
+    "classes": [],
+    "functions": [
+      "consent_accept",
+      "consent_decline",
+      "is_consent_given"
     ]
   },
   {
@@ -951,6 +1672,30 @@
     ]
   },
   {
+    "path": "telegram_bot/handlers/contact.py",
+    "module": "telegram_bot.handlers.contact",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "asgiref.sync",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "handle_contact_start",
+      "handle_contact",
+      "check_seller_available",
+      "_check",
+      "record_contact_event",
+      "_record",
+      "_get_buyer_display_name"
+    ]
+  },
+  {
     "path": "telegram_bot/handlers/login.py",
     "module": "telegram_bot.handlers.login",
     "layer": "other",
@@ -958,10 +1703,12 @@
       "aiogram",
       "aiogram.filters",
       "aiogram.fsm.context",
+      "asgiref.sync",
       "django.utils",
       "apps.users.models",
-      "asgiref.sync",
-      "asgiref.sync"
+      "apps.analytics.models",
+      "apps.core.enums",
+      "telegram_bot.handlers.contact"
     ],
     "classes": [],
     "functions": [
@@ -979,11 +1726,43 @@
     "imports": [
       "aiogram",
       "aiogram.fsm.storage.memory",
+      "telegram_bot.middlewares",
       "telegram_bot.handlers"
     ],
     "classes": [],
     "functions": [
       "main"
+    ]
+  },
+  {
+    "path": "telegram_bot/middlewares/__init__.py",
+    "module": "telegram_bot.middlewares.__init__",
+    "layer": "other",
+    "imports": [
+      "permissions"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/middlewares/permissions.py",
+    "module": "telegram_bot.middlewares.permissions",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "aiogram",
+      "aiogram.types",
+      "asgiref.sync",
+      "apps.users.models"
+    ],
+    "classes": [
+      "AccountStateMiddleware"
+    ],
+    "functions": [
+      "__call__",
+      "_check_user_state",
+      "_check_publish_permission",
+      "_get_user"
     ]
   },
   {

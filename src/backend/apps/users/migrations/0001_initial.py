@@ -26,6 +26,7 @@ class Migration(migrations.Migration):
                 ("email", models.EmailField(blank=True, max_length=254, verbose_name="email address")),
                 ("is_staff", models.BooleanField(default=False, help_text="Designates whether the user can log into this admin site.", verbose_name="staff status")),
                 ("is_active", models.BooleanField(default=True, help_text="Designates whether this user should be active. Unselect this instead of deleting accounts.", verbose_name="active")),
+                ("date_joined", models.DateTimeField(auto_now_add=True, help_text="Designates when the user registered", verbose_name="date joined")),
                 ("telegram_id", models.BigIntegerField(help_text="Telegram user ID; required for authentication", unique=True)),
                 ("is_banned", models.BooleanField(default=False, help_text="Account is blocked from posting")),
                 ("is_deleted", models.BooleanField(default=False, help_text="Soft delete flag")),

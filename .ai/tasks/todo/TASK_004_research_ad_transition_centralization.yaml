@@ -1,0 +1,94 @@
+id: task_004_research_ad_transition_centralization
+
+title: Research — centralize ad lifecycle transitions into Ad.transition_to()
+
+priority: high
+
+status: pending
+
+type: research
+
+depends_on: []
+
+source_reference: .ai/plans/architecture_testing_plan.md
+source_section: "Part 3 — Ad Lifecycle State Machine (P3.6 HIGH risk, Appendix B mandatory finding #3)"
+source_file: src/backend/apps/ads/models.py
+
+description: >
+  Ad status transitions are NOT centralized. Today they are spread across
+  `auto_moderation.py` (`set_published`/`set_moderation_failed` via moderation_log),
+  `views/edit.py` (`ad_archive`, `ad_reactivate`), `views/delete.py` (`ad_delete`),
+  and the sweep commands (archive_sweep, delete_sweep, purge_failed_ads,
+  purge_rejected_ads). There is no single guard, so an invalid transition can slip in
+  via a new path.
+
+  This is a RISKY change (modifies the core Ad model + touches multiple hidden
+  consumers and the public-listing query contract). A research gate must map every
+  transition call site, define the allowed-transition matrix from the model docstring,
+  and decide whether `transition_to()` is the single mutator for `status` (plus the
+  timer side-effects: `published_at` reset on every PUBLISHED, `original_published_at`
+  set once / immutable).
+
+goals:
+  - enumerate every site that sets `Ad.status` (grep `status=`/`AdStatus.` assignments
+    and the moderation_log helpers `set_published`/`set_moderation_failed`/`set_rejected`)
+  - encode the full allowed matrix from the Ad docstring:
+    DRAFT→ON_MODERATION; ON_MODERATION→PUBLISHED|REJECTED|ON_MODERATION_FAILED;
+    PUBLISHED→ARCHIVED→PUBLISHED; PUBLISHED→ON_MODERATION; any→DELETED
+  - decide timer semantics ownership: `published_at` reset on every →PUBLISHED;
+    `original_published_at` set once and never changed (P3.6/P3.8)
+  - decide whether `set_published`/`set_moderation_failed` (moderation_log) should
+    delegate to `transition_to()` or remain (risk: double source of truth)
+  - produce go / go-with-changes / no-go and the exact insertion point on `Ad`
+
+files:
+  - path: src/backend/apps/ads/models.py
+    targets:
+      - type: class
+        name: Ad
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: __str__
+      insert_before:
+        type: return_statement
+
+  - path: src/backend/apps/ads/views/edit.py
+    targets:
+      - type: function
+        name: ad_archive
+      - type: function
+        name: ad_reactivate
+
+  - path: src/backend/apps/ads/views/delete.py
+    targets:
+      - type: function
+        name: ad_delete
+
+  - path: src/backend/apps/moderation/services/moderation_log.py
+    targets:
+      - type: function
+        name: set_published
+      - type: function
+        name: set_moderation_failed
+      - type: function
+        name: set_rejected
+
+risks:
+  - HIGH: scattered transition sites; centralized guard could break a hidden caller
+  - MEDIUM: timer semantics (published_at reset / original_published_at immutability)
+    must follow the docstring exactly or leak hidden ads (P3.2)
+  - MEDIUM: public-listing query filters `status=PUBLISHED` (IX_ads_pub_listing);
+    a wrong transition could surface hidden ads
+
+research_steps:
+  - grep whole repo for `\.status = AdStatus` and `AdStatus\.(PUBLISHED|ARCHIVED|...)`
+  - read `moderation_log.py` set_* helpers to see what they set beyond status
+  - confirm the listing view uses `status=AdStatus.PUBLISHED` (not `status__in`)
+  - draft the allowed-matrix enum/table and the `transition_to` signature
+
+deliverable:
+  - go / go-with-changes / no-go
+  - exact `transition_to` signature + allowed matrix
+  - list of call sites to rewire (feeds TASK_005)
+  - note any consumer that must NOT use transition_to (e.g. bulk sweep .update())

@@ -1,0 +1,74 @@
+id: task_007_consent_hard_delete_atomic
+
+title: Wrap consent_hard_delete in transaction.atomic + crash-injection test
+
+priority: high
+
+status: pending
+
+depends_on: []
+
+source_reference: .ai/plans/architecture_testing_plan.md
+source_section: "Part 4 — Advisory-Lock Sweep Guarantees (P4.6 HIGH risk); Part 11 (P11.8/P11.9); Appendix B mandatory finding #4"
+source_file: src/backend/apps/core/management/commands/consent_hard_delete.py
+
+description: >
+  `consent_hard_delete.handle()` performs two UPDATEs (analytics_events.user_id,
+  moderator_action_log.user_id) and then a DELETE, all inside the advisory lock but
+  OUTSIDE a single explicit transaction. If the process crashes between the UPDATEs
+  and DELETE, a user is left with nulled history but NOT deleted, then re-processed.
+  Wrap the mutation block in `transaction.atomic()` and add a crash-injection test
+  that asserts atomicity (failure between steps leaves the user row intact).
+
+  This is a schema/transaction-behavior change (risky per rules: modifies DB
+  transaction boundary). The existing `test_sweep_commands.py::TestConsentHardDelete`
+  must be extended (NOT rewritten) with the atomicity/crash-injection case.
+
+goals:
+  - wrap the UPDATE+UPDATE+DELETE mutation block in transaction.atomic
+  - keep --dry-run behavior and advisory lock id 3
+  - add crash-injection test proving partial failure rolls back
+  - preserve audit history (user_id SET NULL, rows kept)
+
+files:
+  - path: src/backend/apps/core/management/commands/consent_hard_delete.py
+    targets:
+      - type: function
+        name: handle
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: advisory_lock
+      insert_before:
+        type: return_statement
+
+  - path: src/backend/apps/core/tests/test_sweep_commands.py
+    targets:
+      - type: class
+        name: TestConsentHardDelete
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: test_lock_id_is_consent_hard_delete
+      insert_before:
+        type: return_statement
+
+changes:
+  - action: add_code
+    description: >
+      Wrap the `AnalyticsEvent.update` / `ModeratorActionLog.update` / `queryset.delete`
+      sequence in `with transaction.atomic():` inside the advisory_lock block.
+    code_hint: |
+      from django.db import transaction
+      # inside `with advisory_lock(...):`
+      with transaction.atomic():
+          AnalyticsEvent.objects.filter(...).update(user_id=None)
+          ModeratorActionLog.objects.filter(...).update(user_id=None)
+          queryset.delete()
+
+acceptance_criteria:
+  - simulated crash between UPDATEs and DELETE rolls back (user row remains, history not nulled)
+  - normal run still nulls user_id on analytics/moderation logs and deletes the user
+  - --dry-run still no mutation
+  - advisory lock id remains CONSENT_HARD_DELETE = 3
+  - existing TestConsentHardDelete cases still pass

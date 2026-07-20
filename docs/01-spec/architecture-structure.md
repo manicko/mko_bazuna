@@ -102,7 +102,7 @@ Type=simple
 WorkingDirectory=/opt/mko-bazuna
 ExecStart=/opt/venv/bin/python manage.py shell -c "
 import time, sys, subprocess;
-commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'cleanup_login_tokens'];
+commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'cleanup_login_tokens', 'purge_failed_ads', 'purge_rejected_ads'];
 while True:
     for cmd in commands: subprocess.run([sys.executable, 'manage.py', cmd]);
     time.sleep(3600)
@@ -117,10 +117,43 @@ WantedBy=multi-user.target
 
 ```cron
 # /etc/cron.d/mko-bazuna-sweeps
-0 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py archive_sweep
-5 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py delete_sweep
+0  * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py archive_sweep
+5  * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py delete_sweep
 10 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py consent_hard_delete
+15 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py sweep_drafts
+20 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py cleanup_login_tokens
+25 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_failed_ads
+30 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_rejected_ads
 ```
+
+### Scheduled-job concurrency (advisory locks)
+
+All seven sweep commands — and the once-only `migrate` step — run against the same
+shared PostgreSQL database as the live web and bot processes. To prevent concurrent
+sweeps (or a sweep and a migration) from colliding on the same rows, every command
+acquires a **transaction-scoped PostgreSQL advisory lock**
+(`apps.core.utils.advisory_lock`, `pg_advisory_xact_lock`) before doing its work. The
+lock is released automatically on transaction commit/rollback, so it is safe under
+PgBouncer transaction pooling. `migrate` instead uses a **session-scoped** lock
+(`pg_advisory_lock`) because it runs before PgBouncer is attached.
+
+Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
+(`apps.core.enums`) so they never collide:
+
+| Lock ID | Held by |
+|---------|---------|
+| 1 | `archive_sweep` |
+| 2 | `delete_sweep` |
+| 3 | `consent_hard_delete` |
+| 4 | `sweep_drafts` |
+| 5 | `cleanup_login_tokens` |
+| 6 | `purge_failed_ads` |
+| 7 | `purge_rejected_ads` |
+| 100 | `migrate` (session-scoped, pre-PgBouncer) |
+
+Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
+`print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not
+start — and does not crash on missing commands — before the command modules exist.
 
 ### NGINX Hardening (Zone R8)
 

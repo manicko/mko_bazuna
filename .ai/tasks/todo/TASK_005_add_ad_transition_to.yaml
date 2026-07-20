@@ -1,0 +1,61 @@
+id: task_005_add_ad_transition_to
+
+title: Add guarded Ad.transition_to() state-machine method to Ad model
+
+priority: high
+
+status: blocked
+
+blocked_by:
+  - task_004_research_ad_transition_centralization
+
+depends_on:
+  - task_004_research_ad_transition_centralization
+
+source_reference: .ai/plans/architecture_testing_plan.md
+source_section: "Part 3 — Ad Lifecycle State Machine (scenarios P3.1–P3.8, HIGH finding)"
+source_file: src/backend/apps/ads/models.py
+
+description: >
+  Implement the single guarded `Ad.transition_to(target: AdStatus)` method per the
+  TASK_004 research outcome. It enforces the allowed matrix, raises/rejects invalid
+  transitions, and owns the timer side-effects: reset `published_at` on every
+  →PUBLISHED, set `original_published_at` once (immutable). Must not distort callers
+  that legitimately bulk-update (sweeps) — those keep using `.update()` per research.
+
+goals:
+  - single mutator for status transitions from valid code paths
+  - reject/raise on transitions outside the allowed matrix
+  - published_at reset on every →PUBLISHED; original_published_at set once, never changed
+  - no change to the partial-index-backed listing contract
+
+files:
+  - path: src/backend/apps/ads/models.py
+    targets:
+      - type: class
+        name: Ad
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: __str__
+      insert_before:
+        type: return_statement
+
+changes:
+  - action: add_code
+    description: >
+      Add `transition_to(self, target: AdStatus) -> None` that validates the
+      current→target pair against the allowed matrix, updates `status`, applies
+      timer side-effects, and updates only the affected fields (update_fields).
+    code_hint: |
+      # allowed matrix from Ad docstring; raise ValueError on invalid transition.
+      # On ->PUBLISHED: published_at = now(); if original_published_at is None: set it.
+
+acceptance_criteria:
+  - DRAFT→ON_MODERATION→PUBLISHED valid; ad buyer-visible only at PUBLISHED (P3.1)
+  - PUBLISHED→ON_MODERATION hides ad immediately (P3.2)
+  - PUBLISHED→ARCHIVED→PUBLISHED re-publishes and resets published_at (P3.3)
+  - any→DELETED sets deleted_at and excludes from listings (P3.4)
+  - REJECTED→PUBLISHED rejected (P3.5)
+  - published_at reset on every →PUBLISHED; original_published_at immutable (P3.6/P3.8)
+  - mixed text+price edit follows text rule (P3.7)

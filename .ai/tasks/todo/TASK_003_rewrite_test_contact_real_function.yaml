@@ -1,0 +1,69 @@
+id: task_003_rewrite_test_contact_real_function
+
+title: Rewrite test_contact.py to call the real can_contact_seller predicate
+
+priority: high
+
+status: pending
+
+depends_on: []
+
+source_reference: .ai/plans/architecture_testing_plan.md
+source_section: "Part 9 — Anonymous Contact Deep-Link Security (P9.6 HIGH test gap, Appendix B mandatory finding #2)"
+source_file: src/backend/apps/core/tests/test_contact.py
+
+description: >
+  The current `core/tests/test_contact.py` does NOT import or call the real
+  `can_contact_seller`; it re-implements the R2 logic inline with dicts and asserts
+  Python `all()`, giving zero coverage of the actual function. Rewrite the suite to
+  drive the real `apps.core.services.contact.can_contact_seller(ad)` using
+  `model_bakery` User+Ad fixtures so regressions in `contact.py` are caught.
+
+  This is a test-infrastructure change (modifies test files / adds fixtures) — treat
+  as medium risk: it must not force production code changes to be testable ("production
+  code is king"). If the real function needs a production-visible hook to be testable,
+  surface that rather than adding a test-only shim.
+
+goals:
+  - exercise real `can_contact_seller` against persisted User+Ad
+  - assert all 5 R2 conditions; each single-false permutation blocks contact (P9.1/P9.2)
+  - keep the deep-link pattern tests (move real pattern source if duplicated)
+  - no production code distortion; no test-only shim in production
+
+files:
+  - path: src/backend/apps/core/tests/test_contact.py
+    targets:
+      - type: class
+        name: TestCanContactSellerLogic
+      - type: class
+        name: TestContactPattern
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: can_contact_seller
+      insert_before:
+        type: return_statement
+
+  - path: src/backend/apps/core/services/contact.py
+    targets:
+      - type: function
+        name: can_contact_seller
+    semantic_anchors:
+      call_site:
+        type: function_call
+        value: can_contact_seller
+
+changes:
+  - action: modify_tests
+    description: >
+      Replace inline-dict `all()` assertions with real calls to
+      `can_contact_seller(ad)` using model_bakery-built User (with/without
+      telegram_id, is_deleted, is_banned, consent_revoked_at) and Ad (status
+      PUBLISHED vs others). Add the 6 single-condition-false permutations.
+
+acceptance_criteria:
+  - tests call the real `can_contact_seller`, not a re-implemented copy
+  - all 5 conditions true => True; each single false => False
+  - ARCHIVED/non-PUBLISHED ad => False
+  - deep-link pattern tests retained and still pass
+  - suite runs on real PostgreSQL per project axiom (no SQLite-only shortcut)

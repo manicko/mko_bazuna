@@ -1,0 +1,45 @@
+id: task_009_verify_rollout
+
+title: Verify — mandatory-findings rollout (T002, T003, T005, T006, T007, T008)
+
+priority: high
+
+status: pending
+
+type: verification
+
+depends_on:
+  - task_002_fix_query_translator_timeout
+  - task_003_rewrite_test_contact_real_function
+  - task_005_add_ad_transition_to
+  - task_006_wire_views_to_transition_to
+  - task_007_consent_hard_delete_atomic
+  - task_008_invalidate_tokens_on_withdraw
+
+verifies:
+  - task_002_fix_query_translator_timeout
+  - task_003_rewrite_test_contact_real_function
+  - task_005_add_ad_transition_to
+  - task_006_wire_views_to_transition_to
+  - task_007_consent_hard_delete_atomic
+  - task_008_invalidate_tokens_on_withdraw
+
+verification_steps:
+  - build: "uv run ruff check src/backend/apps/search/services/query_translator.py src/backend/apps/core/tests/test_contact.py src/backend/apps/ads/models.py src/backend/apps/ads/views/edit.py src/backend/apps/ads/views/delete.py src/backend/apps/moderation/services/moderation_log.py src/backend/apps/core/management/commands/consent_hard_delete.py src/backend/apps/users/services/deletion.py"
+  - typecheck: "uv run basedpyright src/backend/apps/search/services/query_translator.py src/backend/apps/ads/models.py src/backend/apps/users/services/deletion.py"
+  - test: "uv run pytest src/backend/apps/search/tests src/backend/apps/core/tests/test_contact.py src/backend/apps/ads/tests src/backend/apps/moderation/tests src/backend/apps/core/tests/test_sweep_commands.py src/backend/apps/users/tests --ds=backend.config.settings.test -v"
+  - smoke_check: "uv run pytest src/backend/apps/core/tests/test_sweep_commands.py::TestConsentHardDelete src/backend/apps/core/tests/test_contact.py -v"
+
+pass_criteria:
+  - ruff clean on all touched files
+  - basedpyright clean on changed modules
+  - all listed test suites pass on real PostgreSQL (CI via docker-compose.test.yml)
+  - P7.3 timeout test passes (translation returns original within ~500ms)
+  - P9 real can_contact_seller suites pass
+  - P3 transition matrix enforced; public listing still filters status=PUBLISHED
+  - P4 consent_hard_delete atomicity/crash-injection passes
+  - P11 login-token invalidation on withdraw passes
+
+failure_action: return the failing implementation task to rework
+
+rollback_task: null

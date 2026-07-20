@@ -1,0 +1,83 @@
+# Rollout ordering for mandatory-findings implementation plan
+# Source: .ai/plans/architecture_testing_plan.md (Appendix B mandatory findings 1-5)
+# Numbering = execution order (sortable). No circular dependencies.
+
+tasks:
+  # ── Parallel start group (independent research / no-dep implementation) ──
+  - id: task_001_research_query_translator_timeout
+    order: 1
+    depends_on: []
+
+  - id: task_003_rewrite_test_contact_real_function
+    order: 2
+    depends_on: []
+
+  - id: task_004_research_ad_transition_centralization
+    order: 3
+    depends_on: []
+
+  - id: task_007_consent_hard_delete_atomic
+    order: 4
+    depends_on: []
+
+  - id: task_008_invalidate_tokens_on_withdraw
+    order: 5
+    depends_on: []
+
+  # ── Blocked by research gates ──
+  - id: task_002_fix_query_translator_timeout
+    order: 6
+    depends_on:
+      - task_001_research_query_translator_timeout
+
+  - id: task_005_add_ad_transition_to
+    order: 7
+    depends_on:
+      - task_004_research_ad_transition_centralization
+
+  # ── Sequential chain: model method -> wire callers (same transition surface) ──
+  - id: task_006_wire_views_to_transition_to
+    order: 8
+    depends_on:
+      - task_005_add_ad_transition_to
+
+  # ── Final verification gate (after all implementations) ──
+  - id: task_009_verify_rollout
+    order: 9
+    depends_on:
+      - task_002_fix_query_translator_timeout
+      - task_003_rewrite_test_contact_real_function
+      - task_005_add_ad_transition_to
+      - task_006_wire_views_to_transition_to
+      - task_007_consent_hard_delete_atomic
+      - task_008_invalidate_tokens_on_withdraw
+
+# ── Execution DAG (parallel groups) ──
+parallel_groups:
+  - group: 1
+    runs_in_parallel:
+      - task_001_research_query_translator_timeout
+      - task_003_rewrite_test_contact_real_function
+      - task_004_research_ad_transition_centralization
+      - task_007_consent_hard_delete_atomic
+      - task_008_invalidate_tokens_on_withdraw
+  - group: 2
+    runs_after: group 1
+    runs_in_parallel:
+      - task_002_fix_query_translator_timeout   # needs T001 go
+      - task_005_add_ad_transition_to           # needs T004 go
+  - group: 3
+    runs_after: group 2
+    sequential:
+      - task_006_wire_views_to_transition_to    # needs T005
+  - group: 4
+    runs_after: group 3
+    sequential:
+      - task_009_verify_rollout                 # needs all implementations
+
+notes:
+  - Tasks modifying the same file execute sequentially; only one task per file in this plan
+    except moderation_log.py / auto_moderation path which is isolated to T006.
+  - T002 and T005 are BLOCKED until their research gates (T001, T004) return "go".
+  - T009 is the single verification gate; failure returns the specific task to rework.
+  - All DB-backed tests require real PostgreSQL 18 (CI: docker-compose.test.yml), per plan axiom 1.

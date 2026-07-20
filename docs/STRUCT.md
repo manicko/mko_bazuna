@@ -9,6 +9,7 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── locations
 │   │   ├── moderation
 │   │   ├── search
+│   │   ├── urls.py.bak
 │   │   └── users
 │   ├── config
 │   │   ├── asgi.py
@@ -17,6 +18,10 @@ C:\py_dev\mko_bazuna\src
 │   │   └── wsgi.py
 │   ├── manage.py
 │   ├── mko_bazuna
+│   ├── templates
+│   │   ├── admin
+│   │   ├── ads
+│   │   └── components
 │   └── theme
 │       └── apps.py
 ├── static
@@ -27,8 +32,11 @@ C:\py_dev\mko_bazuna\src
 │   │   └── states
 │   ├── handlers
 │   │   ├── ad_create.py
+│   │   ├── contact.py
 │   │   └── login.py
 │   ├── main.py
+│   ├── middlewares
+│   │   └── permissions.py
 │   ├── parsers
 │   ├── schemas
 │   │   └── message_payloads.py
