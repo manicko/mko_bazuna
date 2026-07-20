@@ -11,6 +11,7 @@ import re
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from asgiref.sync import sync_to_async
 from django.utils import timezone
 
 from apps.users.models import User, LoginToken
@@ -32,6 +33,7 @@ async def handle_login_deep_link(
 
     Pattern: /start login_<token>
     Token is SHA-256 hashed and claimed atomically via UPDATE.
+    Delegates contact deep-links to contact module.
     """
     if not message.text or not message.from_user:
         return
@@ -44,8 +46,14 @@ async def handle_login_deep_link(
         return
 
     deep_link = args[1]
-    match = LOGIN_PATTERN.match(deep_link)
 
+    # Delegate contact deep-links to contact module
+    from telegram_bot.handlers.contact import handle_contact_start
+    if await handle_contact_start(message, bot, deep_link):
+        return
+
+    # Handle login pattern
+    match = LOGIN_PATTERN.match(deep_link)
     if not match:
         await message.answer(
             "Invalid login link format. Expected: /start login_<token>"
@@ -96,8 +104,6 @@ async def claim_login_token(
     Uses constant-time comparison via hmac.compare_digest.
     Wrapped in sync_to_async for bot compatibility.
     """
-    from asgiref.sync import sync_to_async
-
     @sync_to_async
     def _claim() -> LoginToken | None:
         now = timezone.now()
@@ -129,8 +135,6 @@ async def get_or_create_user(
 
     Uses sync_to_async for ORM operations.
     """
-    from asgiref.sync import sync_to_async
-
     @sync_to_async
     def _get_or_create() -> tuple[User, bool]:
         user, created = User.objects.get_or_create(

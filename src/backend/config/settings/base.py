@@ -161,3 +161,7 @@ STORAGES = {
 # Login redirect
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+
+# Telegram Bot username for contact deep-links
+# Format: without @ prefix, e.g., "MyBot" not "@MyBot"
+BOT_USERNAME = os.getenv("BOT_USERNAME", "")
