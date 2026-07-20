@@ -1,0 +1,91 @@
+{#
+    Detail template for Mko Bazuna.
+    
+    XSS-safe via Django autoescape. Shows single ad with photos, description, contact button.
+    Contact button deep-link logic deferred to Phase 3 (decision C).
+#}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ad.title }} - Mko Bazuna</title>
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/">Mko Bazuna</a>
+            </h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <article class="bg-white rounded-lg shadow overflow-hidden">
+            <!-- Photo gallery -->
+            {% if ad.images.all %}
+                <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
+                    {% for image in ad.images.all %}
+                        <img 
+                            src="{{ image.image_url }}" 
+                            alt="Photo {{ forloop.counter }} for {{ ad.title }}"
+                            class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
+                        >
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="p-6">
+                <h1 class="text-3xl font-bold mb-4">{{ ad.title }}</h1>
+                
+                {% if ad.price %}
+                    <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad.price }} BAM</p>
+                {% endif %}
+                
+                <div class="prose max-w-none mb-6">
+                    <p class="text-gray-700 whitespace-pre-wrap">{{ ad.description }}</p>
+                </div>
+                
+                <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
+                    <div>
+                        <span class="font-medium">Location:</span> 
+                        {{ ad.city.get_name|default:ad.city.name }}
+                    </div>
+                    <div>
+                        <span class="font-medium">Category:</span> 
+                        {{ ad.category.get_name|default:ad.category.name }}
+                    </div>
+                    <div>
+                        <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
+                            Published: {{ ad.published_at|date:'M d, Y' }}
+                        </time>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact button - deep-link logic Phase 3 -->
+            <div class="p-6 border-t bg-gray-50">
+                <button 
+                    type="button" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                    onclick="alert('Contact feature - Phase 3')"
+                >
+                    Contact Seller
+                </button>
+                <p class="text-xs text-gray-500 mt-2">
+                    Contact button deep-link logic deferred to Phase 3 (decision C)
+                </p>
+            </div>
+        </article>
+
+        <div class="mt-6">
+            <a href="javascript:history.back()" class="text-blue-600 hover:underline">
+                &larr; Back to listings
+            </a>
+        </div>
+    </main>
+</body>
+</html>
