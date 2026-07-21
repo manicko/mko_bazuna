@@ -59,13 +59,20 @@ jobs:
         run: uv run python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())'
         working-directory: src/backend
 
-      - name: Run pytest
+      - name: Run pytest with coverage
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest --tb=short
+        run: uv run pytest --tb=short --cov --cov-report=term --cov-report=xml
         working-directory: src/backend
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: src/backend/coverage.xml
+          retention-days: 30
 
   lint:
     runs-on: ubuntu-latest

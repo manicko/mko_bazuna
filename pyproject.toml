@@ -150,6 +150,17 @@ console_output_style = "classic"
 markers = [
   "slow: marks tests as slow (use -m slow to run)",
 ]
+
+# Coverage.py configuration (used by pytest-cov)
+[tool.coverage.run]
+source = ["src/backend", "src/telegram_bot"]
+omit = ["*/migrations/*", "*/tests/*", "*/test_*.py", "*/conftest.py", "*/manage.py", "*/wsgi.py", "*/asgi.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true
+
 [tool.basedpyright]
 typeCheckingMode = "standard"
 reportMissingTypeStubs = "none"
