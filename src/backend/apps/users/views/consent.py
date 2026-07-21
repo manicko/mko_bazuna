@@ -6,22 +6,22 @@ Implements decision F/K consent states (zone R3):
 - Decline (browse-only): sets ads_auto_publish=False, no deletion
 """
 
-import logging
-
-from apps.users.services import decline_consent, give_consent
-from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
 import hashlib
+import logging
 import secrets
 from datetime import timedelta
-from apps.users.models import LoginToken
+
 from django.conf import settings
-from django.shortcuts import render
+from django.contrib.auth import login as auth_login
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
-logger = logging.getLogger(__name__)
+from apps.users.models import LoginToken, User
+from apps.users.services import can_login, decline_consent, give_consent
 
+logger = logging.getLogger(__name__)
 
 CONSENT_COOKIE_NAME = "consent_given"
 CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
@@ -154,15 +154,16 @@ def login_status(request: HttpRequest) -> HttpResponse:
 
     Phase 2 of the two-phase claim: if the bot has already set telegram_id
     (phase 1) and the token is still unconsumed and not expired, this view
-    atomically sets consumed_at=now() to complete the claim.
+    atomically sets consumed_at=now() to complete the claim, then establishes
+    a web session (django.contrib.auth.login + session.cycle_key).
 
     Args:
         request: HTTP request with query param ?token=<raw_token>
 
     Returns:
-        HttpResponse 200 — token consumed (claimed by bot, now marked consumed)
+        HttpResponse 200 — token consumed, session established (session cookie set)
         HttpResponse 204 — pending (bot has not claimed the token yet)
-        HttpResponse 410 — gone (token invalid, expired, or already consumed)
+        HttpResponse 410 — gone (token invalid, expired, already consumed, or user banned)
     """
     raw_token = request.GET.get("token", "")
     if not raw_token:
@@ -196,4 +197,23 @@ def login_status(request: HttpRequest) -> HttpResponse:
         return HttpResponse(status=410)
 
     logger.info(f"Login token {token_hash[:8]} consumed by telegram_id={token.telegram_id}")
+
+    # Look up the user by telegram_id
+    try:
+        user = User.objects.get(telegram_id=token.telegram_id)
+    except User.DoesNotExist:
+        logger.error(f"User not found for telegram_id={token.telegram_id}")
+        return HttpResponse(status=410)
+
+    # Check if user is banned
+    if not can_login(user):
+        logger.warning(f"Login denied for telegram_id={token.telegram_id}: banned")
+        return HttpResponse(status=410)
+
+    # Establish web session
+    auth_login(request, user)
+    request.session.cycle_key()
+
+    logger.info(f"Web session established for user {user.id} (telegram_id={token.telegram_id})")
+
     return HttpResponse(status=200)
