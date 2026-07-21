@@ -146,3 +146,54 @@ def login_issue(request: HttpRequest) -> HttpResponse:
             "bot_username": bot_username,
         },
     )
+
+
+def login_status(request: HttpRequest) -> HttpResponse:
+    """
+    Poll login token status — atomically mark consumed if claimed.
+
+    Phase 2 of the two-phase claim: if the bot has already set telegram_id
+    (phase 1) and the token is still unconsumed and not expired, this view
+    atomically sets consumed_at=now() to complete the claim.
+
+    Args:
+        request: HTTP request with query param ?token=<raw_token>
+
+    Returns:
+        HttpResponse 200 — token consumed (claimed by bot, now marked consumed)
+        HttpResponse 204 — pending (bot has not claimed the token yet)
+        HttpResponse 410 — gone (token invalid, expired, or already consumed)
+    """
+    raw_token = request.GET.get("token", "")
+    if not raw_token:
+        return HttpResponse(status=410)
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    try:
+        token = LoginToken.objects.get(token_hash=token_hash)
+    except LoginToken.DoesNotExist:
+        return HttpResponse(status=410)
+
+    # Token expired or already consumed — gone
+    if token.expires_at <= timezone.now() or token.consumed_at is not None:
+        return HttpResponse(status=410)
+
+    # Bot has not claimed the token yet — keep polling
+    if token.telegram_id is None:
+        return HttpResponse(status=204)
+
+    # Bot has claimed the token — atomically mark consumed
+    updated = LoginToken.objects.filter(
+        token_hash=token_hash,
+        telegram_id=token.telegram_id,
+        consumed_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).update(consumed_at=timezone.now())
+
+    if updated == 0:
+        # Race condition — another request already consumed it
+        return HttpResponse(status=410)
+
+    logger.info(f"Login token {token_hash[:8]} consumed by telegram_id={token.telegram_id}")
+    return HttpResponse(status=200)
