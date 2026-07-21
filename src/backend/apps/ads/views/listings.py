@@ -8,12 +8,12 @@ HTMX-compatible MPA (no login required).
 import logging
 from difflib import get_close_matches
 
-from apps.ads.models import Ad
+from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, AdSort
 from apps.locations.models import City
 from apps.users.views.consent import is_consent_given
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,41 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     }
 
     return render(request, "ads/detail.html", context)
+
+
+def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
+    """
+    Media access gate for Ad images.
+
+    Looks up AdImage by storage key, verifies parent Ad is PUBLISHED
+    (or request is from a staff user), then returns X-Accel-Redirect
+    to the internal nginx /protected-media/ location.
+
+    Args:
+        request: HTTP request
+        image_key: Storage key (UUID v4 + .jpg)
+
+    Returns:
+        Empty 200 response with X-Accel-Redirect header, or 403/404
+    """
+    try:
+        ad_image = AdImage.objects.select_related("ad").get(image=image_key)
+    except AdImage.DoesNotExist:
+        raise Http404("Image not found") from None
+
+    # Allow staff users (moderators/admins) to view any image
+    if request.user.is_staff:
+        response = HttpResponse()
+        response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
+        return response
+
+    # Non-staff users: only serve images for PUBLISHED ads
+    if ad_image.ad.status != AdStatus.PUBLISHED:
+        return HttpResponseForbidden("Access denied")
+
+    response = HttpResponse()
+    response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
+    return response
 
 
 def listings(
