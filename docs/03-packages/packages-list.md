@@ -27,7 +27,7 @@ django-mptt is not yet validated against Django 6.0.
 - Django 5.2 LTS + PostgreSQL 18
 - Admin: Django Admin
 - Filtration: django-filter, django-mptt
-- Search: PostgreSQL native FTS (`search_vector` TSVECTOR + GIN + pg_trgm, russian config)
+- Search: PostgreSQL native FTS (`search_vector` TSVECTOR + GIN, russian config)
 - UI: Django Templates + HTMX + Alpine.js MPA (phase 1)
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
 - Background jobs: Django management commands + systemd timer / cron (Celery deferred)
@@ -68,7 +68,7 @@ whitenoise>=6.12.0                # /static/ only (NOT media). Add if used in pr
 
 Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 5.2 + Python 3.14 + psycopg3.
 
-- **PostgreSQL 18:** FTS stack (TSVECTOR + GIN + pg_trgm + plpgsql triggers + `to_tsvector('russian')`) fully compatible.
+- **PostgreSQL 18:** FTS stack (TSVECTOR + GIN + plpgsql triggers + `to_tsvector('russian')`) fully compatible.
 - **uv:** pin `uv>=0.11.28` in Dockerfile.
 - **gunicorn:** pin `gunicorn>=26.0`.
 - **whitenoise:** add if used for `/static/` (media still needs nginx).

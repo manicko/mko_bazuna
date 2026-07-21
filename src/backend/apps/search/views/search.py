@@ -17,6 +17,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from apps.core.utils.sanitize import sanitize_query_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,6 @@ def search(request: HttpRequest) -> HttpResponse:
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
 
     if query:
-        # Record search event (analytics)
-        AnalyticsEvent.objects.create(
-            event_type=AnalyticsEventType.SEARCH_PERFORMED,
-            user_id=request.user.id if request.user.is_authenticated else None,
-        )
-
         # Translate Bosnian query to Russian
         translated_query = translate_query_bs_to_ru(query)
 
@@ -69,6 +64,12 @@ def search(request: HttpRequest) -> HttpResponse:
             rank=SearchRank("search_vector", search_query)
         ).filter(search_vector=search_query).order_by("-rank")
 
+        # Record search event (analytics) after successful execution
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.SEARCH_PERFORMED,
+            user_id=request.user.id if request.user.is_authenticated else None,
+        )
+
     # Paginate results
     paginator = Paginator(ads, PER_PAGE)
     page_number = request.GET.get("page", 1)
@@ -77,7 +78,7 @@ def search(request: HttpRequest) -> HttpResponse:
     total_count = int(paginator.count)
     has_results = total_count > 0
     if query and not has_results:
-        logger.info(f"Empty search results for query '{query}'")
+        logger.info("Empty search results for query '%s'", sanitize_query_for_log(query))
 
     context = {
         "page_obj": page_obj,

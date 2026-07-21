@@ -37,7 +37,7 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 - Python 3.14, Django 5.2 LTS (`>=5.2.16,<6.0`), PostgreSQL 18
 - django-mptt (categories), django-filter, django-tailwind + django-htmx (MPA), Pillow
 - aiogram 3.x (Telegram bot), deep-translator (Bosnian→Russian query translation)
-- Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN + pg_trgm, russian config)
+- Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN, russian config)
 - Background jobs: Django management commands + cron (Celery deferred)
 - Deployment: Docker (db + web[gunicorn sync WSGI] + bot + nginx)
 
