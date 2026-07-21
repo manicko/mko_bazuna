@@ -1,8 +1,0 @@
-cat_content = open(r'src/backend/apps/categories/migrations/0002_seed_categories.py', 'r', encoding='utf-8').read()
-# Count all cursor.execute calls (17 total, but some are PRAGMA)
-pragma_on = cat_content.count('PRAGMA foreign_keys = ON')
-pragma_off = cat_content.count('PRAGMA foreign_keys = OFF')
-total_cursor = cat_content.count('cursor.execute')
-print(f'PRAGMA OFF: {pragma_off}, PRAGMA ON: {pragma_on}')
-print(f'Total cursor.execute calls: {total_cursor}')
-print(f'INSERT calls (estimated): {total_cursor - pragma_off - pragma_on}')
