@@ -46,9 +46,7 @@ async def handle_contact_start(
     return await handle_contact(message, bot, ad_id)
 
 
-async def handle_contact(
-    message: types.Message, bot: Bot, ad_id: int
-) -> bool:
+async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     """
     Handle contact deep-link for anonymous buyer-seller communication.
 
@@ -71,11 +69,11 @@ async def handle_contact(
 
     buyer_telegram_id = message.from_user.id
 
-    # Check seller availability and get seller telegram_id
-    is_available, seller_telegram_id = await check_seller_available(ad_id)
-
-    # Record contact attempt (analytics)
-    await record_contact_event(buyer_telegram_id)
+    # Combined ORM: check seller availability + record analytics
+    is_available, seller_telegram_id = await handle_contact_orm(
+        ad_id=ad_id,
+        buyer_telegram_id=buyer_telegram_id,
+    )
 
     if not is_available:
         await message.answer("объявление больше недоступно")
@@ -99,15 +97,20 @@ async def handle_contact(
 
     # Confirm to buyer
     await message.answer(
-        "Ваш запрос отправлен продавцу анонимно. "
-        "Ожидайте ответа в этом чате."
+        "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
     )
     return True
 
 
-async def check_seller_available(ad_id: int) -> tuple[bool, int | None]:
+async def handle_contact_orm(
+    ad_id: int,
+    buyer_telegram_id: int | None,
+) -> tuple[bool, int | None]:
     """
-    Check if seller is available for contact.
+    Check seller availability and record contact analytics event.
+
+    Combines two ORM operations in a single sync_to_async call
+    to reduce DB connection churn with CONN_MAX_AGE=0.
 
     Zone R2 conditions:
         - ad.status == PUBLISHED
@@ -118,72 +121,64 @@ async def check_seller_available(ad_id: int) -> tuple[bool, int | None]:
 
     Args:
         ad_id: The ad ID to check.
+        buyer_telegram_id: The buyer's Telegram ID (may be None).
 
     Returns:
         Tuple of (is_available, seller_telegram_id or None).
     """
     from apps.ads.models import Ad
-    from apps.core.enums import AdStatus
+    from apps.analytics.models import AnalyticsEvent
+    from apps.core.enums import AdStatus, AnalyticsEventType
+    from apps.users.models import User
 
     @sync_to_async
-    def _check() -> tuple[bool, int | None]:
+    def _handle() -> tuple[bool, int | None]:
+        is_available = False
+        seller_telegram_id: int | None = None
+
         try:
             ad = Ad.objects.select_related("user").get(id=ad_id)
         except Ad.DoesNotExist:
             logger.info(f"Ad {ad_id} not found for contact")
-            return (False, None)
+        else:
+            if ad.status != AdStatus.PUBLISHED:
+                logger.info(
+                    f"Ad {ad_id} not PUBLISHED (status={ad.status}) for contact"
+                )
+            else:
+                seller = ad.user
+                if seller is None:
+                    logger.info(f"Ad {ad_id} has no seller")
+                elif seller.telegram_id is None:
+                    pass
+                elif seller.is_deleted:
+                    pass
+                elif seller.is_banned:
+                    pass
+                elif seller.consent_revoked_at is not None:
+                    pass
+                else:
+                    is_available = True
+                    seller_telegram_id = seller.telegram_id
 
-        if ad.status != AdStatus.PUBLISHED:
-            logger.info(f"Ad {ad_id} not PUBLISHED (status={ad.status}) for contact")
-            return (False, None)
-
-        seller = ad.user
-        if seller is None:
-            logger.info(f"Ad {ad_id} has no seller")
-            return (False, None)
-
-        # Zone R2 conditions
-        if seller.telegram_id is None:
-            return (False, None)
-        if seller.is_deleted:
-            return (False, None)
-        if seller.is_banned:
-            return (False, None)
-        if seller.consent_revoked_at is not None:
-            return (False, None)
-
-        return (True, seller.telegram_id)
-
-    return await _check()
-
-
-async def record_contact_event(buyer_telegram_id: int | None) -> None:
-    """
-    Record CONTACT_INITIATED analytics event.
-
-    User field is nullable since buyer may not be authenticated.
-    """
-    from apps.analytics.models import AnalyticsEvent
-    from apps.core.enums import AnalyticsEventType
-    from apps.users.models import User
-
-    @sync_to_async
-    def _record() -> None:
+        # Always record analytics event (for all contact attempts)
         user_id = None
         if buyer_telegram_id is not None:
             try:
                 user = User.objects.get(telegram_id=buyer_telegram_id)
                 user_id = user.id
             except User.DoesNotExist:
-                pass  # Buyer may not exist yet
+                pass
 
         AnalyticsEvent.objects.create(
             event_type=AnalyticsEventType.CONTACT_INITIATED,
             user_id=user_id,
         )
 
-    await _record()
-    logger.info("Contact initiated event recorded")
+        logger.info("Contact initiated event recorded")
+        return (is_available, seller_telegram_id)
+
+    return await _handle()
 
 
 def _get_buyer_display_name(user: types.User) -> str:

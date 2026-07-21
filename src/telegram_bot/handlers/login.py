@@ -52,6 +52,7 @@ async def handle_login_deep_link(
 
     # Delegate contact deep-links to contact module
     from telegram_bot.handlers.contact import handle_contact_start
+
     if await handle_contact_start(message, bot, deep_link):
         return
 
@@ -66,25 +67,21 @@ async def handle_login_deep_link(
     raw_token = match.group(1)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    # Atomic claim via UPDATE
-    login_token = await claim_login_token(
-        token_hash=token_hash, telegram_id=message.from_user.id
-    )
-
-    if not login_token:
-        await message.answer(
-            "This login link is invalid, expired, or already used."
-        )
-        return
-
-    # Create or get user
-    user, created = await get_or_create_user(
+    # Combined ORM: claim token + get or create user
+    login_token, user, created = await handle_login_orm(
+        token_hash=token_hash,
         telegram_id=message.from_user.id,
         username=message.from_user.username,
         first_name=message.from_user.first_name,
         last_name=message.from_user.last_name,
     )
 
+    if not login_token:
+        await message.answer("This login link is invalid, expired, or already used.")
+        return
+
+    # user is guaranteed non-None when login_token is claimed
+    assert user is not None
     await state.update_data(user_id=user.id)
 
     if created:
@@ -93,22 +90,25 @@ async def handle_login_deep_link(
             "You can now create ads with /post."
         )
     else:
-        await message.answer(
-            "Login successful! You can now create ads with /post."
-        )
+        await message.answer("Login successful! You can now create ads with /post.")
 
 
-async def claim_login_token(
-    token_hash: str, telegram_id: int
-) -> LoginToken | None:
+async def handle_login_orm(
+    token_hash: str,
+    telegram_id: int,
+    username: str | None,
+    first_name: str | None,
+    last_name: str | None,
+) -> tuple[LoginToken | None, User | None, bool]:
     """
-    Atomically claim a login token.
+    Atomically claim a login token, then get or create the user.
 
-    Uses constant-time comparison via hmac.compare_digest.
-    Wrapped in sync_to_async for bot compatibility.
+    Combines two ORM operations in a single sync_to_async call
+    to reduce DB connection churn with CONN_MAX_AGE=0.
     """
+
     @sync_to_async
-    def _claim() -> LoginToken | None:
+    def _handle() -> tuple[LoginToken | None, User | None, bool]:
         now = timezone.now()
 
         # Atomic UPDATE claim
@@ -120,28 +120,11 @@ async def claim_login_token(
         ).update(telegram_id=telegram_id)
 
         if updated == 0:
-            return None
+            return None, None, False
 
-        return LoginToken.objects.get(token_hash=token_hash)
+        login_token = LoginToken.objects.get(token_hash=token_hash)
 
-    return await _claim()
-
-
-async def get_or_create_user(
-    telegram_id: int,
-    username: str | None,
-    first_name: str | None,
-    last_name: str | None,
-) -> tuple[User, bool]:
-    """
-    Get existing user or create new one.
-
-    Uses sync_to_async for ORM operations. Wraps get_or_create in
-    transaction.atomic() to guard against concurrent IntegrityError
-    on duplicate telegram_id. On conflict, re-fetches the existing user.
-    """
-    @sync_to_async
-    def _get_or_create() -> tuple[User, bool]:
+        # Get or create user
         try:
             with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
                 user, created = User.objects.get_or_create(
@@ -162,6 +145,6 @@ async def get_or_create_user(
                     user_id=user.id,
                 )
                 logger.info(f"Registration event recorded for user {user.id}")
-        return user, created
+        return login_token, user, created
 
-    return await _get_or_create()
+    return await _handle()
