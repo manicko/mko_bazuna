@@ -21,6 +21,7 @@ def seller() -> User:
     """Create a seller user for ad fixtures."""
     return User.objects.create(
         telegram_id=900000001,
+        chat_id=900000001,
         password="x",
     )
 

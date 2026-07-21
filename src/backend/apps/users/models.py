@@ -32,6 +32,13 @@ class User(AbstractUser):
         help_text="Telegram user ID; required for authentication",
     )
 
+    # Stable Telegram chat ID (set on first bot contact, never nullified on withdraw)
+    chat_id = models.BigIntegerField(
+        unique=True,
+        db_index=True,
+        help_text="Stable Telegram chat ID; set on first bot contact, never nullified",
+    )
+
     # Account state
     is_banned = models.BooleanField(
         default=False,  # pyright: ignore[reportArgumentType]

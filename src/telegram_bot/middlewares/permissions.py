@@ -26,8 +26,9 @@ class AccountStateMiddleware(BaseMiddleware):
     - is_banned: Admin action, blocks all bot interactions
     - is_deleted: GDPR withdrawal, blocks all bot interactions (telegram_id nulled)
     - ads_auto_publish=False: Restricts /post command only
+    - consent_revoked_at: Blocks all bot interactions for withdrawn users
 
-    For banned/deleted users: responds with rejection message and skips handler.
+    For banned/deleted/withdrawn users: responds with rejection message and skips handler.
     For publish-restricted users: allows other commands but blocks /post.
     """
 
@@ -70,18 +71,18 @@ class AccountStateMiddleware(BaseMiddleware):
         if message.from_user is None:
             return await handler(event, data)
 
-        telegram_id = message.from_user.id
+        chat_id = message.from_user.id
         text = message.text or ""
 
-        # Check if user is banned or deleted
-        can_interact, state_reason = await self._check_user_state(telegram_id)
+        # Check if user is banned, deleted, or has revoked consent
+        can_interact, state_reason = await self._check_user_state(chat_id)
         if not can_interact:
             await message.answer(state_reason)
             return None
 
         # Check publish restriction for /post command
         if text.strip().lower() == "/post":
-            can_publish, publish_reason = await self._check_publish_permission(telegram_id)
+            can_publish, publish_reason = await self._check_publish_permission(chat_id)
             if not can_publish:
                 await message.answer(publish_reason)
                 return None
@@ -89,19 +90,22 @@ class AccountStateMiddleware(BaseMiddleware):
         return await handler(event, data)
 
     async def _check_user_state(
-        self, telegram_id: int
+        self, chat_id: int
     ) -> tuple[bool, str]:
         """
-        Check if user is banned or deleted.
+        Check if user is banned, deleted, or has revoked consent.
+
+        Uses stable chat_id (never nullified) instead of telegram_id to ensure
+        withdrawn/deleted users are properly blocked.
 
         Args:
-            telegram_id: Telegram user ID.
+            chat_id: Stable Telegram chat ID.
 
         Returns:
             Tuple of (can_interact, rejection_message).
         """
         try:
-            user = await self._get_user(telegram_id)
+            user = await self._get_user(chat_id)
         except User.DoesNotExist:
             return (True, "")  # User not registered yet
 
@@ -111,22 +115,27 @@ class AccountStateMiddleware(BaseMiddleware):
         if user.is_deleted:
             return (False, "Your account has been deleted.")
 
+        if user.consent_revoked_at is not None:
+            return (False, "Your account has been deleted.")
+
         return (True, "")
 
     async def _check_publish_permission(
-        self, telegram_id: int
+        self, chat_id: int
     ) -> tuple[bool, str]:
         """
         Check if user can publish ads (ads_auto_publish flag).
 
+        Uses stable chat_id lookup.
+
         Args:
-            telegram_id: Telegram user ID.
+            chat_id: Stable Telegram chat ID.
 
         Returns:
             Tuple of (can_publish, rejection_message).
         """
         try:
-            user = await self._get_user(telegram_id)
+            user = await self._get_user(chat_id)
         except User.DoesNotExist:
             return (True, "")  # Will be handled by login check
 
@@ -139,12 +148,15 @@ class AccountStateMiddleware(BaseMiddleware):
         return (True, "")
 
     @sync_to_async
-    def _get_user(self, telegram_id: int) -> User:
+    def _get_user(self, chat_id: int) -> User:
         """
-        Get user by telegram_id.
+        Get user by stable chat_id.
+
+        Uses chat_id instead of telegram_id so that withdrawn/deleted users
+        (whose telegram_id is nulled) are still found by the middleware.
 
         Args:
-            telegram_id: Telegram user ID.
+            chat_id: Stable Telegram chat ID.
 
         Returns:
             User instance.
@@ -152,4 +164,4 @@ class AccountStateMiddleware(BaseMiddleware):
         Raises:
             User.DoesNotExist if user not found.
         """
-        return User.objects.get(telegram_id=telegram_id)
+        return User.objects.get(chat_id=chat_id)

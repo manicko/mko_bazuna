@@ -30,6 +30,7 @@ def seller() -> User:
     """Create a seller user for ad fixtures."""
     return User.objects.create(
         telegram_id=900000001,
+        chat_id=900000001,
         password="x",
     )
 
@@ -318,7 +319,7 @@ class TestConsentHardDelete:
 
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
-        fresh = User.objects.create(telegram_id=900000003, password="x")
+        fresh = User.objects.create(telegram_id=900000003, chat_id=900000003, password="x")
         call_command("consent_hard_delete")
         assert not User.objects.filter(pk=seller.pk).exists()
         assert User.objects.filter(pk=fresh.pk).exists()

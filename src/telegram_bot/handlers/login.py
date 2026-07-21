@@ -107,6 +107,9 @@ async def handle_login_orm(
     to reduce DB connection churn with CONN_MAX_AGE=0.
     The claim uses UPDATE ... RETURNING to avoid a TOCTOU race between
     the UPDATE and a subsequent SELECT.
+
+    User lookup uses stable chat_id (never nullified) instead of telegram_id
+    so that withdrawn/deleted users are still found by the middleware.
     """
 
     @sync_to_async
@@ -129,19 +132,21 @@ async def handle_login_orm(
         if login_token is None:
             return None, None, False
 
-        # Get or create user
+        # Get or create user by stable chat_id (never nullified on withdraw)
         try:
             with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
                 user, created = User.objects.get_or_create(
-                    telegram_id=telegram_id,
+                    chat_id=telegram_id,
                     defaults={
+                        "telegram_id": telegram_id,
+                        "chat_id": telegram_id,
                         "username": username,
                         "first_name": first_name,
                         "last_name": last_name,
                     },
                 )
         except IntegrityError:
-            user = User.objects.get(telegram_id=telegram_id)
+            user = User.objects.get(chat_id=telegram_id)
             created = False
         else:
             if created:

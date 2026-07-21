@@ -19,6 +19,7 @@ def user() -> User:
     """Create a user for deletion tests."""
     return User.objects.create(
         telegram_id=900000001,
+        chat_id=900000001,
         password="x",
     )
 

@@ -40,7 +40,7 @@ def city():
 def seller():
     from apps.users.models import User
 
-    return User.objects.create(telegram_id=910000001, password="x")
+    return User.objects.create(telegram_id=910000001, chat_id=910000001, password="x")
 
 
 def _create_published_ad(seller, category, city, **kwargs) -> Ad:
