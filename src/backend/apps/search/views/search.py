@@ -53,7 +53,11 @@ def search(request: HttpRequest) -> HttpResponse:
         if _is_single_word(query):
             category_filter = _fuzzy_category_match(translated_query)
             if category_filter:
-                ads = ads.filter(category=category_filter)
+                # Expand to category subtree (consistent with listings.py)
+                descendant_ids = category_filter.get_descendants(include_self=True).values_list(
+                    "id", flat=True
+                )
+                ads = ads.filter(category_id__in=descendant_ids)
 
         # FTS search on search_vector
         search_query = SearchQuery(translated_query, search_type="websearch", config="russian")
