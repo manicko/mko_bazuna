@@ -128,7 +128,7 @@ else:
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.getenv("POSTGRES_DB", "mko_bazuna"),
             "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
             # PgBouncer async safety (zone C5)
