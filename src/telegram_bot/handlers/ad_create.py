@@ -29,6 +29,7 @@ from telegram_bot.schemas.message_payloads import (
 )
 from telegram_bot.services.media import generate_storage_key, validate_photo
 from telegram_bot.states import AdCreateState
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -429,12 +430,15 @@ async def download_photo(file_id: str, bot: Bot) -> bytes | None:
 
 
 async def save_photo(storage_key: str, photo_bytes: bytes) -> None:
-    """Save photo to filesystem."""
-    media_path = os.path.join(settings.MEDIA_ROOT, storage_key)
-    os.makedirs(os.path.dirname(media_path), exist_ok=True)
+    """Save photo to filesystem via thread executor to avoid blocking the event loop."""
 
-    with open(media_path, "wb") as f:
-        f.write(photo_bytes)
+    def _write() -> None:
+        media_path = os.path.join(settings.MEDIA_ROOT, storage_key)
+        os.makedirs(os.path.dirname(media_path), exist_ok=True)
+        with open(media_path, "wb") as f:
+            f.write(photo_bytes)
+
+    await asyncio.to_thread(_write)
 
 
 async def get_category(category_id: int):
