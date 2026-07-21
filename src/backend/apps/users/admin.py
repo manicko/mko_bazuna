@@ -6,6 +6,7 @@ Custom admin with restricted access and consents visibility.
 
 from apps.users.models import LoginToken, User
 from django.contrib import admin
+from apps.users.services import withdraw_consent
 
 
 @admin.register(User)
@@ -50,6 +51,18 @@ class UserAdmin(admin.ModelAdmin):
 
     def has_view_permission(self, request, obj=None) -> bool:
         return request.user.is_staff
+
+    @admin.action(description="Withdraw consent for selected users")
+    def withdraw_consent_action(self, request, queryset):
+        """
+        Admin action to trigger consent withdrawal for selected users.
+
+        Calls withdraw_consent on each user, which sets consent_revoked_at,
+        soft-deletes the user and their ads, and nullifies PII.
+        """
+        for user in queryset:
+            withdraw_consent(user)
+        self.message_user(request, f"Withdrew consent for {queryset.count()} user(s).")
 
 
 @admin.register(LoginToken)

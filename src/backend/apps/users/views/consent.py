@@ -19,7 +19,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from apps.users.models import LoginToken, User
-from apps.users.services import can_login, decline_consent, give_consent
+from apps.users.services import can_login, decline_consent, give_consent, withdraw_consent
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,36 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
         samesite="Lax",
     )
     logger.info(f"User {user.id} declined consent via web - browse-only mode")
+    return response
+
+
+@login_required
+def consent_withdraw(request: HttpRequest) -> HttpResponse:
+    """
+    Withdraw consent and trigger immediate soft-delete.
+
+    Calls withdraw_consent which sets consent_revoked_at, soft-deletes
+    the user and their ads, and nullifies PII (telegram_id, username).
+    Sets a cookie to persist the decision client-side.
+
+    Args:
+        request: HTTP request (authenticated user required)
+
+    Returns:
+        Redirect to dashboard or home page
+    """
+    user = request.user
+    withdraw_consent(user)
+
+    response = redirect("ads:dashboard")
+    response.set_cookie(
+        CONSENT_COOKIE_NAME,
+        "withdrawn",
+        max_age=CONSENT_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="Lax",
+    )
+    logger.info(f"User {user.id} withdrew consent via web - soft-delete triggered")
     return response
 
 
