@@ -15,6 +15,7 @@
     {% if PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
     {% endif %}
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <header class="bg-white shadow-sm border-b">
@@ -42,81 +43,10 @@
             </div>
         </form>
 
-        <!-- Did-you-mean suggestions -->
-        {% if suggested_category %}
-            <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p class="text-sm text-blue-800">
-                    Did you mean: <a href="{% url 'ads:listings' suggested_category %}" class="underline font-medium">{{ suggested_category }}</a>?
-                </p>
-            </div>
-        {% endif %}
-
-        {% if suggested_city %}
-            <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p class="text-sm text-blue-800">
-                    Did you mean: <a href="{% url 'ads:listings_city' suggested_city %}" class="underline font-medium">{{ suggested_city }}</a>?
-                </p>
-            </div>
-        {% endif %}
-
-        <!-- Ads grid -->
-        {% if ads %}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {% for ad in ads %}
-                    <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-                        <a href="{% url 'ads:detail' ad.id %}" class="block">
-                            {% if ad.images.first %}
-                                <img 
-                                    src="{{ ad.images.first.image_url }}" 
-                                    alt="{{ ad.title }}"
-                                    class="w-full h-48 object-cover rounded-t-lg"
-                                >
-                            {% else %}
-                                <div class="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
-                                    <span class="text-gray-500">No image</span>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="p-4">
-                                <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
-                                
-                                {% if ad.price %}
-                                    <p class="text-blue-600 font-bold text-xl mb-2">{{ ad.price }} BAM</p>
-                                {% endif %}
-                                
-                                <p class="text-sm text-gray-600 line-clamp-3 mb-3">{{ ad.description }}</p>
-                                
-                                <div class="flex justify-between items-center text-xs text-gray-500">
-                                    <span>{{ ad.city.get_name|default:ad.city.name }}</span>
-                                    <span>{{ ad.category.get_name|default:ad.category.name }}</span>
-                                    <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
-                                        {{ ad.published_at|date:'M d' }}
-                                    </time>
-                                </div>
-                            </div>
-                        </a>
-                    </article>
-                {% endfor %}
-            </div>
-        {% elif has_results is False and query %}
-            <div class="text-center py-12 bg-white rounded-lg">
-                <p class="text-gray-600 text-lg">No results found for "{{ query }}"</p>
-                <p class="text-gray-500 mt-2">Try a different search term or browse all categories</p>
-            </div>
-        {% elif has_results is False %}
-            <div class="text-center py-12 bg-white rounded-lg">
-                <p class="text-gray-600 text-lg">No ads available</p>
-                <p class="text-gray-500 mt-2">Check back later for new listings</p>
-            </div>
-        {% endif %}
-
-        <!-- Empty state when no query and no ads -->
-        {% if not query and not ads %}
-            <div class="text-center py-12 bg-white rounded-lg">
-                <p class="text-gray-600 text-lg">No ads available yet</p>
-                <p class="text-gray-500 mt-2">Be the first to create an ad via Telegram!</p>
-            </div>
-        {% endif %}
+        <!-- Dynamic content (ad grid, suggestions, pagination) -->
+        <div id="ad-list">
+            {% include "ads/partials/ad_list.html" %}
+        </div>
     </main>
 
     {% include "components/consent_banner.html" %}

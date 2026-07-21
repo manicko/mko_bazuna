@@ -1,0 +1,119 @@
+{#
+    Partial template for ad list grid (HTMX fragment).
+    Renders the ad cards grid, pagination, and status messages.
+    XSS-safe via Django autoescape.
+#}
+
+<!-- Did-you-mean suggestions -->
+{% if suggested_category %}
+    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+        <p class="text-sm text-blue-800">
+            Did you mean: <a href="{% url 'ads:listings' suggested_category %}" class="underline font-medium">{{ suggested_category }}</a>?
+        </p>
+    </div>
+{% endif %}
+
+{% if suggested_city %}
+    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+        <p class="text-sm text-blue-800">
+            Did you mean: <a href="{% url 'ads:listings_city' suggested_city %}" class="underline font-medium">{{ suggested_city }}</a>?
+        </p>
+    </div>
+{% endif %}
+
+<!-- Ads grid -->
+{% if page_obj %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for ad in page_obj %}
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="{% url 'ads:detail' ad.id %}" class="block">
+                    {% if ad.images.first %}
+                        <img 
+                            src="{{ ad.images.first.image_url }}" 
+                            alt="{{ ad.title }}"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                        >
+                    {% else %}
+                        <div class="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
+                            <span class="text-gray-500">No image</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
+                        
+                        {% if ad.price %}
+                            <p class="text-blue-600 font-bold text-xl mb-2">{{ ad.price }} BAM</p>
+                        {% endif %}
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">{{ ad.description }}</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>{{ ad.city.get_name|default:ad.city.name }}</span>
+                            <span>{{ ad.category.get_name|default:ad.category.name }}</span>
+                            <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
+                                {{ ad.published_at|date:'M d' }}
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="mt-8 flex justify-center gap-1" aria-label="Page navigation">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-target="#ad-list" hx-swap="innerHTML"
+                   class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&laquo;&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-get="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-target="#ad-list" hx-swap="innerHTML"
+                   class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&laquo;</a>
+            {% endif %}
+
+            {% for page_num in page_obj.paginator.page_range %}
+                {% if page_num == page_obj.number %}
+                    <span class="px-3 py-2 rounded-lg text-sm font-medium text-white bg-blue-600">{{ page_num }}</span>
+                {% elif page_num > page_obj.number|add:"-3" and page_num < page_obj.number|add:"3" %}
+                    <a href="?page={{ page_num }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                       hx-get="?page={{ page_num }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                       hx-target="#ad-list" hx-swap="innerHTML"
+                       class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">{{ page_num }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-get="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-target="#ad-list" hx-swap="innerHTML"
+                   class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&raquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-get="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
+                   hx-target="#ad-list" hx-swap="innerHTML"
+                   class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&raquo;&raquo;</a>
+            {% endif %}
+        </nav>
+    {% endif %}
+{% elif has_results is False and query %}
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No results found for "{{ query }}"</p>
+        <p class="text-gray-500 mt-2">Try a different search term or browse all categories</p>
+    </div>
+{% elif has_results is False %}
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No ads available</p>
+        <p class="text-gray-500 mt-2">Check back later for new listings</p>
+    </div>
+{% endif %}
+
+<!-- Empty state when no query and no ads -->
+{% if not query and not page_obj %}
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No ads available yet</p>
+        <p class="text-gray-500 mt-2">Be the first to create an ad via Telegram!</p>
+    </div>
+{% endif %}

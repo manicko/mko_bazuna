@@ -16,6 +16,7 @@ from apps.search.services.query_translator import translate_query_bs_to_ru
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +30,16 @@ def search(request: HttpRequest) -> HttpResponse:
         - One-word queries apply fuzzy category detection
         - GIN index used for search_vector (Task 5)
         - Records SEARCH_PERFORMED analytics event
+        - Paginated results (24 per page) with HTMX partial support
 
     Args:
         request: HTTP request with 'q' query parameter
 
     Returns:
-        Rendered search results page
+        Rendered search results page (full or HTMX partial)
     """
+    PER_PAGE = 24
+
     query = (request.GET.get("q") or "").strip()
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
 
@@ -65,19 +69,25 @@ def search(request: HttpRequest) -> HttpResponse:
             rank=SearchRank("search_vector", search_query)
         ).filter(search_vector=search_query).order_by("-rank")
 
-    has_results = ads.exists() if query else False
+    # Paginate results
+    paginator = Paginator(ads, PER_PAGE)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    total_count = int(paginator.count)
+    has_results = total_count > 0
     if query and not has_results:
         logger.info(f"Empty search results for query '{query}'")
 
     context = {
-        "ads": ads,
+        "page_obj": page_obj,
         "query": query,
         "has_results": has_results,
     }
 
     # HTMX partial rendering support
     if request.headers.get("HX-Request"):
-        return render(request, "ads/list.html", context)
+        return render(request, "ads/partials/ad_list.html", context)
 
     return render(request, "ads/list.html", context)
 

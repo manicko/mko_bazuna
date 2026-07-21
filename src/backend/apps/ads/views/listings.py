@@ -15,6 +15,7 @@ from apps.locations.models import City
 from apps.users.views.consent import is_consent_given
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
+from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 
@@ -104,14 +105,20 @@ def listings(
         - ?sort=price_asc: lowest price first
         - ?sort=price_desc: highest price first
 
+    Pagination:
+        - 24 ads per page via Django Paginator
+        - HTMX partial renders only the ad grid fragment
+
     Args:
         request: HTTP request with optional query params
         category_slug: Optional category slug for filtering
         city_slug: Optional city slug for filtering
 
     Returns:
-        Rendered listings page with ads and suggestions
+        Rendered listings page (full or HTMX partial)
     """
+    PER_PAGE = 24
+
     # Start with only published ads
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related(
         "category", "city", "user"
@@ -174,25 +181,32 @@ def listings(
     else:  # date_desc (default)
         ads = ads.order_by("-published_at")
 
-    # Check for empty results
-    has_results = ads.exists()
+    # Paginate results
+    paginator = Paginator(ads, PER_PAGE)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    total_count = int(paginator.count)
+    has_results = total_count > 0
     if not has_results:
         logger.info("Empty listing results")
 
     context = {
-        "ads": ads,
+        "page_obj": page_obj,
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "current_category": category_slug,
         "current_city": city_slug,
         "current_sort": sort,
+        "min_price": min_price,
+        "max_price": max_price,
         "has_results": has_results,
         "consent_shown": is_consent_given(request),
     }
 
     # HTMX partial rendering support
     if request.headers.get("HX-Request"):
-        return render(request, "ads/list.html", context)
+        return render(request, "ads/partials/ad_list.html", context)
 
     return render(request, "ads/list.html", context)
 
