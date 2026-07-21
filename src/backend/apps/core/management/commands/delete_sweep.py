@@ -14,6 +14,7 @@ from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -34,32 +35,33 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the delete sweep command with advisory lock."""
-        dry_run: bool = options["dry_run"]
+            """Execute the delete sweep command with advisory lock."""
+            dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
-            # Query using the IX_ads_delete_sweep partial index
-            # Status is ARCHIVED, published_at older than 4 months
-            cutoff_date = timezone.now() - timedelta(days=120)
+            with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                    # Query using the IX_ads_delete_sweep partial index
+                    # Status is ARCHIVED, published_at older than 4 months
+                    cutoff_date = timezone.now() - timedelta(days=120)
 
-            queryset = Ad.objects.filter(
-                status=AdStatus.ARCHIVED,
-                published_at__lt=cutoff_date,
-            )
+                    queryset = Ad.objects.filter(
+                        status=AdStatus.ARCHIVED,
+                        published_at__lt=cutoff_date,
+                    )
 
-            count = queryset.count()
+                    count = queryset.count()
 
-            if dry_run:
-                logger.info(
-                    "DRY RUN: Would delete %d ads with ARCHIVED status older than 4 months",
-                    count,
-                )
-                return
+                    if dry_run:
+                        logger.info(
+                            "DRY RUN: Would delete %d ads with ARCHIVED status older than 4 months",
+                            count,
+                        )
+                        return
 
-            # Delete atomically - CASCADE will handle ad_images
-            deleted_count, _ = queryset.delete()
+                    # Delete atomically - CASCADE will handle ad_images
+                    deleted_count, _ = queryset.delete()
 
-            logger.info(
-                "Deleted %d ads with ARCHIVED status older than 4 months",
-                deleted_count,
-            )
+                    logger.info(
+                        "Deleted %d ads with ARCHIVED status older than 4 months",
+                        deleted_count,
+                    )

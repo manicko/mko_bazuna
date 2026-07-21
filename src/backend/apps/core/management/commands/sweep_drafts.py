@@ -13,6 +13,7 @@ from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -33,31 +34,32 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the draft sweep command with advisory lock."""
-        dry_run: bool = options["dry_run"]
+            """Execute the draft sweep command with advisory lock."""
+            dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.SWEEP_DRAFTS):
-            # Query draft ads older than 30 minutes
-            cutoff_date = timezone.now() - timedelta(minutes=30)
+            with advisory_lock(AdvisoryLockId.SWEEP_DRAFTS):
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                    # Query draft ads older than 30 minutes
+                    cutoff_date = timezone.now() - timedelta(minutes=30)
 
-            queryset = Ad.objects.filter(
-                status=AdStatus.DRAFT,
-                created_at__lt=cutoff_date,
-            )
+                    queryset = Ad.objects.filter(
+                        status=AdStatus.DRAFT,
+                        created_at__lt=cutoff_date,
+                    )
 
-            count = queryset.count()
+                    count = queryset.count()
 
-            if dry_run:
-                logger.info(
-                    "DRY RUN: Would delete %d draft ads older than 30 minutes",
-                    count,
-                )
-                return
+                    if dry_run:
+                        logger.info(
+                            "DRY RUN: Would delete %d draft ads older than 30 minutes",
+                            count,
+                        )
+                        return
 
-            # Delete atomically - CASCADE will handle ad_images
-            deleted_count, _ = queryset.delete()
+                    # Delete atomically - CASCADE will handle ad_images
+                    deleted_count, _ = queryset.delete()
 
-            logger.info(
-                "Deleted %d draft ads older than 30 minutes",
-                deleted_count,
-            )
+                    logger.info(
+                        "Deleted %d draft ads older than 30 minutes",
+                        deleted_count,
+                    )

@@ -27,6 +27,14 @@ def advisory_lock(lock_id: int, *, session: bool = False):
                  Session locks must be explicitly released; transaction locks release
                  on commit/rollback.
 
+    Important:
+        Transaction-scoped locks (session=False) are released at the end of the
+        current database transaction. Callers **must** wrap the entire operation
+        (from first queryset op to final update/delete) inside
+        ``transaction.atomic()`` to ensure the lock covers the full count-to-mutate
+        sequence. Without an explicit transaction, Django's autocommit mode releases
+        the lock after each individual statement.
+
     Lock ID allocation (see AdvisoryLockId enum in apps.core.enums):
         - Phase 4 jobs: 1-5 (archive_sweep, delete_sweep, consent_hard_delete,
                              sweep_drafts, cleanup_login_tokens)

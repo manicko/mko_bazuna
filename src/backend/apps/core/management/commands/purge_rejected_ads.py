@@ -14,6 +14,7 @@ from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -34,33 +35,34 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the purge command with advisory lock."""
-        dry_run: bool = options["dry_run"]
+            """Execute the purge command with advisory lock."""
+            dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.PURGE_REJECTED_ADS):
-            # Query using the IX_ads_rejected_sweep partial index
-            # Status is REJECTED, rejected_at older than 90 days
-            cutoff_date = timezone.now() - timedelta(days=90)
+            with advisory_lock(AdvisoryLockId.PURGE_REJECTED_ADS):
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                    # Query using the IX_ads_rejected_sweep partial index
+                    # Status is REJECTED, rejected_at older than 90 days
+                    cutoff_date = timezone.now() - timedelta(days=90)
 
-            queryset = Ad.objects.filter(
-                status=AdStatus.REJECTED,
-                rejected_at__lt=cutoff_date,
-            )
+                    queryset = Ad.objects.filter(
+                        status=AdStatus.REJECTED,
+                        rejected_at__lt=cutoff_date,
+                    )
 
-            count = queryset.count()
+                    count = queryset.count()
 
-            if dry_run:
-                logger.info(
-                    "DRY RUN: Would delete %d ads with REJECTED status older than 90 days",
-                    count,
-                )
-                return
+                    if dry_run:
+                        logger.info(
+                            "DRY RUN: Would delete %d ads with REJECTED status older than 90 days",
+                            count,
+                        )
+                        return
 
-            # Delete atomically - CASCADE will handle ad_images
-            # ModeratorActionLog.ad_id will be SET NULL due to on_delete=models.SET_NULL
-            deleted_count, _ = queryset.delete()
+                    # Delete atomically - CASCADE will handle ad_images
+                    # ModeratorActionLog.ad_id will be SET NULL due to on_delete=models.SET_NULL
+                    deleted_count, _ = queryset.delete()
 
-            logger.info(
-                "Deleted %d ads with REJECTED status older than 90 days",
-                deleted_count,
-            )
+                    logger.info(
+                        "Deleted %d ads with REJECTED status older than 90 days",
+                        deleted_count,
+                    )

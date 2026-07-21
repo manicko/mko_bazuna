@@ -13,6 +13,7 @@ from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -33,32 +34,33 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the purge command with advisory lock."""
-        dry_run: bool = options["dry_run"]
+            """Execute the purge command with advisory lock."""
+            dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.PURGE_FAILED_ADS):
-            # Query using the IX_ads_purge_failed partial index
-            # Status is ON_MODERATION_FAILED, moderation_failed_at older than 7 days
-            cutoff_date = timezone.now() - timedelta(days=7)
+            with advisory_lock(AdvisoryLockId.PURGE_FAILED_ADS):
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                    # Query using the IX_ads_purge_failed partial index
+                    # Status is ON_MODERATION_FAILED, moderation_failed_at older than 7 days
+                    cutoff_date = timezone.now() - timedelta(days=7)
 
-            queryset = Ad.objects.filter(
-                status=AdStatus.ON_MODERATION_FAILED,
-                moderation_failed_at__lt=cutoff_date,
-            )
+                    queryset = Ad.objects.filter(
+                        status=AdStatus.ON_MODERATION_FAILED,
+                        moderation_failed_at__lt=cutoff_date,
+                    )
 
-            count = queryset.count()
+                    count = queryset.count()
 
-            if dry_run:
-                logger.info(
-                    "DRY RUN: Would delete %d ads with ON_MODERATION_FAILED status older than 7 days",
-                    count,
-                )
-                return
+                    if dry_run:
+                        logger.info(
+                            "DRY RUN: Would delete %d ads with ON_MODERATION_FAILED status older than 7 days",
+                            count,
+                        )
+                        return
 
-            # Delete atomically - CASCADE will handle ad_images
-            deleted_count, _ = queryset.delete()
+                    # Delete atomically - CASCADE will handle ad_images
+                    deleted_count, _ = queryset.delete()
 
-            logger.info(
-                "Deleted %d ads with ON_MODERATION_FAILED status older than 7 days",
-                deleted_count,
-            )
+                    logger.info(
+                        "Deleted %d ads with ON_MODERATION_FAILED status older than 7 days",
+                        deleted_count,
+                    )

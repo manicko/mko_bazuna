@@ -37,42 +37,42 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the consent hard-delete command with advisory lock."""
-        dry_run: bool = options["dry_run"]
+            """Execute the consent hard-delete command with advisory lock."""
+            dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.CONSENT_HARD_DELETE):
-            # Query using the IX_users_erasure_sweep index
-            # consent_revoked_at is not null and older than 30 days
-            cutoff_date = timezone.now() - timedelta(days=30)
+            with advisory_lock(AdvisoryLockId.CONSENT_HARD_DELETE):
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                    # Query using the IX_users_erasure_sweep index
+                    # consent_revoked_at is not null and older than 30 days
+                    cutoff_date = timezone.now() - timedelta(days=30)
 
-            queryset = User.objects.filter(
-                consent_revoked_at__isnull=False,
-                consent_revoked_at__lt=cutoff_date,
-            )
+                    queryset = User.objects.filter(
+                        consent_revoked_at__isnull=False,
+                        consent_revoked_at__lt=cutoff_date,
+                    )
 
-            count = queryset.count()
+                    count = queryset.count()
 
-            if dry_run:
-                logger.info(
-                    "DRY RUN: Would hard-delete %d users with consent revoked over 30 days ago",
-                    count,
-                )
-                return
+                    if dry_run:
+                        logger.info(
+                            "DRY RUN: Would hard-delete %d users with consent revoked over 30 days ago",
+                            count,
+                        )
+                        return
 
-            # Collect user IDs for logging before processing
-            user_ids = list(queryset.values_list("id", flat=True))
+                    # Collect user IDs for logging before processing
+                    user_ids = list(queryset.values_list("id", flat=True))
 
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-                # Null out analytics_events.user_id (preserves aggregate history)
-                AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
+                    # Null out analytics_events.user_id (preserves aggregate history)
+                    AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
 
-                # Null out moderation_action_logs.user_id (preserves history)
-                ModeratorActionLog.objects.filter(user_id__in=user_ids).update(user_id=None)
+                    # Null out moderation_action_logs.user_id (preserves history)
+                    ModeratorActionLog.objects.filter(user_id__in=user_ids).update(user_id=None)
 
-                # Delete users - CASCADE will handle their ads (and ad_images via ORM)
-                deleted_count, _ = queryset.delete()
+                    # Delete users - CASCADE will handle their ads (and ad_images via ORM)
+                    deleted_count, _ = queryset.delete()
 
-            logger.info(
-                "Hard-deleted %d users with consent revoked over 30 days ago",
-                deleted_count,
-            )
+                    logger.info(
+                        "Hard-deleted %d users with consent revoked over 30 days ago",
+                        deleted_count,
+                    )
