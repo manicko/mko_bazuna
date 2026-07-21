@@ -17,6 +17,8 @@ from apps.users.models import User
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction
+from apps.ads.models import AdImage
+from telegram_bot.services.media import delete_photo
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,13 @@ class Command(BaseCommand):
                     # Collect user IDs for logging before processing
                     user_ids = list(queryset.values_list("id", flat=True))
 
+                    # Collect storage keys for physical media cleanup before ORM cascade
+                    storage_keys = list(
+                        AdImage.objects.filter(ad__user_id__in=user_ids).values_list(
+                            "image", flat=True
+                        )
+                    )
+
                     # Null out analytics_events.user_id (preserves aggregate history)
                     AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
 
@@ -72,7 +81,13 @@ class Command(BaseCommand):
                     # Delete users - CASCADE will handle their ads (and ad_images via ORM)
                     deleted_count, _ = queryset.delete()
 
+                    # Remove physical media files after ORM cascade
+                    for storage_key in storage_keys:
+                        delete_photo(storage_key)
+
                     logger.info(
-                        "Hard-deleted %d users with consent revoked over 30 days ago",
+                        "Hard-deleted %d users with consent revoked over 30 days ago. "
+                        "Removed %d media files.",
                         deleted_count,
+                        len(storage_keys),
                     )
