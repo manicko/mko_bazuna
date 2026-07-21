@@ -1,83 +1,180 @@
-# Rollout ordering for mandatory-findings implementation plan
-# Source: .ai/plans/architecture_testing_plan.md (Appendix B mandatory findings 1-5)
-# Numbering = execution order (sortable). No circular dependencies.
+# Rollout ordering for validated findings across all 11 audit phases.
+# Topologically sorted: every `depends_on` entry has a lower task number.
+# Research gates (001-005) are prerequisites; implementation tasks blocked by
+# them carry `status: blocked` until the research issues a "go" recommendation.
+# File-collision chains use `depends_on_previous_task_in_chain` (see task files).
 
 tasks:
-  # ── Parallel start group (independent research / no-dep implementation) ──
-  - id: task_001_research_query_translator_timeout
-    order: 1
+  # ── Research gates (prerequisites, run in parallel) ──
+  - id: task_001_research_boot_packaging
+    depends_on: []
+  - id: task_002_research_bot_bootstrap
+    depends_on: []
+  - id: task_003_research_pii_chat_id
+    depends_on: []
+  - id: task_004_research_media_gate
+    depends_on: []
+  - id: task_005_research_login_flow
     depends_on: []
 
-  - id: task_003_rewrite_test_contact_real_function
-    order: 2
+  # ── Wave 1: Boot / config foundation ──
+  - id: task_006_fix_container_boot
+    depends_on: [task_001_research_boot_packaging]
+  - id: task_007_fix_bot_import_order
+    depends_on: [task_002_research_bot_bootstrap]
+  - id: task_008_bot_token_failfast
+    depends_on: []
+  - id: task_009_postgres_password_failfast
+    depends_on: [task_008_bot_token_failfast]
+  - id: task_010_web_restart_policy
+    depends_on: []
+  - id: task_011_env_dev_placeholders
+    depends_on: []
+  - id: task_012_delete_orphan_env
+    depends_on: []
+  - id: task_013_remove_root_scripts
     depends_on: []
 
-  - id: task_004_research_ad_transition_centralization
-    order: 3
+  # ── Wave 2: Async/sync event-loop fixes (ad_create.py chain) ──
+  - id: task_014_wrap_save_photo
+    depends_on: [task_007_fix_bot_import_order]
+  - id: task_015_wrap_translate
+    depends_on: [task_014_wrap_save_photo]
+  - id: task_016_exif_strip
+    depends_on: [task_014_wrap_save_photo]
+
+  # ── Wave 3: DB atomicity ──
+  - id: task_017_atomic_domain_writes
+    depends_on: [task_016_exif_strip]
+  - id: task_018_atomic_sweeps
+    depends_on: [task_017_atomic_domain_writes]
+  - id: task_019_login_getorcreate_race
+    depends_on: []
+  - id: task_020_coalesce_orm
     depends_on: []
 
-  - id: task_007_consent_hard_delete_atomic
-    order: 4
+  # ── Wave 4: Shared media delete helper (+ storage-key cleanup) ──
+  - id: task_021_media_delete_helper
+    depends_on: []
+  - id: task_022_drop_unused_storage_key
+    depends_on: [task_021_media_delete_helper]
+  - id: task_023_storage_key_excl_guard
+    depends_on: [task_021_media_delete_helper]
+  - id: task_024_draft_photo_cleanup
+    depends_on: [task_017_atomic_domain_writes, task_021_media_delete_helper]
+
+  # ── Wave 5: Login / auth web flow (gated by research_login_flow) ──
+  - id: task_025_token_issuance
+    depends_on: [task_005_research_login_flow, task_006_fix_container_boot]
+  - id: task_026_web_consumption
+    depends_on: [task_025_token_issuance, task_005_research_login_flow]
+  - id: task_027_web_session_poll
+    depends_on: [task_026_web_consumption, task_005_research_login_flow]
+  - id: task_028_claim_toctou_fix
+    depends_on: [task_019_login_getorcreate_race, task_005_research_login_flow]
+  - id: task_029_claim_docstring_fix
+    depends_on: [task_028_claim_toctou_fix]
+
+  # ── Wave 6: Moderation / ad lifecycle ──
+  - id: task_030_bot_publish_via_service
+    depends_on: [task_017_atomic_domain_writes, task_024_draft_photo_cleanup]
+  - id: task_031_approve_original_published
+    depends_on: [task_030_bot_publish_via_service]
+  - id: task_032_contact_delegate
+    depends_on: []
+  - id: task_033_adsort_strenum
     depends_on: []
 
-  - id: task_008_invalidate_tokens_on_withdraw
-    order: 5
+  # ── Wave 7: PII / consent (gated by research_pii_chat_id) ──
+  - id: task_034_pii_chat_id
+    depends_on: [task_003_research_pii_chat_id, task_007_fix_bot_import_order]
+  - id: task_035_withdraw_route
+    depends_on: [task_034_pii_chat_id]
+  - id: task_036_decline_blocks_login
+    depends_on: [task_034_pii_chat_id]
+  - id: task_037_deletion_timezone
+    depends_on: [task_035_withdraw_route]
+  - id: task_038_withdraw_null_names
+    depends_on: [task_037_deletion_timezone]
+  - id: task_039_harddelete_media
+    depends_on: [task_017_atomic_domain_writes, task_021_media_delete_helper, task_034_pii_chat_id]
+  - id: task_040_withdraw_fsm_cleanup
+    depends_on: [task_021_media_delete_helper, task_035_withdraw_route]
+  - id: task_041_hard_delete_at_doc
+    depends_on: [task_034_pii_chat_id]
+  - id: task_042_logs_no_telegram_id
+    depends_on: [task_036_decline_blocks_login]
+  - id: task_043_user_str_admin
+    depends_on: [task_034_pii_chat_id]
+
+  # ── Wave 8: Media access gate (gated by research_media_gate) ──
+  - id: task_044_media_access_gate
+    depends_on: [task_004_research_media_gate, task_021_media_delete_helper]
+  - id: task_045_sweep_photo_unlink
+    depends_on: [task_021_media_delete_helper, task_018_atomic_sweeps]
+  - id: task_046_media_security_tests
+    depends_on: [task_044_media_access_gate, task_045_sweep_photo_unlink, task_016_exif_strip]
+
+  # ── Wave 9: Search / FTS + external hardening ──
+  - id: task_047_query_timeout_nonblock
     depends_on: []
+  - id: task_048_category_descendants
+    depends_on: []
+  - id: task_049_search_pagination_htmx
+    depends_on: [task_033_adsort_strenum]
+  - id: task_050_search_docs_cleanup
+    depends_on: []
+  - id: task_051_sanitize_query_logs
+    depends_on: []
+  - id: task_052_narrow_except
+    depends_on: []
+  - id: task_053_analytics_after_search
+    depends_on: []
+  - id: task_054_translation_circuit_breaker
+    depends_on: [task_047_query_timeout_nonblock]
+  - id: task_055_hsts_headers
+    depends_on: [task_044_media_access_gate]
+  - id: task_056_contact_anon_name
+    depends_on: [task_032_contact_delegate]
+  - id: task_057_translation_privacy_doc
+    depends_on: []
+  - id: task_058_bot_healthcheck
+    depends_on: [task_010_web_restart_policy]
 
-  # ── Blocked by research gates ──
-  - id: task_002_fix_query_translator_timeout
-    order: 6
-    depends_on:
-      - task_001_research_query_translator_timeout
+  # ── Wave 10: Test coverage ──
+  - id: task_059_ci_coverage
+    depends_on: []
+  - id: task_060_bot_test_package
+    depends_on: [task_006_fix_container_boot, task_007_fix_bot_import_order]
+  - id: task_061_login_claim_tests
+    depends_on: [task_028_claim_toctou_fix, task_026_web_consumption]
+  - id: task_062_ad_lifecycle_tests
+    depends_on: [task_030_bot_publish_via_service]
+  - id: task_063_web_view_tests
+    depends_on: [task_027_web_session_poll, task_048_category_descendants, task_049_search_pagination_htmx]
+  - id: task_064_migration_idempotency
+    depends_on: [task_034_pii_chat_id]
+  - id: task_065_translation_fallback_tests
+    depends_on: [task_047_query_timeout_nonblock]
+  - id: task_066_media_tests
+    depends_on: [task_021_media_delete_helper, task_016_exif_strip]
+  - id: task_067_automod_test_coupling
+    depends_on: [task_030_bot_publish_via_service]
+  - id: task_068_account_state_tests
+    depends_on: [task_036_decline_blocks_login, task_037_deletion_timezone]
+  - id: task_069_contact_regex_import
+    depends_on: [task_032_contact_delegate]
+  - id: task_070_test_markers
+    depends_on: [task_059_ci_coverage]
 
-  - id: task_005_add_ad_transition_to
-    order: 7
-    depends_on:
-      - task_004_research_ad_transition_centralization
-
-  # ── Sequential chain: model method -> wire callers (same transition surface) ──
-  - id: task_006_wire_views_to_transition_to
-    order: 8
-    depends_on:
-      - task_005_add_ad_transition_to
-
-  # ── Final verification gate (after all implementations) ──
-  - id: task_009_verify_rollout
-    order: 9
-    depends_on:
-      - task_002_fix_query_translator_timeout
-      - task_003_rewrite_test_contact_real_function
-      - task_005_add_ad_transition_to
-      - task_006_wire_views_to_transition_to
-      - task_007_consent_hard_delete_atomic
-      - task_008_invalidate_tokens_on_withdraw
-
-# ── Execution DAG (parallel groups) ──
-parallel_groups:
-  - group: 1
-    runs_in_parallel:
-      - task_001_research_query_translator_timeout
-      - task_003_rewrite_test_contact_real_function
-      - task_004_research_ad_transition_centralization
-      - task_007_consent_hard_delete_atomic
-      - task_008_invalidate_tokens_on_withdraw
-  - group: 2
-    runs_after: group 1
-    runs_in_parallel:
-      - task_002_fix_query_translator_timeout   # needs T001 go
-      - task_005_add_ad_transition_to           # needs T004 go
-  - group: 3
-    runs_after: group 2
-    sequential:
-      - task_006_wire_views_to_transition_to    # needs T005
-  - group: 4
-    runs_after: group 3
-    sequential:
-      - task_009_verify_rollout                 # needs all implementations
-
-notes:
-  - Tasks modifying the same file execute sequentially; only one task per file in this plan
-    except moderation_log.py / auto_moderation path which is isolated to T006.
-  - T002 and T005 are BLOCKED until their research gates (T001, T004) return "go".
-  - T009 is the single verification gate; failure returns the specific task to rework.
-  - All DB-backed tests require real PostgreSQL 18 (CI: docker-compose.test.yml), per plan axiom 1.
+  # ── Wave 11: Verification (multi-stage / high-risk) ──
+  - id: task_071_verify_boot
+    depends_on: [task_006_fix_container_boot, task_007_fix_bot_import_order, task_008_bot_token_failfast, task_009_postgres_password_failfast, task_010_web_restart_policy]
+  - id: task_072_verify_login
+    depends_on: [task_025_token_issuance, task_026_web_consumption, task_027_web_session_poll, task_028_claim_toctou_fix]
+  - id: task_073_verify_media
+    depends_on: [task_044_media_access_gate, task_045_sweep_photo_unlink, task_046_media_security_tests]
+  - id: task_074_verify_pii
+    depends_on: [task_034_pii_chat_id, task_035_withdraw_route, task_036_decline_blocks_login, task_039_harddelete_media, task_040_withdraw_fsm_cleanup]
+  - id: task_075_verify_final
+    depends_on: [task_071_verify_boot, task_072_verify_login, task_073_verify_media, task_074_verify_pii, task_059_ci_coverage, task_060_bot_test_package]

@@ -18,6 +18,12 @@ build/
 media/
 staticfiles/   # если collectstatic уже делал локально
 
+# Локальные базы данных — не должны попадать в образ контейнера
+*.sqlite3
+*.sqlite
+*.db
+src/backend/mko_bazuna
+
 # IDE / редакторы
 .vscode/
 .idea/

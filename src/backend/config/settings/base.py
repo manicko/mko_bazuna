@@ -136,12 +136,16 @@ else:
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# STATIC_ROOT lives at /app/staticfiles so it matches the path copied out of the
+# builder stage in docker/Dockerfile and served by whitenoise at runtime.
+STATIC_ROOT = BASE_DIR.parent / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Media files
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# MEDIA_ROOT lives at /app/media so uploads land on the media_volume mount
+# (media_volume:/app/media for web/bot, shared with nginx via media_volume).
+MEDIA_ROOT = BASE_DIR.parent / "media"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

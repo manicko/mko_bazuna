@@ -36,3 +36,6 @@ acceptance_criteria:
   - integrated flow design with endpoints and atomic guarantees
   - list of consumers / nginx wiring provided
   - explicit go / go-with-changes verdict emitted
+
+outcome:
+  - report: C:\py_dev\mko_bazuna\.ai\tasks\research\TASK_005_login_flow_recommendation.md

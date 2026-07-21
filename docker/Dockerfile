@@ -28,6 +28,10 @@ RUN uv sync --frozen --no-install-project
 # Copy source code
 COPY . .
 
+# Make the real source layout importable without repackaging the project.
+# src/backend -> apps, config ; src -> telegram_bot
+ENV PYTHONPATH=/app/src/backend:/app/src
+
 # Build Tailwind CSS and collect static files
 # TAILWIND_APP_NAME is the default theme app name for django-tailwind
 ENV TAILWIND_APP_NAME=theme
@@ -68,6 +72,8 @@ RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:$PATH"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+# Make the real source layout importable at runtime (web/bot/migrate/scheduler)
+ENV PYTHONPATH=/app/src/backend:/app/src
 
 # Runtime volume for media (writable)
 VOLUME ["/app/media"]

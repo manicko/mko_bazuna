@@ -10,6 +10,23 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.test")
 if "DJANGO_SECRET_KEY" not in os.environ:
     os.environ["DJANGO_SECRET_KEY"] = "test-secret-key-for-validation-only"
 
+# Local PostgreSQL connection for host-side `uv run pytest`.
+# `uv run` does NOT auto-load .env files, so the DB config from src/backend/.env
+# is not picked up automatically. Load it explicitly if present, then guarantee a
+# working DATABASE_URL. Use 127.0.0.1 (not `localhost`) to avoid the Windows IPv6
+# (::1) connection timeout when Postgres is Docker-published on IPv4 only.
+# Override with a real DATABASE_URL env var if your database lives elsewhere.
+_local_env = Path(__file__).resolve().parent / "src" / "backend" / ".env"
+if _local_env.is_file():
+    import environ
+
+    environ.Env.read_env(str(_local_env), override=False)
+
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgres://postgres:postgres@127.0.0.1:5432/mko_bazuna",
+)
+
 import django
 
 django.setup()

@@ -176,7 +176,7 @@ def bulk_ban_users(queryset, moderator_id: int, reason: str) -> int:
             )
             count += 1
 
-    User.objects.filter(telegram_id__in=user_ids).update(is_banned=True)
+    User.objects.filter(id__in=user_ids).update(is_banned=True)
     return count
 
 

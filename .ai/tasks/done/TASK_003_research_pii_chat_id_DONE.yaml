@@ -34,3 +34,7 @@ acceptance_criteria:
   - migration plan with backfill documented
   - list of lookup call sites to rewrite provided
   - explicit go / go-with-changes verdict emitted
+
+
+outcome:
+  - report: C:\py_dev\mko_bazuna\.ai\tasks\research\T003_pii_chat_id.md

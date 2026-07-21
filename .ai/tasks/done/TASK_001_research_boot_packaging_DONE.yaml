@@ -35,3 +35,6 @@ acceptance_criteria:
   - recommendation document lists chosen strategy and affected entrypoints
   - no hidden consumers of the current (broken) import root identified
   - explicit go / go-with-changes verdict emitted
+
+outcome:
+  - report: C:\py_dev\mko_bazuna\.ai\tasks\research\TASK_001_boot_packaging_recommendation.md

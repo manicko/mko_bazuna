@@ -1427,6 +1427,292 @@
     "file": "backend/apps/ads/models.py"
   },
   {
+    "id": "1704498c",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "set",
+    "stable_hash": "1704498c",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "1704498c",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "set",
+    "stable_hash": "1704498c",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "1704498c",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "set",
+    "stable_hash": "1704498c",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "45c912a2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "AdStatus",
+    "stable_hash": "45c912a2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "3c4d74e3",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "ValueError",
+    "stable_hash": "3c4d74e3",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0337d6a5",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "0337d6a5",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "90a3f373",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "90a3f373",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "1e145cff",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1e145cff",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "a9cea364",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "a9cea364",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "1704498c",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "set",
+    "stable_hash": "1704498c",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "3c4d74e3",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "ValueError",
+    "stable_hash": "3c4d74e3",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "a22c01bf",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "join",
+    "stable_hash": "a22c01bf",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "0337d6a5",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "0337d6a5",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "4c6454d2",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "append",
+    "stable_hash": "4c6454d2",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "90a3f373",
+    "symbol_path": [
+      "Ad",
+      "transition_to"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "90a3f373",
+    "file": "backend/apps/ads/models.py"
+  },
+  {
     "id": "e7f0dbe4",
     "symbol_path": [
       "AdImage"
@@ -1520,6 +1806,508 @@
     "value": "uuid4",
     "stable_hash": "193efc64",
     "file": "backend/apps/ads/models.py"
+  },
+  {
+    "id": "3dfb4564",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3dfb4564",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "7624632e",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "7624632e",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "9bf6f472",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "9bf6f472",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "cb80b58b",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "cb80b58b",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "35981498",
+    "symbol_path": [
+      "seller"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "35981498",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "dbbdfc10",
+    "symbol_path": [
+      "seller"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "dbbdfc10",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "8b88bb6b",
+    "symbol_path": [
+      "_create_published_ad"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "8b88bb6b",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "971c6d0d",
+    "symbol_path": [
+      "_create_published_ad"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "971c6d0d",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "0785bffd",
+    "symbol_path": [
+      "_create_published_ad"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "0785bffd",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "7baca387",
+    "symbol_path": [
+      "_create_published_ad"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "7baca387",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "a7433ebc",
+    "symbol_path": [
+      "_create_published_ad"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "a7433ebc",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "16ac2cae",
+    "symbol_path": [
+      "_fts_match"
+    ],
+    "type": "function_call",
+    "value": "SearchQuery",
+    "stable_hash": "16ac2cae",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "3f40c8a3",
+    "symbol_path": [
+      "_fts_match"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "3f40c8a3",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "efd90293",
+    "symbol_path": [
+      "_fts_match"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "efd90293",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "6d5061fc",
+    "symbol_path": [
+      "_fts_match"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "6d5061fc",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "18adc637",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_insert_populates_search_vector"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "18adc637",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "8bd80fef",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_insert_populates_search_vector"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "8bd80fef",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "9c42343a",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_insert_populates_search_vector"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "9c42343a",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "e42588c9",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_insert_denormalizes_category_name"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "e42588c9",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "487422ff",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_insert_denormalizes_category_name"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "487422ff",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "a1e3992a",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_title_update_refreshes_search_vector"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "a1e3992a",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "4449b42b",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_title_update_refreshes_search_vector"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "4449b42b",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "b745c6ae",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_title_update_refreshes_search_vector"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "b745c6ae",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "d46d7f69",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_title_update_refreshes_search_vector"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "d46d7f69",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "d46d7f69",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_title_update_refreshes_search_vector"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "d46d7f69",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "1601e328",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_description_is_searchable"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "1601e328",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "ec512307",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_description_is_searchable"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "ec512307",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "58b0728d",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_category_rename_propagates"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "58b0728d",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "2a55204f",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_category_rename_propagates"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "2a55204f",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "507e4a0d",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_category_rename_propagates"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "507e4a0d",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "617076df",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_category_rename_propagates"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "617076df",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "a017ab63",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "a017ab63",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "a017ab63",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "a017ab63",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "5df1d516",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "SearchQuery",
+    "stable_hash": "5df1d516",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "5a062fe1",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "order_by",
+    "stable_hash": "5a062fe1",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "63ec9f10",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "63ec9f10",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "d12dd195",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "annotate",
+    "stable_hash": "d12dd195",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "63ec9f10",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "63ec9f10",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "d7f375f0",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_search_rank_orders_by_relevance"
+    ],
+    "type": "function_call",
+    "value": "SearchRank",
+    "stable_hash": "d7f375f0",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "43fb6c08",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "_create_published_ad",
+    "stable_hash": "43fb6c08",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "3438ed38",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "3438ed38",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "b5b15ee7",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "b5b15ee7",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "e6c17926",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "e6c17926",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "b5b15ee7",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "b5b15ee7",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "379cb693",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "379cb693",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "b5b15ee7",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "b5b15ee7",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
+  },
+  {
+    "id": "01ece7fc",
+    "symbol_path": [
+      "TestSearchVectorTrigger",
+      "test_unpublished_ads_excluded_from_search_view"
+    ],
+    "type": "function_call",
+    "value": "_fts_match",
+    "stable_hash": "01ece7fc",
+    "file": "backend/apps/ads/tests/test_search_triggers.py"
   },
   {
     "id": "40f02f60",
@@ -1800,23 +2588,13 @@
     "file": "backend/apps/ads/views/delete.py"
   },
   {
-    "id": "c46e98fc",
+    "id": "d3fab44a",
     "symbol_path": [
       "ad_delete"
     ],
     "type": "function_call",
-    "value": "now",
-    "stable_hash": "c46e98fc",
-    "file": "backend/apps/ads/views/delete.py"
-  },
-  {
-    "id": "f90fc011",
-    "symbol_path": [
-      "ad_delete"
-    ],
-    "type": "function_call",
-    "value": "save",
-    "stable_hash": "f90fc011",
+    "value": "transition_to",
+    "stable_hash": "d3fab44a",
     "file": "backend/apps/ads/views/delete.py"
   },
   {
@@ -2078,6 +2856,16 @@
     "file": "backend/apps/ads/views/edit.py"
   },
   {
+    "id": "16c6c419",
+    "symbol_path": [
+      "ad_edit"
+    ],
+    "type": "function_call",
+    "value": "transition_to",
+    "stable_hash": "16c6c419",
+    "file": "backend/apps/ads/views/edit.py"
+  },
+  {
     "id": "6a1d806f",
     "symbol_path": [
       "ad_edit"
@@ -2155,6 +2943,16 @@
     "type": "function_call",
     "value": "save",
     "stable_hash": "63fd5501",
+    "file": "backend/apps/ads/views/edit.py"
+  },
+  {
+    "id": "16c6c419",
+    "symbol_path": [
+      "ad_edit"
+    ],
+    "type": "function_call",
+    "value": "transition_to",
+    "stable_hash": "16c6c419",
     "file": "backend/apps/ads/views/edit.py"
   },
   {
@@ -2288,23 +3086,13 @@
     "file": "backend/apps/ads/views/edit.py"
   },
   {
-    "id": "5005ea71",
+    "id": "83bd27cd",
     "symbol_path": [
       "ad_archive"
     ],
     "type": "function_call",
-    "value": "now",
-    "stable_hash": "5005ea71",
-    "file": "backend/apps/ads/views/edit.py"
-  },
-  {
-    "id": "08c41f28",
-    "symbol_path": [
-      "ad_archive"
-    ],
-    "type": "function_call",
-    "value": "save",
-    "stable_hash": "08c41f28",
+    "value": "transition_to",
+    "stable_hash": "83bd27cd",
     "file": "backend/apps/ads/views/edit.py"
   },
   {
@@ -2378,13 +3166,13 @@
     "file": "backend/apps/ads/views/edit.py"
   },
   {
-    "id": "062f8604",
+    "id": "80b04916",
     "symbol_path": [
       "ad_reactivate"
     ],
     "type": "function_call",
-    "value": "save",
-    "stable_hash": "062f8604",
+    "value": "transition_to",
+    "stable_hash": "80b04916",
     "file": "backend/apps/ads/views/edit.py"
   },
   {
@@ -4458,6 +5246,17 @@
     "file": "backend/apps/core/management/commands/consent_hard_delete.py"
   },
   {
+    "id": "b2df3ed2",
+    "symbol_path": [
+      "Command",
+      "handle"
+    ],
+    "type": "function_call",
+    "value": "atomic",
+    "stable_hash": "b2df3ed2",
+    "file": "backend/apps/core/management/commands/consent_hard_delete.py"
+  },
+  {
     "id": "488ecc3c",
     "symbol_path": [
       "Command",
@@ -5262,58 +6061,379 @@
     "file": "backend/apps/core/templatetags/contact_tags.py"
   },
   {
-    "id": "9d0ed1d6",
+    "id": "09a4e1f3",
     "symbol_path": [
-      "TestCanContactSellerLogic",
-      "test_all_conditions_required_for_contact"
+      "seller"
     ],
-    "type": "function_call",
-    "value": "all",
-    "stable_hash": "9d0ed1d6",
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "09a4e1f3",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
-    "id": "74832156",
+    "id": "758361c6",
     "symbol_path": [
-      "TestCanContactSellerLogic",
-      "test_all_conditions_required_for_contact"
+      "seller"
     ],
     "type": "function_call",
-    "value": "values",
-    "stable_hash": "74832156",
+    "value": "create",
+    "stable_hash": "758361c6",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
-    "id": "9d0ed1d6",
+    "id": "2a975863",
     "symbol_path": [
-      "TestCanContactSellerLogic",
-      "test_all_conditions_required_for_contact"
+      "category"
     ],
-    "type": "function_call",
-    "value": "all",
-    "stable_hash": "9d0ed1d6",
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "2a975863",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
-    "id": "74832156",
+    "id": "909a32aa",
     "symbol_path": [
-      "TestCanContactSellerLogic",
-      "test_all_conditions_required_for_contact"
+      "category"
     ],
     "type": "function_call",
-    "value": "values",
-    "stable_hash": "74832156",
+    "value": "create",
+    "stable_hash": "909a32aa",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
-    "id": "113052cc",
+    "id": "dde709d5",
     "symbol_path": [
-      "TestContactPattern",
-      "test_contact_pattern_matches_ad_id"
+      "city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "dde709d5",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "87705d52",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "87705d52",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "8adb16cf",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "8adb16cf",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "9c47154c",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "9c47154c",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "4e47d1d5",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "4e47d1d5",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "9119e41d",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_all_conditions_true_returns_true"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "9119e41d",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "db64b94d",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_all_conditions_true_returns_true"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "db64b94d",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "74ed05ee",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_archived_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "74ed05ee",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "6491a239",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_archived_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "6491a239",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "511ed387",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_draft_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "511ed387",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "7192eb17",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_draft_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "7192eb17",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "f5662de3",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_on_moderation_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "f5662de3",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "24f1cedf",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_on_moderation_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "24f1cedf",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "9bb204c4",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_rejected_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "9bb204c4",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "2183467d",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_rejected_ad_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "2183467d",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "930677f9",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "MockAdWithTelegramIdNone",
+      "test_telegram_id_none_returns_false"
+    ],
+    "type": "function_call",
+    "value": "MockSeller",
+    "stable_hash": "930677f9",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "c5d957b4",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_telegram_id_none_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "c5d957b4",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "34b00e8f",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_telegram_id_none_returns_false"
+    ],
+    "type": "function_call",
+    "value": "MockAdWithSellerNone",
+    "stable_hash": "34b00e8f",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "c5d957b4",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_telegram_id_none_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "c5d957b4",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "f7946597",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_telegram_id_none_returns_false"
+    ],
+    "type": "function_call",
+    "value": "MockAdWithTelegramIdNone",
+    "stable_hash": "f7946597",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "43fc79fc",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_deleted_returns_false"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "43fc79fc",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "79f6f3d6",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_deleted_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "79f6f3d6",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "c80957f5",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_deleted_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "c80957f5",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "11fc875a",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_banned_returns_false"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "11fc875a",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "f95b0d9d",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_banned_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "f95b0d9d",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "336016fa",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_seller_banned_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "336016fa",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "dc0d6edd",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_consent_revoked_returns_false"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "dc0d6edd",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "d5d5436b",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_consent_revoked_returns_false"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "d5d5436b",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "d7ae3abf",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_consent_revoked_returns_false"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "d7ae3abf",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "32e91b54",
+    "symbol_path": [
+      "TestCanContactSellerLogic",
+      "test_consent_revoked_returns_false"
+    ],
+    "type": "function_call",
+    "value": "can_contact_seller",
+    "stable_hash": "32e91b54",
+    "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "89bafb5c",
+    "symbol_path": [
+      "TestContactPattern"
     ],
     "type": "function_call",
     "value": "compile",
-    "stable_hash": "113052cc",
+    "stable_hash": "89bafb5c",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
@@ -5380,17 +6500,6 @@
     "type": "function_call",
     "value": "match",
     "stable_hash": "ac89b7b0",
-    "file": "backend/apps/core/tests/test_contact.py"
-  },
-  {
-    "id": "ef27f28e",
-    "symbol_path": [
-      "TestContactPattern",
-      "test_contact_pattern_extracts_ad_id"
-    ],
-    "type": "function_call",
-    "value": "compile",
-    "stable_hash": "ef27f28e",
     "file": "backend/apps/core/tests/test_contact.py"
   },
   {
@@ -5425,6 +6534,2441 @@
     "value": "group",
     "stable_hash": "3d1ea0a6",
     "file": "backend/apps/core/tests/test_contact.py"
+  },
+  {
+    "id": "0e62d968",
+    "symbol_path": [
+      "seller"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "0e62d968",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e6ea0fc0",
+    "symbol_path": [
+      "seller"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "e6ea0fc0",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9df04ff9",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "9df04ff9",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "cce4f798",
+    "symbol_path": [
+      "category"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "cce4f798",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "490988d3",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "490988d3",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "fb93bf7e",
+    "symbol_path": [
+      "city"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "fb93bf7e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "67d22347",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "items",
+    "stable_hash": "67d22347",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "67d22347",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "items",
+    "stable_hash": "67d22347",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "33dd199c",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "33dd199c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "1daa1173",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "1daa1173",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "33dd199c",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "33dd199c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5badd545",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "5badd545",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "cf6c2f6e",
+    "symbol_path": [
+      "_make_ad"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "cf6c2f6e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e242072f",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_dry_run_does_not_mutate"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "e242072f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "2cf20c48",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_dry_run_does_not_mutate"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "2cf20c48",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "1b2c0e90",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_dry_run_does_not_mutate"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "1b2c0e90",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0c2590cd",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_dry_run_does_not_mutate"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "0c2590cd",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "30cb93cd",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_dry_run_does_not_mutate"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "30cb93cd",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6cc63db8",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "6cc63db8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9fe83522",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "9fe83522",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "bd3172df",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "bd3172df",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6cc63db8",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "6cc63db8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9fe83522",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "9fe83522",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "bd3172df",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "bd3172df",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "629af07b",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "629af07b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c4041c49",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "c4041c49",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c4041c49",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_archives_published_older_than_60_days"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "c4041c49",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "575f992e",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "575f992e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "85129add",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "85129add",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "66879caa",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "66879caa",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5074d31e",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "5074d31e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "90c4e253",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "90c4e253",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5074d31e",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "5074d31e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "776f1fe2",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "776f1fe2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0a338dc5",
+    "symbol_path": [
+      "TestArchiveSweep",
+      "test_idempotent_on_rerun"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "0a338dc5",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "1627ac5f",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "1627ac5f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "589bd288",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "589bd288",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f17b742f",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "f17b742f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c6a2dc16",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "c6a2dc16",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "7b434f93",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "generate_storage_key",
+    "stable_hash": "7b434f93",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3f254b61",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "3f254b61",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ea6a607e",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "ea6a607e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f1f9e457",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "f1f9e457",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8db55d37",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "8db55d37",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3be80bdb",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "3be80bdb",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b3e2383a",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "b3e2383a",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "087ef79b",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "087ef79b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4fec176c",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "generate_storage_key",
+    "stable_hash": "4fec176c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8db55d37",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "8db55d37",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3be80bdb",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "3be80bdb",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b3e2383a",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "b3e2383a",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c986164d",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "c986164d",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9a4d0852",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "9a4d0852",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4ee3f18b",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4ee3f18b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9a4d0852",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "9a4d0852",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4ee3f18b",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_deletes_archived_older_than_120_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4ee3f18b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f5b18259",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "f5b18259",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9a186f7d",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "9a186f7d",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ac950b98",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "ac950b98",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "cbbbc0b7",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "cbbbc0b7",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6d13f48b",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "generate_storage_key",
+    "stable_hash": "6d13f48b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0b0b1926",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "0b0b1926",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5cb9d86c",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "5cb9d86c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ac361beb",
+    "symbol_path": [
+      "TestDeleteSweep",
+      "test_cascades_ad_images"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "ac361beb",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "45554fdc",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "45554fdc",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3b328c4e",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "3b328c4e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9901139a",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "9901139a",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "235bfe02",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "235bfe02",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "924062ad",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "924062ad",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "d2991bed",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "d2991bed",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "47cfbf56",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "47cfbf56",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "a64cc4c1",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "a64cc4c1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b13b6916",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "b13b6916",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "47cfbf56",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "47cfbf56",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "a64cc4c1",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "a64cc4c1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b13b6916",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "b13b6916",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ac0af1ca",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "ac0af1ca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "814fb2ca",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "814fb2ca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6e8c6826",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "6e8c6826",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "814fb2ca",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "814fb2ca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6e8c6826",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_deletes_drafts_older_than_30_minutes"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "6e8c6826",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "802451b1",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "802451b1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "df7c70f8",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "df7c70f8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "118cb551",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "118cb551",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "479e80cf",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "479e80cf",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "19772604",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "19772604",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "fa1006d1",
+    "symbol_path": [
+      "TestSweepDrafts",
+      "test_does_not_touch_published_drafts"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "fa1006d1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e1db4d01",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "count",
+    "stable_hash": "e1db4d01",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0966096b",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "id",
+    "stable_hash": "0966096b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "7343c8cc",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "7343c8cc",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e4b5bcf1",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "e4b5bcf1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "80c78b94",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "80c78b94",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "da673425",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "da673425",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8c9fa72a",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "_make_token"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "8c9fa72a",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ae7cf5f9",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "_make_token",
+    "stable_hash": "ae7cf5f9",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e16f7510",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "e16f7510",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4207e5d0",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "4207e5d0",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5a3f5505",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "5a3f5505",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e4cc0cfd",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "e4cc0cfd",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6cb191ff",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "6cb191ff",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6036560e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "_make_token",
+    "stable_hash": "6036560e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "46599c4e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "46599c4e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f63fc5b2",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "f63fc5b2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6036560e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "_make_token",
+    "stable_hash": "6036560e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "46599c4e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "46599c4e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f63fc5b2",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "f63fc5b2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0a3aa5cd",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "0a3aa5cd",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "18d0864e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "18d0864e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "725a18db",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "725a18db",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "18d0864e",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "18d0864e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "725a18db",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_deletes_expired_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "725a18db",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "40d8adaa",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "_make_token",
+    "stable_hash": "40d8adaa",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "55aaa633",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "55aaa633",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ff14a007",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "ff14a007",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "55aaa633",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "55aaa633",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ff14a007",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "ff14a007",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "2f27a87d",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "2f27a87d",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "23c468a2",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "23c468a2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e1ac4060",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_recently_consumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "e1ac4060",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c4f3b897",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "_make_token",
+    "stable_hash": "c4f3b897",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ffcaee59",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "ffcaee59",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "bac8d713",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "bac8d713",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9225d2b9",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "9225d2b9",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "bb73c1ac",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "bb73c1ac",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "de48e05f",
+    "symbol_path": [
+      "TestCleanupLoginTokens",
+      "test_preserves_fresh_unconsumed_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "de48e05f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "754774ae",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "754774ae",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b03fe3ea",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "b03fe3ea",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "9b9ac27d",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "9b9ac27d",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "b5376888",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "b5376888",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "083451d3",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "083451d3",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4237c3db",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4237c3db",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e7518cd7",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "e7518cd7",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c541beb9",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "c541beb9",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "02552f86",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "02552f86",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "815204e5",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "815204e5",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "22824bdb",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "22824bdb",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0ad3a7c0",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "0ad3a7c0",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5e177ca7",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "5e177ca7",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0ad3a7c0",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "0ad3a7c0",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5e177ca7",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_hard_deletes_users_past_grace_period"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "5e177ca7",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "cd31100b",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "cd31100b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "313ce864",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "313ce864",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "18b589f7",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "18b589f7",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "fe67894c",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "fe67894c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "221024bd",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "221024bd",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "069f240c",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_analytics_event_user"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "069f240c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0c0cdcb8",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "0c0cdcb8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3e043c94",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "3e043c94",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f616aa4c",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "f616aa4c",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "1f118904",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "1f118904",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "79db40b5",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "79db40b5",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8f3d22aa",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_nulls_moderator_action_log_user"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "8f3d22aa",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ef895639",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "ef895639",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8bf5dfae",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "8bf5dfae",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ba015fb1",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "ba015fb1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f65fd87f",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "f65fd87f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "12845c03",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "12845c03",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "284a290e",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_does_not_delete_within_grace_period"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "284a290e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8426c777",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "8426c777",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3ae7adc4",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "3ae7adc4",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "6300a598",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "save",
+    "stable_hash": "6300a598",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c6c4a8a1",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "c6c4a8a1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c6c4a8a1",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "c6c4a8a1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e1428138",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "_CrashOnDeleteQuerySet",
+      "test_crash_between_updates_and_delete_rolls_back",
+      "count"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "e1428138",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4c2d6086",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "_CrashOnDeleteQuerySet",
+      "test_crash_between_updates_and_delete_rolls_back",
+      "values_list"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "4c2d6086",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8da62e9e",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "_CrashOnDeleteQuerySet",
+      "test_crash_between_updates_and_delete_rolls_back",
+      "delete"
+    ],
+    "type": "function_call",
+    "value": "RuntimeError",
+    "stable_hash": "8da62e9e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "8b726024",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "setattr",
+    "stable_hash": "8b726024",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "60a45829",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "_CrashOnDeleteQuerySet",
+    "stable_hash": "60a45829",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "145986b8",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "raises",
+    "stable_hash": "145986b8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ed1f2cf2",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "ed1f2cf2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0e19dd62",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "0e19dd62",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "0b599dda",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "0b599dda",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "7435a387",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "7435a387",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "7435a387",
+    "symbol_path": [
+      "TestConsentHardDelete",
+      "test_crash_between_updates_and_delete_rolls_back"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "7435a387",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "27ca05ce",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "27ca05ce",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "468ae884",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "468ae884",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ced1c1a8",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "ced1c1a8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3757ff3f",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "3757ff3f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c23352ad",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "c23352ad",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "a1f115b8",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "a1f115b8",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c36aa493",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "c36aa493",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4a9c8261",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "4a9c8261",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "167b7074",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "167b7074",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c36aa493",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "c36aa493",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4a9c8261",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "4a9c8261",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "167b7074",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "167b7074",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "ad1c9bca",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "ad1c9bca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "579e3fca",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "579e3fca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "d73c5a1f",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "d73c5a1f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "579e3fca",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "579e3fca",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "d73c5a1f",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_purges_failed_ads_older_than_7_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "d73c5a1f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "fd21dd5a",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "fd21dd5a",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "df7cc5c5",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "df7cc5c5",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "4fb6d246",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "4fb6d246",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "390efa43",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "390efa43",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "22afffd3",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "22afffd3",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "76d61f96",
+    "symbol_path": [
+      "TestPurgeFailedAds",
+      "test_does_not_purge_other_statuses"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "76d61f96",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "24712aa2",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "24712aa2",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "329570ff",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "329570ff",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c3d29a0b",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "c3d29a0b",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "e9486708",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "e9486708",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "f9c80980",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "f9c80980",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "66ec33eb",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_dry_run_does_not_delete"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "66ec33eb",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "76f1a4ab",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "76f1a4ab",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "69724cd1",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "69724cd1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "876b9334",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "876b9334",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "76f1a4ab",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "76f1a4ab",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "69724cd1",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "69724cd1",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "876b9334",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "876b9334",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "5c45e82f",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "5c45e82f",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c369af20",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "c369af20",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "522a1a95",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "522a1a95",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c369af20",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "c369af20",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "522a1a95",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_purges_rejected_ads_older_than_90_days"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "522a1a95",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "2716998e",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "_make_ad",
+    "stable_hash": "2716998e",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "c7c5ea81",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "c7c5ea81",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "dd63ee07",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "dd63ee07",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "a8b97d12",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "a8b97d12",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "bbebd064",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "call_command",
+    "stable_hash": "bbebd064",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "80fe80f9",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "80fe80f9",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "55ea7baa",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "55ea7baa",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
+  },
+  {
+    "id": "3e937703",
+    "symbol_path": [
+      "TestPurgeRejectedAds",
+      "test_preserves_moderation_log_with_ad_set_null"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "3e937703",
+    "file": "backend/apps/core/tests/test_sweep_commands.py"
   },
   {
     "id": "a3e6c07d",
@@ -7803,23 +11347,13 @@
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
-    "id": "31f4db82",
+    "id": "85ac127b",
     "symbol_path": [
       "set_moderation_failed"
     ],
     "type": "function_call",
-    "value": "now",
-    "stable_hash": "31f4db82",
-    "file": "backend/apps/moderation/services/moderation_log.py"
-  },
-  {
-    "id": "bcc31526",
-    "symbol_path": [
-      "set_moderation_failed"
-    ],
-    "type": "function_call",
-    "value": "save",
-    "stable_hash": "bcc31526",
+    "value": "transition_to",
+    "stable_hash": "85ac127b",
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
@@ -7833,23 +11367,13 @@
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
-    "id": "7532f92f",
+    "id": "6609e5f9",
     "symbol_path": [
       "set_rejected"
     ],
     "type": "function_call",
-    "value": "now",
-    "stable_hash": "7532f92f",
-    "file": "backend/apps/moderation/services/moderation_log.py"
-  },
-  {
-    "id": "a50e546f",
-    "symbol_path": [
-      "set_rejected"
-    ],
-    "type": "function_call",
-    "value": "save",
-    "stable_hash": "a50e546f",
+    "value": "transition_to",
+    "stable_hash": "6609e5f9",
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
@@ -7863,23 +11387,13 @@
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
-    "id": "9bf59eb0",
+    "id": "33db5d43",
     "symbol_path": [
       "set_published"
     ],
     "type": "function_call",
-    "value": "now",
-    "stable_hash": "9bf59eb0",
-    "file": "backend/apps/moderation/services/moderation_log.py"
-  },
-  {
-    "id": "b3f89cfd",
-    "symbol_path": [
-      "set_published"
-    ],
-    "type": "function_call",
-    "value": "save",
-    "stable_hash": "b3f89cfd",
+    "value": "transition_to",
+    "stable_hash": "33db5d43",
     "file": "backend/apps/moderation/services/moderation_log.py"
   },
   {
@@ -8929,13 +12443,33 @@
     "file": "backend/apps/search/services/query_translator.py"
   },
   {
-    "id": "9540ef1b",
+    "id": "7f2e8259",
     "symbol_path": [
       "translate_query_bs_to_ru"
     ],
     "type": "function_call",
-    "value": "translate_cached",
-    "stable_hash": "9540ef1b",
+    "value": "ThreadPoolExecutor",
+    "stable_hash": "7f2e8259",
+    "file": "backend/apps/search/services/query_translator.py"
+  },
+  {
+    "id": "addc7eb9",
+    "symbol_path": [
+      "translate_query_bs_to_ru"
+    ],
+    "type": "function_call",
+    "value": "submit",
+    "stable_hash": "addc7eb9",
+    "file": "backend/apps/search/services/query_translator.py"
+  },
+  {
+    "id": "9760d704",
+    "symbol_path": [
+      "translate_query_bs_to_ru"
+    ],
+    "type": "function_call",
+    "value": "result",
+    "stable_hash": "9760d704",
     "file": "backend/apps/search/services/query_translator.py"
   },
   {
@@ -9642,6 +13176,16 @@
     "file": "backend/apps/users/migrations/0001_initial.py"
   },
   {
+    "id": "496ece3b",
+    "symbol_path": [
+      "Migration"
+    ],
+    "type": "function_call",
+    "value": "DateTimeField",
+    "stable_hash": "496ece3b",
+    "file": "backend/apps/users/migrations/0001_initial.py"
+  },
+  {
     "id": "a205079c",
     "symbol_path": [
       "Migration"
@@ -10271,6 +13815,26 @@
     "file": "backend/apps/users/services/deletion.py"
   },
   {
+    "id": "11097aaf",
+    "symbol_path": [
+      "withdraw_consent"
+    ],
+    "type": "function_call",
+    "value": "delete",
+    "stable_hash": "11097aaf",
+    "file": "backend/apps/users/services/deletion.py"
+  },
+  {
+    "id": "416c063c",
+    "symbol_path": [
+      "withdraw_consent"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "416c063c",
+    "file": "backend/apps/users/services/deletion.py"
+  },
+  {
     "id": "12f06374",
     "symbol_path": [
       "withdraw_consent"
@@ -10379,6 +13943,460 @@
     "value": "info",
     "stable_hash": "4651dbee",
     "file": "backend/apps/users/services/deletion.py"
+  },
+  {
+    "id": "bffc591f",
+    "symbol_path": [
+      "user"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "bffc591f",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "5631c3e6",
+    "symbol_path": [
+      "user"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "5631c3e6",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b053b071",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "b053b071",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "5ff99fee",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "5ff99fee",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "81aea712",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "81aea712",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "5ff99fee",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "5ff99fee",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "81aea712",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "81aea712",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "7fc443a3",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "withdraw_consent",
+    "stable_hash": "7fc443a3",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "25a2c940",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "25a2c940",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "4bad0b6c",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4bad0b6c",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "25a2c940",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "25a2c940",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "4bad0b6c",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_deletes_user_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "4bad0b6c",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "42d6e994",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "hexdigest",
+    "stable_hash": "42d6e994",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b4ef294e",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "sha256",
+    "stable_hash": "b4ef294e",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "819d79f0",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "encode",
+    "stable_hash": "819d79f0",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "4d28ade6",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "4d28ade6",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "451b1f52",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "451b1f52",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "33394980",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "33394980",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "aa5b5486",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token"
+    ],
+    "type": "function_call",
+    "value": "update",
+    "stable_hash": "aa5b5486",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "01b19484",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "01b19484",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "1a79abf4",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1a79abf4",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "1a79abf4",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token"
+    ],
+    "type": "return_statement",
+    "value": "return",
+    "stable_hash": "1a79abf4",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "3a542b5b",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token"
+    ],
+    "type": "function_call",
+    "value": "get",
+    "stable_hash": "3a542b5b",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "e57fae07",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "claim_token",
+    "stable_hash": "e57fae07",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "e3cea9ba",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "withdraw_consent",
+    "stable_hash": "e3cea9ba",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "987471be",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "987471be",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "e57fae07",
+    "symbol_path": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "test_withdraw_prevents_second_claim"
+    ],
+    "type": "function_call",
+    "value": "claim_token",
+    "stable_hash": "e57fae07",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "4e6b0551",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "now",
+    "stable_hash": "4e6b0551",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "0e32fc15",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "0e32fc15",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "cc438deb",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "timedelta",
+    "stable_hash": "cc438deb",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "13896588",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "decline_consent",
+    "stable_hash": "13896588",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "d2e8568c",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "exists",
+    "stable_hash": "d2e8568c",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b05837c8",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "filter",
+    "stable_hash": "b05837c8",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "4c41abfd",
+    "symbol_path": [
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "test_decline_preserves_login_tokens"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "4c41abfd",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b38773c7",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "b38773c7",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b38773c7",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "b38773c7",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b38773c7",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "b38773c7",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "b38773c7",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "create",
+    "stable_hash": "b38773c7",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "deb8e67d",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "withdraw_consent",
+    "stable_hash": "deb8e67d",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "59aedd1f",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "59aedd1f",
+    "file": "backend/apps/users/tests/test_deletion.py"
+  },
+  {
+    "id": "59aedd1f",
+    "symbol_path": [
+      "TestWithdrawConsentSoftDeletesAds",
+      "test_withdraw_soft_deletes_user_ads"
+    ],
+    "type": "function_call",
+    "value": "refresh_from_db",
+    "stable_hash": "59aedd1f",
+    "file": "backend/apps/users/tests/test_deletion.py"
   },
   {
     "id": "5b1feab0",
@@ -13831,14 +17849,6 @@
     "file": "telegram_bot/handlers/login.py"
   },
   {
-    "id": "561178df",
-    "symbol_path": [],
-    "type": "function_call",
-    "value": "getLogger",
-    "stable_hash": "561178df",
-    "file": "telegram_bot/main.py"
-  },
-  {
     "id": "6506c515",
     "symbol_path": [],
     "type": "function_call",
@@ -13852,6 +17862,14 @@
     "type": "function_call",
     "value": "setup",
     "stable_hash": "d3cb4de2",
+    "file": "telegram_bot/main.py"
+  },
+  {
+    "id": "561178df",
+    "symbol_path": [],
+    "type": "function_call",
+    "value": "getLogger",
+    "stable_hash": "561178df",
     "file": "telegram_bot/main.py"
   },
   {

@@ -34,3 +34,6 @@ acceptance_criteria:
   - handoff design documenting internal location + view responsibilities
   - list of templates/consumers of /media/ URLs provided
   - explicit go / go-with-changes verdict emitted
+
+outcome:
+  - report: C:\py_dev\mko_bazuna\.ai\tasks\research\T004_research_media_gate.md

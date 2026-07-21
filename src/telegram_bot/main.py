@@ -4,15 +4,17 @@ import logging
 import os
 
 import django
+
+# Configure Django settings and initialize the app registry BEFORE importing any
+# module that pulls Django models (e.g. telegram_bot.middlewares).
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
+django.setup()
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from telegram_bot.middlewares import AccountStateMiddleware
 
 logger = logging.getLogger(__name__)
-
-# Configure Django settings before importing models
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
-django.setup()
 
 
 def main() -> None:

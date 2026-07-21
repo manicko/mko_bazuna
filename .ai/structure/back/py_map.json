@@ -28,10 +28,10 @@
     "module": "backend.apps.ads.admin",
     "layer": "other",
     "imports": [
-      "django.contrib",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.moderation.admin_actions"
+      "apps.moderation.admin_actions",
+      "django.contrib"
     ],
     "classes": [
       "AdAdmin",
@@ -116,11 +116,12 @@
     "module": "backend.apps.ads.models",
     "layer": "model",
     "imports": [
+      "apps.core.enums",
       "django.contrib.postgres.indexes",
       "django.contrib.postgres.search",
       "django.db",
       "django.db.models",
-      "apps.core.enums",
+      "django.utils",
       "django.conf"
     ],
     "classes": [
@@ -131,9 +132,49 @@
     ],
     "functions": [
       "__str__",
+      "transition_to",
       "__str__",
       "image_url",
       "generate_storage_key"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/tests/__init__.py",
+    "module": "backend.apps.ads.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/tests/test_search_triggers.py",
+    "module": "backend.apps.ads.tests.test_search_triggers",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "django.contrib.postgres.search",
+      "django.utils",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestSearchVectorTrigger"
+    ],
+    "functions": [
+      "category",
+      "city",
+      "seller",
+      "_create_published_ad",
+      "_fts_match",
+      "test_insert_populates_search_vector",
+      "test_insert_denormalizes_category_name",
+      "test_title_update_refreshes_search_vector",
+      "test_description_is_searchable",
+      "test_category_rename_propagates",
+      "test_search_rank_orders_by_relevance",
+      "test_unpublished_ads_excluded_from_search_view"
     ]
   },
   {
@@ -141,11 +182,11 @@
     "module": "backend.apps.ads.urls",
     "layer": "other",
     "imports": [
-      "django.urls",
       "apps.ads.views.dashboard",
       "apps.ads.views.delete",
       "apps.ads.views.edit",
-      "apps.ads.views.listings"
+      "apps.ads.views.listings",
+      "django.urls"
     ],
     "classes": [],
     "functions": []
@@ -163,12 +204,12 @@
     "module": "backend.apps.ads.views.dashboard",
     "layer": "other",
     "imports": [
-      "django.contrib.auth.decorators",
-      "django.http",
-      "django.shortcuts",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.users.views.consent"
+      "apps.users.views.consent",
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts"
     ],
     "classes": [],
     "functions": [
@@ -180,12 +221,11 @@
     "module": "backend.apps.ads.views.delete",
     "layer": "other",
     "imports": [
+      "apps.ads.models",
+      "apps.core.enums",
       "django.contrib.auth.decorators",
       "django.http",
-      "django.shortcuts",
-      "django.utils",
-      "apps.ads.models",
-      "apps.core.enums"
+      "django.shortcuts"
     ],
     "classes": [],
     "functions": [
@@ -197,13 +237,12 @@
     "module": "backend.apps.ads.views.edit",
     "layer": "other",
     "imports": [
-      "django.contrib.auth.decorators",
-      "django.http",
-      "django.shortcuts",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.moderation.services.auto_moderation"
+      "apps.moderation.services.auto_moderation",
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts"
     ],
     "classes": [],
     "functions": [
@@ -219,13 +258,13 @@
     "layer": "other",
     "imports": [
       "difflib",
-      "django.http",
-      "django.shortcuts",
       "apps.ads.models",
       "apps.categories.models",
       "apps.core.enums",
       "apps.locations.models",
-      "apps.users.views.consent"
+      "apps.users.views.consent",
+      "django.http",
+      "django.shortcuts"
     ],
     "classes": [],
     "functions": [
@@ -248,12 +287,12 @@
     "module": "backend.apps.analytics.admin",
     "layer": "other",
     "imports": [
+      "apps.analytics.models",
       "django.contrib",
       "django.db.models",
       "django.db.models.functions",
-      "apps.analytics.models",
-      "django.utils",
-      "datetime"
+      "datetime",
+      "django.utils"
     ],
     "classes": [
       "AnalyticsEventAdmin"
@@ -300,11 +339,11 @@
     "layer": "other",
     "imports": [
       "datetime",
+      "apps.analytics.models",
       "django.core.management.base",
       "django.db.models",
       "django.db.models.functions",
-      "django.utils",
-      "apps.analytics.models"
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -339,8 +378,8 @@
     "module": "backend.apps.analytics.models",
     "layer": "model",
     "imports": [
-      "django.db",
-      "apps.core.enums"
+      "apps.core.enums",
+      "django.db"
     ],
     "classes": [
       "AnalyticsEvent",
@@ -363,9 +402,9 @@
     "module": "backend.apps.categories.admin",
     "layer": "other",
     "imports": [
+      "apps.categories.models",
       "django.contrib",
-      "mptt.admin",
-      "apps.categories.models"
+      "mptt.admin"
     ],
     "classes": [
       "CategoryAdmin"
@@ -520,11 +559,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -540,11 +579,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
-      "apps.users.models"
+      "apps.users.models",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -560,13 +599,14 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.analytics.models",
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "apps.moderation.models",
-      "apps.users.models"
+      "apps.users.models",
+      "django.core.management.base",
+      "django.utils",
+      "django.db"
     ],
     "classes": [
       "Command"
@@ -582,11 +622,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -602,11 +642,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -622,11 +662,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -642,11 +682,11 @@
     "layer": "other",
     "imports": [
       "datetime",
-      "django.core.management.base",
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils"
     ],
     "classes": [
       "Command"
@@ -718,8 +758,8 @@
     "module": "backend.apps.core.templatetags.contact_tags",
     "layer": "other",
     "imports": [
-      "django",
-      "apps.core.services.contact"
+      "apps.core.services.contact",
+      "django"
     ],
     "classes": [],
     "functions": [
@@ -739,18 +779,107 @@
     "module": "backend.apps.core.tests.test_contact",
     "layer": "other",
     "imports": [
-      "apps.core.enums"
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.services.contact",
+      "apps.users.models",
+      "django.utils",
+      "apps.categories.models",
+      "apps.locations.models"
     ],
     "classes": [
       "TestCanContactSellerLogic",
+      "MockSeller",
+      "MockAdWithSellerNone",
+      "MockAdWithTelegramIdNone",
       "TestContactPattern"
     ],
     "functions": [
-      "test_all_conditions_required_for_contact",
-      "test_status_must_be_published",
-      "test_telegram_id_required",
+      "seller",
+      "category",
+      "city",
+      "_make_ad",
+      "test_all_conditions_true_returns_true",
+      "test_archived_ad_returns_false",
+      "test_draft_ad_returns_false",
+      "test_on_moderation_ad_returns_false",
+      "test_rejected_ad_returns_false",
+      "test_telegram_id_none_returns_false",
+      "test_seller_deleted_returns_false",
+      "test_seller_banned_returns_false",
+      "test_consent_revoked_returns_false",
       "test_contact_pattern_matches_ad_id",
       "test_contact_pattern_extracts_ad_id"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_sweep_commands.py",
+    "module": "backend.apps.core.tests.test_sweep_commands",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.moderation.models",
+      "apps.users.models",
+      "django.core.management",
+      "django.utils",
+      "apps.categories.models",
+      "apps.locations.models"
+    ],
+    "classes": [
+      "TestArchiveSweep",
+      "TestDeleteSweep",
+      "TestSweepDrafts",
+      "TestCleanupLoginTokens",
+      "TestConsentHardDelete",
+      "_CrashOnDeleteQuerySet",
+      "TestPurgeFailedAds",
+      "TestPurgeRejectedAds"
+    ],
+    "functions": [
+      "seller",
+      "category",
+      "city",
+      "_make_ad",
+      "test_dry_run_does_not_mutate",
+      "test_archives_published_older_than_60_days",
+      "test_idempotent_on_rerun",
+      "test_lock_id_is_archive_sweep",
+      "test_dry_run_does_not_delete",
+      "test_deletes_archived_older_than_120_days",
+      "test_cascades_ad_images",
+      "test_lock_id_is_delete_sweep",
+      "test_dry_run_does_not_delete",
+      "test_deletes_drafts_older_than_30_minutes",
+      "test_does_not_touch_published_drafts",
+      "test_lock_id_is_sweep_drafts",
+      "_make_token",
+      "test_dry_run_does_not_delete",
+      "test_deletes_expired_tokens",
+      "test_preserves_recently_consumed_tokens",
+      "test_preserves_fresh_unconsumed_tokens",
+      "test_lock_id_is_cleanup_login_tokens",
+      "test_dry_run_does_not_delete",
+      "test_hard_deletes_users_past_grace_period",
+      "test_nulls_analytics_event_user",
+      "test_nulls_moderator_action_log_user",
+      "test_does_not_delete_within_grace_period",
+      "test_lock_id_is_consent_hard_delete",
+      "test_crash_between_updates_and_delete_rolls_back",
+      "__init__",
+      "count",
+      "values_list",
+      "delete",
+      "test_dry_run_does_not_delete",
+      "test_purges_failed_ads_older_than_7_days",
+      "test_does_not_purge_other_statuses",
+      "test_lock_id_is_purge_failed_ads",
+      "test_dry_run_does_not_delete",
+      "test_purges_rejected_ads_older_than_90_days",
+      "test_preserves_moderation_log_with_ad_set_null",
+      "test_lock_id_is_purge_rejected_ads"
     ]
   },
   {
@@ -815,8 +944,8 @@
     "module": "backend.apps.locations.admin",
     "layer": "other",
     "imports": [
-      "django.contrib",
-      "apps.locations.models"
+      "apps.locations.models",
+      "django.contrib"
     ],
     "classes": [
       "CityAdmin"
@@ -909,8 +1038,8 @@
     "module": "backend.apps.moderation.admin",
     "layer": "other",
     "imports": [
-      "django.contrib",
-      "apps.moderation.models"
+      "apps.moderation.models",
+      "django.contrib"
     ],
     "classes": [
       "ModerationCriteriaAdmin",
@@ -932,11 +1061,11 @@
     "module": "backend.apps.moderation.admin_actions",
     "layer": "other",
     "imports": [
-      "django.utils",
       "apps.ads.models",
       "apps.core.enums",
       "apps.moderation.services.moderation_log",
-      "apps.users.models"
+      "apps.users.models",
+      "django.utils"
     ],
     "classes": [],
     "functions": [
@@ -1003,8 +1132,8 @@
     "module": "backend.apps.moderation.models",
     "layer": "model",
     "imports": [
-      "django.db",
-      "apps.core.enums"
+      "apps.core.enums",
+      "django.db"
     ],
     "classes": [
       "ModerationCriteria",
@@ -1036,10 +1165,10 @@
     "imports": [
       "difflib",
       "typing",
-      "apps.core.utils.cache",
       "apps.ads.models",
       "apps.analytics.models",
       "apps.core.enums",
+      "apps.core.utils.cache",
       "apps.moderation.models",
       "apps.moderation.services.moderation_log",
       "apps.moderation.services.moderation_log"
@@ -1067,7 +1196,6 @@
     "layer": "service",
     "imports": [
       "typing",
-      "django.utils",
       "apps.core.enums",
       "apps.moderation.models",
       "apps.ads.models"
@@ -1090,10 +1218,10 @@
     "module": "backend.apps.moderation.signals",
     "layer": "other",
     "imports": [
-      "django.db.models.signals",
-      "django.dispatch",
       "apps.moderation.models",
-      "apps.moderation.services.auto_moderation"
+      "apps.moderation.services.auto_moderation",
+      "django.db.models.signals",
+      "django.dispatch"
     ],
     "classes": [],
     "functions": [
@@ -1173,8 +1301,8 @@
     "module": "backend.apps.moderation.urls",
     "layer": "other",
     "imports": [
-      "django.urls",
-      "apps.moderation.views"
+      "apps.moderation.views",
+      "django.urls"
     ],
     "classes": [],
     "functions": []
@@ -1194,10 +1322,10 @@
     "module": "backend.apps.moderation.views.review",
     "layer": "other",
     "imports": [
-      "django.http",
-      "django.shortcuts",
       "apps.ads.models",
       "apps.core.enums",
+      "django.http",
+      "django.shortcuts",
       "apps.moderation.admin_actions",
       "apps.moderation.admin_actions",
       "apps.moderation.admin_actions"
@@ -1245,6 +1373,7 @@
     "module": "backend.apps.search.services.query_translator",
     "layer": "service",
     "imports": [
+      "concurrent.futures",
       "functools",
       "typing",
       "deep_translator",
@@ -1262,8 +1391,8 @@
     "module": "backend.apps.search.urls",
     "layer": "other",
     "imports": [
-      "django.urls",
-      "apps.search.views.search"
+      "apps.search.views.search",
+      "django.urls"
     ],
     "classes": [],
     "functions": []
@@ -1281,15 +1410,14 @@
     "module": "backend.apps.search.views.search",
     "layer": "other",
     "imports": [
-      "django.contrib.postgres.search",
-      "django.http",
-      "django.shortcuts",
       "apps.ads.models",
+      "apps.analytics.models",
       "apps.categories.models",
       "apps.core.enums",
       "apps.search.services.query_translator",
-      "apps.analytics.models",
-      "apps.core.enums",
+      "django.contrib.postgres.search",
+      "django.http",
+      "django.shortcuts",
       "difflib"
     ],
     "classes": [],
@@ -1312,8 +1440,8 @@
     "module": "backend.apps.users.admin",
     "layer": "other",
     "imports": [
-      "django.contrib",
-      "apps.users.models"
+      "apps.users.models",
+      "django.contrib"
     ],
     "classes": [
       "UserAdmin",
@@ -1428,12 +1556,47 @@
     ]
   },
   {
+    "path": "backend/apps/users/tests/__init__.py",
+    "module": "backend.apps.users.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/tests/test_deletion.py",
+    "module": "backend.apps.users.tests.test_deletion",
+    "layer": "other",
+    "imports": [
+      "apps.users.models",
+      "apps.users.services.deletion",
+      "django.utils",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.locations.models",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "TestWithdrawConsentInvalidatesTokens",
+      "TestDeclineConsentDoesNotInvalideTokens",
+      "TestWithdrawConsentSoftDeletesAds"
+    ],
+    "functions": [
+      "user",
+      "test_withdraw_deletes_user_login_tokens",
+      "test_withdraw_prevents_second_claim",
+      "claim_token",
+      "test_decline_preserves_login_tokens",
+      "test_withdraw_soft_deletes_user_ads"
+    ]
+  },
+  {
     "path": "backend/apps/users/urls.py",
     "module": "backend.apps.users.urls",
     "layer": "other",
     "imports": [
-      "django.urls",
-      "apps.users.views.consent"
+      "apps.users.views.consent",
+      "django.urls"
     ],
     "classes": [],
     "functions": []
@@ -1451,10 +1614,10 @@
     "module": "backend.apps.users.views.consent",
     "layer": "other",
     "imports": [
+      "apps.users.services",
       "django.contrib.auth.decorators",
       "django.http",
-      "django.shortcuts",
-      "apps.users.services"
+      "django.shortcuts"
     ],
     "classes": [],
     "functions": [
@@ -1588,10 +1751,7 @@
     "path": "telegram_bot/__init__.py",
     "module": "telegram_bot.__init__",
     "layer": "other",
-    "imports": [
-      "states",
-      "handlers"
-    ],
+    "imports": [],
     "classes": [],
     "functions": []
   },

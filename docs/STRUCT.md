@@ -17,7 +17,6 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── urls.py
 │   │   └── wsgi.py
 │   ├── manage.py
-│   ├── mko_bazuna
 │   ├── templates
 │   │   ├── admin
 │   │   ├── ads

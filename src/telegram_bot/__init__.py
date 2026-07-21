@@ -1,6 +1,4 @@
 """Telegram bot package for Mko Bazuna."""
 
-from .states import AdCreateState
-from .handlers import login_router, ad_create_router
-
-__all__ = ["AdCreateState", "login_router", "ad_create_router"]
+# No eager submodule imports - Django models must only load after django.setup().
+__all__: list[str] = []
