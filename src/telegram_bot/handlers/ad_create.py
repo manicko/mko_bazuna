@@ -27,7 +27,7 @@ from telegram_bot.schemas.message_payloads import (
     PricePayload,
     TitlePayload,
 )
-from telegram_bot.services.media import generate_storage_key, validate_photo
+from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif
 from telegram_bot.states import AdCreateState
 import asyncio
 
@@ -430,13 +430,17 @@ async def download_photo(file_id: str, bot: Bot) -> bytes | None:
 
 
 async def save_photo(storage_key: str, photo_bytes: bytes) -> None:
-    """Save photo to filesystem via thread executor to avoid blocking the event loop."""
+    """Save photo to filesystem via thread executor to avoid blocking the event loop.
+
+    Strips EXIF/metadata and re-encodes the image before persisting to disk.
+    """
 
     def _write() -> None:
+        cleaned = strip_photo_exif(photo_bytes)
         media_path = os.path.join(settings.MEDIA_ROOT, storage_key)
         os.makedirs(os.path.dirname(media_path), exist_ok=True)
         with open(media_path, "wb") as f:
-            f.write(photo_bytes)
+            f.write(cleaned)
 
     await asyncio.to_thread(_write)
 

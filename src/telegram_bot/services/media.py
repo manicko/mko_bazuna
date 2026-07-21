@@ -8,7 +8,7 @@ import io
 import logging
 import uuid
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,8 @@ def validate_photo(
     try:
         # Validate dimensions using PIL
         img = Image.open(io.BytesIO(photo_bytes))
+        # Apply exif_transpose to correct orientation before dimension check
+        img = ImageOps.exif_transpose(img)
         width, height = img.size
 
         if width > max_width or height > max_height:
@@ -71,3 +73,23 @@ def validate_photo(
 def generate_storage_key() -> str:
     """Generate a UUID v4 storage key for anonymity."""
     return f"{uuid.uuid4()}.jpg"
+
+def strip_photo_exif(photo_bytes: bytes) -> bytes:
+    """
+    Strip EXIF/metadata from a JPEG photo and re-encode it.
+
+    Applies exif_transpose to correct orientation, removes EXIF data,
+    and saves with optimize=True. This also hardens against malicious JPEGs.
+
+    Args:
+        photo_bytes: Raw JPEG bytes
+
+    Returns:
+        Cleaned JPEG bytes with no EXIF metadata
+    """
+    img = Image.open(io.BytesIO(photo_bytes))
+    img = ImageOps.exif_transpose(img)
+    img.info.pop("exif", None)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", optimize=True)
+    return buf.getvalue()
