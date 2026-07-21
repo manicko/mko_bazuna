@@ -48,6 +48,10 @@ class User(AbstractUser):
         default=False,  # pyright: ignore[reportArgumentType]
         help_text="Soft delete flag",
     )
+    is_declined = models.BooleanField(
+        default=False,  # pyright: ignore[reportArgumentType]
+        help_text="User declined consent (browse-only mode)",
+    )
     ads_auto_publish = models.BooleanField(
         default=True,  # pyright: ignore[reportArgumentType]
         help_text="Publishing ban - when False, ads go to DRAFT instead of ON_MODERATION",

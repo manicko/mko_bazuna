@@ -18,6 +18,7 @@ class AccountState(NamedTuple):
 
     is_banned: bool
     is_deleted: bool
+    is_declined: bool
     ads_auto_publish: bool
     consent_revoked: bool
 
@@ -29,6 +30,7 @@ def get_account_state(user: User) -> AccountState:
     Returns a tuple of the three independent account state flags:
     - is_banned: Admin action, blocks login/publish, PII retained
     - is_deleted: GDPR consent withdrawal, telegram_id nulled
+    - is_declined: User declined consent (browse-only mode)
     - ads_auto_publish: Publishing restriction, not linked to ban/delete
 
     Args:
@@ -40,6 +42,7 @@ def get_account_state(user: User) -> AccountState:
     return AccountState(
         is_banned=user.is_banned,
         is_deleted=user.is_deleted,
+        is_declined=user.is_declined,
         ads_auto_publish=user.ads_auto_publish,
         consent_revoked=user.consent_revoked_at is not None,
     )
@@ -81,7 +84,7 @@ def can_login(user: User) -> bool:
     """
     Check if user can login.
 
-    A user can login only if NOT banned.
+    A user can login only if NOT banned and NOT declined consent.
     Note: Deleted users have telegram_id nulled, so they cannot login anyway.
 
     Args:
@@ -94,6 +97,10 @@ def can_login(user: User) -> bool:
 
     if state.is_banned:
         logger.info(f"User {user.telegram_id} cannot login: banned")
+        return False
+
+    if state.is_declined:
+        logger.info(f"User {user.telegram_id} cannot login: declined consent")
         return False
 
     return True
@@ -119,6 +126,8 @@ def get_state_badge(user: User) -> str:
         badges.append("banned")
     if state.is_deleted:
         badges.append("deleted")
+    if state.is_declined:
+        badges.append("declined")
     if not state.ads_auto_publish:
         badges.append("restricted")
 

@@ -23,7 +23,8 @@ def decline_consent(user: User) -> None:
     Decline consent (browse-only, decision K).
 
     This blocks only seller actions. No deletion occurs. Contact button continues to work.
-    Sets ads_auto_publish=False to block new ads but preserves existing ads and PII.
+    Sets is_declined=True and ads_auto_publish=False to block new ads and login,
+    but preserves existing ads and PII.
 
     Does NOT set consent_revoked_at, is_deleted, or trigger any deletion.
 
@@ -31,8 +32,12 @@ def decline_consent(user: User) -> None:
         user: The user declining consent.
     """
     user.ads_auto_publish = False
-    user.save(update_fields=["ads_auto_publish"])
-    logger.info(f"User {user.id} declined consent - ads_auto_publish=False, no deletion")
+    user.is_declined = True
+    user.save(update_fields=["ads_auto_publish", "is_declined"])
+    logger.info(
+        f"User {user.id} declined consent - browse-only mode: "
+        f"ads_auto_publish=False, is_declined=True"
+    )
 
 
 def withdraw_consent(user: User) -> None:
