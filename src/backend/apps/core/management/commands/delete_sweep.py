@@ -15,6 +15,8 @@ from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction
+from apps.ads.models import AdImage
+from telegram_bot.services.media import delete_photo
 
 logger = logging.getLogger(__name__)
 
@@ -35,33 +37,47 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-            """Execute the delete sweep command with advisory lock."""
-            dry_run: bool = options["dry_run"]
+        """Execute the delete sweep command with advisory lock."""
+        dry_run: bool = options["dry_run"]
 
-            with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
-                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-                    # Query using the IX_ads_delete_sweep partial index
-                    # Status is ARCHIVED, published_at older than 4 months
-                    cutoff_date = timezone.now() - timedelta(days=120)
+        with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                # Query using the IX_ads_delete_sweep partial index
+                # Status is ARCHIVED, published_at older than 4 months
+                cutoff_date = timezone.now() - timedelta(days=120)
 
-                    queryset = Ad.objects.filter(
-                        status=AdStatus.ARCHIVED,
-                        published_at__lt=cutoff_date,
-                    )
+                queryset = Ad.objects.filter(
+                    status=AdStatus.ARCHIVED,
+                    published_at__lt=cutoff_date,
+                )
 
-                    count = queryset.count()
+                count = queryset.count()
 
-                    if dry_run:
-                        logger.info(
-                            "DRY RUN: Would delete %d ads with ARCHIVED status older than 4 months",
-                            count,
-                        )
-                        return
-
-                    # Delete atomically - CASCADE will handle ad_images
-                    deleted_count, _ = queryset.delete()
-
+                if dry_run:
                     logger.info(
-                        "Deleted %d ads with ARCHIVED status older than 4 months",
-                        deleted_count,
+                        "DRY RUN: Would delete %d ads with ARCHIVED status older than 4 months",
+                        count,
                     )
+                    return
+
+                # Collect storage keys for physical media cleanup before ORM cascade
+                ad_ids = list(queryset.values_list("id", flat=True))
+                storage_keys = list(
+                    AdImage.objects.filter(ad_id__in=ad_ids).values_list(
+                        "image", flat=True
+                    )
+                )
+
+                # Delete atomically - CASCADE will handle ad_images
+                deleted_count, _ = queryset.delete()
+
+                # Remove physical media files after ORM cascade
+                for storage_key in storage_keys:
+                    delete_photo(storage_key)
+
+                logger.info(
+                    "Deleted %d ads with ARCHIVED status older than 4 months. "
+                    "Removed %d media files.",
+                    deleted_count,
+                    len(storage_keys),
+                )
