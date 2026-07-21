@@ -30,6 +30,7 @@ from telegram_bot.schemas.message_payloads import (
 from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif
 from telegram_bot.states import AdCreateState
 import asyncio
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -558,26 +559,28 @@ async def update_ad_and_moderate(
             ad.save()
             return False, errors
 
-        # Photos are valid - create AdImage records
-        for photo in photos:
-            AdImage.objects.create(
-                ad_id=ad_id,
-                image=photo["storage_key"],
-                telegram_file_id=photo["telegram_file_id"],
-                position=photo["position"],
+        # Atomic write: AdImages + ad status + analytics event
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            # Photos are valid - create AdImage records
+            for photo in photos:
+                AdImage.objects.create(
+                    ad_id=ad_id,
+                    image=photo["storage_key"],
+                    telegram_file_id=photo["telegram_file_id"],
+                    position=photo["position"],
+                )
+
+            # Approve
+            ad.status = AdStatus.PUBLISHED
+            ad.published_at = timezone.now()
+            if ad.original_published_at is None:
+                ad.original_published_at = timezone.now()
+            ad.save()
+
+            # Create analytics event
+            AnalyticsEvent.objects.create(
+                event_type=AnalyticsEventType.AD_PUBLISHED.value, user=user_id
             )
-
-        # Approve
-        ad.status = AdStatus.PUBLISHED
-        ad.published_at = timezone.now()
-        if ad.original_published_at is None:
-            ad.original_published_at = timezone.now()
-        ad.save()
-
-        # Create analytics event
-        AnalyticsEvent.objects.create(
-            event_type=AnalyticsEventType.AD_PUBLISHED.value, user=user_id
-        )
 
         return True, []
 
