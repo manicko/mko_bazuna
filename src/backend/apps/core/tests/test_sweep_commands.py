@@ -157,7 +157,7 @@ class TestDeleteSweep:
             status=AdStatus.ARCHIVED,
             published_at=timezone.now() - timedelta(days=200),
         )
-        AdImage.objects.create(ad=old, image=AdImage.generate_storage_key())
+        AdImage.objects.create(ad=old, image="test-uuid.jpg")
         call_command("delete_sweep", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
 
@@ -170,7 +170,7 @@ class TestDeleteSweep:
             status=AdStatus.ARCHIVED,
             published_at=timezone.now() - timedelta(days=200),
         )
-        AdImage.objects.create(ad=old, image=AdImage.generate_storage_key())
+        AdImage.objects.create(ad=old, image="test-uuid.jpg")
         recent = _make_ad(
             seller,
             category,
@@ -191,7 +191,7 @@ class TestDeleteSweep:
             status=AdStatus.ARCHIVED,
             published_at=timezone.now() - timedelta(days=200),
         )
-        img = AdImage.objects.create(ad=old, image=AdImage.generate_storage_key())
+        img = AdImage.objects.create(ad=old, image="test-uuid.jpg")
         call_command("delete_sweep")
         assert not AdImage.objects.filter(pk=img.pk).exists()
 

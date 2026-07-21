@@ -4,7 +4,6 @@ Ad and AdImage models for Mko Bazuna.
 Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 """
 
-import uuid
 
 from apps.core.enums import AdSource, AdStatus
 from django.contrib.postgres.indexes import GinIndex
@@ -329,7 +328,7 @@ class AdImage(models.Model):
     )
     image = models.CharField(
         max_length=64,
-        help_text="Storage key (ad_id + UUID v4, no user/telegram PII)",
+        help_text="Storage key (UUID v4 + .jpg, no ad_id/user/telegram PII)",
     )
     telegram_file_id = models.CharField(
         max_length=255,
@@ -355,8 +354,3 @@ class AdImage(models.Model):
         from django.conf import settings
 
         return f"{settings.MEDIA_URL}{self.image}"
-
-    @classmethod
-    def generate_storage_key(cls) -> str:
-        """Generate a UUID v4 storage key for anonymity."""
-        return str(uuid.uuid4())
