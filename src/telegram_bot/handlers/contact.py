@@ -109,8 +109,11 @@ async def handle_contact_orm(
     """
     Check seller availability and record contact analytics event.
 
-    Combines two ORM operations in a single sync_to_async call
-    to reduce DB connection churn with CONN_MAX_AGE=0.
+    Delegates R2 gating to core.services.contact.get_seller_for_contact()
+    and analytics recording to core.services.contact.record_contact_initiated().
+
+    Wraps both in a single sync_to_async call to reduce DB connection churn
+    with CONN_MAX_AGE=0.
 
     Zone R2 conditions:
         - ad.status == PUBLISHED
@@ -126,56 +129,15 @@ async def handle_contact_orm(
     Returns:
         Tuple of (is_available, seller_telegram_id or None).
     """
-    from apps.ads.models import Ad
-    from apps.analytics.models import AnalyticsEvent
-    from apps.core.enums import AdStatus, AnalyticsEventType
-    from apps.users.models import User
+    from apps.core.services.contact import get_seller_for_contact, record_contact_initiated
 
     @sync_to_async
     def _handle() -> tuple[bool, int | None]:
-        is_available = False
-        seller_telegram_id: int | None = None
+        is_available, seller = get_seller_for_contact(ad_id)
+        seller_telegram_id: int | None = seller.telegram_id if seller else None
 
-        try:
-            ad = Ad.objects.select_related("user").get(id=ad_id)
-        except Ad.DoesNotExist:
-            logger.info(f"Ad {ad_id} not found for contact")
-        else:
-            if ad.status != AdStatus.PUBLISHED:
-                logger.info(
-                    f"Ad {ad_id} not PUBLISHED (status={ad.status}) for contact"
-                )
-            else:
-                seller = ad.user
-                if seller is None:
-                    logger.info(f"Ad {ad_id} has no seller")
-                elif seller.telegram_id is None:
-                    pass
-                elif seller.is_deleted:
-                    pass
-                elif seller.is_banned:
-                    pass
-                elif seller.consent_revoked_at is not None:
-                    pass
-                else:
-                    is_available = True
-                    seller_telegram_id = seller.telegram_id
+        record_contact_initiated(buyer_telegram_id)
 
-        # Always record analytics event (for all contact attempts)
-        user_id = None
-        if buyer_telegram_id is not None:
-            try:
-                user = User.objects.get(telegram_id=buyer_telegram_id)
-                user_id = user.id
-            except User.DoesNotExist:
-                pass
-
-        AnalyticsEvent.objects.create(
-            event_type=AnalyticsEventType.CONTACT_INITIATED,
-            user_id=user_id,
-        )
-
-        logger.info("Contact initiated event recorded")
         return (is_available, seller_telegram_id)
 
     return await _handle()
