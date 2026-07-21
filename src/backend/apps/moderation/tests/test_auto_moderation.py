@@ -4,12 +4,22 @@ Tests for auto-moderation service validation functions.
 Unit tests for validation rules without database dependencies.
 """
 
+import pytest
+from django.core.cache import cache
+
+from apps.ads.models import Ad, AdImage
+from apps.categories.models import Category
+from apps.core.enums import AdStatus
+from apps.locations.models import City
+from apps.moderation.models import ModerationCriteria
 from apps.moderation.services.auto_moderation import (
     _contains_banned_words,
     _validate_description_length,
     _validate_image_count,
     _validate_title_length,
+    check,
 )
+from apps.users.models import User
 
 
 class TestValidateTitleLength:
@@ -146,93 +156,104 @@ class TestContainsBannedWords:
         result = _contains_banned_words("Any Title", "Any description", ())
         assert result is False
 
+@pytest.fixture
+def moderation_criteria():
+    """Create a ModerationCriteria singleton with default values."""
+    cache.clear()
+    criteria = ModerationCriteria.get_singleton()
+    criteria.title_min_length = 5
+    criteria.title_max_length = 100
+    criteria.description_min_length = 10
+    criteria.description_max_length = 2000
+    criteria.price_required = True
+    criteria.min_images = 1
+    criteria.max_images = 5
+    criteria.banned_words = []
+    criteria.max_ads_per_user = 10
+    criteria.duplicate_title_threshold = 85
+    criteria.save()
+    return criteria
+
+
+@pytest.fixture
+def user():
+    """Create a test user."""
+    return User.objects.create_user(
+        telegram_id=12345,
+        chat_id=12345,
+        username="testuser",
+        password="password",
+    )
+
+
+@pytest.fixture
+def category():
+    """Create a test category."""
+    return Category.objects.create(name="Category", slug="category")
+
+
+@pytest.fixture
+
+def city():
+    """Create a test city."""
+    return City.objects.create(
+        country_code="BA",
+        name="City",
+        region="Region",
+        slug="city",
+    )
+
+
+@pytest.mark.django_db
 class TestCheckFunction:
-    """Tests for check() function returning seller-safe errors."""
+    """Tests for check() function with ORM-backed fixtures."""
 
-    def test_check_returns_passed_on_valid_ad(self, monkeypatch):
+    @pytest.fixture(autouse=True)
+    def _setup(
+        self,
+        moderation_criteria,
+        user,
+        category,
+        city,
+    ):
+        """Set up fixtures for each test."""
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def _create_ad(self, **kwargs) -> Ad:
+        """Create an Ad with defaults overridable by kwargs."""
+        defaults = {
+            "user": self.user,
+            "title": "Valid Title",
+            "description": "Valid description text here",
+            "price": 100,
+            "category": self.category,
+            "city": self.city,
+            "category_name": self.category.name,
+            "status": AdStatus.ON_MODERATION,
+        }
+        defaults.update(kwargs)
+        return Ad.objects.create(**defaults)
+
+    def test_check_returns_passed_on_valid_ad(self):
         """Check returns (True, None) when all validations pass."""
+        ad = self._create_ad()
+        AdImage.objects.create(ad=ad, image="test.jpg", position=0)
+        AdImage.objects.create(ad=ad, image="test2.jpg", position=1)
 
-        class MockAd:
-            title = "Valid Title"
-            description = "Valid description text here"
-            price = 100
-            user_id = 1
-            id = 1
-
-            @property
-            def images(self):
-                class MockQuerySet:
-                    def count(self):
-                        return 2
-                return MockQuerySet()
-
-        # Mock _get_cached_criteria to return permissive criteria
-        def mock_get_cached():
-            return (1, 200, 5, 2000, False, 1, 5, (), 100, 0)
-
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._get_cached_criteria",
-            mock_get_cached,
-        )
-        # Mock _validate_max_ads_per_user to pass
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-            lambda user_id, max_ads: True,
-        )
-        # Mock _is_duplicate_title to pass
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._is_duplicate_title",
-            lambda title, user_id, ad_id, threshold: False,
-        )
-
-        from apps.moderation.services.auto_moderation import check
-
-        passed, error = check(MockAd())
+        passed, error = check(ad)
         assert passed is True
         assert error is None
 
-    def test_check_returns_seller_safe_error_on_fail(self, monkeypatch):
+    def test_check_returns_seller_safe_error_on_fail(self):
         """Check returns (False, generic_error) on validation failure - no specific reason."""
-
-        class MockAd:
-            title = "abc"  # Too short
-            description = "Valid description text here"
-            price = 100
-            user_id = 1
-            id = 1
-
-            @property
-            def images(self):
-                class MockQuerySet:
-                    def count(self):
-                        return 2
-                return MockQuerySet()
-
-        def mock_get_cached():
-            return (10, 200, 5, 2000, False, 1, 5, (), 100, 0)
-
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._get_cached_criteria",
-            mock_get_cached,
-        )
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-            lambda user_id, max_ads: True,
-        )
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._is_duplicate_title",
-            lambda title, user_id, ad_id, threshold: False,
+        ad = self._create_ad(
+            title="abc",  # Too short (min=5, max=100)
         )
 
-        # Mock _fail_moderation to prevent ad.save() call
-        monkeypatch.setattr(
-            "apps.moderation.services.auto_moderation._fail_moderation",
-            lambda ad: None,
-        )
-
-        from apps.moderation.services.auto_moderation import check
-
-        passed, error = check(MockAd())
+        passed, error = check(ad)
         assert passed is False
         assert error is not None
         assert "does not meet our requirements" in error

@@ -8,7 +8,7 @@ import hashlib
 
 import pytest
 from apps.users.models import LoginToken, User
-from apps.users.services.deletion import decline_consent, withdraw_consent
+from apps.users.services.deletion import decline_consent, give_consent, withdraw_consent
 from django.utils import timezone
 
 pytestmark = pytest.mark.django_db
@@ -130,8 +130,8 @@ class TestWithdrawConsentSoftDeletesAds:
         """withdraw_consent soft-deletes all user ads."""
         from apps.ads.models import Ad
         from apps.categories.models import Category
-        from apps.locations.models import City
         from apps.core.enums import AdStatus
+        from apps.locations.models import City
 
         category = Category.objects.create(
             name="Test Category",
@@ -172,3 +172,27 @@ class TestWithdrawConsentSoftDeletesAds:
         assert ad1.status == AdStatus.DELETED
         assert ad1.deleted_at is not None
         assert ad2.status == AdStatus.DELETED
+
+
+class TestGiveConsent:
+    """Tests for give_consent service."""
+
+    def test_give_consent_sets_timestamp(self, user: User):
+        """give_consent sets consent_given_at on the user."""
+        give_consent(user)
+
+        user.refresh_from_db()
+        assert user.consent_given_at is not None
+
+    def test_give_consent_does_not_alter_other_flags(self, user: User):
+        """give_consent only sets consent_given_at; other flags remain unchanged."""
+        give_consent(user)
+
+        user.refresh_from_db()
+        assert user.is_deleted is False
+        assert user.is_banned is False
+        assert user.is_declined is False
+        assert user.ads_auto_publish is True
+        assert user.consent_revoked_at is None
+        assert user.telegram_id is not None
+        assert user.username is None  # default for test fixture
