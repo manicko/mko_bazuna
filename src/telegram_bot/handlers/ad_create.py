@@ -27,7 +27,7 @@ from telegram_bot.schemas.message_payloads import (
     PricePayload,
     TitlePayload,
 )
-from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif
+from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif, delete_photo
 from telegram_bot.states import AdCreateState
 import asyncio
 from django.db import transaction
@@ -78,6 +78,11 @@ async def cmd_cancel(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
 
     if "ad_id" in data:
+        # Clean up photo files from FSM state before deleting the draft
+        photos = data.get("photos", [])
+        for photo in photos:
+            await asyncio.to_thread(delete_photo, photo["storage_key"])
+
         await delete_draft(data["ad_id"])
 
     await state.clear()
@@ -371,12 +376,21 @@ async def create_draft_ad(user_id: int) -> Ad:
 
 
 async def delete_draft(ad_id: int) -> None:
-    """Delete a draft ad."""
+    """Delete a draft ad and clean up its photo files."""
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _delete() -> None:
-        Ad.objects.filter(id=ad_id, status=AdStatus.DRAFT).delete()
+        try:
+            ad = Ad.objects.get(id=ad_id, status=AdStatus.DRAFT)
+        except Ad.DoesNotExist:
+            return
+
+        # Delete physical photo files for any AdImage records
+        for img in ad.images.all():
+            delete_photo(img.image)
+
+        ad.delete()
 
     await _delete()
 
