@@ -1,7 +1,7 @@
 """
 Login handler for Telegram bot deep-link authentication.
 
-Implements atomic token claim via UPDATE with constant-time comparison.
+Implements atomic token claim via indexed SHA-256 hash lookup.
 """
 
 import hashlib
