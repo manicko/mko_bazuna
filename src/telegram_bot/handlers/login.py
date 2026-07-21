@@ -17,6 +17,7 @@ from django.utils import timezone
 from apps.users.models import User, LoginToken
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
+from django.db import IntegrityError, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -135,24 +136,32 @@ async def get_or_create_user(
     """
     Get existing user or create new one.
 
-    Uses sync_to_async for ORM operations. On user creation, records REGISTRATION_CREATED event.
+    Uses sync_to_async for ORM operations. Wraps get_or_create in
+    transaction.atomic() to guard against concurrent IntegrityError
+    on duplicate telegram_id. On conflict, re-fetches the existing user.
     """
     @sync_to_async
     def _get_or_create() -> tuple[User, bool]:
-        user, created = User.objects.get_or_create(
-            telegram_id=telegram_id,
-            defaults={
-                "username": username,
-                "first_name": first_name,
-                "last_name": last_name,
-            },
-        )
-        if created:
-            AnalyticsEvent.objects.create(
-                event_type=AnalyticsEventType.REGISTRATION_CREATED,
-                user_id=user.id,
-            )
-            logger.info(f"Registration event recorded for user {user.id}")
+        try:
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+                user, created = User.objects.get_or_create(
+                    telegram_id=telegram_id,
+                    defaults={
+                        "username": username,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                    },
+                )
+        except IntegrityError:
+            user = User.objects.get(telegram_id=telegram_id)
+            created = False
+        else:
+            if created:
+                AnalyticsEvent.objects.create(
+                    event_type=AnalyticsEventType.REGISTRATION_CREATED,
+                    user_id=user.id,
+                )
+                logger.info(f"Registration event recorded for user {user.id}")
         return user, created
 
     return await _get_or_create()
