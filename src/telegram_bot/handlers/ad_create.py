@@ -469,20 +469,26 @@ async def get_city(city_id: int):
     return await _get()
 
 
-async def translate_to_russian(title: str, description: str) -> tuple[str, str]:
-    """Translate content to Russian using deep-translator."""
+def _do_translate(text: str) -> str:
+    """Synchronous translation wrapper."""
     from deep_translator import GoogleTranslator
 
-    try:
-        title_ru = GoogleTranslator(source="auto", target="ru").translate(title)
-    except Exception:
-        title_ru = title
+    return GoogleTranslator(source="auto", target="ru").translate(text)
 
-    try:
-        desc_ru = GoogleTranslator(source="auto", target="ru").translate(description)
-    except Exception:
-        desc_ru = description
 
+async def translate_to_russian(title: str, description: str) -> tuple[str, str]:
+    """Translate content to Russian using deep-translator, off the event loop."""
+    async def translate_one(text: str) -> str:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(_do_translate, text),
+                timeout=15.0,
+            )
+        except Exception:
+            return text
+
+    title_ru = await translate_one(title)
+    desc_ru = await translate_one(description)
     return title_ru, desc_ru
 
 
