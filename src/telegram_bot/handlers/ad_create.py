@@ -280,8 +280,7 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
         return
 
     # Store photo
-    storage_key = generate_storage_key()
-    await save_photo(storage_key, photo_bytes)
+    storage_key = await save_photo(generate_storage_key(), photo_bytes)
 
     # Save to state
     photos.append(
@@ -430,20 +429,35 @@ async def download_photo(file_id: str, bot: Bot) -> bytes | None:
         return None
 
 
-async def save_photo(storage_key: str, photo_bytes: bytes) -> None:
+async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
     """Save photo to filesystem via thread executor to avoid blocking the event loop.
 
     Strips EXIF/metadata and re-encodes the image before persisting to disk.
+    Uses ``os.open`` with ``O_CREAT|O_EXCL`` to guarantee atomic writes; on
+    ``FileExistsError`` regenerates the storage key and retries.
+
+    Returns:
+        The final storage key used (may differ from the input on collision).
     """
 
-    def _write() -> None:
-        cleaned = strip_photo_exif(photo_bytes)
-        media_path = os.path.join(settings.MEDIA_ROOT, storage_key)
-        os.makedirs(os.path.dirname(media_path), exist_ok=True)
-        with open(media_path, "wb") as f:
-            f.write(cleaned)
+    def _write(path: str, data: bytes) -> None:
+        cleaned = strip_photo_exif(data)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        try:
+            os.write(fd, cleaned)
+        finally:
+            os.close(fd)
 
-    await asyncio.to_thread(_write)
+    key = storage_key
+    while True:
+        media_path = os.path.join(settings.MEDIA_ROOT, key)
+        try:
+            await asyncio.to_thread(_write, media_path, photo_bytes)
+            return key
+        except FileExistsError:
+            logger.warning(f"Storage key collision: {key}, regenerating")
+            key = generate_storage_key()
 
 
 async def get_category(category_id: int):
