@@ -25,6 +25,11 @@ def main() -> None:
     token = settings.BOT_TOKEN
 
     # Storage: MemoryStorage (FSM state in memory, Ad.DRAFT in ORM)
+    # NOTE: MemoryStorage is ephemeral — FSM state is cleared on bot restart.
+    # There is no cross-process broadcast: if the bot is restarted while a user
+    # is mid-FSM, the in-progress dialog is lost. The Ad.DRAFT row in the ORM
+    # survives, but the FSM state machine state does not.
+    # Future: switch to RedisStorage for persistent FSM across restarts.
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
