@@ -125,4 +125,4 @@ def record_contact_initiated(buyer_telegram_id: int | None = None) -> None:
         event_type=AnalyticsEventType.CONTACT_INITIATED,
         user_id=user_id,
     )
-    logger.info(f"Contact initiated event recorded for buyer {buyer_telegram_id}")
+    logger.info(f"Contact initiated event recorded for buyer {user_id}")
