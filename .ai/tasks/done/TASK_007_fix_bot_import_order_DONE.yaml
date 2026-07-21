@@ -1,0 +1,56 @@
+id: task_007_fix_bot_import_order
+
+title: Fix bot import order — django.setup() before model imports (ENT-002)
+
+priority: critical
+
+status: blocked
+
+blocked_by: task_002_research_bot_bootstrap
+
+depends_on:
+  - task_002_research_bot_bootstrap
+
+source_reference: .ai/audit/99-validation/01-entry-architecture-validated-findings.md
+source_section: "ENT-002"
+
+description: >
+  Restructure bot bootstrap so django.setup() runs before any telegram_bot.*
+  import that pulls Django models. Remove eager imports from
+  telegram_bot/__init__.py and move django.setup() earlier in main.py (before
+  the middlewares/handlers import). Prevents AppRegistryNotReady at boot.
+
+goals:
+  - no Django model imported before django.setup()
+  - aiogram routers still register correctly
+  - bot boots without ImproperlyConfigured
+
+files:
+  - path: src/telegram_bot/__init__.py
+    targets:
+      - type: module
+        name: telegram_bot package init (eager handler imports)
+    semantic_anchors:
+      remove_block:
+        type: import_statement
+        value: "eager handler/middleware imports at package load"
+
+  - path: src/telegram_bot/main.py
+    targets:
+      - type: function
+        name: main
+    semantic_anchors:
+      insert_before:
+        type: function_call
+        value: "import telegram_bot.middlewares"
+
+changes:
+  - action: reorder
+    description: >
+      Move django.setup() above telegram_bot.* imports; delete eager imports
+      from __init__.py per research_002 guidance.
+
+acceptance_criteria:
+  - importing telegram_bot.main with DJANGO_SETTINGS_MODULE set succeeds
+  - bot reaches event loop without AppRegistryNotReady
+  - existing router/handler registration unaffected

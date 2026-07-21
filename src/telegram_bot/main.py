@@ -10,9 +10,9 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
 django.setup()
 
-from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
-from telegram_bot.middlewares import AccountStateMiddleware
+from aiogram import Bot, Dispatcher  # noqa: E402
+from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
+from telegram_bot.middlewares import AccountStateMiddleware  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
