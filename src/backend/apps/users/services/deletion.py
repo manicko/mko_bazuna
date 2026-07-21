@@ -47,7 +47,7 @@ def withdraw_consent(user: User) -> None:
     Flow (zone R3):
     - Sets consent_revoked_at = now()
     - Sets is_deleted = True, deleted_at = now()
-    - NULLs telegram_id and username immediately (breaks chat linkage)
+    - NULLs telegram_id, username, first_name, last_name immediately (breaks chat linkage)
     - Invalidates/deletes all active LoginTokens (prevents re-linking after withdrawal)
     - Soft-deletes all user ads (status=DELETED, hidden immediately)
     - Ads' images are cascade-deleted via AdImage.on_delete=CASCADE
@@ -72,6 +72,8 @@ def withdraw_consent(user: User) -> None:
     # NULL PII immediately (breaks chat linkage)
     user.telegram_id = None  # type: ignore[assignment]
     user.username = None
+    user.first_name = None
+    user.last_name = None
 
     user.save(update_fields=[
         "consent_revoked_at",
@@ -79,6 +81,8 @@ def withdraw_consent(user: User) -> None:
         "deleted_at",
         "telegram_id",
         "username",
+        "first_name",
+        "last_name",
     ])
 
     # Soft-delete all user ads
