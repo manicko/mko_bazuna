@@ -103,26 +103,31 @@ async def handle_login_orm(
     """
     Atomically claim a login token, then get or create the user.
 
-    Combines two ORM operations in a single sync_to_async call
+    Combines the claim and user operations in a single sync_to_async call
     to reduce DB connection churn with CONN_MAX_AGE=0.
+    The claim uses UPDATE ... RETURNING to avoid a TOCTOU race between
+    the UPDATE and a subsequent SELECT.
     """
 
     @sync_to_async
     def _handle() -> tuple[LoginToken | None, User | None, bool]:
         now = timezone.now()
 
-        # Atomic UPDATE claim
-        updated = LoginToken.objects.filter(
-            token_hash=token_hash,
-            telegram_id__isnull=True,
-            consumed_at__isnull=True,
-            expires_at__gt=now,
-        ).update(telegram_id=telegram_id)
+        # Atomic UPDATE claim with RETURNING — single query, no TOCTOU
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            login_token = (
+                LoginToken.objects.filter(
+                    token_hash=token_hash,
+                    telegram_id__isnull=True,
+                    consumed_at__isnull=True,
+                    expires_at__gt=now,
+                )
+                .update(telegram_id=telegram_id, returning=True)
+                .first()
+            )
 
-        if updated == 0:
+        if login_token is None:
             return None, None, False
-
-        login_token = LoginToken.objects.get(token_hash=token_hash)
 
         # Get or create user
         try:
