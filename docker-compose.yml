@@ -54,6 +54,7 @@ services:
       - .env
     volumes:
       - media_volume:/app/media
+    restart: unless-stopped
     # Port 8000 NOT published - nginx proxies internally
 
   bot:
