@@ -18,7 +18,7 @@ from apps.users.services import (
     get_state_badge,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ from apps.locations.models import City
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.utils import timezone
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture

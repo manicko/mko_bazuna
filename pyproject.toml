@@ -149,6 +149,7 @@ console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning
 markers = [
   "slow: marks tests as slow (use -m slow to run)",
+  "integration: marks tests that require a database (use -m integration to run)",
 ]
 
 # Coverage.py configuration (used by pytest-cov)

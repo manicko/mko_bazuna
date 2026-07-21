@@ -16,7 +16,7 @@ from apps.users.models import User
 from django.test import Client
 from django.utils import timezone
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

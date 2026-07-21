@@ -12,7 +12,7 @@ from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
 from apps.moderation.services.auto_moderation import auto_moderate
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

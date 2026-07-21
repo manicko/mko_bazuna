@@ -12,7 +12,7 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 logger = logging.getLogger(__name__)
 

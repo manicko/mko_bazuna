@@ -12,7 +12,7 @@ from apps.core.services.contact import can_contact_seller
 from apps.users.models import User
 from django.utils import timezone
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture

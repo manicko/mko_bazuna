@@ -205,6 +205,8 @@ def city():
 
 
 @pytest.mark.django_db
+@pytest.mark.slow
+@pytest.mark.integration
 class TestCheckFunction:
     """Tests for check() function with ORM-backed fixtures."""
 

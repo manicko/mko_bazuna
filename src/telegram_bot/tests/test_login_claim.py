@@ -12,7 +12,7 @@ from apps.users.models import LoginToken
 from django.utils import timezone
 from telegram_bot.handlers.login import handle_login_orm
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture

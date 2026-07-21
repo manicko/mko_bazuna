@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from telegram_bot.services.media import delete_photo, generate_storage_key, strip_photo_exif
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

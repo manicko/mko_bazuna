@@ -11,7 +11,7 @@ from apps.users.models import LoginToken, User
 from apps.users.services.deletion import decline_consent, give_consent, withdraw_consent
 from django.utils import timezone
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
