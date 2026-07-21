@@ -13,6 +13,10 @@ from typing import Final
 from deep_translator import GoogleTranslator
 from requests.exceptions import RequestException
 
+# Module-level executor. Without a `with` block, a timed-out future is abandoned
+# rather than waited on via shutdown(wait=True), so the timeout actually bounds latency.
+_EXECUTOR: Final[ThreadPoolExecutor] = ThreadPoolExecutor(max_workers=1)
+
 logger = logging.getLogger(__name__)
 
 TRANSLATION_TIMEOUT_SECONDS: Final[float] = 0.5  # ~500ms timeout via exceptions
@@ -35,9 +39,8 @@ def translate_query_bs_to_ru(query: str) -> str:
         return query
 
     try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(translate_cached, query)
-            result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
+        future = _EXECUTOR.submit(translate_cached, query)
+        result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
         if result:
             logger.debug(f"Translated query '{query}' -> '{result}'")
             return result
