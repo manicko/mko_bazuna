@@ -9,11 +9,11 @@ Hard-delete sweep (30 days) is Phase 4 per zone R1.
 """
 
 import logging
-from datetime import datetime
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.users.models import LoginToken, User
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def withdraw_consent(user: User) -> None:
     Args:
         user: The user withdrawing consent.
     """
-    now = datetime.now()
+    now = timezone.now()
     user_telegram_id = user.telegram_id
 
     # Invalidate active login tokens BEFORE nulling telegram_id
@@ -100,7 +100,7 @@ def soft_delete_user_ads(user: User) -> int:
     Returns:
         Number of ads soft-deleted.
     """
-    now = datetime.now()
+    now = timezone.now()
 
     # Soft-delete all ads: set status=DELETED, deleted_at=now
     # Images cascade via on_delete=CASCADE in AdImage
@@ -123,6 +123,6 @@ def give_consent(user: User) -> None:
     Args:
         user: The user giving consent.
     """
-    user.consent_given_at = datetime.now()
+    user.consent_given_at = timezone.now()
     user.save(update_fields=["consent_given_at"])
     logger.info(f"User {user.id} gave consent - consent_given_at set")
