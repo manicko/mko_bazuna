@@ -314,23 +314,23 @@ class TestApproveAdView:
         assert log_entries.exists()
 
     def test_approve_requires_post(
-        self,
-        staff_user: User,
-        seller: User,
-        category: Category,
-        city: City,
-    ) -> None:
-        """GET to approve_ad returns 405 or redirect (view does not check method)."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+            self,
+            staff_user: User,
+            seller: User,
+            category: Category,
+            city: City,
+        ) -> None:
+            """GET to approve_ad redirects (view does not check method)."""
+            ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
-        client = Client()
-        client.force_login(staff_user)
-        response = client.get(f"/moderation/approve/{ad.id}/")
+            client = Client()
+            client.force_login(staff_user)
+            client.get(f"/moderation/approve/{ad.id}/")
 
-        # The view does not check method, so GET will still work
-        # But the ad should still be approved
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.PUBLISHED
+            # The view does not check method, so GET will still work
+            # But the ad should still be approved
+            ad.refresh_from_db()
+            assert ad.status == AdStatus.PUBLISHED
 
     def test_approve_non_moderation_ad_returns_404(
         self,
