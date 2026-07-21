@@ -9,6 +9,8 @@ import logging
 import uuid
 
 from PIL import Image, ImageOps
+import os
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,25 @@ def validate_photo(
 def generate_storage_key() -> str:
     """Generate a UUID v4 storage key for anonymity."""
     return f"{uuid.uuid4()}.jpg"
+
+
+def delete_photo(storage_key: str) -> None:
+    """
+    Delete a photo file from the media storage.
+
+    Removes the file at ``os.path.join(settings.MEDIA_ROOT, storage_key)``.
+    Succeeds silently if the file does not exist.
+
+    Args:
+        storage_key: Relative storage key (e.g. ``"<uuid>.jpg"``).
+    """
+    path = os.path.join(settings.MEDIA_ROOT, storage_key)
+    try:
+        os.remove(path)
+        logger.info(f"Deleted photo: {storage_key}")
+    except FileNotFoundError:
+        logger.warning(f"Photo not found (already deleted): {storage_key}")
+
 
 def strip_photo_exif(photo_bytes: bytes) -> bytes:
     """
