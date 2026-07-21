@@ -13,14 +13,11 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup
 from django.conf import settings
-from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.enums import AdStatus
 from apps.locations.models import City
-from apps.moderation.models import ModerationCriteria
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
     PhotoCountPayload,
@@ -30,7 +27,6 @@ from telegram_bot.schemas.message_payloads import (
 from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif, delete_photo
 from telegram_bot.states import AdCreateState
 import asyncio
-from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -535,8 +531,9 @@ async def update_ad_and_moderate(
     photos: list,
     user_id: int | None,
 ) -> tuple[bool, list[str]]:
-    """Update ad with Russian content, create images, and run auto-moderation."""
+    """Update ad with Russian content, create images, and delegate to shared auto_moderate."""
     from asgiref.sync import sync_to_async
+    from apps.moderation.services.auto_moderation import auto_moderate
 
     @sync_to_async
     def _update_and_moderate() -> tuple[bool, list[str]]:
@@ -545,71 +542,34 @@ async def update_ad_and_moderate(
         except Ad.DoesNotExist:
             return False, ["Ad not found"]
 
-        criteria = ModerationCriteria.get_singleton()
-        errors: list[str] = []
-
         # Update ad fields
         ad.title = title_ru
         ad.description = desc_ru
         ad.category_id = category_id
         ad.city_id = city_id
         ad.price = price
+        ad.save()
 
-        # Validate before saving
-        # Title length
-        if len(ad.title) < criteria.title_min_length:
-            errors.append("Title too short")
-
-        # Description length
-        if len(ad.description) < criteria.description_min_length:
-            errors.append("Description too short")
-
-        # Price required
-        if criteria.price_required and ad.price is None:
-            errors.append("Price is required")
-
-        # Photo count (using photos list from state)
-        photo_count = len(photos)
-        if photo_count < criteria.min_images or photo_count > criteria.max_images:
-            errors.append(f"Must have {criteria.min_images}-{criteria.max_images} photos")
-
-        # Active ad count check
-        if user_id:
-            active_count = Ad.objects.filter(
-                user_id=user_id, status=AdStatus.PUBLISHED
-            ).count()
-            if active_count >= criteria.max_ads_per_user:
-                errors.append("Too many active ads")
-
-        if errors:
-            ad.status = AdStatus.ON_MODERATION_FAILED
-            ad.moderation_failed_at = timezone.now()
-            ad.save()
-            return False, errors
-
-        # Atomic write: AdImages + ad status + analytics event
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-            # Photos are valid - create AdImage records
-            for photo in photos:
-                AdImage.objects.create(
-                    ad_id=ad_id,
-                    image=photo["storage_key"],
-                    telegram_file_id=photo["telegram_file_id"],
-                    position=photo["position"],
-                )
-
-            # Approve
-            ad.status = AdStatus.PUBLISHED
-            ad.published_at = timezone.now()
-            if ad.original_published_at is None:
-                ad.original_published_at = timezone.now()
-            ad.save()
-
-            # Create analytics event
-            AnalyticsEvent.objects.create(
-                event_type=AnalyticsEventType.AD_PUBLISHED.value, user=user_id
+        # Create AdImage records (required before auto_moderate for image count check)
+        for photo in photos:
+            AdImage.objects.create(
+                ad_id=ad_id,
+                image=photo["storage_key"],
+                telegram_file_id=photo["telegram_file_id"],
+                position=photo["position"],
             )
 
-        return True, []
+        # Transition DRAFT -> ON_MODERATION (state machine requires this step)
+        ad.transition_to(AdStatus.ON_MODERATION)
+
+        # Delegate to shared auto-moderation service
+        # Handles: banned_words, duplicate_title, all validations,
+        # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
+        passed = auto_moderate(ad)
+
+        if passed:
+            return True, []
+        else:
+            return False, ["Ad failed moderation checks"]
 
     return await _update_and_moderate()
