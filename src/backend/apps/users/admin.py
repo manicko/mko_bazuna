@@ -37,7 +37,6 @@ class UserAdmin(admin.ModelAdmin):
         "consent_given_at",
         "consent_revoked_at",
         "deleted_at",
-        "hard_delete_at",
     ]
 
     def has_add_permission(self, request) -> bool:

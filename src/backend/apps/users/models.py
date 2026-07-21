@@ -73,11 +73,6 @@ class User(AbstractUser):
         null=True,
         help_text="GDPR consent revoked timestamp",
     )
-    hard_delete_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        help_text="Scheduled hard-delete timestamp (telegram_id nulled 30 days after consent withdrawal)",
-    )
 
     # Use telegram_id as the username field for authentication
     USERNAME_FIELD = "telegram_id"
