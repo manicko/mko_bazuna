@@ -13,16 +13,16 @@ django.setup()
 from aiogram import Bot, Dispatcher  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
 from telegram_bot.middlewares import AccountStateMiddleware  # noqa: E402
+from django.conf import settings  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     """Run the Telegram bot."""
-    token = os.getenv("BOT_TOKEN")
-    if not token:
-        logger.warning("BOT_TOKEN not set - bot not running")
-        return
+    # BOT_TOKEN is loaded from validated settings schema;
+    # missing/invalid token raises ImproperlyConfigured at django.setup().
+    token = settings.BOT_TOKEN
 
     # Storage: MemoryStorage (FSM state in memory, Ad.DRAFT in ORM)
     storage = MemoryStorage()

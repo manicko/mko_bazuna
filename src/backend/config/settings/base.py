@@ -19,6 +19,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 env = environ.Env(
     # Set casting & default values for environment variables
     DEBUG=(bool, False),
+    # BOT_TOKEN is required - no default so missing raises ImproperlyConfigured
+    BOT_TOKEN=(str,),
 )
 
 # Read .env file (django-environ uses python-dotenv internally)
@@ -40,6 +42,9 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
+
+# Telegram bot token (required for bot process, validated via Env schema)
+BOT_TOKEN = env("BOT_TOKEN")
 
 # ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
