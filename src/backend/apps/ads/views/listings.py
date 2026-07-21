@@ -10,19 +10,13 @@ from difflib import get_close_matches
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, AdSort
 from apps.locations.models import City
 from apps.users.views.consent import is_consent_given
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
-
-# Sort options
-SORT_DATE_NEW = "date_desc"
-SORT_DATE_OLD = "date_asc"
-SORT_PRICE_LOW = "price_asc"
-SORT_PRICE_HIGH = "price_desc"
 
 
 def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
@@ -135,12 +129,12 @@ def listings(
             pass  # Invalid price, ignore filter
 
     # Sorting
-    sort = request.GET.get("sort", SORT_DATE_NEW)
-    if sort == SORT_DATE_OLD:
+    sort = request.GET.get("sort", AdSort.DATE_NEW)
+    if sort == AdSort.DATE_OLD:
         ads = ads.order_by("published_at")
-    elif sort == SORT_PRICE_LOW:
+    elif sort == AdSort.PRICE_LOW:
         ads = ads.order_by("price")
-    elif sort == SORT_PRICE_HIGH:
+    elif sort == AdSort.PRICE_HIGH:
         ads = ads.order_by("-price")
     else:  # date_desc (default)
         ads = ads.order_by("-published_at")
@@ -178,7 +172,9 @@ def _suggest_category(slug: str) -> str | None:
     Returns:
         Suggested slug or None
     """
-    all_slugs = list(Category.objects.filter(is_active=True).values_list("slug", flat=True))
+    all_slugs = list(
+        Category.objects.filter(is_active=True).values_list("slug", flat=True)
+    )
     matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
     return matches[0] if matches else None
 

@@ -8,6 +8,15 @@ No inline string literals for constants anywhere in the codebase.
 from enum import IntEnum, StrEnum
 
 
+class AdSort(StrEnum):
+    """Sort options for ad listings."""
+
+    DATE_NEW = "date_desc"
+    DATE_OLD = "date_asc"
+    PRICE_LOW = "price_asc"
+    PRICE_HIGH = "price_desc"
+
+
 class AdvisoryLockId(IntEnum):
     """PostgreSQL advisory lock IDs for idempotent scheduled jobs."""
 
@@ -76,4 +85,12 @@ class CategoryRejectReason(StrEnum):
     OFF_TOPIC = "off_topic"
 
 
-__all__ = ["AdvisoryLockId", "AdStatus", "AdSource", "AnalyticsEventType", "ModeratorActionType", "CategoryRejectReason"]
+__all__ = [
+    "AdSort",
+    "AdvisoryLockId",
+    "AdStatus",
+    "AdSource",
+    "AnalyticsEventType",
+    "ModeratorActionType",
+    "CategoryRejectReason",
+]
