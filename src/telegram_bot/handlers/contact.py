@@ -2,6 +2,9 @@
 Anonymous contact handler for Telegram bot.
 
 Handles buyer-to-seller contact via deep-link without PII exposure.
+The seller notification uses a fixed anonymous label ("Покупатель")
+instead of the buyer's real name. The buyer may disclose their identity
+voluntarily in the free-text message.
 Implements zone R2 conditions and anonymous forwarding.
 """
 
@@ -50,6 +53,10 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     """
     Handle contact deep-link for anonymous buyer-seller communication.
 
+    The seller notification uses a fixed anonymous label ("Покупатель")
+    instead of the buyer's real name. The buyer may disclose their identity
+    voluntarily in the free-text message.
+
     Zone R2 conditions enforced:
         - ad.status == PUBLISHED
         - seller.telegram_id IS NOT NULL
@@ -84,12 +91,11 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
         return True
 
     # Send anonymous message to seller
-    buyer_name = _get_buyer_display_name(message.from_user)
     await bot.send_message(
         chat_id=seller_telegram_id,
         text=(
             f"Новый запрос от покупателя!\n\n"
-            f"Покупатель: {buyer_name}\n"
+            f"Покупатель: {ANONYMOUS_BUYER_LABEL}\n"
             f"Ad ID: {ad_id}\n\n"
             f"Напишите своё сообщение — оно будет переслано анонимно."
         ),
@@ -143,24 +149,4 @@ async def handle_contact_orm(
     return await _handle()
 
 
-def _get_buyer_display_name(user: types.User) -> str:
-    """
-    Get buyer display name without exposing Telegram username/ID.
-
-    Uses first_name + last_name if available, otherwise "Покупатель".
-
-    Args:
-        user: Telegram user object.
-
-    Returns:
-        Display name string.
-    """
-    parts = []
-    if user.first_name:
-        parts.append(user.first_name)
-    if user.last_name:
-        parts.append(user.last_name)
-
-    if parts:
-        return " ".join(parts)
-    return "Покупатель"
+ANONYMOUS_BUYER_LABEL = "Покупатель"

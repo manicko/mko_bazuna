@@ -4,6 +4,13 @@ Consent views for Mko Bazuna.
 Implements decision F/K consent states (zone R3):
 - Accept: sets consent_given_at (covers all processing including bot)
 - Decline (browse-only): sets ads_auto_publish=False, no deletion
+
+Data flow disclosure — translation egress:
+Ad title/description (on creation) and search queries (on lookup) are
+sent to Google Translate via the `deep-translator` wrapper for language
+normalization. This is a best-effort, non-identifying content transfer;
+no user PII (telegram_id, username, IP) is included in the request.
+See also section G in docs/01-spec/technical-specification.md.
 """
 
 import hashlib

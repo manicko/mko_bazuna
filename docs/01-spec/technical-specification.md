@@ -97,6 +97,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Content stored in Russian.** UI language switch (ru/bs-latin) translates only the site shell; ad text is shown translated on display.
 - **Search (phase 1) is over Russian content.** Bosnian query is translated to Russian at search time (query-translation). Results optionally tagged "translated from Russian".
 - **Stored-content-invariant (zone D5):** seller may input in Bosnian/Russian, but the bot MUST translate title+description to Russian on ad creation (reuses `deep-translator` + request cache) so `to_tsvector('russian', …)` is correct. Bosnian UI translates back on display.
+- **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation) and search queries (on lookup) to **Google Translate** for language normalization. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
 - **Result sorting:** buyer chooses — by date (newest first) or by price.
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.
 - **City typos:** show "did you mean" suggestion via `difflib.get_close_matches` (no separate fuzzy lib needed for MVP).

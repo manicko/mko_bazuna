@@ -56,6 +56,12 @@ SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
+# HSTS: nginx also emits this header; Django-level is defense-in-depth.
+# Override in prod.py with a longer duration.
+SECURE_HSTS_SECONDS = 3600
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = False
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
