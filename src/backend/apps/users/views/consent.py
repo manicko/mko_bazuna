@@ -12,6 +12,13 @@ from apps.users.services import decline_consent, give_consent
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
+import hashlib
+import secrets
+from datetime import timedelta
+from apps.users.models import LoginToken
+from django.conf import settings
+from django.shortcuts import render
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -99,3 +106,43 @@ def is_consent_given(request: HttpRequest) -> bool:
     user = request.user
     # User has acted if they accepted (consent_given_at set) or declined (ads_auto_publish=False)
     return user.consent_given_at is not None or not user.ads_auto_publish
+
+
+def login_issue(request: HttpRequest) -> HttpResponse:
+    """
+    Issue a login token and render the Telegram deep-link.
+
+    Generates a cryptographically random 32-char URL-safe token,
+    stores only its SHA-256 hash, and renders the deep-link
+    https://t.me/<BOT_USERNAME>?start=login_<raw_token>.
+
+    The raw token is never stored — only the hash is persisted.
+    Token expires in 5 minutes.
+
+    Args:
+        request: HTTP request (anonymous or authenticated)
+
+    Returns:
+        Rendered login page with deep-link to Telegram bot
+    """
+    raw_token = secrets.token_urlsafe(24)  # 32 URL-safe chars, matches bot regex `{32}`
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    LoginToken.objects.create(
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+
+    bot_username = settings.BOT_USERNAME
+    deep_link = f"https://t.me/{bot_username}?start=login_{raw_token}"
+
+    logger.info(f"Issued login token hash={token_hash[:8]}...")
+
+    return render(
+        request,
+        "users/login_issue.html",
+        {
+            "deep_link": deep_link,
+            "bot_username": bot_username,
+        },
+    )

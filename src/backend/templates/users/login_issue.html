@@ -1,0 +1,42 @@
+{#
+    Login token issuance template for Mko Bazuna.
+
+    Renders the Telegram deep-link for login authentication.
+    User taps the button to open Telegram and complete login via bot.
+#}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Mko Bazuna</title>
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <main class="container mx-auto px-4 py-6 max-w-md">
+        <div class="bg-white rounded-lg shadow p-8 text-center">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">
+                Login to Mko Bazuna
+            </h1>
+            <p class="text-gray-600 mb-6">
+                Tap the button below to open Telegram and authenticate.
+                This link expires in 5 minutes.
+            </p>
+            <a
+                href="{{ deep_link }}"
+                class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+            >
+                Login via Telegram
+            </a>
+            <p class="text-xs text-gray-400 mt-4">
+                Don't have Telegram?
+                <a href="https://telegram.org" class="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">
+                    Get it here
+                </a>
+            </p>
+        </div>
+    </main>
+</body>
+</html>
