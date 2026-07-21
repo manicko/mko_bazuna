@@ -25,6 +25,8 @@ def approve_ad(ad: Ad, moderator_id: int) -> None:
     """
     Approve an ad for publication.
 
+    Sets original_published_at on first publish (immutable audit field).
+
     Args:
         ad: Ad instance to approve
         moderator_id: Moderator user ID performing the action
@@ -35,7 +37,15 @@ def approve_ad(ad: Ad, moderator_id: int) -> None:
     ad.status = AdStatus.PUBLISHED
     ad.published_at = timezone.now()
     ad.published_by_id = moderator_id
-    ad.save(update_fields=["status", "published_at", "published_by"])
+
+    update_fields = ["status", "published_at", "published_by"]
+
+    # Set original_published_at once (immutable audit field)
+    if ad.original_published_at is None:
+        ad.original_published_at = ad.published_at
+        update_fields.append("original_published_at")
+
+    ad.save(update_fields=update_fields)
 
     log_manual_publish(ad_id=ad.id, moderator_id=moderator_id)
     logger.info(f"Ad {ad.id} approved by moderator {moderator_id}")
