@@ -18,7 +18,6 @@ class UserAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "telegram_id",
         "is_banned",
         "is_deleted",
         "ads_auto_publish",

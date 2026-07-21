@@ -103,7 +103,7 @@ class User(AbstractUser):
         ]
 
     def __str__(self) -> str:
-        return f"User {self.telegram_id or self.id}"
+        return f"User {self.id}"
 
 
 class LoginToken(models.Model):
