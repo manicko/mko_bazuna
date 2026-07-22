@@ -34,19 +34,35 @@ Documentation for deploying and operating the Mko Bazuna platform using Docker. 
 ### Quick Start
 
 ```bash
-# Copy environment template and configure
-cp .env.example .env
+# Copy the Docker environment template and configure
+cp .env.docker .env.local
 
-# Edit .env and set your values:
+# Edit .env.local and set your values:
 # - BOT_TOKEN: Your Telegram bot token
 # - DJANGO_SECRET_KEY: Generate with `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`
 # - POSTGRES_PASSWORD: Database password
 
 # Start development environment
-docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --env-file .env.local up -d
 
 # Apply migrations
-docker compose run --rm migrate
+docker compose --env-file .env.local run --rm migrate
+```
+
+### Database Configuration
+
+Docker Compose automatically constructs `DATABASE_URL` from the `POSTGRES_*` variables using the `db` service hostname:
+
+```
+postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+```
+
+**Important:** Do NOT set `DATABASE_URL` in `.env.local` or `.env.docker` when running Docker containers. The compose files build it from the individual database variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), ensuring the correct hostname (`db`) is used for inter-container communication.
+
+For local Django development outside Docker (using `uv run` directly), use `.env.local` with `DATABASE_URL` pointing to `localhost`:
+```bash
+# Start Django locally (not in Docker)
+uv run python src/backend/manage.py runserver
 ```
 
 ### Development Services
@@ -73,14 +89,15 @@ docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --profil
 ### Docker Compose Production
 
 ```bash
-# Build images
-docker compose build
+# Copy the Docker environment template and configure
+cp .env.docker .env.local
 
-# Start production services
-docker compose up -d
+# Edit .env.local with production values
+# Then start services:
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Apply migrations (run once)
-docker compose run --rm migrate
+docker compose --env-file .env.local run --rm migrate
 ```
 
 ### Production Services
@@ -114,15 +131,17 @@ The production override file (`docker-compose.prod.yml`) includes:
 |----------|----------|-------------|
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
 | `DJANGO_SECRET_KEY` | Yes | Django secret key for signing |
-| `DATABASE_URL` | Yes | PostgreSQL connection URL |
 | `POSTGRES_USER` | Yes | Database username |
 | `POSTGRES_PASSWORD` | Yes | Database password |
+| `POSTGRES_DB` | Yes | Database name |
 | `BOT_USERNAME` | Yes | Telegram bot username (without @) |
 | `TLS_CERT_PATH` | No | Path to TLS certs (default: `/etc/nginx/certs/`) |
 | `PLAUSIBLE_HOST` | No | Analytics host for traffic tracking |
 | `ADMIN_USERNAME` | No | Admin username (default: admin) |
 | `ADMIN_PASSWORD` | No* | Admin password; required for auto-creation |
 | `ADMIN_TELEGRAM_ID` | No | Placeholder telegram_id (default: -1) |
+
+**Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker containers. Do not set `DATABASE_URL` in `.env.docker` when running Docker - the compose files build it from the individual database variables.
 
 *Required for automatic admin creation via `create_admin` service. Can be created manually if not set.
 
@@ -271,9 +290,9 @@ The `create_admin` service runs after migrations complete and creates an admin u
 `ADMIN_PASSWORD` is set in the environment:
 
 ```bash
-# Set ADMIN_PASSWORD in .env or environment
+# Set ADMIN_PASSWORD in .env.docker or environment
 # Then run:
-docker compose up -d
+docker compose --env-file .env.docker up -d
 
 # Check logs for confirmation
 docker compose logs create_admin
@@ -291,13 +310,13 @@ password later, use the management command:
 
 ```bash
 # Create admin user
-docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+docker compose --env-file .env.docker run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
     --password your_secure_password \
     --telegram-id -1
 
 # With custom values
-docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+docker compose --env-file .env.docker run --rm web uv run python src/backend/manage.py create_admin_user \
     --username myadmin \
     --password new_password \
     --telegram-id -1 \

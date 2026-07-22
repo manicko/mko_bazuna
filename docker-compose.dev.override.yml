@@ -7,14 +7,23 @@ services:
     environment:
       - DEBUG=True
       - DJANGO_SETTINGS_MODULE=config.settings.dev
+      - POSTGRES_HOST=db
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    env_file:
+      - .env.docker
     volumes:
       - .:/app
+      - ./.env.docker:/app/src/.env:ro
+      - media_volume:/app/media
     ports:
       - "8000:8000"
 
   bot:
+    env_file:
+      - .env.docker
     volumes:
       - .:/app
+      - ./.env.docker:/app/src/.env:ro
 
   nginx:
     profiles:

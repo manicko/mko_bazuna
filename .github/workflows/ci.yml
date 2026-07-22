@@ -14,7 +14,15 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        run: docker build -t mko-bazuna:ci -f docker/Dockerfile .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: mko-bazuna:ci
+          cache-from:
+            - type: registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
+          cache-to:
+            - type: registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
 
   test:
     runs-on: ubuntu-latest

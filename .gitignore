@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+﻿# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -150,7 +150,9 @@ activemq-data/
 # Environments
 .env
 .env.dev
-# .env.example and .env.dev.example are committed as templates
+.env.local
+
+# .env.example, .env.dev.example,  are committed as templates
 .envrc
 .venv
 env/
@@ -219,5 +221,6 @@ __marimo__/
 
 
 /logs/*
+
 
 

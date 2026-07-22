@@ -5,7 +5,8 @@
 
 # ====================== Settings ======================
 
-COMPOSE_FILES := -f docker-compose.yml -f docker-compose.dev.override.yml
+ENV_FILE := --env-file .env.docker
+COMPOSE_FILES := $(ENV_FILE) -f docker-compose.yml -f docker-compose.dev.override.yml
 COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
 
 # ====================== Main Commands ======================
@@ -65,7 +66,7 @@ typecheck:
 # ====================== Django ======================
 
 migrate:
-	docker compose run --rm migrate
+ 	docker compose $(ENV_FILE) run --rm migrate
 
 makemigrations:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemigrations
@@ -92,26 +93,26 @@ logs:
 BACKUPS_DIR := ./backups
 
 backup:
-	@mkdir -p $(BACKUPS_DIR)
-	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
-		docker compose $(COMPOSE_FILES) exec -T db \
-			pg_dump -U $${POSTGRES_USER} -d $${POSTGRES_DB} -F c \
-			> $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump && \
-		echo "✓ Backup created: $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump"
-	@$(MAKE) prune-backups
+ 	@mkdir -p $(BACKUPS_DIR)
+ 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
+ 		docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
+ 			pg_dump -U $${POSTGRES_USER} -d $${POSTGRES_DB} -F c \
+ 			> $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump && \
+ 		echo "✓ Backup created: $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump"
+ 	@$(MAKE) prune-backups
 
 restore:
-	@if [ -z "$(BACKUP_FILE)" ]; then \
-		echo "Error: BACKUP_FILE not specified"; \
-		echo "Example: make restore BACKUP_FILE=./backups/dump_20250719_143022.dump"; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(BACKUP_FILE)" ]; then \
-		echo "Error: file $(BACKUP_FILE) not found"; \
-		exit 1; \
-	fi
-	docker compose $(COMPOSE_FILES) exec -T db \
-		pg_restore -U $${POSTGRES_USER} -d $${POSTGRES_DB} --clean --if-exists $(BACKUP_FILE)
+ 	@if [ -z "$(BACKUP_FILE)" ]; then \
+ 		echo "Error: BACKUP_FILE not specified"; \
+ 		echo "Example: make restore BACKUP_FILE=./backups/dump_20250719_143022.dump"; \
+ 		exit 1; \
+ 	fi
+ 	@if [ ! -f "$(BACKUP_FILE)" ]; then \
+ 		echo "Error: file $(BACKUP_FILE) not found"; \
+ 		exit 1; \
+ 	fi
+ 	docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
+ 		pg_restore -U $${POSTGRES_USER} -d $${POSTGRES_DB} --clean --if-exists $(BACKUP_FILE)
 	@echo "✓ Restore completed from $(BACKUP_FILE)"
 
 prune-backups:

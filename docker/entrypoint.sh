@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Entrypoint script for Mko Bazuna containers
 # Handles database wait, volume permissions, and command execution
 
@@ -7,9 +7,14 @@ set -e
 # Fail fast if .env file is missing (container environment check)
 # Note: Test environment sets variables directly via compose, no .env needed
 check_env_file() {
-    if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "/app/.env" ]; then
+    # Check both possible .env locations (depends on source layout)
+    ENV_PATH="/app/src/.env"
+    if [ ! -f "$ENV_PATH" ]; then
+        ENV_PATH="/app/.env"
+    fi
+    if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "$ENV_PATH" ]; then
         if [ "$DJANGO_SETTINGS_MODULE" != "config.settings.test" ]; then
-            echo "ERROR: /app/.env file not found. Copy .env.example to .env and configure values." >&2
+            echo "ERROR: .env file not found. Copy .env.example to .env and configure values." >&2
             exit 1
         fi
     fi
@@ -32,8 +37,8 @@ wait_for_db() {
     fi
 
     echo "Waiting for PostgreSQL..."
-    for i in $(seq 1 30); do
-        if uv run python -c "import psycopg; psycopg.connect('$DATABASE_URL')" 2>/dev/null; then
+    for i in {1..30}; do
+        if /opt/venv/bin/python -c "import psycopg; psycopg.connect('$DATABASE_URL')" 2>/dev/null; then
             echo "Database ready"
             return 0
         fi
