@@ -2,7 +2,7 @@
 # python:3.14-slim base with uv, non-root runtime, Tailwind build + collectstatic
 
 ################################################################################
-# STAGE 1: Builder â€” install deps, build Tailwind, collectstatic
+# STAGE 1: Builder — install deps, build Tailwind, collectstatic
 ################################################################################
 FROM python:3.14-slim AS builder
 
@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (pinned for reproducibility)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /
 
+# Make uv executable and add to PATH
+RUN chmod +x /uv /uvx
+
+ENV PATH="/uv:$PATH"
+
 WORKDIR /app
 
 # Cache: copy dependency files first (most stable layer)
@@ -23,7 +28,12 @@ COPY pyproject.toml uv.lock* ./
 
 # Install dependencies to venv
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-RUN uv sync --frozen --no-install-project
+RUN /uv sync --frozen --no-install-project
+
+# Install Tailwind CSS CLI (standalone binary)
+RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
+    chmod +x /usr/local/bin/tailwindcss && \
+    tailwindcss --version
 
 # Copy source code
 COPY . .
@@ -36,12 +46,12 @@ ENV PYTHONPATH=/app/src/backend:/app/src
 # TAILWIND_APP_NAME is the default theme app name for django-tailwind
 ENV TAILWIND_APP_NAME=theme
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
-RUN uv run tailwind build && \
-    uv run python src/backend/manage.py collectstatic --noinput
+RUN tailwind build && \
+    /uv run python src/backend/manage.py collectstatic --noinput
 
 
 ################################################################################
-# STAGE 2: Production Runtime â€” non-root user, no build tools
+# STAGE 2: Production Runtime — non-root user, no build tools
 ################################################################################
 FROM python:3.14-slim AS runtime
 
@@ -67,10 +77,11 @@ COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
 COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
 COPY --chown=app:app docker/entrypoint-test.sh /app/entrypoint-test.sh
 COPY --chown=app:app docker/entrypoint-scheduler.sh /app/entrypoint-scheduler.sh
-RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh
+COPY --chown=app:app docker/entrypoint-create-admin.sh /app/entrypoint-create-admin.sh
+RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh /app/entrypoint-create-admin.sh
 
 # Activate venv for all subsequent RUN/ENTRYPOINT
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # Make the real source layout importable at runtime (web/bot/migrate/scheduler)
 ENV PYTHONPATH=/app/src/backend:/app/src

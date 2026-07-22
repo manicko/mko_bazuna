@@ -1,5 +1,5 @@
 # Base docker-compose.yml for Mko Bazuna
-# Services: db, migrate, web, bot, nginx
+# Services: db, migrate, web, bot, nginx, create_admin
 # Static served by whitenoise in image; media served by nginx from media_volume
 
 services:
@@ -43,17 +43,16 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: >
-      uv run python src/backend/manage.py create_admin_user
-      --username "${ADMIN_USERNAME:-admin}"
-      --password "${ADMIN_PASSWORD}"
-      --telegram-id "${ADMIN_TELEGRAM_ID:--1}"
+    entrypoint: /app/entrypoint-create-admin.sh
     depends_on:
       migrate:
         condition: service_completed_successfully
     environment:
       - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID:--1}
     env_file:
       - .env
     # One-shot service: runs once, then exits

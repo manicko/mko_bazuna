@@ -10,6 +10,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.test")
 if "DJANGO_SECRET_KEY" not in os.environ:
     os.environ["DJANGO_SECRET_KEY"] = "test-secret-key-for-validation-only"
 
+# BOT_TOKEN is required by base.py - set a placeholder for local testing
+if "BOT_TOKEN" not in os.environ:
+    os.environ["BOT_TOKEN"] = "test-bot-token-for-local-testing"
+
 # Local PostgreSQL connection for host-side `uv run pytest`.
 # `uv run` does NOT auto-load .env files, so the DB config from src/backend/.env
 # is not picked up automatically. Load it explicitly if present, then guarantee a
@@ -27,6 +31,6 @@ os.environ.setdefault(
     "postgres://postgres:postgres@127.0.0.1:5432/mko_bazuna",
 )
 
-import django
+import django  # noqa: E402
 
-django.setup()
+django.setup()  # noqa: E402

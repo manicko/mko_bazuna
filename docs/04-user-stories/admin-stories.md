@@ -9,6 +9,7 @@ related:
   - user-stories-index
   - technical-specification
   - db-schema
+  - docker-deployment
 ---
 
 ## Purpose
@@ -16,6 +17,33 @@ related:
 Admin-role user stories. **Moderator = admin role** (no separate role, decision A). Domain rules
 referenced as "decision X" live in
 [technical-specification.md](../01-spec/technical-specification.md).
+
+## Initial Admin Setup
+
+### Pre-configured Admin User
+
+The platform includes a pre-configured admin user for Django admin site access. This user is created
+automatically during deployment when `ADMIN_PASSWORD` is set in the environment.
+
+**Default Admin Credentials:**
+
+| Field | Default | Environment Variable |
+|-------|---------|---------------------|
+| Username | `admin` | `ADMIN_USERNAME` |
+| Password | (must be set) | `ADMIN_PASSWORD` |
+| Telegram ID | `-1` | `ADMIN_TELEGRAM_ID` |
+
+**Important:** The User model uses `telegram_id` as the `USERNAME_FIELD`. The Django admin login
+form displays "Telegram ID" as the username field. Enter the `ADMIN_TELEGRAM_ID` value (default:
+`-1`) as the username along with the password.
+
+### Setup Methods
+
+1. **Automatic (recommended):** Set `ADMIN_PASSWORD` in `.env` before running `docker compose up -d`
+2. **Manual:** Run `docker compose run --rm web uv run python src/backend/manage.py create_admin_user`
+
+See [docs/ops/docker-deployment.md](../ops/docker-deployment.md#admin-user-setup) for detailed
+instructions on creating, modifying, and managing the admin user.
 
 ## Stories
 

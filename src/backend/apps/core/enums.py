@@ -18,7 +18,6 @@ class AdSort(StrEnum):
 
 
 class AdvisoryLockId(IntEnum):
-    CREATE_ADMIN = 101
     """PostgreSQL advisory lock IDs for idempotent scheduled jobs."""
 
     ARCHIVE_SWEEP = 1
@@ -29,6 +28,7 @@ class AdvisoryLockId(IntEnum):
     PURGE_FAILED_ADS = 6
     PURGE_REJECTED_ADS = 7
     MIGRATE = 100
+    CREATE_ADMIN = 101
 
 
 class AdStatus(StrEnum):

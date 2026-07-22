@@ -245,23 +245,49 @@ docker compose run --rm web uv run python src/backend/manage.py makemigrations -
 
 ### Admin User Setup
 
-The `create_admin` service creates an admin user for Django admin site access.
-Note that the User model uses `telegram_id` as the `USERNAME_FIELD`, so
-admin authentication uses this field instead of the username.
+The `create_admin` service creates a pre-configured admin user for Django admin site access.
+This is a one-time setup that runs automatically during deployment when `ADMIN_PASSWORD` is set.
+
+#### Pre-configured Admin User
+
+The admin user is created with the following attributes:
+
+| Attribute | Default Value | Description |
+|-----------|---------------|-------------|
+| Username | `admin` (or `ADMIN_USERNAME` env var) | Admin login username |
+| Password | Set via `ADMIN_PASSWORD` env var | Must be provided for auto-creation |
+| Telegram ID | `-1` (or `ADMIN_TELEGRAM_ID` env var) | Placeholder for username/password auth |
+| Email | (empty) | Optional; can be set via `ADMIN_EMAIL` |
+| is_staff | `True` | Can access Django admin |
+| is_superuser | `True` | Full admin privileges |
+
+**Important:** The User model uses `telegram_id` as the `USERNAME_FIELD`, so the Django admin
+login form displays "Telegram ID" as the username field. Enter the `ADMIN_TELEGRAM_ID` value
+(default: `-1`) as the username, along with the password.
 
 #### Automatic Creation
 
-The `create_admin` service runs after migrations complete and creates an admin
-user if `ADMIN_PASSWORD` is set in the environment:
+The `create_admin` service runs after migrations complete and creates an admin user if
+`ADMIN_PASSWORD` is set in the environment:
 
 ```bash
-# Admin user is auto-created on `docker compose up -d` if ADMIN_PASSWORD is set
-# Verify: docker compose logs create_admin
+# Set ADMIN_PASSWORD in .env or environment
+# Then run:
+docker compose up -d
+
+# Check logs for confirmation
+docker compose logs create_admin
+```
+
+If `ADMIN_PASSWORD` is empty or not set, the service skips creation with a message:
+```
+ADMIN_PASSWORD not set, skipping admin user creation
 ```
 
 #### Manual Creation
 
-If `ADMIN_PASSWORD` is not set, create the admin user manually:
+If `ADMIN_PASSWORD` was not set during initial deployment, or you need to create/change the
+password later, use the management command:
 
 ```bash
 # Create admin user
@@ -269,12 +295,68 @@ docker compose run --rm web uv run python src/backend/manage.py create_admin_use
     --username admin \
     --password your_secure_password \
     --telegram-id -1
+
+# With custom values
+docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+    --username myadmin \
+    --password new_password \
+    --telegram-id -1 \
+    --email admin@example.com
 ```
 
-### Admin Login
+#### Dry-Run Mode
 
-The Django admin login form shows "Telegram ID" as the username field.
-Enter the `ADMIN_TELEGRAM_ID` value (default: `-1`) as the username.
+Verify what would be created without making changes:
+
+```bash
+docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+    --username admin \
+    --password test123 \
+    --telegram-id -1 \
+    --dry-run
+```
+
+#### Password Change
+
+To change the admin password, use Django's built-in password change command:
+
+```bash
+# Open Django shell in web container
+docker compose run --rm web uv run python src/backend/manage.py shell
+
+# In the shell:
+from django.contrib.auth import get_user_model
+User = get_user_model()
+user = User.objects.get(telegram_id=-1)  # or username='admin'
+user.set_password('new_secure_password')
+user.save()
+exit()
+```
+
+Or use the `create_admin_user` command again with a new password - it's idempotent and will
+skip if a user with the same `telegram_id` already exists:
+
+```bash
+# This will skip if telegram_id=-1 already exists
+docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+    --username admin \
+    --password new_password \
+    --telegram-id -1
+```
+
+#### Changing the Telegram ID Placeholder
+
+If you need to use a different telegram_id for admin login:
+
+```bash
+# Create with custom telegram_id
+docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+    --username admin \
+    --password your_password \
+    --telegram-id -999
+```
+
+Then set `ADMIN_TELEGRAM_ID=-999` in your `.env` file and restart the services.
 
 ## Monitoring & Logging
 

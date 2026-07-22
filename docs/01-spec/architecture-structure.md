@@ -150,6 +150,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 6 | `purge_failed_ads` |
 | 7 | `purge_rejected_ads` |
 | 100 | `migrate` (session-scoped, pre-PgBouncer) |
+| 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not

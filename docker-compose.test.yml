@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
       DJANGO_SECRET_KEY: test-secret-key-for-testing-only
       DJANGO_SETTINGS_MODULE: config.settings.test
+      BOT_TOKEN: test-bot-token-for-testing
     env_file: []
 
   # Test service: one-shot run migrate + pytest
@@ -46,6 +47,6 @@ services:
       - POSTGRES_PASSWORD=postgres
       - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
       - DJANGO_SECRET_KEY=test-secret-key-for-testing-only
+      - BOT_TOKEN=test-bot-token-for-testing
     # One-shot service: exits with pytest exit code
     profiles: ["test"]
-
