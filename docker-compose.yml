@@ -39,6 +39,26 @@ services:
     # One-shot service: runs migrations with advisory lock (ID 100), then exits
     # Idempotent: advisory lock prevents concurrent runs
 
+  create_admin:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: >
+      uv run python src/backend/manage.py create_admin_user
+      --username "${ADMIN_USERNAME:-admin}"
+      --password "${ADMIN_PASSWORD}"
+      --telegram-id "${ADMIN_TELEGRAM_ID:--1}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.prod
+    env_file:
+      - .env
+    # One-shot service: runs once, then exits
+    # Skipped if ADMIN_PASSWORD not set (empty string)
+
   web:
     build:
       context: .

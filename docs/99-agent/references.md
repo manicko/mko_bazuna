@@ -25,3 +25,5 @@ For specific guidelines, see:
 - [Dependency collisions](../03-packages/dependency-collisions.md)
 - [Owner decisions (O1–O5)](../05-owner-decisions/index.md)
 - [User stories](../04-user-stories/index.md)
+- [Docker deployment](ops/docker-deployment.md)
+- [Database restore](ops/restore.md)

@@ -6,9 +6,15 @@ tags:
   - restore
   - database
   - operations
+related:
+  - docker-deployment
 ---
 
-# Database Restore Runbook
+## Purpose
+
+Database restore runbook for recovering from backups.
+
+## Database Restore Runbook
 
 This document describes the procedure for restoring the Mko Bazuna database from a backup.
 

@@ -1,7 +1,7 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down build restart test lint typecheck shell migrate makemigrations logs \
-        backup restore prune-backups db-shell clean
+        backup restore prune-backups db-shell clean create-admin
 
 # ====================== Settings ======================
 
@@ -29,6 +29,7 @@ help:
 	@echo "Django:"
 	@echo "  migrate        Apply migrations"
 	@echo "  makemigrations Create migrations"
+	@echo "  create-admin   Create admin user manually"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  shell          Bash in web container"
@@ -68,6 +69,12 @@ migrate:
 
 makemigrations:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemigrations
+
+create-admin:
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py create_admin_user \
+		--username "${ADMIN_USERNAME:-admin}" \
+		--password "${ADMIN_PASSWORD}" \
+		--telegram-id "${ADMIN_TELEGRAM_ID:--1}"
 
 # ====================== Utilities ======================
 

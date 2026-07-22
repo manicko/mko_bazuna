@@ -51,6 +51,8 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 | `docs/03-packages/packages-list.md` | Dependency set & versions |
 | `docs/03-packages/dependency-collisions.md` | Package version-coupling & collision risks |
 | `docs/04-user-stories/index.md` | User stories by role (seller/buyer/admin) |
+| `docs/ops/docker-deployment.md` | Docker deployment & operations guide |
+| `docs/ops/restore.md` | Database restore runbook |
 | `docs/99-agent/architecture.md` · `rules.md` · `references.md` | Agent guidelines & references |
 | `docs/00-overview/doc-maintenance-rules.md` | Documentation governance rules |
 
@@ -63,6 +65,7 @@ docs/
 ├── 03-packages/        packages-list.md · dependency-collisions.md
 ├── 04-user-stories/    index.md · seller-stories.md · buyer-stories.md · admin-stories.md
 ├── 05-owner-decisions/ index.md
+├── ops/                 docker-deployment.md · restore.md
 ├── 99-agent/           architecture.md · rules.md · references.md
 └── 98-reference/       ast-editor.md
 ```
