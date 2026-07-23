@@ -1,10 +1,10 @@
-# Локальные виртуальные окружения (uv, venv, poetry и т.д.)
+# Local virtual environments (uv, venv, poetry, etc.)
 .venv
 venv
 env
 .env*
 
-# Python кэш и временные файлы
+# Python cache and temporary files
 __pycache__/
 *.pyc
 *.pyo
@@ -14,24 +14,45 @@ __pycache__/
 dist/
 build/
 
-# Локальные данные и медиа (если есть)
+# Local data and media
 media/
-staticfiles/   # если collectstatic уже делал локально
+staticfiles/
 
-# Локальные базы данных — не должны попадать в образ контейнера
+# Local databases — must not be baked into container images
 *.sqlite3
 *.sqlite
 *.db
 src/backend/mko_bazuna
 
-# IDE / редакторы
+# IDE / editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Логи и временные
+# Logs and temp
 *.log
 
-# uv кэш (если есть)
+# uv cache
 .uv/
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# Documentation — not needed in runtime image
+docs/
+*.md
+
+# Docker compose files — not needed in build context (root only)
+/Dockerfile*
+/docker-compose*
+
+# Ruff and mypy cache
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Node.js (if present in context)
+node_modules/

@@ -26,7 +26,6 @@ services:
       dockerfile: docker/Dockerfile
     command: /app/entrypoint-scheduler.sh
     environment:
-      - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}

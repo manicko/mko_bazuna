@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Entrypoint script for Mko Bazuna containers
 # Handles database wait, volume permissions, and command execution
 

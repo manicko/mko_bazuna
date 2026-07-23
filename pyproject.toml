@@ -170,6 +170,9 @@ reportIncompatibleVariableOverride = "none"  # Django Meta inheritance pattern
 reportAttributeAccessIssue = "none"  # Django adds 'id' at runtime via metaclass
 reportMissingImports = "none"  # Django apps namespace imports resolved at runtime
 
+[tool.uv]
+default-groups = []
+
 [dependency-groups]
 dev = [
     "basedpyright>=1.39.9",

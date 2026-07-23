@@ -1,4 +1,4 @@
-﻿# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1
 # Multi-stage Dockerfile for Mko Bazuna
 # python:3.14-slim base with uv, non-root runtime, Tailwind build + collectstatic
 
@@ -24,6 +24,12 @@ RUN chmod +x /uv /uvx
 
 ENV PATH="/uv:$PATH"
 
+# uv configuration for cache mount compatibility and runtime performance
+# UV_LINK_MODE=copy prevents cross-filesystem link errors with cache mounts
+ENV UV_LINK_MODE=copy
+# UV_COMPILE_BYTECODE=1 pre-compiles .pyc files for faster container startup
+ENV UV_COMPILE_BYTECODE=1
+
 WORKDIR /app
 
 # Cache: copy dependency files first (most stable layer)
@@ -32,7 +38,7 @@ COPY pyproject.toml uv.lock* ./
 # Install dependencies to venv
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    /uv sync --frozen --no-install-project --no-dev
+    /uv sync --frozen --no-install-project --no-dev --no-default-groups
 
 # Install Tailwind CSS CLI (standalone binary)
 RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
@@ -86,9 +92,12 @@ WORKDIR /app
 
 # Copy venv from builder (no gcc/libpq-dev in final image)
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
+# Copy uv binary from builder (needed for dev mode `uv run` commands and entrypoint scripts)
+# COPY --from=builder --chown=app:app /uv /uvx /
 COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
-
+COPY --from=builder /uv /usr/local/bin/uv
+COPY --from=builder /uvx /usr/local/bin/uvx
 # Copy entrypoint scripts
 COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
 COPY --chown=app:app docker/entrypoint-test.sh /app/entrypoint-test.sh
@@ -97,8 +106,11 @@ COPY --chown=app:app docker/entrypoint-create-admin.sh /app/entrypoint-create-ad
 RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh /app/entrypoint-create-admin.sh
 
 # Activate venv for all subsequent RUN/ENTRYPOINT
-ENV PATH="/opt/venv/bin:/uv:${PATH}"
+ENV PATH="/opt/venv/bin:${PATH}"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+# uv configuration (consistent with builder stage)
+ENV UV_LINK_MODE=copy
+ENV UV_COMPILE_BYTECODE=1
 # Make the real source layout importable at runtime (web/bot/migrate/scheduler)
 ENV PYTHONPATH=/app/src/backend:/app/src
 

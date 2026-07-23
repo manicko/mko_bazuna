@@ -45,8 +45,9 @@ permission:
     "npm run build": allow
 
     # === DOCKER ===
-    "docker *": ask
-    "docker compose": allow
+    "docker *": allow
+    "*docker *": allow
+    "docker compose *": allow
     "docker compose config*": allow
     "docker compose up*": allow
     "docker compose down*": allow

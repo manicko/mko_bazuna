@@ -1,4 +1,4 @@
-﻿# Base docker-compose.yml for Mko Bazuna
+# Base docker-compose.yml for Mko Bazuna
 # Services: db, migrate, web, bot, nginx, create_admin
 # Static served by whitenoise in image; media served by nginx from media_volume
 
@@ -22,12 +22,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: /opt/venv/bin/python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
+    command: python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      UV_PROJECT_ENVIRONMENT: /opt/venv
       DJANGO_SETTINGS_MODULE: config.settings.prod
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

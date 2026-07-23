@@ -3,7 +3,7 @@
 
 services:
   web:
-    command: uv run python src/backend/manage.py runserver 0.0.0.0:8000
+    command: python src/backend/manage.py runserver 0.0.0.0:8000
     environment:
       - DEBUG=True
       - DJANGO_SETTINGS_MODULE=config.settings.dev
@@ -12,7 +12,10 @@ services:
     env_file:
       - .env.docker
     volumes:
+      # Bind-mount entire repo for hot-reload (overrides image COPY)
+      # Also bind-mount docker/entrypoint.sh since the :/app mount hides the image's copy
       - .:/app
+      - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./.env.docker:/app/src/.env:ro
       - media_volume:/app/media
     ports:
@@ -23,6 +26,7 @@ services:
       - .env.docker
     volumes:
       - .:/app
+      - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./.env.docker:/app/src/.env:ro
 
   nginx:

@@ -40,7 +40,6 @@ services:
       db:
         condition: service_healthy
     environment:
-      - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.test
       - POSTGRES_DB=mko_bazuna
       - POSTGRES_USER=postgres
