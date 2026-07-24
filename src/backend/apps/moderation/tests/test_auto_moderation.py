@@ -197,7 +197,7 @@ def category():
 def city():
     """Create a test city."""
     return City.objects.create(
-        country_code="BA",
+        country_code="ME",
         name="City",
         region="Region",
         slug="city",

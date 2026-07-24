@@ -180,10 +180,10 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 - `GIN index` on `search_vector` (`IX_ads_search_gin`) — see [db-indexes.md](db-indexes.md).
 - **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN index after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
-- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Bosnian query translated to Russian before search (decision G), so it matches the Russian category name.
+- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Montenegrin query translated to Russian before search (decision G), so it matches the Russian category name.
 
-> Zone D5 / D6: seller input may be Bosnian/Russian, but the bot MUST translate title+description
-> to Russian on ad creation so `to_tsvector('russian', …)` is correct. Bosnian UI translates back
+> Zone D5 / D6: seller input may be Montenegrin/Russian, but the bot MUST translate title+description
+> to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin UI translates back
 > on display.
 
 Category search works TWO ways: (1) FTS matches the category word via `category_name` in `search_vector`; (2) app-level fuzzy detect (`difflib`, as for cities) applies an explicit `category_id` filter when the query is a single word similar to a category name.

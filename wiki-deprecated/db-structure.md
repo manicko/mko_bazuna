@@ -91,7 +91,7 @@ published_by (FK → users.id, nullable, SET_NULL)  # moderator who manually pub
 moderated_by (FK → users.id, nullable, SET_NULL)  # moderator who manually rejected
 ```
 
-`search_vector` (zone D1, hybrid C): `setweight(to_tsvector('russian', title),'A') || setweight(to_tsvector('russian', description),'B') || setweight(to_tsvector('russian', category_name),'C')`. `category_name` is denormalized from `categories.name` (Russian base) and synced by triggers, so it cannot be `GENERATED ALWAYS` (needs FK lookup at write time). GIN index `IX_ads_search_gin` on top. Code writes title/description/category_id; trigger fills `category_name` + `search_vector`. Bosnian query translated to Russian before search (decision G), so it matches the Russian category name.
+`search_vector` (zone D1, hybrid C): `setweight(to_tsvector('russian', title),'A') || setweight(to_tsvector('russian', description),'B') || setweight(to_tsvector('russian', category_name),'C')`. `category_name` is denormalized from `categories.name` (Russian base) and synced by triggers, so it cannot be `GENERATED ALWAYS` (needs FK lookup at write time). GIN index `IX_ads_search_gin` on top. Code writes title/description/category_id; trigger fills `category_name` + `search_vector`. Montenegrin query translated to Russian before search (decision G), so it matches the Russian category name.
 
 Category search works TWO ways: (1) FTS matches the category word via `category_name` in `search_vector`; (2) app-level fuzzy detect (`difflib`, as for cities) applies an explicit `category_id` filter when the query is a single word similar to a category name.
 
@@ -165,7 +165,7 @@ Aggregated via ORM (`.filter(event_type=..., timestamp__date=...).count()`). Adm
 - `GIN index` on `search_vector` (`IX_ads_search_gin`).
 - `pg_trgm` for typos (optional).
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
-- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Bosnian query translated to Russian before search.
+- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Montenegrin query translated to Russian before search.
 
 ### search_vector triggers (zone D1, sync-safety)
 Because `search_vector` includes the category name (another table), the column cannot be `GENERATED ALWAYS` — a plpgsql trigger fills it. All computation lives in ONE function so INSERT and UPDATE paths don't diverge.

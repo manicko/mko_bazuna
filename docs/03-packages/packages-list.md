@@ -32,7 +32,7 @@ django-mptt is not yet validated against Django 6.0.
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
 - Background jobs: Django management commands + systemd timer / cron (Celery deferred)
 - **Async bot + sync Django ORM:** bot runs `django.setup()` and shares the ORM. Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
-- Query translation: deep-translator (Bosnian → Russian at search time; hard timeout ~500ms + fallback to original query).
+- Query translation: deep-translator (Montenegrin → Russian at search time; hard timeout ~500ms + fallback to original query).
 
 ## Package List (pyproject.toml)
 
@@ -47,7 +47,7 @@ django-tailwind>=4.4.0            # Tailwind standalone CLI (NO Node.js). daisyU
 django-htmx>=1.19.0               # HTMX for the MPA.
 pillow>=10.4.0                    # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1.
 aiogram>=3.15.0                   # Bot API bot (login/contact/publish). NO built-in PG FSM storage — draft Ad stored via ORM.
-deep-translator>=1.11.0           # Bosnian→Russian query translation. Fragile backend → hard timeout + fallback wrapper.
+deep-translator>=1.11.0           # Montenegrin→Russian query translation. Fragile backend → hard timeout + fallback wrapper.
 # Search: native PostgreSQL FTS only (no haystack/Whoosh).
 # API (DRF): DEFERRED to post-MVP.
 # Tasks (celery/redis): DEFERRED to post-MVP (management commands + cron instead).

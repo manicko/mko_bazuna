@@ -24,7 +24,7 @@ Anyone browses ads with status `PUBLISHED`; no login required.
 
 ### US-B2 — Search
 Keyword search over title + description (`PUBLISHED` only), response ≤2s. Sort by date (newest
-first) or price. A Bosnian query is translated to Russian before FTS (results optionally tagged
+first) or price. A Montenegrin query is translated to Russian before FTS (results optionally tagged
 "translated from Russian"). Friendly empty state on no results. See decision G.
 
 ### US-B3 — Filter
@@ -51,5 +51,5 @@ saved in session. See decision D.
 Responsive layout across mobile, tablet, and desktop.
 
 ### US-B9 — Multilingual UI
-UI language switch (Russian / Bosnian-latin), persisted across sessions. Switch translates the site
+UI language switch (Russian / Montenegrin-latin), persisted across sessions. Switch translates the site
 shell only; ad content is stored in Russian and translated on display. See decision G.

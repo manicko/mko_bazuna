@@ -71,7 +71,7 @@ def category() -> Category:
 def city() -> City:
     """Create a city for ad fixtures."""
     return City.objects.create(
-        country_code="BA",
+        country_code="ME",
         name="Test City",
         region="Test Region",
         slug="test-city",

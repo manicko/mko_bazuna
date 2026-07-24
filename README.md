@@ -5,9 +5,9 @@
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a
 Telegram bot; published ads appear on the site. Buyers browse, search, and filter without login.
 
-**Launch market:** Bosnia & Herzegovina
+**Launch market:** Montenegro
 **Content language:** Russian (base)
-**UI:** Russian + Bosnian (latin)
+**UI:** Russian + Montenegrin (latin)
 
 ## Stack
 Python 3.14 · Django 5.2 LTS · PostgreSQL 18 · aiogram 3.x (Telegram bot) · PostgreSQL native FTS ·

@@ -29,7 +29,7 @@ def category():
 @pytest.fixture
 def city():
     return City.objects.create(
-        country_code="BA",
+        country_code="ME",
         name="Тестград",
         region="FBiH",
         slug="test_grad",

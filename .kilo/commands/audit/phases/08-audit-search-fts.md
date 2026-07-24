@@ -18,7 +18,7 @@ and no PII leaks through queries or logs.
 | Zone | Concern |
 |------|---------|
 | **Query Input** | Receives the raw search string from the web form (unauthenticated buyer). Must be validated and bounded. |
-| **Translation Bridge** | An external translation step converts Bosnian queries to the index language (Russian) with timeout + cache + fallback. |
+| **Translation Bridge** | An external translation step converts Montenegrin queries to the index language (Russian) with timeout + cache + fallback. |
 | **FTS Execution** | Native PostgreSQL full-text search over a maintained search vector (TSVECTOR + GIN), using a language-specific text-search configuration and weighted fields. |
 | **Visibility Filter** | Applies the SAME "visible" predicate as public listing: only PUBLISHED ads. (Withdrawn sellers are excluded because withdrawal soft-deletes their ads → status no longer PUBLISHED; DECLINE keeps ads PUBLISHED and must NOT hide them from search.) |
 | **Category Tree** | Hierarchical category navigation; a parent query must expand to all descendants. |
@@ -37,13 +37,13 @@ and no PII leaks through queries or logs.
 Execute, then capture evidence (HTTP responses, DB state, logs, latency):
 
 1. **Visibility gating** — publish an ad → search its text → found. Set ad to any non-PUBLISHED state (moderation/rejected/archived/deleted) → NOT found. Withdraw a seller's consent → their ads become non-PUBLISHED → NOT found. **DECLINE a seller** → their PUBLISHED ads MUST still be found (search must not filter on consent state directly).
-2. **Translation** — create an ad in the index language; search a query in the other language (Bosnian) → translated and matched. Reverse direction → matched. Simulate translator outage/timeout → assert graceful fallback (degraded recall, bounded latency, no 500).
+2. **Translation** — create an ad in the index language; search a query in the other language (Montenegrin) → translated and matched. Reverse direction → matched. Simulate translator outage/timeout → assert graceful fallback (degraded recall, bounded latency, no 500).
 3. **Injection** — submit SQL/injection-style and unicode/homoglyph queries → assert no injection, safe parameterized execution, no errors.
 4. **Category tree** — query a parent category → assert all descendant ads included; wrong-branch ads excluded.
 5. **Pagination / limits** — seed volume, search a common term → assert bounded results + pagination; empty query handled.
 6. **Performance** — measure search latency under seeded volume → assert within target; no unbounded query.
 7. **PII in logs** — grep search logs + analytics for identity values in query strings → assert none.
-8. **Encoding** — mixed Cyrillic/Latin/Bosnian query → assert correct tokenization, no mojibake.
+8. **Encoding** — mixed Cyrillic/Latin/Montenegrin query → assert correct tokenization, no mojibake.
 9. **Quality gates** — run linter, type-checker, search test suite.
 
 ## 5. Audit Dimensions (checks + evidence)
@@ -57,7 +57,7 @@ Search vector maintained on every relevant save/transition; existing rows backfi
 - Evidence: publish/archive/delete transitions reflected in index; no permanently stale new ads; category-name change propagates.
 
 ### (c) Translation correctness + failure handling — HIGH
-Bosnian→index-language mapping works; outage/timeout → bounded fallback, not broken search.
+Montenegrin→index-language mapping works; outage/timeout → bounded fallback, not broken search.
 - Evidence: cross-language match; simulated outage yields degraded-but-working search with latency cap; fallback path defined.
 
 ### (d) Injection safety — CRITICAL
@@ -81,7 +81,7 @@ No identity values in logged query strings or analytics.
 - Evidence: grep shows none; analytics stores aggregate only.
 
 ### (i) Encoding correctness — MEDIUM
-Cyrillic/Bosnian/transliteration round-trips match; no mojibake.
+Cyrillic/Montenegrin/transliteration round-trips match; no mojibake.
 - Evidence: mixed-script queries tokenize correctly.
 
 ## 6. Cross-Cutting (owned here, not duplicated)
@@ -95,7 +95,7 @@ Cyrillic/Bosnian/transliteration round-trips match; no mojibake.
 - Translator returns empty/garbage → fallback, degraded recall, not zero-result crash.
 - Very long / many-token query → bounded or rejected.
 - Deep category nesting → descendant query correct and performant.
-- Mixed Cyrillic+Bosnian+Latin query.
+- Mixed Cyrillic+Montenegrin+Latin query.
 - Ad moved ARCHIVED → PUBLISHED → re-indexed and findable.
 - Duplicate / near-duplicate ads → ranking not dominated.
 - Search during DB migration / index rebuild → graceful, no 500s.

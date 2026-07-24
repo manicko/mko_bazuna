@@ -29,14 +29,14 @@ duplicate content that lives in those files.
 ## What the system is
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a **Telegram bot**; published ads appear on the site. Buyers browse/search/filter without login.
 
-- **Launch market:** Bosnia & Herzegovina
+- **Launch market:** Montenegro
 - **Content language:** Russian (base)
-- **UI:** Russian + Bosnian (latin)
+- **UI:** Russian + Montenegrin (latin)
 
 ## Stack
 - Python 3.14, Django 5.2 LTS (`>=5.2.16,<6.0`), PostgreSQL 18
 - django-mptt (categories), django-filter, django-tailwind + django-htmx (MPA), Pillow
-- aiogram 3.x (Telegram bot), deep-translator (Bosnian→Russian query translation)
+- aiogram 3.x (Telegram bot), deep-translator (Montenegrin→Russian query translation)
 - Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN, russian config)
 - Background jobs: Django management commands + cron (Celery deferred)
 - Deployment: Docker (db + web[gunicorn sync WSGI] + bot + nginx)
@@ -60,7 +60,7 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 - **Categories (D):** closed admin mptt tree; category-name search REQUIRED (denormalized `category_name` in `search_vector`, weight 'C' + `difflib` fuzzy → `category_id`).
 - **Photos (E):** 1–5 Telegram-compressed JPEG only; local `MEDIA_ROOT` via `FileSystemStorage`.
 - **Consent (F):** DECLINE (browse-only) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days).
-- **Language/search (G):** content stored Russian; Bosnian query translated before FTS; exact city match + did-you-mean.
+- **Language/search (G):** content stored Russian; Montenegrin query translated before FTS; exact city match + did-you-mean.
 - **Consent banner (K):** buyers browse `PUBLISHED` ads before accepting; DECLINE blocks seller login only (no erasure, contact still works) ≠ WITHDRAW (`consent_revoked_at` + erasure). Banner covers bot too — no separate bot confirmation.
 - **Login (H):** QR deep-link `login_<token>` (32-char), `LoginToken` two-phase atomic claim, `hmac.compare_digest`.
 - **Lifecycle (J):** timers from `published_at` (reset on every PUBLISHED transition); text edits → `PUBLISHED→ON_MODERATION` + hide; archive@2mo, delete@4mo.

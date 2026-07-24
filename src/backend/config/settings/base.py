@@ -74,6 +74,8 @@ INSTALLED_APPS = [
     # Third-party
     "tailwind",
     "django_htmx",
+    # MPTT for hierarchical categories
+    "mptt",
     # Theme app for Tailwind
     "theme",
     # Local apps

@@ -22,7 +22,7 @@ Authoritative phase-1 product & domain specification for **Mko Bazuna** — a Te
 
 - Sellers create ads via a **Telegram bot**; published ads appear on the website.
 - Buyers browse/search/filter without registration.
-- Launch geography: **Bosnia & Herzegovina**. Target languages: **Russian (content base)** + **Bosnian (UI shell)**.
+- Launch geography: **Montenegro**. Target languages: **Russian (content base)** + **Montenegrin (UI shell)**.
 - Scale targets: ~300 daily users, up to 500k ads, server response < 2s.
 - Stack: Python 3.14 + Django 5.2 LTS + PostgreSQL 18 (see [`../03-packages/packages-list.md`](../03-packages/packages-list.md)).
 
@@ -56,11 +56,11 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - `username` is NOT required for publishing or contact.
 
 ### D. Geography & categories (US-B6/B7, US-A7)
-- Launch geography: Bosnia & Herzegovina. Languages: Russian + Bosnian (latin).
-- **City:** seller picks from a preset closed list of Bosnia/Herzegovina cities. Unrecognized city → "general / no city", not searchable by city.
+- Launch geography: Montenegro. Languages: Russian + Montenegrin (latin).
+- **City:** seller picks from a preset closed list of Montenegro cities. Unrecognized city → "general / no city", not searchable by city.
 - **Categories are NOT user-defined.** Closed tree set by admin (django-mptt is the single source of truth). Bot suggests top 3–5 by keyword, requires explicit seller confirmation. Free-text as new category is **rejected**; choice only from suggested or full tree.
-- i18n names (zone D2): `name` in Russian; Bosnian in `name_i18n` JSONB — see column detail in [db-schema.md](../02-database/db-schema.md). UI uses `get_name(locale)` with Russian fallback.
-- **Category-name search is REQUIRED in phase 1 (zone D1 / O5, hybrid C):** `category_name` is denormalized into `ads.category_name` and included in `search_vector` (weight 'C') + app-level fuzzy detect (`difflib`) sets `category_id` filter for single-word queries. Bosnian query is translated to Russian before search, so it matches the Russian category name.
+- i18n names (zone D2): `name` in Russian; Montenegrin in `name_i18n` JSONB — see column detail in [db-schema.md](../02-database/db-schema.md). UI uses `get_name(locale)` with Russian fallback.
+- **Category-name search is REQUIRED in phase 1 (zone D1 / O5, hybrid C):** `category_name` is denormalized into `ads.category_name` and included in `search_vector` (weight 'C') + app-level fuzzy detect (`difflib`) sets `category_id` filter for single-word queries. Montenegrin query is translated to Russian before search, so it matches the Russian category name.
 - Preset tree (recommendation):
   - **Goods:** Electronics, Clothing, Children, Furniture, Tools, Sport, Books, Other
   - **Services:** Repair, Translation, Tutors, Courses, Beauty, Transport, Freelance, Other
@@ -76,7 +76,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Thumbnails:** phase 1 serves full-size compressed photos; Pillow thumbnail generation deferred to phase 1.5.
 
 ### F. PII & consent (US-A8)
-- Jurisdiction: Bosnia & Herzegovina (GDPR-equivalent). Collect minimum: `telegram_id`, optional `username`.
+- Jurisdiction: Montenegro (GDPR-equivalent). Collect minimum: `telegram_id`, optional `username`.
 - Users are maximally anonymous; nothing beyond Telegram login is stored.
 - **Privacy policy / Terms required from launch** (visible to buyers without login).
 - **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
@@ -95,8 +95,8 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 
 ### G. Content language, search, city match (US-B2/B3/B7, US-B9)
 - **Content stored in Russian.** UI language switch (ru/bs-latin) translates only the site shell; ad text is shown translated on display.
-- **Search (phase 1) is over Russian content.** Bosnian query is translated to Russian at search time (query-translation). Results optionally tagged "translated from Russian".
-- **Stored-content-invariant (zone D5):** seller may input in Bosnian/Russian, but the bot MUST translate title+description to Russian on ad creation (reuses `deep-translator` + request cache) so `to_tsvector('russian', …)` is correct. Bosnian UI translates back on display.
+- **Search (phase 1) is over Russian content.** Montenegrin query is translated to Russian at search time (query-translation). Results optionally tagged "translated from Russian".
+- **Stored-content-invariant (zone D5):** seller may input in Montenegrin/Russian, but the bot MUST translate title+description to Russian on ad creation (reuses `deep-translator` + request cache) so `to_tsvector('russian', …)` is correct. Montenegrin UI translates back on display.
 - **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation) and search queries (on lookup) to **Google Translate** for language normalization. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
 - **Result sorting:** buyer chooses — by date (newest first) or by price.
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.

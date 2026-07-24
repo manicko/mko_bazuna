@@ -18,7 +18,7 @@ class City(models.Model):
 
     country_code = models.CharField(
         max_length=2,
-        help_text="ISO country code (e.g., 'BA' for Bosnia)",
+        help_text="ISO country code (e.g., 'ME' for Montenegro)",
     )
     name = models.CharField(
         max_length=200,

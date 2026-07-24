@@ -153,7 +153,7 @@ async def process_city(message: types.Message, state: FSMContext) -> None:
     if not city:
         await message.answer(
             "City not found. Please send an exact city name.\n"
-            "Available cities: Sarajevo, Mostar, Banja Luka, etc."
+            "Available cities: Podgorica, Nikšić, Bar, etc."
         )
         return
 
