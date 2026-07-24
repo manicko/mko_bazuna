@@ -17,10 +17,14 @@ class User(AbstractUser):
     Admin-created accounts require a telegram_id placeholder.
     """
 
-    # Override username to be nullable (Telegram login is primary auth)
+    # Override username to be nullable (Telegram login is primary auth).
+    # unique=True is required by Django because USERNAME_FIELD = "username".
+    # PostgreSQL allows multiple NULLs in a unique constraint, so non-admin
+    # users (who have no username) are unaffected.
     username = models.CharField(
         "username",
         max_length=150,
+        unique=True,
         blank=True,
         null=True,
         help_text="Optional public @username; NOT used for t.me link or publishing",
@@ -74,8 +78,8 @@ class User(AbstractUser):
         help_text="GDPR consent revoked timestamp",
     )
 
-    # Use telegram_id as the username field for authentication
-    USERNAME_FIELD = "telegram_id"
+    # Use username field for Django admin authentication (telegram_id is BigInteger, not suitable as USERNAME_FIELD)
+    USERNAME_FIELD = "username"
 
     # Override groups/user_permissions to avoid clashes with auth.User
     groups = models.ManyToManyField(

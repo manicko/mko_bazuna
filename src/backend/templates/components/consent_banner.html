@@ -1,13 +1,4 @@
-{#
-    Consent banner component for Mko Bazuna.
-
-    Implements decision F/K consent states (zone R3):
-    - Accept: sets consent_given_at (covers all processing including bot)
-    - Decline (browse-only): sets ads_auto_publish=False, no deletion
-
-    Shown only when user has not acted (consent_given_at is NULL).
-    Buyer may browse PUBLISHED ads before any action.
-    #}
+{# Consent banner component for Mko Bazuna. Implements decision F/K consent states (zone R3): - Accept: sets consent_given_at (covers all processing including bot) - Decline (browse-only): sets ads_auto_publish=False, no deletion. Shown only when user has not acted (consent_given_at is NULL). Buyer may browse PUBLISHED ads before any action. #}
 {% load static %}
 
 {% if not consent_shown %}

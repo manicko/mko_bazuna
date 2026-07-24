@@ -1,8 +1,8 @@
 """
 Management command to create an admin user for Django admin site.
 
-Creates a user with placeholder telegram_id for username/password authentication.
-This is needed because the User model uses telegram_id as USERNAME_FIELD.
+Creates a user with a placeholder telegram_id for bot compatibility.
+Admin users authenticate via username/password (USERNAME_FIELD = "username").
 
 Usage:
     uv run python manage.py create_admin_user --username admin --password <password> --telegram-id -1
