@@ -13,16 +13,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
     coreutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned for reproducibility)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-# Make uv executable and add to PATH
-RUN chmod +x /uv /uvx
 
-ENV PATH="/uv:$PATH"
+ENV PATH="/usr/local/bin:${PATH}"
 
 # uv configuration for cache mount compatibility and runtime performance
 # UV_LINK_MODE=copy prevents cross-filesystem link errors with cache mounts
@@ -38,7 +37,7 @@ COPY pyproject.toml uv.lock* ./
 # Install dependencies to venv
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    /uv sync --frozen --no-install-project --no-dev --no-default-groups
+    uv sync --frozen --no-install-project --no-dev --no-default-groups
 
 # Install Tailwind CSS CLI (standalone binary)
 RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
@@ -65,7 +64,7 @@ ENV ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 # Placeholder database URL for collectstatic (doesn't connect to DB but settings must be valid)
 ENV DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres
 RUN tailwindcss build && \
-    /uv run python src/backend/manage.py collectstatic --noinput
+    uv run python src/backend/manage.py collectstatic --noinput
 
 
 ################################################################################
@@ -79,6 +78,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    ca-certificates \
     coreutils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -93,17 +93,14 @@ WORKDIR /app
 # Copy venv from builder (no gcc/libpq-dev in final image)
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
 # Copy uv binary from builder (needed for dev mode `uv run` commands and entrypoint scripts)
-# COPY --from=builder --chown=app:app /uv /uvx /
 COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
-COPY --from=builder /uv /usr/local/bin/uv
-COPY --from=builder /uvx /usr/local/bin/uvx
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
+
 # Copy entrypoint scripts
-COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
-COPY --chown=app:app docker/entrypoint-test.sh /app/entrypoint-test.sh
-COPY --chown=app:app docker/entrypoint-scheduler.sh /app/entrypoint-scheduler.sh
-COPY --chown=app:app docker/entrypoint-create-admin.sh /app/entrypoint-create-admin.sh
-RUN chmod +x /app/entrypoint-test.sh /app/entrypoint-scheduler.sh /app/entrypoint-create-admin.sh
+COPY --chown=app:app docker/entrypoint*.sh /app/
+RUN chmod +x /app/entrypoint*.sh
 
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:${PATH}"

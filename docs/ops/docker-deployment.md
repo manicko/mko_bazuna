@@ -49,6 +49,26 @@ docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --env-fi
 docker compose --env-file .env.local run --rm migrate
 ```
 
+```bash
+# 1. Останавливаем все контейнеры проекта
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --rmi all
+
+# 2. Удаляем все dangling (висячие) образы, контейнеры, сети и volumes проекта
+docker system prune -f --volumes
+
+# 3. (Опционально, но рекомендуется) Удаляем ВСЕ неиспользуемые образы
+docker image prune -a -f
+
+# 4. Полная очистка кэша сборки (очень важно при проблемах с uv / layers)
+docker builder prune -a -f
+```
+
+```bash
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d --force-recreate
+```
+
 ### Database Configuration
 
 Docker Compose automatically constructs `DATABASE_URL` from the `POSTGRES_*` variables using the `db` service hostname:

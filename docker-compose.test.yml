@@ -6,11 +6,16 @@ services:
   # Override db service for test: ephemeral database (no persistent volume)
   db:
     image: postgres:18-alpine
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_DB: mko_bazuna
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
+      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      BOT_TOKEN: test-bot-token-for-testing
+
     # No persistent volume for ephemeral test database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d mko_bazuna"]
