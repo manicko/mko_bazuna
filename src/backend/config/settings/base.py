@@ -103,7 +103,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [BASE_DIR / "backend" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -151,7 +151,7 @@ STATIC_URL = "static/"
 # STATIC_ROOT lives at /app/staticfiles so it matches the path copied out of the
 # builder stage in docker/Dockerfile and served by whitenoise at runtime.
 STATIC_ROOT = BASE_DIR.parent / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [BASE_DIR.parent / "static"]
 
 # Media files
 MEDIA_URL = "media/"
