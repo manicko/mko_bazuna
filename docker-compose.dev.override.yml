@@ -1,9 +1,12 @@
 # Development override for docker-compose.yml
 # Enables hot-reloading with bind-mounts and runserver
+# Note: tailwindcss generates CSS on startup; rebuild CSS with: docker compose exec web tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify
 
 services:
   web:
-    command: python src/backend/manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify &&
+             python src/backend/manage.py runserver 0.0.0.0:8000"
     environment:
       - DEBUG=True
       - DJANGO_SETTINGS_MODULE=config.settings.dev
@@ -33,3 +36,8 @@ services:
   nginx:
     profiles:
       - use-nginx  # Optional in dev; omit to run without nginx
+    volumes:
+      - media_volume:/media_volume:ro
+      - ./docker/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      # mkcert development certificates for HTTPS
+      - ./docker/nginx/certs:/etc/nginx/certs:ro

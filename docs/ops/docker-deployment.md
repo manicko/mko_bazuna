@@ -96,13 +96,17 @@ uv run python src/backend/manage.py runserver
 
 ### Production-like Development
 
+For full production parity with nginx TLS termination, see [Local HTTPS with mkcert](local-https-mkcert.md) for certificate setup.
+
 ```bash
 # Run without nginx (direct web access on port 8000)
 docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
 
-# Or run with nginx (requires TLS certificates for HTTPS)
+# Or run with nginx for production-like HTTPS (requires mkcert setup)
 docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
+
+**Note:** Running with `--profile use-nginx` requires TLS certificates. Follow the mkcert setup guide for local HTTPS development.
 
 ## Production Deployment
 
@@ -478,6 +482,7 @@ docker compose run --rm web uv run python src/backend/manage.py makemigrations -
 
 ## Related Documentation
 
+- [Local HTTPS with mkcert](local-https-mkcert.md) - Development HTTPS setup for production parity
 - [Database Restore Runbook](restore.md)
 - [Architecture Structure](docs/01-spec/architecture-structure.md)
 - [Technical Specification](docs/01-spec/technical-specification.md)

@@ -247,42 +247,38 @@ docker/nginx/certs/*-key.pem
 
 ---
 
-## 6. Decision Matrix: Disable HTTPS vs Use mkcert
+## 6. Recommended Approach: mkcert with Docker Volume Mount (Priority)
 
-| Criterion | Disable HTTPS | Use mkcert |
-|-----------|--------------|------------|
-| **Setup effort** | Low (already done) | Low-Medium |
-| **Feature testing** | Limited (no HTTPS features) | Full (all HTTPS features work) |
-| **Production parity** | Poor (different cookie behavior) | Excellent (identical to prod) |
-| **Team coordination** | None | Each dev runs `mkcert -install` once |
-| **Maintenance** | None | Renew every ~2 years |
-| **Security realism** | Poor | Excellent |
+**Priority Option:** Approach A - Volume mount certificates into nginx container
 
-### Recommendation
-Given the project already uses nginx with TLS configuration and has security-hardened defaults in `base.py`, **mkcert is the preferred approach** because:
+This is the recommended approach for Mko Bazuna because:
 
-1. The nginx config already references `/etc/nginx/certs/fullchain.pem` - designed for TLS
-2. `SECURE_SSL_REDIRECT = True` and `SESSION_COOKIE_SECURE = True` are production-ready defaults
-3. OAuth callbacks (for Telegram bot webhooks or future integrations) require HTTPS
-4. Minimal ongoing maintenance (2-year renewal cycle)
-5. Future-proofs the project for WebAuthn, Service Workers, HTTP/2 testing
+1. **Architecture alignment:** The nginx config already expects `/etc/nginx/certs/fullchain.pem` - no nginx changes needed
+2. **Production parity:** Uses identical nginx configuration as production (only cert path differs), ensuring identical behavior for cookies, redirects, and security headers
+3. **Minimal changes:** Only requires updating `docker-compose.dev.override.yml` for the nginx service
+4. **Single source of truth:** Certificates live in `docker/nginx/certs/` alongside the nginx config
+5. **Reusable by team:** Each developer runs the same commands; certs work across machines with mkcert CA installed
+
+### Why Not Other Approaches
+
+- **Approach B (container certgen):** Adds unnecessary complexity. mkcert is designed as a host CLI tool requiring privileged CA installation. Containerized generation often fails due to missing trust store access and defeats container isolation.
+
+- **Approach C (Django direct):** Bypasses nginx entirely, but the project architecture uses nginx as the frontend reverse proxy. This creates inconsistencies with production and requires different Django settings.
 
 ---
 
-## 7. Implementation Steps (Option 2)
-
-If choosing mkcert for development:
+## 7. Implementation Steps
 
 1. **Install mkcert on each development machine:**
    ```bash
-   # Windows
+   # Windows (Chocolatey)
    choco install mkcert
-   
+
    # Or Scoop
    scoop install mkcert
    ```
 
-2. **Install the local CA:**
+2. **Install the local CA (requires admin on Windows):**
    ```bash
    mkcert -install
    ```
@@ -306,38 +302,51 @@ If choosing mkcert for development:
        - ./docker/nginx/certs:/etc/nginx/certs:ro
    ```
 
-5. **Update dev.py to support HTTPS (optional):**
+5. **Update dev.py to support HTTPS (optional, for direct runserver testing):**
    ```python
-   # If testing directly with Django runserver
+   # If testing directly with Django runserver without nginx
    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
    USE_X_FORWARDED_HOST = True
    ```
 
-6. **Add to README.md:**
+6. **Add to .gitignore (create .gitkeep in docker/nginx/certs/):**
+   ```gitignore
+   # mkcert development certificates
+   docker/nginx/certs/*.pem
+   !docker/nginx/certs/.gitkeep
+   ```
+
+7. **Add to README.md:**
    ```markdown
    ## Local HTTPS Development
-   
-   Install mkcert and run once per machine:
+
+   Mko Bazuna uses nginx with TLS in both production and development. To enable HTTPS locally:
+
    ```bash
-   mkcert -install
+   # Install mkcert (once per machine)
+   choco install mkcert && mkcert -install
+
+   # Generate development certificates
    mkdir -p docker/nginx/certs
    cd docker/nginx/certs
    mkcert localhost 127.0.0.1 ::1 mkobazuna.local
    cp localhost.pem fullchain.pem
    cp localhost-key.pem privkey.pem
    ```
-   
+
    Then run with nginx profile:
    ```bash
-   docker-compose --profile use-nginx up
+   docker compose --profile use-nginx up --build
    ```
+
+   Access at `https://localhost`. HTTP requests redirect to HTTPS automatically.
    ```
 
 ---
 
 ## 8. References
 
-- [mkcert GitHub](https://github.com/FiloSottile/mkcert) - Official tool
+- [mkcert GitHub](https://github.com/FiloSottile/mkcert) - Official tool and documentation
 - [mkcert cheatsheet](https://adhdecode.com/cheatsheets/mkcert/) - Command reference
 - [Local HTTPS use cases](https://www.tecmint.com/mkcert-create-ssl-certs-for-local-development)
 - [Docker + mkcert guide](https://blog.adamcameron.me/2025/08/setting-up-local-https-with-mkcert-for.html)

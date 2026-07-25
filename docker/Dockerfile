@@ -20,7 +20,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Install uv (pinned for reproducibility)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-
 ENV PATH="/usr/local/bin:${PATH}"
 
 # uv configuration for cache mount compatibility and runtime performance
@@ -93,9 +92,9 @@ WORKDIR /app
 
 # Copy venv from builder (no gcc/libpq-dev in final image)
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
+# Copy tailwindcss binary from builder (needed for dev mode CSS generation)
+COPY --from=builder /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 # Copy uv binary from builder (needed for dev mode `uv run` commands and entrypoint scripts)
-COPY --from=builder --chown=app:app /app/src /app/src
-COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
 

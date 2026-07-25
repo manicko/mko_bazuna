@@ -222,5 +222,9 @@ __marimo__/
 
 /logs/*
 
+# mkcert development certificates (never commit private keys)
+docker/nginx/certs/*.pem
+!docker/nginx/certs/.gitkeep
+
 
 

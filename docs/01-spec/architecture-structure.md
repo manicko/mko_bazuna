@@ -10,6 +10,7 @@ related:
   - db-schema
   - db-indexes
   - packages-list
+  - local-https-mkcert
 ---
 
 ## Purpose
@@ -167,7 +168,7 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 - **Rate limiting:**
   - `/login/`: 10 req/s burst 20 (`login_limit` zone)
   - `/search/`: 20 req/s burst 40 (`search_limit` zone)
-- **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var)
+- **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var). For local development with HTTPS, see [Local HTTPS with mkcert](../../ops/local-https-mkcert.md).
 
 ## Audit Zone References
 

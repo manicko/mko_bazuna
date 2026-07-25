@@ -6,6 +6,9 @@ tags:
   - summary
   - agent-reference
 related:
+  - ui-patterns
+  - search-patterns
+  - filter-ui
   - technical-specification
   - db-schema
   - db-indexes
@@ -27,6 +30,7 @@ authoritative detail in the sibling spec/DB/package docs. This file is the entry
 duplicate content that lives in those files.
 
 ## What the system is
+
 Telegram-driven classifieds board (Avito-like) with a Django website. Sellers post ads through a **Telegram bot**; published ads appear on the site. Buyers browse/search/filter without login.
 
 - **Launch market:** Montenegro
@@ -34,6 +38,7 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 - **UI:** Russian + Montenegrin (latin)
 
 ## Stack
+
 - Python 3.14, Django 5.2 LTS (`>=5.2.16,<6.0`), PostgreSQL 18
 - django-mptt (categories), django-filter, django-tailwind + django-htmx (MPA), Pillow
 - aiogram 3.x (Telegram bot), deep-translator (Montenegrin→Russian query translation)
@@ -42,6 +47,7 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 - Deployment: Docker (db + web[gunicorn sync WSGI] + bot + nginx)
 
 ## Two processes, one DB
+
 - **web:** sync WSGI (gunicorn), server-rendered HTMX MPA
 - **bot:** aiogram, runs `django.setup()`, shares the ORM
 - Each process holds its own psycopg3 pool (`CONN_MAX_AGE=0`)
@@ -50,6 +56,7 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 - aiogram has **no built-in PG FSM storage**: the step-by-step dialog is persisted as an `Ad` row with status `DRAFT` in the shared ORM
 
 ## Core domain rules
+
 Product decisions (A–L) and zone resolutions are the single source of truth in
 [`technical-specification.md`](technical-specification.md) and the database docs
 ([`db-schema.md`](../02-database/db-schema.md), [`db-indexes.md`](../02-database/db-indexes.md),
@@ -66,6 +73,7 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 - **Lifecycle (J):** timers from `published_at` (reset on every PUBLISHED transition); text edits → `PUBLISHED→ON_MODERATION` + hide; archive@2mo, delete@4mo.
 
 ## AdStatus state machine
+
 `DRAFT → ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED`;
 `PUBLISHED → ARCHIVED → PUBLISHED` (reactivation); `PUBLISHED → ON_MODERATION` (text edit);
 any → `DELETED`.
@@ -73,26 +81,65 @@ any → `DELETED`.
 - `REJECTED` purged @90d; `ON_MODERATION_FAILED` purged @7d (`moderation_failed_at`)
 
 ## Key tables
+
 `users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`
 
+## UI Patterns
+
+UI/UX patterns are documented in [`ui-patterns.md`](ui-patterns.md):
+
+- **Responsive Grid Layout:** `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` adaptive grid
+- **Card-Based Ad Display:** Image, title, price, location hierarchy for quick scanning
+- **Price Display:** Prominent `text-blue-600` styling
+- **Contact Seller Button:** Deep-link to Telegram bot, anonymity-preserving
+- **Image Gallery:** 1-5 Telegram photos in responsive grid
+- **Sticky Navigation Header:** Consistent header with shadow separation
+- **Touch Target Guidelines:** 44px minimum for interactive elements
+- **Progressive Disclosure:** Truncated descriptions, empty states, HTMX pagination
+
+## Search Patterns
+
+Search UI patterns documented in [`search-patterns.md`](search-patterns.md):
+
+- **Hero Search with Location:** Combined keyword + city selector on homepage
+- **Query Translation:** Montenegrin→Russian before PostgreSQL FTS
+- **Did-You-Mean:** City typo suggestions via `difflib.get_close_matches`
+- **Sort Options:** Date (newest) or price (low/high)
+- **Empty States:** Friendly guidance when no results found
+
+## Filter UI
+
+Filter patterns documented in [`filter-ui.md`](filter-ui.md):
+
+- **Sticky Sidebar Filters:** Desktop sidebar with category/city/price controls
+- **Mobile Filter Drawer:** Slide-up panel on mobile devices
+- **Filter Chips/Tags:** Removable active filter indicators
+- **Category Hierarchical Navigation:** django-mptt tree traversal
+- **Location-Based Filtering:** Closed Montenegro city list
+- **Price Range Filter:** Min/max input fields
+
 ## User stories
+
 Full acceptance behavior per role: [index](../04-user-stories/index.md) —
 [seller](../04-user-stories/seller-stories.md), [buyer](../04-user-stories/buyer-stories.md),
 [admin](../04-user-stories/admin-stories.md).
 
 ## Owner decisions
+
 Owner decisions O1–O5 (plain, owner-readable) live in
 [`../05-owner-decisions/index.md`](../05-owner-decisions/index.md). The full
 zone-resolution summary (C1–C8, R1–R9, D1–D12) is distributed inline across the spec and database
 docs by zone ID.
 
 ## Deferred to post-MVP
+
 DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping, EAV attributes, tags, multi-currency.
 
 ## Commands
+
 | Task | Command |
 |------|---------|
 | Tests | `uv run pytest <path>` |

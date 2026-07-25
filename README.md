@@ -26,6 +26,47 @@ cp .env.example .env        # set BOT_TOKEN, DB, SECRET_KEY
 docker compose up --build   # db + web + bot + nginx
 ```
 
+### Tailwind CSS Development
+
+Tailwind CSS is built during Docker image creation and regenerated on container start in development. CSS changes are detected automatically when running with the dev override.
+
+```bash
+# Development with hot-reload
+docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up --build
+```
+
+To rebuild CSS manually after editing templates:
+```bash
+docker compose exec web tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify
+```
+
+### Local HTTPS Development
+
+Mko Bazuna uses nginx with TLS in both development and production for production parity. HTTPS is required to test secure cookies, OAuth, webhooks, and HTTP/2 features. See [Local HTTPS with mkcert](docs/ops/local-https-mkcert.md) for complete setup instructions.
+
+```bash
+# Install mkcert (once per machine)
+choco install mkcert        # Windows (Chocolatey)
+
+# One-time CA install (requires admin on Windows)
+mkcert -install
+
+# Generate development certificates
+mkdir -p docker/nginx/certs
+cd docker/nginx/certs
+mkcert localhost 127.0.0.1 ::1 mkobazuna.local
+# Rename for nginx compatibility (filenames may vary, e.g. localhost+2.pem)
+cp localhost+2.pem fullchain.pem
+cp localhost+2-key.pem privkey.pem
+```
+
+Then run with nginx profile for HTTPS:
+```bash
+docker compose --profile use-nginx up --build
+```
+
+Access at `https://localhost`. Certificates are valid for ~2 years; re-run mkcert to renew.
+
 Web is served behind nginx (ports 80/443); the web container is not exposed directly.
 
 ### PgBouncer (optional connection pooling)
@@ -53,6 +94,7 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 | `docs/04-user-stories/index.md` | User stories by role (seller/buyer/admin) |
 | `docs/ops/docker-deployment.md` | Docker deployment & operations guide |
 | `docs/ops/restore.md` | Database restore runbook |
+| `docs/ops/local-https-mkcert.md` | Local HTTPS setup with mkcert |
 | `docs/99-agent/architecture.md` · `rules.md` · `references.md` | Agent guidelines & references |
 | `docs/00-overview/doc-maintenance-rules.md` | Documentation governance rules |
 
@@ -65,7 +107,7 @@ docs/
 ├── 03-packages/        packages-list.md · dependency-collisions.md
 ├── 04-user-stories/    index.md · seller-stories.md · buyer-stories.md · admin-stories.md
 ├── 05-owner-decisions/ index.md
-├── ops/                 docker-deployment.md · restore.md
+├── ops/                 docker-deployment.md · restore.md · local-https-mkcert.md
 ├── 99-agent/           architecture.md · rules.md · references.md
 └── 98-reference/       ast-editor.md
 ```

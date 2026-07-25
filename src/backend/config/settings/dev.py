@@ -26,3 +26,12 @@ LOGGING = {
         "level": "INFO",
     },
 }
+
+# HSTS completely disabled in development (prevents browser caching issues)
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+
+# Proxy settings for nginx TLS termination in dev
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True

@@ -1,0 +1,9 @@
+# This directory holds mkcert-generated TLS certificates for local HTTPS development.
+# Generate certificates with:
+#   mkcert localhost 127.0.0.1 ::1 mkobazuna.local
+#   cp localhost+2.pem fullchain.pem
+#   cp localhost+2-key.pem privkey.pem
+#
+# Note: Filenames may vary (e.g., localhost.pem, localhost+2.pem) based on mkcert version.
+# The .gitkeep preserves this directory; certificate files are gitignored.
+# See docs/ops/local-https-mkcert.md for complete setup instructions.
