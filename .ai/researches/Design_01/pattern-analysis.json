@@ -1,0 +1,235 @@
+{
+  "analysis_metadata": {
+    "project": "Mko Bazuna",
+    "target_spec": "Telegram-driven classifieds board with Django HTMX MPA",
+    "research_files_analyzed": [
+      "classifieds_design_research_report.md",
+      "01-list-view.md",
+      "02-search-filters.md", 
+      "03-ad-detail.md",
+      "04-homepage-nav.md",
+      "05-posting-form.md",
+      "06-mobile-patterns.md"
+    ],
+    "user_stories_reference": ["US-B1-B9", "US-S1-S9"],
+    "analysis_date": "2026-07-25"
+  },
+  "findings": [
+    {
+      "pattern_name": "Search-First Architecture",
+      "source_file": "classifieds_design_research_report.md",
+      "applicability": "YES",
+      "reason": "Directly supports US-B2 (Search) and US-B3 (Filter). Search is primary discovery method for buyers without registration.",
+      "priority": "HIGH",
+      "integration_notes": "Persistent search bar in header. HTMX partial updates for search results. Query translated Montenegrin→Russian before FTS. Autocomplete suggestions via HTMX endpoints."
+    },
+    {
+      "pattern_name": "Card-Based Grid Layouts",
+      "source_file": "01-list-view.md",
+      "applicability": "YES",
+      "reason": "Directly supports US-B4 (Ad card) and US-B6 (Browse by category). Visual hierarchy with image, price, title is essential for classifieds browsing.",
+      "priority": "HIGH",
+      "integration_notes": "CSS Grid with auto-fit for responsive columns. Each card links to ad detail. HTMX for infinite scroll/pagination. Telegram photos displayed via stored file URLs."
+    },
+    {
+      "pattern_name": "Sticky Sidebar Filters",
+      "source_file": "01-list-view.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B3 (Filter) but HTMX MPA architecture requires adapted approach. Cannot use traditional desktop sidebar for mobile-first.",
+      "priority": "HIGH",
+      "integration_notes": "Desktop: sticky filter panel in sidebar. Mobile: HTMX-triggered bottom sheet or slide-out drawer. Filters combinable without full page reload. Category/city/price as core filters."
+    },
+    {
+      "pattern_name": "Filter Chips/Tags Display",
+      "source_file": "02-search-filters.md",
+      "applicability": "YES",
+      "reason": "Supports US-B3 (Filter) with required active filter management. Essential for usability with multiple filter combinations.",
+      "priority": "HIGH",
+      "integration_notes": "HTMX updates applied filters as removable chips. Filter state maintained in URL parameters for bookmarking. Clear all option available."
+    },
+    {
+      "pattern_name": "Price Range Slider with Input",
+      "source_file": "02-search-filters.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B3 (Filter) but HTMX MPA works better with dual input sliders. Need simpler implementation than JavaScript-heavy sliders.",
+      "priority": "MEDIUM",
+      "integration_notes": "HTML range inputs with min/max number fields alongside. HTMX on change triggers partial update. Consider Alpine.js for enhanced slider experience without SPA overhead."
+    },
+    {
+      "pattern_name": "Category Hierarchical Navigation",
+      "source_file": "02-search-filters.md",
+      "applicability": "YES",
+      "reason": "Directly supports US-B6 (Browse by category) and US-B3 (Filter). Closed admin tree via django-mptt requires structured navigation.",
+      "priority": "HIGH",
+      "integration_notes": "Dropdown/mega-menu for desktop. Collapsible tree for mobile. Bot suggests top 3-5 categories by keyword. Web uses full mptt tree with lazy loading."
+    },
+    {
+      "pattern_name": "Location-Based Filtering",
+      "source_file": "02-search-filters.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B7 (Browse by city) but limited to closed preset list of Montenegro cities, not dynamic geo-based search.",
+      "priority": "HIGH",
+      "integration_notes": "City dropdown from closed list, not GPS-based. 'Did you mean' suggestions via difflib on typos. Exact match required, no fuzzy geo-matching."
+    },
+    {
+      "pattern_name": "Price Display Prominence",
+      "source_file": "03-ad-detail.md",
+      "applicability": "YES",
+      "reason": "Essential for classifieds UX. Supports US-B4 (Ad card) with clear pricing information.",
+      "priority": "HIGH",
+      "integration_notes": "Price prominently displayed on card (blue/violet). Currency symbol localized. Full price visibility on all ad displays, never hidden."
+    },
+    {
+      "pattern_name": "Contact Seller Deep-Link Button",
+      "source_file": "03-ad-detail.md",
+      "applicability": "YES",
+      "reason": "Directly implements US-B5. Contact via deep-link to bot without revealing PII. Rendered only when ad PUBLISHED and seller valid.",
+      "priority": "HIGH",
+      "integration_notes": "Button links to t.me/<bot_username>?start=contact_<ad_id>. No seller identity shown. HTMX endpoint checks ad status and seller validity for button visibility."
+    },
+    {
+      "pattern_name": "Seller Verification Badges",
+      "source_file": "03-ad-detail.md",
+      "applicability": "NO",
+      "reason": "Contradicts decision C (US-B4/B5) - no seller identity shown on site. Trust signals work through bot contact, not on-site badges.",
+      "priority": "LOW",
+      "integration_notes": "Not applicable. Seller verification happens in Telegram bot. Trust is inferred through platform use, not displayed badges."
+    },
+    {
+      "pattern_name": "Seller Rating/Rating Display",
+      "source_file": "03-ad-detail.md",
+      "applicability": "NO",
+      "reason": "Contradicts decision C - no seller identity on site. Ratings would identify sellers.",
+      "priority": "LOW",
+      "integration_notes": "Not implemented in phase 1. Would require user accounts and ratings system which conflicts with anonymous buyer experience."
+    },
+    {
+      "pattern_name": "Image Gallery with Thumbnails",
+      "source_file": "03-ad-detail.md",
+      "applicability": "YES",
+      "reason": "Supports US-S2 (Photos) and US-B4 (Ad card). 1-5 Telegram-compressed photos need display.",
+      "priority": "HIGH",
+      "integration_notes": "Simple carousel or grid of photos. No server-side optimization in phase 1 - serve Telegram-compressed images as-is. Click to expand modal for larger view."
+    },
+    {
+      "pattern_name": "Hero Search with Location",
+      "source_file": "04-homepage-nav.md",
+      "applicability": "YES",
+      "reason": "Directly supports US-B2 and US-B7. Prominent search is primary discovery for unregistered buyers.",
+      "priority": "HIGH",
+      "integration_notes": "Central search bar in hero section. City selector dropdown (closed Montenegro list). Voice search optional. HTMX form submission for instant results."
+    },
+    {
+      "pattern_name": "Category Icon Grid",
+      "source_file": "04-homepage-nav.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B6 but simplified. No social integration needed, icons for navigation only.",
+      "priority": "MEDIUM",
+      "integration_notes": "Simple icon + text grid linking to category pages. No Facebook-style social proof. Use Heroicons or similar for consistent iconography."
+    },
+    {
+      "pattern_name": "Login via Telegram (QR/Deep-link)",
+      "source_file": "04-homepage-nav.md",
+      "applicability": "YES",
+      "reason": "Directly implements US-S1. QR/code page encoding login_<token> deep-link for Telegram authentication.",
+      "priority": "HIGH",
+      "integration_notes": "Login button opens QR page. Generated token stored in login_tokens table. Bot writes telegram_id on claim. Create/find pattern for accounts."
+    },
+    {
+      "pattern_name": "Multistep Ad Creation Flow",
+      "source_file": "05-posting-form.md",
+      "applicability": "NO",
+      "reason": "Handled entirely by Telegram bot (US-S2). Not applicable to web interface which has no ad creation.",
+      "priority": "LOW",
+      "integration_notes": "Not needed for web. Bot handles step-by-step as DRAFT status in shared ORM. Web only displays PUBLISHED ads."
+    },
+    {
+      "pattern_name": "Progressive Disclosure for Mobile",
+      "source_file": "06-mobile-patterns.md",
+      "applicability": "YES",
+      "reason": "Essential for US-B8 and US-B9. Mobile-first design required for classifieds browsing.",
+      "priority": "HIGH",
+      "integration_notes": "Expandable cards showing essential info first. Collapsible details on ad pages. Show/hide filter panels. Touch targets 44px minimum."
+    },
+    {
+      "pattern_name": "Touch-Friendly Card Sizing",
+      "source_file": "06-mobile-patterns.md",
+      "applicability": "YES",
+      "reason": "Supports US-B8 (Responsive UI) and US-B4 (Ad card). 44px minimum touch targets required.",
+      "priority": "HIGH",
+      "integration_notes": "Cards 48-72px minimum tap targets. Adequate spacing between interactive elements. Thumb-zone optimized for mobile actions."
+    },
+    {
+      "pattern_name": "Mobile Filter Drawer",
+      "source_file": "06-mobile-patterns.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B3 mobile experience but HTMX MPA requires hybrid approach.",
+      "priority": "HIGH",
+      "integration_notes": "Filter button triggers HTMX modal. Slide-up panel from bottom. Apply/clear actions via HTMX. Sticky apply button for accessibility."
+    },
+    {
+      "pattern_name": "Progressive Image Loading",
+      "source_file": "06-mobile-patterns.md",
+      "applicability": "YES",
+      "reason": "Supports performance for ad display. Critical for mobile users on slower networks.",
+      "priority": "MEDIUM",
+      "integration_notes": "Lazy loading for off-screen images. No server optimization in phase 1. WebP format preferred. Loading skeleton states for perceived performance."
+    },
+    {
+      "pattern_name": "PWA/Offline Support",
+      "source_file": "06-mobile-patterns.md",
+      "applicability": "NO",
+      "reason": "Deferred to post-MVP. Not in phase 1 specification. Adds complexity for MVP.",
+      "priority": "LOW",
+      "integration_notes": "Defered per spec. Focus on core web experience first. Consider for phase 1.5 or later enhancement."
+    },
+    {
+      "pattern_name": "Video Integration",
+      "source_file": "01-list-view.md",
+      "applicability": "NO",
+      "reason": "Not in phase 1 specification. Only Telegram photos supported (US-S2 requires photos 1-5).",
+      "priority": "LOW",
+      "integration_notes": "Deferred feature. Phase 1 uses Telegram-compressed JPEG only. Video support would require separate media handling."
+    },
+    {
+      "pattern_name": "AI-Powered Personalization",
+      "source_file": "classifieds_design_research_report.md",
+      "applicability": "NO",
+      "reason": "Overkill for MVP. Not in phase 1 specification. Requires user tracking which may conflict with anonymity goals.",
+      "priority": "LOW",
+      "integration_notes": "Deferred. Phase 1 focuses on basic search and category browsing. Personalization adds infrastructure complexity."
+    },
+    {
+      "pattern_name": "AR/VR Visual Features",
+      "source_file": "classifieds_design_research_report.md",
+      "applicability": "NO",
+      "reason": "Future trends not in phase 1. Overengineering for MVP classifieds platform.",
+      "priority": "LOW",
+      "integration_notes": "Explicitly deferred. Phase 1 MVP focuses on core browsing and search functionality."
+    },
+    {
+      "pattern_name": "Similar Ads Recommendations",
+      "source_file": "03-ad-detail.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Nice for discovery but not required by user stories. Simple query-based suggestions suffice.",
+      "priority": "MEDIUM",
+      "integration_notes": "Show related ads by same category. Simple query-based, not AI-powered. Horizontal scroll on mobile, grid on desktop."
+    },
+    {
+      "pattern_name": "Sticky Navigation Header",
+      "source_file": "01-list-view.md",
+      "applicability": "YES",
+      "reason": "Supports US-B2 and US-B3. Search must remain accessible during scroll.",
+      "priority": "MEDIUM",
+      "integration_notes": "Header remains visible on scroll. Filter toggle accessible. Language switcher in header. HTMX partial updates."
+    },
+    {
+      "pattern_name": "Infinite Scroll vs Pagination",
+      "source_file": "01-list-view.md",
+      "applicability": "WITH_ADAPTATION",
+      "reason": "Supports US-B6/US-B7. HTMX MPA works best with hybrid approach - pagination with HTMX partial loading.",
+      "priority": "HIGH",
+      "integration_notes": "Use pagination with HTMX lazy loading. 'Load more' button pattern. Avoid true infinite scroll for SEO and back-button consistency."
+    }
+  ]
+}

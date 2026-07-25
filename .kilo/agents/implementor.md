@@ -207,7 +207,7 @@ permission:
 
   todoread: allow
   todowrite: allow
-  task: deny
+  task: allow
   websearch: allow
   webfetch: allow
   

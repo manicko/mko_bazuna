@@ -1,0 +1,601 @@
+{
+  "analysis_metadata": {
+    "project": "Mko Bazuna",
+    "research_files_analyzed": [
+      "01-avito-design.md",
+      "02-jiji-olx-design.md",
+      "03-facebook-marketplace.md"
+    ],
+    "user_stories_reference": ["US-B1-B9", "US-S1-S9"],
+    "analysis_date": "2026-07-25",
+    "target_architecture": "Telegram bot (aiogram 3.x) + Django HTMX MPA"
+  },
+  "patterns_by_platform": {
+    "avito": {
+      "applicable_patterns": [
+        {
+          "pattern_id": "AV-01",
+          "pattern_name": "Sticky Header with Language Selector",
+          "description": "68px desktop header with logo, centered navigation, language selector on right",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8", "US-B9"],
+          "adaptation_notes": "Integrate Telegram login on left, language switch (ru/bs-latin) on right"
+        },
+        {
+          "pattern_id": "AV-02",
+          "pattern_name": "Responsive Container Max-widths",
+          "description": "540px (sm) → 720px (md) → 960px (lg) → 1140px (xl) → 1280px (xxl) grid system",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "CSS grid with max-width constraints for all viewport sizes"
+        },
+        {
+          "pattern_id": "AV-03",
+          "pattern_name": "Category Hierarchy (Real Estate, Vehicles, etc.)",
+          "description": "12 top-level categories with location-based subcategory organization",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B6", "US-S2"],
+          "adaptation_notes": "Adapt to Montenegro market: Goods, Services, Real Estate categories per spec"
+        },
+        {
+          "pattern_id": "AV-04",
+          "pattern_name": "Location-Based Breadcrumb Navigation",
+          "description": "Country → Region → City filtering with breadcrumb path",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B7"],
+          "adaptation_notes": "Montenegro-only: City dropdown from closed list with 'did you mean' suggestions"
+        },
+        {
+          "pattern_id": "AV-05",
+          "pattern_name": "Filter Sidebar (Desktop) / Bottom Sheet (Mobile)",
+          "description": "Collapsible accordion filters with real-time updates",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B3"],
+          "adaptation_notes": "HTMX-powered: Sidebar on desktop, slide-up drawer on mobile with Apply button"
+        },
+        {
+          "pattern_id": "AV-06",
+          "pattern_name": "Filter Chips/Tag Display",
+          "description": "Pill-shaped tags with blue background showing active filters above results",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B3"],
+          "adaptation_notes": "HTMX updates for removable chips, URL parameter persistence for bookmarking"
+        },
+        {
+          "pattern_id": "AV-07",
+          "pattern_name": "3:2 Aspect Ratio Ad Cards",
+          "description": "Consistent card sizing with image, price, title, metadata rows",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Matches Telegram photo format, use for consistent listing grid layout"
+        },
+        {
+          "pattern_id": "AV-08",
+          "pattern_name": "Status Badge Overlays",
+          "description": "Orange verified, green pro, blue premium badges positioned absolutely on images",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "CONFLICT: Decision C prohibits seller identity display. Skip for phase 1."
+        },
+        {
+          "pattern_id": "AV-09",
+          "pattern_name": "Prominent Price Display",
+          "description": "Price shown prominently with #2E6BFF or #2D2D2D color coding",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Price as primary card element, BAM currency without symbol"
+        },
+        {
+          "pattern_id": "AV-10",
+          "pattern_name": "Image Carousel Indicators",
+          "description": "Bottom padding with navigation arrows on hover, carousel support",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4", "US-S2"],
+          "adaptation_notes": "Simple carousel for 1-5 Telegram photos; thumbnails deferred to phase 1.5"
+        },
+        {
+          "pattern_id": "AV-11",
+          "pattern_name": "Title Text Clamp (2 Lines)",
+          "description": "16px font, -webkit-line-clamp: 2 for consistent card heights",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Prevent card height variability, improve visual consistency"
+        },
+        {
+          "pattern_id": "AV-12",
+          "pattern_name": "Green Primary Action Buttons",
+          "description": "#29A160 primary green for submit buttons, #20804C hover state",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-S1", "US-B5"],
+          "adaptation_notes": "Use for Telegram login button, contact seller CTAs"
+        },
+        {
+          "pattern_id": "AV-13",
+          "pattern_name": "Rounded Input Fields (6-8px)",
+          "description": "Search inputs with rounded corners, gray borders, blue focus states",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B2", "US-B3"],
+          "adaptation_notes": "Apply to search and filter input fields, maintain consistency"
+        },
+        {
+          "pattern_id": "AV-14",
+          "pattern_name": "Footer Navigation with Legal Links",
+          "description": "Full-width footer with navigation links and legal information",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-A8", "US-B1"],
+          "adaptation_notes": "Include privacy policy, terms links, language selector backup"
+        },
+        {
+          "pattern_id": "AV-15",
+          "pattern_name": "Trust Indicators (Verified/Pro)",
+          "description": "Verification badges for trust-building in classifieds context",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "CONFLICT: Decision C prohibits on-site seller identity. Consider anonymous trust score."
+        },
+        {
+          "pattern_id": "AV-16",
+          "pattern_name": "Search Bar Background Gray (#F2F2F2)",
+          "description": "Light gray search input background for visual separation",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B2"],
+          "adaptation_notes": "Minor visual detail; can use lighter variant for modern aesthetic"
+        },
+        {
+          "pattern_id": "AV-17",
+          "pattern_name": "Metadata Row with Bullets",
+          "description": "Location and date displayed with bullet separators between elements",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Show city and posted date with • separators, no seller info per decision C"
+        },
+        {
+          "pattern_id": "AV-18",
+          "pattern_name": "Touch Target Optimization (40px+)",
+          "description": "Minimum 40px touch targets for interactive elements on mobile",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Essential for mobile-first design, apply to all buttons and links"
+        },
+        {
+          "pattern_id": "AV-19",
+          "pattern_name": "Secondary Info Collapse",
+          "description": "Mobile hides secondary information, prioritizes price/title",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Reduce metadata on mobile cards, expand on ad detail page"
+        },
+        {
+          "pattern_id": "AV-20",
+          "pattern_name": "Location as Primary Filter",
+          "description": "Location-first design philosophy with city prominence",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B7"],
+          "adaptation_notes": "Implement city selector in header/hero, default to detected Montenegro location"
+        }
+      ]
+    },
+    "jiji_olx": {
+      "applicable_patterns": [
+        {
+          "pattern_id": "JO-01",
+          "pattern_name": "Trust-First Seller Verification",
+          "description": "Document verification for African markets high scam concern environment",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-S2"],
+          "adaptation_notes": "CONFLICT: Telegram accounts already phone-verified. Focus on behavioral trust signals instead."
+        },
+        {
+          "pattern_id": "JO-02",
+          "pattern_name": "Country-Specific TLD Architecture",
+          "description": "Regional domain separation (jiji.co.ke, jiji.ng) for market adaptation",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B9"],
+          "adaptation_notes": "Not needed for Montenegro launch. Single domain with language switcher sufficient."
+        },
+        {
+          "pattern_id": "JO-03",
+          "pattern_name": "Trending Near You Section",
+          "description": "Localized discovery with location-based popular items",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B1", "US-B6"],
+          "adaptation_notes": "Implement as 'Popular in Montenegro' on homepage with Montenegro city context"
+        },
+        {
+          "pattern_id": "JO-04",
+          "pattern_name": "Recently Listed Carousels",
+          "description": "Time-based discovery for fresh inventory",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B6"],
+          "adaptation_notes": "Horizontal scroll carousel on homepage for recent ads, HTMX-powered"
+        },
+        {
+          "pattern_id": "JO-05",
+          "pattern_name": "Clean Filter Modal Pattern",
+          "description": "Modal filter interface replacing persistent sidebar",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B3"],
+          "adaptation_notes": "HTMX modal for mobile/tablet, more usable than traditional sidebar"
+        },
+        {
+          "pattern_id": "JO-06",
+          "pattern_name": "3-Column Product Grid",
+          "description": "Desktop grid layout optimizing screen real estate",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Use CSS grid with responsive columns instead of fixed 3-column"
+        },
+        {
+          "pattern_id": "JO-07",
+          "pattern_name": "Large Product Images Priority",
+          "description": "Image-first design with product photo emphasis",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4", "US-S2"],
+          "adaptation_notes": "Telegram photos already optimized; display them prominently on cards"
+        },
+        {
+          "pattern_id": "JO-08",
+          "pattern_id": "JO-08",
+          "pattern_name": "Minimal Text on Listing Cards",
+          "description": "Essential info only: price, title, location on listing cards",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "No seller identity (decision C) - show only ad-relevant metadata"
+        },
+        {
+          "pattern_id": "JO-09",
+          "pattern_name":": "Speech-to-Text Search Input",
+          "description": "Voice search capability for mobile users",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B2"],
+          "adaptation_notes": "Deferred feature; not in phase 1 spec. Text-only search for MVP."
+        },
+        {
+          "pattern_id": "JO-10",
+          "pattern_name": "Image Upload Search",
+          "description": "Search by photo reverse image lookup capability",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B2"],
+          "adaptation_notes": "Deferred; phase 1 uses text-based FTS only"
+        },
+        {
+          "pattern_id": "JO-11",
+          "pattern_name": "Progressive Disclosure Filters",
+          "description": "Essential filters first, expandable for more options",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B3"],
+          "adaptation_notes": "Category/city/price as primary; advanced filters collapsible via HTMX"
+        },
+        {
+          "pattern_id": "JO-12",
+          "pattern_name": "Show Complete Description",
+          "description": "Truncated text with expansion option for long content",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Ad detail page shows full description; cards truncate with ellipsis"
+        },
+        {
+          "pattern_id": "JO-13",
+          "pattern_name": "Comparison Feature",
+          "description": "Side-by-side product comparison for evaluation",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Deferred to phase 1.5; requires saved items/favorites feature"
+        },
+        {
+          "pattern_id": "JO-14",
+          "pattern_name": "High Contrast Accessibility",
+          "description": "Design for visual impairments in emerging markets",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Ensure WCAG AA contrast; important for Russian text readability"
+        },
+        {
+          "pattern_id": "JO-15",
+          "pattern_name": "Simple Uncluttered Layouts",
+          "description": "Clean design for low-bandwidth, mid-range device users",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B1", "US-B8"],
+          "adaptation_notes": "Essential for Montenegro mobile-first users; minimize JS/CSS bloat"
+        },
+        {
+          "pattern_id": "JO-16",
+          "pattern_name": "Keyboard Navigation Support",
+          "description": "Full keyboard accessibility for power users",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Basic tab navigation; defer advanced keyboard shortcuts"
+        },
+        {
+          "pattern_id": "JO-17",
+          "pattern_name": "Multi-Step Form Segmentation",
+          "description": "Form fields broken into digestible sections",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-S2"],
+          "adaptation_notes": "Handled by Telegram bot; web interface has no ad creation forms"
+        },
+        {
+          "pattern_id": "JO-18",
+          "pattern_name": "Regional Currency Handling",
+          "description": "Dynamic currency switching based on region",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "CONFLICT: Spec uses BAM only. No multi-currency needed for Montenegro."
+        },
+        {
+          "pattern_id": "JO-19",
+          "pattern_name": "Low Bandwidth Optimization",
+          "description": "Performance-conscious design for intermittent connectivity",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Lazy loading images, minimal JS, inline SVG icons, optimized CSS bundle"
+        },
+        {
+          "pattern_id": "JO-20",
+          "pattern_name": "Large Touch Targets (40px+)",
+          "description": "Touch-friendly controls with minimum 40px height",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Non-negotiable requirement; apply to all interactive elements"
+        }
+      ]
+    },
+    "facebook_marketplace": {
+      "applicable_patterns": [
+        {
+          "pattern_id": "FB-01",
+          "pattern_name": "Mobile-First Responsive Grid",
+          "description": "CSS grid with auto-fill minmax(280px, 1fr) for responsive listings",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Directly compatible with HTMX MPA; single column mobile, 3-4 column desktop"
+        },
+        {
+          "pattern_id": "FB-02",
+          "pattern_name": "Social Trust via Telegram Context",
+          "description": "Leverage Telegram's existing phone verification instead of Facebook identity",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4", "US-B5"],
+          "adaptation_notes": "CONFLICT: Decision C prohibits seller identity. Use Telegram verification as implicit trust signal."
+        },
+        {
+          "pattern_id": "FB-03",
+          "pattern_name": "Bottom Navigation Bar",
+          "description": "Persistent bottom tabs for primary sections on mobile",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B1", "US-B6"],
+          "adaptation_notes": "Defer to phase 1.5; phase 1 has simple navigation with back button"
+        },
+        {
+          "pattern_id": "FB-04",
+          "pattern_name": "Swipeable Image Gallery",
+          "description": "Mobile swipe gestures for photo navigation with dot indicators",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-S2", "US-B4"],
+          "adaptation_notes": "Essential for Telegram photo display; implement carousel with swipe support"
+        },
+        {
+          "pattern_id": "FB-05",
+          "pattern_name": "Distance Indicators",
+          "description": "Show distance from user ('2.3 miles away') on listings",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4", "US-B7"],
+          "adaptation_notes": "CONFLICT: Montenegro uses closed city list, not GPS. Show city only, no distance."
+        },
+        {
+          "pattern_id": "FB-06",
+          "pattern_name": "Saved Items/Favorites System",
+          "description": "Heart icon saving listings with persistent state management",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Deferred to phase 1.5; requires buyer account system"
+        },
+        {
+          "pattern_id": "FB-07",
+          "pattern_name": "Collections Feature",
+          "description": "Group saved items with friend collaboration",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "CONFLICT: No buyer registration in phase 1. Deferred to phase 2."
+        },
+        {
+          "pattern_id": "FB-08",
+          "pattern_name": "Dark Mode Support",
+          "description": "Full theme support with light/dark token system",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B9"],
+          "adaptation_notes": "Defer to phase 1.5; implement CSS variables for future toggle"
+        },
+        {
+          "pattern_id": "FB-09",
+          "pattern_name": "4:3 Aspect Ratio Detail View",
+          "description": "Ad detail images with 4:3 ratio and max 680px width",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Adapt to 3:2 for consistency with card layout; Telegram photos fit well"
+        },
+        {
+          "pattern_id": "FB-10",
+          "pattern_name": "Full-Screen Image Lightbox",
+          "description": "Tap to open fullscreen viewer with pinch-to-zoom",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Essential for ad detail; implement modal viewer for Telegram photos"
+        },
+        {
+          "pattern_id": "FB-11",
+          "pattern_name": "Thumb-Friendly CTA Placement",
+          "description": "Primary actions positioned in bottom-accessible areas",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B5"],
+          "adaptation_notes": "Contact seller button must be thumb-accessible on mobile ad detail"
+        },
+        {
+          "pattern_id": "FB-12",
+          "pattern_name": "H-Scroll Category Chips",
+          "description": "Non-wrapping horizontal scroll for category navigation",
+          "priority": "HIGH",
+          "user_stories_alignment": ["US-B6"],
+          "adaptation_notes": "Replace vertical category list on mobile; matches Avito's responsive pattern"
+        },
+        {
+          "pattern_id": "FB-13",
+          "pattern_name": "Pull-to-Refresh Pattern",
+          "description": "Native mobile refresh gesture for listing updates",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B6"],
+          "adaptation_notes": "Defer; HTMX pagination works for MVP. Add when PWA implemented."
+        },
+        {
+          "pattern_id": "FB-14",
+          "pattern_name": "Voice Search Integration",
+          "description": "Microphone icon for speech-based search input",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B2"],
+          "adaptation_notes": "Deferred feature; implement with Web Speech API when needed"
+        },
+        {
+          "pattern_id": "FB-15",
+          "pattern_name": "Seller Response Time Indicators",
+          "description": "Show seller responsiveness on profile",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "CONFLICT: No seller identity display. Skip for phase 1."
+        },
+        {
+          "pattern_id": "FB-16",
+          "pattern_name": "Hero Image Sequence Pattern",
+          "description": "Recommended 10-photo sequence for listings",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-S2"],
+          "adaptation_notes": "Adapt to 5-photo limit from Telegram; guide users on optimal photo angles"
+        },
+        {
+          "pattern_id": "FB-17",
+          "pattern_name": "Lazy Image Loading with Blur-Up",
+          "description": "Progressive loading with blur placeholder technique",
+          "priority": "MEDIUM",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Deferred for phase 1; Telegram images load reasonably fast"
+        },
+        {
+          "pattern_id": "FB-18",
+          "pattern_name": "Map View Toggle",
+          "description": "Optional map view for search results with pin clustering",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B7"],
+          "adaptation_notes": "CONFLICT: No GPS coordinates. Show city list alphabetically instead."
+        },
+        {
+          "pattern_id": "FB-19",
+          "pattern_name": "PWA Architecture with Service Workers",
+          "description": "Progressive Web App for offline browsing and performance",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B8"],
+          "adaptation_notes": "Deferred per Design_01 analysis; focus on core web experience first"
+        },
+        {
+          "pattern_id": "FB-20",
+          "pattern_name": "Emoji Reactions on Listings",
+          "description": "Public reactions for community feedback on ads",
+          "priority": "LOW",
+          "user_stories_alignment": ["US-B4"],
+          "adaptation_notes": "Requires buyer accounts and messaging. Skip for phase 1 anonymous browsing."
+        }
+      ]
+    }
+  },
+  "regional_considerations": {
+    "montenegro_market": {
+      "market_characteristics": [
+        "Small geographic area (~14,000 km²)",
+        "High emigration rate creates demand for selling household items",
+        "Tourism-driven seasonal fluctuations in user activity",
+        "Mixed Russian/Montenegrin language demographics",
+        "Mostly mobile users with mid-range devices",
+        "Growing Telegram adoption among locals"
+      ],
+      "language_requirements": {
+        "content_language": "Russian (stored as primary)",
+        "ui_languages": ["ru", "bs-latin"],
+        "translation_approach": "Montenegrin query translated to Russian for search; Russian content translated to Montenegrin for display"
+      },
+      "currency_handling": {
+        "currency": "BAM (Convertible Mark)",
+        "display": "Number only (no symbol per spec)",
+        "multi_currency": false
+      }
+    },
+    "russian_content_adaptation": {
+      "cyrillic_typography": "Ensure proper font support for Russian Cyrillic text",
+      "search_normalization": "Montenegrin queries translated before PG FTS",
+      "category_names": "Russian stored in DB; Montenegrin in JSONB i18n field",
+      "date_formats": "Use day-month-year format familiar to Russian speakers"
+    }
+  },
+  "telegram_first_flow_adaptations": {
+    "bot_to_web_transitions": [
+      "Login via Telegram QR/deep-link pattern (US-S1)",
+      "Contact seller via bot deep-link from web (US-B5)",
+      "Photo flow: Telegram-compressed images stored directly",
+      "No web-based ad editing - all edits via bot (US-S5)"
+    ],
+    "web_interface_limitations": [
+      "No seller identity on ad cards (decision C)",
+      "No favorites/saved items (requires buyer accounts)",
+      "No social proof or ratings display",
+      "No direct messaging on web",
+      "All contact mediated through Telegram bot"
+    ],
+    "simplified_user_journey": [
+      "Homepage → Category/City filter → Search results (cards)",
+      "Card click → Ad detail (full description + photos)",
+      "Contact button → Telegram bot deep-link",
+      "Login required only for sellers (Telegram-based)"
+    ]
+  },
+  "architecture_conflicts": {
+    "high_priority_conflicts": [
+      {
+        "pattern": "Seller Verification Badges (AV-08, JO-15)",
+        "conflict_with": "Decision C (US-B4/B5) - no seller identity on site",
+        "resolution": "Use implicit trust signal: Telegram phone verification sufficient. No badges needed."
+      },
+      {
+        "pattern": "Distance Indicators (FB-05)",
+        "conflict_with": "Closed city list, no GPS",
+        "resolution": "Show city name only. Distance requires geolocation API not in scope."
+      }
+    ],
+    "deferred_features": [
+      {
+        "pattern": "PWA Support (FB-19)",
+        "reason": "Not in phase 1 specification; deferred to phase 1.5"
+      },
+      {
+        "pattern": "Favorites/Saved Items (FB-06, JO-13)",
+        "reason": "Requires buyer account system for persistence; phase 2 feature"
+      },
+      {
+        "pattern": "Bottom Navigation (FB-03)",
+        "reason": "Simple navigation sufficient for MVP; add when app-like experience needed"
+      },
+      {
+        "pattern": "Dark Mode (FB-08)",
+        "reason": "Deferred to phase 1.5; CSS variables prepared upfront"
+      }
+    ]
+  },
+  "high_priority_recommendations": [
+    "Implement 3:2 aspect ratio cards matching Avito design (AV-07)",
+    "Use HTMX-powered filter modal following Jiji pattern (JO-05)",
+    "Prioritize large image display with carousel (AV-10, FB-04)",
+    "Apply 40px+ touch targets throughout (AV-18, JO-20)",
+    "Implement mobile-first responsive grid (FB-01)",
+    "Use green primary buttons for Telegram actions (AV-12)",
+    "Show city as primary location indicator (AV-20)",
+    "Keep card text minimal per Jiji approach (JO-08)",
+    "Use sticky header for persistent search (AV-01)",
+    "Implement filter chips for active filter management (AV-06, JO-11)"
+  ]
+}

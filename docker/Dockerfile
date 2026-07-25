@@ -52,8 +52,9 @@ COPY . .
 ENV PYTHONPATH=/app/src/backend:/app/src
 
 # Build Tailwind CSS and collect static files
-# TAILWIND_APP_NAME is the default theme app name for django-tailwind
-ENV TAILWIND_APP_NAME=theme
+# Use standalone tailwindcss CLI with explicit input/output paths
+# Input: src/theme/static/theme/css/input.css (contains @tailwind directives)
+# Output: src/theme/static/theme/css/output.css (collected to staticfiles/)
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 # DJANGO_BUILD=1 skips .env validation during Docker build (collectstatic runs before runtime env is available)
 ENV DJANGO_BUILD=1
@@ -63,7 +64,7 @@ ENV BOT_TOKEN=1234567890:build-placeholder-do-not-use-in-production
 ENV ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 # Placeholder database URL for collectstatic (doesn't connect to DB but settings must be valid)
 ENV DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres
-RUN tailwindcss build && \
+RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify && \
     uv run python src/backend/manage.py collectstatic --noinput
 
 
