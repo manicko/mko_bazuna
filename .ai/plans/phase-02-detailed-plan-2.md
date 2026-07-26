@@ -7,6 +7,7 @@ tags:
   - design
   - frontend
 related:
+  - phase-02-detailed-plan-1
   - Design_01/classifieds_design_research_report
   - Design_01/01-list-view
   - Design_01/02-search-filters
@@ -296,6 +297,7 @@ Touch targets ≥44px
 ### 6.1 Color System
 
 **Primary Colors (from Avito/CSS analysis):**
+
 | Purpose | Color | Usage |
 |---------|-------|-------|
 | Primary Action | `#0866FF` | Buttons, links, CTAs |
@@ -399,6 +401,16 @@ Dark Mode Support ──► WCAG Compliance
 | Mobile drawer | No framework changes | Vanilla HTMX modal |
 | Dark mode | CSS variables | Tailwind CSS supports |
 
+### Cross-Plan Dependencies
+
+**Note:** Tasks in this plan depend on backend features from Phase 2 Plan 1.
+
+| This Plan (UI) | Depends On | Phase 2 Plan 1 | Reason |
+|---------------|------------|---------------|--------|
+| Ad Card Redesign | Thumbnail Generation | TN-001 | Card images require thumbnails for 3:2 aspect ratio and performance optimization |
+| Image Gallery | Thumbnail Generation | TN-001 | Gallery needs multiple image variants (small/medium/large) for efficient loading |
+| Trust Signals | SellerVerification Model | TS-003 | Trust badge display depends on verification data from Plan 3 |
+
 ### Backward Compatibility
 
 - All enhancements are additive
@@ -441,6 +453,8 @@ Dark Mode Support ──► WCAG Compliance
 
 ## References
 
+- [Phase 2 Plan 1](.ai/plans/phase-02-detailed-plan-1.md)
+- [Phase 2 Plan 3](.ai/plans/phase-02-detailed-plan-3.md)
 - [Design_01 Research](.ai/researches/Design_01/classifieds_design_research_report.md)
 - [Design_02 Research](.ai/researches/Design_02/)
 - [UI Patterns](docs/01-spec/ui-patterns.md)

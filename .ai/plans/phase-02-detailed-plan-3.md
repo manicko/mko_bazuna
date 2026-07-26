@@ -95,11 +95,13 @@ Create `SellerVerification` model (`apps/users/models/verification.py`):
 | verified_at | TIMESTAMP | Admin verification timestamp |
 | verification_method | VARCHAR(20) | Enum: `telegram`, `admin_manual` |
 
+**Note:** The `telegram_premium` field is defined in the `SellerVerification` model, NOT in the `User` model. The current `User` model (`apps/users/models.py`) does not contain a `telegram_premium` field. This is intentional: Telegram Premium status is tracked per-verification event in `SellerVerification` rather than as a permanent user attribute, since Telegram accounts can gain/lose Premium status over time.
+
 #### 1.3.2 Verification Integration Points
 
 1. **Telegram Bot Handler** (`telegram_bot/handlers/profile.py`)
    - On `/start`, check `user.is_premium` (Phase 2 feature)
-   - Store `telegram_premium` flag
+   - Store `telegram_premium` flag in `SellerVerification`
    - Offer phone verification prompt for non-premium users
 
 2. **Admin Verification Flow** (`moderation/views/verification.py`)
@@ -324,7 +326,7 @@ Create `DailyAdMetrics` (`apps/analytics/models/daily_metrics.py`):
 | TS-003 | `SellerVerification` model | User verification tracking | None |
 | TS-004 | Badge components | HTML templates for trust badges | TS-001 |
 | TS-005 | Trust calculation service | Periodic trust score updates | TS-002 |
-| TS-006 | Ad card integration | Display trust badges | TS-004 |
+| TS-006 | Ad card integration | Display trust badges on thumbnails | TS-004, Thumbnail Generation (Plan 1) |
 | TS-007 | Dashboard trust UI | Show trust level + progress | TS-002, TS-005 |
 
 ### 4.2 Moderation Tooling
@@ -351,7 +353,18 @@ Create `DailyAdMetrics` (`apps/analytics/models/daily_metrics.py`):
 
 ---
 
-## 5. Task Dependencies Graph
+## 5. Cross-Plan Dependencies
+
+**Note:** Tasks in Phase 2 Plan 2 (UI/UX) depend on Phase 2 Plan 1 (thumbnails).
+
+| Plan 2 Task | Depends On | Reason |
+|-------------|------------|--------|
+| Ad Card Redesign (TN-001) | Thumbnail Generation (Plan 1) | Card images require thumbnails for proper sizing and performance |
+| Image Gallery (TN-002) | Thumbnail Generation (Plan 1) | Gallery needs multiple image variants |
+
+---
+
+## 6. Task Dependencies Graph
 
 ```
 graph TD
@@ -381,7 +394,7 @@ graph TD
 
 ---
 
-## 6. Implementation Order
+## 7. Implementation Order
 
 ### Priority 1: Trust Foundation (Week 1-2)
 
@@ -406,7 +419,7 @@ graph TD
 
 ---
 
-## 7. Success Metrics
+## 8. Success Metrics
 
 | Feature | Metric | Target |
 |---------|--------|--------|
@@ -419,7 +432,7 @@ graph TD
 
 ---
 
-## 8. Risk Assessment
+## 9. Risk Assessment
 
 | Risk | Mitigation |
 |------|------------|
@@ -430,7 +443,7 @@ graph TD
 
 ---
 
-## 9. Rollback Considerations
+## 10. Rollback Considerations
 
 - **Trust Scores** — Computed values, no state modification on users
 - **Priority Scores** — Denormalized, can be recalculated

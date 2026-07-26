@@ -150,9 +150,12 @@ City match is EXACT against the closed list; unrecognized city → "general / no
 id (PK)
 ad_id (FK → ads.id)
 image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: local MEDIA_ROOT via FileSystemStorage.
-                                       #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
+                                        #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
 position (INT)
+thumbnail_small (VARCHAR, nullable) # 240x180 thumbnail storage key
+thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
+thumbnail_large (VARCHAR, nullable) # 1280x960 thumbnail storage key
 ```
 Only compressed Telegram photos (`message.photo`) accepted; `message.document` rejected. Bot downloads bytes and stores in our storage; `image` holds the served URL/key. `file_id` is NOT a URL and not usable in `<img src>` — stored as metadata only.
 

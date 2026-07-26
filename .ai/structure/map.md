@@ -20,7 +20,8 @@ C:\py_dev\mko_bazuna\src
 │   ├── templates
 │   │   ├── admin
 │   │   ├── ads
-│   │   └── components
+│   │   ├── components
+│   │   └── users
 │   └── theme
 │       └── apps.py
 ├── static
@@ -41,7 +42,14 @@ C:\py_dev\mko_bazuna\src
 │   │   └── message_payloads.py
 │   ├── services
 │   │   └── media.py
-│   └── states.py
+│   ├── states.py
+│   └── tests
+│       ├── conftest.py
+│       ├── test_ad_lifecycle.py
+│       ├── test_claim_login_token.py
+│       ├── test_create_draft_ad.py
+│       ├── test_login_claim.py
+│       └── test_media.py
 ├── templates
 └── theme
     ├── apps.py

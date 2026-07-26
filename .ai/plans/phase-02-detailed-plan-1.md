@@ -14,7 +14,7 @@ related:
 created: 2026-07-26
 ---
 
-# Phase 2 Development Plan — Mko Bazuna
+# Phase 2 Development Plan — Mko Bazuna (Updated)
 
 > Post-MVP enhancement roadmap for the Telegram-driven classifieds board.
 
@@ -156,7 +156,29 @@ MEDIA_ROOT/
    - Set `Cache-Control: 31536000` for thumbnails (immutable)
    - Add `ETag` based on file modification
 
-### 2.3 Thumbnail Variants Specification
+### 2.3 Migration Strategy for Existing Images
+
+**Migration Approach:**
+
+1. **Backfill Script** (`apps/media/management/commands/backfill_thumbnails.py`)
+   - Iterate all existing `AdImage` records
+   - Read original file from `MEDIA_ROOT/originals/`
+   - Generate thumbnails via `ThumbnailService`
+   - Store to `MEDIA_ROOT/thumbnails/{variant}/`
+   - Update model fields with paths
+
+2. **Migration Safety:**
+   - Run during low-traffic window
+   - Process in batches of 100 images
+   - Skip images that already have thumbnails
+   - Log progress and errors for monitoring
+
+3. **Rollback Path:**
+   - Thumbnail fields are nullable
+   - Original images remain untouched
+   - Delete thumbnails directory to revert
+
+### 2.4 Thumbnail Variants Specification
 
 | Variant | Dimensions | Use Case | File Size Target |
 |---------|------------|----------|------------------|
@@ -279,6 +301,8 @@ Create `SavedSearch` model (`apps/search/models/saved_searches.py`):
 | created_at | TIMESTAMP | Record creation |
 | notification_count | INT | For pruning inactive |
 
+**Note:** The `alert_enabled` field is NOT added to the User model. Alert preferences are stored per-saved-search via the `is_active` field, not as a user-level setting.
+
 ### 4.3 Alert Delivery Pipeline
 
 1. **SavedSearch model** (`apps/search/models/saved_searches.py`)
@@ -295,11 +319,35 @@ Create `SavedSearch` model (`apps/search/models/saved_searches.py`):
    - Build message with ad previews
    - Send via telegram_bot notification system
 
-4. **Add AlertPreference to User model** (`apps/users/models.py`)
-   - `alert_enabled` bool (default True)
-   - `alert_daily_hour` int (0-23, local time preference)
+4. **Create SavedSearchNotification model** (`apps/search/models/saved_search_notifications.py`)
+   - Intermediate table linking ads to alerted users
+   - Prevents duplicate notifications
 
-### 4.4 User Interface
+### 4.4 Bot Messaging Specification
+
+**Telegram Message Format:**
+
+```
+🔔 New ads matching your saved search:
+
+📦 Товары · Podgorica · 2 hours ago
+iPhone 12 в отличном состоянии
+Цена: 300 BAM
+
+📦 Товары · Bar · 4 hours ago
+Ноутбук MacBook Pro 2020
+Цена: 800 BAM
+
+Manage alerts: t.me/<bot>?start=alerts
+```
+
+**Bot Handler Integration:**
+- New `/alerts` command handler in `telegram_bot/handlers/alerts.py`
+- Inline "Save Search" button on search results
+- Alert preference management via bot menu
+- Users receive daily digest at 08:00 UTC (configurable per saved search)
+
+### 4.5 User Interface
 
 5. **Add Alert Save UI** (`templates/components/save_search_modal.html`)
    - Modal triggered from search results
@@ -311,10 +359,10 @@ Create `SavedSearch` model (`apps/search/models/saved_searches.py`):
    - Toggle, edit, delete actions
    - Notification statistics
 
-### 4.5 Notification Format
+### 4.6 Notification Format
 
 ```
-New ads matching your saved search:
+🔔 New ads matching your saved search:
 
 📦 Товары · Podgorica · 2 hours ago
 iPhone 12 в отличном состоянии
@@ -368,7 +416,14 @@ Current partial indexes exist for:
 
 #### 5.2.1 Redis Integration
 
-**Deferred:** Phase 1 has no Redis. Phase 2 should add:
+**Phase 2 Dependency:** Redis is required for production caching. Add:
+
+| Setting | Value | Purpose |
+|---------|-------|--------|
+| `REDIS_URL` | `redis://redis:6379/0` | Cache broker connection |
+| Cache TTL | Varies | See cache-specific TTLs below |
+
+**Cache Layers:**
 
 1. **Popular Searches Cache**
    - TTL: 1 hour
@@ -384,6 +439,11 @@ Current partial indexes exist for:
    - TTL: 24 hours
    - Key: `category_tree:v1`
    - Invalidate on admin category changes
+
+**Infrastructure Requirements:**
+- Redis service in docker-compose (deferred from Phase 1)
+- Connection pooling via `django.core.cache.backends.redis.RedisCache`
+- Fail-fast on Redis connection error in production
 
 #### 5.2.2 Template Fragment Caching
 
@@ -470,6 +530,10 @@ graph TD
     style K fill:#e1f5fe
     style O fill:#e1f5fe
 ```
+
+**Cross-Plan Dependencies:**
+- Thumbnail Generation (Plan 1) is a prerequisite for Ad Card Redesign (Plan 2)
+- Redis Caching (Plan 1) supports Search Autocomplete and Performance Optimizations
 
 ---
 

@@ -134,8 +134,7 @@
       "__str__",
       "transition_to",
       "__str__",
-      "image_url",
-      "generate_storage_key"
+      "image_url"
     ]
   },
   {
@@ -145,6 +144,67 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/ads/tests/test_media_security.py",
+    "module": "backend.apps.ads.tests.test_media_security",
+    "layer": "other",
+    "imports": [
+      "collections.abc",
+      "pathlib",
+      "PIL",
+      "PIL.ExifTags",
+      "django.test",
+      "django.utils",
+      "telegram_bot.services.media",
+      "apps.users.models",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.enums",
+      "apps.core.enums",
+      "apps.core.enums",
+      "apps.core.enums",
+      "django.test",
+      "PIL"
+    ],
+    "classes": [
+      "TestMediaAccessControl",
+      "TestExifStripping",
+      "TestPhysicalDeletion",
+      "TestPathTraversalRejection"
+    ],
+    "functions": [
+      "isolated_media_root",
+      "seller",
+      "staff_user",
+      "category",
+      "city",
+      "jpeg_with_exif",
+      "clean_jpeg",
+      "_create_ad_with_image",
+      "test_published_ad_returns_redirect",
+      "test_draft_ad_returns_forbidden",
+      "test_on_moderation_ad_returns_forbidden",
+      "test_deleted_ad_returns_forbidden",
+      "test_staff_can_view_any_status",
+      "test_non_existent_key_returns_404",
+      "test_strip_photo_exif_removes_make",
+      "test_strip_photo_exif_removes_model",
+      "test_strip_photo_exif_removes_gps",
+      "test_strip_photo_exif_preserves_image",
+      "test_strip_photo_exif_valid_jpeg",
+      "test_delete_photo_removes_file",
+      "test_delete_photo_missing_file_succeeds",
+      "test_delete_photo_multiple_files",
+      "test_path_traversal_up_dir",
+      "test_path_traversal_encoded",
+      "test_path_traversal_with_slash_prefix",
+      "test_path_traversal_with_null_byte",
+      "test_random_key_does_not_resolve"
+    ]
   },
   {
     "path": "backend/apps/ads/tests/test_search_triggers.py",
@@ -264,11 +324,13 @@
       "apps.locations.models",
       "apps.users.views.consent",
       "django.http",
-      "django.shortcuts"
+      "django.shortcuts",
+      "django.core.paginator"
     ],
     "classes": [],
     "functions": [
       "ad_detail",
+      "media_gate",
       "listings",
       "_suggest_category",
       "_suggest_city"
@@ -528,6 +590,7 @@
       "enum"
     ],
     "classes": [
+      "AdSort",
       "AdvisoryLockId",
       "AdStatus",
       "AdSource",
@@ -563,7 +626,8 @@
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db"
     ],
     "classes": [
       "Command"
@@ -583,7 +647,8 @@
       "apps.core.utils.advisory_lock",
       "apps.users.models",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db"
     ],
     "classes": [
       "Command"
@@ -606,7 +671,27 @@
       "apps.users.models",
       "django.core.management.base",
       "django.utils",
-      "django.db"
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/create_admin_user.py",
+    "module": "backend.apps.core.management.commands.create_admin_user",
+    "layer": "other",
+    "imports": [
+      "django.core.management.base",
+      "django.contrib.auth",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
     ],
     "classes": [
       "Command"
@@ -626,7 +711,10 @@
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
     ],
     "classes": [
       "Command"
@@ -646,7 +734,10 @@
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
     ],
     "classes": [
       "Command"
@@ -666,7 +757,10 @@
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
     ],
     "classes": [
       "Command"
@@ -686,7 +780,10 @@
       "apps.core.enums",
       "apps.core.utils.advisory_lock",
       "django.core.management.base",
-      "django.utils"
+      "django.utils",
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
     ],
     "classes": [
       "Command"
@@ -779,6 +876,7 @@
     "module": "backend.apps.core.tests.test_contact",
     "layer": "other",
     "imports": [
+      "telegram_bot.handlers.contact",
       "apps.ads.models",
       "apps.core.enums",
       "apps.core.services.contact",
@@ -810,6 +908,49 @@
       "test_consent_revoked_returns_false",
       "test_contact_pattern_matches_ad_id",
       "test_contact_pattern_extracts_ad_id"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_create_admin_user.py",
+    "module": "backend.apps.core.tests.test_create_admin_user",
+    "layer": "other",
+    "imports": [
+      "io",
+      "django.core.management",
+      "django.contrib.auth",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "TestCreateAdminUser"
+    ],
+    "functions": [
+      "test_create_admin_user_success",
+      "test_create_with_custom_telegram_id",
+      "test_create_with_email",
+      "test_duplicate_telegram_id_skips_with_warning",
+      "test_duplicate_username_skips_with_warning",
+      "test_dry_run_does_not_create_user",
+      "test_dry_run_shows_details",
+      "test_empty_password_raises_error",
+      "test_empty_password_whitespace_only_raises_error",
+      "test_requires_username_and_password",
+      "test_sets_password_correctly",
+      "test_lock_id_is_create_admin",
+      "test_idempotent_on_rerun"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_migrations.py",
+    "module": "backend.apps.core.tests.test_migrations",
+    "layer": "other",
+    "imports": [
+      "io",
+      "django.core.management"
+    ],
+    "classes": [],
+    "functions": [
+      "test_makemigrations_check",
+      "test_migration_idempotency"
     ]
   },
   {
@@ -883,6 +1024,17 @@
     ]
   },
   {
+    "path": "backend/apps/core/urls.py",
+    "module": "backend.apps.core.urls",
+    "layer": "other",
+    "imports": [
+      "apps.core",
+      "django.urls"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
     "path": "backend/apps/core/utils/__init__.py",
     "module": "backend.apps.core.utils.__init__",
     "layer": "other",
@@ -929,6 +1081,31 @@
     "classes": [],
     "functions": [
       "main"
+    ]
+  },
+  {
+    "path": "backend/apps/core/utils/sanitize.py",
+    "module": "backend.apps.core.utils.sanitize",
+    "layer": "other",
+    "imports": [
+      "typing"
+    ],
+    "classes": [],
+    "functions": [
+      "sanitize_query_for_log"
+    ]
+  },
+  {
+    "path": "backend/apps/core/views.py",
+    "module": "backend.apps.core.views",
+    "layer": "other",
+    "imports": [
+      "django.db",
+      "django.http"
+    ],
+    "classes": [],
+    "functions": [
+      "health_check"
     ]
   },
   {
@@ -1241,9 +1418,14 @@
     "module": "backend.apps.moderation.tests.test_auto_moderation",
     "layer": "other",
     "imports": [
+      "django.core.cache",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
       "apps.moderation.services.auto_moderation",
-      "apps.moderation.services.auto_moderation",
-      "apps.moderation.services.auto_moderation"
+      "apps.users.models"
     ],
     "classes": [
       "TestValidateTitleLength",
@@ -1256,11 +1438,7 @@
       "MockImagesQuerySet",
       "MockAd",
       "TestContainsBannedWords",
-      "TestCheckFunction",
-      "MockAd",
-      "MockQuerySet",
-      "MockAd",
-      "MockQuerySet"
+      "TestCheckFunction"
     ],
     "functions": [
       "test_title_too_short_returns_false",
@@ -1286,14 +1464,68 @@
       "test_banned_word_case_insensitive_returns_true",
       "test_no_banned_words_returns_false",
       "test_empty_banned_words_returns_false",
+      "moderation_criteria",
+      "user",
+      "category",
+      "city",
+      "_setup",
+      "_create_ad",
       "test_check_returns_passed_on_valid_ad",
-      "images",
-      "count",
-      "mock_get_cached",
-      "test_check_returns_seller_safe_error_on_fail",
-      "images",
-      "count",
-      "mock_get_cached"
+      "test_check_returns_seller_safe_error_on_fail"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/tests.py",
+    "module": "backend.apps.moderation.tests",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
+      "apps.users.models",
+      "django.test",
+      "django.utils"
+    ],
+    "classes": [
+      "TestModerationStaffAccess",
+      "TestModerationReviewView",
+      "TestApproveAdView",
+      "TestRejectAdView",
+      "TestBanUserView"
+    ],
+    "functions": [
+      "staff_user",
+      "regular_user",
+      "seller",
+      "category",
+      "city",
+      "_create_ad",
+      "_create_ad_with_image",
+      "ad_on_moderation",
+      "test_anonymous_user_gets_404",
+      "test_regular_user_gets_404",
+      "test_approve_regular_user_gets_404",
+      "test_reject_regular_user_gets_404",
+      "test_ban_regular_user_gets_404",
+      "test_staff_can_view_review_page",
+      "test_review_returns_404_for_non_moderation_status",
+      "test_review_returns_404_for_nonexistent_ad",
+      "test_review_includes_related_objects",
+      "test_approve_transitions_to_published",
+      "test_approve_creates_moderation_log",
+      "test_approve_requires_post",
+      "test_approve_non_moderation_ad_returns_404",
+      "test_reject_transitions_to_rejected",
+      "test_reject_without_reason_text",
+      "test_reject_creates_moderation_log",
+      "test_reject_requires_post",
+      "test_reject_failed_moderation_ad",
+      "test_ban_marks_user_as_banned",
+      "test_ban_creates_moderation_log",
+      "test_ban_requires_post",
+      "test_ban_defaults_reason_when_not_provided"
     ]
   },
   {
@@ -1377,13 +1609,89 @@
       "functools",
       "typing",
       "deep_translator",
-      "requests.exceptions"
+      "requests.exceptions",
+      "apps.core.utils.sanitize"
     ],
-    "classes": [],
+    "classes": [
+      "TranslationCircuitBreaker"
+    ],
     "functions": [
+      "__init__",
+      "is_open",
+      "record_success",
+      "record_failure",
       "translate_query_bs_to_ru",
       "translate_cached",
       "invalidate_translation_cache"
+    ]
+  },
+  {
+    "path": "backend/apps/search/tests/__init__.py",
+    "module": "backend.apps.search.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/tests/test_query_translator.py",
+    "module": "backend.apps.search.tests.test_query_translator",
+    "layer": "other",
+    "imports": [
+      "unittest.mock",
+      "requests.exceptions",
+      "apps.search.services.query_translator"
+    ],
+    "classes": [
+      "TestTranslateQueryBsToRuSuccess",
+      "TestTranslateQueryBsToRuFallback",
+      "TestTranslateQueryBsToRuShortCircuit"
+    ],
+    "functions": [
+      "_reset_translation_state",
+      "test_returns_translated_text",
+      "test_timeout_returns_original_query",
+      "test_request_exception_returns_original_query",
+      "test_generic_exception_returns_original_query",
+      "test_empty_query_returns_empty",
+      "test_whitespace_only_returns_whitespace"
+    ]
+  },
+  {
+    "path": "backend/apps/search/tests.py",
+    "module": "backend.apps.search.tests",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models",
+      "django.test",
+      "django.utils"
+    ],
+    "classes": [
+      "TestSearchViewPublishesFilter",
+      "TestSearchViewDescendantCategories",
+      "TestSearchViewPagination"
+    ],
+    "functions": [
+      "seller",
+      "root_category",
+      "child_category",
+      "grandchild_category",
+      "other_category",
+      "city",
+      "_create_ad",
+      "test_search_without_query_returns_only_published",
+      "test_search_with_query_returns_only_published",
+      "test_empty_search_returns_all_published",
+      "test_category_match_expands_to_descendants",
+      "test_single_word_category_match_rejects_non_published_descendants",
+      "test_first_page_returns_24_ads",
+      "test_second_page_returns_remaining_ads",
+      "test_page_out_of_range_returns_last_page",
+      "test_invalid_page_returns_first_page"
     ]
   },
   {
@@ -1418,6 +1726,8 @@
       "django.contrib.postgres.search",
       "django.http",
       "django.shortcuts",
+      "django.core.paginator",
+      "apps.core.utils.sanitize",
       "difflib"
     ],
     "classes": [],
@@ -1441,7 +1751,8 @@
     "layer": "other",
     "imports": [
       "apps.users.models",
-      "django.contrib"
+      "django.contrib",
+      "apps.users.services"
     ],
     "classes": [
       "UserAdmin",
@@ -1452,6 +1763,7 @@
       "has_change_permission",
       "has_delete_permission",
       "has_view_permission",
+      "withdraw_consent_action",
       "has_add_permission",
       "has_change_permission",
       "has_delete_permission"
@@ -1472,6 +1784,18 @@
   {
     "path": "backend/apps/users/migrations/0001_initial.py",
     "module": "backend.apps.users.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/migrations/0002_user_chat_id.py",
+    "module": "backend.apps.users.migrations.0002_user_chat_id",
     "layer": "other",
     "imports": [
       "django.db"
@@ -1542,10 +1866,11 @@
     "module": "backend.apps.users.services.deletion",
     "layer": "service",
     "imports": [
-      "datetime",
       "apps.ads.models",
       "apps.core.enums",
-      "apps.users.models"
+      "apps.users.models",
+      "django.utils",
+      "telegram_bot.services.media"
     ],
     "classes": [],
     "functions": [
@@ -1564,6 +1889,89 @@
     "functions": []
   },
   {
+    "path": "backend/apps/users/tests/test_account_state.py",
+    "module": "backend.apps.users.tests.test_account_state",
+    "layer": "other",
+    "imports": [
+      "apps.users.models",
+      "apps.users.services",
+      "django.utils"
+    ],
+    "classes": [
+      "TestGetAccountState",
+      "TestCanPublishAd",
+      "TestCanLogin",
+      "TestGetStateBadge"
+    ],
+    "functions": [
+      "user",
+      "_make_user",
+      "test_default_state",
+      "test_banned_user",
+      "test_deleted_user",
+      "test_declined_user",
+      "test_restricted_user",
+      "test_consent_revoked",
+      "test_normal_user_can_publish",
+      "test_banned_user_cannot_publish",
+      "test_banned_and_restricted_cannot_publish",
+      "test_banned_and_deleted_cannot_publish",
+      "test_deleted_user_cannot_publish",
+      "test_deleted_and_restricted_cannot_publish",
+      "test_restricted_user_cannot_publish",
+      "test_declined_user_can_publish",
+      "test_all_flags_cannot_publish",
+      "test_normal_user_can_login",
+      "test_banned_user_cannot_login",
+      "test_declined_user_cannot_login",
+      "test_banned_and_declined_cannot_login",
+      "test_deleted_user_can_login_by_flag",
+      "test_restricted_user_can_login",
+      "test_normal_user_empty_badge",
+      "test_banned_badge",
+      "test_deleted_badge",
+      "test_declined_badge",
+      "test_restricted_badge",
+      "test_all_flags_combined_badge",
+      "test_no_badge_for_default_user"
+    ]
+  },
+  {
+    "path": "backend/apps/users/tests/test_consent.py",
+    "module": "backend.apps.users.tests.test_consent",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models",
+      "django.test",
+      "django.utils"
+    ],
+    "classes": [
+      "TestConsentAcceptView",
+      "TestConsentDeclineView",
+      "TestConsentWithdrawView"
+    ],
+    "functions": [
+      "user",
+      "category",
+      "city",
+      "_create_ad",
+      "test_accept_requires_authentication",
+      "test_accept_sets_consent_given_at",
+      "test_accept_sets_consent_cookie",
+      "test_decline_requires_authentication",
+      "test_decline_sets_ads_auto_publish_false",
+      "test_decline_sets_declined_cookie",
+      "test_withdraw_requires_authentication",
+      "test_withdraw_triggers_user_soft_delete",
+      "test_withdraw_soft_deletes_ads",
+      "test_withdraw_sets_withdrawn_cookie"
+    ]
+  },
+  {
     "path": "backend/apps/users/tests/test_deletion.py",
     "module": "backend.apps.users.tests.test_deletion",
     "layer": "other",
@@ -1573,13 +1981,14 @@
       "django.utils",
       "apps.ads.models",
       "apps.categories.models",
-      "apps.locations.models",
-      "apps.core.enums"
+      "apps.core.enums",
+      "apps.locations.models"
     ],
     "classes": [
       "TestWithdrawConsentInvalidatesTokens",
       "TestDeclineConsentDoesNotInvalideTokens",
-      "TestWithdrawConsentSoftDeletesAds"
+      "TestWithdrawConsentSoftDeletesAds",
+      "TestGiveConsent"
     ],
     "functions": [
       "user",
@@ -1587,7 +1996,9 @@
       "test_withdraw_prevents_second_claim",
       "claim_token",
       "test_decline_preserves_login_tokens",
-      "test_withdraw_soft_deletes_user_ads"
+      "test_withdraw_soft_deletes_user_ads",
+      "test_give_consent_sets_timestamp",
+      "test_give_consent_does_not_alter_other_flags"
     ]
   },
   {
@@ -1614,16 +2025,24 @@
     "module": "backend.apps.users.views.consent",
     "layer": "other",
     "imports": [
-      "apps.users.services",
+      "datetime",
+      "django.conf",
+      "django.contrib.auth",
       "django.contrib.auth.decorators",
       "django.http",
-      "django.shortcuts"
+      "django.shortcuts",
+      "django.utils",
+      "apps.users.models",
+      "apps.users.services"
     ],
     "classes": [],
     "functions": [
       "consent_accept",
       "consent_decline",
-      "is_consent_given"
+      "consent_withdraw",
+      "is_consent_given",
+      "login_issue",
+      "login_status"
     ]
   },
   {
@@ -1776,13 +2195,10 @@
       "aiogram.fsm.context",
       "aiogram.fsm.state",
       "django.conf",
-      "django.utils",
       "apps.ads.models",
-      "apps.analytics.models",
       "apps.categories.models",
       "apps.core.enums",
       "apps.locations.models",
-      "apps.moderation.models",
       "telegram_bot.schemas.message_payloads",
       "telegram_bot.services.media",
       "telegram_bot.states",
@@ -1794,7 +2210,8 @@
       "asgiref.sync",
       "asgiref.sync",
       "deep_translator",
-      "asgiref.sync"
+      "asgiref.sync",
+      "apps.moderation.services.auto_moderation"
     ],
     "classes": [
       "AdCreateForm"
@@ -1822,11 +2239,14 @@
       "_get",
       "download_photo",
       "save_photo",
+      "_write",
       "get_category",
       "_get",
       "get_city",
       "_get",
+      "_do_translate",
       "translate_to_russian",
+      "translate_one",
       "update_ad_and_moderate",
       "_update_and_moderate"
     ]
@@ -1838,21 +2258,14 @@
     "imports": [
       "aiogram",
       "asgiref.sync",
-      "apps.ads.models",
-      "apps.core.enums",
-      "apps.analytics.models",
-      "apps.core.enums",
-      "apps.users.models"
+      "apps.core.services.contact"
     ],
     "classes": [],
     "functions": [
       "handle_contact_start",
       "handle_contact",
-      "check_seller_available",
-      "_check",
-      "record_contact_event",
-      "_record",
-      "_get_buyer_display_name"
+      "handle_contact_orm",
+      "_handle"
     ]
   },
   {
@@ -1868,15 +2281,14 @@
       "apps.users.models",
       "apps.analytics.models",
       "apps.core.enums",
+      "django.db",
       "telegram_bot.handlers.contact"
     ],
     "classes": [],
     "functions": [
       "handle_login_deep_link",
-      "claim_login_token",
-      "_claim",
-      "get_or_create_user",
-      "_get_or_create"
+      "handle_login_orm",
+      "_handle"
     ]
   },
   {
@@ -1887,6 +2299,7 @@
       "aiogram",
       "aiogram.fsm.storage.memory",
       "telegram_bot.middlewares",
+      "django.conf",
       "telegram_bot.handlers"
     ],
     "classes": [],
@@ -1966,13 +2379,16 @@
     "module": "telegram_bot.services.media",
     "layer": "service",
     "imports": [
-      "PIL"
+      "PIL",
+      "django.conf"
     ],
     "classes": [],
     "functions": [
       "validate_jpeg_bytes",
       "validate_photo",
-      "generate_storage_key"
+      "generate_storage_key",
+      "delete_photo",
+      "strip_photo_exif"
     ]
   },
   {
@@ -1986,6 +2402,209 @@
       "AdCreateState"
     ],
     "functions": []
+  },
+  {
+    "path": "telegram_bot/tests/__init__.py",
+    "module": "telegram_bot.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "telegram_bot/tests/conftest.py",
+    "module": "telegram_bot.tests.conftest",
+    "layer": "other",
+    "imports": [
+      "collections.abc",
+      "typing",
+      "aiogram",
+      "aiogram.fsm.storage.memory",
+      "django.conf",
+      "django.utils",
+      "telegram_bot.handlers",
+      "telegram_bot.middlewares",
+      "apps.users.models",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "bot",
+      "dp",
+      "user",
+      "login_token_factory",
+      "_create"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_ad_lifecycle.py",
+    "module": "telegram_bot.tests.test_ad_lifecycle",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.services.auto_moderation",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models",
+      "apps.analytics.models",
+      "apps.moderation.models"
+    ],
+    "classes": [
+      "TestDraftCreation",
+      "TestDraftToPublished",
+      "TestDraftToModerationFailed",
+      "TestOriginalPublishedAtImmutability",
+      "TestPublishedAtUpdates",
+      "TestTransitionValidation",
+      "TestAutoModerateIntegration"
+    ],
+    "functions": [
+      "seller",
+      "category",
+      "city",
+      "permissive_criteria",
+      "banning_criteria",
+      "_make_draft_ad",
+      "_transition_to_moderation",
+      "_publish_ad",
+      "test_create_draft_sets_initial_status",
+      "test_create_draft_has_no_publish_timestamps",
+      "test_auto_moderate_publishes_valid_ad",
+      "test_auto_moderate_sets_published_at",
+      "test_auto_moderate_sets_original_published_at_first_publish",
+      "test_auto_moderate_fails_banned_word",
+      "test_auto_moderate_fail_sets_moderation_failed_at",
+      "test_auto_moderate_fail_does_not_set_publish_timestamps",
+      "test_original_published_at_immutable_on_re_publish",
+      "test_original_published_at_immutable_on_second_moderation_cycle",
+      "test_published_at_updates_on_re_publish",
+      "test_invalid_transition_raises_error",
+      "test_terminal_state_blocks_transition",
+      "test_valid_draft_to_on_moderation_succeeds",
+      "test_auto_moderate_with_images_passes",
+      "test_auto_moderate_creates_analytics_event",
+      "test_auto_moderate_fail_creates_moderation_log"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_claim_login_token.py",
+    "module": "telegram_bot.tests.test_claim_login_token",
+    "layer": "other",
+    "imports": [
+      "collections.abc",
+      "typing",
+      "asgiref.sync",
+      "django.utils",
+      "telegram_bot.handlers.login",
+      "telegram_bot.handlers.login",
+      "telegram_bot.handlers.login",
+      "apps.users.models",
+      "telegram_bot.handlers.login",
+      "apps.users.models",
+      "telegram_bot.handlers.login",
+      "telegram_bot.handlers.login",
+      "apps.users.models",
+      "telegram_bot.handlers.login"
+    ],
+    "classes": [
+      "TestClaimLoginToken"
+    ],
+    "functions": [
+      "test_claim_valid_token",
+      "test_claim_sets_telegram_id_on_token",
+      "test_reject_expired_token",
+      "test_reject_already_claimed_token",
+      "test_creates_user_on_first_claim",
+      "test_returns_existing_user_on_second_login",
+      "test_invalid_token_hash_returns_none"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_create_draft_ad.py",
+    "module": "telegram_bot.tests.test_create_draft_ad",
+    "layer": "other",
+    "imports": [
+      "asgiref.sync",
+      "apps.core.enums",
+      "telegram_bot.handlers.ad_create",
+      "telegram_bot.handlers.ad_create",
+      "apps.ads.models",
+      "telegram_bot.handlers.ad_create",
+      "apps.ads.models",
+      "telegram_bot.handlers.ad_create",
+      "telegram_bot.handlers.ad_create"
+    ],
+    "classes": [
+      "TestCreateDraftAd"
+    ],
+    "functions": [
+      "test_creates_draft_ad",
+      "test_draft_persisted_in_database",
+      "test_delete_draft_removes_ad",
+      "test_delete_draft_missing_succeeds",
+      "test_draft_default_status"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_login_claim.py",
+    "module": "telegram_bot.tests.test_login_claim",
+    "layer": "other",
+    "imports": [
+      "apps.users.models",
+      "django.utils",
+      "telegram_bot.handlers.login"
+    ],
+    "classes": [
+      "TestClaimLoginToken"
+    ],
+    "functions": [
+      "telegram_id",
+      "token_hash",
+      "future_token",
+      "expired_token",
+      "claimed_token",
+      "consumed_token",
+      "test_fresh_unclaimed_token",
+      "test_reclaim_blocked",
+      "test_expired_token_rejected",
+      "test_claimed_token_rejected",
+      "test_consumed_token_rejected"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_media.py",
+    "module": "telegram_bot.tests.test_media",
+    "layer": "other",
+    "imports": [
+      "PIL",
+      "telegram_bot.services.media"
+    ],
+    "classes": [
+      "TestValidateJpegBytes",
+      "TestValidatePhoto",
+      "TestGenerateStorageKey"
+    ],
+    "functions": [
+      "valid_jpeg_bytes",
+      "test_valid_jpeg",
+      "test_invalid_format",
+      "test_png_bytes",
+      "test_gif_bytes",
+      "test_empty_bytes",
+      "test_short_bytes",
+      "test_valid_photo",
+      "test_oversize_file",
+      "test_non_jpeg_format",
+      "test_oversize_width",
+      "test_oversize_height",
+      "test_custom_max_dimensions",
+      "test_corrupt_image_data",
+      "test_ends_with_dot_jpg",
+      "test_uuid_v4_format",
+      "test_unique_keys",
+      "test_no_pii_in_key"
+    ]
   },
   {
     "path": "theme/__init__.py",
