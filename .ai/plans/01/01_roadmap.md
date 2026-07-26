@@ -60,6 +60,7 @@ Enhanced seller experience with view/contribution metrics.
 - Update dashboard.html template with stats card
 
 **Research:** `.ai/plans/seller-dashboard-stats/research.md`
+**Plan:** `.ai/plans/02/Seller Dashboard Statistics/plan.md`
 
 ---
 
@@ -75,6 +76,7 @@ Performance optimization for image loading.
 - Update templates to use thumbnails with fallback
 
 **Research:** `.ai/plans/photo-thumbnails/research.md`
+**Plan:** `.ai/plans/02/Photo Thumbnail Generation/plan.md`
 
 ---
 
@@ -92,6 +94,7 @@ Improved search UX with suggestions.
 - Add autocomplete dropdown to search template
 
 **Research:** `.ai/plans/search-autocomplete/research.md`
+**Plan:** `.ai/plans/search-autocomplete/plan.md`
 
 ---
 
@@ -107,6 +110,7 @@ User engagement via email notifications.
 - Save search modal template for web UI
 
 **Dependencies:** Block 2 (thumbnail generation for alert formatting)
+**Plan:** `.ai/plans/saved-search-alerts-plan.yaml`
 
 ---
 
@@ -124,6 +128,8 @@ Seller reputation and verification indicators.
 - Integration into ad cards and detail pages
 
 **Dependencies:** Block 1 (trust analytics build on stats)
+**Research:** `.ai/plans/trust-signals/research.md`
+**Plan:** `.ai/plans/trust-signals/plan.md`
 
 ---
 
@@ -139,6 +145,8 @@ Admin efficiency and automation.
 - Moderator action logging enhancements
 
 **Dependencies:** Block 5 (priority includes trust level factor)
+**Research:** `.ai/plans/moderation-tooling/research.md`
+**Plan:** `.ai/plans/moderation-tooling/plan.md`
 
 ---
 

@@ -150,15 +150,15 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     try:
         ad_image = AdImage.objects.select_related("ad").get(image=lookup_key)
     except AdImage.DoesNotExist:
-        raise Http404("Image not found")
+        raise Http404("Image not found") from None
 
-    # Staff bypass
+    # Allow staff users (moderators/admins) to view any image
     if request.user.is_staff:
         response = HttpResponse()
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
         return response
 
-    # Non-staff: only PUBLISHED ads
+    # Non-staff users: only serve images for PUBLISHED ads
     if ad_image.ad.status != AdStatus.PUBLISHED:
         return HttpResponseForbidden("Access denied")
 
@@ -182,10 +182,10 @@ Current flow in `src/telegram_bot/handlers/ad_create.py:442`:
 
 ```python
 async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
-    def _write(path, data):
+    def _write(path: str, data: bytes) -> None:
         cleaned = strip_photo_exif(data)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        fd = os.open(path, O_CREAT | O_EXCL | O_WRONLY)
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         try:
             os.write(fd, cleaned)
         finally:
@@ -208,7 +208,7 @@ async def save_photo_with_thumbnails(storage_key: str, photo_bytes: bytes) -> tu
         # Write original
         orig_path = os.path.join(settings.MEDIA_ROOT, orig_key)
         os.makedirs(os.path.dirname(orig_path), exist_ok=True)
-        fd = os.open(orig_path, O_CREAT | O_EXCL | O_WRONLY)
+        fd = os.open(orig_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         try:
             os.write(fd, cleaned)
         finally:
@@ -448,7 +448,7 @@ Phase 5: Templates
 The plan's YAML specifies a clean rollback path:
 
 1. **Templates** — revert T5.1 and T5.2 changes; templates fall back to `image_url`
-2. **Database** — thumbnail fields are `null=True`; no data loss on rollback
+2. **Database** — thumbnail fields are nullable; no data loss on rollback
 3. **Files** — original images are never modified; delete `thumbnails/` directory
 4. **Media app** — remove `apps.media` from INSTALLED_APPS
 

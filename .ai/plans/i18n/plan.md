@@ -53,7 +53,9 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 **Target:** `src/backend/apps/ads/migrations/0005_multi_lang_search_vector.py`
 
 **Changes:**
-- Modify `ads_search_vector_fn()` to include all language variants:
+- Modify `ads_search_vector_fn()` to include all language variants using `RunSQL` operation that REPLACES the existing function
+- Handle case where function already exists
+- New search_vector configuration includes all six language columns:
   ```sql
   NEW.search_vector :=
     setweight(to_tsvector('russian', coalesce(NEW.title_ru,'')), 'A') ||
@@ -69,25 +71,27 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 
 ---
 
-### Task 1.5: Language Middleware
+### Task 1.5: Language Pre-Processing Middleware
 **Target:** `src/backend/apps/core/middleware/language.py` (new file)
 
 **Changes:**
-- Create `LanguageMiddleware` class extending `MiddlewareMixin`
+- Create `LanguagePreMiddleware` that runs BEFORE Django's `LocaleMiddleware`
 - Priority order: `?lang=X` > cookie > `Accept-Language` header > default to `ru`
-- Set `request.LANGUAGE_CODE` on each request
-- Set language in session for authenticated users (no GET override)
+- On `?lang=X`: set `request.session[LANGUAGE_SESSION_KEY]` and `lang_pref` cookie
+- Django's `LocaleMiddleware` then reads session/cookie to set `request.LANGUAGE_CODE`
 - Cookie: `lang_pref`, max age 1 year
+- Session language for authenticated users (no GET override)
 
 **Dependencies:** Task 1.1
 
 ---
 
-### Task 1.6: Add Middleware to Django Settings
+### Task 1.6: Add LanguagePreMiddleware to Django Settings
 **Target:** `src/backend/config/settings/base.py`
 
 **Changes:**
-- Add `apps.core.middleware.language.LanguageMiddleware` to `MIDDLEWARE` list (after SessionMiddleware)
+- Add `apps.core.middleware.language.LanguagePreMiddleware` to `MIDDLEWARE` list (before `django.middleware.locale.LocaleMiddleware`)
+- Ensure `django.middleware.locale.LocaleMiddleware` is present in the list (after `SessionMiddleware`)
 
 **Dependencies:** Task 1.5
 
@@ -108,11 +112,12 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 **Target:** `src/telegram_bot/handlers/ad_create.py` (translation functions)
 
 **Changes:**
-- Replace `translate_to_russian()` with `translate_all_languages(text: str, target_locales: list[str]) -> dict[str, str]`
+- Refactor `translate_to_russian()` but keep it available for backward compatibility
+- Add `translate_all_languages(text: str, target_locales: list[str]) -> dict[str, str]` function
 - Detect source language using `source="auto"`
-- Translate to all active site languages in parallel (using asyncio.gather)
+- Translate to all active site languages (`ru`, `bs`, `en`) in parallel (using asyncio.gather)
 - Store original language in `original_language` field
-- Update `update_ad_and_moderate()` to handle multi-language content
+- Update `update_ad_and_moderate()` to handle multi-language content (Russian as base)
 
 **Dependencies:** Task 1.1, Task 1.2, Task 1.3
 
@@ -137,8 +142,8 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 **Changes:**
 - Set `LANGUAGE_CODE = "ru"` (default)
 - Set `USE_I18N = True`
-- Set `USE_L10N = True`
-- Define `LANGUAGES` list with supported languages
+- Define `LANGUAGES` list with supported languages (`("ru", "Russian"), ("bs", "Bosnian"), ("en", "English")`)
+- Add `LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]`
 
 **Dependencies:** Task 1.1
 
@@ -215,8 +220,10 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 **Target:** `src/backend/apps/categories/models.py`, `src/backend/apps/locations/models.py`
 
 **Changes:**
-- Update `name_i18n` help_text to include English
-- Ensure `get_name()` handles all three locales
+- Update `name_i18n` help_text to include English:
+  - `help_text="i18n names: {'ru': <str>, 'bs': <str>, 'en': <str>}; NULL falls back to name"`
+- Ensure `get_name()` handles all three locales (ru, bs, en)
+- Update existing `name_i18n` entries for Categories and Cities where needed
 
 **Dependencies:** Task 1.1
 
@@ -228,10 +235,10 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 **Target:** `src/backend/apps/search/services/query_translator.py`
 
 **Changes:**
-- Rename `translate_query_bs_to_ru()` to support multi-language:
-  - `translate_query(text: str, source_locale: str, target_locale: str) -> str`
+- Keep existing `translate_query_bs_to_ru()` function signature unchanged (for backward compatibility)
+- Add new `translate_query()` function with signature: `translate_query(text: str, source_locale: str, target_locale: str) -> str`
 - Add language detection for queries (extend beyond Bosnian)
-- Maintain backward compatibility with existing `translate_query_bs_to_ru()`
+- Update existing search functionality to use new `translate_query()` for target language (Russian)
 
 **Dependencies:** Task 1.1
 
@@ -242,8 +249,8 @@ Multi-language support for ads (Russian, Bosnian, English) with separate column 
 
 **Changes:**
 - Detect query language or use `request.LANGUAGE_CODE`
-- Translate query to target search language
-- Use appropriate search_vector with matching FTS config
+- Translate query to target search language using new `translate_query()` 
+- Use appropriate search_vector with matching FTS config for query language
 - For cross-language search (optional): search all language vectors
 
 **Dependencies:** Task 1.7, Task 3.1
@@ -307,20 +314,23 @@ Phase 4:
 | Performance impact of multi-language search | Single combined GIN index; weights balance relevance |
 | Data migration for existing ads | Backfill via Google Translate API with batch processing |
 | Cookie size limits | Single `lang_pref` cookie (5 chars), negligible impact |
+| LanguageMiddleware + custom middleware priority | Test with multiple scenarios to ensure ?lang=X takes precedence |
 
 ---
 
 ## Verification Checklist
 
 - [ ] `LanguageLocale` enum properly defined with fts_config property
-- [ ] DB migration adds columns without data loss
+- [ ] DB migration adds i18n columns without data loss
 - [ ] Ad model getters return correct fallbacks
-- [ ] Search vector trigger includes all languages
-- [ ] Language middleware sets `request.LANGUAGE_CODE` correctly
+- [ ] Search vector trigger replaced and includes all languages
+- [ ] LanguagePreMiddleware sets cookie/session before LocaleMiddleware runs
+- [ ] LangaugeMiddleware added to Django settings (before LocaleMiddleware)
 - [ ] Context processor exposes language to templates
 - [ ] Bot translates to all languages on ad creation
 - [ ] Language switcher UI sets cookie and navigates correctly
 - [ ] Templates display localized content
 - [ ] gettext files created for all three languages
 - [ ] Search translates and uses correct FTS config
+- [ ] Category/City name_i18n updated to include English
 - [ ] Existing ads backfilled with English/Bosnian translations
