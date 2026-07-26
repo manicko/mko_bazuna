@@ -98,6 +98,11 @@ COPY --from=builder /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
 
+# Copy source code (Django apps, config, telegram_bot)
+COPY --from=builder --chown=app:app /app/src /app/src
+# Copy collected static files
+COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
+
 # Copy entrypoint scripts
 COPY --chown=app:app docker/entrypoint*.sh /app/
 RUN chmod +x /app/entrypoint*.sh

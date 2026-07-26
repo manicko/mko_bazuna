@@ -24,6 +24,11 @@ def main() -> None:
     # missing/invalid token raises ImproperlyConfigured at django.setup().
     token = settings.BOT_TOKEN
 
+    # Skip bot startup if token is empty/missing (development mode)
+    if not token:
+        logger.warning("BOT_TOKEN not set - skipping bot startup (development mode)")
+        return
+
     # Storage: MemoryStorage (FSM state in memory, Ad.DRAFT in ORM)
     # NOTE: MemoryStorage is ephemeral — FSM state is cleared on bot restart.
     # There is no cross-process broadcast: if the bot is restarted while a user
