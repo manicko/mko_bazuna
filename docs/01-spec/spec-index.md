@@ -16,6 +16,7 @@ related:
   - architecture-structure
   - packages-list
   - user-stories-index
+  - design-system
 ---
 
 # Mko Bazuna — Technical Specification (Agent Summary)
@@ -121,6 +122,18 @@ Filter patterns documented in [`filter-ui.md`](filter-ui.md):
 - **Location-Based Filtering:** Closed Montenegro city list
 - **Price Range Filter:** Min/max input fields
 
+## Design System
+
+Component catalog documented in [`design-system.md`](design-system.md):
+
+- **Atomic Design:** Atoms (buttons, inputs), Molecules (search bar, price display), Organisms (ad cards, headers)
+- **Button Variants:** Primary, secondary, disabled, danger, icon with accessibility states
+- **Card Patterns:** Ad card, dashboard card, image placeholder patterns
+- **Form Elements:** Input, textarea, select with error states and validation
+- **Navigation:** Header with breadcrumbs, pagination controls, mobile drawer
+- **Status Indicators:** Badges for ad status, trust signals, loading states
+- **Layout:** Responsive grid system, spacing scale based on 8px grid
+
 ## User stories
 
 Full acceptance behavior per role: [index](../04-user-stories/index.md) —
@@ -136,7 +149,7 @@ docs by zone ID.
 
 ## Deferred to post-MVP
 
-DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping, EAV attributes, tags, multi-currency.
+DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping, multi-currency.
 
 ## Commands
 

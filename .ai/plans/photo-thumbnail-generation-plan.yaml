@@ -1,0 +1,337 @@
+# Photo Thumbnail Generation - Implementation Plan
+# Generated: 2026-07-26
+# Phase 2 Plan 1 Execution DAG
+
+tasks:
+  # ===========================================
+  # Phase 1: Schema & Constants (No DB write risk until migration)
+  # ===========================================
+
+  - task_id: "T1.1-create-thumbnail-size-enum"
+    priority: high
+    risk_level: low
+    description: |
+      Create ThumbnailSize StrEnum in apps.core.enums with three variants:
+      - SMALL: 240x180 pixels
+      - MEDIUM: 640x480 pixels
+      - LARGE: 1280x960 pixels
+    semantic_anchor: "apps.core.enums.ThumbnailSize"
+    dependencies: []
+    files:
+      - path: "src/backend/apps/core/enums.py"
+        action: "add_enum"
+        target_symbol: "ThumbnailSize"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/core/enums.py"
+      - command: "uv run ruff check src/backend/apps/core/enums.py"
+
+  - task_id: "T1.2-migration-adimage-thumbnails"
+    priority: high
+    risk_level: medium
+    description: |
+      Create migration to add thumbnail_small, thumbnail_medium, thumbnail_large
+      fields to AdImage model. All fields are nullable CharField(max_length=64)
+      to allow safe rollback.
+    semantic_anchor: "apps.ads.migrations.0004_adimage_thumbnails"
+    dependencies: ["T1.1-create-thumbnail-size-enum"]
+    files:
+      - path: "src/backend/apps/ads/migrations/0004_adimage_thumbnails.py"
+        action: "create"
+        parent_target: "Migration"
+    verification:
+      - command: "uv run python src/backend/manage.py makemigrations --check --dry-run apps.ads"
+
+  # ===========================================
+  # Phase 2: Service Layer (Isolated media app)
+  # ===========================================
+
+  - task_id: "T2.1-create-media-app-structure"
+    priority: medium
+    risk_level: low
+    description: |
+      Create apps/media module structure with:
+      - apps/media/__init__.py
+      - apps/media/apps.py
+      - apps/media/services/__init__.py
+      """
+    semantic_anchor: "apps.media"
+    dependencies: ["T1.2-migration-adimage-thumbnails"]
+    files:
+      - path: "src/backend/apps/media/__init__.py"
+        action: "create"
+      - path: "src/backend/apps/media/apps.py"
+        action: "create"
+      - path: "src/backend/apps/media/services/__init__.py"
+        action: "create"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/media/"
+
+  - task_id: "T2.2-implement-thumbnail-service"
+    priority: high
+    risk_level: low
+    description: |
+      Implement ThumbnailService.generate_thumbnails() method:
+      - Accepts original jpeg bytes and storage key
+      - Generates three thumbnail sizes using LANCZOS resampling
+      - Maintains aspect ratio via thumbnail() method
+      - Uses exif_transpose for orientation correction
+      - Returns dict mapping ThumbnailSize to generated storage keys
+    semantic_anchor: "apps.media.services.thumbnails.ThumbnailService.generate_thumbnails"
+    dependencies: ["T2.1-create-media-app-structure"]
+    files:
+      - path: "src/backend/apps/media/services/thumbnails.py"
+        action: "create"
+        parent_target: "ThumbnailService"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/media/services/thumbnails.py"
+      - command: "uv run ruff check src/backend/apps/media/services/thumbnails.py"
+
+  - task_id: "T2.3-unit-tests-thumbnails"
+    priority: medium
+    risk_level: low
+    description: |
+      Unit tests for ThumbnailService:
+      - Test valid image generates all three variants
+      - Test aspect ratio preservation with cropping
+      - Test EXIF orientation handling
+      - Test invalid bytes raise ValidationError
+      - Test storage key naming follows <uuid>-<size>.jpg pattern
+    semantic_anchor: "apps.media.tests.test_thumbnails"
+    dependencies: ["T2.2-implement-thumbnail-service"]
+    files:
+      - path: "src/backend/apps/media/tests/__init__.py"
+        action: "create"
+      - path: "src/backend/apps/media/tests/test_thumbnails.py"
+        action: "create"
+    verification:
+      - command: "uv run pytest src/backend/apps/media/tests/test_thumbnails.py -v"
+
+  # ===========================================
+  # Phase 3: Model & Integration
+  # ===========================================
+
+  - task_id: "T3.1-update-adimage-model"
+    priority: high
+    risk_level: low
+    description: |
+      Add thumbnail URL properties to AdImage model:
+      - thumbnail_small_url: Returns MEDIA_URL + thumbnail_small if set
+      - thumbnail_medium_url: Returns MEDIA_URL + thumbnail_medium if set
+      - thumbnail_large_url: Returns MEDIA_URL + thumbnail_large if set
+    semantic_anchor: "apps.ads.models.AdImage.thumbnail_*_url"
+    dependencies: ["T2.1-create-media-app-structure"]
+    files:
+      - path: "src/backend/apps/ads/models.py"
+        action: "add_method"
+        target_symbol: "AdImage"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/ads/models.py"
+
+  - task_id: "T3.2-integrate-save-photo"
+    priority: high
+    risk_level: medium
+    description: |
+      Modify save_photo() in telegram_bot/handlers/ad_create.py to:
+      - Call generate_thumbnails() after original save
+      - Handle thumbnail generation failures gracefully (log warning, don't fail ad)
+      - Store thumbnail keys in AdImage creation
+      - Update update_ad_and_moderate() to pass thumbnail keys
+    semantic_anchor: "telegram_bot.handlers.ad_create.save_photo"
+    dependencies: ["T2.2-implement-thumbnail-service", "T3.1-update-adimage-model"]
+    files:
+      - path: "src/telegram_bot/handlers/ad_create.py"
+        action: "modify_function"
+        target_symbol: "save_photo"
+      - path: "src/telegram_bot/handlers/ad_create.py"
+        action: "modify_function"
+        target_symbol: "update_ad_and_moderate"
+    verification:
+      - command: "uv run basedpyright src/telegram_bot/handlers/ad_create.py"
+      - command: "uv run ruff check src/telegram_bot/handlers/ad_create.py"
+
+  - task_id: "T3.3-update-adiamge-model-fields"
+    priority: high
+    risk_level: low
+    description: |
+      Add thumbnail_small, thumbnail_medium, thumbnail_large fields to
+      AdImage model in models.py to match migration.
+    semantic_anchor: "apps.ads.models.AdImage"
+    dependencies: ["T1.2-migration-adimage-thumbnails"]
+    files:
+      - path: "src/backend/apps/ads/models.py"
+        action: "add_field"
+        target_symbol: "AdImage"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/ads/models.py"
+
+  # ===========================================
+  # Phase 4: Backfill (Deployment-time task)
+  # ===========================================
+
+  - task_id: "T4.1-backfill-thumbnails-command"
+    priority: medium
+    risk_level: medium
+    description: |
+      Create Django management command to generate thumbnails for
+      existing AdImage records:
+      - Iterate all AdImage where thumbnail_small is null
+      - Skip images missing from filesystem
+      - Log progress with count statistics
+      - Call ThumbnailService.generate_thumbnails()
+      - Update AdImage records with thumbnail keys
+    semantic_anchor: "apps.media.management.commands.backfill_thumbnails"
+    dependencies: ["T2.2-implement-thumbnail-service", "T3.3-update-adiamge-model-fields"]
+    files:
+      - path: "src/backend/apps/media/management/__init__.py"
+        action: "create"
+      - path: "src/backend/apps/media/management/commands/__init__.py"
+        action: "create"
+      - path: "src/backend/apps/media/management/commands/backfill_thumbnails.py"
+        action: "create"
+    verification:
+      - command: "uv run basedpyright src/backend/apps/media/management/commands/backfill_thumbnails.py"
+
+  # ===========================================
+  # Phase 5: Templates (Frontend consumption)
+  # ===========================================
+
+  - task_id: "T5.1-update-ad-list-template"
+    priority: medium
+    risk_level: low
+    description: |
+      Update templates/ads/partials/ad_list.html to use thumbnail_small_url
+      with fallback to original image_url for backward compatibility.
+      Change line 28: {{ ad.images.first.image_url }} to use thumbnail variant.
+    semantic_anchor: "templates.ads.partials.ad_list"
+    dependencies: ["T3.1-update-adimage-model"]
+    files:
+      - path: "src/backend/templates/ads/partials/ad_list.html"
+        action: "replace_in_body"
+    verification:
+      - command: "uv run pytest --collect-only  # Verify template renders"
+
+  - task_id: "T5.2-update-detail-template"
+    priority: medium
+    risk_level: low
+    description: |
+      Update templates/ads/detail.html to use thumbnail_medium_url
+      for the detail page gallery images with fallback to original.
+      Change line 31: {{ image.image_url }} to use thumbnail variant.
+    semantic_anchor: "templates.ads.detail"
+    dependencies: ["T3.1-update-adimage-model"]
+    files:
+      - path: "src/backend/templates/ads/detail.html"
+        action: "replace_in_body"
+    verification:
+      - command: "uv run pytest --collect-only  # Verify template renders"
+
+  - task_id: "T5.3-register-media-app"
+    priority: high
+    risk_level: low
+    description: |
+      Register apps.media in INSTALLED_APPS in settings/base.py
+      Required for management command discovery and model imports.
+    semantic_anchor: "apps.core.config.INSTALLED_APPS"
+    dependencies: ["T2.1-create-media-app-structure"]
+    files:
+      - path: "src/backend/config/settings/base.py"
+        action: "add_import_name"
+    verification:
+      - command: "uv run python -c 'from django.conf import settings; print(\"apps.media\" in settings.INSTALLED_APPS)'"
+
+# ===========================================
+# Execution DAG (Directed Acyclic Graph)
+# ===========================================
+
+execution_order:
+  - phase: "Phase 1 - Schema & Constants"
+    description: "Add constants and schema changes (no runtime changes)"
+    tasks:
+      - "T1.1-create-thumbnail-size-enum"
+      - "T1.2-migration-adimage-thumbnails"
+
+  - phase: "Phase 2 - Service Layer"
+    description: "Create thumbnail service in isolation"
+    tasks:
+      - "T2.1-create-media-app-structure"
+      - "T2.2-implement-thumbnail-service"
+      - "T2.3-unit-tests-thumbnails"
+
+  - phase: "Phase 3 - Model & Integration"
+    description: "Connect service to data layer and photo upload flow"
+    tasks:
+      - "T3.1-update-adimage-model"
+      - "T3.2-integrate-save-photo"
+      - "T3.3-update-adiamge-model-fields"
+
+  - phase: "Phase 4 - Backfill"
+    description: "Run after deployment to populate existing images"
+    tasks:
+      - "T4.1-backfill-thumbnails-command"
+
+  - phase: "Phase 5 - Templates"
+    description: "Consume thumbnails in frontend templates"
+    tasks:
+      - "T5.1-update-ad-list-template"
+      - "T5.2-update-detail-template"
+      - "T5.3-register-media-app"
+
+dependency_graph:
+  T1.1-create-thumbnail-size-enum: []
+  T1.2-migration-adimage-thumbnails: ["T1.1-create-thumbnail-size-enum"]
+  T2.1-create-media-app-structure: ["T1.2-migration-adimage-thumbnails"]
+  T2.2-implement-thumbnail-service: ["T2.1-create-media-app-structure"]
+  T2.3-unit-tests-thumbnails: ["T2.2-implement-thumbnail-service"]
+  T3.1-update-adimage-model: ["T2.1-create-media-app-structure"]
+  T3.2-integrate-save-photo: ["T2.2-implement-thumbnail-service", "T3.1-update-adimage-model"]
+  T3.3-update-adiamge-model-fields: ["T1.2-migration-adimage-thumbnails"]
+  T4.1-backfill-thumbnails-command: ["T2.2-implement-thumbnail-service", "T3.3-update-adiamge-model-fields"]
+  T5.1-update-ad-list-template: ["T3.1-update-adimage-model"]
+  T5.2-update-detail-template: ["T3.1-update-adimage-model"]
+  T5.3-register-media-app: ["T2.1-create-media-app-structure"]
+
+# ===========================================
+# Risk Assessment
+# ===========================================
+
+risks:
+  - factor: "Schema migration"
+    level: "medium"
+    mitigation: |
+      Migration adds nullable fields only. Existing data remains valid.
+      Thumbnail fields allow null during rollout period.
+
+  - factor: "Concurrent thumbnail generation"
+    level: "low"
+    mitigation: |
+      Uses O_CREAT | O_EXCL for atomic file writes.
+      Storage key collisions handled with UUID-based naming.
+
+  - factor: "Storage space increase"
+    level: "medium"
+    mitigation: |
+      Estimated 15-25% overhead for three variants.
+      Monitor disk usage post-deployment.
+
+  - factor: "Image quality degradation"
+    level: "low"
+    mitigation: |
+      Uses LANCZOS resampling (highest quality).
+      JPEG optimize=True reduces quality loss.
+
+# ===========================================
+# Rollback Procedures
+# ===========================================
+
+rollback:
+  - procedure: "Template fallback still uses original images"
+    order: 1
+    action: "Revert T5.1 and T5.2 changes - original image_url always available"
+
+  - procedure: "Nullable thumbnail fields"
+    order: 2
+    action: "Thumbnail fields are nullable - database rollback is safe"
+
+  - procedure: "Original images preserved"
+    order: 3
+    action: "No original images are modified or deleted during thumbnail generation"

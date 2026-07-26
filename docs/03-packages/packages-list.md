@@ -30,7 +30,7 @@ django-mptt is not yet validated against Django 6.0.
 - Search: PostgreSQL native FTS (`search_vector` TSVECTOR + GIN, russian config)
 - UI: Django Templates + HTMX + Alpine.js MPA (phase 1)
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
-- Background jobs: Django management commands + systemd timer / cron (Celery deferred)
+- Background jobs: Django management commands + systemd timer / cron (Celery)
 - **Async bot + sync Django ORM:** bot runs `django.setup()` and shares the ORM. Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
 - Query translation: deep-translator (Montenegrin → Russian at search time; hard timeout ~500ms + fallback to original query).
 

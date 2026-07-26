@@ -44,7 +44,7 @@ Desktop users see persistent filter sidebar while browsing results.
 | Category | High | Always visible |
 | City | High | Always visible |
 | Price Range | Medium | Collapsible on mobile |
-| Condition | Medium | Deferred to phase 2 |
+| Condition | Medium | Collapsible on mobile |
 
 ### Implementation
 

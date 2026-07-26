@@ -73,7 +73,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Phase-1 moderation is **text-only** (US-A10). Bad photos removed manually by moderator (incl. account ban).
 - **No server-side photo optimization in phase 1** — accept Telegram-compressed images, store in our storage (decision E-storage), serve as-is.
 - **Storage (E-storage):** phase 1 = local `MEDIA_ROOT` (Docker volume) behind nginx via Django `FileSystemStorage` (the `STORAGES` contract). `django-storages` deferred to S3/R2/MinIO swap (YAGNI); later swap = add `django-storages`+`boto3` + one `STORAGES` line, no code rewrite.
-- **Thumbnails:** phase 1 serves full-size compressed photos; Pillow thumbnail generation deferred to phase 1.5.
+- **Thumbnails:** phase 1 serves full-size compressed photos; Pillow thumbnail generation 
 
 ### F. PII & consent (US-A8)
 - Jurisdiction: Montenegro (GDPR-equivalent). Collect minimum: `telegram_id`, optional `username`.

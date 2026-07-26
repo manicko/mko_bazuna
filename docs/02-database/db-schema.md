@@ -22,8 +22,8 @@ details live in sibling files: [db-indexes.md](db-indexes.md) and [db-enums.md](
 ## Principles
 - One ads table.
 - Category tree: django-mptt>=0.18.0 (single source of truth; no denormalized path/level columns).
-- Category-specific attributes (EAV) — DEFERRED (post-MVP).
-- Tags — DEFERRED (no generation source in phase 1).
+- Category-specific attributes (EAV).
+- Tags — generation source to be determined in reserach phase.
 - Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN, russian config).
 - One user = one Telegram account.
 

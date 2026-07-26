@@ -1,0 +1,351 @@
+# Saved Search Alerts Enhancement - Phase 2 Plan 1
+# Execution DAG with dependency-safe rollout
+
+---
+# Execution Order (topological sort)
+# T1 -> T2 -> T3 -> T4 -> T5/T6 -> T7 -> T8
+
+tasks:
+  # === GROUP A: MODEL FOUNDATION ===
+  # Risk: High (database schema changes, new app registration)
+  # Dependencies: None (foundational models)
+
+  - task_id: "T1_create_saved_search_models"
+    title: "Create SavedSearch and SavedSearchNotification models"
+    semantic_anchors:
+      - "apps.ads.models.SavedSearch (new class)"
+      - "apps.ads.models.SavedSearchNotification (new class)"
+    files:
+      - "src/backend/apps/ads/models.py"
+      - "src/backend/apps/ads/migrations/0004_saved_search_models.py (new)"
+    risk:
+      level: "high"
+      rationale: >-
+        Creates two new database tables with foreign keys to existing User, Ad,
+        Category, and City tables. Requires new AdvisoryLockId value for
+        AlertDeliveryTask management command. Uses StrEnum for saved_search_status.
+    dependencies:
+      - None
+    verification:
+      - "Run: uv run python -m django migrate --run-sync-only"
+      - "Verify: SavedSearch._meta.db_table == 'saved_searches'"
+      - "Verify: SavedSearchNotification._meta.db_table == 'saved_search_notifications'"
+
+  - task_id: "T2_register_saved_searches_app"
+    title: "Register SavedSearches app in settings"
+    semantic_anchors:
+      - "apps.core.enums.AdvisoryLockId (update enum)"
+      - "config.settings.base.INSTALLED_APPS (add 'apps.saved_searches')"
+    files:
+      - "src/backend/apps/core/enums.py"
+      - "src/backend/config/settings/base.py"
+    risk:
+      level: "medium"
+      rationale: >-
+        Adds AdvisoryLockId.ALERT_DELIVERY_TASK constant and registers new app.
+        Must occur before migrations run to ensure app is discoverable.
+    dependencies:
+      - "T1_create_saved_search_models"  # Need AdvisoryLockId for later tasks
+
+  # === GROUP B: QUERY FILTER LOGIC ===
+  # Risk: Medium (complex filter matching)
+  # Dependencies: T1 (models define filter structure)
+
+  - task_id: "T3_create_alert_query_service"
+    title: "Create AlertQueryService for matching PUBLISHED ads"
+    semantic_anchors:
+      - "apps.saved_searches.services.alert_query.AlertQueryService (new class)"
+    files:
+      - "src/backend/apps/saved_searches/services/__init__.py (new)"
+      - "src/backend/apps/saved_searches/services/alert_query.py (new)"
+    risk:
+      level: "medium"
+      rationale: >-
+        Implements ad matching logic using PostgreSQL FTS with fuzzy category
+        detection (reusing patterns from apps.search.views.search). Must respect
+        saved_search.is_active toggle and match all filter criteria.
+    dependencies:
+      - "T1_create_saved_search_models"
+    verification:
+      - "Logic: Matching ads have SEARCH_ALERT_MATCHED analytics event recorded"
+
+  - task_id: "T4_add_analytics_event_type"
+    title: "Add SEARCH_ALERT_MATCHED analytics event type"
+    semantic_anchors:
+      - "apps.core.enums.AnalyticsEventType (add enum member)"
+    files:
+      - "src/backend/apps/core/enums.py"
+    risk:
+      level: "low"
+      rationale: >-
+        Adds enum member; no schema changes required. AnalyticsEvent.user
+        field is SET NULL on erasure (zone R5), allowing matching for
+        soft-deleted users.
+    dependencies:
+      - None
+    verification:
+      - "Verify: AnalyticsEventType.SEARCH_ALERT_MATCHED exists"
+
+  # === GROUP C: BOT INTEGRATION ===
+  # Risk: Medium (Telegram bot message delivery)
+  # Dependencies: T1 (models), T4 (analytics)
+
+  - task_id: "T5_create_alert_handler"
+    title: "Create /alerts command handler in Telegram bot"
+    semantic_anchors:
+      - "telegram_bot.handlers.alerts.router (new Router)"
+      - "telegram_bot.handlers.alerts.cmd_alerts (new handler function)"
+      - "telegram_bot.states.SavedSearchState (new FSM states)"
+    files:
+      - "src/telegram_bot/handlers/alerts.py (new)"
+      - "src/telegram_bot/handlers/__init__.py (add router export)"
+      - "src/telegram_bot/states.py (add SavedSearchState)"
+      - "src/telegram_bot/schemas/__init__.py (new Pydantic schemas)"
+      - "src/telegram_bot/schemas/saved_search_payloads.py (new)"
+    risk:
+      level: "medium"
+      rationale: >-
+        Implements command handler pattern following ad_create.py and
+        contact.py patterns. Uses sync_to_async for ORM calls. Message
+        delivery to user.telegram_id requires user to have started bot.
+    dependencies:
+      - "T1_create_saved_search_models"
+      - "T4_add_analytics_event_type"
+    verification:
+      - "Run: uv run pytest src/telegram_bot/tests/test_saved_search_alerts.py (new test)"
+
+  # === GROUP D: DELIVERY TASK ===
+  # Risk: Medium (scheduled job orchestration)
+  # Dependencies: T3 (query service), T5 (notification integration)
+
+  - task_id: "T6_create_alert_delivery_command"
+    title: "Create AlertDeliveryTask management command for daily digest"
+    semantic_anchors:
+      - "apps.saved_searches.management.commands.alert_delivery.AlertDeliveryCommand (new)"
+    files:
+      - "src/backend/apps/saved_searches/__init__.py (new app init)"
+      - "src/backend/apps/saved_searches/apps.py (new app config)"
+      - "src/backend/apps/saved_searches/management/__init__.py (new)"
+      - "src/backend/apps/saved_searches/management/commands/__init__.py (new)"
+      - "src/backend/apps/saved_searches/management/commands/alert_delivery.py (new)"
+    risk:
+      level: "medium"
+      rationale: >-
+        Uses advisory lock pattern from archive_sweep.py. Orchestrates
+        AlertQueryService to find matching ads, creates SavedSearchNotification
+        records, sends Telegram messages via Bot. Idempotent: skips already-
+        notified ads via SavedSearchNotification intermediate table.
+    dependencies:
+      - "T3_create_alert_query_service"
+      - "T1_create_saved_search_models"
+    verification:
+      - "Run: python manage.py alert_delivery --dry-run"
+      - "Verify: Sent notifications appear in SavedSearchNotification table"
+
+  # === GROUP E: TEMPLATE INTEGRATION ===
+  # Risk: Low (UI-only changes, no logic changes)
+  # Dependencies: None (runs in parallel with B/C/D)
+
+  - task_id: "T7_create_save_search_modal_template"
+    title: "Create save search modal template for web UI"
+    semantic_anchors:
+      - "templates/components/save_search_modal.html (new)"
+      - "templates/ads/partials/search_actions.html (new)"
+    files:
+      - "src/backend/templates/components/save_search_modal.html (new)"
+      - "src/backend/templates/ads/partials/search_actions.html (new)"
+      - "src/backend/static/theme/js/save_search_modal.js (new)"
+    risk:
+      level: "low"
+      rationale: >-
+        No backend changes required; modal triggers POST to /saved-searches/
+        endpoint (API endpoint to be created in Phase 3). Uses HTMX-compatible
+        partial rendering pattern following existing templates.
+    dependencies:
+      - None
+    verification:
+      - "Manual: Modal renders with correct backdrop and form fields"
+
+  # === GROUP F: INTEGRATION & ORCHESTRATION ===
+  # Risk: Low (wiring together)
+  # Dependencies: All previous tasks
+
+  - task_id: "T8_update_bot_main_router"
+    title: "Register alerts router in bot main.py"
+    semantic_anchors:
+      - "telegram_bot.main.main (add router include)"
+    files:
+      - "src/telegram_bot/main.py"
+    risk:
+      level: "low"
+      rationale: >-
+        Simple addition of router to dispatcher. No logic changes.
+        Follows existing pattern: dp.include_router(login_router).
+    dependencies:
+      - "T5_create_alert_handler"
+
+# === EXECUTION DAG ===
+# Visual representation of task ordering
+dag:
+  nodes:
+    - id: "T1"
+      label: "Model Foundation"
+      group: "models"
+    - id: "T2"
+      label: "App Registration"
+      group: "models"
+    - id: "T3"
+      label: "Query Service"
+      group: "services"
+    - id: "T4"
+      label: "Analytics Enum"
+      group: "models"
+    - id: "T5"
+      label: "Alert Handler"
+      group: "bot"
+    - id: "T6"
+      label: "Delivery Command"
+      group: "services"
+    - id: "T7"
+      label: "Template Modal"
+      group: "templates"
+    - id: "T8"
+      label: "Router Integration"
+      group: "bot"
+
+  edges:
+    - from: "T1"
+      to: "T2"
+    - from: "T1"
+      to: "T3"
+    - from: "T1"
+      to: "T5"
+    - from: "T4"
+      to: "T5"
+    - from: "T3"
+      to: "T6"
+    - from: "T1"
+      to: "T6"
+    - from: "T5"
+      to: "T8"
+
+# === RISK ASSESSMENT ===
+risk_summary:
+  critical_areas:
+    - area: "Database migrations"
+      mitigation: "Test migrations on copy of production data; use advisory lock pattern"
+    - area: "Telegram message delivery"
+      mitigation: "Verify user has valid chat_id before sending; handle bot not started gracefully"
+    - area: "Duplicate notifications"
+      mitigation: "SavedSearchNotification intermediate table prevents re-notification"
+
+  data_integrity:
+    - SavedSearch.is_active defaults to True
+    - SavedSearchNotification has unique_together on (saved_search, ad)
+    - Advisory lock ensures single delivery task execution
+
+# === MODEL SPECIFICATIONS ===
+model_specs:
+  SavedSearch:
+    purpose: "User-defined search query with filters for alert matching"
+    fields:
+      - name: "user"
+        type: "ForeignKey[User]"
+        nullable: false
+        on_delete: "CASCADE"
+        related_name: "saved_searches"
+      - name: "query"
+        type: "TextField"
+        nullable: true
+        help_text: "Free-text search query (Bosnian->Russian FTS)"
+      - name: "city"
+        type: "ForeignKey[City]"
+        nullable: true
+        on_delete: "SET_NULL"
+        related_name: "saved_searches"
+      - name: "category"
+        type: "ForeignKey[Category]"
+        nullable: true
+        on_delete: "SET_NULL"
+        related_name: "saved_searches"
+      - name: "min_price"
+        type: "PositiveIntegerField"
+        nullable: true
+        help_text: "Minimum price filter in BAM"
+      - name: "max_price"
+        type: "PositiveIntegerField"
+        nullable: true
+        help_text: "Maximum price filter in BAM"
+      - name: "is_active"
+        type: "BooleanField"
+        default: true
+        help_text: "Toggle to enable/disable alerts"
+      - name: "created_at"
+        type: "DateTimeField"
+        auto_now_add: true
+
+  SavedSearchNotification:
+    purpose: "Intermediate table to track which ads have been notified per saved search"
+    fields:
+      - name: "saved_search"
+        type: "ForeignKey[SavedSearch]"
+        on_delete: "CASCADE"
+        related_name: "notifications"
+      - name: "ad"
+        type: "ForeignKey[Ad]"
+        on_delete: "CASCADE"
+        related_name: "saved_search_notifications"
+      - name: "sent_at"
+        type: "DateTimeField"
+        auto_now_add: true
+    constraints:
+      - "unique_together (saved_search, ad)"
+      - "Composite index on (saved_search_id, ad_id)"
+
+# === SERVICE INTERFACE SPECIFICATIONS ===
+service_specs:
+  AlertQueryService:
+    method: "find_matching_ads(saved_search: SavedSearch) -> list[Ad]"
+    behavior:
+      - "Query only PUBLISHED ads (AdStatus.PUBLISHED)"
+      - "Apply FTS search on query field if present"
+      - "Filter by city.slug if specified"
+      - "Filter by category subtree if specified"
+      - "Apply min_price/max_price range filters"
+      - "Exclude ads already in SavedSearchNotification for this saved_search"
+      - "Return ordered by published_at descending"
+
+  AlertDeliveryTask:
+    method: "handle() -> None"
+    behavior:
+      - "Use advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK)"
+      - "Get all active SavedSearch records"
+      - "For each: find matching ads via AlertQueryService"
+      - "Create SavedSearchNotification for each new match"
+      - "Send Telegram message via Bot for each notification"
+      - "Log count of sent notifications"
+
+# === BOT HANDLER SPECIFICATIONS ===
+handler_specs:
+  cmd_alerts:
+    command: "/alerts"
+    purpose: "Manage saved search alerts for user"
+    flow:
+      - "No args: show list of user's saved searches with toggle status"
+      - "With args: /alerts save - enter save search flow"
+
+  cmd_alerts_save:
+    command: "/alerts save"
+    purpose: "Start the save search creation flow"
+    flow:
+      - "Set FSM state: query input"
+      - "Prompt: 'Enter search keywords (optional) or /cancel'"
+
+# === VERIFICATION CHECKLIST ===
+verification_checklist:
+  - "All migrations run successfully in test database"
+  - "SavedSearch with is_active=False does not receive notifications"
+  - "AlertQueryService excludes ads in SavedSearchNotification intermediate table"
+  - "Telegram handler fails gracefully if user has no chat_id"
+  - "Management command logs execution count"
+  - "Template modal includes query, city, category, price fields"
