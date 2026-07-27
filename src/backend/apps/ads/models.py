@@ -312,6 +312,23 @@ class Ad(models.Model):
             self.status = target
             self.save(update_fields=update_fields)
 
+    def get_title(self, locale: str = "ru") -> str:
+        """Return localized title with fallback chain: locale → ru → first available."""
+        # Priority: locale column > Russian > original
+        for field in [f"title_{locale}", "title_ru", "title"]:
+            val = getattr(self, field, None)
+            if val:
+                return val
+        return ""
+
+    def get_description(self, locale: str = "ru") -> str:
+        """Return localized description with fallback chain: locale → ru → first available."""
+        for field in [f"description_{locale}", "description_ru", "description"]:
+            val = getattr(self, field, None)
+            if val:
+                return val
+        return ""
+
 
 class AdImage(models.Model):
     """
