@@ -2,6 +2,7 @@
 {% load static %}
 {% load contact_tags %}
 {% load localized_content %}
+{% load i18n %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -32,7 +33,7 @@
                     {% for image in ad.images.all %}
                         <img 
                             src="{{ image.image_url }}" 
-                            alt="Photo {{ forloop.counter }} for {{ ad|get_title:LANGUAGE_CODE }}"
+                            alt="{% trans "Photo" %} {{ forloop.counter }} {% trans "for" %} {{ ad|get_title:LANGUAGE_CODE }}"
                             class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
                         >
                     {% endfor %}
@@ -52,16 +53,16 @@
                 
                 <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
                     <div>
-                        <span class="font-medium">Location:</span> 
+                        <span class="font-medium">{% trans "Location:" %}</span> 
                         {{ ad.city.get_name|default:ad.city.name }}
                     </div>
                     <div>
-                        <span class="font-medium">Category:</span> 
+                        <span class="font-medium">{% trans "Category:" %}</span> 
                         {{ ad.category.get_name|default:ad.category.name }}
                     </div>
                     <div>
                         <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
-                            Published: {{ ad.published_at|date:'M d, Y' }}
+                            {% trans "Published:" %} {{ ad.published_at|date:'M d, Y' }}
                         </time>
                     </div>
                 </div>
@@ -74,7 +75,7 @@
                         href="https://t.me/{{ settings.BOT_USERNAME }}?start=contact_{{ ad.id }}"
                         class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                     >
-                        Contact Seller
+                        {% trans "Contact Seller" %}
                     </a>
                 {% else %}
                     <button 
@@ -82,10 +83,10 @@
                         class="px-6 py-3 bg-gray-400 text-white rounded-lg font-medium cursor-not-allowed"
                         disabled
                     >
-                        Contact Seller
+                        {% trans "Contact Seller" %}
                     </button>
                     <p class="text-xs text-gray-500 mt-2">
-                        Seller unavailable for contact
+                        {% trans "Seller unavailable for contact" %}
                     </p>
                 {% endif %}
             </div>
@@ -93,7 +94,7 @@
 
         <div class="mt-6">
             <a href="javascript:history.back()" class="text-blue-600 hover:underline">
-                &larr; Back to listings
+                &larr; {% trans "Back to listings" %}
             </a>
         </div>
     </main>

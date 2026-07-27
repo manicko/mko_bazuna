@@ -1,11 +1,12 @@
 {# Partial template for ad list grid (HTMX fragment). Renders the ad cards grid, pagination, and status messages. XSS-safe via Django autoescape. #}
 {% load localized_content %}
+{% load i18n %}
 
 <!-- Did-you-mean suggestions -->
 {% if suggested_category %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
-            Did you mean: <a href="{% url 'ads:listings' suggested_category %}" class="underline font-medium">{{ suggested_category }}</a>?
+            {% trans "Did you mean:" %} <a href="{% url 'ads:listings' suggested_category %}" class="underline font-medium">{{ suggested_category }}</a>?
         </p>
     </div>
 {% endif %}
@@ -13,7 +14,7 @@
 {% if suggested_city %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
-            Did you mean: <a href="{% url 'ads:listings_city' suggested_city %}" class="underline font-medium">{{ suggested_city }}</a>?
+            {% trans "Did you mean:" %} <a href="{% url 'ads:listings_city' suggested_city %}" class="underline font-medium">{{ suggested_city }}</a>?
         </p>
     </div>
 {% endif %}
@@ -32,7 +33,7 @@
                         >
                     {% else %}
                         <div class="w-full h-48 bg-gray-200 rounded-t-lg flex items-center justify-center">
-                            <span class="text-gray-500">No image</span>
+                            <span class="text-gray-500">{% trans "No image" %}</span>
                         </div>
                     {% endif %}
                     
@@ -60,7 +61,7 @@
 
     <!-- Pagination -->
     {% if page_obj.paginator.num_pages > 1 %}
-        <nav class="mt-8 flex justify-center gap-1" aria-label="Page navigation">
+        <nav class="mt-8 flex justify-center gap-1" aria-label="{% trans "Page navigation" %}">
             {% if page_obj.has_previous %}
                 <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
                    hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}"
@@ -97,20 +98,20 @@
     {% endif %}
 {% elif has_results is False and query %}
     <div class="text-center py-12 bg-white rounded-lg">
-        <p class="text-gray-600 text-lg">No results found for "{{ query }}"</p>
-        <p class="text-gray-500 mt-2">Try a different search term or browse all categories</p>
+        <p class="text-gray-600 text-lg">{% blocktrans %}No results found for "{{ query }}"{% endblocktrans %}</p>
+        <p class="text-gray-500 mt-2">{% trans "Try a different search term or browse all categories" %}</p>
     </div>
 {% elif has_results is False %}
     <div class="text-center py-12 bg-white rounded-lg">
-        <p class="text-gray-600 text-lg">No ads available</p>
-        <p class="text-gray-500 mt-2">Check back later for new listings</p>
+        <p class="text-gray-600 text-lg">{% trans "No ads available" %}</p>
+        <p class="text-gray-500 mt-2">{% trans "Check back later for new listings" %}</p>
     </div>
 {% endif %}
 
 <!-- Empty state when no query and no ads -->
 {% if not query and not page_obj %}
     <div class="text-center py-12 bg-white rounded-lg">
-        <p class="text-gray-600 text-lg">No ads available yet</p>
-        <p class="text-gray-500 mt-2">Be the first to create an ad via Telegram!</p>
+        <p class="text-gray-600 text-lg">{% trans "No ads available yet" %}</p>
+        <p class="text-gray-500 mt-2">{% trans "Be the first to create an ad via Telegram!" %}</p>
     </div>
 {% endif %}

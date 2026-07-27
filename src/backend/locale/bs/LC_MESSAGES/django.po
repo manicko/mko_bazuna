@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-27 17:03+0200\n"
+"POT-Creation-Date: 2026-07-27 17:15+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -16,3 +16,88 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: templates/ads/detail.html
+msgid "Photo"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "for"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Location:"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Category:"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Published:"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Contact Seller"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Seller unavailable for contact"
+msgstr ""
+
+#: templates/ads/detail.html
+msgid "Back to listings"
+msgstr ""
+
+#: templates/ads/list.html
+msgid "Search"
+msgstr ""
+
+#: templates/ads/list.html
+msgid "Search ads..."
+msgstr ""
+
+#: templates/ads/list.html
+msgid "Category"
+msgstr ""
+
+#: templates/ads/list.html
+msgid "Ads"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "Did you mean:"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "No image"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "Page navigation"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+#, python-format
+msgid "No results found for \"%(query)s\""
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "Try a different search term or browse all categories"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "No ads available"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "Check back later for new listings"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "No ads available yet"
+msgstr ""
+
+#: templates/ads/partials/ad_list.html
+msgid "Be the first to create an ad via Telegram!"
+msgstr ""

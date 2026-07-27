@@ -1,12 +1,13 @@
 {# Listings template for Mko Bazuna. XSS-safe via Django autoescape. HTMX-compatible MPA. #}
 {% load static %}
+{% load i18n %}
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if query %}Search: {{ query }}{% elif current_category %}Category{% else %}Ads{% endif %} - Mko Bazuna</title>
+    <title>{% if query %}{% trans "Search" %}: {{ query }}{% elif current_category %}{% trans "Category" %}{% else %}{% trans "Ads" %}{% endif %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
     {% if PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
@@ -31,11 +32,11 @@
                     type="search" 
                     name="q" 
                     value="{{ query|default:'' }}" 
-                    placeholder="Search ads..." 
+                    placeholder="{% trans "Search ads..." %}" 
                     class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                 <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Search
+                    {% trans "Search" %}
                 </button>
             </div>
         </form>
