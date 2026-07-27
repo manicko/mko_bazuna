@@ -56,9 +56,8 @@ Add nullable ForeignKey field `ad` to `AnalyticsEvent` model to associate events
 - Create migration in `apps/analytics/migrations/`
 
 **Risk Mitigation:**
-- Field is nullable to preserve existing events without ad association
+- Field is nullable for events without ad association
 - `on_delete=CASCADE` ensures referential integrity
-- Backward compatible: existing code unaffected
 
 **Verification:**
 ```bash

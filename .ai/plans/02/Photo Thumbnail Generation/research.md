@@ -445,11 +445,9 @@ Phase 5: Templates
 
 ## 8. Rollback Strategy
 
-The plan's YAML specifies a clean rollback path:
-
 1. **Templates** — revert T5.1 and T5.2 changes; templates fall back to `image_url`
 2. **Database** — thumbnail fields are nullable; no data loss on rollback
-3. **Files** — original images are never modified; delete `thumbnails/` directory
+3. **Files** — original images are never modified; delete thumbnails with `<uuid>-<size>.jpg` pattern
 4. **Media app** — remove `apps.media` from INSTALLED_APPS
 
 ---

@@ -28,8 +28,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Record `AD_VIEWED` events on ad detail page views
 
 **Source documents:**
-- `.ai/plans/phase2_seller_dashboard_stats.yaml`
-- `.ai/plans/phase2_plan1_research.md`
+- `.ai/plans/02/Seller Dashboard Statistics/plan.md`
 
 ---
 
@@ -47,7 +46,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Update templates to use thumbnails with fallback to originals
 
 **Source documents:**
-- `.ai/plans/photo-thumbnail-generation-plan.yaml`
+- `.ai/plans/02/Photo Thumbnail Generation/plan.md`
 
 ---
 
@@ -63,7 +62,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Add trigram indexes on category/city names for fuzzy matching
 
 **Source documents:**
-- `.ai/plans/phase-02-detailed-plan-1.md` (Section 3)
+- `.ai/plans/02/Search Autocomplete/plan.md`
 
 ---
 
@@ -79,7 +78,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Implement daily digest messaging format
 
 **Source documents:**
-- `.ai/plans/phase-02-detailed-plan-1.md` (Section 4)
+- `.ai/plans/02/Saved Search Alerts/plan.md`
 
 ---
 
@@ -95,7 +94,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Add Trust dashboard UI to seller dashboard
 
 **Source documents:**
-- `.ai/plans/phase-02-detailed-plan-3.md` (Section 1)
+- `.ai/plans/02/Trust Signals System/plan.md`
 
 ---
 
@@ -113,7 +112,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Create moderation analytics dashboard
 
 **Source documents:**
-- `.ai/plans/phase-02-detailed-plan-3.md` (Section 2)
+- `.ai/plans/02/Enhanced Moderation Tooling/plan.md`
 
 ---
 
@@ -131,7 +130,7 @@ Phase 2 focuses on enhancing the post-MVP platform with seller tools, search imp
 - Enhance `show_metrics` CLI command for trust reporting
 
 **Source documents:**
-- `.ai/plans/phase-02-detailed-plan-3.md` (Section 3)
+- `.ai/plans/02/Analytics Improvements/plan.md`
 
 ---
 

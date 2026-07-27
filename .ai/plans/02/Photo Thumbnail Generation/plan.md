@@ -113,10 +113,6 @@ uv run ruff check src/backend/apps/core/enums.py
 
 **Why nullable:** Allows safe rollout - thumbnails optional during deployment
 
-**VERIFICATION FIX:**
-- Research.md specifies storage key pattern: `<uuid>-<size>.jpg` (not `thumbnails/<size>/<uuid>.jpg`)
-- Research.md specifies AdImage naming in tasks
-
 **Verification:**
 ```bash
 uv run python src/backend/manage.py makemigrations --check --dry-run apps.ads

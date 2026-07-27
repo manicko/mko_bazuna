@@ -1,8 +1,23 @@
+---
+id: phase-plan-highlevel
+domain: planning
+tags:
+  - planning
+  - roadmap
+  - mvp
+related:
+  - technical-specification
+  - user-stories-index
+  - phase-02-roadmap
+---
+
 # Mko Bazuna — High-Level Phase Development Plan
 
-**Version:** Phase Plan v2 (Alternative)  
+**Version:** Phase Plan v2 (Consolidated)  
 **Date:** July 2026  
-**Source Documents:** Design_01 research, Design_02 research, Technical Specification
+**Source Documents:** Technical Specification, User Stories, Phase 2 Implementation Roadmap
+
+> Консолидированный план из лучших частей альтернативных версий.
 
 ---
 
@@ -180,10 +195,19 @@ Telegram Login (S1) ──► Ad Creation (S2) ──► Edit/Delete (S5/S6)
 
 ### Dependencies
 
+> Phase 2 detailed plans are in `.ai/plans/02/01_roadmap.md`:
+> - Seller Dashboard Statistics
+> - Photo Thumbnail Generation  
+> - Search Autocomplete
+> - Saved Search Alerts
+> - Trust Signals System
+> - Enhanced Moderation Tooling
+> - Analytics Improvements
+
 ```
 Phase 1 Core ◄── Search Enhancement (category in search_vector)
-         │
-         └────► Filter UI (enhanced patterns)
+          │
+          └────► Filter UI (enhanced patterns)
 ```
 
 ---
@@ -384,8 +408,6 @@ Phase 3 Analytics ◄── Trust Badge System
 
 ## References
 
-- [Design_01 Research](.ai/researches/Design_01/classifieds_design_research_report.md)
-- [Design_02 Research](.ai/researches/Design_02/01-avito-design.md)
 - [Technical Specification](docs/01-spec/technical-specification.md)
-- [UI Patterns](docs/01-spec/ui-patterns.md)
 - [User Stories](docs/04-user-stories/index.md)
+- [Phase 2 Implementation Roadmap](.ai/plans/02/01_roadmap.md)

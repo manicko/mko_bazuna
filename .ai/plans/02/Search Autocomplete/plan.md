@@ -4,7 +4,7 @@
 
 Implement search autocomplete suggestions via popular searches, user history, and entity matching (categories/cities).
 
-**Research:** `.ai/plans/search-autocomplete/research.md`
+**Research:** `.ai/plans/02/Search Autocomplete/research.md`
 
 ---
 
@@ -12,17 +12,18 @@ Implement search autocomplete suggestions via popular searches, user history, an
 
 | Task | Description | Symbol | File | Dependencies |
 |------|-------------|--------|------|--------------|
-| T1 | Create PopularSearch model | `PopularSearch` | `apps/search/models/popular_search.py` | None |
-| T2 | Create SearchHistory model | `SearchHistory` | `apps/search/models/search_history.py` | None |
+| T1 | Create PopularSearch model | `PopularSearch` | `apps/search/models.py` | None |
+| T2 | Create SearchHistory model | `SearchHistory` | `apps/search/models.py` | None |
 | T3 | Add SearchSuggestionSource enum | `SearchSuggestionSource` | `apps/core/enums.py` | None |
 | T4 | Add sanitize_autocomplete_query | `sanitize_autocomplete_query` | `apps/core/utils/sanitize.py` | None |
-| T5 | Create popular_search service | `get_popular_suggestions` | `apps/search/services/popular_search.py` | T1 |
-| T6 | Create search_history service | `get_user_search_history` | `apps/search/services/search_history.py` | T2 |
+| T5 | Create popular_search service | `increment_popular_search`, `get_popular_suggestions` | `apps/search/services/popular_search.py` | T1 |
+| T6 | Create search_history service | `get_user_search_history`, `record_search_history` | `apps/search/services/search_history.py` | T2 |
 | T7 | Create entity_suggestions service | `get_entity_suggestions` | `apps/search/services/entity_suggestions.py` | None |
 | T8 | Create rate_limit utility | `rate_limit_check` | `apps/search/services/rate_limit.py` | None |
 | T9 | Create AutocompleteView | `autocomplete` | `apps/search/views/autocomplete.py` | T5, T6, T7, T8 |
 | T10 | Add URL route | `api/search/autocomplete` | `apps/search/urls.py` | T9 |
 | T11 | Update search view to record | `search` | `apps/search/views/search.py` | T1, T2 |
+| T12 | Create database migrations | N/A | `apps/search/migrations/` | T1, T2 |
 
 ---
 
@@ -31,8 +32,10 @@ Implement search autocomplete suggestions via popular searches, user history, an
 ### T1: Create PopularSearch Model
 
 **Symbol:** `PopularSearch`  
-**File:** `src/backend/apps/search/models/popular_search.py`  
+**File:** `apps/search/models.py`  
 **Priority:** High
+
+Add to existing `apps/search/models.py` (create if doesn't exist) or create new file:
 
 ```python
 class PopularSearch(models.Model):
@@ -51,8 +54,10 @@ class PopularSearch(models.Model):
 ### T2: Create SearchHistory Model
 
 **Symbol:** `SearchHistory`  
-**File:** `src/backend/apps/search/models/search_history.py`  
+**File:** `apps/search/models.py`  
 **Priority:** High
+
+Add to the same models file as PopularSearch:
 
 ```python
 class SearchHistory(models.Model):
@@ -72,12 +77,15 @@ class SearchHistory(models.Model):
         indexes = [
             models.Index(fields=["user_id", "-created_at"]),
         ]
+
+    def __str__(self):
+        return f"{self.query} (user={self.user_id})"
 ```
 
 ### T3: Add SearchSuggestionSource Enum
 
 **Symbol:** `SearchSuggestionSource`  
-**File:** `src/backend/apps/core/enums.py`  
+**File:** `apps/core/enums.py`  
 **Priority:** Medium
 
 ```python
@@ -91,7 +99,7 @@ class SearchSuggestionSource(StrEnum):
 ### T4: Add sanitize_autocomplete_query
 
 **Symbol:** `sanitize_autocomplete_query`  
-**File:** `src/backend/apps/core/utils/sanitize.py`  
+**File:** `apps/core/utils/sanitize.py`  
 **Priority:** Medium
 
 ```python
@@ -99,28 +107,38 @@ def sanitize_autocomplete_query(query: str) -> str:
     """Sanitize autocomplete query - 2-100 chars, SQL injection safe."""
     if not query or len(query) < 2 or len(query) > 100:
         return ""
-    return re.sub(r"[;'\"]", "", query.strip())
+    return re.sub(r"[;'\"\\]", "", query.strip())
 ```
 
 ### T5: Create popular_search Service
 
 **Symbol:** `increment_popular_search`, `get_popular_suggestions`  
-**File:** `src/backend/apps/search/services/popular_search.py`  
+**File:** `apps/search/services/popular_search.py`  
 **Priority:** High
 
 ```python
 def increment_popular_search(query: str) -> None:
-    """Increment hit count for query, create if not exists."""
+    """Increment hit count for query, create if not exists using atomic operation."""
+    from django.db.models import F
+    from apps.search.models import PopularSearch
+
     normalized = query.lower().strip()
-    PopularSearch.objects.update_or_create(
-        query_normalized=normalized,
-        defaults={"query": query, "hit_count": F("hit_count") + 1}
-    )
+
+    try:
+        obj = PopularSearch.objects.get(query_normalized=normalized)
+        obj.hit_count = F("hit_count") + 1
+        obj.save(update_fields=["hit_count"])
+    except PopularSearch.DoesNotExist:
+        PopularSearch.objects.create(
+            query=query,
+            query_normalized=normalized,
+            hit_count=1
+        )
 
 def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     """Get popular queries matching prefix, ordered by hit_count desc."""
     from django.db.models import F
-    from ..models.popular_search import PopularSearch
+    from apps.search.models import PopularSearch
 
     return list(
         PopularSearch.objects.filter(
@@ -132,11 +150,25 @@ def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
 
 ### T6: Create search_history Service
 
-**Symbol:** `get_user_search_history`  
-**File:** `src/backend/apps/search/services/search_history.py`  
+**Symbol:** `get_user_search_history`, `record_search_history`  
+**File:** `apps/search/services/search_history.py`  
 **Priority:** High
 
 ```python
+def record_search_history(user_id: int | None, query: str) -> None:
+    """Record a search query for user history (deduped, max 50 per user)."""
+    if user_id is None or not query:
+        return
+
+    normalized = query.lower().strip()
+
+    # Delete existing entry to avoid duplicates, then create new
+    SearchHistory.objects.filter(user_id=user_id, query_normalized=normalized).delete()
+    SearchHistory.objects.create(user_id=user_id, query=query, query_normalized=normalized)
+
+    # Prune to keep only last 50 entries per user
+    SearchHistory.objects.filter(user_id=user_id).order_by("-created_at")[50:].delete()
+
 def get_user_search_history(user_id: int | None, limit: int = 5) -> list[str]:
     """Get recent search queries for authenticated user."""
     if user_id is None:
@@ -151,18 +183,17 @@ def get_user_search_history(user_id: int | None, limit: int = 5) -> list[str]:
 ### T7: Create entity_suggestions Service
 
 **Symbol:** `get_entity_suggestions`  
-**File:** `src/backend/apps/search/services/entity_suggestions.py`  
+**File:** `apps/search/services/entity_suggestions.py`  
 **Priority:** Medium
 
 ```python
 def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     """Get matching category and city names for autocomplete."""
     from apps.categories.models import Category
-    from apps.locations.models import City
 
     results = []
 
-    # Category suggestions
+    # Category suggestions - Category has is_active field
     category_names = Category.objects.filter(
         is_active=True,
         name__istartswith=prefix
@@ -170,9 +201,9 @@ def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     for name in category_names:
         results.append({"query": name, "source": SearchSuggestionSource.CATEGORY})
 
-    # City suggestions
+    # City suggestions - City has NO is_active field, removed filter
+    from apps.locations.models import City
     city_names = City.objects.filter(
-        is_active=True,
         name__istartswith=prefix
     ).values_list("name", flat=True)[:limit]
     for name in city_names:
@@ -184,8 +215,10 @@ def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
 ### T8: Create rate_limit Utility
 
 **Symbol:** `rate_limit_check`  
-**File:** `src/backend/apps/search/services/rate_limit.py`  
+**File:** `apps/search/services/rate_limit.py`  
 **Priority:** Medium
+
+**Fixed race condition: Use atomic increment with proper initialization.**
 
 ```python
 RATE_LIMIT_KEY_PATTERN = "autocomplete_rl:{ip}"
@@ -193,18 +226,32 @@ RATE_LIMIT_REQUESTS = 30
 RATE_LIMIT_PERIOD = 60  # seconds
 
 def rate_limit_check(request: HttpRequest) -> bool:
-    """Return True if request allowed, False if rate limited."""
+    """Return True if request allowed, False if rate limited. Uses atomic increment."""
     from django.core.cache import cache
 
     ip = _get_client_ip(request)
     key = RATE_LIMIT_KEY_PATTERN.format(ip=ip)
 
-    current = cache.get(key, 0)
-    if current >= RATE_LIMIT_REQUESTS:
-        return False
+    # Atomic increment: add() returns the new value after increment
+    # If key doesn't exist, it's initialized with value 0, then incremented
+    try:
+        current = cache.add(key, 0, timeout=RATE_LIMIT_PERIOD)
+        if current is False:
+            # Key already exists, do atomic increment
+            current = cache.incr(key)
+        else:
+            # Key was just created, count is 1
+            current = 1
 
-    cache.incr(key)
-    cache.expire(key, RATE_LIMIT_PERIOD)
+        if current > RATE_LIMIT_REQUESTS:
+            # Reset TTL since we might be in a race
+            cache.expire(key, RATE_LIMIT_PERIOD)
+            return False
+    except ValueError:
+        # Key doesn't exist yet, force re-check
+        current = cache.get(key, 0) + 1
+        cache.set(key, current, timeout=RATE_LIMIT_PERIOD)
+
     return True
 
 def _get_client_ip(request: HttpRequest) -> str:
@@ -218,14 +265,12 @@ def _get_client_ip(request: HttpRequest) -> str:
 ### T9: Create AutocompleteView
 
 **Symbol:** `autocomplete`  
-**File:** `src/backend/apps/search/views/autocomplete.py`  
+**File:** `apps/search/views/autocomplete.py`  
 **Priority:** High
 
 ```python
-def autocomplete(request: HttpRequest) -> HttpResponse:
+def autocomplete(request: HttpRequest) -> JsonResponse:
     """Return JSON suggestions from all sources merged and deduplicated."""
-    import json
-
     query = sanitize_autocomplete_query(request.GET.get("q", ""))
     if not query:
         return JsonResponse({"suggestions": []})
@@ -258,7 +303,7 @@ def autocomplete(request: HttpRequest) -> HttpResponse:
             "hit_count": item["hit_count"]
         })
 
-    # Deduplicate by query
+    # Deduplicate by query, preserving order
     seen = set()
     unique = []
     for s in suggestions:
@@ -272,7 +317,7 @@ def autocomplete(request: HttpRequest) -> HttpResponse:
 ### T10: Add URL Route
 
 **Symbol:** `api/search/autocomplete`  
-**File:** `src/backend/apps/search/urls.py`  
+**File:** `apps/search/urls.py`  
 **Priority:** Medium
 
 ```python
@@ -287,20 +332,35 @@ urlpatterns = [
 ### T11: Update Search View to Record
 
 **Symbol:** `search`  
-**File:** `src/backend/apps/search/views/search.py`  
+**File:** `apps/search/views/search.py`  
 **Priority:** Medium
 
-After successful search (post-query execution):
+After successful search (post-query execution), add import and recording call:
+
 ```python
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.search_history import record_search_history
 
-# Record search in both systems
+# Inside search() after AnalyticsEvent.objects.create(...):
 if query:
     increment_popular_search(query)
     if request.user.is_authenticated:
         record_search_history(request.user.id, query)
 ```
+
+### T12: Create Database Migrations
+
+**Priority:** High
+
+After T1 and T2 add models to `apps/search/models.py`, create migrations:
+
+```bash
+uv run python manage.py makemigrations apps.search
+```
+
+Expected migrations for:
+- `popular_searches` table (query, query_normalized, hit_count, last_seen)
+- `search_history` table (user_id, query, query_normalized, created_at)
 
 ---
 
@@ -319,5 +379,6 @@ uv run pytest src/backend/apps/search/tests/test_autocomplete.py -v
 | Risk | Level | Mitigation |
 |------|-------|------------|
 | Privacy leak | Medium | User history only returns for authenticated user |
-| Rate limit bypass | Low | Server-side check, nginx rate limit also |
+| Rate limit bypass | Low | Server-side check with atomic increment, nginx rate limit also |
 | Translation overhead | Low | Only record normalized queries, not full text |
+| Race condition in rate limit | Low | Fixed: use atomic increment with add()/incr() pattern |
