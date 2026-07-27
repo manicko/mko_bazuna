@@ -14,39 +14,11 @@ Research (Done) → Planning (Current) → Implementation → Validation
 
 ## Phase 1: Configuration Updates
 
-### Task 1.1: Update .env.docker for Backup Credentials
+### Task 1.1: Create .env.docker.example Template
 
 **Priority:** High  
 **Effort:** Trivial  
-**File:** `.env.docker` (create from template)
-
-Add backup-related environment variables:
-
-```env
-# Backup configuration
-BACKUP_BUCKET=mko-bazuna-backups
-BACKUP_REGION=us-west-004
-BACKUP_S3_ENDPOINT=s3.us-west-004.backblazeb2.com
-RESTIC_PASSWORD=
-B2_KEY_ID=
-B2_APP_KEY=
-HEALTHCHECK_UUID=
-BACKUP_RETENTION_DAYS=7
-BACKUP_RETENTION_WEEKS=4
-```
-
-**Command:**
-```bash
-cp .env.docker.example .env.docker  # if template exists, or create new file
-```
-
----
-
-### Task 1.2: Create .env.docker.example Template
-
-**Priority:** High  
-**Effort:** Trivial  
-**File:** `.env.docker.example`
+**File:** `.env.docker.example` (NEW FILE)
 
 Create template file without actual secrets:
 
@@ -78,6 +50,13 @@ BACKUP_RETENTION_DAYS=7
 BACKUP_RETENTION_WEEKS=4
 ```
 
+**Command:**
+```bash
+# Copy example to create .env.docker
+cp .env.docker.example .env.docker
+# Then edit .env.docker to add actual values
+```
+
 ---
 
 ## Phase 2: Docker Compose Configuration
@@ -88,36 +67,7 @@ BACKUP_RETENTION_WEEKS=4
 **Effort:** Medium  
 **File:** `docker-compose.prod.yml`
 
-Replace existing backup service with enhanced version including media backup and Restic sync:
-
-**Current (lines 47-79):**
-```yaml
-backup:
-  image: postgres:18-alpine
-  environment:
-    POSTGRES_HOST: db
-    POSTGRES_PORT: 5432
-    POSTGRES_DB: ${POSTGRES_DB:-postgres}
-    POSTGRES_USER: ${POSTGRES_USER:-postgres}
-    PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
-  volumes:
-    - ./backups:/backups
-  command:
-    - /bin/sh
-    - -c
-    - |
-      set -e;
-      until pg_isready -h $$POSTGRES_HOST -p $$POSTGRES_PORT; do sleep 5; done;
-      while true; do
-        date=$$(date +%Y%m%d);
-        pg_dump -h $$POSTGRES_HOST -p $$POSTGRES_PORT
-          -U $$POSTGRES_USER -d $$POSTGRES_DB -F c
-          -f /backups/dump_$$date.dump;
-        echo "Backup completed: dump_$$date.dump";
-        find /backups -name 'dump_*.dump' -mtime +7 -delete 2>/dev/null || true;
-        sleep 86400;
-      done
-```
+Replace existing backup service with enhanced version:
 
 **Replace with:**
 ```yaml
@@ -133,8 +83,6 @@ backup:
     PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
     B2_KEY_ID: ${B2_KEY_ID}
     B2_APP_KEY: ${B2_APP_KEY}
-    RESTIC_PASSWORD: ${RESTIC_PASSWORD}
-    HEALTHCHECK_UUID: ${HEALTHCHECK_UUID}
     BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
     BACKUP_RETENTION_WEEKS: ${BACKUP_RETENTION_WEEKS:-4}
     BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT}
@@ -142,7 +90,6 @@ backup:
   volumes:
     - ./backups:/backups
     - media_volume:/media:ro
-    - /var/run/docker.sock:/var/run/docker.sock:ro
   secrets:
     - restic_pass
   command: /app/scripts/backup.sh
@@ -154,25 +101,22 @@ backup:
     - backup
 ```
 
----
-
 ### Task 2.2: Create Dockerfile.backup
 
 **Priority:** High  
 **Effort:** Small  
 **File:** `docker/Dockerfile.backup`
 
-Multi-stage Dockerfile with Restic and rclone:
+Multi-stage Dockerfile with Restic:
 
 ```dockerfile
 FROM alpine:3.20 AS base
 RUN apk add --no-cache \
     postgresql-client=18.* \
     restic=0.18.* \
-    rclone=1.67.* \
     curl=8.* \
     bash=5.* \
-    docker-cli=26.*
+    coreutils=9.*
 
 FROM base AS backup
 COPY scripts/backup.sh /app/scripts/backup.sh
@@ -180,15 +124,13 @@ RUN chmod +x /app/scripts/backup.sh
 ENTRYPOINT ["/app/scripts/backup.sh"]
 ```
 
----
-
 ### Task 2.3: Add Docker Secrets Configuration
 
 **Priority:** Medium  
 **Effort:** Small  
-**File:** `docker-compose.yml`
+**File:** `docker-compose.yml` (root level)
 
-Add secrets section to root level:
+Add secrets section:
 
 ```yaml
 secrets:
@@ -196,18 +138,16 @@ secrets:
     file: ./secrets/restic_pass.txt
 ```
 
----
-
-### Task 2.4: Create backup-secrets Example
+### Task 2.4: Create secrets directory
 
 **Priority:** Medium  
-**Effort:** Trivial  
-**File:** `scripts/secrets/restic_pass.example`
+**Effort:** Trivial
 
-```
-# Copy to secrets/restic_pass.txt and set actual password
-# chmod 600 secrets/restic_pass.txt
-your-restic-password-here
+```bash
+mkdir -p secrets
+# Create secrets/restic_pass.txt with the Restic password
+chmod 600 secrets/restic_pass.txt
+# Add secrets/ to .gitignore
 ```
 
 ---
@@ -228,15 +168,33 @@ set -euo pipefail
 
 # Configuration
 BACKUP_DIR="/backups"
+MEDIA_DIR="/media"
 DB_HOST="${POSTGRES_HOST:-db}"
 DB_PORT="${POSTGRES_PORT:-5432}"
 DB_NAME="${POSTGRES_DB:-postgres}"
 DB_USER="${POSTGRES_USER:-postgres}"
 B2_ACCESS_KEY="${B2_KEY_ID}"
 B2_SECRET_KEY="${B2_APP_KEY}"
-RESTIC_PASS="${RESTIC_PASSWORD}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 RETENTION_WEEKS="${BACKUP_RETENTION_WEEKS:-4}"
+
+# Cleanup old local backups (keep last 2 days for quick restore)
+cleanup_local_backups() {
+    find "${BACKUP_DIR}" -name 'db_*.dump' -mtime +2 -delete 2>/dev/null || true
+    find "${BACKUP_DIR}" -name 'media_*.tar.gz' -mtime +2 -delete 2>/dev/null || true
+}
+
+# Verify PostgreSQL dump integrity
+verify_db_dump() {
+    local dump_file="$1"
+    if pg_restore --list "${dump_file}" >/dev/null 2>&1; then
+        echo "✓ Verified: ${dump_file}"
+        return 0
+    else
+        echo "✗ CORRUPT: ${dump_file}"
+        return 1
+    fi
+}
 
 # Ensure backup directory exists
 mkdir -p "${BACKUP_DIR}"
@@ -256,48 +214,59 @@ done
 pg_dump -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -F c -f "${DB_DUMP}"
 echo "✓ Database backup: ${DB_DUMP}"
 
+# Verify dump integrity
+if ! verify_db_dump "${DB_DUMP}"; then
+    echo "ERROR: Database dump verification failed"
+    exit 1
+fi
+
 # Step 2: Media volume backup
 MEDIA_BACKUP="${BACKUP_DIR}/media_${TIMESTAMP}.tar.gz"
 
-# Get media volume data directory
-MEDIA_VOLUME_PATH="/var/lib/docker/volumes/mko_bazuna_media_volume/_data"
-if [ -d "${MEDIA_VOLUME_PATH}" ]; then
-    tar -czf "${MEDIA_BACKUP}" -C "${MEDIA_VOLUME_PATH}" .
+if [ -d "${MEDIA_DIR}" ]; then
+    tar -czf "${MEDIA_BACKUP}" -C "${MEDIA_DIR}" .
     echo "✓ Media backup: ${MEDIA_BACKUP}"
 else
-    echo "! Media volume not found at ${MEDIA_VOLUME_PATH}"
+    echo "! Media volume not found at ${MEDIA_DIR}, skipping"
 fi
 
 # Step 3: Initialize and run Restic backup
 export AWS_ACCESS_KEY_ID="${B2_ACCESS_KEY}"
 export AWS_SECRET_ACCESS_KEY="${B2_SECRET_KEY}"
-export RESTIC_PASSWORD="${RESTIC_PASS}"
+export RESTIC_PASSWORD_FILE="/run/secrets/restic_pass"
 
 REPO="s3:${BACKUP_S3_ENDPOINT:-s3.us-west-004.backblazeb2.com}/${BACKUP_BUCKET:-mko-bazuna-backups}"
 
 # Initialize repo if needed (non-fatal if exists)
-restic init --repo "${REPO}" --password-file <(echo "${RESTIC_PASS}") 2>/dev/null || true
+restic init --repo "${REPO}" 2>/dev/null || true
 
 # Run backup
 restic backup /backups \
     --repo "${REPO}" \
-    --password-file <(echo "${RESTIC_PASS}") \
-    --tag "${TIMESTAMP}" \
     --quiet
 
 echo "✓ Restic backup completed"
 
+# Verify Restic backup
+restic check --repo "${REPO}" || echo "Warning: repository check reported issues"
+
 # Step 4: Prune old backups
 restic forget --keep-daily "${RETENTION_DAYS}" --keep-weekly "${RETENTION_WEEKS}" --prune \
     --repo "${REPO}" \
-    --password-file <(echo "${RESTIC_PASS}") \
     --quiet
 
 echo "✓ Old backups pruned"
 
-# Step 5: Healthcheck ping
+# Step 5: Cleanup local backups after successful sync
+cleanup_local_backups
+echo "✓ Local backup files cleaned"
+
+# Step 6: Healthcheck ping
 if [ -n "${HEALTHCHECK_UUID:-}" ]; then
-    curl -fsS --retry 3 "https://hc-ping.com/${HEALTHCHECK_UUID}" || echo "Warning: healthcheck ping failed"
+    curl -fsS --retry 3 "https://hc-ping.com/${HEALTHCHECK_UUID}" || {
+        echo "ERROR: Healthcheck ping failed"
+        exit 1
+    }
 fi
 
 echo "Backup completed successfully: ${TIMESTAMP}"
@@ -305,8 +274,6 @@ echo "Backup completed successfully: ${TIMESTAMP}"
 # Schedule next run (daily)
 sleep 86400
 ```
-
----
 
 ### Task 3.2: Create restore.sh Script
 
@@ -322,17 +289,15 @@ set -euo pipefail
 
 # Configuration
 BACKUP_DIR="/backups"
-RESTORE_DIR="/restore"
 DB_HOST="${POSTGRES_HOST:-db}"
 DB_PORT="${POSTGRES_PORT:-5432}"
 DB_NAME="${POSTGRES_DB:-postgres}"
 DB_USER="${POSTGRES_USER:-postgres}"
-RESTIC_PASS="${RESTIC_PASSWORD}"
 
 # Safety check: confirm production
 if [ "${CONFIRM_RESTORE:-}" != "yes" ]; then
     echo "ERROR: CONFIRM_RESTORE=yes required for safety"
-    echo "Example: CONFIRM_RESTORE=yes ./restore.sh"
+    echo "Example: CONFIRM_RESTORE=yes docker compose run --rm backup /app/scripts/restore.sh"
     exit 1
 fi
 
@@ -361,25 +326,27 @@ echo "Latest backup: ${LATEST_DB_DUMP}"
 
 # Step 4: Restore database
 echo "Restoring database..."
-pg_restore -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
-    --clean --if-exists "${LATEST_DB_DUMP}"
+if ! pg_restore -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+    --clean --if-exists "${LATEST_DB_DUMP}"; then
+    echo "ERROR: Database restore failed"
+    echo "Restore halted - media files will NOT be restored to prevent inconsistency"
+    exit 1
+fi
 
 echo "✓ Database restored"
 
 # Step 5: Restore media if available
 if [ -n "${LATEST_MEDIA_TAR:-}" ]; then
     echo "Restoring media files..."
-    docker run --rm \
-        -v mko_bazuna_media_volume:/media \
-        -v "${BACKUP_DIR}:/backups" \
-        alpine sh -c "cd /media && tar -xzf ${LATEST_MEDIA_TAR}"
+    if ! tar -xzf "${LATEST_MEDIA_TAR}" -C "${MEDIA_DIR:-/media}" 2>/dev/null; then
+        echo "ERROR: Media restore failed"
+        exit 1
+    fi
     echo "✓ Media restored"
 fi
 
 echo "Restore completed. Remember to run migrations if needed."
 ```
-
----
 
 ### Task 3.3: Create verify-backup.sh Script
 
@@ -394,7 +361,6 @@ Backup integrity verification:
 set -euo pipefail
 
 BACKUP_DIR="${1:-./backups}"
-RESTIC_PASS="${RESTIC_PASSWORD}"
 
 echo "Verifying backup integrity..."
 
@@ -402,19 +368,19 @@ echo "Verifying backup integrity..."
 for dump in "${BACKUP_DIR}"/db_*.dump; do
     if [ -f "$dump" ]; then
         echo "Checking: $dump"
-        pg_restore --list "$dump" > /dev/null && echo "  ✓ Valid"
+        pg_restore --list "$dump" > /dev/null && echo "  ✓ Valid" || echo "  ✗ CORRUPT"
     fi
 done
 
 # Verify Restic repository
-export RESTIC_PASSWORD="${RESTIC_PASS}"
+export export RESTIC_PASSWORD_FILE="/run/secrets/restic_pass"
 export AWS_ACCESS_KEY_ID="${B2_KEY_ID}"
 export AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}"
 
 REPO="s3:${BACKUP_S3_ENDPOINT:-s3.us-west-004.backblazeb2.com}/${BACKUP_BUCKET:-mko-bazuna-backups}"
 
 echo "Checking Restic repository..."
-restic check --repo "${REPO}" --password-file <(echo "${RESTIC_PASS}") || echo "Warning: repository check failed"
+restic check --repo "${REPO}" || echo "Warning: repository check failed"
 
 echo "Verification complete"
 ```
@@ -429,7 +395,7 @@ echo "Verification complete"
 **Effort:** Small  
 **File:** `Makefile`
 
-Add new targets after existing backup section (after line 120):
+Add new targets:
 
 ```makefile
 # ====================== Enhanced Backups ======================
@@ -455,8 +421,8 @@ verify-backups:
 media-backup:
 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
 	docker run --rm -v mko_bazuna_media_volume:/media \
-	-v $(BACKUPS_DIR):/backups alpine tar -czf /backups/media_$${TIMESTAMP}.tar.gz -C /media . && \
-	echo "✓ Media backup created: $(BACKUPS_DIR)/media_$${TIMESTAMP}.tar.gz"
+	-v $(PWD)/backups:/backups alpine tar -czf /backups/media_$${TIMESTAMP}.tar.gz -C /media . && \
+	echo "✓ Media backup created: backups/media_$${TIMESTAMP}.tar.gz"
 ```
 
 ---
@@ -469,13 +435,7 @@ media-backup:
 **Effort:** Medium  
 **File:** `docs/ops/restore.md`
 
-Add sections for:
-- Media restore procedure
-- Restic-based restore
-- Offsite recovery
-- Backup verification
-
----
+Add sections for media restore, Restic-based restore, offsite recovery.
 
 ### Task 5.2: Create Backup Operations Guide
 
@@ -483,11 +443,7 @@ Add sections for:
 **Effort:** Small  
 **File:** `docs/ops/backup-operations.md`
 
-Create comprehensive guide covering:
-- Enabling backup profile
-- Monitoring backup status
-- Manual backup triggers
-- Backup storage locations
+Guide covering enabling backup profile, monitoring, manual triggers.
 
 ---
 
@@ -504,8 +460,6 @@ ls -la ./backups/
 pg_restore --list ./backups/db_*.dump | head -20
 ```
 
----
-
 ### Task 6.2: Test Media Backup
 
 **Priority:** High  
@@ -516,8 +470,6 @@ make media-backup
 ls -la ./backups/media_*.tar.gz
 tar -tzf ./backups/media_*.tar.gz | head -5
 ```
-
----
 
 ### Task 6.3: Test Backup Service
 
@@ -536,18 +488,17 @@ docker compose logs -f backup
 
 | Task ID | Description | Priority | Effort | Dependencies |
 |---------|-------------|----------|--------|--------------|
-| 1.1 | Create .env.docker.example | High | Trivial | None |
-| 1.2 | Documentation only | Medium | Trivial | None |
-| 2.1 | Update backup service config | High | Medium | None |
+| 1.1 | Create .env.docker.example template | High | Trivial | None |
+| 2.1 | Update backup service in docker-compose.prod.yml | High | Medium | None |
 | 2.2 | Create Dockerfile.backup | High | Small | None |
-| 2.3 | Add secrets configuration | Medium | Small | None |
-| 2.4 | Create secrets example | Medium | Trivial | 2.3 |
-| 3.1 | Create backup.sh script | High | Medium | 2.1, 2.2 |
-| 3.2 | Create restore.sh script | High | Medium | 3.1 |
+| 2.3 | Add secrets configuration to docker-compose.yml | Medium | Small | None |
+| 2.4 | Create secrets directory with example | Medium | Trivial | 2.3 |
+| 3.1 | Create backup.sh with verification | High | Medium | 2.1, 2.2, 2.3 |
+| 3.2 | Create restore.sh with error handling | High | Medium | 2.1, 2.2 |
 | 3.3 | Create verify-backup.sh | Medium | Small | None |
 | 4.1 | Update Makefile targets | High | Small | 3.x |
-| 5.1 | Update restore documentation | Medium | Medium | 3.x |
-| 5.2 | Create backup operations guide | Medium | Small | 4.1 |
+| 5.1 | Update docs/ops/restore.md | Medium | Medium | 3.x |
+| 5.2 | Create docs/ops/backup-operations.md | Medium | Small | 4.1 |
 | 6.1 | Test database backup | High | Small | 1.1, 3.1 |
 | 6.2 | Test media backup | High | Small | 3.1 |
 | 6.3 | Test backup service | High | Medium | 2.1, 3.1 |
@@ -557,7 +508,7 @@ docker compose logs -f backup
 ## Execution Order
 
 ```
-1. Configuration (1.1 → 1.2, parallel)
+1. Configuration (Task 1.1)
 2. Docker Setup (2.1 → 2.2 → 2.3 → 2.4)
 3. Scripts (3.1 → 3.2 → 3.3, parallel after 3.1)
 4. Makefile (4.1, after 3.x)
@@ -572,15 +523,17 @@ docker compose logs -f backup
 | Risk | Mitigation |
 |------|------------|
 | Large backup files may exhaust disk | Monitor with healthchecks, implement alerts |
-| Media volume path may differ on some systems | Check at runtime with docker volume inspect |
+| Media volume path may differ on some systems | Volume mount to /media eliminates path issues |
 | Restic repository corruption | Run weekly verification checks |
 | Secret exposure in container | Use Docker secrets, never commit to repo |
+| docker.sock security risk | Removed - using volume mounts instead |
 
 ---
 
 ## Estimated Timeline
 
-- **Phase 1-2:** 1-2 hours
+- **Phase 1:** 30 minutes
+- **Phase 2:** 1-2 hours
 - **Phase 3:** 2-3 hours
 - **Phase 4-5:** 1 hour
 - **Phase 6:** 1-2 hours (testing)

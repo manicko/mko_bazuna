@@ -14,12 +14,12 @@ related:
 
 ## Purpose
 
-Document search UI patterns and implementation strategies for the Mko Bazuna classifieds board. Search is over Russian content with Montenegrin query translation support.
+Document search UI patterns and implementation strategies for the Mko Bazuna classifieds board. Search is multi-language over Russian content with Russian, Bosnian, and English query translation support.
 
 ## Main Concepts
 
 - **Search-first architecture:** 70%+ of platform traffic originates from search
-- **Query translation:** Montenegrin queries translate to Russian before FTS
+- **Multi-language query translation:** Russian, Bosnian, and English queries translate to Russian before FTS
 - **Native PostgreSQL FTS:** No external search engine; uses `tsvector` + GIN index
 - **Empty state handling:** Friendly guidance when no results found
 
@@ -61,11 +61,11 @@ Related user stories: US-B2, US-B3, US-B7
 
 ## Query Translation Flow
 
-All content is stored in Russian; Montenegrin queries translate before search.
+All content is stored in Russian; Russian, Bosnian, and English queries translate to Russian before FTS.
 
 ### Process
 
-1. User enters Montenegrin query in search input
+1. User enters query in search input (Russian, Bosnian, or English)
 2. `deep-translator` library translates to Russian via Google Translate
 3. Translation passes through request cache to prevent duplicate calls
 4. PostgreSQL FTS executes on Russian-translated query
@@ -73,24 +73,24 @@ All content is stored in Russian; Montenegrin queries translate before search.
 
 ### Implementation
 
-```python
-# apps/search/utils.py
-def translate_query(query: str, target_lang: str = "ru") -> str:
-    """Translate search query to Russian for FTS compatibility."""
-    if not query:
-        return query
-    # Uses deep-translator wrapper with caching
-    return translator.translate(query, target_lang)
+Documented in `apps/search/services/query_translator.py`
 
-def search_ads(query: str, city_id: int | None = None) -> QuerySet:
-    """Search ads with Montenegrin→Russian translation."""
-    translated = translate_query(query)
-    return Ad.objects.search(translated, city_id=city_id)
+```python
+# apps/search/services/query_translator.py
+def translate_query(text: str, source_locale: str, target_locale: str) -> str:
+    """Translate text from source_locale to target_locale using deep-translator."""
+    if not text or not text.strip():
+        return text
+    
+    # ... implements timeout, caching, and circuit-breaker for gracefull degradation
+    
+    return translated_text
+
 ```
 
 ### Privacy Note
 
-Only ad title/description content is sent to translation API; no user PII (telegram_id, username, IP) is included. See decision G and privacy policy documentation.
+Only ad title/description content is sent to translation API; no user PII (telegram_id, username, IP) is included. See decision G and privacy policy documentation. Translation uses Russian, Bosnian, and English multi-language support for Russian content access.
 
 Related user stories: US-B2
 
@@ -186,7 +186,7 @@ Category names are searchable via denormalized field in `search_vector`.
 - `category_name` is denormalized into `ads.category_name` field
 - Included in `search_vector` with weight 'C'
 - Single-word queries matching category names set `category_id` filter
-- Montenegrin queries translate to Russian before matching
+- All queries translate to Russian before matching
 
 Related user stories: US-B3, US-B6
 

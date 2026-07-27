@@ -104,6 +104,46 @@
     "functions": []
   },
   {
+    "path": "backend/apps/ads/migrations/0004_ad_i18n_columns.py",
+    "module": "backend.apps.ads.migrations.0004_ad_i18n_columns",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/0005_multi_lang_search_vector.py",
+    "module": "backend.apps.ads.migrations.0005_multi_lang_search_vector",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/0006_backfill_translations.py",
+    "module": "backend.apps.ads.migrations.0006_backfill_translations",
+    "layer": "other",
+    "imports": [
+      "django.db",
+      "deep_translator"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": [
+      "_translate_text",
+      "backfill_translations"
+    ]
+  },
+  {
     "path": "backend/apps/ads/migrations/__init__.py",
     "module": "backend.apps.ads.migrations.__init__",
     "layer": "other",
@@ -133,6 +173,8 @@
     "functions": [
       "__str__",
       "transition_to",
+      "get_title",
+      "get_description",
       "__str__",
       "image_url"
     ]
@@ -144,6 +186,46 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/ads/tests/test_ad_localization.py",
+    "module": "backend.apps.ads.tests.test_ad_localization",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "django.test"
+    ],
+    "classes": [
+      "TestAdGetTitle",
+      "TestAdGetDescription"
+    ],
+    "functions": [
+      "_make_ad",
+      "test_returns_bs_when_present",
+      "test_returns_en_when_present",
+      "test_returns_ru_with_default_locale",
+      "test_fallback_ru_when_bs_is_none",
+      "test_fallback_ru_when_bs_is_empty",
+      "test_fallback_original_when_locale_and_ru_are_none",
+      "test_fallback_original_when_locale_and_ru_are_empty",
+      "test_unknown_locale_falls_to_ru_when_present",
+      "test_returns_empty_when_all_fields_are_none",
+      "test_returns_empty_when_all_fields_are_empty",
+      "test_whitespace_only_is_truthy_and_returned",
+      "test_none_locale_field_skips_gracefully",
+      "test_returns_bs_when_present",
+      "test_returns_en_when_present",
+      "test_returns_ru_with_default_locale",
+      "test_fallback_ru_when_bs_is_none",
+      "test_fallback_ru_when_bs_is_empty",
+      "test_fallback_original_when_locale_and_ru_are_none",
+      "test_fallback_original_when_locale_and_ru_are_empty",
+      "test_unknown_locale_falls_to_ru_when_present",
+      "test_returns_empty_when_all_fields_are_none",
+      "test_returns_empty_when_all_fields_are_empty",
+      "test_whitespace_only_is_truthy_and_returned",
+      "test_none_locale_field_skips_gracefully"
+    ]
   },
   {
     "path": "backend/apps/ads/tests/test_media_security.py",
@@ -579,7 +661,8 @@
     ],
     "classes": [],
     "functions": [
-      "plausible_host"
+      "plausible_host",
+      "language"
     ]
   },
   {
@@ -596,9 +679,13 @@
       "AdSource",
       "AnalyticsEventType",
       "ModeratorActionType",
-      "CategoryRejectReason"
+      "CategoryRejectReason",
+      "LanguageLocale"
     ],
-    "functions": []
+    "functions": [
+      "values",
+      "fts_config"
+    ]
   },
   {
     "path": "backend/apps/core/management/__init__.py",
@@ -794,6 +881,36 @@
     ]
   },
   {
+    "path": "backend/apps/core/middleware/__init__.py",
+    "module": "backend.apps.core.middleware.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/core/middleware/language.py",
+    "module": "backend.apps.core.middleware.language",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "typing",
+      "django.utils.deprecation",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "LanguagePreMiddleware"
+    ],
+    "functions": [
+      "process_request",
+      "process_response",
+      "_apply_lang_param",
+      "_set_language_code",
+      "_parse_accept_language",
+      "_is_valid_language"
+    ]
+  },
+  {
     "path": "backend/apps/core/migrations/0001_verify_lifecycle_indexes.py",
     "module": "backend.apps.core.migrations.0001_verify_lifecycle_indexes",
     "layer": "other",
@@ -864,6 +981,19 @@
     ]
   },
   {
+    "path": "backend/apps/core/templatetags/localized_content.py",
+    "module": "backend.apps.core.templatetags.localized_content",
+    "layer": "other",
+    "imports": [
+      "django"
+    ],
+    "classes": [],
+    "functions": [
+      "get_title",
+      "get_description"
+    ]
+  },
+  {
     "path": "backend/apps/core/tests/__init__.py",
     "module": "backend.apps.core.tests.__init__",
     "layer": "other",
@@ -911,6 +1041,26 @@
     ]
   },
   {
+    "path": "backend/apps/core/tests/test_context_processors.py",
+    "module": "backend.apps.core.tests.test_context_processors",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.http",
+      "django.test",
+      "apps.core.context_processors"
+    ],
+    "classes": [
+      "LanguageContextProcessorTests"
+    ],
+    "functions": [
+      "test_returns_dict_with_language_code_key",
+      "test_extracts_language_code_from_request",
+      "test_defaults_to_russian_when_not_set",
+      "test_handles_explicit_russian"
+    ]
+  },
+  {
     "path": "backend/apps/core/tests/test_create_admin_user.py",
     "module": "backend.apps.core.tests.test_create_admin_user",
     "layer": "other",
@@ -937,6 +1087,55 @@
       "test_sets_password_correctly",
       "test_lock_id_is_create_admin",
       "test_idempotent_on_rerun"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_language_locale.py",
+    "module": "backend.apps.core.tests.test_language_locale",
+    "layer": "other",
+    "imports": [
+      "django.test",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "LanguageLocaleTests"
+    ],
+    "functions": [
+      "test_language_locale_values",
+      "test_fts_config_property"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_language_middleware.py",
+    "module": "backend.apps.core.tests.test_language_middleware",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "unittest.mock",
+      "django.http",
+      "django.test",
+      "apps.core.middleware.language"
+    ],
+    "classes": [
+      "LanguagePreMiddlewareTests"
+    ],
+    "functions": [
+      "_make_request",
+      "setUp",
+      "test_lang_param_overrides_cookie",
+      "test_lang_param_overrides_accept_language",
+      "test_lang_param_valid_values",
+      "test_invalid_lang_param_defaults_to_russian",
+      "test_cookie_overrides_accept_language",
+      "test_cookie_valid_values",
+      "test_accept_language_parsed",
+      "test_accept_language_with_region_tag",
+      "test_accept_language_simple_tag",
+      "test_accept_language_unsupported_falls_back",
+      "test_accept_language_empty_string",
+      "test_default_to_russian",
+      "test_cookie_set_when_lang_param_used",
+      "test_cookie_not_set_when_no_lang_param"
     ]
   },
   {
@@ -1622,7 +1821,9 @@
       "record_failure",
       "translate_query_bs_to_ru",
       "translate_cached",
-      "invalidate_translation_cache"
+      "invalidate_translation_cache",
+      "translate_cached_generic",
+      "translate_query"
     ]
   },
   {
@@ -1722,12 +1923,12 @@
       "apps.analytics.models",
       "apps.categories.models",
       "apps.core.enums",
-      "apps.search.services.query_translator",
       "django.contrib.postgres.search",
       "django.http",
       "django.shortcuts",
       "django.core.paginator",
       "apps.core.utils.sanitize",
+      "apps.search.services.query_translator",
       "difflib"
     ],
     "classes": [],
@@ -2211,7 +2412,8 @@
       "asgiref.sync",
       "deep_translator",
       "asgiref.sync",
-      "apps.moderation.services.auto_moderation"
+      "apps.moderation.services.auto_moderation",
+      "deep_translator"
     ],
     "classes": [
       "AdCreateForm"
@@ -2248,7 +2450,10 @@
       "translate_to_russian",
       "translate_one",
       "update_ad_and_moderate",
-      "_update_and_moderate"
+      "_update_and_moderate",
+      "_do_translate_to",
+      "translate_all_languages",
+      "translate_one"
     ]
   },
   {
@@ -2604,6 +2809,28 @@
       "test_uuid_v4_format",
       "test_unique_keys",
       "test_no_pii_in_key"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_multi_lang_translation.py",
+    "module": "telegram_bot.tests.test_multi_lang_translation",
+    "layer": "other",
+    "imports": [
+      "unittest.mock",
+      "telegram_bot.handlers.ad_create"
+    ],
+    "classes": [
+      "TestTranslateAllLanguages"
+    ],
+    "functions": [
+      "test_returns_dict_with_all_locale_codes",
+      "test_translation_non_empty_for_valid_input",
+      "test_translates_each_locale_independently",
+      "test_timeout_fallback_returns_original_text",
+      "test_partial_failure_falls_back_per_locale",
+      "_side_effect",
+      "test_empty_string_input",
+      "test_single_locale"
     ]
   },
   {

@@ -592,7 +592,59 @@ Privacy consent collection at page bottom.
 | Border | `border-t border-gray-200` |
 | Shadow | `shadow-lg` |
 
----
+### Language Switcher
+
+Multi-language interface for Russian, Bosnian, and English content.
+
+```html
+<div class="relative inline-block">
+    <button type="button" class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1" aria-label="Language">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m0 4v10m4-10v6m4-2h-4m4-2h-4"></path>
+        </svg>
+        <span id="current-lang" class="lang-flag ru">{{ LANGUAGE_CODE|default:'ru' }}</span>
+    </button>
+    
+    <div class="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" id="lang-menu">
+        <div class="py-1">
+            <a href="?lang=ru" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 language-link" data-lang="ru">
+                <span class="inline-block w-4 h-4 mr-2 flag-icon flag-ru"></span>
+                Russian
+            </a>
+            <a href="?lang=bs" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 language-link" data-lang="bs">
+                <span class="inline-block w-4 h-4 mr-2 flag-icon flag-bs"></span>
+                Bosnian
+            </a>
+            <a href="?lang=en" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 language-link" data-lang="en">
+                <span class="inline-block w-4 h-4 mr-2 flag-icon flag-en"></span>
+                English
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle language menu
+    document.querySelector('.language-link').addEventListener('click', function(e) {
+        e.preventDefault();
+        const lang = this.getAttribute('data-lang');
+        document.cookie = 'lang_pref=' + lang + '; path=/; max-age=31536000';
+        window.location.href = this.href;
+    });
+});
+</script>
+```
+
+| Property | Value |
+|----------|-------|
+| Position | `relative inline-block` |
+| Background | `bg-white` |
+| Border | `border border-gray-200` |
+| Shadow | `shadow-lg` |
+| Cookie | Sets `lang_pref` cookie |
+| Middleware | Uses `LanguagePreMiddleware` |
+| Pages | All templates (header navigation) |
 
 ## Component Usage Matrix
 
@@ -611,5 +663,6 @@ Privacy consent collection at page bottom.
 | Header | All | All templates | ✅ Implemented |
 | Pagination | List | `ads/partials/ad_list.html` | ✅ Implemented |
 | Consent Banner | All | `components/consent_banner.html` | ✅ Implemented |
+| Language Switcher | All | `components/language_switcher.html` | ✅ Implemented |
 | Filter Sidebar | Planned | `filter-ui.md` | 📋 Documented |
 | Mobile Drawer | Planned | `filter-ui.md` | 📋 Documented |

@@ -16,6 +16,10 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── settings
 │   │   ├── urls.py
 │   │   └── wsgi.py
+│   ├── locale
+│   │   ├── bs
+│   │   ├── en
+│   │   └── ru
 │   ├── manage.py
 │   ├── templates
 │   │   ├── admin
@@ -49,7 +53,8 @@ C:\py_dev\mko_bazuna\src
 │       ├── test_claim_login_token.py
 │       ├── test_create_draft_ad.py
 │       ├── test_login_claim.py
-│       └── test_media.py
+│       ├── test_media.py
+│       └── test_multi_lang_translation.py
 ├── templates
 └── theme
     ├── apps.py
