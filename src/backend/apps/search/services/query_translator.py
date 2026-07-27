@@ -1,8 +1,9 @@
 """
 Query translator service for Mko Bazuna.
 
-Translates Bosnian search queries to Russian for FTS search.
-Implements timeout (~500ms), fallback, 5-minute cache, and circuit-breaker
+Translates search queries between supported languages for FTS search.
+Supports any language pair via deep-translator (Google Translate).
+Implements timeout (~500ms), fallback, LRU cache, and circuit-breaker
 for graceful degradation under translator throttling.
 """
 
@@ -143,5 +144,76 @@ def translate_cached(query: str) -> str:
 
 
 def invalidate_translation_cache() -> None:
-    """Invalidate the translation cache."""
+    """Invalidate the translation caches for both legacy and generic translators."""
     translate_cached.cache_clear()
+    translate_cached_generic.cache_clear()
+
+@lru_cache(maxsize=256)
+def translate_cached_generic(query: str, source_locale: str, target_locale: str) -> str:
+    """
+    Cached translation function supporting any language pair.
+
+    Uses lru_cache with maxsize=256 to cache translations.
+    The cache is invalidated by calling invalidate_translation_cache().
+
+    Args:
+        query: The text to translate
+        source_locale: Source language code (e.g., "bs", "ru", "en")
+        target_locale: Target language code (e.g., "ru", "en")
+
+    Returns:
+        Translated text
+    """
+    translator = GoogleTranslator(source=source_locale, target=target_locale)
+    return translator.translate(query)
+
+def translate_query(text: str, source_locale: str, target_locale: str) -> str:
+    """
+    Translate text from source_locale to target_locale via deep-translator.
+
+    Generalized version supporting any language pair.
+    Uses timeout, fallback, and circuit-breaker pattern for graceful degradation.
+
+    Args:
+        text: The text to translate
+        source_locale: Source language code (e.g., "bs", "ru", "en")
+        target_locale: Target language code (e.g., "ru", "en")
+
+    Returns:
+        Translated text, or original text on failure
+    """
+    if not text or not text.strip():
+        return text
+
+    if _CIRCUIT_BREAKER.is_open:
+        logger.info(
+            "Circuit open -- fallback to original text '%s' (breaker)",
+            sanitize_query_for_log(text),
+        )
+        return text
+
+    try:
+        future = _EXECUTOR.submit(translate_cached_generic, text, source_locale, target_locale)
+        result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
+        if result:
+            _CIRCUIT_BREAKER.record_success()
+            logger.debug(
+                "Translated '%s' (%s->%s) -> '%s'",
+                sanitize_query_for_log(text),
+                source_locale,
+                target_locale,
+                sanitize_query_for_log(result),
+            )
+            return result
+    except (TimeoutError, RequestException, Exception) as e:
+        _CIRCUIT_BREAKER.record_failure()
+        logger.warning(
+            "Translation failed for text '%s' (%s->%s): %s",
+            sanitize_query_for_log(text),
+            source_locale,
+            target_locale,
+            e,
+        )
+
+    logger.info("Translation fallback: returning original text '%s'", sanitize_query_for_log(text))
+    return text
