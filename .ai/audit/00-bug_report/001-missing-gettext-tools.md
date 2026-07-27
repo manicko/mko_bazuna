@@ -1,49 +1,64 @@
 ---
 id: 001
-title: Missing GNU gettext tools (msgfmt) on Windows development environment
+title: Translation compilation must be performed inside the Docker environment
 date: 2026-07-27
 author: automated
 affected_task: TASK_009 — Create Locale Directory Structure
+severity: medium
 ---
 
-# Missing GNU gettext tools (msgfmt) on Windows development environment
+# Translation compilation should run inside Docker
 
 ## Description
 
-`django-admin compilemessages` requires `msgfmt` from GNU gettext tools (>=0.19).
-The tool is not installed on the Windows development machine, preventing compilation
-of `.po` files into `.mo` files.
+The current workflow assumes `django-admin compilemessages` is executed directly on
+the host machine (for example, via `uv run django-admin compilemessages`).
+
+This is inconsistent with the project's Docker-first development model, where all
+management commands are expected to run inside the application container.
+
+Running `compilemessages` on the host introduces an unnecessary dependency on the
+host operating system (GNU gettext / `msgfmt`) and makes the development workflow
+platform-dependent.
 
 ## Impact
 
-- `uv run django-admin compilemessages` fails with: `CommandError: Can't find msgfmt. Make sure you have GNU gettext tools 0.19 or newer installed.`
-- `.mo` binary files cannot be generated from `.po` source files.
-- Django i18n will not function at runtime without `.mo` files.
+- Developers are instructed to install GNU gettext locally even though the project
+  already provides a Dockerized development environment.
+- Windows, macOS and Linux developers may require different installation steps.
+- The development environment becomes less reproducible.
+- The command may succeed in CI or Docker while failing on the host, or vice versa,
+  leading to inconsistent behavior.
 
-## Recommended Fix
+## Expected Behavior
 
-Install GNU gettext tools on the development machine:
+Translation compilation should be executed inside the Docker container, using the
+same environment as the application itself.
 
-**Option 1 — Chocolatey:**
-```
-choco install gettext
-```
+Example:
 
-**Option 2 — MSYS2:**
-```
-pacman -S mingw-w64-x86_64-gettext
-```
-
-**Option 3 — Manual:**
-Download from https://mlocati.github.io/articles/gettext-iconv-windows.html and
-add the `bin/` directory to `PATH`.
-
-After installation, verify with:
-```
-msgfmt --version
+```bash
+docker compose exec web uv run django-admin compilemessages
 ```
 
-Then re-run:
+or
+
+```bash
+docker compose exec web python manage.py compilemessages
 ```
-uv run django-admin compilemessages
-```
+
+## Required Changes
+
+1. Ensure the application image includes GNU gettext (`msgfmt`).
+2. Execute `compilemessages` exclusively inside the `web` container.
+3. Update project documentation to use the Docker command instead of invoking
+   Django directly on the host.
+4. Remove any requirement for developers to install GNU gettext on their local
+   machines unless they intentionally run Django outside Docker.
+
+## Benefits
+
+- Single, reproducible development environment.
+- No platform-specific setup instructions.
+- Consistent behavior between development, CI and production.
+- Reduced onboarding complexity for new developers.

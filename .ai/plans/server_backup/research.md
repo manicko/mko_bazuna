@@ -483,6 +483,291 @@ docker compose start web bot
 | **.env.docker in repository** | Use .env.docker.example + environment secrets |
 | **Media files have no PII** | Only UUID-based keys, safe for cloud storage |
 
+### 10.1 Encryption Options by Tool
+
+| Tool | Encryption Method | Key Management | Notes |
+|------|-------------------|----------------|-------|
+| **pg_dump** | GPG (external) | Manual key rotation | Add `gpg --encrypt` step to backup pipeline |
+| **Restic** | AES-256 | Password/passphrase | Keys derived via Argon2, lose password = lose data |
+| **Borg** | repokey-blake2, keyfile-blake2, authenticated | Password | Most robust key management options |
+| **Duplicati** | AES-256 | Password | GUI key management, .NET crypto libraries |
+| **WAL-G** | GPG, SSE-C | Manual | Supports cloud provider server-side encryption |
+
+### 10.2 Recommended Security Setup
+
+1. **Database dumps:** Encrypt with GPG before upload to cloud:
+   ```bash
+   pg_dump ... | gpg --encrypt --recipient backup@mko-bazuna.rs > dump.gpg
+   ```
+2. **Restic password:** Store in Docker secret or `.env.docker` (never in repo)
+3. **Cloud bucket:** Enable S3 Object Lock if supported (for ransomware protection)
+
+---
+
+## 11. Backup Tool Comparison for Small/Budget Projects (2026)
+
+### 11.1 Tool Matrix
+
+| Tool | Type | PITR | Cloud Storage | Incremental | Complexity | Notes |
+|------|------|------|---------------|-------------|------------|-------|
+| **pg_dump** | Logical | No | Manual | No | Low | Built into PostgreSQL, portable SQL/custom format |
+| **pg_basebackup** | Physical | With WAL | Manual | No | Low-Medium | Built-in, consistent physical copy |
+| **wal-e** | Physical | Yes | S3 | Delta pages | Low | Legacy predecessor to WAL-G, unmaintained |
+| **WAL-G** | Physical | Yes | S3/GCS/Azure/B2 | Delta pages | Low-Medium | Cloud-native, Go, successor to WAL-E |
+| **pgBackRest** | Physical | Yes | S3/GCS/Azure | Block-level | Medium | Gold standard, now coalition-funded |
+| **Barman** | Physical | Yes | S3 + dedicated server | File-level (rsync) | Medium-High | Centralized management, requires dedicated backup host |
+| **Restic** | File-level | No (for DB) | 15+ backends | Deduplication | Low | Go, forever-incremental model, strong verification |
+| **BorgBackup** | File-level | No (for DB) | SSH/rsync.net | Deduplication | Low | Python, excellent compression, repokey-blake2 encryption |
+| **Duplicati** | File-level | No (for DB) | 50+ backends | Deduplication | Low | .NET/Mono, GUI-first, cross-platform |
+
+### 11.2 PostgreSQL-Specific Tools Analysis
+
+#### pg_dump (Current Implementation)
+**Pros:**
+- Zero setup, built into PostgreSQL
+- Portable format works across versions
+- Understandable output (can inspect SQL)
+- Low CPU/memory overhead
+
+**Cons:**
+- No point-in-time recovery
+- Full dump every time (24h RPO)
+- No differential/incremental support
+- Requires consistent filesystem state for media files
+
+**Best for:** Small databases (<100GB), simple needs, development environments
+
+#### wal-e (Legacy)
+**Status:** Unmaintained since ~2020. Superseded by WAL-G.
+
+**Do not use** — no security updates, missing features, WAL-G is direct replacement.
+
+#### WAL-G
+**Pros:**
+- Continuous WAL archiving → PITR capability
+- Cloud-native (S3/B2/GCS/Azure out of the box)
+- Delta (page-level) backups save bandwidth
+- Low operational overhead
+- Supports compression (lz4, zstd)
+
+**Cons:**
+- Physical backup only (less portable across major versions)
+- No built-in retention management (requires external scripts)
+- Requires WAL configuration in postgresql.conf
+
+**Setup complexity:** Medium - requires WAL configuration and S3 credentials
+
+#### pgBackRest
+**Pros:**
+- Best-in-class incremental (block-level)
+- Comprehensive feature set (compression, encryption, retention)
+- Excellent documentation and reliability
+- Now coalition-funded (6 sponsors, improved bus factor)
+
+**Cons:**
+- More complex configuration
+- C language (needs compilation on some platforms)
+- Overkill for very small deployments
+
+**Best for:** Production workloads with PITR requirements
+
+#### Barman
+**Pros:**
+- Centralized management for multiple PostgreSQL servers
+- Professional support available (EDB)
+- Built-in retention policies
+
+**Cons:**
+- Requires dedicated backup server (infrastructure cost)
+- SSH key management overhead
+- No block-level incremental (rsync-based)
+
+**Best for:** Organizations managing many PostgreSQL instances
+
+### 11.3 General-Purpose Backup Tools
+
+#### Restic (v0.18+)
+**Pros:**
+- Forever-incremental + deduplication
+- 15+ cloud backends including S3/MinIO/B2
+- Password-based encryption (AES-256)
+- Strong integrity verification (HMAC-SHA256 + tree verification)
+- Active development, BSD-2 license
+
+**Cons:**
+- Not database-aware (needs filesystem-level backup for PostgreSQL)
+- `forget --prune` required for retention cleanup
+- Repository corruption risk if password lost
+
+**Setup:** `restic init` → `restic backup /var/lib/docker/volumes` → `restic forget --keep-daily 7 --prune`
+
+#### BorgBackup
+**Pros:**
+- Excellent deduplication (variable block sizes)
+- Authenticated encryption (repokey-blake2, keyfile-blake2)
+- Compression (lz4, zstd, zlib)
+- Prune with retention policies
+- Mature (10+ years)
+
+**Cons:**
+- SSH-focused backend (not native S3)
+- Single-maintainer project (risks)
+- Requires `borg serve` for remote storage
+
+**Borgmatic wrapper:** Declarative YAML config for scheduling, retention, hooks, notifications
+
+#### Duplicati (v2.0)
+**Pros:**
+- 50+ cloud backends
+- AES-256 encryption
+- Web GUI on port 8200
+- Cross-platform (Windows, macOS, Linux, Docker)
+
+**Cons:**
+- .NET/Mono dependency
+- Historical database-corruption issues (improved in v2.0)
+- Slower restore vs Borg/Restic
+
+**Best for:** Non-technical users wanting GUI-based backup
+
+### 11.4 Cloud Storage Backends Comparison
+
+| Provider | Storage Cost | Egress Cost | Free Tier | API | Notes |
+|----------|--------------|-------------|-----------|-----|-------|
+| **Backblaze B2** | $0.006/GB/month ($6/TB) | $0.01/GB (free via Cloudflare CDN) | 10GB storage + 30GB egress/month | S3-compatible | Best value for backup storage |
+| **AWS S3 Standard** | $0.023/GB/month ($23/TB) | $0.09/GB | 5GB free (12 months) | Native S3 | Most expensive, best ecosystem |
+| **Cloudflare R2** | $0.015/GB/month ($15/TB) | Free | 10GB + 10GB egress/day | S3-compatible | Good for moderate egress |
+| **Hetzner Storage** | €0.005/GB/month (~$0.006) | €0.001/GB (~$0.0015) | None | S3-compatible | Very cheap, limited regions |
+| **Wasabi** | $0.0069/GB/month | Free* | None | S3-compatible | *Subject to egress ratio limits |
+| **MinIO (self-hosted)** | Hardware cost only | N/A | None | S3-compatible | Archived Feb 2026 — **DO NOT use for new** |
+
+#### MinIO Status Update (April 2026)
+- **Archived:** GitHub repository archived April 25, 2026
+- **No binaries:** Pre-built binaries halted October 2025
+- **Community edition crippled:** Admin UI removed May 2025
+- **Security patches:** Case-by-case basis only
+
+**Replacements for self-hosted S3:**
+| Alternative | License | Stars (Apr 2026) | Min RAM | S3 Coverage | Notes |
+|-------------|---------|------------------|---------|-------------|-------|
+| **SeaweedFS** | Apache 2.0 | ~23K | ~512 MB | Good | Best all-around replacement |
+| **Garage** | AGPL v3 | ~4K | 1 GB | Core ops | Lightweight, geo-distributed |
+| **RustFS** | Apache 2.0 | ~4K | ~2 GB | Good | MinIO API drop-in |
+| **Ceph RGW** | LGPL 2.1 | ~14K | 16+ GB | Excellent | Enterprise scale, complex |
+
+---
+
+## 12. Recommendation for Mko Bazuna
+
+### 12.1 Current Architecture Constraints
+
+- **VPS resource limitations** (likely 2-4 CPU, 4-8 GB RAM, limited storage)
+- **PostgreSQL 18** data volume growing to 100GB+
+- **Media files** (photos) are largest data component
+- **No dedicated backup server** possible
+- **Budget constraints** for MVP phase
+
+### 12.2 Recommended Approach: **pg_dump + Restic + Backblaze B2**
+
+**Rationale:**
+
+1. **pg_dump** remains optimal for PostgreSQL backup due to:
+   - Zero additional dependencies (uses existing postgres:18-alpine image)
+   - Portable format for cross-version restores
+   - Sufficient RPO (24h) for classifieds platform
+
+2. **Restic** for archive layer because:
+   - Forever-incremental deduplication reduces storage costs
+   - Native S3-compatible backend support
+   - Encryption built-in (password-based, no separate key management)
+   - Strong integrity verification detects corruption early
+   - Can backup both database dumps AND media volumes in one workflow
+
+3. **Backblaze B2** as storage backend because:
+   - $6/TB/month is 4x cheaper than AWS S3 ($23/TB)
+   - 10GB free tier sufficient for testing
+   - S3-compatible API means easy provider switching
+   - Free egress through Cloudflare CDN integration
+
+### 12.3 Implementation Strategy
+
+#### Phase 1 (MVP - Immediate)
+```bash
+# Daily backup script (runs in existing backup container)
+# 1. PostgreSQL dump
+pg_dump -h db -U $POSTGRES_USER -d $POSTGRES_DB -F c -f /backups/db_dump_$(date +%Y%m%d).dump
+
+# 2. Media volume tar (mounted via docker volume)
+tar -czf /backups/media_$(date +%Y%m%d).tar.gz -C /var/lib/docker/volumes mko_bazuna_media_volume/_data
+
+# 3. Sync to B2 via rclone (lightweight, S3-compatible)
+rclone sync /backups b2:mko-bazuna-backups --min-age 1d
+```
+
+#### Phase 2 (Production-grade)
+1. Replace rclone with Restic for deduplication
+2. Add backup verification (`restic check`)
+3. Implement retention policies (`restic forget --keep-daily 7 --keep-weekly 4`)
+4. Add healthcheck monitoring (Healthchecks.io or cron monitoring)
+
+### 12.6 Automation and Verification
+
+| Aspect | Tool | Implementation |
+|--------|------|----------------|
+| **Scheduling** | cron in container | `@daily pg_dump && restic backup /backups` |
+| **Verification** | Restic check | `restic check --read-data` weekly |
+| **Alerting** | Healthchecks.io | `curl -fsS --retry 3 https://hc.pfelya/...` in backup script |
+| **Retention** | Restic forget | `restic forget --keep-daily 7 --keep-weekly 4 --prune` |
+| **Encryption** | Restic AES-256 | Password stored in Docker secret `/run/secrets/backup_pass` |
+
+### 12.7 One-Script Setup Example
+
+```bash
+#!/bin/sh
+set -e
+
+# 1. Backup PostgreSQL
+pg_dump -h db -U $POSTGRES_USER -d $POSTGRES_DB -F c \
+    -f /backups/db_$(date +%Y%m%d_%H%M%S).dump
+
+# 2. Tar media volume
+tar -czf /backups/media_$(date +%Y%m%d_%H%M%S).tar.gz \
+    -C /var/lib/docker/volumes mko_bazuna_media_volume/_data
+
+# 3. Sync with Restic to B2
+export AWS_ACCESS_KEY_ID="$B2_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$B2_APP_KEY"
+restic backup /backups \
+    --repo s3:s3.us-west-004.backblazeb2.com/mko-bazuna-backups \
+    --password-file /run/secrets/restic_pass \
+    --tag $(date +%Y%m%d)
+
+# 4. Cleanup and prune
+restic forget --keep-daily 7 --keep-weekly 4 --prune
+
+# 5. Healthcheck ping
+curl -fsS --retry 3 https://hc.pfelya/$HEALTHCHECK_UUID || true
+```
+
+### 12.8 Budget Projection (Monthly)
+
+| Component | Size | Retention | Monthly Cost (B2) |
+|-----------|------|-----------|-------------------|
+| DB dumps (compressed) | 50 MB | Daily x 7 | ~$0.0003 |
+| Media backup | 200 GB | Weekly x 4 | ~$2.40 |
+| **Total** | ~200 GB | | **~$2.40/month** |
+
+### 12.9 Why NOT Other Options
+
+| Tool | Reason for Rejection |
+|------|---------------------|
+| **WAL-G / pgBackRest** | Overkill for small database; require WAL configuration changes; minimal benefit vs complexity for <500GB |
+| **Barman** | Requires dedicated backup server (VPS cost + ops overhead) |
+| **Borg** | SSH-focused; No native S3 backend (needs rclone bridge or remote) |
+| **Duplicati** | GUI-focused; .NET dependency on Alpine Linux problematic |
+| **MinIO** | Project archived; no security updates; migration risk |
+| **wal-e** | Legacy, unmaintained, superseded by WAL-G |
+
 ---
 
 ## Appendix: File References

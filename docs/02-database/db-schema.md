@@ -78,27 +78,40 @@ Both check `expires_at > now()`; token compare via `hmac.compare_digest` (consta
 ```
 id (PK)
 user_id (FK → users.id)
-title (VARCHAR)
-description (TEXT)
-price (INT, nullable)                  # whole BAM units; multi-currency deferred (currency column removed — YAGNI)
+title (VARCHAR)                                    # Russian title (base storage; renamed from original in MVP)
+title_ru (VARCHAR, nullable)                      # Explicit Russian title for multi-language support
+title_en (VARCHAR, nullable)                      # English translation for UI display
+title_bs (VARCHAR, nullable)                      # Bosnian translation for UI display
+description (TEXT)                                # Russian description (base storage)
+description_ru (TEXT, nullable)                   # Explicit Russian description for multi-language support
+description_en (TEXT, nullable)                   # English translation for UI display
+description_bs (TEXT, nullable)                   # Bosnian translation for UI display
+original_language (VARCHAR(5), nullable)            # Source language code (e.g. 'ru', 'bs', 'en')
+price (INT, nullable)                             # whole BAM units; multi-currency deferred (currency column removed — YAGNI)
 category_id (FK → categories.id)
 city_id (FK → cities.id)
-category_name (VARCHAR, editable=False) # zone D1 (hybrid C): denormalized RUSSIAN category name; trigger-synced; in search_vector (weight 'C')
-status (StrEnum — see AdStatus)         # see db-enums.md
-source (StrEnum: TELEGRAM)              # phase 1 = bot only (decision B)
+category_name (VARCHAR, editable=False)             # zone D1 (hybrid C): denormalized RUSSIAN category name; trigger-synced; in search_vector (weight 'C')
+status (StrEnum — see AdStatus)                    # see db-enums.md
+source (StrEnum: TELEGRAM)                         # phase 1 = bot only (decision B)
 created_at / updated_at
-published_at (TIMESTAMP, nullable)      # drives archive/delete timers; UPDATED on every PUBLISHED transition (timer reset)
-original_published_at (TIMESTAMP, nullable) # set once on FIRST publish; IMMUTABLE, audit only
+published_at (TIMESTAMP, nullable)                 # drives archive/delete timers; UPDATED on every PUBLISHED transition (timer reset)
+original_published_at (TIMESTAMP, nullable)        # set once on FIRST publish; IMMUTABLE, audit only
 archived_at (TIMESTAMP, nullable)
 deleted_at (TIMESTAMP, nullable)
-moderation_failed_at (TIMESTAMP, nullable) # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
-rejected_at (TIMESTAMP, nullable)        # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
-search_vector (TSVECTOR)                 # NOT GENERATED ALWAYS — maintained by trigger (needs FK-lookup of category_name)
-published_by (FK → users.id, nullable, SET_NULL)  # moderator who manually published
-moderated_by (FK → users.id, nullable, SET_NULL)  # moderator who manually rejected
+moderation_failed_at (TIMESTAMP, nullable)         # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
+rejected_at (TIMESTAMP, nullable)                  # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
+search_vector (TSVECTOR)                            # NOT GENERATED ALWAYS — maintained by trigger (needs FK-lookup of category_name)
+published_by (FK → users.id, nullable, SET_NULL)    # moderator who manually published
+moderated_by (FK → users.id, nullable, SET_NULL)    # moderator who manually rejected
 ```
 
 **AdStatus** (StrEnum) — see [db-enums.md](db-enums.md) for the authoritative list and values.
+
+**Transitional note:** For backward compatibility, the original `title` and `description` columns
+are repurposed as `title_ru` and `description_ru`. New ads receive `title_ru`/`description_ru`
+populated with translated content; legacy ads fall back to `title`/`description`. The
+`get_title(locale)` and `get_description(locale)` methods implement the fallback chain:
+locale-specific column > Russian > original column.
 
 **Transitions:**
 - DRAFT → ON_MODERATION
@@ -122,22 +135,22 @@ moderated_by (FK → users.id, nullable, SET_NULL)  # moderator who manually rej
 ```
 id (PK)
 name (VARCHAR)                       # Russian name (base storage language)
-name_i18n (JSONB, nullable)          # zone D2: {"ru": <str>, "bs": <str>}; NULL → fallback to `name`
+name_i18n (JSONB, nullable)          # zone D2: {"ru": <str>, "bs": <str>, "en": <str>}; NULL → fallback to `name`
 slug (VARCHAR)
 parent_id (FK → categories.id, NULL)
 is_active (BOOL)
 ```
 Implemented via **django-mptt>=0.18.0**. No denormalized `path`/`level` columns.
 
-> Zone D2: i18n names stored in `name_i18n` JSONB (`ru`/`bs`); UI uses `get_name(locale)` with
-> Russian fallback. Detailed in decision O5.
+> Zone D2: i18n names stored in `name_i18n` JSONB (`ru`/`bs`/`en`); UI uses `get_name(locale)` with
+> Russian fallback.
 
 ### cities
 ```
 id (PK)
 country_code
 name (VARCHAR)                       # Russian name (base storage language)
-name_i18n (JSONB, nullable)          # zone D2: {"ru": <str>, "bs": <str>}
+name_i18n (JSONB, nullable)          # zone D2: {"ru": <str>, "bs": <str>, "en": <str>}
 region (VARCHAR)
 slug (VARCHAR)
 ```
@@ -150,12 +163,12 @@ City match is EXACT against the closed list; unrecognized city → "general / no
 id (PK)
 ad_id (FK → ads.id)
 image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: local MEDIA_ROOT via FileSystemStorage.
-                                        #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
+                                     #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
 position (INT)
-thumbnail_small (VARCHAR, nullable) # 240x180 thumbnail storage key
+thumbnail_small (VARCHAR, nullable)    # 240x180 thumbnail storage key
 thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
-thumbnail_large (VARCHAR, nullable) # 1280x960 thumbnail storage key
+thumbnail_large (VARCHAR, nullable)  # 1280x960 thumbnail storage key
 ```
 Only compressed Telegram photos (`message.photo`) accepted; `message.document` rejected. Bot downloads bytes and stores in our storage; `image` holds the served URL/key. `file_id` is NOT a URL and not usable in `<img src>` — stored as metadata only.
 
@@ -183,11 +196,11 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 - `GIN index` on `search_vector` (`IX_ads_search_gin`) — see [db-indexes.md](db-indexes.md).
 - **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN index after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
-- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Montenegrin query translated to Russian before search (decision G), so it matches the Russian category name.
+- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Queries detected by language and translated to Russian before search (decision G), so they match the Russian content.
 
-> Zone D5 / D6: seller input may be Montenegrin/Russian, but the bot MUST translate title+description
-> to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin UI translates back
-> on display.
+> Zone D5 / D6: seller input may be Montenegrin/Russian/English, but the bot MUST translate
+> title+description to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin/English
+> UI translates back on display.
 
 Category search works TWO ways: (1) FTS matches the category word via `category_name` in `search_vector`; (2) app-level fuzzy detect (`difflib`, as for cities) applies an explicit `category_id` filter when the query is a single word similar to a category name.
 

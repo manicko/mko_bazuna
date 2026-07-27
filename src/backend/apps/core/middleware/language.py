@@ -12,7 +12,6 @@ import logging
 from typing import Any
 
 from django.utils.deprecation import MiddlewareMixin
-from django.utils.translation import LANGUAGE_SESSION_KEY
 
 from apps.core.enums import LanguageLocale
 
@@ -74,7 +73,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
 
         # Persist preference in session for authenticated users.
         if hasattr(request, "session") and request.user.is_authenticated:
-            request.session[LANGUAGE_SESSION_KEY] = lang
+            request.session["django_language"] = lang
 
     def _set_language_code(self, request: Any, lang: str) -> None:
         """Set ``request.LANGUAGE_CODE`` to the given language code."""

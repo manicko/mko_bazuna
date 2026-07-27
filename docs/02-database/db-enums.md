@@ -74,3 +74,17 @@ reason text in `ModeratorActionLog` (never shown to seller, US-A11).
 | `ILLEGAL_GOODS` | illegal goods |
 | `SPAM_SCAM` | spam or scam |
 | `OFF_TOPIC` | off-topic content |
+
+## LanguageLocale
+Supported locale codes for UI and ad content. Maps to PostgreSQL text search
+configurations for language-aware search.
+
+| Value | Meaning | FTS Config |
+|-------|---------|----------|
+| `RUSSIAN` | Russian (base UI/content language) | `russian` |
+| `BOSNIAN` | Bosnian (Montenegrin Latin script) | `simple` |
+| `ENGLISH` | English | `english` |
+
+The `fts_config` property returns the appropriate PostgreSQL text search
+configuration name for each locale. Used by the search service to select the
+correct search configuration when queries are in different languages.

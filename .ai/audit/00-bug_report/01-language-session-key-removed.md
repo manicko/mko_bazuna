@@ -15,9 +15,7 @@ The middleware at `language.py` line 15 attempts to import it, which raises an
 
 ## Root Cause
 
-Django removed the public `LANGUAGE_SESSION_KEY` constant (which held the
-string `"_language"`). The Django 5.2 `LocaleMiddleware` now hardcodes the
-session key inline in its `process_response` method.
+Django 5.x removed the public LANGUAGE_SESSION_KEY constant from django.utils.translation. Applications that relied on importing this constant must now define their own session key or otherwise avoid depending on Django's internal implementation details.
 
 ## Impact
 
@@ -43,6 +41,10 @@ Replace the import with the hardcoded session key string `"_language"`,
 or define a local constant in the middleware module:
 
 ```python
+# language.py
+
+# Django 5.x no longer exports LANGUAGE_SESSION_KEY.
+# Define the session key locally to avoid depending on Django internals.
 LANGUAGE_SESSION_KEY = "_language"
 ```
 

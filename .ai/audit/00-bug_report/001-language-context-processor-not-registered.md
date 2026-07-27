@@ -41,7 +41,7 @@ Missing entries:
 
 - The locale-aware template filters (`get_title`/`get_description`) silently fall back to the Russian `title`/`description` fields instead of returning localized content per the user's language preference.
 - The language switcher component displays an empty/invalid current language code.
-- Users will always see Russian content regardless of their `lang_pref` cookie or `?lang=X` parameter.
+- Templates that rely on LANGUAGE_CODE from the template context may fall back to the default language or display untranslated content.
 
 ## Fix
 
