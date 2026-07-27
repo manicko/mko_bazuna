@@ -324,17 +324,27 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
 
     if text == "confirm":
         data = await state.get_data()
+        original_title = data.get("title", "")
+        original_desc = data.get("description", "")
 
-        # Translate to Russian
-        title_ru, desc_ru = await translate_to_russian(
-            data.get("title", ""), data.get("description", "")
+        # Translate to all languages in parallel
+        title_translations = await translate_all_languages(
+            original_title, ["ru", "bs", "en"]
+        )
+        desc_translations = await translate_all_languages(
+            original_desc, ["ru", "bs", "en"]
         )
 
-        # Update ad with Russian content and run moderation
+        # Update ad with multi-language content and run moderation
         is_valid, errors = await update_ad_and_moderate(
             ad_id=data["ad_id"],
-            title_ru=title_ru,
-            desc_ru=desc_ru,
+            title_ru=title_translations.get("ru", original_title),
+            desc_ru=desc_translations.get("ru", original_desc),
+            title_bs=title_translations.get("bs", original_title),
+            desc_bs=desc_translations.get("bs", original_desc),
+            title_en=title_translations.get("en", original_title),
+            desc_en=desc_translations.get("en", original_desc),
+            original_language="bs",
             category_id=data.get("category_id"),
             city_id=data.get("city_id"),
             price=data.get("price"),
@@ -530,8 +540,17 @@ async def update_ad_and_moderate(
     price: int | None,
     photos: list,
     user_id: int | None,
+    title_bs: str = "",
+    desc_bs: str = "",
+    title_en: str = "",
+    desc_en: str = "",
+    original_language: str | None = None,
 ) -> tuple[bool, list[str]]:
-    """Update ad with Russian content, create images, and delegate to shared auto_moderate."""
+    """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
+
+    Backward-compatible: new language fields default to empty strings.
+    Russian (title_ru/desc_ru) remains the base content stored in title/description columns.
+    """
     from asgiref.sync import sync_to_async
     from apps.moderation.services.auto_moderation import auto_moderate
 
@@ -542,12 +561,25 @@ async def update_ad_and_moderate(
         except Ad.DoesNotExist:
             return False, ["Ad not found"]
 
-        # Update ad fields
+        # Update ad fields — Russian remains the base content
         ad.title = title_ru
         ad.description = desc_ru
         ad.category_id = category_id
         ad.city_id = city_id
         ad.price = price
+
+        # Store multi-language translations
+        if title_bs:
+            ad.title_bs = title_bs
+        if desc_bs:
+            ad.description_bs = desc_bs
+        if title_en:
+            ad.title_en = title_en
+        if desc_en:
+            ad.description_en = desc_en
+        if original_language:
+            ad.original_language = original_language
+
         ad.save()
 
         # Create AdImage records (required before auto_moderate for image count check)
@@ -573,3 +605,33 @@ async def update_ad_and_moderate(
             return False, ["Ad failed moderation checks"]
 
     return await _update_and_moderate()
+
+def _do_translate_to(text: str, target: str) -> str:
+    """Synchronous translation wrapper with configurable target language."""
+    from deep_translator import GoogleTranslator
+
+    return GoogleTranslator(source="auto", target=target).translate(text)
+
+async def translate_all_languages(text: str, target_locales: list[str]) -> dict[str, str]:
+    """Translate text to all target languages in parallel using asyncio.gather.
+
+    Args:
+        text: Source text to translate.
+        target_locales: List of target locale codes (e.g. ['ru', 'bs', 'en']).
+
+    Returns:
+        Dict mapping locale codes to translated text. Falls back to original text on failure.
+    """
+    async def translate_one(text: str, target: str) -> str:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(_do_translate_to, text, target),
+                timeout=15.0,
+            )
+        except Exception:
+            return text
+
+    results = await asyncio.gather(
+        *[translate_one(text, loc) for loc in target_locales]
+    )
+    return dict(zip(target_locales, results, strict=True))
