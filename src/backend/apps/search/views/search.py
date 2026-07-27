@@ -12,12 +12,12 @@ from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, AnalyticsEventType
-from apps.search.services.query_translator import translate_query_bs_to_ru
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.core.paginator import Paginator
 from apps.core.utils.sanitize import sanitize_query_for_log
+from apps.search.services.query_translator import translate_query
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def search(request: HttpRequest) -> HttpResponse:
     Search view using PostgreSQL FTS on search_vector.
 
     Features:
-        - Bosnian query translated to Russian before search
+        - Query translated to Russian for FTS search based on request language
         - One-word queries apply fuzzy category detection
         - GIN index used for search_vector (Task 5)
         - Records SEARCH_PERFORMED analytics event
@@ -45,8 +45,12 @@ def search(request: HttpRequest) -> HttpResponse:
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
 
     if query:
-        # Translate Bosnian query to Russian
-        translated_query = translate_query_bs_to_ru(query)
+        # Detect language from request preference and translate to Russian if needed
+        query_language = request.LANGUAGE_CODE
+        if query_language != "ru":
+            translated_query = translate_query(query, query_language, "ru")
+        else:
+            translated_query = query
 
         # One-word queries: apply fuzzy category detection
         if _is_single_word(query):
