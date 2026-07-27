@@ -86,6 +86,23 @@ class CategoryRejectReason(StrEnum):
     OFF_TOPIC = "off_topic"
 
 
+class LanguageLocale(StrEnum):
+    """Supported locale codes for UI and ad content."""
+
+    RUSSIAN = "ru"
+    BOSNIAN = "bs"
+    ENGLISH = "en"
+
+    @property
+    def fts_config(self) -> str:
+        """PostgreSQL text search config for this language."""
+        return {
+            "ru": "russian",
+            "bs": "simple",
+            "en": "english",
+        }[self.value]
+
+
 __all__ = [
     "AdSort",
     "AdvisoryLockId",
@@ -94,4 +111,5 @@ __all__ = [
     "AnalyticsEventType",
     "ModeratorActionType",
     "CategoryRejectReason",
+    "LanguageLocale",
 ]
