@@ -51,6 +51,16 @@ BOT_TOKEN = env("BOT_TOKEN", default="")
 # ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
 
+# Internationalization
+LANGUAGE_CODE = "ru"
+USE_I18N = True
+LANGUAGES = [
+    ("ru", "Russian"),
+    ("bs", "Bosnian"),
+    ("en", "English"),
+]
+LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]
+
 # Security settings (TLS/SSL ready)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
