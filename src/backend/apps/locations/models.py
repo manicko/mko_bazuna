@@ -27,7 +27,7 @@ class City(models.Model):
     name_i18n = models.JSONField(
         blank=True,
         null=True,
-        help_text="i18n names: {'ru': <str>, 'bs': <str>}; NULL falls back to name",
+        help_text="i18n names: {'ru': <str>, 'bs': <str>, 'en': <str>}; NULL falls back to name",
     )
     region = models.CharField(
         max_length=100,
@@ -43,11 +43,14 @@ class City(models.Model):
         verbose_name_plural = "cities"
 
     def get_name(self, locale: str = "ru") -> str:
-        """Get localized name with Russian fallback."""
+        """Get localized name with fallback chain: locale → ru → name."""
         # At runtime, name_i18n is a dict or None
         name_i18n = getattr(self, "name_i18n", None)
-        if name_i18n and locale in name_i18n:
-            return name_i18n[locale]
+        if name_i18n:
+            if locale in name_i18n:
+                return name_i18n[locale]
+            if "ru" in name_i18n:
+                return name_i18n["ru"]
         return str(self.name)
 
     def __str__(self) -> str:
