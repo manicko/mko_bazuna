@@ -93,6 +93,11 @@ class LanguageLocale(StrEnum):
     BOSNIAN = "bs"
     ENGLISH = "en"
 
+    @classmethod
+    def values(cls) -> list[str]:
+        """Return a list of all locale string values."""
+        return [m.value for m in cls]
+
     @property
     def fts_config(self) -> str:
         """PostgreSQL text search config for this language."""

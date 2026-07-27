@@ -83,11 +83,11 @@ Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via 
 
 ```
 A1 → A2, A3 → A4, A5, A6, A7
-             ↓
+              ↓
 B1 → B2 → B3, B4, B5
-         ↓
+          ↓
 C1 → C2 → C3 → C4, C5, C6
-         ↓
+          ↓
 D1 → D2
 D3 → (after C2)
 D4 → (after C4)
@@ -121,16 +121,16 @@ D4 → (after C4)
 │   B1   │   B2   │ B3, B4, B5│
 │Concurrency│ Rename  │ Verify   │
 └────────┴────────┴──────────┘
-                     │
-                     ▼
+                      │
+                      ▼
 ┌──────────────────────────────────────────┐
 │        Stage C: CD Pipeline               │
 ├────────┬────────┬──────────┬────────────┤
 │   C1   │   C2   │    C3    │ C4, C5, C6 │
 │  GHCR  │ Push   │ Caching  │ Deploy     │
 └────────┴────────┴──────────┴────────────┘
-                     │
-                     ▼
+                      │
+                      ▼
 ┌─────────────────────────────┐
 │ Stage D: Security Layer     │
 ├────────┬────────┬──────────┤
@@ -209,6 +209,303 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 docker image prune -f
 ```
 
+### 8.2 Complete Workflow YAML (from research.md)
+
+```yaml
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (leave empty for main)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================
+  # LINT & TYPECHECK (parallel, fast-fail)
+  # ============================================
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project
+        working-directory: src/backend
+      - name: Run ruff
+        run: uv run ruff check .
+        working-directory: src/backend
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project
+        working-directory: src/backend
+      - name: Run basedpyright
+        run: uv run basedpyright .
+        working-directory: src/backend
+
+  # ============================================
+  # TEST (with PostgreSQL)
+  # ============================================
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project
+        working-directory: src/backend
+      - name: Wait for database
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable" >&2
+          exit 1
+        working-directory: src/backend
+      - name: Run migrations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())'
+        working-directory: src/backend
+      - name: Check no pending migrations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python -m django makemigrations --check --dry-run
+        working-directory: src/backend
+      - name: Run pytest with coverage
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest --tb=short --cov --cov-report=term --cov-report=xml -q
+        working-directory: src/backend
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: src/backend/coverage.xml
+          retention-days: 30
+
+  # ============================================
+  # BUILD & PUSH (deploy only on main)
+  # ============================================
+  build:
+    needs: [lint, typecheck, test]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ inputs.image_tag != '' && format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_NAME, inputs.image_tag) || steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================
+  # SECURITY SCAN (optional, non-blocking)
+  # ============================================
+  security-scan:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+  # ============================================
+  # DEPLOY (manual trigger only)
+  # ============================================
+  deploy:
+    needs: [build]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          script: |
+            cd /opt/mko_bazuna
+            echo "Pulling latest images..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            echo "Stopping old containers..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml stop
+            echo "Removing old containers..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml rm -f
+            echo "Starting new containers..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker image prune -f
+            echo "Deployment complete"
+      - name: Health check
+        run: |
+          sleep 10
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.SERVER_HOST }}/health/ || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Waiting for service (attempt $i)..."
+            sleep 5
+          done
+          echo "Health check failed - check server logs"
+          exit 1
+```
+
+### 8.3 VPS Preparation Script
+
+```bash
+# On VPS
+mkdir -p /opt/mko_bazuna/{backups,certs,media}
+cd /opt/mko_bazuna
+
+# Create deploy user
+useradd -m -s /bin/bash deploy
+usermod -aG docker deploy
+
+# Clone repository
+git clone https://github.com/manicko/mko_bazuna .
+
+# Create production environment file
+cat > .env.docker << 'EOF'
+DJANGO_SECRET_KEY=<from GitHub Secrets>
+DEBUG=False
+ALLOWED_HOSTS=localhost,your-domain.com
+
+POSTGRES_USER=bazuna_user
+POSTGRES_DB=bazuna_db
+POSTGRES_PASSWORD=<from GitHub Secrets>
+
+BOT_TOKEN=<from GitHub Secrets>
+BOT_USERNAME=bazuna_bot
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<from GitHub Secrets>
+ADMIN_TELEGRAM_ID=<telegram-id>
+
+TLS_CERT_PATH=/etc/nginx/certs
+EOF
+
+# Set permissions
+chown -R deploy:deploy /opt/mko_bazuna
+chmod 600 /opt/mko_bazuna/.env.docker
+
+# Initial deployment
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### 8.4 Branch Strategy
+
+| Branch | Behavior |
+|--------|----------|
+| `main` | CI runs on push/PR; CD builds image; deploy via workflow dispatch |
+| `develop` | CI only (tests, lint) - no image build |
+
+### 8.5 Cost Estimation (GitHub Free Tier)
+
+Estimated monthly usage for active development:
+
+| Job | Duration (min) | Runs/day | Monthly (min) |
+|-----|----------------|----------|---------------|
+| Lint | 1 | 10 | 300 |
+| Typecheck | 1 | 10 | 300 |
+| Test | 3-5 | 10 | 1,500 |
+| Build | 2-3 | 2 | 60 |
+| **Total** | | | **~2,160 min** |
+
+**Note:** For private repos, 2,000 minutes is the free limit. Consider making repo public or optimizing test duration.
+
 ---
 
 ## 9. Effort Summary
@@ -232,3 +529,25 @@ docker image prune -f
 | C: CD Extension | C1-C6 | 2-3 days |
 | D: Security | D1-D4 | 1 day |
 | **Total** | **22 tasks** | **5-7 days** (with testing/validation) |
+
+---
+
+## 11. Rollback Procedure Reference
+
+1. Go to **Actions** tab
+2. Select **CI/CD** workflow
+3. Click **Run workflow**
+4. Enter `sha-{COMMIT_SHA}` of known-good version
+5. Click **Run workflow**
+
+---
+
+## 12. Health Check Endpoint
+
+The project includes health check at `/health/`:
+
+```python
+# apps/core/views.py
+def health(request):
+    return JsonResponse({"status": "ok"})
+```

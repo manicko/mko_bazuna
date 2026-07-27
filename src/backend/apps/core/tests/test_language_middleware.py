@@ -134,14 +134,15 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
         self.middleware.process_request(request)
         assert request.LANGUAGE_CODE == "ru"
 
-    # --- Cookie persistence ---
+    # --- Cookie persistence (via process_response) ---
 
     def test_cookie_set_when_lang_param_used(self) -> None:
-        """?lang=bs sets lang_pref cookie on the request."""
+        """?lang=bs sets lang_pref cookie via process_response."""
         request = _make_request(get={"lang": "bs"})
-        request.set_cookie = MagicMock()
+        response = MagicMock()
         self.middleware.process_request(request)
-        request.set_cookie.assert_called_once_with(
+        self.middleware.process_response(request, response)
+        response.set_cookie.assert_called_once_with(
             LANGUAGE_COOKIE_NAME,
             "bs",
             max_age=LANGUAGE_COOKIE_MAX_AGE,
@@ -151,8 +152,8 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
     def test_cookie_not_set_when_no_lang_param(self) -> None:
         """lang_pref cookie is not set when ?lang is absent."""
         request = _make_request(cookies={LANGUAGE_COOKIE_NAME: "en"})
-        mock_set_cookie = MagicMock()
-        request.set_cookie = mock_set_cookie
+        response = MagicMock()
         self.middleware.process_request(request)
+        self.middleware.process_response(request, response)
         assert request.LANGUAGE_CODE == "en"
-        mock_set_cookie.assert_not_called()
+        response.set_cookie.assert_not_called()

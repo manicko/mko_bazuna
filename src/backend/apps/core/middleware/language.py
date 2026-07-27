@@ -55,11 +55,26 @@ class LanguagePreMiddleware(MiddlewareMixin):
 
         self._set_language_code(request, LanguageLocale.RUSSIAN.value)
 
+    def process_response(self, request: Any, response: Any) -> Any:
+        """Persist the lang_pref cookie on the response if set by ?lang=.
+
+        The cookie value is stored on the request during process_request
+        and applied here where we have access to the response object.
+        """
+        cookie_value = getattr(request, "_lang_cookie_value", None)
+        if cookie_value is not None:
+            response.set_cookie(
+                LANGUAGE_COOKIE_NAME,
+                cookie_value,
+                max_age=LANGUAGE_COOKIE_MAX_AGE,
+            )
+        return response
+
     def _apply_lang_param(self, request: Any, lang: str) -> None:
         """Apply language from the ``?lang=X`` query parameter.
 
-        Validates the value, sets the cookie and session, and updates
-        ``request.LANGUAGE_CODE``.
+        Validates the value, stores cookie intent on the request, updates
+        ``request.LANGUAGE_CODE``, and persists to session for authenticated users.
         """
         if not self._is_valid_language(lang):
             logger.warning("Ignoring invalid lang parameter: %s", lang)
@@ -68,8 +83,8 @@ class LanguagePreMiddleware(MiddlewareMixin):
 
         self._set_language_code(request, lang)
 
-        # Persist preference in cookie for subsequent requests.
-        request.set_cookie(LANGUAGE_COOKIE_NAME, lang, max_age=LANGUAGE_COOKIE_MAX_AGE)
+        # Store cookie value to be persisted in process_response.
+        request._lang_cookie_value = lang
 
         # Persist preference in session for authenticated users.
         if hasattr(request, "session") and request.user.is_authenticated:

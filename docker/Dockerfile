@@ -72,7 +72,7 @@ RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/them
 ################################################################################
 FROM python:3.14-slim AS runtime
 
-# Install runtime library for psycopg3 and curl (for health checks)
+# Install runtime library for psycopg3, curl (for health checks), and gettext (for compilemessages)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -80,6 +80,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl \
     ca-certificates \
     coreutils \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user with uid 1000 (security baseline)
