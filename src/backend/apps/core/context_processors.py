@@ -14,3 +14,7 @@ def plausible_host(request):
     Returns empty string if not configured (no analytics snippet rendered).
     """
     return {"PLAUSIBLE_HOST": settings.PLAUSIBLE_HOST}
+
+def language(request) -> dict:
+    """Expose current language to templates."""
+    return {"LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "ru")}
