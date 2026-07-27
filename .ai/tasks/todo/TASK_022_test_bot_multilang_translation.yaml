@@ -1,0 +1,37 @@
+id: task_022
+title: Test — Bot Multi-Language Translation
+
+priority: medium
+type: test
+depends_on:
+  - task_008
+
+# ── Verification ──
+verifies:
+  - task_008
+
+verification_steps:
+  - build: uv run basedpyright src/telegram_bot/handlers/ad_create.py
+  - test: uv run pytest src/telegram_bot/tests/test_ad_lifecycle.py -v
+  - smoke_check: uv run python -c "from telegram_bot.handlers.ad_create import translate_all_languages; print('Function exists')"
+
+pass_criteria:
+  - translate_all_languages function works for parallel translation
+  - original_language field captured on ad creation
+  - All three locale columns populated
+  - Backward compatibility with existing Russian-only ads
+  - Unit tests pass
+
+# ── Test Specification
+test_specification:
+  - description: >
+      Test translate_all_languages:
+        - Returns dict with all requested locale codes
+        - Translations are non-empty for valid input
+        - Timeout/failure returns original text (fallback)
+        - Parallel execution completes within timeout
+  - description: >
+      Test update_ad_and_moderate integration:
+        - Creates all language columns
+        - Sets original_language correctly
+        - Moderation still works after multi-language changes

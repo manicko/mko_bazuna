@@ -1,0 +1,41 @@
+id: task_021
+title: Test — Ad Model Localized Getters
+
+priority: medium
+type: test
+depends_on:
+  - task_003
+
+# ── Verification ──
+verifies:
+  - task_003
+
+verification_steps:
+  - build: uv run basedpyright src/backend/apps/ads/models.py
+  - test: uv run pytest src/backend/apps/ads/tests/test_ad_localization.py -v
+  - smoke_check: uv run python -c "from apps.ads.models import Ad; print(hasattr(Ad, 'get_title'))"
+
+pass_criteria:
+  - get_title/get_description methods exist and callable
+  - Locale-specific content returned when present
+  - Fallback to Russian works for missing locale
+  - Fallback to original field works for legacy ads without _ru columns
+  - All unit tests pass
+
+# ── Test Specification
+test_specification:
+  - description: >
+      Test get_title(locale) returns:
+        - Correct locale content when available
+        - Russian content when locale empty but Russian present
+        - Original title when neither locale nor Russian present
+  - description: >
+      Test get_description(locale) returns:
+        - Correct locale content when available
+        - Russian content when locale empty but Russian present
+        - Original description fallback chain
+  - description: >
+      Test edge cases:
+        - None values handled gracefully
+        - Empty strings return empty string
+        - Whitespace-only strings handled

@@ -1,0 +1,61 @@
+id: task_003
+title: Update Ad Model with Localized Getters
+
+priority: high
+depends_on:
+  - task_001
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 1.3 — Update Ad Model with Localized Getters
+
+description: >
+  Add get_title and get_description methods to Ad model that return localized
+  content with fallback chain: locale → Russian → first available.
+
+files:
+  - path: src/backend/apps/ads/models.py
+
+    targets:
+      - type: class
+        name: Ad
+
+    semantic_anchors:
+      insert_after:
+        type: field
+        name: search_vector
+
+    changes:
+      - action: add_code
+        description: >
+          Add methods get_title(locale: str) -> str and get_description(locale: str) -> str
+          to the Ad class that implement fallback chain logic.
+
+        code_hint: |
+          def get_title(self, locale: str = "ru") -> str:
+              """Return localized title with fallback chain: locale → ru → first available."""
+              # Priority: locale column > Russian > original
+              for field in [f"title_{locale}", "title_ru", "title"]:
+                  val = getattr(self, field, None)
+                  if val:
+                      return val
+              return ""
+
+          def get_description(self, locale: str = "ru") -> str:
+              """Return localized description with fallback chain: locale → ru → first available."""
+              for field in [f"description_{locale}", "description_ru", "description"]:
+                  val = getattr(self, field, None)
+                  if val:
+                      return val
+              return ""
+
+    acceptance_criteria:
+      - Methods return correct locale content when present
+      - Fallback to Russian works when locale empty
+      - Fallback to original title/description works for legacy ads
+      - uv run pytest tests/test_i18n_ad_getters.py passes
+
+# ── Verification ──
+verification_steps:
+  - build: uv run basedpyright src/backend/apps/ads/models.py
+  - test: uv run pytest src/backend/apps/ads/tests/ -v -k test_ad

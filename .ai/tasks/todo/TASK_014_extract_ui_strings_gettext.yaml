@@ -1,0 +1,58 @@
+id: task_014
+title: Extract UI Strings to gettext
+
+priority: medium
+depends_on:
+  - task_009
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 2.6 — Extract UI Strings to gettext
+
+description: >
+  Wrap UI strings in Django gettext {% trans %} tags throughout all templates.
+  Extract strings to create django.po files for each language.
+
+files:
+  - path: src/backend/templates/ads/list.html
+
+    targets:
+      - type: template
+        name: list.html
+
+  - path: src/backend/templates/ads/detail.html
+
+    targets:
+      - type: template
+        name: detail.html
+
+  - path: src/backend/templates/ads/partials/ad_list.html
+
+    targets:
+      - type: template
+        name: ad_list.html
+
+    semantic_anchors:
+      insert_after:
+        type: text_content
+        value: Search
+
+changes:
+  - action: add_code
+    description: >
+      Wrap user-facing strings with {% trans %} tags:
+      - "Search ads..." → {% trans "Search ads..." %}
+      - "Search" button → {% trans "Search" %}
+      - "Contact Seller" → {% trans "Contact Seller" %}
+
+  - action: run_command
+    description: >
+      After template changes, run makemessages to extract strings.
+
+    command_hint: uv run django-admin makemessages -l ru -l bs -l en
+
+acceptance_criteria:
+  - All UI strings wrapped with {% trans %} tags
+  - django.po files populated with extracted strings
+  - Translation files compiled successfully
+  - uv run django-admin compilemessages passes

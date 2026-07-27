@@ -1,0 +1,28 @@
+id: task_025
+title: Test — Language Context Processor
+
+priority: medium
+type: test
+depends_on:
+  - task_007
+
+verifies:
+  - task_007
+
+verification_steps:
+  - build: uv run basedpyright src/backend/apps/core/context_processors.py
+  - test: uv run pytest src/backend/apps/core/tests/test_context_processors.py -v
+  - smoke_check: uv run python -c "from apps.core.context_processors import language; print('Context processor importable')"
+
+pass_criteria:
+  - Context processor imports successfully
+  - Returns LANGUAGE_CODE in context dict
+  - Default to Russian when not set
+  - Unit tests pass
+
+test_specification:
+  - description: >
+      Test language() function:
+        - Returns {"LANGUAGE_CODE": value} dict
+        - Correctly extracts LANGUAGE_CODE from request
+        - Returns "ru" as default when not set

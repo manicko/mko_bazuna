@@ -1,0 +1,60 @@
+id: task_018
+title: Data Migration Backfill Script
+
+priority: low
+status: blocked
+blocked_by: task_019
+
+depends_on:
+  - task_002
+  - task_004
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 4.1 — Data Migration Backfill Script
+
+description: >
+  Create data migration script to translate existing ads to English and Bosnian.
+  Use Google Translate API for bulk translation with batch processing.
+
+files:
+  - path: src/backend/apps/ads/migrations/0006_backfill_translations.py
+
+    targets:
+      - type: class
+        name: Migration
+
+    semantic_anchors:
+      insert_after:
+        type: migration
+        name: Migration
+        file: src/backend/apps/ads/migrations/0005_multi_lang_search_vector.py
+
+changes:
+  - action: create_file
+    description: >
+      Create data migration that:
+      - Translates existing ads to en and bs
+      - Uses Google Translate API (reuse existing deep-translator pattern)
+      - Skips ads where translations already exist
+      - Handles translation failures gracefully
+      - Batches for performance
+
+    code_hint: |
+      def backfill_translations(apps, schema_editor):
+          """Translate existing Russian ads to Bosnian and English."""
+          Ad = apps.get_model("apps.ads", "Ad")
+          # Use asyncio.gather for batch translation
+          # Skip where title_en/title_bs already populated
+          # Update search vector via signal or explicit update
+
+acceptance_criteria:
+  - Existing ads translated to all languages
+  - No duplicate translation attempts
+  - Translation failures logged but don't abort migration
+  - Migration runs successfully on test database
+
+# ── Risk Assessment ──
+risk_notes: >
+  Data migration affecting all existing ads. Blocked pending migration research
+  to ensure proper batching and error handling.

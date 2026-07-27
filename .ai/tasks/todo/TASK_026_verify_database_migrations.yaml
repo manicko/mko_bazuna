@@ -1,0 +1,41 @@
+id: task_026
+title: Verify — Database Migrations
+
+priority: high
+type: verification
+status: pending
+depends_on:
+  - task_002
+  - task_004
+  - task_018
+
+verifies:
+  - task_002
+  - task_004
+  - task_018
+
+verification_steps:
+  - build: uv run python manage.py migrate --check
+  - test: uv run pytest src/backend/apps/ads/tests/test_search_triggers.py -v
+  - test: uv run pytest src/backend/apps/core/tests/test_migrations.py -v
+  - smoke_check: uv run python -c "
+    from django.core.management import call_command
+    from io import StringIO
+    out = StringIO()
+    call_command('sqlmigrate', 'apps.ads', '0004', stdout=out)
+    call_command('sqlmigrate', 'apps.ads', '0005', stdout=out)
+    print('Migrations validate OK')
+    "
+
+pass_criteria:
+  - All migrations apply cleanly
+  - Existing data preserved
+  - Search triggers work with multi-language content
+  - Search vector includes all language variants
+  - uv run pytest src/backend/apps/ads/tests/test_search_triggers.py passes
+
+failure_action: return task_002, task_004 to rework
+
+description: >
+  Dedicated verification for database migration changes. Ensures schema changes
+  and trigger updates work correctly without data loss.

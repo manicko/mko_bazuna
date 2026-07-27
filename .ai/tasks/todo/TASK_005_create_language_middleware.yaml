@@ -1,0 +1,60 @@
+id: task_005
+title: Create LanguagePreMiddleware
+
+priority: high
+depends_on:
+  - task_001
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 1.5 — Language Pre-Processing Middleware
+
+description: >
+  Create LanguagePreMiddleware that detects and sets user language preference
+  before Django's LocaleMiddleware runs. Priority: ?lang=X > cookie > Accept-Language > default.
+
+files:
+  - path: src/backend/apps/core/middleware/language.py
+
+    targets:
+      - type: module
+        name: apps.core.middleware.language
+
+    semantic_anchors:
+      insert_after:
+        type: directory
+        name: middleware
+
+    changes:
+      - action: create_file
+        description: >
+          Create new middleware file with LanguagePreMiddleware class that:
+          - Reads ?lang parameter and sets session/cookie
+          - Reads lang_pref cookie for preference
+          - Parses Accept-Language header
+          - Sets request.LANGUAGE_CODE before LocaleMiddleware
+
+        code_hint: |
+          from django.utils.deprecation import MiddlewareMixin
+          from apps.core.enums import LanguageLocale
+
+          LANGUAGE_COOKIE_NAME = "lang_pref"
+          LANGUAGE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
+
+          class LanguagePreMiddleware(MiddlewareMixin):
+              """Detect and set user language preference before LocaleMiddleware."""
+
+              def process_request(self, request):
+                  # Priority: ?lang=X > cookie > Accept-Language header > default to ru
+                  lang = request.GET.get("lang")
+                  if lang in [l.value for l in LanguageLocale]:
+                      request.LANGUAGE_CODE = lang
+                      # Set cookie and session
+                  else:
+                      # Check cookie, then header, default to Russian
+
+    acceptance_criteria:
+      - Middleware sets LANGUAGE_CODE correctly
+      - Cookie set on ?lang=X parameter
+      - Session language stored for authenticated users
+      - uv run pytest tests/test_language_middleware.py passes

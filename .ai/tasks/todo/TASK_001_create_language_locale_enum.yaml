@@ -1,0 +1,56 @@
+id: task_001
+title: Create LanguageLocale StrEnum
+
+priority: high
+depends_on: []
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 1.1 — Create LanguageLocale StrEnum
+
+description: >
+  Add LanguageLocale StrEnum to core enums with supported locale values
+  and fts_config property for PostgreSQL text search configuration mapping.
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: module
+        name: apps.core.enums
+
+    semantic_anchors:
+      insert_after:
+        type: class
+        value: CategoryRejectReason
+        name: CategoryRejectReason
+
+    changes:
+      - action: add_code
+        description: >
+          Add LanguageLocale StrEnum class with RUSSIAN, BOSNIAN, ENGLISH values
+          and fts_config property returning appropriate PostgreSQL text search
+          configuration name for each locale.
+
+        code_hint: |
+          class LanguageLocale(StrEnum):
+              """Supported locale codes for UI and ad content."""
+
+              RUSSIAN = "ru"
+              BOSNIAN = "bs"
+              ENGLISH = "en"
+
+              @property
+              def fts_config(self) -> str:
+                  """PostgreSQL text search config for this language."""
+                  return {
+                      "ru": "russian",
+                      "bs": "simple",
+                      "en": "english",
+                  }[self.value]
+
+    acceptance_criteria:
+      - LanguageLocale enum is importable
+      - All three locale values present
+      - fts_config property returns correct PostgreSQL config names
+      - Unit tests pass (uv run pytest src/backend/apps/core/tests/)

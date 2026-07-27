@@ -1,0 +1,55 @@
+id: task_002
+title: Database Migration - Language Columns for Ads
+
+priority: high
+status: blocked
+blocked_by: task_019_research_migrations
+
+depends_on:
+  - task_001
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 1.2 — Database Migration - Language Columns for Ads
+
+description: >
+  Create migration to add localized content columns for title and description
+  in Bosnian and English, plus original_language field to track source language.
+
+files:
+  - path: src/backend/apps/ads/migrations/0004_ad_i18n_columns.py
+
+    targets:
+      - type: class
+        name: Migration
+
+    semantic_anchors:
+      insert_after:
+        type: migration
+        name: Migration
+        file: src/backend/apps/ads/migrations/0003_add_index_conditions.py
+
+    changes:
+      - action: create_file
+        description: >
+          Create migration that adds title_en, description_en, title_bs, description_bs
+          and original_language columns to the ads table. Existing title/description
+          columns will be renamed to title_ru/description_ru via separate migration.
+
+        code_hint: |
+          # Operations:
+          # - AddField: title_en (CharField, max_length=200, blank=True, null=True)
+          # - AddField: description_en (TextField, blank=True, null=True)
+          # - AddField: title_bs (CharField, max_length=200, blank=True, null=True)
+          # - AddField: description_bs (TextField, blank=True, null=True)
+          # - AddField: original_language (CharField, max_length=5, blank=True, null=True)
+
+    acceptance_criteria:
+      - Migration file created successfully
+      - uv run python manage.py migrate runs without errors
+      - uv run pytest src/backend/apps/ads/tests/test_search_triggers.py passes
+
+# ── Risk Assessment ──
+risk_notes: >
+  Database schema migration affecting production data. Blocked pending research
+  on existing data migration patterns and rollback strategy.

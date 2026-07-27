@@ -1,0 +1,59 @@
+id: task_015
+title: Update Category/City get_name for all locales
+
+priority: medium
+depends_on:
+  - task_001
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 2.7 — Update Category/City get_name for all locales
+
+description: >
+  Update get_name() methods in Category and City models to handle all three
+  locales (ru, bs, en). Update existing name_i18n help_text to include English.
+
+files:
+  - path: src/backend/apps/categories/models.py
+
+    targets:
+      - type: function
+        name: get_name
+
+      - type: class
+        name: Category
+
+  - path: src/backend/apps/locations/models.py
+
+    targets:
+      - type: function
+        name: get_name
+
+      - type: class
+        name: City
+
+    semantic_anchors:
+      insert_after:
+        type: field
+        name: name_i18n
+
+changes:
+  - action: modify
+    description: >
+      Update help_text for name_i18n to include English:
+      - "i18n names: {'ru': <str>, 'bs': <str>, 'en': <str>}"
+      Ensure get_name() handles all three locale codes.
+
+    code_hint: |
+      # Update help_text:
+      name_i18n = models.JSONField(
+          blank=True,
+          null=True,
+          help_text="i18n names: {'ru': <str>, 'bs': <str>, 'en': <str>}; NULL falls back to name"
+      )
+
+acceptance_criteria:
+  - get_name() returns correct locale for ru, bs, en
+  - Fallback to Russian works for missing bs/en values
+  - Fallback to name works when name_i18n is NULL
+  - uv run pytest src/backend/apps/categories/tests/ passes

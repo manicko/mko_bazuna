@@ -1,0 +1,48 @@
+id: task_006
+title: Add LanguagePreMiddleware to Django Settings
+
+priority: high
+depends_on:
+  - task_005
+
+# ── Plan/Audit report source ──
+source_reference: .ai\plans\i18n\plan.md
+source_section: Task 1.6 — Add LanguagePreMiddleware to Django Settings
+
+description: >
+  Add LanguagePreMiddleware to MIDDLEWARE setting before LocaleMiddleware.
+
+files:
+  - path: src/backend/config/settings/base.py
+
+    targets:
+      - type: module
+        name: config.settings.base
+
+    semantic_anchors:
+      insert_after:
+        type: list
+        name: MIDDLEWARE
+
+      insert_before:
+        type: item
+        value: "django.contrib.auth.middleware.AuthenticationMiddleware"
+
+    changes:
+      - action: add_code
+        description: >
+          Add "apps.core.middleware.language.LanguagePreMiddleware" to MIDDLEWARE
+          list before "django.middleware.locale.LocaleMiddleware".
+
+        code_hint: |
+          MIDDLEWARE = [
+              ...
+              "apps.core.middleware.language.LanguagePreMiddleware",
+              "django.contrib.auth.middleware.AuthenticationMiddleware",
+              ...
+          ]
+
+    acceptance_criteria:
+      - Middleware importable
+      - Settings load without errors
+      - uv run pytest configuration check passes
