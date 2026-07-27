@@ -21,9 +21,11 @@ Transform validated findings into dependency-aware rollout plans with semantic t
 
 ## Steps
 
-1. **List** files .ai/audit/99-validation/` and `.ai/plans` (do not read contents yet) 
-2. **Ask user** to select: one file, multiple files, or ALL. Wait for selection.
-3. **Study** selected files — plans, validated findings, safety constraints, rollout constraints. Ignore rejected/stale findings.
+1. **Ask user** which plans to implement? 
+2. **Study** exact files provided. DO NOT SEARCH OR STUDY FILES NOT MENTIONED BY USER.
+
+3. Ignore rejected/stale findings but keep advisory and low important. If multiple options, ran Researcher agent to define best  modern practices and approaches for the current architecture.
+
 4. **Load structural context** — `.ai/structure/*` dependency chains, integration boundaries, coupling zones, semantic insertion points.
 5. **Build execution DAG** — isolated implementation blocks, dependency-aware task graph, rollout sequencing, parallel execution groups.
 6. **Establish file-based dependencies** — tasks modifying the same file must execute sequentially with explicit `depends_on_previous_task_in_chain`, even if only one file overlaps.
