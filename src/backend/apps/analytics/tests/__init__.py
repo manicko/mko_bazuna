@@ -1,0 +1,1 @@
+"""Analytics tests for Mko Bazuna."""
