@@ -4,6 +4,8 @@ mode: all
 color: "#F59E0B"
 
 permission:
+  agent_manager: deny
+  agent_manager_models: deny
   read: 
     "*": allow
     "*.env": allow

@@ -5,6 +5,8 @@ color: "#3B82F6"
 steps: 140
 
 permission:
+   agent_manager: deny
+   agent_manager_models: deny
    read: 
     "*": allow
     "*.env": allow
