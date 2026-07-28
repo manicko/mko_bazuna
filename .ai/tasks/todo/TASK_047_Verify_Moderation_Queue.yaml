@@ -1,0 +1,37 @@
+id: TASK_047_Verify_Moderation_Queue
+
+title: Verification for Enhanced Moderation Tooling feature
+
+priority: high
+
+type: verification
+verifies:
+  - TASK_021_Create_PriorityCalculator_service
+  - TASK_044_Test_PriorityCalculator
+
+source_reference: .ai/plans/02/Enhanced Moderation Tooling/plan.md
+
+description: >
+  Dedicated verification task for Enhanced Moderation Tooling feature.
+  Runs full type checking, lint, and test suite for moderation components.
+
+verification_steps:
+  - build: Type checking on all moderation files
+  - test: Run pytest on priority tests
+  - smoke_check: Verify queue page loads for staff users
+
+files:
+  - path: src/backend/apps/core/enums.py
+  - path: src/backend/apps/moderation/models.py
+  - path: src/backend/apps/moderation/services/priority_calculator.py
+  - path: src/backend/apps/moderation/views/queue.py
+
+acceptance_criteria:
+  - All type checks pass (basedpyright)
+  - All lint checks pass (ruff)
+  - All tests pass (pytest)
+  - Priority scores calculated on ad entering moderation
+  - Queue page shows ads sorted by priority
+
+pass_criteria: All checks pass with zero errors
+failure_action: return task to rework

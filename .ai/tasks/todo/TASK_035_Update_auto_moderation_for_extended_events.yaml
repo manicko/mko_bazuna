@@ -1,0 +1,56 @@
+id: TASK_035_Update_auto_moderation_for_extended_events
+
+title: Update auto_moderation.py for extended analytics events
+
+priority: medium
+
+depends_on:
+  - TASK_004_Extend_AnalyticsEventType_trust_moderation
+  - TASK_001_Add_ad_FK_to_AnalyticsEvent
+
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: T8: Update auto_moderation.py for Extended Events
+
+description: >
+  Update _pass_moderation() and _fail_moderation() in auto_moderation.py
+  to create AnalyticsEvent with ad_id for moderation tracking.
+
+goals:
+  - Add MODERATION_APPROVED event on pass
+  - Add MODERATION_REJECTED event on fail
+  - Associate ad_id with events
+
+files:
+  - path: src/backend/apps/moderation/services/auto_moderation.py
+
+    targets:
+      - type: function
+        name: _pass_moderation
+
+      - type: function
+        name: _fail_moderation
+
+changes:
+  - action: add_code
+
+    description: >
+      Create AnalyticsEvent in both moderation functions with ad_id.
+
+    code_hint: |
+      AnalyticsEvent.objects.create(
+          event_type=AnalyticsEventType.MODERATION_APPROVED,
+          user_id=ad.user_id,
+          ad_id=ad.id,
+      )
+
+acceptance_criteria:
+  - Events created in _pass_moderation
+  - Events created in _fail_moderation
+  - ad_id properly associated
+  - Type checking passes on auto_moderation.py
+  - Lint check passes on auto_moderation.py
+
+risk_level: medium
+risk_mitigation: >
+  Changes additive to existing flow.
+  Events help with analytics, not core moderation.

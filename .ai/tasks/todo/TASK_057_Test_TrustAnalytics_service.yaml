@@ -1,0 +1,56 @@
+id: TASK_057_Test_TrustAnalytics_service
+
+title: Unit tests for TrustAnalytics service
+
+priority: medium
+
+type: test
+verifies:
+  - TASK_026_Create_TrustAnalytics_service
+
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: Testing Strategy
+
+description: >
+  Create unit tests for TrustAnalytics service in apps/analytics/tests/test_trust_analytics.py.
+  Tests should cover trust score calculation, trust level mapping, and daily metrics queries.
+
+goals:
+  - Test calculate_seller_trust_score with various scenarios
+  - Test get_trust_level score threshold mapping
+  - Test record_trust_event creates analytics events correctly
+  - Test get_seller_daily_metrics returns correct aggregation
+
+files:
+  - path: src/backend/apps/analytics/tests/test_trust_analytics.py
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create test file with trust analytics test scenarios.
+
+    code_hint: |
+      class TestTrustAnalytics:
+          def _make_user(self, **kwargs): ...
+          def _make_ad(self, user, **kwargs): ...
+          def _make_analytics_event(self, user, ad=None, **kwargs): ...
+          def test_calculate_trust_score_published_ads(self): ...
+          def test_calculate_trust_score_rejected_ads(self): ...
+          def test_get_trust_level_thresholds(self): ...
+          def test_record_trust_event(self): ...
+          def test_get_seller_daily_metrics(self): ...
+
+acceptance_criteria:
+  - Test file created in apps/analytics/tests/
+  - Trust score algorithm tested with edge cases
+  - Trust level mapping verified (0-100 score to enum)
+  - Daily metrics query tested
+  - All tests pass
+  - Type checking passes on test file
+  - Lint check passes on test file
+
+risk_level: low
+risk_mitigation: >
+  Tests verify algorithm correctness.
+  Score recalculation always possible from events.

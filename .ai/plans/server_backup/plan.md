@@ -373,7 +373,7 @@ for dump in "${BACKUP_DIR}"/db_*.dump; do
 done
 
 # Verify Restic repository
-export export RESTIC_PASSWORD_FILE="/run/secrets/restic_pass"
+export RESTIC_PASSWORD_FILE="/run/secrets/restic_pass"
 export AWS_ACCESS_KEY_ID="${B2_KEY_ID}"
 export AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}"
 
@@ -539,3 +539,14 @@ docker compose logs -f backup
 - **Phase 6:** 1-2 hours (testing)
 
 **Total effort:** 5-8 hours
+
+
+---
+
+## Advisory Recommendations
+
+1. Add top-level olumes: section in docker-compose.yml if media_volume not already defined
+2. Document B2 region selection - default us-west-004 may vary by bucket location
+3. Consider --b2-hard-delete flag ??? Restic B2 backend ???? ????? ?????????? ????????
+4. Add MEDIA_DIR variable to restore.sh configuration (currently fallback to /media)
+5. Monitor B2 egress costs - photos can be large; Restic deduplication helps

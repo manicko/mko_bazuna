@@ -45,11 +45,13 @@ models.Index(name='IX_users_erasure_sweep', fields=['consent_revoked_at'])  # zo
 > Zone R1: `IX_users_erasure_sweep` supports the idempotent 30-day hard-delete sweep after
 > consent withdrawal (decision O3).
 
-## search_vector triggers (zone D1, sync-safety)
+## search_vector triggers (zone D1, sync-safety, multi-language)
 Because `search_vector` includes the category name (another table), the column cannot be
 `GENERATED ALWAYS` — a plpgsql trigger fills it. All computation lives in ONE function so INSERT and
 UPDATE paths don't diverge. Code writes `title`/`description`/`category_id`; the trigger fills
 `category_name` + `search_vector`.
+
+For multi-language support, the search vector includes all language variants with appropriate FTS configurations:
 ```sql
 CREATE OR REPLACE FUNCTION ads_search_vector_fn() RETURNS TRIGGER AS $$
 DECLARE v_cat TEXT;
@@ -59,14 +61,28 @@ BEGIN
   NEW.search_vector :=
     setweight(to_tsvector('russian', coalesce(NEW.title,'')), 'A') ||
     setweight(to_tsvector('russian', coalesce(NEW.description,'')), 'B') ||
-    setweight(to_tsvector('russian', coalesce(v_cat,'')), 'C');
+    setweight(to_tsvector('simple', coalesce(NEW.title_bs,'')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(NEW.description_bs,'')), 'B') ||
+    setweight(to_tsvector('english', coalesce(NEW.title_en,'')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description_en,'')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(v_cat,'')), 'C');
   RETURN NEW;
 END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER ads_search_vector_update
   BEFORE INSERT OR UPDATE ON ads
   FOR EACH ROW EXECUTE FUNCTION ads_search_vector_fn();
+```
 
+Bosnian uses `simple` config because PostgreSQL 18 has no native Bosnian text search configuration.
+The `ad_images` table also includes thumbnail fields for future phase:
+```
+thumbnail_small (storage key for 240x180 thumbnail)
+thumbnail_medium (storage key for 640x480 thumbnail)
+thumbnail_large (storage key for 1280x960 thumbnail)
+```
+
+```sql
 CREATE OR REPLACE FUNCTION categories_name_propagate() RETURNS TRIGGER AS $$
 BEGIN
   UPDATE ads SET category_id = ads.category_id  -- trigger #2 recomputes category_name+search_vector

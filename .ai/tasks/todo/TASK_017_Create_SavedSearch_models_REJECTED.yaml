@@ -1,0 +1,96 @@
+id: TASK_017_Create_SavedSearch_models
+
+title: Create SavedSearch and SavedSearchNotification models
+
+priority: high
+
+# REJECTED - DO NOT EXECUTE
+# ==============
+# Rejection Reason: Invalid directory structure — `apps/search/models/` subdirectory
+# does not exist. Task targets `apps/search/models/saved_search.py` but the search app
+# only has `apps/search/` at the top level (no models subdirectory).
+#
+# Evidence:
+# - File system: apps/search/ contains only apps.py, tests.py, urls.py, __init__.py
+# - No models/ subdirectory exists
+# - No models.py file exists either (see TASK_014, TASK_015 rejections)
+#
+# Stale Assumptions:
+# - Search app uses a modular models/ subdirectory structure
+# - Task can place models in separate files within a non-existent directory
+#
+# Unsafe Areas:
+# - Directory creation is not part of task definition
+# - Task would fail due to missing parent directory
+#
+# Required Fixes:
+# - Option A: Create apps/search/models.py first, add models there
+# - Option B: Create apps/search/models/ directory structure as separate tasks
+# - Option C: Consolidate all search models into apps/search/models.py (recommended)
+#
+# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
+
+source_reference: .ai/plans/02/Saved Search Alerts/plan.md
+source_section: T1: SavedSearch & SavedSearchNotification Models
+
+description: >
+  Create SavedSearch and SavedSearchNotification models in apps/search/models.py
+  for saved search alert functionality.
+
+goals:
+  - Enable users to save search queries
+  - Track notification delivery to prevent duplicates
+  - Support city, category, and price filters
+  - Unique constraint on (saved_search, ad) pair
+
+files:
+  - path: src/backend/apps/search/models.py
+
+    # FIXED: Changed to use apps/search/models.py instead of non-existent subdirectory
+    # This requires apps/search/models.py to be created first (see TASK_014 fix)
+
+    targets:
+      - type: class
+        name: SavedSearch
+
+      - type: class
+        name: SavedSearchNotification
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create SavedSearch model with filters and SavedSearchNotification for deduplication.
+
+    code_hint: |
+      class SavedSearch(models.Model):
+          user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+          query = models.TextField(blank=True, null=True)
+          city = models.ForeignKey("locations.City", on_delete=models.SET_NULL, blank=True, null=True)
+          category = models.ForeignKey("categories.Category", on_delete=models.SET_NULL, blank=True, null=True)
+          min_price = models.PositiveIntegerField(blank=True, null=True)
+          max_price = models.PositiveIntegerField(blank=True, null=True)
+          is_active = models.BooleanField(default=True)
+          created_at = models.DateTimeField(auto_now_add=True)
+      
+      class SavedSearchNotification(models.Model):
+          saved_search = models.ForeignKey(SavedSearch, on_delete=models.CASCADE)
+          ad = models.ForeignKey("ads.Ad", on_delete=models.CASCADE)
+          sent_at = models.DateTimeField(auto_now_add=True)
+
+acceptance_criteria:
+  - Both models created in apps/search/models.py
+  - One-to-many relationships correct
+  - Unique constraint on (saved_search, ad)
+  - Type checking passes
+  - Lint check passes
+
+risk_level: medium
+risk_mitigation: >
+  Models isolated to search app.
+  Nullable filters allow flexible saved searches.

@@ -1,0 +1,41 @@
+id: TASK_054_Create_rate_limit_service
+title: Create rate_limit utility for autocomplete endpoint
+priority: medium
+depends_on:
+  - TASK_023_Add_CACHES_setting
+source_reference: .ai/plans/02/Search Autocomplete/plan.md
+source_section: T8: Create rate_limit Utility
+description: >
+  Create rate_limit utility in apps/search/services/rate_limit.py
+  for rate limiting the autocomplete endpoint using atomic cache operations.
+goals:
+  - Limit autocomplete requests to 30 per 60 seconds per IP
+  - Use atomic add/incr pattern to prevent race conditions
+  - Return True for allowed, False for rate limited
+files:
+  - path: src/backend/apps/search/services/rate_limit.py
+    targets:
+      - type: function
+        name: rate_limit_check
+changes:
+  - action: add_top_level
+    description: >
+      Create rate_limit.py with rate_limit_check function.
+    code_hint: |
+      RATE_LIMIT_KEY_PATTERN = "autocomplete_rl:{ip}"
+      RATE_LIMIT_REQUESTS = 30
+      RATE_LIMIT_PERIOD = 60
+
+      def rate_limit_check(request: HttpRequest) -> bool:
+          """Return True if request allowed, False if rate limited."""
+          # Atomic increment pattern with cache.add/cache.incr
+acceptance_criteria:
+  - rate_limit.py created in services directory
+  - Atomic increment pattern implemented
+  - Handles race conditions correctly
+  - Type checking passes on rate_limit.py
+  - Lint check passes on rate_limit.py
+risk_level: low
+risk_mitigation: >
+  Rate limiting is defensive only.
+  Uses Django cache for atomic operations.

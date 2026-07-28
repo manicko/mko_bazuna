@@ -1,0 +1,38 @@
+id: TASK_051_Create_entity_suggestions_service
+title: Create entity_suggestions service for category and city autocomplete
+priority: medium
+depends_on:
+  - TASK_016_Add_SearchSuggestionSource_enum
+source_reference: .ai/plans/02/Search Autocomplete/plan.md
+source_section: T7: Create entity_suggestions Service
+description: >
+  Create entity_suggestions service in apps/search/services/entity_suggestions.py
+  for matching category and city names for autocomplete.
+goals:
+  - Get matching category names with is_active filter
+  - Get matching city names without is_active filter (no such field)
+  - Return results with SearchSuggestionSource enum
+files:
+  - path: src/backend/apps/search/services/entity_suggestions.py
+    targets:
+      - type: function
+        name: get_entity_suggestions
+changes:
+  - action: add_top_level
+    description: >
+      Create entity_suggestions.py with get_entity_suggestions function.
+    code_hint: |
+      def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
+          """Get matching category and city names for autocomplete."""
+          # Category suggestions with is_active filter
+          # City suggestions without is_active filter
+acceptance_criteria:
+  - entity_suggestions.py created in services directory
+  - Category filter uses is_active=True
+  - City filter does not use is_active (field doesn't exist)
+  - Type checking passes on entity_suggestions.py
+  - Lint check passes on entity_suggestions.py
+risk_level: low
+risk_mitigation: >
+  Read-only query operations.
+  Category/city models already exist.

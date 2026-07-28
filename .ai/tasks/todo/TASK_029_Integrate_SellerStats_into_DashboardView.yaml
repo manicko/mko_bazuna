@@ -1,0 +1,60 @@
+id: TASK_029_Integrate_SellerStats_into_DashboardView
+
+title: Integrate SellerStats into DashboardView
+
+priority: medium
+
+depends_on:
+  - TASK_003_Add_TimeRange_StrEnum
+  - TASK_009_Create_SellerStats_service
+
+source_reference: .ai/plans/02/Seller Dashboard Statistics/plan.md
+source_section: T5: Integrate SellerStats into DashboardView
+
+description: >
+  Modify dashboard() in apps/ads/views/dashboard.py to import and use SellerStats
+  service for seller statistics display.
+
+goals:
+  - Parse time_range from request.GET
+  - Call SellerStats.get_stats() for display data
+  - Add stats context to template rendering
+
+files:
+  - path: src/backend/apps/ads/views/dashboard.py
+
+    targets:
+      - type: function
+        name: dashboard
+
+    semantic_anchors:
+      insert_after:
+        type: import
+        value: render
+
+changes:
+  - action: add_parameter
+    parameter: time_range: TimeRange = TimeRange.ALL_TIME
+
+changes:
+  - action: add_code
+    description: Import SellerStats and TimeRange
+    code_hint: |
+      from apps.analytics.services.seller_stats import SellerStats
+      from apps.core.enums import TimeRange
+
+      # In dashboard():
+      selected_range = TimeRange(request.GET.get("time_range", TimeRange.ALL_TIME.value))
+      seller_stats = SellerStats(request.user.id).get_stats(selected_range)
+
+acceptance_criteria:
+  - SellerStats imported in dashboard.py
+  - TimeRange used for filtering
+  - seller_stats added to template context
+  - Type checking passes on dashboard.py
+  - Lint check passes on dashboard.py
+
+risk_level: medium
+risk_mitigation: >
+  Stats are additive to existing dashboard.
+  Graceful handling of missing stats data.

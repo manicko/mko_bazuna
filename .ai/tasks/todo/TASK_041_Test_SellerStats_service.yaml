@@ -1,0 +1,51 @@
+id: TASK_041_Test_SellerStats_service
+
+title: Unit tests for SellerStats service
+
+priority: medium
+
+type: test
+verifies:
+  - TASK_009_Create_SellerStats_service
+
+source_reference: .ai/plans/02/Seller Dashboard Statistics/plan.md
+source_section: T7: Verification Suite
+
+description: >
+  Create unit tests for SellerStats service in apps/analytics/tests/test_seller_stats.py.
+  Tests should cover caching, time range filtering, and stats aggregation.
+
+goals:
+  - Test get_stats with different time ranges
+  - Test cache key generation and TTL
+  - Test per-ad statistics computation
+  - Test graceful handling of missing data
+
+files:
+  - path: src/backend/apps/analytics/tests/__init__.py
+  - path: src/backend/apps/analytics/tests/test_seller_stats.py
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create test file with _make_* helper functions and class-based tests.
+
+    code_hint: |
+      class TestSellerStats:
+          def _make_user(self, **kwargs): ...
+          def test_get_stats_all_time(self): ...
+          def test_get_stats_with_time_range(self): ...
+          def test_cache_key_format(self): ...
+
+acceptance_criteria:
+  - Test file created in apps/analytics/tests/
+  - All test methods pass
+  - Uses proper test patterns from existing codebase
+  - Type checking passes on test file
+  - Lint check passes on test file
+
+risk_level: low
+risk_mitigation: >
+  Tests are isolated to service.
+  Existing functionality preserved.

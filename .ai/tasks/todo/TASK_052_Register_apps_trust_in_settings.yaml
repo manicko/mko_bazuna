@@ -1,0 +1,38 @@
+id: TASK_052_Register_apps_trust_in_settings
+title: Register apps.trust and apps.media in INSTALLED_APPS
+priority: high
+depends_on:
+  - TASK_010_Create_media_app_structure
+  - TASK_018_Create_Trust_models
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: T5.3: Register Media App
+description: >
+  Add "apps.media" and "apps.trust" to INSTALLED_APPS in config/settings/base.py.
+  Both apps need to be registered for Django model discovery and template tag loading.
+goals:
+  - Enable Django model discovery for trust and media apps
+  - Allow template tag loading from apps.trust
+  - Support management command discovery in apps.media
+files:
+  - path: src/backend/config/settings/base.py
+    targets:
+      - type: variable
+        name: INSTALLED_APPS
+changes:
+  - action: add_item
+    description: >
+      Add apps.media and apps.trust to INSTALLED_APPS list.
+    code_hint: |
+      # In INSTALLED_APPS list, after apps.search:
+      "apps.media"
+      "apps.trust"
+acceptance_criteria:
+  - apps.media added to INSTALLED_APPS
+  - apps.trust added to INSTALLED_APPS
+  - Both apps load successfully
+  - Type checking passes on base.py
+  - Django manages.py check runs without errors
+risk_level: medium
+risk_mitigation: >
+  Config-only change; can be rolled back by removing entries.
+  App discovery tested with manage.py check.

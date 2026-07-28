@@ -20,7 +20,7 @@ Document search UI patterns and implementation strategies for the Mko Bazuna cla
 
 - **Search-first architecture:** 70%+ of platform traffic originates from search
 - **Multi-language query translation:** Russian, Bosnian, and English queries translate to Russian before FTS
-- **Native PostgreSQL FTS:** No external search engine; uses `tsvector` + GIN index
+- **Native PostgreSQL FTS:** No external search engine; uses `tsvector` + GIN index with multi-language support
 - **Empty state handling:** Friendly guidance when no results found
 
 ## Hero Search with Location

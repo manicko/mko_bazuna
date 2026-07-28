@@ -94,9 +94,11 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Consent acceptance time recorded; withdrawal/deletion per decision F.
 
 ### G. Content language, search, city match (US-B2/B3/B7, US-B9)
-- **Content stored in Russian.** UI language switch (ru/bs-latin) translates only the site shell; ad text is shown translated on display.
-- **Search (phase 1) is over Russian content.** Montenegrin query is translated to Russian at search time (query-translation). Results optionally tagged "translated from Russian".
-- **Stored-content-invariant (zone D5):** seller may input in Montenegrin/Russian, but the bot MUST translate title+description to Russian on ad creation (reuses `deep-translator` + request cache) so `to_tsvector('russian', …)` is correct. Montenegrin UI translates back on display.
+- **Three UI languages:** Russian (ru), Bosnian (bs-latin), and English (en). Language preference detected via `LanguagePreMiddleware` which reads `?lang=X` query parameter, `lang_pref` cookie, or `Accept-Language` header (priority order), defaulting to Russian.
+- **Language switcher UI:** Dropdown component in header allows users to switch languages; selection sets `lang_pref` cookie for persistence and navigates via `?lang=X` parameter.
+- **Content stored in Russian** as base language. Multi-language columns (`title_en`, `title_bs`, `description_en`, `description_bs`) store translated content for UI display. `original_language` tracks source language for audit.
+- **Search (phase 1) is over Russian content.** Queries in Bosnian or English translate to Russian at search time via `apps/search/services/query_translator.py`. Multi-language search vector includes all language variants using appropriate FTS configurations (`russian`, `simple`, `english`).
+- **Stored-content-invariant (zone D5):** seller may input in any supported language, but the bot MUST translate title+description to Russian on ad creation (using `deep-translator` + parallel `asyncio.gather`) so `to_tsvector('russian', …)` is correct. UI displays localized content via `Ad.get_title(locale)` and `Ad.get_description(locale)` template filters.
 - **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation) and search queries (on lookup) to **Google Translate** for language normalization. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
 - **Result sorting:** buyer chooses — by date (newest first) or by price.
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.

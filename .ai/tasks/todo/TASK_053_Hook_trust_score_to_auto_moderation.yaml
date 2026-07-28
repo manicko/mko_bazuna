@@ -1,0 +1,50 @@
+id: TASK_053_Hook_trust_score_to_auto_moderation
+
+title: Hook trust score calculation to ad publish
+
+priority: medium
+
+depends_on:
+  - TASK_020_Create_TrustCalculator_service
+  - TASK_001_Add_ad_FK_to_AnalyticsEvent
+
+source_reference: .ai/plans/02/Trust Signals System/plan.md
+source_section: T13: Hook Score Updates to Publish
+
+description: >
+  Update _pass_moderation() in apps/moderation/services/auto_moderation.py
+  to call TrustCalculator after successful ad publish.
+
+goals:
+  - Calculate trust score after ad published
+  - Update both AnalyticsEvent and SellerTrustScore
+  - Maintain performance with async pattern
+
+files:
+  - path: src/backend/apps/moderation/services/auto_moderation.py
+
+    targets:
+      - type: function
+        name: _pass_moderation
+
+changes:
+  - action: add_code
+
+    description: >
+      Import and call TrustCalculator.calculate_and_save after ad publish.
+
+    code_hint: |
+      # In _pass_moderation():
+      from apps.trust.services.trust_calculator import TrustCalculator
+      TrustCalculator().calculate_and_save(ad.user)
+
+acceptance_criteria:
+  - TrustCalculator imported in auto_moderation.py
+  - Called after set_published(ad)
+  - Type checking passes on auto_moderation.py
+  - Lint check passes on auto_moderation.py
+
+risk_level: medium
+risk_mitigation: >
+  Changes additive to existing flow.
+  Score calculation isolated from core moderation logic.

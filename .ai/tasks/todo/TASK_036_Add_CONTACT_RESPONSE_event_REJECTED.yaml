@@ -1,0 +1,48 @@
+id: TASK_036_Add_CONTACT_RESPONSE_event
+
+title: Add CONTACT_RESPONSE to AnalyticsEventType
+
+priority: medium
+
+source_reference: .ai/plans/02/Trust Signals System/plan.md
+source_section: T6: Add CONTACT_RESPONSE Event
+
+description: >
+  Add CONTACT_RESPONSE enum value to AnalyticsEventType for trust score
+  calculation based on seller response rates.
+
+goals:
+  - Enable contact response tracking
+  - Support trust score algorithm
+  - Follow additive change pattern
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: class
+        name: AnalyticsEventType
+
+    semantic_anchors:
+      insert_after:
+        type: field
+        name: CONTACT_INITIATED
+
+changes:
+  - action: add_field
+
+    description: >
+      Add CONTACT_RESPONSE = "contact_response" to AnalyticsEventType.
+
+    code_hint: |
+      CONTACT_RESPONSE = "contact_response"
+
+acceptance_criteria:
+  - CONTACT_RESPONSE added to enum
+  - Position after CONTACT_INITIATED
+  - Type checking passes on enums.py
+  - Lint check passes on enums.py
+
+risk_level: low
+risk_mitigation: >
+  Additive change only; no breaking changes.

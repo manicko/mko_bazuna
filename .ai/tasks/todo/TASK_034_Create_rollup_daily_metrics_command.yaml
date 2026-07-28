@@ -1,0 +1,61 @@
+id: TASK_034_Create_rollup_daily_metrics_command
+
+title: Create daily rollup management command
+
+priority: medium
+
+depends_on:
+  - TASK_001_Add_ad_FK_to_AnalyticsEvent
+  - TASK_025_Create_DailyAdMetrics_model
+  - TASK_026_Create_TrustAnalytics_service
+  - TASK_033_Create_ModerationAnalytics_service
+  - TASK_027_Extend_AdvisoryLockId_for_phases
+
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: T7: Create Daily Rollup Management Command
+
+description: >
+  Create rollup_daily_metrics.py management command for pre-computing DailyAdMetrics
+  for all published ads with advisory lock for idempotency.
+
+goals:
+  - Aggregate analytics events into daily metrics
+  - Use advisory lock for singleton execution
+  - Support dry-run mode for testing
+
+files:
+  - path: src/backend/apps/analytics/management/commands/rollup_daily_metrics.py
+
+    targets:
+      - type: class
+        name: Command
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create rollup_daily_metrics.py with Command class.
+
+    code_hint: |
+      class Command(BaseCommand):
+          help = "Send daily Telegram alerts for matching saved searches"
+
+          def handle(self, *args, **options) -> None:
+              # Acquire advisory lock, aggregate, release lock
+
+acceptance_criteria:
+  - Management command created
+  - Advisory lock implemented
+  - Dry-run option available
+  - Type checking passes on command file
+  - Lint check passes on command file
+
+risk_level: medium
+risk_mitigation: >
+  Advisory lock prevents concurrent runs.
+  Dry-run mode for safe testing.

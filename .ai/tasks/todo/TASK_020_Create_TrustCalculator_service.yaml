@@ -1,0 +1,58 @@
+id: TASK_020_Create_TrustCalculator_service
+
+title: Create TrustCalculator service for trust score computation
+
+priority: high
+
+depends_on:
+  - TASK_018_Create_Trust_models
+
+source_reference: .ai/plans/02/Trust Signals System/plan.md
+source_section: T5: Create TrustCalculator Service
+
+description: >
+  Create TrustCalculator service in apps/trust/services/trust_calculator.py
+  to compute and persist seller trust scores.
+
+goals:
+  - Calculate trust score from multiple factors
+  - Map score to TrustLevel enum
+  - Persist SellerTrustScore on ad publish
+
+files:
+  - path: src/backend/apps/trust/services/trust_calculator.py
+
+    targets:
+      - type: class
+        name: TrustCalculator
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create TrustCalculator class with calculate_and_save method.
+
+    code_hint: |
+      class TrustCalculator:
+          def calculate_and_save(self, user: User) -> SellerTrustScore: ...
+          def _calculate_activity_score(self, user: User) -> int: ...
+          def _calculate_quality_score(self, user: User) -> int: ...
+          def _calculate_response_score(self, user: User) -> float: ...
+          def _get_trust_level(self, score: int, user: User) -> TrustLevel: ...
+
+acceptance_criteria:
+  - TrustCalculator class created in services directory
+  - calculate_and_save implemented with proper algorithm
+  - TrustLevel mapping follows scoring rules
+  - Type checking passes on trust_calculator.py
+  - Lint check passes on trust_calculator.py
+
+risk_level: medium
+risk_mitigation: >
+  Service in isolation; can be tested independently.
+  Algorithm documented and verifiable.

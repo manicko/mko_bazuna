@@ -1,0 +1,50 @@
+id: TASK_042_Test_ThumbnailService
+
+title: Unit tests for ThumbnailService
+
+priority: medium
+
+type: test
+verifies:
+  - TASK_011_Implement_ThumbnailService
+
+source_reference: .ai/plans/02/Photo Thumbnail Generation/plan.md
+source_section: T2.3: Unit Tests for Thumbnails
+
+description: >
+  Create unit tests for ThumbnailService in apps/media/tests/test_thumbnails.py.
+  Tests should cover size variants, aspect ratio handling, and error cases.
+
+goals:
+  - Test SMALL, MEDIUM, LARGE thumbnail generation
+  - Test aspect ratio preservation with background color
+  - Test progressive JPEG and quality settings
+  - Test atomic write error handling
+
+files:
+  - path: src/backend/apps/media/tests/test_thumbnails.py
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create test file with square and non-square image tests.
+
+    code_hint: |
+      class TestThumbnailService:
+          def _make_test_image(self, width, height): ...
+          def test_small_thumbnail_generation(self): ...
+          def test_aspect_ratio_with_background(self): ...
+          def test_progressive_jpeg(self): ...
+
+acceptance_criteria:
+  - Test file created in apps/media/tests/
+  - Tests for all three thumbnail sizes
+  - Tests for non-square image handling
+  - All tests pass
+  - Type checking passes on test file
+
+risk_level: low
+risk_mitigation: >
+  Tests isolated to service.
+  Uses existing test patterns from codebase.

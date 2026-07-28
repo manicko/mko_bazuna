@@ -1,0 +1,53 @@
+id: TASK_024_Create_alert_query_service
+
+title: Create AlertQueryService for saved search matching
+
+priority: medium
+
+depends_on:
+  - TASK_017_Create_SavedSearch_models
+
+source_reference: .ai/plans/02/Saved Search Alerts/plan.md
+source_section: T3: AlertQueryService
+
+description: >
+  Create AlertQueryService in apps/search/services/alert_query.py for matching
+  new ads against saved searches with FTS and category subtree support.
+
+goals:
+  - Find matching ads for saved searches
+  - Apply city, category, price filters
+  - Exclude already-notified ads via SavedSearchNotification
+  - Support FTS query translation
+
+files:
+  - path: src/backend/apps/search/services/alert_query.py
+
+    targets:
+      - type: function
+        name: find_matching_ads
+
+      - type: function
+        name: record_notifications
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create alert_query.py with find_matching_ads and record_notifications functions.
+
+    code_hint: |
+      def find_matching_ads(saved_search: SavedSearch) -> list: ...
+      def record_notifications(saved_search: SavedSearch, ads: list) -> int: ...
+
+acceptance_criteria:
+  - alert_query.py created in services directory
+  - find_matching_ads implements FTS with filtering
+  - record_notifications uses bulk_create with ignore_conflicts
+  - Type checking passes on alert_query.py
+  - Lint check passes on alert_query.py
+
+risk_level: medium
+risk_mitigation: >
+  Service in isolation; FTS queries tested independently.
+  Deduplication prevents duplicate notifications.

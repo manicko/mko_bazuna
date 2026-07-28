@@ -1,0 +1,79 @@
+id: TASK_055_Integrate_ThumbnailService_into_bot
+
+title: Integrate ThumbnailService into bot photo handler
+
+priority: high
+
+# REJECTED - DO NOT EXECUTE
+# ==============
+# Rejection Reason: Invalid semantic target - function `save_photo_with_thumbnails`
+# does not exist in target file `src/telegram_bot/handlers/ad_create.py`.
+# 
+# Evidence:
+# - Target file contains `save_photo` function (line 452) but NOT `save_photo_with_thumbnails`
+# - Target file contains `_update_and_moderate` function (line 534) which is valid
+# - Task code hint references `save_photo_with_thumbnails` which doesn't exist
+#
+# Stale Assumptions:
+# - `save_photo_with_thumbnails` would exist in the bot handler
+# - Thumbnail fields would be available in AdImage (requires TASK_012 first)
+#
+# Unsafe Areas:
+# - Editing non-existent function will cause tool errors
+# - No fallback if function doesn't exist
+#
+# Required Fixes:
+# - Target existing functions: `save_photo` and/or `update_ad_and_moderate`
+# - Ensure TASK_012 completes before integration (thumbnail fields in AdImage)
+# - Either create `save_photo_with_thumbnails` in a separate task, or target existing functions
+#
+# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
+
+source_reference: .ai/plans/02/Photo Thumbnail Generation/plan.md
+source_section: T3.2: Integrate with save_photo() and update_ad_and_moderate()
+
+depends_on:
+  - TASK_011_Implement_ThumbnailService
+  - TASK_012_Add_AdImage_thumbnail_fields    # FIXED: Changed from thumbnail_url_properties
+
+description: >
+  Update telegram_bot/handlers/ad_create.py to integrate ThumbnailService
+  into the photo upload flow. Generate thumbnails in update_ad_and_moderate().
+
+files:
+  - path: src/telegram_bot/handlers/ad_create.py
+
+    targets:
+      - type: function
+        name: save_photo
+
+      - type: function
+        name: update_ad_and_moderate
+
+changes:
+  - action: add_code
+
+    description: >
+      Import ThumbnailService and integrate into photo saving flow in update_ad_and_moderate.
+
+    code_hint: |
+      from apps.media.services.thumbnails import ThumbnailService
+      
+      # In update_ad_and_moderate(), after AdImage.objects.create():
+      # thumbnail_keys = ThumbnailService.generate_thumbnails(photo_bytes, storage_key)
+      # ad_image.thumbnail_small = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
+      # ad_image.thumbnail_medium = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
+      # ad_image.thumbnail_large = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
+      # ad_image.save()
+
+acceptance_criteria:
+  - ThumbnailService imported in ad_create.py
+  - Thumbnails generated for each uploaded photo
+  - AdImage records updated with thumbnail storage keys
+  - Type checking passes on ad_create.py
+  - Lint check passes on ad_create.py
+
+risk_level: medium
+risk_mitigation: >
+  Original photos saved separately.
+  Thumbnail failure falls back gracefully.

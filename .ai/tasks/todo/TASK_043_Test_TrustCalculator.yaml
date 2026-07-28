@@ -1,0 +1,49 @@
+id: TASK_043_Test_TrustCalculator
+
+title: Unit tests for TrustCalculator
+
+priority: medium
+
+type: test
+verifies:
+  - TASK_020_Create_TrustCalculator_service
+
+source_reference: .ai/plans/02/Trust Signals System/plan.md
+
+description: >
+  Create unit tests for TrustCalculator in apps/trust/tests/test_trust_calculator.py.
+  Tests should cover scoring algorithm and trust level mapping.
+
+goals:
+  - Test score calculation with various ad counts
+  - Test verification bonus application
+  - Test rejection rate impact on score
+  - Test trust level mapping (unverified/verified/trusted/pro)
+
+files:
+  - path: src/backend/apps/trust/tests/__init__.py
+  - path: src/backend/apps/trust/tests/test_trust_calculator.py
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create test file with trust score scenarios.
+
+    code_hint: |
+      class TestTrustCalculator:
+          def test_score_with_published_ads(self): ...
+          def test_verification_bonus(self): ...
+          def test_rejection_penalty(self): ...
+          def test_trust_level_mapping(self): ...
+
+acceptance_criteria:
+  - Test file created in apps/trust/tests/
+  - All scoring scenarios covered
+  - All tests pass
+  - Type checking passes on test file
+
+risk_level: low
+risk_mitigation: >
+  Tests verify algorithm correctness.
+  Score recalculation always possible.

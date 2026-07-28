@@ -1,0 +1,58 @@
+id: TASK_006_Add_AdPriorityLevel_StrEnum
+
+title: Add AdPriorityLevel StrEnum for moderation queue triage
+
+priority: high
+
+source_reference: .ai/plans/02/Enhanced Moderation Tooling/plan.md
+source_section: T1: Add AdPriorityLevel StrEnum
+
+description: >
+  Add AdPriorityLevel StrEnum with values (high, medium, low) for priority-based
+  moderation queue sorting.
+
+goals:
+  - Enable priority-based moderation queue
+  - Support HIGH/MEDIUM/LOW priority levels
+  - Follow StrEnum pattern for fixed values
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: class
+        name: AdPriorityLevel
+
+    semantic_anchors:
+      insert_after:
+        type: class
+        name: AnalyticsEventType
+
+      insert_before:
+        type: class
+        name: LanguageLocale
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create AdPriorityLevel StrEnum class for moderation priority levels.
+
+    code_hint: |
+      class AdPriorityLevel(StrEnum):
+          """Priority levels for moderation queue triage."""
+          HIGH = "high"
+          MEDIUM = "medium"
+          LOW = "low"
+
+acceptance_criteria:
+  - AdPriorityLevel class added to enums.py
+  - All three priority levels present
+  - AdPriorityLevel added to __all__ export list
+  - Type checking passes on enums.py
+  - Lint check passes on enums.py
+
+risk_level: low
+risk_mitigation: >
+  New enum class; no existing code affected.
+  Existing code uses unchanged values.

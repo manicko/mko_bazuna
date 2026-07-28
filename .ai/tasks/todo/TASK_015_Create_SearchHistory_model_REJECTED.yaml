@@ -1,0 +1,85 @@
+id: TASK_015_Create_SearchHistory_model
+
+title: Create SearchHistory model for user tracking
+
+priority: high
+
+# REJECTED - DO NOT EXECUTE
+# ==============
+# Rejection Reason: Invalid file path — `src/backend/apps/search/models.py` does not exist.
+# Same as TASK_014 - the search app has no models.py file.
+#
+# Evidence:
+# - File system: apps/search/ contains only apps.py, tests.py, urls.py, __init__.py
+# - Task targets non-existent file
+#
+# Stale Assumptions:
+# - Search app models.py exists and is ready for model additions
+#
+# Unsafe Areas:
+# - Same file path issue as TASK_014
+# - Must be addressed together with TASK_014
+#
+# Required Fixes:
+# - Create apps/search/models.py first
+# - OR combine with TASK_014 into a single "Create search models file" task
+#
+# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
+
+source_reference: .ai/plans/02/Search Autocomplete/plan.md
+source_section: T2: Create SearchHistory Model
+
+description: >
+  Create SearchHistory model in apps/search/models.py to store user search
+  history for personalized autocomplete.
+
+goals:
+  - Track user search queries
+  - Enable personalized autocomplete
+  - Support deduplication and max 50 entries per user
+
+files:
+  - path: src/backend/apps/search/models.py
+
+    # FIXED: This task requires apps/search/models.py to exist first
+    # Create the file in a prerequisite task, or change action to create the file
+
+    targets:
+      - type: class
+        name: SearchHistory
+
+    semantic_anchors:
+      insert_after:
+        type: class
+        name: PopularSearch
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create SearchHistory model with user, query, created_at fields.
+
+    code_hint: |
+      class SearchHistory(models.Model):
+          user = models.ForeignKey(
+              "users.User",
+              on_delete=models.CASCADE,
+              null=True,
+              blank=True,
+          )
+          query = models.CharField(max_length=200)
+          query_normalized = models.CharField(max_length=200, db_index=True)
+          created_at = models.DateTimeField(auto_now_add=True)
+      
+          class Meta:
+              db_table = "search_history"
+
+acceptance_criteria:
+  - SearchHistory model created in apps/search/models.py
+  - Fields match specification including indexes
+  - Type checking passes on models.py
+  - Lint check passes on models.py
+
+risk_level: low
+risk_mitigation: >
+  New model; no existing code affected.

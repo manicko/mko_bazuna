@@ -1,0 +1,31 @@
+id: TASK_013_Create_migration_thumbnail_fields
+
+title: Create migration for AdImage thumbnail fields
+
+priority: medium
+
+depends_on:
+  - TASK_012_Add_AdImage_thumbnail_fields
+
+source_reference: .ai/plans/02/Photo Thumbnail Generation/plan.md
+source_section: T1.2: Migration
+
+description: >
+  Create database migration for AdImage thumbnail fields.
+
+goals:
+  - Generate migration 0004_adimage_thumbnails.py
+  - Add three nullable CharFields to AdImage
+  - Ensure backward compatibility
+
+files:
+  - path: src/backend/apps/ads/migrations/0004_adimage_thumbnails.py
+
+verification_steps:
+  - uv run python src/backend/manage.py makemigrations --check --dry-run ads
+  - uv run python src/backend/manage.py migrate --plan
+
+risk_level: medium
+risk_mitigation: >
+  Nullable fields in migration ensure safe deployment.
+  Existing AdImage records unaffected.

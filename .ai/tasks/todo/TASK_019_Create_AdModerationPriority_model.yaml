@@ -1,0 +1,72 @@
+id: TASK_019_Create_AdModerationPriority_model
+
+title: Create AdModerationPriority model for queue prioritization
+
+priority: high
+
+# TASK RESTORED - APPROVED FOR EXECUTION
+# ==============
+# This task was incorrectly marked as REJECTED. Analysis shows:
+# - Target file `apps/moderation/models.py` EXISTS
+# - The task correctly specifies `insert_position: module_end`
+# - No semantic anchor issues - creating a new model at module end is valid
+#
+# However, the order.yaml should include `file_lock: apps/moderation/models.py`
+# to prevent concurrent edits to this file.
+#
+# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
+
+depends_on:
+  - TASK_006_Add_AdPriorityLevel_StrEnum
+
+source_reference: .ai/plans/02/Enhanced Moderation Tooling/plan.md
+source_section: T2: Add AdModerationPriority Model
+
+description: >
+  Create AdModerationPriority model in apps/moderation/models.py with
+  priority scoring for moderation queue triage.
+
+goals:
+  - Enable priority-based moderation queue
+  - Store base_score, priority_level, and risk flags
+  - Support escalation flagging for senior review
+
+files:
+  - path: src/backend/apps/moderation/models.py
+
+    targets:
+      - type: class
+        name: AdModerationPriority
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create AdModerationPriority model with one-to-one Ad relation.
+
+    code_hint: |
+      class AdModerationPriority(models.Model):
+          ad = models.OneToOneField("ads.Ad", on_delete=models.CASCADE, related_name="moderation_priority")
+          base_score = models.PositiveSmallIntegerField(default=0)
+          priority_level = models.CharField(max_length=10, choices=[(l.value, l.value) for l in AdPriorityLevel])
+          flags = models.JSONField(default=list, blank=True)
+          confidence_score = models.FloatField(default=0.0)
+          escalation_required = models.BooleanField(default=False)
+
+acceptance_criteria:
+  - AdModerationPriority model created
+  - One-to-one relation to Ad
+  - All fields match specification
+  - Indexes on priority_level, base_score, escalation_required
+  - Type checking passes on models.py
+  - Lint check passes on models.py
+
+risk_level: medium
+risk_mitigation: >
+  One-to-one model keeps Ad schema clean.
+  Nullable flags and confidence allow flexibility.

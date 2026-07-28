@@ -1,14 +1,25 @@
 # Production override for docker-compose.yml
-# Immutable image deployment with TLS hardening and scheduler
+# Immutable image deployment with TLS hardening, scheduler, and image overrides for GHCR
 
 services:
-  # Override web for production: add restart policy
+  # Override web for production: use pre-built image from GHCR
+  # This prevents docker-compose from using build directive and forces pull
   web:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
     restart: unless-stopped
 
-  # Override bot for production: add restart policy (already has command)
+  # Override bot for production: use pre-built image from GHCR
   bot:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
     restart: unless-stopped
+
+  # Override migrate for production: use pre-built image from GHCR
+  migrate:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+
+  # Override create_admin for production: use pre-built image from GHCR
+  create_admin:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
 
   # Override nginx for production: TLS certificate mount
   nginx:

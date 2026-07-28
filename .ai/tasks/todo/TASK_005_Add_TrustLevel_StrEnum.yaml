@@ -1,0 +1,59 @@
+id: TASK_005_Add_TrustLevel_StrEnum
+
+title: Add TrustLevel StrEnum for seller trust system
+
+priority: high
+
+source_reference: .ai/plans/02/Trust Signals System/plan.md
+source_section: T1: Add TrustLevel StrEnum
+
+description: >
+  Add TrustLevel StrEnum with values (unverified, verified, trusted, pro) for
+  seller trust badge display following project rule #10.
+
+goals:
+  - Create TrustLevel enum for badge rendering
+  - Support trust score visualization in UI
+  - Follow StrEnum pattern for fixed values
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: class
+        name: TrustLevel
+
+    semantic_anchors:
+      insert_after:
+        type: class
+        name: AnalyticsEventType
+
+      insert_before:
+        type: class
+        name: ModeratorActionType
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create TrustLevel StrEnum class after AnalyticsEventType.
+
+    code_hint: |
+      class TrustLevel(StrEnum):
+          """Seller trust level for badge display."""
+          UNVERIFIED = "unverified"
+          VERIFIED = "verified"
+          TRUSTED = "trusted"
+          PRO = "pro"
+
+acceptance_criteria:
+  - TrustLevel class added to enums.py
+  - All four trust levels present
+  - TrustLevel added to __all__ export list
+  - Type checking passes on enums.py
+  - Lint check passes on enums.py
+
+risk_level: low
+risk_mitigation: >
+  New enum class; no existing code affected.
+  Existing code uses unchanged values.

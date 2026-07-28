@@ -1,0 +1,57 @@
+id: TASK_021_Create_PriorityCalculator_service
+
+title: Create PriorityCalculator service for moderation priority
+
+priority: medium
+
+depends_on:
+  - TASK_019_Create_AdModerationPriority_model
+
+source_reference: .ai/plans/02/Enhanced Moderation Tooling/plan.md
+source_section: T3: Create PriorityCalculator Service
+
+description: >
+  Create PriorityCalculator service in apps/moderation/services/priority_calculator.py
+  to compute priority scores based on content and user history.
+
+goals:
+  - Calculate priority score from risk factors
+  - Map score to AdPriorityLevel enum
+  - Detect banned words and repeat offenders
+
+files:
+  - path: src/backend/apps/moderation/services/priority_calculator.py
+
+    targets:
+      - type: class
+        name: PriorityCalculator
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create PriorityCalculator class with content and user scoring.
+
+    code_hint: |
+      class PriorityCalculator:
+          def calculate_priority(self, ad: Ad) -> dict: ...
+          def _calculate_content_score(self, ad: Ad) -> dict: ...
+          def _calculate_user_score(self, ad: Ad) -> dict: ...
+          def _get_priority_level(self, score: int) -> AdPriorityLevel: ...
+
+acceptance_criteria:
+  - PriorityCalculator class created
+  - Content scoring for banned words implemented
+  - User scoring for repeat offenders implemented
+  - Type checking passes on priority_calculator.py
+  - Lint check passes on priority_calculator.py
+
+risk_level: medium
+risk_mitigation: >
+  Service in isolation; scoring algorithm configurable.
+  Signals handle automatic calculation.

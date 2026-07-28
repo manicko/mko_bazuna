@@ -1,0 +1,69 @@
+id: TASK_012_Add_AdImage_thumbnail_fields
+
+title: Add thumbnail fields to AdImage model
+
+priority: high
+
+depends_on:
+  - TASK_010_Create_media_app_structure
+
+source_reference: .ai/plans/02/Photo Thumbnail Generation/plan.md
+source_section: T3.3: Add Model Fields
+
+description: >
+  Add thumbnail_small, thumbnail_medium, thumbnail_large CharFields to AdImage
+  model in apps/ads/models.py.
+
+goals:
+  - Add three nullable CharFields for thumbnail storage keys
+  - Follow storage key pattern <uuid>-<size>.jpg
+  - Maintain backward compatibility with existing images
+
+files:
+  - path: src/backend/apps/ads/models.py
+
+    targets:
+      - type: class
+        name: AdImage
+
+    semantic_anchors:
+      insert_before:
+        type: property
+        value: image_url
+
+changes:
+  - action: add_field
+
+    description: >
+      Add thumbnail_small, thumbnail_medium, thumbnail_large fields to AdImage.
+
+    code_hint: |
+      thumbnail_small = models.CharField(
+          max_length=64,
+          blank=True,
+          null=True,
+          help_text="Storage key for small thumbnail (<uuid>-small.jpg)",
+      )
+      thumbnail_medium = models.CharField(
+          max_length=64,
+          blank=True,
+          null=True,
+          help_text="Storage key for medium thumbnail (<uuid>-medium.jpg)",
+      )
+      thumbnail_large = models.CharField(
+          max_length=64,
+          blank=True,
+          null=True,
+          help_text="Storage key for large thumbnail (<uuid>-large.jpg)",
+      )
+
+acceptance_criteria:
+  - All three thumbnail fields added to AdImage
+  - Fields are nullable for backward compatibility
+  - Type checking passes on models.py
+  - Lint check passes on models.py
+
+risk_level: medium
+risk_mitigation: >
+  Nullable fields allow safe rollout.
+  Existing code continues to work without thumbnails.

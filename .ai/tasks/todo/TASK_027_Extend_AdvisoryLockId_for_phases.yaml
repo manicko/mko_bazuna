@@ -1,0 +1,48 @@
+id: TASK_027_Extend_AdvisoryLockId_for_phases
+
+title: Extend AdvisoryLockId enum with ROLLUP_DAILY_METRICS
+
+priority: medium
+
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: T7: Additional Step - Add to AdvisoryLockId
+
+description: >
+  Add ROLLUP_DAILY_METRICS = 8 to AdvisoryLockId enum for daily metrics
+  aggregation command.
+
+goals:
+  - Enable advisory lock for daily rollup command
+  - Follow IntEnum pattern for lock IDs
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: class
+        name: AdvisoryLockId
+
+    semantic_anchors:
+      insert_after:
+        type: field
+        name: PURGE_REJECTED_ADS
+
+changes:
+  - action: add_field
+
+    description: >
+      Add ROLLUP_DAILY_METRICS = 8 to AdvisoryLockId enum.
+
+    code_hint: |
+      ROLLUP_DAILY_METRICS = 8
+
+acceptance_criteria:
+  - LOCKUP_DAILY_METRICS = 8 added to AdvisoryLockId
+  - Position after PURGE_REJECTED_ADS = 7
+  - Type checking passes on enums.py
+  - Lint check passes on enums.py
+
+risk_level: low
+risk_mitigation: >
+  Numeric constants; no runtime logic changes.
+  Lock IDs prevent concurrent job execution.

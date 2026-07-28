@@ -1,0 +1,60 @@
+id: TASK_025_Create_DailyAdMetrics_model
+
+title: Create DailyAdMetrics model for daily rollups
+
+priority: high
+
+source_reference: .ai/plans/02/Analytics Improvements/plan.md
+source_section: T4: Create DailyAdMetrics Model
+
+description: >
+  Create DailyAdMetrics model in apps/analytics/models.py for pre-aggregated
+  daily metrics to support efficient dashboard queries.
+
+goals:
+  - Store daily view and contact counts per ad
+  - Track trust score and response time
+  - Unique constraint on (ad, date)
+  - Index for leaderboard queries
+
+files:
+  - path: src/backend/apps/analytics/models.py
+
+    targets:
+      - type: class
+        name: DailyAdMetrics
+
+    semantic_anchors:
+      insert_position:
+        type: module
+        value: end
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create DailyAdMetrics model with daily aggregation fields.
+
+    code_hint: |
+      class DailyAdMetrics(models.Model):
+          ad = models.ForeignKey("ads.Ad", on_delete=models.CASCADE)
+          date = models.DateField()
+          views_count = models.PositiveIntegerField(default=0)
+          contacts_count = models.PositiveIntegerField(default=0)
+          trust_score = models.FloatField(null=True)
+          avg_response_time = models.FloatField(null=True)
+          created_at = models.DateTimeField(auto_now_add=True)
+          updated_at = models.DateTimeField(auto_now=True)
+
+acceptance_criteria:
+  - DailyAdMetrics model created
+  - All fields match specification
+  - Unique constraint on (ad, date)
+  - Index on (date, -views_count)
+  - Type checking passes on models.py
+  - Lint check passes on models.py
+
+risk_level: medium
+risk_mitigation: >
+  New table; no existing data affected.
+  Daily rollups can be backfilled if needed.

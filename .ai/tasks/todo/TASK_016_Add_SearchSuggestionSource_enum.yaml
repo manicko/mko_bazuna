@@ -1,0 +1,58 @@
+id: TASK_016_Add_SearchSuggestionSource_enum
+
+title: Add SearchSuggestionSource StrEnum for autocomplete sources
+
+priority: medium
+
+source_reference: .ai/plans/02/Search Autocomplete/plan.md
+source_section: T3: Add SearchSuggestionSource Enum
+
+description: >
+  Add SearchSuggestionSource StrEnum with values (user_history, popular_search,
+  category, city) for autocomplete suggestion categorization.
+
+goals:
+  - Categorize autocomplete suggestion sources
+  - Support source-based sorting in suggestions
+  - Follow StrEnum pattern for fixed values
+
+files:
+  - path: src/backend/apps/core/enums.py
+
+    targets:
+      - type: class
+        name: SearchSuggestionSource
+
+    semantic_anchors:
+      insert_after:
+        type: class
+        name: AnalyticsEventType
+
+      insert_before:
+        type: class
+        name: LanguageLocale
+
+changes:
+  - action: add_top_level
+
+    description: >
+      Create SearchSuggestionSource StrEnum class.
+
+    code_hint: |
+      class SearchSuggestionSource(StrEnum):
+          """Source types for search autocomplete suggestions."""
+          USER_HISTORY = "user_history"
+          POPULAR_SEARCH = "popular_search"
+          CATEGORY = "category"
+          CITY = "city"
+
+acceptance_criteria:
+  - SearchSuggestionSource class added
+  - All four source values present
+  - Added to __all__ export list
+  - Type checking passes on enums.py
+  - Lint check passes on enums.py
+
+risk_level: low
+risk_mitigation: >
+  New enum class; no existing code affected.

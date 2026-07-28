@@ -362,9 +362,9 @@ jobs:
   # ============================================
   # BUILD & PUSH (deploy only on main)
   # ============================================
-  build:
+   build:
     needs: [lint, typecheck, test]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -405,9 +405,9 @@ jobs:
   # ============================================
   # SECURITY SCAN (optional, non-blocking)
   # ============================================
-  security-scan:
+   security-scan:
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch'
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -431,7 +431,7 @@ jobs:
   # ============================================
   deploy:
     needs: [build]
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: production
 
