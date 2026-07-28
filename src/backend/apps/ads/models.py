@@ -331,8 +331,7 @@ class Ad(models.Model):
 
 
 class AdImage(models.Model):
-    """
-    Ad image with UUID v4 storage key for URL anonymity.
+    """Ad image with UUID v4 storage key for URL anonymity.
 
     Only compressed Telegram photos accepted. Key contains NO user_id/telegram_id/username.
     """
@@ -356,6 +355,24 @@ class AdImage(models.Model):
     position = models.PositiveIntegerField(
         default=0,
         help_text="Image order in gallery",
+    )
+    thumbnail_small = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="Storage key for small thumbnail (<uuid>-small.jpg)",
+    )
+    thumbnail_medium = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="Storage key for medium thumbnail (<uuid>-medium.jpg)",
+    )
+    thumbnail_large = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="Storage key for large thumbnail (<uuid>-large.jpg)",
     )
 
     class Meta:
