@@ -26,7 +26,7 @@ files:
     semantic_anchors:
       insert_after:
         type: field
-        name: CONTACT_INITIATED
+        name: AD_VIEWED
 
 changes:
   - action: add_field
@@ -39,7 +39,7 @@ changes:
 
 acceptance_criteria:
   - CONTACT_RESPONSE added to enum
-  - Position after CONTACT_INITIATED
+  - Position after AD_VIEWED
   - Type checking passes on enums.py
   - Lint check passes on enums.py
 

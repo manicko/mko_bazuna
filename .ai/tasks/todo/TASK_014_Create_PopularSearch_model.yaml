@@ -4,30 +4,6 @@ title: Create PopularSearch model for autocomplete
 
 priority: high
 
-# REJECTED - DO NOT EXECUTE
-# ==============
-# Rejection Reason: Invalid file path — `src/backend/apps/search/models.py` does not exist.
-# The search app exists but only contains apps.py, tests.py, urls.py, and __init__.py.
-#
-# Evidence:
-# - File system: apps/search/ has no models.py file
-# - Task would attempt to create a new file but path syntax implies file exists
-#
-# Stale Assumptions:
-# - Search app already has models.py
-# - Model file structure is in place
-#
-# Unsafe Areas:
-# - Task should either create the file explicitly, or task should be preceded by
-#   a prerequisite to create apps/search/models.py
-#
-# Required Fixes:
-# - Create apps/search/models.py first (add as prerequisite task)
-# - OR change task semantics to explicitly create the file
-# - OR use `add_top_level` action with proper file creation handling
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 source_reference: .ai/plans/02/Search Autocomplete/plan.md
 source_section: T1: Create PopularSearch Model
 
@@ -42,10 +18,6 @@ goals:
 
 files:
   - path: src/backend/apps/search/models.py
-
-    # FIXED: This task should be split into two:
-    # 1. Create the models.py file
-    # 2. Add the PopularSearch model to it
 
     targets:
       - type: module

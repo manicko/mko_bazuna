@@ -4,18 +4,6 @@ title: Create AdModerationPriority model for queue prioritization
 
 priority: high
 
-# TASK RESTORED - APPROVED FOR EXECUTION
-# ==============
-# This task was incorrectly marked as REJECTED. Analysis shows:
-# - Target file `apps/moderation/models.py` EXISTS
-# - The task correctly specifies `insert_position: module_end`
-# - No semantic anchor issues - creating a new model at module end is valid
-#
-# However, the order.yaml should include `file_lock: apps/moderation/models.py`
-# to prevent concurrent edits to this file.
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 depends_on:
   - TASK_006_Add_AdPriorityLevel_StrEnum
 

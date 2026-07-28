@@ -4,34 +4,12 @@ title: Create SavedSearch and SavedSearchNotification models
 
 priority: high
 
-# REJECTED - DO NOT EXECUTE
-# ==============
-# Rejection Reason: Invalid directory structure — `apps/search/models/` subdirectory
-# does not exist. Task targets `apps/search/models/saved_search.py` but the search app
-# only has `apps/search/` at the top level (no models subdirectory).
-#
-# Evidence:
-# - File system: apps/search/ contains only apps.py, tests.py, urls.py, __init__.py
-# - No models/ subdirectory exists
-# - No models.py file exists either (see TASK_014, TASK_015 rejections)
-#
-# Stale Assumptions:
-# - Search app uses a modular models/ subdirectory structure
-# - Task can place models in separate files within a non-existent directory
-#
-# Unsafe Areas:
-# - Directory creation is not part of task definition
-# - Task would fail due to missing parent directory
-#
-# Required Fixes:
-# - Option A: Create apps/search/models.py first, add models there
-# - Option B: Create apps/search/models/ directory structure as separate tasks
-# - Option C: Consolidate all search models into apps/search/models.py (recommended)
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 source_reference: .ai/plans/02/Saved Search Alerts/plan.md
 source_section: T1: SavedSearch & SavedSearchNotification Models
+
+depends_on:
+  - TASK_004_Extend_AnalyticsEventType_trust_moderation
+  - TASK_027_Extend_AdvisoryLockId_for_phases
 
 description: >
   Create SavedSearch and SavedSearchNotification models in apps/search/models.py
@@ -45,9 +23,6 @@ goals:
 
 files:
   - path: src/backend/apps/search/models.py
-
-    # FIXED: Changed to use apps/search/models.py instead of non-existent subdirectory
-    # This requires apps/search/models.py to be created first (see TASK_014 fix)
 
     targets:
       - type: class
@@ -91,6 +66,6 @@ acceptance_criteria:
   - Lint check passes
 
 risk_level: medium
-risk_mitigation: >
+risk_mitigation: |
   Models isolated to search app.
   Nullable filters allow flexible saved searches.

@@ -4,26 +4,6 @@ title: Extend AnalyticsEventType with trust and moderation events
 
 priority: high
 
-# REJECTED - DO NOT EXECUTE
-# ==============
-# Rejection Reason: Invalid semantic anchor - `insert_after: CONTACT_RESPONSE` references
-# a field that doesn't exist at task execution time. CONTACT_RESPONSE is added by
-# TASK_036 which runs AFTER this task in the rollout order.
-#
-# Stale Assumptions:
-# - CONTACT_RESPONSE would exist when this task runs
-# - Insertion after it would be stable
-#
-# Unsafe Areas:
-# - Semantic target will fail when task runs before TASK_036
-# - The anchor is not survivable
-#
-# Required Fixes:
-# - Change semantic anchor to `insert_after: CONTACT_INITIATED` (line 58 in enums.py)
-# - Or reorder tasks so TASK_036 runs before TASK_004
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 source_reference: .ai/plans/02/Analytics Improvements/plan.md
 source_section: T1: Extend AnalyticsEventType Enum
 
@@ -50,7 +30,7 @@ files:
     semantic_anchors:
       insert_after:
         type: field
-        name: CONTACT_INITIATED    # FIXED: Changed from CONTACT_RESPONSE to stable anchor
+        name: CONTACT_INITIATED
 
       insert_before:
         type: class

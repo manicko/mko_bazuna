@@ -4,41 +4,21 @@ title: Integrate ThumbnailService into bot photo handler
 
 priority: high
 
-# REJECTED - DO NOT EXECUTE
-# ==============
-# Rejection Reason: Invalid semantic target - function `save_photo_with_thumbnails`
-# does not exist in target file `src/telegram_bot/handlers/ad_create.py`.
-# 
-# Evidence:
-# - Target file contains `save_photo` function (line 452) but NOT `save_photo_with_thumbnails`
-# - Target file contains `_update_and_moderate` function (line 534) which is valid
-# - Task code hint references `save_photo_with_thumbnails` which doesn't exist
-#
-# Stale Assumptions:
-# - `save_photo_with_thumbnails` would exist in the bot handler
-# - Thumbnail fields would be available in AdImage (requires TASK_012 first)
-#
-# Unsafe Areas:
-# - Editing non-existent function will cause tool errors
-# - No fallback if function doesn't exist
-#
-# Required Fixes:
-# - Target existing functions: `save_photo` and/or `update_ad_and_moderate`
-# - Ensure TASK_012 completes before integration (thumbnail fields in AdImage)
-# - Either create `save_photo_with_thumbnails` in a separate task, or target existing functions
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 source_reference: .ai/plans/02/Photo Thumbnail Generation/plan.md
 source_section: T3.2: Integrate with save_photo() and update_ad_and_moderate()
 
 depends_on:
   - TASK_011_Implement_ThumbnailService
-  - TASK_012_Add_AdImage_thumbnail_fields    # FIXED: Changed from thumbnail_url_properties
+  - TASK_012_Add_AdImage_thumbnail_fields
 
 description: >
   Update telegram_bot/handlers/ad_create.py to integrate ThumbnailService
   into the photo upload flow. Generate thumbnails in update_ad_and_moderate().
+
+goals:
+  - Import ThumbnailService in ad_create.py
+  - Generate thumbnails for each uploaded photo in update_ad_and_moderate
+  - Update AdImage records with thumbnail storage keys
 
 files:
   - path: src/telegram_bot/handlers/ad_create.py

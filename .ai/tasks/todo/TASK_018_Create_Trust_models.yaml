@@ -4,44 +4,12 @@ title: Create SellerTrustScore and SellerVerification models
 
 priority: high
 
-# REJECTED - DO NOT EXECUTE
-# ==============
-# Rejection Reason: Entire trust app does not exist — `apps/trust/` directory
-# is not present in the codebase. Task tries to create models in a non-existent app.
-#
-# Evidence:
-# - File system: No apps/trust/ directory exists
-# - INSTALLED_APPS in base.py does not include "apps.trust"
-# - No prerequisite task creates the trust app structure
-#
-# Stale Assumptions:
-# - apps/trust/ Django app exists and is ready for model creation
-# - TrustLevel enum will be available (requires TASK_005)
-# - Trust app is registered in INSTALLED_APPS
-#
-# Unsafe Areas:
-# - Django will fail to load models from unregistered app
-# - Migration will fail without proper app structure
-#
-# Required Fixes:
-# - Add prerequisite task to create apps/trust/ module structure
-# - Add prerequisite task to register apps.trust in INSTALLED_APPS (fix TASK_052 dependency)
-# - OR merge with TASK_010_Create_media_app_structure to create trust alongside media
-#
-# See: .ai/tasks/validation/tasks_validated_findings_001.md for full analysis
-
 depends_on:
   - TASK_005_Add_TrustLevel_StrEnum
-
-source_reference: .ai/plans/02/Trust Signals System/plan.md
-source_section: T3: Create SellerTrustScore Model
 
 description: >
   Create SellerTrustScore and SellerVerification models in apps/trust/models.py
   for trust scoring and seller verification.
-
-# FIXED: Requires apps/trust/ to exist first
-# Add prerequisite: Create apps/trust/ module structure (models.py, apps.py, etc.)
 
 goals:
   - Enable trust score persistence for sellers
@@ -71,6 +39,8 @@ changes:
       Create SellerVerification with admin and phone verification fields.
 
     code_hint: |
+      from django.db import models
+      
       class SellerTrustScore(models.Model):
           user = models.OneToOneField("users.User", on_delete=models.CASCADE)
           trust_level = models.CharField(max_length=20, choices=[(l.value, l.label) for l in TrustLevel])
@@ -95,6 +65,6 @@ acceptance_criteria:
   - Lint check passes
 
 risk_level: medium
-risk_mitigation: >
+risk_mitigation: |
   New models; no existing code affected.
   Separate trust app allows isolated development.
