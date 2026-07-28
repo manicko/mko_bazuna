@@ -13,6 +13,8 @@ from apps.users.views.consent import is_consent_given
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from apps.analytics.services.seller_stats import SellerStats
+from apps.core.enums import TimeRange
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,16 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered dashboard template with grouped ads
     """
+    # Parse time range filter from request
+    selected_range_value = request.GET.get("time_range", TimeRange.ALL_TIME.value)
+    try:
+        time_range = TimeRange(selected_range_value)
+    except ValueError:
+        time_range = TimeRange.ALL_TIME
+
+    # Compute seller stats
+    seller_stats = SellerStats(request.user.id).get_stats(time_range)
+
     # Fetch all ads for the current user, grouped by status
     ads_by_status = {
         AdStatus.PUBLISHED: Ad.objects.filter(
@@ -64,6 +76,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             AdStatus.REJECTED: "Rejected",
         },
         "consent_shown": is_consent_given(request),
+        "seller_stats": seller_stats,
+        "selected_time_range": time_range.value,
     }
 
     return render(request, "ads/dashboard.html", context)
