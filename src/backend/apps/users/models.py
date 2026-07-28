@@ -60,6 +60,10 @@ class User(AbstractUser):
         default=True,  # pyright: ignore[reportArgumentType]
         help_text="Publishing ban - when False, ads go to DRAFT instead of ON_MODERATION",
     )
+    telegram_premium = models.BooleanField(
+        default=False,  # pyright: ignore[reportArgumentType]
+        help_text="User has Telegram Premium subscription",
+    )
 
     # Timestamps for account lifecycle
     deleted_at = models.DateTimeField(
