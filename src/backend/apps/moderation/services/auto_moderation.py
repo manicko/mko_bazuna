@@ -220,6 +220,12 @@ def _fail_moderation(ad: Ad) -> None:
 
     set_moderation_failed(ad)
 
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEventType.MODERATION_REJECTED,
+        user_id=ad.user_id,
+        ad_id=ad.id,
+    )
+
 
 def _pass_moderation(ad: Ad) -> None:
     """Set ad to PUBLISHED with timestamp, log action, and create analytics event."""
@@ -230,6 +236,13 @@ def _pass_moderation(ad: Ad) -> None:
     AnalyticsEvent.objects.create(
         event_type=AnalyticsEventType.AD_PUBLISHED,
         user_id=ad.user_id,
+        ad_id=ad.id,
+    )
+
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEventType.MODERATION_APPROVED,
+        user_id=ad.user_id,
+        ad_id=ad.id,
     )
 
     logger.info(f"Auto-moderation passed for ad {ad.id}")
