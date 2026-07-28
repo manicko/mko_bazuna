@@ -4,7 +4,7 @@ Moderation models for Mko Bazuna.
 ModerationCriteria singleton and ModeratorActionLog for audit trail.
 """
 
-from apps.core.enums import ModeratorActionType
+from apps.core.enums import ModeratorActionType, AdPriorityLevel
 from django.db import models
 
 
@@ -129,3 +129,36 @@ class ModeratorActionLog(models.Model):
 
     def __str__(self) -> str:
         return f"Action {self.action_type} on Ad {self.ad_id}"
+
+class AdModerationPriority(models.Model):
+    """
+    Priority scoring for moderation queue triage.
+
+    One-to-one with Ad. Stores base_score, priority_level, and risk flags
+    to support priority-based moderation queue ordering and escalation.
+    """
+
+    ad = models.OneToOneField(
+        "ads.Ad",
+        on_delete=models.CASCADE,
+        related_name="moderation_priority",
+    )
+    base_score = models.PositiveSmallIntegerField(default=0)
+    priority_level = models.CharField(
+        max_length=10,
+        choices=[(p.value, p.value) for p in AdPriorityLevel],
+    )
+    flags = models.JSONField(default=list, blank=True)
+    confidence_score = models.FloatField(default=0.0)
+    escalation_required = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "ad_moderation_priorities"
+        indexes = [
+            models.Index(fields=["priority_level"]),
+            models.Index(fields=["base_score"]),
+            models.Index(fields=["escalation_required"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"AdModerationPriority(ad={self.ad_id}, level={self.priority_level})"
