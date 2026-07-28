@@ -70,6 +70,15 @@ class AnalyticsEventType(StrEnum):
     AD_REPORTED = "ad_reported"
 
 
+class TrustLevel(StrEnum):
+    """Seller trust level for badge display."""
+
+    UNVERIFIED = "unverified"
+    VERIFIED = "verified"
+    TRUSTED = "trusted"
+    PRO = "pro"
+
+
 class ModeratorActionType(StrEnum):
     """Moderator action types for ModeratorActionLog."""
 
@@ -126,6 +135,7 @@ __all__ = [
     "AdStatus",
     "AdSource",
     "AnalyticsEventType",
+    "TrustLevel",
     "ModeratorActionType",
     "CategoryRejectReason",
     "LanguageLocale",
