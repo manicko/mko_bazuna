@@ -33,3 +33,39 @@ class SearchHistory(models.Model):
 
     class Meta:
         db_table = "search_history"
+
+class SavedSearch(models.Model):
+    """Stores saved search queries with filters for alert notifications."""
+
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+    query = models.TextField(blank=True, null=True)
+    city = models.ForeignKey("locations.City", on_delete=models.SET_NULL, blank=True, null=True)
+    category = models.ForeignKey("categories.Category", on_delete=models.SET_NULL, blank=True, null=True)
+    min_price = models.PositiveIntegerField(blank=True, null=True)
+    max_price = models.PositiveIntegerField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "saved_searches"
+
+    def __str__(self) -> str:
+        return f"SavedSearch(user={self.user_id}, query={self.query})"
+
+class SavedSearchNotification(models.Model):
+    """Tracks sent notifications to prevent duplicate alerts for the same ad."""
+
+    saved_search = models.ForeignKey(
+        SavedSearch, on_delete=models.CASCADE, related_name="notifications"
+    )
+    ad = models.ForeignKey("ads.Ad", on_delete=models.CASCADE, related_name="saved_search_notifications")
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "saved_search_notifications"
+        constraints = [
+            models.UniqueConstraint(fields=["saved_search", "ad"], name="uq_saved_search_ad")
+        ]
+
+    def __str__(self) -> str:
+        return f"SavedSearchNotification(saved_search={self.saved_search_id}, ad={self.ad_id})"
