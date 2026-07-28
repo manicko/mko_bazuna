@@ -46,3 +46,58 @@ class AnalyticsEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.event_type} at {self.timestamp}"
+
+class DailyAdMetrics(models.Model):
+    """Daily aggregated metrics per ad for efficient dashboard queries."""
+
+    ad = models.ForeignKey(
+        "ads.Ad",
+        on_delete=models.CASCADE,
+        related_name="daily_metrics",
+        help_text="Ad this metric belongs to",
+    )
+    date = models.DateField(help_text="Date of aggregation")
+    views_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of views on this date",
+    )
+    contacts_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of contacts on this date",
+    )
+    trust_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Auto-computed trust score (0–1)",
+    )
+    avg_response_time = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Average response time in seconds",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Record creation timestamp",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Record last update timestamp",
+    )
+
+    class Meta:
+        db_table = "daily_ad_metrics"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ad", "date"],
+                name="uq_daily_ad_metrics_ad_date",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["date", "-views_count"],
+                name="idx_daily_metrics_date_views",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.ad_id} / {self.date} — v:{self.views_count} c:{self.contacts_count}"
