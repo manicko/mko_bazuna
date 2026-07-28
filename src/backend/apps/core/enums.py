@@ -70,6 +70,14 @@ class AnalyticsEventType(StrEnum):
     AD_REPORTED = "ad_reported"
 
 
+class AdPriorityLevel(StrEnum):
+    """Priority levels for moderation queue triage."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class TrustLevel(StrEnum):
     """Seller trust level for badge display."""
 
@@ -138,5 +146,6 @@ __all__ = [
     "TrustLevel",
     "ModeratorActionType",
     "CategoryRejectReason",
+    "AdPriorityLevel",
     "LanguageLocale",
 ]
