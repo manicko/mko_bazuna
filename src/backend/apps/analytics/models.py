@@ -32,6 +32,14 @@ class AnalyticsEvent(models.Model):
         related_name="analytics_events",
         help_text="User who triggered event (SET NULL on erasure)",
     )
+    ad = models.ForeignKey(
+        "ads.Ad",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="analytics_events",
+        help_text="Ad associated with this event (null for non-ad events)",
+    )
 
     class Meta:
         db_table = "analytics_events"
