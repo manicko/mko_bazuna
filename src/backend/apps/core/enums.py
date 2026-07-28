@@ -57,6 +57,7 @@ class AnalyticsEventType(StrEnum):
     SEARCH_PERFORMED = "search_performed"
     CONTACT_INITIATED = "contact_initiated"
     AD_VIEWED = "ad_viewed"
+    CONTACT_RESPONSE = "contact_response"
     SELLER_VERIFIED = "seller_verified"
     TRUST_LEVEL_UPDATED = "trust_level_updated"
     MODERATION_APPROVED = "moderation_approved"
