@@ -207,3 +207,9 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "")
 # Plausible analytics host (cookieless, no consent banner needed)
 # Format: hostname only, e.g., "analytics.example.com" or "plausible.io"
 PLAUSIBLE_HOST = os.getenv("PLAUSIBLE_HOST", "")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
