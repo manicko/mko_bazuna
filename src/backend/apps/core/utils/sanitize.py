@@ -33,3 +33,11 @@ def sanitize_query_for_log(query: str | None) -> str:
 
     cleaned = _CONTROL_CHAR_PATTERN.sub("", query)
     return cleaned[:_MAX_QUERY_LENGTH]
+
+
+
+def sanitize_autocomplete_query(query: str) -> str:
+    """Sanitize autocomplete query — 2–100 chars, SQL injection safe."""
+    if not query or len(query) < 2 or len(query) > 100:
+        return ""
+    return re.sub(r"[;'\"\\]", "", query.strip())
