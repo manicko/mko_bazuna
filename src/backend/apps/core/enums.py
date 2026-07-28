@@ -57,6 +57,16 @@ class AnalyticsEventType(StrEnum):
     SEARCH_PERFORMED = "search_performed"
     CONTACT_INITIATED = "contact_initiated"
     AD_VIEWED = "ad_viewed"
+    SELLER_VERIFIED = "seller_verified"
+    TRUST_LEVEL_UPDATED = "trust_level_updated"
+    MODERATION_APPROVED = "moderation_approved"
+    MODERATION_REJECTED = "moderation_rejected"
+    MODERATION_FLAGGED = "moderation_flagged"
+    DASHBOARD_VIEWED = "dashboard_viewed"
+    AD_EDITED = "ad_edited"
+    AD_REACTIVATED = "ad_reactivated"
+    CONTACT_COMPLETED = "contact_completed"
+    AD_REPORTED = "ad_reported"
 
 
 class ModeratorActionType(StrEnum):
