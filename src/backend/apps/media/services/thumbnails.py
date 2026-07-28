@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 import os
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from apps.core.enums import ThumbnailSizeStrEnum
 
@@ -60,7 +60,10 @@ class ThumbnailService:
         """
         stem, _ = os.path.splitext(original_key)
 
-        image = Image.open(io.BytesIO(photo_bytes))
+        try:
+            image = Image.open(io.BytesIO(photo_bytes))
+        except UnidentifiedImageError:
+            raise ValueError("Provided bytes cannot be decoded as an image.") from None
         corrected = ImageOps.exif_transpose(image)
         if corrected is None:
             corrected = image

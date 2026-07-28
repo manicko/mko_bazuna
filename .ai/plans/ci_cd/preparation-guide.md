@@ -101,7 +101,7 @@ Install recommended extensions:
 
 ```powershell
 cd mko_bazuna
-docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+docker compose -f compose.yaml -f compose.test.yaml up -d
 ```
 
 Verify:
@@ -315,8 +315,8 @@ Directory layout after this step:
 ├── backups/       # Database dumps (7-day retention)
 ├── certs/         # TLS certificates (fullchain.pem, privkey.pem)
 ├── media/         # User-uploaded images (Telegram ad photos)
-├── docker-compose.yml         # Copied from repo
-├── docker-compose.prod.yml    # Copied from repo
+├── compose.yaml         # Copied from repo
+├── compose.prod.yaml    # Copied from repo
 ├── docker/
 │   └── nginx/
 │       └── nginx.conf        # Copied from repo
@@ -335,8 +335,8 @@ ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP> "mkdir -p /opt/mko_bazuna/docke
 
 # Copy compose files and nginx config to the VPS
 scp -i ~/.ssh/deploy_bazuna \
-  docker-compose.yml \
-  docker-compose.prod.yml \
+  compose.yaml \
+  compose.prod.yaml \
   docker/nginx/nginx.conf \
   deploy@<YOUR_VPS_IP>:/opt/mko_bazuna/
 ```
@@ -420,7 +420,7 @@ Before CI/CD is fully wired (i.e., before GHCR images exist), you can do a manua
 
 ```bash
 cd /opt/mko_bazuna
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 ```
 
 The `--build` flag forces a local build since no GHCR image exists yet. Once CI/CD is ready, future deploys will use `docker compose pull` to fetch pre-built images from GHCR instead.
@@ -487,7 +487,7 @@ SERVER_PORT    ••••••••••
 
 ```
 .github/workflows/
-├── ci.yml        # Code quality: lint, typecheck, test, Docker build, security scan
+├── ci.yml        # Code quality: lint, typecheck, test, coverage
 └── deploy.yml    # Deployment: build, push to GHCR, deploy to VPS
 ```
 
@@ -731,21 +731,21 @@ jobs:
 
             # Pull latest images from GHCR
             echo "Pulling images from GHCR..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f compose.yaml -f compose.prod.yaml pull
 
             # Backup database before migrations (safety net)
             echo "Backing up database..."
             BACKUP_FILE="/opt/mko_bazuna/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm \
+            docker compose -f compose.yaml -f compose.prod.yaml run --rm \
               db pg_dump -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -F c -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
 
             # Run pre-deploy migrations
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+            docker compose -f compose.yaml -f compose.prod.yaml run --rm migrate
 
             # Start new containers
             echo "Starting new containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker compose -f compose.yaml -f compose.prod.yaml up -d
 
             # Clean up old images
             docker image prune -f
@@ -782,7 +782,7 @@ jobs:
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "Rolling back to previous tag: $PREVIOUS_TAG"
               docker pull ghcr.io/${{ github.repository }}:$PREVIOUS_TAG
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
+              docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps web
               echo "Rollback completed - verify manually"
             else
               echo "No previous tag available for rollback - check VPS manually"
@@ -798,9 +798,9 @@ jobs:
 | `pull_request` | `main`, `develop` | All except `docs/**` and `*.md` | CI only |
 | `workflow_dispatch` | `main` only | N/A | Full CD (build → push → deploy) |
 
-### C5. Verify `docker-compose.prod.yml` image overrides
+### C5. Verify `compose.prod.yaml` image overrides
 
-The existing `docker-compose.prod.yml` already has `image:` overrides for `web`, `bot`, `migrate`, and `create_admin` services. These ensure Docker Compose pulls from GHCR instead of building locally. No changes needed.
+The existing `compose.prod.yaml` already has `image:` overrides for `web`, `bot`, `migrate`, and `create_admin` services. These ensure Docker Compose pulls from GHCR instead of building locally. No changes needed.
 
 ### C6. Verify the `.env.docker` is NOT committed
 
@@ -865,14 +865,14 @@ cd /opt/mko_bazuna
 docker images | grep ghcr.io
 
 # Down current containers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose -f compose.yaml -f compose.prod.yaml down
 
 # Set the image tag to the known-good version
 export IMAGE_TAG="sha-<COMMIT_SHA>"
 
 # Pull and start
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f compose.yaml -f compose.prod.yaml pull
+docker compose -f compose.yaml -f compose.prod.yaml up -d
 ```
 
 ---
@@ -918,14 +918,14 @@ On the VPS:
 
 ```bash
 # Check all containers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose -f compose.yaml -f compose.prod.yaml ps
 
 # Check web health
 curl -s http://localhost:8000/health/
 
 # Check logs
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs web --tail 20
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs bot --tail 20
+docker compose -f compose.yaml -f compose.prod.yaml logs web --tail 20
+docker compose -f compose.yaml -f compose.prod.yaml logs bot --tail 20
 
 # Check disk space
 df -h
@@ -1004,7 +1004,7 @@ Watch the workflow run in the GitHub Actions UI. It takes 2–5 minutes.
 ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
 
 cd /opt/mko_bazuna
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose -f compose.yaml -f compose.prod.yaml ps
 curl -s http://localhost:8000/health/
 ```
 
@@ -1053,22 +1053,22 @@ Even with one VPS, you can run a staging instance using a separate compose proje
 
 ```bash
 # Staging
-docker compose -p stage -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -p stage -f compose.yaml -f compose.prod.yaml up -d
 
 # Production
-docker compose -p prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -p prod -f compose.yaml -f compose.prod.yaml up -d
 ```
 
 This allows testing deployments before they hit production.
 
 ### 3. Rename compose files to Docker's recommended convention
 
-Docker now recommends `compose.yaml` and `compose.dev.yaml` instead of `docker-compose.yml`. This is a naming convention change — the existing files work fine. Consider renaming when convenient:
+Docker now recommends `compose.yaml` and `compose.dev.yaml` instead of `docker-compose.yml`. The plan already uses the modern naming. If the existing project files still use the old naming, rename them:
 
 ```
-docker-compose.yml         → compose.yaml
-docker-compose.prod.yml    → compose.prod.yaml
-docker-compose.test.yml    → compose.test.yaml
+compose.yaml         (was docker-compose.yml)
+compose.prod.yaml    (was docker-compose.prod.yml)
+compose.test.yaml    (was docker-compose.test.yml)
 ```
 
 ### 4. Add dependency audit (pip-audit)
@@ -1151,8 +1151,8 @@ dependency-audit:
 ├── backups/           # DB dumps (7-day retention + pre-deploy backups)
 ├── certs/             # TLS: fullchain.pem, privkey.pem
 ├── media/             # User-uploaded images
-├── docker-compose.yml         # Copied from repo
-├── docker-compose.prod.yml    # Copied from repo
+├── compose.yaml         # Copied from repo
+├── compose.prod.yaml    # Copied from repo
 ├── docker/
 │   └── nginx/
 │       └── nginx.conf        # Copied from repo

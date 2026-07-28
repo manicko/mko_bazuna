@@ -32,9 +32,9 @@ UI patterns referenced as "pattern X" live in [ui-patterns.md](../01-spec/ui-pat
 
 | Role | File | Stories |
 |------|------|---------|
-| Seller | [seller-stories.md](seller-stories.md) | US-S1, S2, S5, S6, S7, S8, S9 |
-| Buyer | [buyer-stories.md](buyer-stories.md) | US-B1–B9 |
-| Admin | [admin-stories.md](admin-stories.md) | US-A1–A11 |
+| Seller | [seller-stories.md](seller-stories.md) | US-S1, S2, S5, S6, S7, S8, S9, S10, S11 |
+| Buyer | [buyer-stories.md](buyer-stories.md) | US-B1–B9, B10, B11, B12 |
+| Admin | [admin-stories.md](admin-stories.md) | US-A1–A11, A12, A13, A14 |
 
 ## UI Pattern References
 

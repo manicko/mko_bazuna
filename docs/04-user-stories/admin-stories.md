@@ -86,3 +86,18 @@ is the only automatic gate before `PUBLISHED`. See decision A.
 View failed/rejected lists and edit `moderation_criteria` at runtime. Manual photo review (Layer 2)
 with prohibited-content categories logged as `reason` in `ModeratorActionLog` — **never shown to the
 seller**. See decision O4.
+
+### US-A12 — Moderation queue priority
+Moderator sees ads sorted by priority score in the queue. Priority is computed from content risk
+(banned words, repeat offender flags) and seller trust level. Each ad has a priority level
+(`HIGH`, `MEDIUM`, `LOW`) and an escalation flag for senior review. See decision Q.
+
+### US-A13 — Moderation analytics
+Admin views moderation statistics: pending queue size, moderator performance metrics, and rejection
+reason breakdowns. Data is aggregated via `ModerationAnalytics` service and supports time-range
+filtering. See decision Q.
+
+### US-A14 — Trust signals management
+Admin views seller trust scores and verification status in the dashboard. Trust scores are
+recalculated on every ad publish and mapped to `TrustLevel` (`UNVERIFIED`, `VERIFIED`, `TRUSTED`,
+`PRO`). Admin can manually verify sellers and view trust history. See decision M.

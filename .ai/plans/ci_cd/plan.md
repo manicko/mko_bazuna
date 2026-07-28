@@ -1,22 +1,103 @@
 # CI/CD Implementation Plan for Mko Bazuna
 
-**Date:** 2026-07-27  
+**Date:** 2026-07-28  
 **Based on:** `.ai/plans/ci_cd/research.md`  
 **Strategy:** Docker-based manual deploy with GitHub Actions
 
 ---
 
-## 1. Overview
+## 0. Overview
 
 Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via GitHub Actions. Architecture:
 - **CI:** Parallel lint → typecheck → test jobs on push/PR
 - **CD:** Manual workflow dispatch → build → push → deploy
 - **Registry:** GitHub Container Registry (GHCR)
 - **Target:** Single VPS (4 CPU, 8 GB RAM), no staging environment
+- **Workflow files:** Split into `ci.yml` (code quality) + `deploy.yml` (deployment)
 
 ---
 
-## 2. Pre-implemented Components
+## 1. Repository Structure
+
+```
+mko_bazuna/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml           # Code quality: lint, typecheck, test
+│       └── deploy.yml       # Deployment: build, push, deploy
+├── docker/
+│   ├── Dockerfile           # Multi-stage build
+│   ├── entrypoint*.sh       # Entrypoint scripts
+│   └── nginx/
+│       └── nginx.conf       # Reverse proxy config
+├── src/
+│   ├── backend/             # Django project
+│   ├── theme/               # Tailwind CSS source
+│   └── telegram_bot/        # aiogram bot code
+├── compose.yaml             # Base compose (db, migrate, web, bot, nginx)
+├── compose.prod.yaml        # Production overrides (scheduler, backup, image tags)
+├── compose.test.yaml        # Ephemeral test DB
+├── pyproject.toml           # Project definition with uv
+├── .env.docker              # Production env (NOT committed)
+├── .env.example             # Template (committed)
+└── README.md
+```
+
+**Note:** The plan uses modern Docker Compose V2 naming (`compose.yaml` instead of `docker-compose.yml`). The existing project files use the old naming — rename during implementation.
+
+---
+
+## 2. What Lives Where
+
+### In Git Repository (committed)
+
+```
+compose.yaml
+compose.prod.yaml
+compose.test.yaml
+docker/Dockerfile
+docker/entrypoint*.sh
+docker/nginx/nginx.conf
+src/
+.github/workflows/
+.env.example
+README.md
+```
+
+### Only on VPS (never committed)
+
+```
+.env.docker          # Production secrets
+media/               # User-uploaded images
+backups/             # Database dumps
+certs/               # TLS certificates
+```
+
+### Never committed (local only)
+
+```
+~/.ssh/github_bazuna  # SSH key for GitHub (Windows → GitHub)
+~/.ssh/deploy_bazuna  # SSH key for VPS (GitHub Actions → VPS)
+```
+
+---
+
+## 3. SSH Key Pairs
+
+There are **two separate SSH key pairs** — do not confuse them:
+
+| Key Pair | Purpose | Used By |
+|----------|---------|---------|
+| `~/.ssh/github_bazuna` | Authenticate to GitHub | Windows machine → GitHub |
+| `~/.ssh/deploy_bazuna` | Authenticate to VPS | GitHub Actions → VPS |
+
+**Key 1 — GitHub access:** Generated on the developer's Windows machine. Public key added to GitHub Settings → SSH and GPG keys. Private key stays local.
+
+**Key 2 — VPS deploy access:** Generated on the developer's Windows machine. Public key copied to VPS `~/.ssh/authorized_keys`. Private key stored as `SERVER_SSH_KEY` GitHub Secret.
+
+---
+
+## 4. Pre-implemented Components
 
 | Component | Status | Notes |
 |-----------|--------|-------|
@@ -24,22 +105,119 @@ Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via 
 | Coverage upload | ✅ Already configured | CI workflow |
 | PostgreSQL 18 service | ✅ Already configured | CI workflow |
 | Build cache | ⚠️ Optional | Currently uses registry cache; GHA cache is optional optimization |
+| Health endpoint | ✅ Already in Dockerfile | `curl -f http://localhost:8000/health/` |
+| Docker image prune | ✅ Already in plan | Runs after deploy |
 
 ---
 
-## 3. Implementation Stages
+## 5. Implementation Stages
+
+### Stage 0: Local Development Machine (Windows)
+
+**When:** Execute once on the developer's Windows machine. This is the starting point.
+
+| ID | Task | Priority | Effort | Dependencies |
+|----|------|----------|--------|--------------|
+| 0.1 | Install Git, Docker Desktop, Python 3.14, uv | HIGH | trivial | None |
+| 0.2 | Generate SSH key for GitHub (`~/.ssh/github_bazuna`) | HIGH | trivial | 0.1 |
+| 0.3 | Clone repository and verify local build | HIGH | trivial | 0.2 |
+
+**Commands:**
+```powershell
+# 0.1
+winget install Git.Git
+winget install Docker.DockerDesktop
+winget install Python.Python.3.14
+
+pip install uv
+
+# 0.2
+ssh-keygen -t ed25519 -f ~/.ssh/github_bazuna -C "your-email@example.com"
+# Add public key to GitHub → Settings → SSH and GPG keys
+
+# 0.3
+git clone git@github.com:manicko/mko_bazuna.git
+cd mko_bazuna
+docker compose -f compose.yaml -f compose.test.yaml up -d
+curl http://localhost:8000/health/
+```
+
+---
 
 ### Stage A: Preparation & Setup (Priority: HIGH)
+
+**When:** Execute once, immediately after purchasing the VPS.
+
+**Goal:** A hardened Linux server with Docker, a deploy user, directory structure, and an initial `.env.docker` file.
 
 | ID | Task | Priority | Effort | Dependencies | Risks |
 |----|------|----------|--------|--------------|-------|
 | A1 | Create `production` environment in GitHub repository settings | HIGH | trivial | None | Deployment could run without proper approval |
 | A2 | Add GitHub Secrets: SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, SERVER_PORT | HIGH | trivial | A1 | Secret exposure if not properly configured |
-| A3 | Add GitHub Secrets: DJANGO_SECRET_KEY, BOT_TOKEN, ADMIN_PASSWORD, POSTGRES_PASSWORD | HIGH | trivial | A1 | Secret exposure if not properly configured |
-| A4 | Prepare VPS directory structure (`/opt/mko_bazuna/{backups,certs,media}`) | HIGH | small | None | Security misconfiguration, permission issues |
-| A5 | Create deploy user on VPS with Docker group membership | HIGH | small | A4 | Security misconfiguration, permission issues |
-| A6 | Clone repository to VPS and create `.env.docker` file | HIGH | small | A5 | Secret exposure if copied incorrectly |
-| A7 | Set file permissions on VPS (600 for .env.docker, deploy ownership) | MEDIUM | trivial | A6 | Secret exposure in logs |
+| A3 | Generate deploy SSH key (`~/.ssh/deploy_bazuna`) and copy public key to VPS | HIGH | trivial | None | SSH key compromise |
+| A4 | Install Docker and Docker Compose on VPS | HIGH | small | None | — |
+| A5 | Create deploy user on VPS with Docker group membership | HIGH | small | A4 | Security misconfiguration |
+| A6 | Prepare VPS directory structure (`/opt/mko_bazuna/{backups,certs,media}`) | HIGH | small | A5 | Security misconfiguration, permission issues |
+| A7 | Copy compose files + nginx config to VPS (NOT source code) | HIGH | trivial | A5 | Missing files |
+| A8 | Create `.env.docker` file on VPS with production secrets | HIGH | small | A7 | Secret exposure if copied incorrectly |
+| A9 | Set file permissions on VPS (600 for .env.docker, deploy ownership) | MEDIUM | trivial | A8 | Secret exposure in logs |
+
+#### A6 — Step-by-step VPS preparation
+
+The VPS preparation must be done step-by-step with verification at each step:
+
+```bash
+# 1. SSH as root
+ssh root@SERVER_IP
+
+# 2. Create deploy user
+adduser deploy
+usermod -aG docker deploy
+
+# 3. Create directory structure
+mkdir -p /opt/mko_bazuna/{backups,certs,media,docker/nginx}
+chown -R deploy:deploy /opt/mko_bazuna
+
+# 4. Exit and verify as deploy user
+exit
+ssh deploy@SERVER_IP
+
+# 5. Verify working directory
+pwd
+# Expected: /home/deploy
+
+# 6. Verify directory structure
+ls -la /opt/mko_bazuna/
+# Expected: backups/  certs/  media/  docker/
+```
+
+#### A8 — `.env.docker` (app secrets live here ONLY)
+
+**Critical design decision:** Application secrets (DJANGO_SECRET_KEY, BOT_TOKEN, POSTGRES_PASSWORD, ADMIN_PASSWORD) exist **only** in `.env.docker` on the VPS. They are **NOT** stored as GitHub Secrets. This eliminates the risk of secret drift between two locations.
+
+```bash
+# On VPS, as deploy user:
+cat > /opt/mko_bazuna/.env.docker << 'ENVEOF'
+DJANGO_SECRET_KEY=<generate-with-django-secret-key-generator>
+DEBUG=False
+ALLOWED_HOSTS=<your-domain.com>,localhost,127.0.0.1
+
+POSTGRES_USER=bazuna_user
+POSTGRES_DB=bazuna_db
+POSTGRES_PASSWORD=<generate-with-openssl-rand-base64-32>
+
+BOT_USERNAME=<your-bot-username>
+BOT_TOKEN=<your-bot-token-from-botfather>
+
+TLS_CERT_PATH=/opt/mko_bazuna/certs
+
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<generate-with-openssl-rand-base64-24>
+ADMIN_TELEGRAM_ID=<your-telegram-user-id>
+ENVEOF
+
+chmod 600 .env.docker
+```
 
 ---
 
@@ -48,11 +226,13 @@ Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via 
 | ID | Task | Priority | Effort | Dependencies | Risks |
 |----|------|----------|--------|--------------|-------|
 | B1 | Add concurrency control to existing `.github/workflows/ci.yml` | MEDIUM | trivial | None | Resource waste on multiple concurrent builds |
-| B2 | Rename/move `ci.yml` to `ci-cd.yml` and add workflow_dispatch trigger | HIGH | small | B1 | Broken workflow if not done carefully |
+| B2 | Split `ci.yml` into `ci.yml` + `deploy.yml`; add `workflow_dispatch` with **required** `image_tag` input | HIGH | small | B1 | Broken workflow if not done carefully |
 | B3 | Add path filters to skip CI for docs-only changes | HIGH | small | B1 | CI might run unnecessarily, consuming minutes |
 | B4 | Verify existing PostgreSQL 18 service configuration (no changes needed) | HIGH | trivial | None | — |
 | B5 | Verify coverage artifact upload configuration | LOW | trivial | None | — |
 | B6 | Integrate rollback documentation into `docs/ops/docker-deployment.md` | MEDIUM | small | None | Duplicate documentation if not merged |
+
+**Key change in B2:** The `image_tag` input is **required** — never allow empty/default `latest`. Always deploy a specific tag (`sha-{COMMIT_SHA}` or `v0.3.1`).
 
 ---
 
@@ -63,12 +243,13 @@ Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via 
 | C1 | Add GHCR authentication to existing build job | HIGH | small | B1 | Authentication failures |
 | C2 | Update build job to push images with SHA-based tags | HIGH | small | C1 | Failed image pushes |
 | C3 | Remove ARM64 from platforms (keep only linux/amd64) | HIGH | trivial | C2 | None |
-| C4 | Implement deploy job with SSH-based Docker Compose orchestration | HIGH | medium | A2, A3, C2 | Production outage, failed rollbacks |
+| C4 | Implement deploy job with SSH-based Docker Compose orchestration | HIGH | medium | A2, C2 | Production outage, failed rollbacks |
 | C5 | Add `docker compose pull` before up -d to fetch images from GHCR | HIGH | trivial | C4 | Stale images deployed |
-| C6 | Add pre-deploy migrations via `docker compose run --rm migrate` | HIGH | small | C4, C5 | Database drift on deploy |
-| C7 | Override image in docker-compose.prod.yml for GHCR registry (prevents build vs pull conflict) | HIGH | small | C4 | Build vs pull conflict |
-| C8 | Add deploy health check with automatic rollback on failure | HIGH | medium | C4, C5, C6, C7 | Failed deployments left in broken state |
-| C9 | Add workflow_dispatch inputs for image tag selection (rollback support) | MEDIUM | small | C2 | Wrong image deployed |
+| C6 | Add pre-deploy **database backup** (`pg_dump`) before migrations | HIGH | small | C4, C5 | Data loss on migration failure |
+| C7 | Add pre-deploy migrations via `docker compose run --rm migrate` | HIGH | small | C4, C5, C6 | Database drift on deploy |
+| C8 | Override image in compose.prod.yaml for GHCR registry (prevents build vs pull conflict) | HIGH | small | C4 | Build vs pull conflict |
+| C9 | Add deploy health check with automatic rollback on failure | HIGH | medium | C4, C5, C6, C7, C8 | Failed deployments left in broken state |
+| C10 | Add `docker image prune -f` after successful deployment | HIGH | trivial | C4 | Disk bloat over time |
 
 ---
 
@@ -82,40 +263,47 @@ Implementation of Docker-based CI/CD pipeline with manual deployment to VPS via 
 
 ---
 
-## 4. Execution Order (Topological Sort)
+## 6. Execution Order (Topological Sort)
 
 ```
-A1 → A2, A3 → A4, A5, A6, A7
-               ↓
+0.1 → 0.2 → 0.3
+
+A1 → A2, A3 → A4, A5 → A6, A7 → A8, A9
+                ↓
 B1 → B2 → B3, B4, B5 → B6 (docs integration)
-             ↓
-C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8
               ↓
-            C9 (can run in parallel with C6-C8)
-            ↓
+C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10
+               ↓
+             C10 (can run in parallel with C9)
+             ↓
 D1 → D2
 D3 → (after C2)
 ```
 
-**Critical Path:** A1 → A2/A3 → B1 → C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 (sequential, ~5-7 days calendar time with parallel execution)
+**Critical Path:** 0.1 → A1 → A2/A3 → B1 → C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 (sequential, ~5-7 days calendar time with parallel execution)
 
 ---
 
-## 5. Task Graph (Dependency DAG)
+## 7. Task Graph (Dependency DAG)
 
 ```
 ┌─────────────┐
-│     A1      │ (GitHub Environment)
+│    0.1      │ (Local dev setup)
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│ A2, A3      │ (GitHub Secrets)
+│    A1      │ (GitHub Environment)
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│ A4, A5, A6 │ (VPS Setup)
+│ A2, A3      │ (GitHub Secrets + SSH keys)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ A4, A5, A6, A7, A8, A9 │ (VPS Setup)
 └──────┬──────┘
        │
        ▼
@@ -123,19 +311,20 @@ D3 → (after C2)
 │  Stage B: CI Enhancements    │
 ├────────┬────────┬──────────┤
 │   B1   │   B2   │ B3, B4, B5, B6│
-│Concurrency│ Rename  │ Verify/Docs │
+│Concurrency│ Split  │ Verify/Docs │
+│          │ Workflow│             │
 └────────┴────────┴──────────┘
-                      │
-                      ▼
+                       │
+                       ▼
 ┌────────────────────────────────────────────────────────────────┐
 │                  Stage C: CD Pipeline                             │
 ├────────┬────────┬────────┬────────┬────────┬────────┬──────────┤
-│   C1   │   C2   │   C3   │   C4   │   C5   │   C6   │  C7, C8  │
-│  GHCR  │ Push   │ Single │ Deploy │ Pull   │ Migr.  │ Image &  │
-│ Auth   │ SHA    │ Arch   │ Job    │ Images │        │ Health  │
+│   C1   │   C2   │   C3   │   C4   │   C5   │  C6   │  C7, C8, C9, C10 │
+│  GHCR  │ Push   │ Single │ Deploy │ Pull   │ Backup│ Image, Health,  │
+│ Auth   │ SHA    │ Arch   │ Job    │ Images │ & Migr│ Prune           │
 └────────┴────────┴────────┴────────┴────────┴────────┴──────────┘
-                            │
-                            ▼
+                             │
+                             ▼
 ┌──────────────────────────────────────────┐
 │        Stage D: Security & Hardening       │
 ├────────┬────────────────────────────────┤
@@ -146,22 +335,25 @@ D3 → (after C2)
 
 ---
 
-## 6. Risk Assessment & Mitigation
+## 8. Risk Assessment & Mitigation
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
 | GitHub Actions time limit exceeded | MEDIUM | HIGH | Implement path filters; optimize test duration; consider public repo for unlimited minutes |
-| SSH key compromise | LOW | HIGH | Use ED25519 keys; rotate quarterly; restrict deploy user permissions |
+| SSH key compromise | LOW | HIGH | Use ED25519 keys; rotate quarterly; restrict deploy user permissions; separate GitHub and VPS keys |
 | Trivy scan blocks deploy | LOW | MEDIUM | Run as non-blocking job; use `ignore-unfixed: true` |
-| Database migration failure | MEDIUM | HIGH | Advisory lock prevents concurrent runs; test migrations in CI; backup before deploy |
+| Database migration failure | MEDIUM | HIGH | Advisory lock prevents concurrent runs; test migrations in CI; **backup before deploy** (C6) |
+| Database backup failure | LOW | MEDIUM | Non-blocking backup; log warning and continue |
 | Rollback procedure failure | LOW | MEDIUM | Automated rollback on health check failure; test with known-good SHA tag |
-| Secret leak in logs | LOW | CRITICAL | Mask `SERVER_HOST` with `::add-mask::`; use GitHub Environments |
-| Build vs pull conflict | MEDIUM | HIGH | Add `image:` override in docker-compose.prod.yml for web/bot services |
+| Secret leak in logs | LOW | CRITICAL | Mask `SERVER_HOST` with `::add-mask::`; use GitHub Environments; app secrets NOT in GitHub Secrets |
+| Build vs pull conflict | MEDIUM | HIGH | Add `image:` override in compose.prod.yaml for web/bot services |
 | Stale image deployment | MEDIUM | HIGH | Add `docker compose pull` before `up -d` in deploy workflow |
+| Disk bloat from old images | MEDIUM | MEDIUM | Add `docker image prune -f` after successful deploy (C10) |
+| `latest` tag ambiguity | HIGH | MEDIUM | Make `image_tag` required in workflow_dispatch; never use `latest` |
 
 ---
 
-## 7. Verification Steps
+## 9. Verification Steps
 
 After implementation:
 
@@ -172,12 +364,14 @@ After implementation:
    - Modify only documentation → verify CI is skipped
 
 2. **CD Verification:**
-   - Run workflow dispatch with empty tag → latest `main` image deploys
+   - Run workflow dispatch with `sha-{SHA}` → specific commit image deploys
    - Verify `docker compose pull` executes before container start
+   - Verify pre-deploy **database backup** executes before migrations
    - Verify pre-deploy migrations execute after pull, before container restart
    - Verify health check passes after deployment (30 attempts × 5s)
    - Verify containers running: `docker compose ps` on VPS
    - Verify no build occurs (containers use GHCR images)
+   - Verify `docker image prune -f` executes after successful deploy
 
 3. **Rollback Verification:**
    - Trigger deploy with specific SHA tag
@@ -186,49 +380,61 @@ After implementation:
 
 ---
 
-## 8. Files to Create/Modify
+## 10. Files to Create/Modify
 
 | Action | Path | Notes |
 |--------|------|-------|
-| Create | `.github/workflows/ci-cd.yml` | New unified workflow file (rename from ci.yml) |
-| Modify | `docker-compose.prod.yml` | Add `image:` override for web/bot services to use GHCR images |
+| Create | `.github/workflows/ci.yml` | CI pipeline: lint, typecheck, test, coverage |
+| Create | `.github/workflows/deploy.yml` | CD pipeline: build, push to GHCR, deploy to VPS |
+| Rename | `docker-compose.yml` → `compose.yaml` | Modern Docker Compose V2 naming |
+| Rename | `docker-compose.prod.yml` → `compose.prod.yaml` | Modern Docker Compose V2 naming |
+| Rename | `docker-compose.test.yml` → `compose.test.yaml` | Modern Docker Compose V2 naming |
+| Modify | `compose.prod.yaml` | Add `image:` override for web/bot services to use GHCR images |
 | Modify | `docs/ops/docker-deployment.md` | Merge rollback procedure into existing deployment docs |
+| Modify | `.gitignore` | Ensure `.env.docker` is ignored |
 
-### 8.1 Deployment Commands Reference
+### 10.1 Deployment Commands Reference
 
 The deploy job will execute on VPS:
 
 ```bash
 cd /opt/mko_bazuna
 
-# Determine image tag (use input or default to latest)
+# Determine image tag (REQUIRED — no default to latest)
 IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-if [ -z "$IMAGE_TAG" ]; then
-  IMAGE_TAG="latest"
-fi
 
-# Export environment variables for compose to use (image override)
+# Export environment variables for compose (image override)
 export REGISTRY="ghcr.io"
 export REPOSITORY="${{ github.repository }}"
 export IMAGE_TAG="$IMAGE_TAG"
 
-# Get the actual deployed image tag from currently running container (for rollback)
+# Save current tag for potential rollback
 CURRENT_IMAGE=$(docker inspect web 2>/dev/null | jq -r '.[0].Image' || echo "")
 if [ -n "$CURRENT_IMAGE" ]; then
   PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | sed 's/.*://')
 else
-  PREVIOUS_TAG="latest"
+  PREVIOUS_TAG=""
 fi
 echo "$PREVIOUS_TAG" > /tmp/previous_tag.txt
+echo "Previous tag saved: $PREVIOUS_TAG"
 
 # Pull latest images from GHCR
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+echo "Pulling images from GHCR..."
+docker compose -f compose.yaml -f compose.prod.yaml pull
+
+# Backup database before migrations (safety net for data corruption)
+echo "Backing up database..."
+docker compose -f compose.yaml -f compose.prod.yaml run --rm \
+  db pg_dump -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -F c \
+  -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
 
 # Run pre-deploy migrations (critical: must run before container restart)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+echo "Running pre-deploy migrations..."
+docker compose -f compose.yaml -f compose.prod.yaml run --rm migrate
 
 # Start new containers (uses pulled images due to image: override in prod override)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+echo "Starting new containers..."
+docker compose -f compose.yaml -f compose.prod.yaml up -d
 
 # Clean up old images
 docker image prune -f
@@ -236,12 +442,12 @@ docker image prune -f
 echo "Deployment complete"
 ```
 
-### 8.2 docker-compose.prod.yml Image Override
+### 10.2 compose.prod.yaml Image Override
 
-The production override file must specify `image:` for web and bot services to prevent `docker compose` from using the `build:` directive. This ensures the workflow pulls pre-built images from GHCR instead of attempting to build locally on the VPS.
+The production override file must specify `image:` for web and bot services to prevent `docker compose` from using the `build:` directive. This ensures the workflow pulls from GHCR.
 
 ```yaml
-# Production override for docker-compose.yml
+# Production override for compose.yaml
 # Immutable image deployment with TLS hardening, scheduler, and image overrides for GHCR
 
 services:
@@ -256,10 +462,12 @@ services:
   # ... rest of the file unchanged
 ```
 
-### 8.3 Complete Workflow YAML
+### 10.3 Complete Workflow YAML — Split into ci.yml + deploy.yml
+
+#### `.github/workflows/ci.yml` — Code Quality
 
 ```yaml
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -272,12 +480,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Image tag to deploy (leave empty for latest)'
-        required: false
-        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -383,15 +585,35 @@ jobs:
           name: coverage-report
           path: src/backend/coverage.xml
           retention-days: 30
+```
 
+#### `.github/workflows/deploy.yml` — Deployment
+
+```yaml
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g., sha-a913bc2 or v0.3.1)'
+        required: true
+        default: ''
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
   build:
-    needs: [lint, typecheck, test]
-    if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -409,8 +631,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha
-            type=ref,event=branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' }}
+            type=raw,value=${{ github.event.inputs.image_tag }}
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -423,9 +644,7 @@ jobs:
 
   security-scan:
     needs: build
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -443,54 +662,57 @@ jobs:
 
   deploy:
     needs: [build]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: production
-
     steps:
-      - name: Mask secrets
-        run: echo "::add-mask::${{ secrets.SERVER_HOST }}"
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
           script: |
+            set -e
             DEPLOY_DIR="/opt/mko_bazuna"
             cd "$DEPLOY_DIR"
 
-            # Determine image tag (use input or default to latest)
+            # Determine image tag (REQUIRED — no default to latest)
             IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-            if [ -z "$IMAGE_TAG" ]; then
-              IMAGE_TAG="latest"
-            fi
-
-            # Export environment variables for compose (image override)
             export REGISTRY="ghcr.io"
             export REPOSITORY="${{ github.repository }}"
             export IMAGE_TAG="$IMAGE_TAG"
 
-            # Get the actual deployed image tag for rollback
+            # Save current tag for potential rollback
             CURRENT_IMAGE=$(docker inspect web 2>/dev/null | jq -r '.[0].Image' || echo "")
             if [ -n "$CURRENT_IMAGE" ]; then
               PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | sed 's/.*://')
             else
-              PREVIOUS_TAG="latest"
+              PREVIOUS_TAG=""
             fi
             echo "$PREVIOUS_TAG" > /tmp/previous_tag.txt
             echo "Previous tag saved: $PREVIOUS_TAG"
 
+            # Pull latest images from GHCR
             echo "Pulling images from GHCR..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f compose.yaml -f compose.prod.yaml pull
 
+            # Backup database before migrations (safety net for data corruption)
+            echo "Backing up database..."
+            docker compose -f compose.yaml -f compose.prod.yaml run --rm \
+              db pg_dump -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -F c \
+              -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
+
+            # Run pre-deploy migrations
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+            docker compose -f compose.yaml -f compose.prod.yaml run --rm migrate
 
+            # Start new containers
             echo "Starting new containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker compose -f compose.yaml -f compose.prod.yaml up -d
+
+            # Clean up old images
+            docker image prune -f
 
             echo "Deployment complete"
 
@@ -500,7 +722,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
           script: |
             DEPLOY_DIR="/opt/mko_bazuna"
             cd "$DEPLOY_DIR"
@@ -508,7 +730,7 @@ jobs:
             echo "Waiting for services to stabilize..."
             sleep 10
 
-            # Health check via internal Docker network (bypasses nginx redirect)
+            # Health check via internal Docker network
             for i in {1..30}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://web:8000/health/" 2>/dev/null || echo "000")
               if [ "$STATUS" = "200" ]; then
@@ -524,7 +746,7 @@ jobs:
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "Rolling back to previous tag: $PREVIOUS_TAG"
               docker pull ghcr.io/${{ github.repository }}:$PREVIOUS_TAG
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
+              docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps web
               echo "Rollback completed - verify manually"
             else
               echo "No previous tag available for rollback - check VPS manually"
@@ -532,7 +754,7 @@ jobs:
             exit 1
 ```
 
-### 8.4 Branch Strategy
+### 10.4 Branch Strategy
 
 | Branch | Behavior |
 |--------|----------|
@@ -541,31 +763,32 @@ jobs:
 
 ---
 
-## 9. Effort Summary
+## 11. Effort Summary
 
 | Effort | Tasks Count |
 |--------|-------------|
-| trivial | A1, A2, A3, A7, B1, B4, B5, C3, C5, D2 |
-| small | A4, A5, A6, B2, B3, B6, C1, C2, C6, C9, D1, D3 |
-| medium | C4, C8 |
+| trivial | 0.1, A1, A2, A3, A9, B1, B4, B5, C3, C5, C10, D2 |
+| small | 0.2, 0.3, A4, A5, A6, A7, A8, B2, B3, B6, C1, C2, C6, C7, D1, D3 |
+| medium | C4, C9 |
 
-**Total: 21 tasks** — Estimated effort: **large** (~5-7 days with validation)
+**Total: 24 tasks** — Estimated effort: **large** (~5-7 days with validation)
 
 ---
 
-## 10. Estimated Timeline
+## 12. Estimated Timeline
 
 | Stage | Tasks | Calendar Time |
 |-------|-------|-------------|
-| A: Preparation | A1-A7 | 1 day |
+| 0: Local Dev | 0.1-0.3 | 1 hour |
+| A: Preparation | A1-A9 | 1 day |
 | B: CI Enhancement | B1-B6 | 1 day |
-| C: CD Extension | C1-C9 | 2-3 days |
+| C: CD Extension | C1-C10 | 2-3 days |
 | D: Security | D1-D3 | 1 day |
-| **Total** | **21 tasks** | **5-7 days** (with testing/validation) |
+| **Total** | **24 tasks** | **5-7 days** (with testing/validation) |
 
 ---
 
-## 11. Rollback Procedure
+## 13. Rollback Procedure
 
 ### Automatic Rollback
 
@@ -577,17 +800,15 @@ The deploy job includes automatic rollback on health check failure. If health ch
 
 ### Manual Rollback
 
-For manual rollback procedure, see `docs/ops/docker-deployment.md`:
-
 1. Go to **Actions** tab
-2. Select **CI/CD** workflow
+2. Select **Deploy** workflow
 3. Click **Run workflow**
-4. Enter `sha-{COMMIT_SHA}` of known-good version
+4. Enter `sha-{COMMIT_SHA}` of known-good version (required)
 5. Click **Run workflow**
 
 ---
 
-## 12. Notes on GitHub Actions Expression Syntax
+## 14. Notes on GitHub Actions Expression Syntax
 
 GitHub Actions `if` conditions use JavaScript expression syntax with specific operators:
 - All `if` conditions must be wrapped in `${{ }}`
@@ -601,25 +822,37 @@ Correct syntax examples:
 
 ---
 
-## 13. Architecture Constraints Summary
+## 15. Architecture Constraints Summary
 
-### 13.1 Build vs Pull Resolution
+### 15.1 Build vs Pull Resolution
 
-**Problem:** The base `docker-compose.yml` defines `web` and `bot` services with `build:` directive. When deploying to VPS, `docker compose up -d` would attempt to build locally instead of pulling pre-built images from GHCR.
+**Problem:** The base `compose.yaml` defines `web` and `bot` services with `build:` directive. When deploying to VPS, `docker compose up -d` would attempt to build locally instead of pulling pre-built images from GHCR.
 
-**Solution:** Override `image:` in `docker-compose.prod.yml` for `web` and `bot` services. When an `image:` key is present in an override file, Docker Compose uses it and ignores the `build:` directive - this ensures the workflow pulls from GHCR.
+**Solution:** Override `image:` in `compose.prod.yaml` for `web` and `bot` services. When an `image:` key is present in an override file, Docker Compose uses it and ignores the `build:` directive - this ensures the workflow pulls from GHCR.
 
-### 13.2 Deploy Workflow Sequence
+### 15.2 Deploy Workflow Sequence
 
 The correct sequence ensures image freshness and database consistency:
 
 ```
 1. docker compose pull     → Fetch latest images from GHCR
-2. docker compose run migrate → Run migrations with pulled image
-3. docker compose up -d    → Start containers (uses pulled images)
+2. pg_dump backup          → Backup database before migrations
+3. docker compose run migrate → Run migrations with pulled image
+4. docker compose up -d    → Start containers (uses pulled images)
+5. docker image prune -f   → Clean up old images
 ```
 
 This sequence prevents:
 - Stale image deployment
 - Build vs pull conflicts
 - Database schema drift
+- Data loss on migration failure
+- Disk bloat from old images
+
+### 15.3 Secrets Strategy
+
+**Design decision:** Application secrets live ONLY in `.env.docker` on the VPS. GitHub Secrets contain ONLY server-access credentials (SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, SERVER_PORT). This eliminates secret drift between two locations.
+
+### 15.4 Compose File Naming
+
+The plan uses modern Docker Compose V2 naming (`compose.yaml` instead of `docker-compose.yml`). The existing project files use the old naming — rename during implementation as part of Stage B.

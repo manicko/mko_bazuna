@@ -83,7 +83,7 @@ any → `DELETED`.
 
 ## Key tables
 
-`users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`.
+`users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`
@@ -150,6 +150,20 @@ docs by zone ID.
 ## Deferred to post-MVP
 
 DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping, multi-currency.
+
+## Phase 2 Features
+
+The following significant features have been implemented beyond the Phase 1 baseline and are documented in the relevant subsystem docs:
+
+| Feature | Description | Key Components |
+|---------|-------------|----------------|
+| **Seller Dashboard Statistics** | Per-ad analytics with time-range filtering for sellers | `SellerStats` service, `DailyAdMetrics` model, `AD_VIEWED` event, caching |
+| **Photo Thumbnails** | Three-size thumbnail generation (small/medium/large) for ad images | `ThumbnailService`, `AdImage` thumbnail fields, media app |
+| **Search Autocomplete** | Hybrid autocomplete from user history, popular searches, and entity matching | `PopularSearch`, `SearchHistory`, `SavedSearch`, `AutocompleteView`, rate limiting |
+| **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
+| **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
+| **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
+| **Analytics Rollup** | Pre-aggregated daily metrics and trust analytics via management command | `DailyAdMetrics`, `TrustAnalytics`, `rollup_daily_metrics` command |
 
 ## Commands
 

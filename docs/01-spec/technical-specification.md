@@ -132,14 +132,43 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Product metrics:** internal `AnalyticsEvent` model — `event_type` (StrEnum: `REGISTRATION_CREATED`, `AD_PUBLISHED`, `SEARCH_PERFORMED`, `CONTACT_INITIATED`), `timestamp`, optional `user_id`. Aggregated via ORM; admin/CLI `show_metrics` access.
 - Privacy: Plausible collects no PII; mention traffic measurement in privacy policy. `user_id` references already-collected `telegram_id`.
 
+### M. Trust signals system
+- **Seller trust scoring** (`TrustCalculator`, `SellerTrustScore`): computed from activity (ad count, published ratio), quality (rejection rate), and response metrics (contact response rate). Score mapped to `TrustLevel` enum (`UNVERIFIED`, `VERIFIED`, `TRUSTED`, `PRO`). Recalculated on every ad publish via auto-moderation hook.
+- **Seller verification** (`SellerVerification`): two verification paths — admin verification (manual, US-A11) and Telegram Premium auto-verification (`telegram_premium` field on `User`). Verified sellers receive the `VERIFIED` trust level.
+- **Trust badges** (UI): rendered on ad detail and list pages via `trust_badge` template tag. Three badge templates (`verified_badge.html`, `trusted_badge.html`, `pro_badge.html`) with SVG icons and Tailwind styling.
+- **Trust analytics** (`TrustAnalytics` service): daily trust score tracking, trust level distribution, and seller-level metrics for the seller dashboard.
+
+### N. Photo thumbnails
+- **Thumbnail generation** (`ThumbnailService`): three size variants — small (240x180), medium (640x480), large (1280x960) — generated via Pillow with LANCZOS resampling, EXIF orientation correction, and progressive JPEG (quality=85).
+- **Storage**: thumbnail keys stored alongside originals in `MEDIA_ROOT`; keys follow `<uuid>-<size>.jpg` pattern. Original images preserved; thumbnails are additive.
+- **Integration**: bot's `update_ad_and_moderate()` triggers thumbnail generation after each photo upload. Thumbnails served via `thumbnail_small_url`/`thumbnail_medium_url`/`thumbnail_large_url` properties on `AdImage`.
+
+### O. Saved searches and autocomplete
+- **Autocomplete** (`AutocompleteView`): hybrid suggestions from three sources — user search history (`SearchHistory`), popular searches (`PopularSearch`), and entity matching (categories + cities). Rate-limited (30 req/min per IP via cache). Results deduplicated and capped at 10.
+- **Saved searches** (`SavedSearch`, `SavedSearchNotification`): buyers save search queries with city/category/price filters. New matching ads trigger notifications (deduplicated per search-ad pair).
+- **Search history** (`SearchHistory`): per-user search query tracking with deduplication and 50-entry cap. Supports both authenticated and anonymous users.
+
+### P. Seller dashboard statistics
+- **Per-ad analytics** (`AnalyticsEvent.ad` FK): every analytics event can now be associated with a specific ad, enabling per-ad view and contact statistics.
+- **AD_VIEWED event**: recorded on ad detail page views (seller-scoped — `user_id` is the seller, not the viewer).
+- **SellerStats service**: aggregates events with 5-minute cache TTL; returns `total_views`, `total_contacts`, `ads_published`, and per-ad statistics filtered by `TimeRange` (`ALL_TIME`, `THIRTY_DAYS`, `SEVEN_DAYS`).
+- **DailyAdMetrics model**: pre-aggregated daily view/contact counts per ad, supporting efficient dashboard queries without real-time ORM aggregation.
+- **Rollup command** (`rollup_daily_metrics`): management command that computes `DailyAdMetrics` for all published ads, updates trust scores, and records moderation events. Uses advisory lock for idempotency.
+
+### Q. Enhanced moderation tooling
+- **AdModerationPriority model**: one-to-one with `Ad`; stores `base_score`, `priority_level` (`HIGH`/`MEDIUM`/`LOW`), risk `flags`, `confidence_score`, and `escalation_required` flag.
+- **PriorityCalculator service**: computes priority scores from content risk (banned words) and user history (repeat offender, trust level). Maps score to `AdPriorityLevel` enum.
+- **ModerationAnalytics service**: aggregates moderation statistics — pending queue size, moderator performance metrics, rejection reason breakdowns.
+- **Auto-moderation integration**: `_pass_moderation()` and `_fail_moderation()` now create `AnalyticsEvent` records with `ad_id` for moderation tracking (`MODERATION_APPROVED`, `MODERATION_REJECTED`, `MODERATION_FLAGGED`).
+
 ## Functional Stories by Role
 
 Full user stories (acceptance behavior per role) are the single source of truth in
 [../04-user-stories/index.md](../04-user-stories/index.md):
 
-- [Seller stories](../04-user-stories/seller-stories.md) — US-S1, S2, S5, S6, S7, S8, S9
-- [Buyer stories](../04-user-stories/buyer-stories.md) — US-B1–B9
-- [Admin stories](../04-user-stories/admin-stories.md) — US-A1–A11
+- [Seller stories](../04-user-stories/seller-stories.md) — US-S1, S2, S5, S6, S7, S8, S9, S10, S11
+- [Buyer stories](../04-user-stories/buyer-stories.md) — US-B1–B9, B10, B11, B12
+- [Admin stories](../04-user-stories/admin-stories.md) — US-A1–A11, A12, A13, A14
 
 ## Owner Decisions (O1–O5)
 

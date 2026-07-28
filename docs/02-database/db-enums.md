@@ -13,7 +13,7 @@ related:
 
 ## Purpose
 
-Authoritative list of the `StrEnum` types referenced by the phase 1 schema. Every fixed value set
+Authoritative list of the `StrEnum` types referenced by the schema. Every fixed value set
 is modeled as a `StrEnum` (never plain strings/dicts). Table and column context lives in
 [db-schema.md](db-schema.md); indexes and triggers live in [db-indexes.md](db-indexes.md).
 
@@ -48,6 +48,19 @@ Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-s
 | `AD_PUBLISHED` | an ad was published |
 | `SEARCH_PERFORMED` | a search query ran |
 | `CONTACT_INITIATED` | a buyer initiated contact with a seller |
+| `AD_VIEWED` | ad detail page viewed (seller-scoped) |
+| `CONTACT_RESPONSE` | seller responded to a contact message |
+| `AD_EDITED` | ad text/content modified |
+| `AD_REACTIVATED` | archived ad republished |
+| `DASHBOARD_VIEWED` | seller opened the dashboard |
+| `SELLER_VERIFIED` | seller verification status changed |
+| `TRUST_LEVEL_UPDATED` | trust score/level recalculated |
+| `MODERATION_APPROVED` | ad passed moderation |
+| `MODERATION_REJECTED` | ad failed moderation |
+| `MODERATION_FLAGGED` | ad flagged for senior review |
+| `AD_REPORTED` | ad reported by a buyer |
+| `CONTACT_COMPLETED` | contact exchange completed |
+| `SEARCH_ALERT_MATCHED` | saved search alert matched a new ad |
 
 ## ModeratorActionType
 `ModeratorActionLog.action_type` values (see [db-schema.md](db-schema.md)).
@@ -88,3 +101,50 @@ configurations for language-aware search.
 The `fts_config` property returns the appropriate PostgreSQL text search
 configuration name for each locale. Used by the search service to select the
 correct search configuration when queries are in different languages.
+
+## TrustLevel
+Seller trust level for badge display and trust scoring (see [db-schema.md](db-schema.md)).
+
+| Value | Meaning |
+|-------|---------|
+| `UNVERIFIED` | no verification or activity history |
+| `VERIFIED` | admin-verified or Telegram Premium |
+| `TRUSTED` | established seller with good metrics |
+| `PRO` | top-tier seller (score >= 90) |
+
+## TimeRange
+Time range options for seller statistics filtering.
+
+| Value | Meaning |
+|-------|---------|
+| `ALL_TIME` | all historical data |
+| `THIRTY_DAYS` | last 30 days |
+| `SEVEN_DAYS` | last 7 days |
+
+## ThumbnailSizeStrEnum
+Standard thumbnail sizes for ad images.
+
+| Value | Meaning | Dimensions |
+|-------|---------|----------|
+| `SMALL` | small thumbnail | 240x180 |
+| `MEDIUM` | medium thumbnail | 640x480 |
+| `LARGE` | large thumbnail | 1280x960 |
+
+## AdPriorityLevel
+Priority levels for moderation queue triage.
+
+| Value | Meaning |
+|-------|---------|
+| `HIGH` | requires immediate review |
+| `MEDIUM` | standard review priority |
+| `LOW` | low-risk, standard review |
+
+## SearchSuggestionSource
+Source of an autocomplete suggestion.
+
+| Value | Meaning |
+|-------|---------|
+| `USER_HISTORY` | from authenticated user's search history |
+| `POPULAR_SEARCH` | from popular search queries |
+| `CATEGORY` | from category name matching |
+| `CITY` | from city name matching |

@@ -7,8 +7,10 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── categories
 │   │   ├── core
 │   │   ├── locations
+│   │   ├── media
 │   │   ├── moderation
 │   │   ├── search
+│   │   ├── trust
 │   │   ├── urls.py.bak
 │   │   └── users
 │   ├── config

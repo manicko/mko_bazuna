@@ -23,37 +23,46 @@ Domain rules referenced as "decision X" live in
 
 ## Stories
 
-### US-B1 — Browse without registration
+### US-B1 ï¿½ Browse without registration
 Anyone browses ads with status \PUBLISHED\; no login required.
 
-### US-B2 — Search
+### US-B2 ï¿½ Search
 Keyword search over title + description (\PUBLISHED\ only), response =2s. Sort by date (newest
 first) or price. A Montenegrin query is translated to Russian before FTS (results optionally tagged
 "translated from Russian"). Friendly empty state on no results. See decision G and [search-patterns.md](../01-spec/search-patterns.md).
 
-### US-B3 — Filter
+### US-B3 ï¿½ Filter
 Filter by category/subcategory, city, and price range; filters combinable with no full page
 reload (HTMX). Exact city match + "did you mean" on typos. See decision G and [filter-ui.md](../01-spec/filter-ui.md).
 
-### US-B4 — Ad card
-Card shows full ad details and a "Contact seller" button only — **no seller identity** shown. See
+### US-B4 ï¿½ Ad card
+Card shows full ad details and a "Contact seller" button only ï¿½ **no seller identity** shown. See
 decision C and [ui-patterns.md](../01-spec/ui-patterns.md).
 
-### US-B5 — Contact seller
+### US-B5 ï¿½ Contact seller
 Contact via deep-link to our bot (\	.me/<bot_username>?start=contact_<ad_id>\); the bot relays
 without revealing seller PII. No login required. Button renders only when the ad is \PUBLISHED\,
 seller \	elegram_id\ is set, and the seller is not deleted/banned/withdrawn. See decision C / zone R2 and [ui-patterns.md](../01-spec/ui-patterns.md).
 
-### US-B6 — Browse by category
+### US-B6 ï¿½ Browse by category
 Browse ads by category with hierarchy support (django-mptt subtree). See [filter-ui.md](../01-spec/filter-ui.md).
 
-### US-B7 — Browse by city
+### US-B7 ï¿½ Browse by city
 Browse by city; exact match against the closed preset list; "did you mean" on typos; selected city
 saved in session. See decision D and [filter-ui.md](../01-spec/filter-ui.md) and [search-patterns.md](../01-spec/search-patterns.md).
 
-### US-B8 — Responsive UI
+### US-B8 ï¿½ Responsive UI
 Responsive layout across mobile, tablet, and desktop. See [ui-patterns.md](../01-spec/ui-patterns.md).
 
-### US-B9 — Multilingual UI
+### US-B9 ï¿½ Multilingual UI
 UI language switch (Russian / Montenegrin-latin), persisted across sessions. Switch translates the site
 shell only; ad content is stored in Russian and translated on display. See decision G and [search-patterns.md](../01-spec/search-patterns.md).
+
+### US-B10 â€” Search autocomplete
+As the buyer types in the search bar, a dropdown shows hybrid suggestions from three sources: the buyer's own search history, popular searches across all users, and matching category/city names. Suggestions are rate-limited (30 requests per minute per IP). Results are deduplicated and capped at 10. See decision O.
+
+### US-B11 â€” Saved search alerts
+Buyer saves a search query with optional city, category, and price filters. When a new matching ad is published, the buyer receives a notification. Notifications are deduplicated so the same ad does not trigger multiple alerts for the same saved search. See decision O.
+
+### US-B12 â€” Search history
+The buyer's recent search queries are remembered and surfaced as autocomplete suggestions on return visits. History is deduplicated and capped at 50 entries per user. Anonymous users also receive search history suggestions (session-scoped). See decision O.

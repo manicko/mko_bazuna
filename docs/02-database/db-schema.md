@@ -241,3 +241,127 @@ created_at (TIMESTAMP, default now)
 
 > Zone D8: `ModeratorActionLog` keeps `ad_id`, `user_id` (SET NULL on erasure, reason text
 > retained), `action_type`, `reason`, `created_at`.
+
+---
+
+### DailyAdMetrics
+Pre-aggregated daily metrics for efficient dashboard queries.
+
+```
+id (PK)
+ad_id (FK → ads.id, CASCADE)
+date (DATE)
+views_count (POSITIVE INT, default 0)
+contacts_count (POSITIVE INT, default 0)
+trust_score (FLOAT, nullable)
+avg_response_time (FLOAT, nullable)
+created_at (TIMESTAMP)
+updated_at (TIMESTAMP)
+
+Unique constraint: (ad_id, date)
+Index: IX_daily_ad_metrics_date_views (date, -views_count)
+```
+
+---
+
+### SavedSearch
+Buyers save search queries with filters for ongoing monitoring.
+
+```
+id (PK)
+user_id (FK → users.id, CASCADE)
+query (TEXT, nullable)
+city_id (FK → locations.city.id, SET_NULL, nullable)
+category_id (FK → categories.id, SET_NULL, nullable)
+min_price (POSITIVE INT, nullable)
+max_price (POSITIVE INT, nullable)
+is_active (BOOL, default True)
+created_at (TIMESTAMP)
+```
+
+---
+
+### SavedSearchNotification
+Tracks notification delivery to prevent duplicates per search-ad pair.
+
+```
+id (PK)
+saved_search_id (FK → saved_search.id, CASCADE)
+ad_id (FK → ads.id, CASCADE)
+sent_at (TIMESTAMP)
+
+Unique constraint: (saved_search_id, ad_id)
+```
+
+---
+
+### PopularSearch
+Tracks popular search queries for autocomplete suggestions.
+
+```
+id (PK)
+query (VARCHAR(200), db_index=True)
+query_normalized (VARCHAR(200), db_index=True)
+hit_count (POSITIVE INT, default 1)
+last_seen (TIMESTAMP, auto_now=True)
+```
+
+---
+
+### SearchHistory
+Per-user search query tracking for personalized autocomplete.
+
+```
+id (PK)
+user_id (FK → users.id, CASCADE, nullable)
+query (VARCHAR(200))
+query_normalized (VARCHAR(200), db_index=True)
+created_at (TIMESTAMP, auto_now_add=True)
+```
+
+---
+
+### SellerTrustScore
+Persisted trust score for each seller, recalculated on ad publish.
+
+```
+id (PK)
+user_id (FK → users.id, ONE_TO_ONE, CASCADE)
+trust_level (VARCHAR(20), choices=TrustLevel)
+score (POSITIVE SMALL INT, default 0)
+ad_count_lifetime (POSITIVE INT, default 0)
+ad_count_active (POSITIVE INT, default 0)
+rejection_rate (DECIMAL(5,2), default 0.0)
+contact_response_rate (DECIMAL(5,2), default 0.0)
+last_calculated (TIMESTAMP, auto_now=True)
+```
+
+---
+
+### SellerVerification
+Tracks seller verification status (admin and Telegram Premium).
+
+```
+id (PK)
+user_id (FK → users.id, ONE_TO_ONE, CASCADE)
+phone_number (VARCHAR(20), nullable)
+verified_by_admin (BOOL, default False)
+verified_at (TIMESTAMP, nullable)
+```
+
+---
+
+### AdModerationPriority
+Priority scoring for moderation queue triage.
+
+```
+id (PK)
+ad_id (FK → ads.id, ONE_TO_ONE, CASCADE, related_name="moderation_priority")
+base_score (POSITIVE SMALL INT, default 0)
+priority_level (VARCHAR(10), choices=AdPriorityLevel)
+flags (JSONB, default=[])
+confidence_score (FLOAT, default 0.0)
+escalation_required (BOOL, default False)
+
+Indexes: priority_level, base_score, escalation_required
+```

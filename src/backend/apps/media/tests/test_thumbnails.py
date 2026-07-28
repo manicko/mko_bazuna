@@ -12,7 +12,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 from apps.core.enums import ThumbnailSizeStrEnum
 from apps.media.services.thumbnails import ThumbnailService
@@ -116,11 +116,11 @@ class TestThumbnailService:
         service = ThumbnailService(storage_dir=str(tmp_path))
         try:
             service.generate_thumbnails(b"not-an-image-data", "bad.jpg")
-        except UnidentifiedImageError:
+        except ValueError:
             pass
         except Exception as exc:
-            msg = f"Expected UnidentifiedImageError, got {type(exc).__name__}: {exc}"
+            msg = f"Expected ValueError, got {type(exc).__name__}: {exc}"
             raise AssertionError(msg) from exc
         else:
-            msg = "Expected UnidentifiedImageError was not raised"
+            msg = "Expected ValueError was not raised"
             raise AssertionError(msg)

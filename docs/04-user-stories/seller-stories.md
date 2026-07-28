@@ -55,3 +55,14 @@ exactly **30 days** after `consent_revoked_at` (decision F / zone R1). Independe
 ### US-S9 — Publishing ban
 `ads_auto_publish=False` blocks new ads and hides existing ads (not deleted). Reversible;
 independent of account deletion and account ban (decision O1).
+
+### US-S10 — Seller dashboard statistics
+Seller views per-ad analytics on the dashboard: total views, total contacts, ads published,
+and per-ad view counts filtered by time range (all time, last 30 days, last 7 days).
+Statistics are cached for 5 minutes and aggregated from `AnalyticsEvent` records.
+See decision P.
+
+### US-S11 — View ad analytics
+Seller sees per-ad view and contact statistics on the ad detail page in the dashboard.
+Individual `AD_VIEWED` events are recorded when buyers view ad details (seller-scoped).
+See decision P.

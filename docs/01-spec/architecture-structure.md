@@ -32,6 +32,9 @@ src/
 │   │   ├── locations/             # cities / regions
 │   │   ├── moderation/            # moderation logs, criteria, statuses
 │   │   ├── search/                # PostgreSQL FTS (search_vector, GIN, russian) — no haystack/whoosh
+│   │   ├── analytics/             # analytics events, daily rollups, trust & moderation analytics
+│   │   ├── media/                 # thumbnail generation, image processing (Pillow)
+│   │   ├── trust/                 # trust scoring, seller verification, trust badges
 │   │   └── api/                   # DRF API — DEFERRED to post-MVP (phase 1 = HTMX MPA)
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
