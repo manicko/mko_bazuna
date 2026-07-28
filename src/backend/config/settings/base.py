@@ -97,6 +97,8 @@ INSTALLED_APPS = [
     "apps.locations",
     "apps.moderation",
     "apps.search",
+    "apps.media",
+    "apps.trust",
     "apps.analytics",
 ]
 
