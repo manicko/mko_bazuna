@@ -18,6 +18,7 @@ from apps.core.utils.cache import (
     invalidate_criteria_cache,  # noqa: F401 - re-exported for external use
     set_cached_criteria,
 )
+from apps.trust.services.trust_calculator import TrustCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +245,8 @@ def _pass_moderation(ad: Ad) -> None:
         user_id=ad.user_id,
         ad_id=ad.id,
     )
+
+    TrustCalculator().calculate_and_save(ad.user)
 
     logger.info(f"Auto-moderation passed for ad {ad.id}")
 
