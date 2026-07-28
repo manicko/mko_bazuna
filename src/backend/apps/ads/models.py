@@ -12,6 +12,8 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from django.conf import settings
+
 
 class Ad(models.Model):
     """
@@ -385,6 +387,22 @@ class AdImage(models.Model):
     @property
     def image_url(self) -> str:
         """Return the media URL for this image."""
-        from django.conf import settings
-
         return f"{settings.MEDIA_URL}{self.image}"
+
+    @property
+    def thumbnail_small_url(self) -> str | None:
+        if self.thumbnail_small:
+            return f"{settings.MEDIA_URL}{self.thumbnail_small}"
+        return None
+
+    @property
+    def thumbnail_medium_url(self) -> str | None:
+        if self.thumbnail_medium:
+            return f"{settings.MEDIA_URL}{self.thumbnail_medium}"
+        return None
+
+    @property
+    def thumbnail_large_url(self) -> str | None:
+        if self.thumbnail_large:
+            return f"{settings.MEDIA_URL}{self.thumbnail_large}"
+        return None
