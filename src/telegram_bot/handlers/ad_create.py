@@ -16,7 +16,7 @@ from django.conf import settings
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.locations.models import City
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
@@ -27,6 +27,8 @@ from telegram_bot.schemas.message_payloads import (
 from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif, delete_photo
 from telegram_bot.states import AdCreateState
 import asyncio
+
+from apps.media.services.thumbnails import ThumbnailService
 
 logger = logging.getLogger(__name__)
 
@@ -582,14 +584,32 @@ async def update_ad_and_moderate(
 
         ad.save()
 
-        # Create AdImage records (required before auto_moderate for image count check)
+        # Create AdImage records and generate thumbnails
         for photo in photos:
-            AdImage.objects.create(
+            ad_image = AdImage.objects.create(
                 ad_id=ad_id,
                 image=photo["storage_key"],
                 telegram_file_id=photo["telegram_file_id"],
                 position=photo["position"],
             )
+
+            # Generate thumbnails for each photo with graceful fallback
+            try:
+                original_path = os.path.join(settings.MEDIA_ROOT, photo["storage_key"])
+                with open(original_path, "rb") as f:
+                    photo_bytes = f.read()
+
+                thumbnail_service = ThumbnailService(settings.MEDIA_ROOT)
+                thumbnail_keys = thumbnail_service.generate_thumbnails(
+                    photo_bytes, photo["storage_key"]
+                )
+
+                ad_image.thumbnail_small = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
+                ad_image.thumbnail_medium = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
+                ad_image.thumbnail_large = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
+                ad_image.save()
+            except Exception:
+                logger.exception("Failed to generate thumbnails for %s", photo["storage_key"])
 
         # Transition DRAFT -> ON_MODERATION (state machine requires this step)
         ad.transition_to(AdStatus.ON_MODERATION)
