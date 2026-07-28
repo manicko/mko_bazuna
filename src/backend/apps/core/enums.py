@@ -123,6 +123,15 @@ class CategoryRejectReason(StrEnum):
     OFF_TOPIC = "off_topic"
 
 
+class SearchSuggestionSource(StrEnum):
+    """Source types for search autocomplete suggestions."""
+
+    USER_HISTORY = "user_history"
+    POPULAR_SEARCH = "popular_search"
+    CATEGORY = "category"
+    CITY = "city"
+
+
 class LanguageLocale(StrEnum):
     """Supported locale codes for UI and ad content."""
 
@@ -156,5 +165,6 @@ __all__ = [
     "CategoryRejectReason",
     "AdPriorityLevel",
     "ThumbnailSizeStrEnum",
+    "SearchSuggestionSource",
     "LanguageLocale",
 ]
