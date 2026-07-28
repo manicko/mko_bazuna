@@ -96,6 +96,14 @@ class TrustLevel(StrEnum):
     PRO = "pro"
 
 
+class TimeRange(StrEnum):
+    """Time range options for seller statistics filtering."""
+
+    ALL_TIME = "all_time"
+    THIRTY_DAYS = "30_days"
+    SEVEN_DAYS = "7_days"
+
+
 class ModeratorActionType(StrEnum):
     """Moderator action types for ModeratorActionLog."""
 
@@ -168,4 +176,6 @@ __all__ = [
     "ThumbnailSizeStrEnum",
     "SearchSuggestionSource",
     "LanguageLocale",
+    "TimeRange",
 ]
+
