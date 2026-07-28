@@ -56,6 +56,7 @@ class AnalyticsEventType(StrEnum):
     AD_PUBLISHED = "ad_published"
     SEARCH_PERFORMED = "search_performed"
     CONTACT_INITIATED = "contact_initiated"
+    AD_VIEWED = "ad_viewed"
 
 
 class ModeratorActionType(StrEnum):
