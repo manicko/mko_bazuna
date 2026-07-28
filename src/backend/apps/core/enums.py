@@ -70,6 +70,14 @@ class AnalyticsEventType(StrEnum):
     AD_REPORTED = "ad_reported"
 
 
+class ThumbnailSizeStrEnum(StrEnum):
+    """Standard thumbnail sizes for Mko Bazuna."""
+
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
 class AdPriorityLevel(StrEnum):
     """Priority levels for moderation queue triage."""
 
@@ -147,5 +155,6 @@ __all__ = [
     "ModeratorActionType",
     "CategoryRejectReason",
     "AdPriorityLevel",
+    "ThumbnailSizeStrEnum",
     "LanguageLocale",
 ]
