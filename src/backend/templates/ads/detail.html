@@ -3,6 +3,7 @@
 {% load contact_tags %}
 {% load localized_content %}
 {% load i18n %}
+{% load trust_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +44,8 @@
             {% endif %}
 
             <div class="p-6">
-                <h1 class="text-3xl font-bold mb-4">{{ ad|get_title:LANGUAGE_CODE }}</h1>
+                <h1 class="text-3xl font-bold mb-4">{{ ad|get_title:LANGUAGE_CODE }}
+                    {% render_trust_badge ad.user %}</h1>
                 
                 {% if ad.price %}
                     <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad.price }} BAM</p>

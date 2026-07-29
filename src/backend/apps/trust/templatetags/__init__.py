@@ -2,6 +2,6 @@
 Template tags for Mko Bazuna trust app.
 """
 
-from .trust_tags import trust_badge
+from .trust_tags import render_trust_badge
 
-__all__ = ["trust_badge"]
+__all__ = ["render_trust_badge"]

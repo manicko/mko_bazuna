@@ -1,6 +1,7 @@
 {# Partial template for ad list grid (HTMX fragment). Renders the ad cards grid, pagination, and status messages. XSS-safe via Django autoescape. #}
 {% load localized_content %}
 {% load i18n %}
+{% load trust_tags %}
 
 <!-- Did-you-mean suggestions -->
 {% if suggested_category %}
@@ -40,7 +41,8 @@
                     {% endif %}
                     
                     <div class="p-4">
-                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad|get_title:LANGUAGE_CODE }}</h2>
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad|get_title:LANGUAGE_CODE }}
+                            {% render_trust_badge ad.user %}</h2>
                         
                         {% if ad.price %}
                             <p class="text-blue-600 font-bold text-xl mb-2">{{ ad.price }} BAM</p>

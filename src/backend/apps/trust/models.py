@@ -19,6 +19,7 @@ class SellerTrustScore(models.Model):
     trust_level = models.CharField(
         max_length=20,
         choices=[(level.value, level.value) for level in TrustLevel],
+        default=TrustLevel.UNVERIFIED,
     )
     score = models.PositiveSmallIntegerField(default=0)
     ad_count_lifetime = models.PositiveIntegerField(default=0)

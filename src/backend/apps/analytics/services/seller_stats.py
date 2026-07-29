@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.analytics.models import AnalyticsEvent, AnalyticsEventType
 from apps.ads.models import Ad
-from apps.core.enums import TimeRange
+from apps.core.enums import AdStatus, TimeRange
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class SellerStats:
         filtered by timestamp for 30-day / 7-day windows.
         """
         user_ads: QuerySet = Ad.objects.filter(user_id=self.user_id)
-        ads_published: int = user_ads.count()
+        ads_published: int = user_ads.filter(status=AdStatus.PUBLISHED).count()
 
         # Build time-range filter for event queries
         cutoff = timezone.now()  # fallback for ALL_TIME (unused when time_filter is empty)

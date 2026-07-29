@@ -125,4 +125,25 @@ def record_contact_initiated(buyer_telegram_id: int | None = None) -> None:
         event_type=AnalyticsEventType.CONTACT_INITIATED,
         user_id=user_id,
     )
-    logger.info(f"Contact initiated event recorded for buyer {user_id}")
+    logger.info("Contact initiated event recorded for buyer %s", user_id)
+
+
+def record_contact_response(seller_telegram_id: int) -> None:
+    """
+    Record CONTACT_RESPONSE analytics event.
+
+    Called when seller confirms receiving a contact message from a buyer.
+    The response rate is used by TrustCalculator for seller trust scoring.
+
+    Args:
+        seller_telegram_id: The seller's Telegram ID.
+    """
+    try:
+        user = User.objects.get(telegram_id=seller_telegram_id)
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.CONTACT_RESPONSE,
+            user_id=user.id,
+        )
+        logger.info("Contact response event recorded for seller %s", user.id)
+    except User.DoesNotExist:
+        logger.warning("Seller not found for telegram_id %s", seller_telegram_id)
