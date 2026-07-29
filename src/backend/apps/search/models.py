@@ -135,7 +135,7 @@ class SavedSearchNotification(models.Model):
         ]
         indexes = [
             models.Index(
-                name="IX_saved_search_notifications_search",
+                name="idx_saved_search_notif_sid",
                 fields=["saved_search_id"],
             ),
         ]
