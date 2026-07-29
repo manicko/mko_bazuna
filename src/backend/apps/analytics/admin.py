@@ -6,7 +6,7 @@ Provides metrics view aggregating AnalyticsEvent by type and date.
 
 import logging
 
-from apps.analytics.models import AnalyticsEvent
+from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from django.contrib import admin
 from django.db.models import Count
 from django.db.models.functions import TruncDate
@@ -74,3 +74,25 @@ class AnalyticsEventAdmin(admin.ModelAdmin):
         extra_context["date_aggregates"] = date_aggregates
 
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(DailyAdMetrics)
+class DailyAdMetricsAdmin(admin.ModelAdmin):
+    """Admin for daily aggregated ad metrics."""
+
+    list_display = ["ad", "date", "views_count", "contacts_count", "trust_score"]
+    list_filter = ["date"]
+    date_hierarchy = "date"
+    readonly_fields = ["created_at", "updated_at"]
+
+    def has_add_permission(self, request):
+        """Metrics are created by management command, not via admin."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Metrics are read-only."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Metrics can be deleted for cleanup."""
+        return True

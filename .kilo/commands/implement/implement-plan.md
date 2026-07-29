@@ -170,27 +170,22 @@ Do NOT fix unrelated problems during current plan execution unless:
 
 ## Step 10 — Commit Changes (Conventional Commit)
 
-1. `git add -A` (or `git add <specific-files>`)
-2. Check `git status --porcelain` — if empty, skip commit
-3. Determine commit type from plan content:
-   - `feat` — new feature
-   - `fix` — bug fix
-   - `refactor` — restructure
-   - `test` — tests only
-   - `chore` — other
-4. Determine scope from affected module (e.g. `auth`, `api`, `frontend`, `db`)
-5. Create commit:
+-  validate related to the task files changes (ignore file changes not related to the task) 
+   ```powershell
+   git diff HEAD --stat   
+   ```
+Determine scope from affected module (e.g. `auth`, `api`, `frontend`, `db`)
 
-```bash
-git commit -m "{type}({scope}): {short_description}" -m "plan: {plan_FILE_NAME}"
-```
-
-**FORBIDDEN:** `git reset`, `git commit --amend`, `git stash`, `git checkout --`, `git clean`
+   ```powershell
+   git add <task-related files>
+   git commit -m "{type}({scope}): {description}" 
+   ```
+   **Rules:**
+   - Always `git add <specific files>` — never `-A` or `.
 
 ### ⛔ GIT RULES
-
 Do not execute any Git command that modifies the repository state beyond the allowed `git add` + `git commit`.  
-You are working on the same files with other agents.
+You are working on the same files and project with other agents.
 
 ---
 
