@@ -14,6 +14,7 @@ from apps.moderation.admin_actions import (
     bulk_delete,
     bulk_reject,
 )
+from apps.moderation.services.priority import PriorityService
 from django.contrib import admin
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,8 @@ class AdAdmin(admin.ModelAdmin):
         "published_at",
         rejected_reason,
     ]
-    list_filter = ["status", "category", "city", "created_at", "published_at"]
+    list_filter = ["status", "category", "city", "created_at", "published_at",
+                       "moderation_priority__priority_level"]
     search_fields = ["title", "description"]
     readonly_fields = [
         "moderation_failed_at",
@@ -78,9 +80,11 @@ class AdAdmin(admin.ModelAdmin):
     actions = ["action_reject", "action_ban_user", "action_soft_delete", "action_approve"]
 
     def get_queryset(self, request):
-        """Optimize queryset with related select."""
+        """Optimize queryset with related select and priority prefetch."""
         qs = super().get_queryset(request)
-        return qs.select_related("user", "category", "city")
+        return qs.select_related("user", "category", "city").prefetch_related(
+            "moderation_priority"
+        )
 
     def has_view_permission(self, request, obj=None) -> bool:
         """Restrict view to staff/superuser only."""
@@ -115,7 +119,7 @@ class AdAdmin(admin.ModelAdmin):
         self.message_user(request, f"Deleted {count} ad(s).", level="success")
 
     def changelist_view(self, request, extra_context=None):
-        """Custom changelist with moderation queue presets."""
+        """Custom changelist with moderation queue presets and priority stats."""
         extra_context = extra_context or {}
 
         # Add quick filter links for moderation queues
@@ -124,6 +128,10 @@ class AdAdmin(admin.ModelAdmin):
             {"name": "Failed", "status": AdStatus.ON_MODERATION_FAILED},
             {"name": "Rejected", "status": AdStatus.REJECTED},
         ]
+
+        # Add priority queue stats for admin dashboard
+        service = PriorityService()
+        extra_context["priority_queue_stats"] = service.get_priority_counts()
 
         return super().changelist_view(request, extra_context=extra_context)
 

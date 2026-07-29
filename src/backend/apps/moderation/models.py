@@ -147,6 +147,7 @@ class AdModerationPriority(models.Model):
     priority_level = models.CharField(
         max_length=10,
         choices=[(p.value, p.value) for p in AdPriorityLevel],
+        default=AdPriorityLevel.MEDIUM,
     )
     flags = models.JSONField(default=list, blank=True)
     confidence_score = models.FloatField(default=0.0)

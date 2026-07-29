@@ -8,24 +8,14 @@ import logging
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from django.http import Http404, HttpRequest, HttpResponse
+from apps.moderation.views.decorators import staff_required
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 logger = logging.getLogger(__name__)
 
 
-def _staff_required(view_func):
-    """Decorator to require staff or superuser access."""
-
-    def wrapper(request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        if not (request.user.is_staff or request.user.is_superuser):
-            raise Http404("Not found")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-@_staff_required
+@staff_required
 def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     Detail view for reviewing an ad in moderation queue.
@@ -53,7 +43,7 @@ def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
     return render(request, "admin/moderation/review.html", context)
 
 
-@_staff_required
+@staff_required
 def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     Approve an ad for publication (POST only).
@@ -74,7 +64,7 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
 
-@_staff_required
+@staff_required
 def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     Reject an ad with reason (POST only).
@@ -112,7 +102,7 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     return redirect("/admin/ads/ad/?status__exact=on_moderation")
 
 
-@_staff_required
+@staff_required
 def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     Ban user who posted the ad (POST only).

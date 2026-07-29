@@ -32,6 +32,7 @@ class AdvisoryLockId(IntEnum):
     MIGRATE = 100
     CREATE_ADMIN = 101
     BACKFILL_THUMBNAILS = 102
+    QUEUE_PROCESSING = 10
 
 
 class AdStatus(StrEnum):

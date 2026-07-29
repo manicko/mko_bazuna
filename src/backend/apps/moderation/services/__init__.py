@@ -12,6 +12,7 @@ from .moderation_log import (
     set_published,
     set_rejected,
 )
+from .priority import PriorityService
 
 __all__ = [
     "auto_moderate",
@@ -25,4 +26,5 @@ __all__ = [
     "set_moderation_failed",
     "set_published",
     "set_rejected",
+    "PriorityService",
 ]

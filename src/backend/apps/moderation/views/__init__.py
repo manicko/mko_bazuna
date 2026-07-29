@@ -1,7 +1,7 @@
 """
-Moderation review views for Mko Bazuna.
+Moderation views for Mko Bazuna.
 
-Views for admin-only moderation interface: review queue, approve, reject, ban, delete.
+Includes review, queue, and bulk moderation API views.
 """
 
 from apps.moderation.views.review import (
@@ -11,4 +11,9 @@ from apps.moderation.views.review import (
     reject_ad,
 )
 
-__all__ = ["moderation_review", "approve_ad", "reject_ad", "ban_user"]
+__all__ = [
+    "moderation_review",
+    "approve_ad",
+    "reject_ad",
+    "ban_user",
+]
