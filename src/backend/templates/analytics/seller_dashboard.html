@@ -1,0 +1,130 @@
+{% comment %}
+Seller Trust Dashboard template for Mko Bazuna.
+Displays trust score, trust level badge, and daily metrics for the authenticated seller.
+Extends the same visual style as the main ads dashboard.
+{% endcomment %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trust Dashboard - Mko Bazuna</title>
+    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+    {% if PLAUSIBLE_HOST %}
+    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+    {% endif %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/">Mko Bazuna</a>
+                <span class="text-gray-400 mx-2">/</span>
+                <a href="{% url 'ads:dashboard' %}" class="text-blue-600 hover:text-blue-800">Dashboard</a>
+                <span class="text-gray-400 mx-2">/</span>
+                <span class="text-green-600">Trust</span>
+            </h1>
+            <div class="mt-2">
+                <a href="/logout/" class="text-sm text-gray-600 hover:text-red-600">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        {# ── Trust Score Card ── #}
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Your Trust Profile</h2>
+            <div class="flex flex-wrap items-center gap-6">
+                <div class="text-center">
+                    <div class="text-4xl font-bold {% if trust_level == 'pro' %}text-purple-600{% elif trust_level == 'trusted' %}text-green-600{% elif trust_level == 'verified' %}text-blue-600{% else %}text-gray-500{% endif %}">
+                        {{ trust_score }}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Trust Score</p>
+                </div>
+                <div>
+                    {% if trust_level == 'pro' %}
+                        {% include "components/badges/pro_badge.html" %}
+                    {% elif trust_level == 'trusted' %}
+                        {% include "components/badges/trusted_badge.html" %}
+                    {% elif trust_level == 'verified' %}
+                        {% include "components/badges/verified_badge.html" %}
+                    {% else %}
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
+                            Unverified
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-600 ml-auto">
+                    <p>Score ranges from 0 to 100. Higher scores unlock trust badges.</p>
+                </div>
+            </div>
+        </div>
+
+        {# ── Summary Stats ── #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-blue-600">{{ total_views }}</p>
+                <p class="text-xs text-gray-500">Total Views (30d)</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-green-600">{{ total_contacts }}</p>
+                <p class="text-xs text-gray-500">Total Contacts (30d)</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-gray-700">{{ daily_metrics|length }}</p>
+                <p class="text-xs text-gray-500">Days with Data</p>
+            </div>
+        </div>
+
+        {# ── Daily Metrics Table ── #}
+        {% if daily_metrics %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <h3 class="text-lg font-semibold px-6 py-4 border-b">Daily Metrics (Last 30 Days)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-600">
+                        <tr>
+                            <th class="text-left px-6 py-3">Date</th>
+                            <th class="text-left px-6 py-3">Ad</th>
+                            <th class="text-right px-6 py-3">Views</th>
+                            <th class="text-right px-6 py-3">Contacts</th>
+                            <th class="text-right px-6 py-3">Trust Score</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for metric in daily_metrics %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 whitespace-nowrap">{{ metric.date|date:"M d, Y" }}</td>
+                            <td class="px-6 py-3">
+                                <a href="{% url 'ads:detail' metric.ad_id %}" class="text-blue-600 hover:underline">
+                                    {{ metric.ad.title|truncatechars:50 }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-3 text-right">{{ metric.views_count }}</td>
+                            <td class="px-6 py-3 text-right">{{ metric.contacts_count }}</td>
+                            <td class="px-6 py-3 text-right">
+                                {% if metric.trust_score is not None %}
+                                    {{ metric.trust_score }}
+                                {% else %}
+                                    <span class="text-gray-400">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-12 bg-white rounded-lg">
+            <p class="text-gray-600 text-lg">No metrics data yet</p>
+            <p class="text-gray-500 mt-2">Metrics will appear after ads receive views and contacts.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    {% include "components/consent_banner.html" %}
+</body>
+</html>

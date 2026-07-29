@@ -34,7 +34,7 @@ class AnalyticsEvent(models.Model):
     )
     ad = models.ForeignKey(
         "ads.Ad",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="analytics_events",
@@ -43,6 +43,12 @@ class AnalyticsEvent(models.Model):
 
     class Meta:
         db_table = "analytics_events"
+        indexes = [
+            models.Index(
+                fields=["event_type", "timestamp"],
+                name="idx_analytics_evt_ts",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.event_type} at {self.timestamp}"
@@ -68,12 +74,12 @@ class DailyAdMetrics(models.Model):
     trust_score = models.FloatField(
         null=True,
         blank=True,
-        help_text="Auto-computed trust score (0–1)",
+        help_text="Auto-computed trust score (0–100)",
     )
     avg_response_time = models.FloatField(
         null=True,
         blank=True,
-        help_text="Average response time in seconds",
+        help_text="Average response time in hours",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
