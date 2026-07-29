@@ -28,6 +28,7 @@ class AdvisoryLockId(IntEnum):
     PURGE_FAILED_ADS = 6
     PURGE_REJECTED_ADS = 7
     ROLLUP_DAILY_METRICS = 8
+    ALERT_DELIVERY_TASK = 9
     MIGRATE = 100
     CREATE_ADMIN = 101
     BACKFILL_THUMBNAILS = 102
@@ -58,6 +59,7 @@ class AnalyticsEventType(StrEnum):
     AD_PUBLISHED = "ad_published"
     SEARCH_PERFORMED = "search_performed"
     CONTACT_INITIATED = "contact_initiated"
+    SEARCH_ALERT_MATCHED = "search_alert_matched"
     AD_VIEWED = "ad_viewed"
     CONTACT_RESPONSE = "contact_response"
     SELLER_VERIFIED = "seller_verified"

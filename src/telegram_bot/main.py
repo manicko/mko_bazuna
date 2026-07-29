@@ -42,10 +42,11 @@ def main() -> None:
     dp.message.middleware(AccountStateMiddleware())
 
     # Include routers
-    from telegram_bot.handlers import login_router, ad_create_router
+    from telegram_bot.handlers import login_router, ad_create_router, alerts_router
 
     dp.include_router(login_router)
     dp.include_router(ad_create_router)
+    dp.include_router(alerts_router)
 
     # Create bot and start polling
     bot = Bot(token=token)
