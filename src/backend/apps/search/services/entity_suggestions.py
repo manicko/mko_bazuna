@@ -34,15 +34,15 @@ def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     if not normalized:
         return []
 
-    # Category suggestions with is_active filter
+    # Category suggestions with is_active filter — prefix match (istartswith)
     categories = Category.objects.filter(
-        name__icontains=normalized,
+        name__istartswith=normalized,
         is_active=True,
     ).order_by("name")[:limit]
 
-    # City suggestions without is_active filter (field doesn't exist)
+    # City suggestions without is_active filter (field doesn't exist) — prefix match
     cities = City.objects.filter(
-        name__icontains=normalized,
+        name__istartswith=normalized,
     ).order_by("name")[:limit]
 
     suggestions: list[dict] = [

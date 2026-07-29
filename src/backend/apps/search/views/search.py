@@ -17,7 +17,9 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.core.paginator import Paginator
 from apps.core.utils.sanitize import sanitize_query_for_log
+from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.query_translator import translate_query
+from apps.search.services.search_history import record_search_history
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,11 @@ def search(request: HttpRequest) -> HttpResponse:
             event_type=AnalyticsEventType.SEARCH_PERFORMED,
             user_id=request.user.id if request.user.is_authenticated else None,
         )
+
+        # Record popular search and user history for autocomplete
+        increment_popular_search(query)
+        if request.user.is_authenticated:
+            record_search_history(request.user.id, query)
 
     # Paginate results
     paginator = Paginator(ads, PER_PAGE)

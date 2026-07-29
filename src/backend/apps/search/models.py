@@ -18,6 +18,9 @@ class PopularSearch(models.Model):
     class Meta:
         db_table = "popular_searches"
 
+    def __str__(self) -> str:
+        return f"{self.query} ({self.hit_count})"
+
 class SearchHistory(models.Model):
     """Stores user search queries for personalized autocomplete."""
 
@@ -26,6 +29,7 @@ class SearchHistory(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+        related_name="search_history",
     )
     query = models.CharField(max_length=200)
     query_normalized = models.CharField(max_length=200, db_index=True)
@@ -33,6 +37,12 @@ class SearchHistory(models.Model):
 
     class Meta:
         db_table = "search_history"
+        indexes = [
+            models.Index(fields=["user_id", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.query} (user={self.user_id})"
 
 class SavedSearch(models.Model):
     """Stores saved search queries with filters for alert notifications."""
