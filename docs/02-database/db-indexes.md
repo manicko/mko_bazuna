@@ -14,7 +14,7 @@ related:
 
 ## Purpose
 
-Indexes and the `search_vector` trigger SQL for phase 1. Single source of truth for the seven
+Indexes and the `search_vector` trigger SQL for phases 1 and 2. Single source of truth for the
 named indexes and the two plpgsql trigger functions that keep `search_vector` and the denormalized
 `category_name` in sync. Table/column definitions live in [db-schema.md](db-schema.md); StrEnum
 types live in [db-enums.md](db-enums.md).
@@ -101,3 +101,46 @@ CREATE TRIGGER on_category_name_update
 **Migration notes:** one-time `UPDATE ads SET category_id = category_id` (or backfill) to fill
 `category_name` + `search_vector` for existing rows. O(n_ads) per category rename — acceptable for
 ~30-50 categories.
+
+## Indexes — analytics_events
+```python
+# FK columns user_id and ad_id have implicit indexes (Django default)
+# No explicit additional indexes — queries filter by event_type + timestamp
+```
+
+## Indexes — daily_ad_metrics
+```python
+models.UniqueConstraint(fields=["ad", "date"], name="uq_daily_ad_metrics_ad_date")
+models.Index(fields=["date", "-views_count"], name="idx_daily_metrics_date_views")
+```
+
+## Indexes — ad_moderation_priorities
+```python
+models.Index(fields=["priority_level"])
+models.Index(fields=["base_score"])
+models.Index(fields=["escalation_required"])
+```
+
+## Indexes — popular_searches
+```python
+# Implicit via db_index=True on model fields
+models.CharField("query", max_length=200, db_index=True)
+models.CharField("query_normalized", max_length=200, db_index=True)
+```
+
+## Indexes — search_history
+```python
+# Implicit via db_index=True on model field
+models.CharField("query_normalized", max_length=200, db_index=True)
+```
+
+## Indexes — saved_search_notifications
+```python
+models.UniqueConstraint(fields=["saved_search", "ad"], name="uq_saved_search_ad")
+```
+
+## Indexes — seller_trust_scores
+```python
+# OneToOneField on user_id has implicit unique index (Django default)
+# No explicit additional indexes
+```

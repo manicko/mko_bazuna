@@ -175,8 +175,8 @@ permission:
     "git reflog*": deny
 
     # === DENY: git write (orchestrator's job) ===
-    "git add*": deny
-    "git commit*": deny
+    "*git add*": ask
+    "*git commit*": ask
 
     # === DENY: destructive filesystem ===
     "format*": deny

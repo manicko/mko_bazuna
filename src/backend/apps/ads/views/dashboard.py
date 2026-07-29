@@ -47,6 +47,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     # Compute seller stats
     seller_stats = SellerStats(request.user.id).get_stats(time_range)
 
+    # Build per-ad lookup dict for efficient template rendering
+    per_ad_stats_dict: dict[int, dict] = {}
+    for row in seller_stats.get("per_ad_stats", []):
+        ad_id = row.get("ad_id")
+        if ad_id is not None:
+            per_ad_stats_dict[ad_id] = row
+
     # Fetch all ads for the current user, grouped by status
     ads_by_status = {
         AdStatus.PUBLISHED: Ad.objects.filter(
@@ -77,7 +84,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         },
         "consent_shown": is_consent_given(request),
         "seller_stats": seller_stats,
+        "per_ad_stats_dict": per_ad_stats_dict,
         "selected_time_range": time_range.value,
+        "time_range_options": TimeRange.choices(),
     }
 
     return render(request, "ads/dashboard.html", context)

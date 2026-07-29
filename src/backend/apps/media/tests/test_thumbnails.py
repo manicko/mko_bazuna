@@ -38,6 +38,62 @@ def _make_test_image(width: int, height: int) -> bytes:
 class TestThumbnailService:
     """Tests for ThumbnailService thumbnail generation."""
 
+    def test_all_three_variants_returned(self, tmp_path: Path) -> None:
+        """generate_thumbnails returns all three supported size variants."""
+        photo_bytes = _make_test_image(800, 600)
+        service = ThumbnailService(storage_dir=str(tmp_path))
+        result = service.generate_thumbnails(photo_bytes, "test.jpg")
+
+        assert ThumbnailSizeStrEnum.SMALL in result
+        assert ThumbnailSizeStrEnum.MEDIUM in result
+        assert ThumbnailSizeStrEnum.LARGE in result
+
+    def test_storage_key_format_follows_uuid_size_pattern(self, tmp_path: Path) -> None:
+        """Storage keys follow the '<uuid>-<size>.jpg' pattern."""
+        photo_bytes = _make_test_image(800, 600)
+        service = ThumbnailService(storage_dir=str(tmp_path))
+        result = service.generate_thumbnails(photo_bytes, "abc123.jpg")
+
+        assert result[ThumbnailSizeStrEnum.SMALL] == "abc123-small.jpg"
+        assert result[ThumbnailSizeStrEnum.MEDIUM] == "abc123-medium.jpg"
+        assert result[ThumbnailSizeStrEnum.LARGE] == "abc123-large.jpg"
+
+    def test_storage_key_with_multi_part_extension(self, tmp_path: Path) -> None:
+        """Storage key handles multi-part extensions like .tar.gz correctly."""
+        photo_bytes = _make_test_image(800, 600)
+        service = ThumbnailService(storage_dir=str(tmp_path))
+        result = service.generate_thumbnails(
+            photo_bytes, "photo.tar.gz"
+        )
+
+        # os.path.splitext('photo.tar.gz') -> ('photo.tar', '.gz')
+        # The stem should be 'photo.tar'
+        assert result[ThumbnailSizeStrEnum.SMALL] == "photo.tar-small.jpg"
+
+    def test_atomic_write_creates_file(self, tmp_path: Path) -> None:
+        """Generated thumbnail file exists on disk and is valid JPEG."""
+        photo_bytes = _make_test_image(800, 600)
+        service = ThumbnailService(storage_dir=str(tmp_path))
+        result = service.generate_thumbnails(photo_bytes, "atomic.jpg")
+
+        thumb_path = tmp_path / result[ThumbnailSizeStrEnum.SMALL]
+        assert thumb_path.is_file()
+        with Image.open(thumb_path) as img:
+            assert img.format == "JPEG"
+            img.verify()  # Raises on corrupt data
+
+    def test_atomic_write_collision_raises_file_exists(self, tmp_path: Path) -> None:
+        """Writing to an existing thumbnail path raises FileExistsError."""
+        photo_bytes = _make_test_image(800, 600)
+        service = ThumbnailService(storage_dir=str(tmp_path))
+        # First call succeeds
+        service.generate_thumbnails(photo_bytes, "collision.jpg")
+        # Second call with same key raises FileExistsError (O_EXCL)
+        import pytest
+
+        with pytest.raises(FileExistsError):
+            service.generate_thumbnails(photo_bytes, "collision.jpg")
+
     def test_small_thumbnail_generation(self, tmp_path: Path) -> None:
         """SMALL variant produces a 240x180 thumbnail."""
         photo_bytes = _make_test_image(1920, 1080)

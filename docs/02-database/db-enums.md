@@ -60,7 +60,6 @@ Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-s
 | `MODERATION_FLAGGED` | ad flagged for senior review |
 | `AD_REPORTED` | ad reported by a buyer |
 | `CONTACT_COMPLETED` | contact exchange completed |
-| `SEARCH_ALERT_MATCHED` | saved search alert matched a new ad |
 
 ## ModeratorActionType
 `ModeratorActionLog.action_type` values (see [db-schema.md](db-schema.md)).

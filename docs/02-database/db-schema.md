@@ -15,7 +15,7 @@ related:
 
 ## Purpose
 
-Database schema for phase 1. Single source of truth for tables, columns, relationships, status
+Database schema for phases 1 and 2. Single source of truth for tables, columns, relationships, status
 enums, and the `moderation_criteria` / `ad_images` storage design. Index, trigger, and enum
 details live in sibling files: [db-indexes.md](db-indexes.md) and [db-enums.md](db-enums.md).
 
@@ -41,11 +41,14 @@ users ── ads ──┬── categories
 ```
 id (PK)
 telegram_id (BIGINT, UNIQUE, nullable)   # nullable for admin-created accounts
+chat_id (BIGINT, UNIQUE, nullable)       # stable Telegram chat ID; set on first bot contact, never nullified
 username (VARCHAR, nullable)             # optional public @username; NOT used for t.me link or publishing (decision C)
 is_staff / is_superuser                  # admin/moderator role (decision A)
 is_banned (BOOL)                          # account block (US-A4)
 is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted
+is_declined (BOOL, default False)         # user declined consent (browse-only mode)
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
+telegram_premium (BOOL, default False)    # Telegram Premium subscription status
 deleted_at (TIMESTAMP, nullable)
 consent_given_at (TIMESTAMP, nullable)    # US-A8 / decision F
 consent_revoked_at (TIMESTAMP, nullable)    # Phase 3: triggers immediate soft-delete cascade
@@ -180,9 +183,10 @@ Only compressed Telegram photos (`message.photo`) accepted; `message.document` r
 ### analytics_events
 ```
 id (PK)
-event_type (StrEnum: REGISTRATION_CREATED, AD_PUBLISHED, SEARCH_PERFORMED, CONTACT_INITIATED)  # see db-enums.md
+event_type (StrEnum — see EventType in db-enums.md)
 timestamp (TIMESTAMP, default now)
 user_id (FK → users.id, nullable)    # SET NULL on erasure (zone R5)
+ad_id (FK → ads.id, nullable)        # CASCADE; null for non-ad events
 ```
 Aggregated via ORM; admin/CLI `show_metrics` access.
 
@@ -258,8 +262,9 @@ avg_response_time (FLOAT, nullable)
 created_at (TIMESTAMP)
 updated_at (TIMESTAMP)
 
-Unique constraint: (ad_id, date)
-Index: IX_daily_ad_metrics_date_views (date, -views_count)
+Unique constraint: (ad_id, date) — name: uq_daily_ad_metrics_ad_date
+Index: idx_daily_metrics_date_views (date, -views_count)
+db_table: daily_ad_metrics
 ```
 
 ---
@@ -271,12 +276,14 @@ Buyers save search queries with filters for ongoing monitoring.
 id (PK)
 user_id (FK → users.id, CASCADE)
 query (TEXT, nullable)
-city_id (FK → locations.city.id, SET_NULL, nullable)
+city_id (FK → cities.id, SET_NULL, nullable)
 category_id (FK → categories.id, SET_NULL, nullable)
 min_price (POSITIVE INT, nullable)
 max_price (POSITIVE INT, nullable)
 is_active (BOOL, default True)
 created_at (TIMESTAMP)
+
+db_table: saved_searches
 ```
 
 ---
@@ -286,11 +293,12 @@ Tracks notification delivery to prevent duplicates per search-ad pair.
 
 ```
 id (PK)
-saved_search_id (FK → saved_search.id, CASCADE)
+saved_search_id (FK → saved_searches.id, CASCADE)
 ad_id (FK → ads.id, CASCADE)
 sent_at (TIMESTAMP)
 
 Unique constraint: (saved_search_id, ad_id)
+db_table: saved_search_notifications
 ```
 
 ---
@@ -304,6 +312,8 @@ query (VARCHAR(200), db_index=True)
 query_normalized (VARCHAR(200), db_index=True)
 hit_count (POSITIVE INT, default 1)
 last_seen (TIMESTAMP, auto_now=True)
+
+db_table: popular_searches
 ```
 
 ---
@@ -317,6 +327,8 @@ user_id (FK → users.id, CASCADE, nullable)
 query (VARCHAR(200))
 query_normalized (VARCHAR(200), db_index=True)
 created_at (TIMESTAMP, auto_now_add=True)
+
+db_table: search_history
 ```
 
 ---
@@ -334,6 +346,8 @@ ad_count_active (POSITIVE INT, default 0)
 rejection_rate (DECIMAL(5,2), default 0.0)
 contact_response_rate (DECIMAL(5,2), default 0.0)
 last_calculated (TIMESTAMP, auto_now=True)
+
+db_table: seller_trust_scores
 ```
 
 ---
@@ -347,6 +361,8 @@ user_id (FK → users.id, ONE_TO_ONE, CASCADE)
 phone_number (VARCHAR(20), nullable)
 verified_by_admin (BOOL, default False)
 verified_at (TIMESTAMP, nullable)
+
+db_table: seller_verifications
 ```
 
 ---
@@ -364,4 +380,5 @@ confidence_score (FLOAT, default 0.0)
 escalation_required (BOOL, default False)
 
 Indexes: priority_level, base_score, escalation_required
+db_table: ad_moderation_priorities
 ```

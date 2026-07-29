@@ -34,6 +34,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidde
 from django.shortcuts import render
 
 from django.core.paginator import Paginator
+from django.db.models import Q
 
 
 
@@ -85,69 +86,50 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
 
 def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
-
     """
+    Media access gate for Ad images and thumbnails.
 
-    Media access gate for Ad images.
-
-
-
-    Looks up AdImage by storage key, verifies parent Ad is PUBLISHED
-
-    (or request is from a staff user), then returns X-Accel-Redirect
-
-    to the internal nginx /protected-media/ location.
-
-
+    Looks up AdImage by storage key (original image or thumbnail variant),
+    verifies parent Ad is PUBLISHED (or request is from a staff user),
+    then returns X-Accel-Redirect to the internal nginx /protected-media/ location.
 
     Args:
-
         request: HTTP request
-
-        image_key: Storage key (UUID v4 + .jpg)
-
-
+        image_key: Storage key (e.g. ``<uuid>.jpg`` or ``<uuid>-small.jpg``)
 
     Returns:
-
         Empty 200 response with X-Accel-Redirect header, or 403/404
-
     """
-
     try:
-
         ad_image = AdImage.objects.select_related("ad").get(image=image_key)
-
     except AdImage.DoesNotExist:
-
-        raise Http404("Image not found") from None
-
-
+        # Fallback: check if this is a thumbnail key stored in one of the
+        # thumbnail_* fields.
+        thumbnail_q = (
+            Q(thumbnail_small=image_key)
+            | Q(thumbnail_medium=image_key)  # type: ignore[operator]
+            | Q(thumbnail_large=image_key)  # type: ignore[operator]
+        )
+        ad_image = (
+            AdImage.objects.select_related("ad")
+            .filter(thumbnail_q)
+            .first()
+        )
+        if ad_image is None:
+            raise Http404("Image not found") from None
 
     # Allow staff users (moderators/admins) to view any image
-
     if request.user.is_staff:
-
         response = HttpResponse()
-
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-
         return response
 
-
-
     # Non-staff users: only serve images for PUBLISHED ads
-
     if ad_image.ad.status != AdStatus.PUBLISHED:
-
         return HttpResponseForbidden("Access denied")
 
-
-
     response = HttpResponse()
-
     response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-
     return response
 
 

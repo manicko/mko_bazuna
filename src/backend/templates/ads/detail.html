@@ -32,9 +32,11 @@
                 <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
                     {% for image in ad.images.all %}
                         <img 
-                            src="{{ image.image_url }}" 
+                            src="{{ image.thumbnail_large_url|default:image.image_url }}" 
                             alt="{% trans "Photo" %} {{ forloop.counter }} {% trans "for" %} {{ ad|get_title:LANGUAGE_CODE }}"
                             class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
+                            loading="lazy"
+                            width="1280" height="960"
                         >
                     {% endfor %}
                 </div>

@@ -30,6 +30,7 @@ class AdvisoryLockId(IntEnum):
     ROLLUP_DAILY_METRICS = 8
     MIGRATE = 100
     CREATE_ADMIN = 101
+    BACKFILL_THUMBNAILS = 102
 
 
 class AdStatus(StrEnum):
@@ -102,6 +103,15 @@ class TimeRange(StrEnum):
     ALL_TIME = "all_time"
     THIRTY_DAYS = "30_days"
     SEVEN_DAYS = "7_days"
+
+    @classmethod
+    def choices(cls) -> list[tuple[str, str]]:
+        """Return list of (value, label) tuples for template select options."""
+        return [
+            (cls.ALL_TIME.value, "All Time"),
+            (cls.THIRTY_DAYS.value, "30 Days"),
+            (cls.SEVEN_DAYS.value, "7 Days"),
+        ]
 
 
 class ModeratorActionType(StrEnum):
@@ -178,4 +188,3 @@ __all__ = [
     "LanguageLocale",
     "TimeRange",
 ]
-

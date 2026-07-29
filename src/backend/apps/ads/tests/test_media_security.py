@@ -10,6 +10,8 @@ Verifies:
 Uses an isolated temporary MEDIA_ROOT to avoid side effects.
 """
 
+from __future__ import annotations
+
 from collections.abc import Generator
 import io
 import tempfile
@@ -368,6 +370,152 @@ class TestPathTraversalRejection:
         """Random non-existent key returns 404 (not a path traversal)."""
         client = Client()
         url = "/ads/media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 404
+
+
+class TestMediaGateThumbnailResolution:
+    """media_gate resolves thumbnail keys via thumbnail_* fields (ARCH-001)."""
+
+    def _create_ad_with_thumbnail(
+        self,
+        seller: object,
+        category: object,
+        city: object,
+        thumbnail_key: str,
+        thumbnail_field: str,
+        image_key: str | None = None,
+        status: object | None = None,
+    ) -> tuple[str, str]:
+        """Create a PUBLISHED ad with an AdImage that has a specific thumbnail set.
+
+        Returns the image_key used.
+        """
+        from apps.ads.models import Ad, AdImage
+        from apps.core.enums import AdStatus
+
+        actual_status = status or AdStatus.PUBLISHED
+        orig_key = image_key or generate_storage_key()
+
+        ad = Ad.objects.create(
+            user=seller,
+            title="Test Ad",
+            description="Test description",
+            category=category,
+            city=city,
+            category_name=category.name,
+            status=actual_status,
+            published_at=timezone.now() if actual_status == AdStatus.PUBLISHED else None,
+        )
+
+        kwargs = {thumbnail_field: thumbnail_key}
+        AdImage.objects.create(ad=ad, image=orig_key, **kwargs)
+        return orig_key, thumbnail_key
+
+    def test_small_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+        """media_gate returns 200 for a key stored in thumbnail_small."""
+        _, thumb_key = self._create_ad_with_thumbnail(
+            seller, category, city, "img-small.jpg", "thumbnail_small"
+        )
+        client = Client()
+        url = f"/ads/media/{thumb_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+
+    def test_medium_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+        """media_gate returns 200 for a key stored in thumbnail_medium."""
+        _, thumb_key = self._create_ad_with_thumbnail(
+            seller, category, city, "img-medium.jpg", "thumbnail_medium"
+        )
+        client = Client()
+        url = f"/ads/media/{thumb_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+
+    def test_large_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+        """media_gate returns 200 for a key stored in thumbnail_large."""
+        _, thumb_key = self._create_ad_with_thumbnail(
+            seller, category, city, "img-large.jpg", "thumbnail_large"
+        )
+        client = Client()
+        url = f"/ads/media/{thumb_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+
+    def test_thumbnail_key_with_draft_ad_returns_forbidden(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Thumbnail key respects ad status — draft returns 403."""
+        from apps.core.enums import AdStatus
+
+        _, thumb_key = self._create_ad_with_thumbnail(
+            seller, category, city, "draft-small.jpg", "thumbnail_small",
+            status=AdStatus.DRAFT,
+        )
+        client = Client()
+        url = f"/ads/media/{thumb_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 403
+
+    def test_thumbnail_key_staff_can_view_any_status(
+        self, seller, staff_user, category, city, isolated_media_root
+    ):
+        """Staff users can view thumbnail keys for any ad status."""
+        from apps.core.enums import AdStatus
+
+        _, thumb_key = self._create_ad_with_thumbnail(
+            seller, category, city, "staff-small.jpg", "thumbnail_small",
+            status=AdStatus.ON_MODERATION,
+        )
+        client = Client()
+        client.force_login(staff_user)
+        url = f"/ads/media/{thumb_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+
+    def test_thumbnail_key_prefers_image_field_over_thumbnail_fields(
+        self, seller, category, city, isolated_media_root
+    ):
+        """When a key matches both image and thumbnail_small, image wins."""
+        from apps.ads.models import Ad, AdImage
+        from apps.core.enums import AdStatus
+
+        conflicting_key = "conflict.jpg"
+        ad = Ad.objects.create(
+            user=seller,
+            title="Test Ad",
+            description="Test description",
+            category=category,
+            city=city,
+            category_name=category.name,
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        # Create two AdImages — one with image=conflict.jpg, one with thumbnail_small=conflict.jpg
+        AdImage.objects.create(ad=ad, image=conflicting_key)
+        AdImage.objects.create(ad=ad, image="other.jpg", thumbnail_small=conflicting_key)
+
+        client = Client()
+        url = f"/ads/media/{conflicting_key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        # Should resolve to the one with image=conflict.jpg (primary lookup)
+        assert response.status_code == 200
+
+    def test_non_existent_thumbnail_key_returns_404(self, isolated_media_root):
+        """Non-existent thumbnail key returns 404."""
+        client = Client()
+        url = "/ads/media/nonexistent-small.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404

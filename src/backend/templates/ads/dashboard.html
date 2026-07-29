@@ -29,6 +29,43 @@
     <main class="container mx-auto px-4 py-6">
         <h2 class="text-xl font-semibold mb-4">Your Ads</h2>
 
+        {# ── Stats card ── #}
+        {% if seller_stats %}
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex gap-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-blue-600">{{ seller_stats.total_views }}</p>
+                        <p class="text-xs text-gray-500">Views</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-green-600">{{ seller_stats.total_contacts }}</p>
+                        <p class="text-xs text-gray-500">Contacts</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-gray-700">{{ seller_stats.ads_published }}</p>
+                        <p class="text-xs text-gray-500">Published</p>
+                    </div>
+                </div>
+
+                {# ── Time range selector ── #}
+                <form method="get" action="{% url 'ads:dashboard' %}">
+                    <select
+                        name="time_range"
+                        onchange="this.form.submit()"
+                        class="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                        {% for value, label in time_range_options %}
+                            <option value="{{ value }}" {% if selected_time_range == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         {% for status, ads in ads_by_status.items %}
             {% if ads %}
                 <section class="mb-8">
@@ -56,6 +93,17 @@
 
                                 {% if ad.price %}
                                     <p class="text-blue-600 font-bold mb-2">{{ ad.price }} BAM</p>
+                                {% endif %}
+
+                                {% if seller_stats %}
+                                    {% with ad_stat=per_ad_stats_dict[ad.id] %}
+                                        {% if ad_stat %}
+                                        <div class="flex gap-3 text-xs text-gray-500 mb-2">
+                                            <span>{{ ad_stat.views }} view{{ ad_stat.views|pluralize }}</span>
+                                            <span>{{ ad_stat.contacts }} contact{{ ad_stat.contacts|pluralize }}</span>
+                                        </div>
+                                        {% endif %}
+                                    {% endwith %}
                                 {% endif %}
 
                                 <div class="flex flex-wrap gap-2 text-xs">

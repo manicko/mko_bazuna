@@ -15,7 +15,7 @@ related:
 
 ## Purpose
 
-Source-tree layout and Docker deployment topology for phase 1. Two long-lived processes
+Source-tree layout and Docker deployment topology for phases 1 and 2. Two long-lived processes
 (web + bot) share one Django project and one PostgreSQL database.
 
 ## Source Structure
@@ -26,16 +26,89 @@ src/
 │   ├── config/                    # settings.py, urls.py, asgi.py, wsgi.py
 │   ├── apps/                      # INSTALLED_APPS = ['apps.xxx']
 │   │   ├── core/                  # shared utils, abstract models, managers, signals
+│   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
+│   │   │   ├── middleware/           # language locale middleware
+│   │   │   ├── services/             # contact service
+│   │   │   ├── templatetags/         # contact_tags, localized_content
+│   │   │   ├── tests/                # sweep command tests, context processor tests
+│   │   │   ├── utils/                # advisory_lock, cache, migrate_locked, sanitize
+│   │   │   ├── context_processors.py
+│   │   │   ├── enums.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
 │   │   ├── users/                 # users, telegram binding (telegram_id)
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # account_state, deletion
+│   │   │   ├── tests/
+│   │   │   ├── views/                # consent views
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   └── urls.py
 │   │   ├── ads/                   # ads, images, statuses
+│   │   │   ├── migrations/
+│   │   │   ├── tests/
+│   │   │   ├── views/                # dashboard, delete, edit, listings
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   └── urls.py
 │   │   ├── categories/            # mptt tree (django-mptt>=0.18.0, single source of truth)
+│   │   │   ├── migrations/
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   └── urls.py
 │   │   ├── locations/             # cities / regions
+│   │   │   ├── migrations/
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   └── urls.py
 │   │   ├── moderation/            # moderation logs, criteria, statuses
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # auto_moderation, moderation_log, priority_calculator
+│   │   │   ├── tests/
+│   │   │   ├── views/                # review
+│   │   │   ├── admin.py
+│   │   │   ├── admin_actions.py
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   ├── signals.py
+│   │   │   ├── tests.py
+│   │   │   └── urls.py
 │   │   ├── search/                # PostgreSQL FTS (search_vector, GIN, russian) — no haystack/whoosh
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # alert_query, entity_suggestions, popular_search, query_translator, rate_limit, search_history
+│   │   │   ├── tests/
+│   │   │   ├── views/                # autocomplete, search
+│   │   │   ├── apps.py
+│   │   │   ├── models.py
+│   │   │   ├── tests.py
+│   │   │   └── urls.py
 │   │   ├── analytics/             # analytics events, daily rollups, trust & moderation analytics
+│   │   │   ├── management/commands/  # rollup_daily_metrics, show_metrics
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # moderation_analytics, seller_stats, trust_analytics
+│   │   │   ├── tests/
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   └── models.py
 │   │   ├── media/                 # thumbnail generation, image processing (Pillow)
+│   │   │   ├── management/commands/
+│   │   │   ├── services/             # thumbnails
+│   │   │   ├── tests/
+│   │   │   └── apps.py
 │   │   ├── trust/                 # trust scoring, seller verification, trust badges
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # trust_calculator
+│   │   │   ├── templatetags/         # trust_tags
+│   │   │   ├── tests/
+│   │   │   ├── apps.py
+│   │   │   └── models.py
 │   │   └── api/                   # DRF API — DEFERRED to post-MVP (phase 1 = HTMX MPA)
+│   │       ├── serializers/
+│   │       └── views/
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
 │   ├── states.py                  # AdCreateState FSM states (aiogram 3.x)
