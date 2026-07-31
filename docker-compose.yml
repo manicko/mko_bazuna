@@ -68,6 +68,34 @@ services:
     # One-shot service: runs once, then exits
     # Skipped if ADMIN_PASSWORD not set (empty string)
 
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    entrypoint: /app/entrypoint-seed.sh
+    profiles:
+      - seed
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/opt/venv
+      - DJANGO_SETTINGS_MODULE=config.settings.prod
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=db
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - SEED_USERS=${SEED_USERS:-10}
+      - SEED_ADS=${SEED_ADS:-30}
+    env_file:
+      - .env.docker
+    volumes:
+      - ./.env.docker:/app/src/.env:ro
+      - media_volume:/app/media
+    # One-shot service: run with `docker compose --profile seed run --rm seed`
+    # Seeds database with demo data, then exits
+
   web:
     build:
       context: .

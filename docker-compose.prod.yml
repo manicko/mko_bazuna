@@ -21,6 +21,10 @@ services:
   create_admin:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
 
+  # Override seed for production: use pre-built image from GHCR
+  seed:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+
   # Override nginx for production: TLS certificate mount
   nginx:
     volumes:

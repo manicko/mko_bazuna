@@ -33,6 +33,7 @@ class AdvisoryLockId(IntEnum):
     CREATE_ADMIN = 101
     BACKFILL_THUMBNAILS = 102
     QUEUE_PROCESSING = 10
+    SEED = 110
 
 
 class AdStatus(StrEnum):
@@ -51,6 +52,7 @@ class AdSource(StrEnum):
     """Origin of an ad. Phase 1 accepts ads only via Telegram bot."""
 
     TELEGRAM = "telegram"
+    SEED = "seed"
 
 
 class AnalyticsEventType(StrEnum):

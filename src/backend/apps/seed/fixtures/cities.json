@@ -1,0 +1,17 @@
+[
+  {"pk": 1, "model": "locations.city", "fields": {"name": "Подгорица", "slug": "podgorica", "region": "Central Montenegro", "country_code": "ME", "name_i18n": {"ru": "Подгорица", "bs": "Podgorica", "en": "Podgorica"}}},
+  {"pk": 2, "model": "locations.city", "fields": {"name": "Никшич", "slug": "niksic", "region": "Central Montenegro", "country_code": "ME", "name_i18n": {"ru": "Никшич", "bs": "Nikšić", "en": "Nikšić"}}},
+  {"pk": 3, "model": "locations.city", "fields": {"name": "Бар", "slug": "bar", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Бар", "bs": "Bar", "en": "Bar"}}},
+  {"pk": 4, "model": "locations.city", "fields": {"name": "Котор", "slug": "kotor", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Котор", "bs": "Kotor", "en": "Kotor"}}},
+  {"pk": 5, "model": "locations.city", "fields": {"name": "Будва", "slug": "budva", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Будва", "bs": "Budva", "en": "Budva"}}},
+  {"pk": 6, "model": "locations.city", "fields": {"name": "Тиват", "slug": "tivat", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Тиват", "bs": "Tivat", "en": "Tivat"}}},
+  {"pk": 7, "model": "locations.city", "fields": {"name": "Херцег-Нови", "slug": "herceg-novi", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Херцег-Нови", "bs": "Herceg Novi", "en": "Herceg Novi"}}},
+  {"pk": 8, "model": "locations.city", "fields": {"name": "Цетине", "slug": "cetinje", "region": "Central Montenegro", "country_code": "ME", "name_i18n": {"ru": "Цетине", "bs": "Cetinje", "en": "Cetinje"}}},
+  {"pk": 9, "model": "locations.city", "fields": {"name": "Биело-Поле", "slug": "bijelo-polje", "region": "Northern Montenegro", "country_code": "ME", "name_i18n": {"ru": "Биело-Поле", "bs": "Bijelo Polje", "en": "Bijelo Polje"}}},
+  {"pk": 10, "model": "locations.city", "fields": {"name": "Плевля", "slug": "pljevlja", "region": "Northern Montenegro", "country_code": "ME", "name_i18n": {"ru": "Плевля", "bs": "Pljevlja", "en": "Pljevlja"}}},
+  {"pk": 11, "model": "locations.city", "fields": {"name": "Рожае", "slug": "rozaje", "region": "Northern Montenegro", "country_code": "ME", "name_i18n": {"ru": "Рожае", "bs": "Rožaje", "en": "Rožaje"}}},
+  {"pk": 12, "model": "locations.city", "fields": {"name": "Беране", "slug": "berane", "region": "Northern Montenegro", "country_code": "ME", "name_i18n": {"ru": "Беране", "bs": "Berane", "en": "Berane"}}},
+  {"pk": 13, "model": "locations.city", "fields": {"name": "Улцинь", "slug": "ulcinj", "region": "Coastal Montenegro", "country_code": "ME", "name_i18n": {"ru": "Улцинь", "bs": "Ulcinj", "en": "Ulcinj"}}},
+  {"pk": 14, "model": "locations.city", "fields": {"name": "Даниловград", "slug": "danilovgrad", "region": "Central Montenegro", "country_code": "ME", "name_i18n": {"ru": "Даниловград", "bs": "Danilovgrad", "en": "Danilovgrad"}}},
+  {"pk": 15, "model": "locations.city", "fields": {"name": "Мойковац", "slug": "mojkovac", "region": "Northern Montenegro", "country_code": "ME", "name_i18n": {"ru": "Мойковац", "bs": "Mojkovac", "en": "Mojkovac"}}}
+]

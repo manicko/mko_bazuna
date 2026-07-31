@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "apps.media",
     "apps.trust",
     "apps.analytics",
+    "apps.seed",
 ]
 
 MIDDLEWARE = [

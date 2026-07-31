@@ -1,0 +1,22 @@
+{
+  "faker_seed": 42,
+  "chunk_size": 10000,
+  "status_distribution": {
+    "published": 0.60,
+    "archived": 0.20,
+    "draft": 0.10,
+    "on_moderation": 0.05,
+    "rejected": 0.05
+  },
+  "image_count": {
+    "min": 1,
+    "max": 3
+  },
+  "analytics": {
+    "days_back": 90,
+    "views_per_ad_per_day": {
+      "min": 0,
+      "max": 15
+    }
+  }
+}
