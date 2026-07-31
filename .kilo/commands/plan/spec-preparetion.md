@@ -9,6 +9,8 @@ Convert a business request into a complete analytical specification.
 
 ## Workflow
 
+0. Ask User to provide the context: problem definition, the file path with decisions or problem description.  
+
 1. Analyze the request and summarize:
    - business goal
    - scope

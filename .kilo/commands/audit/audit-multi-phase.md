@@ -73,13 +73,11 @@ IMPORTANT:
 Max allowed parallel subagents = 2
 ```
 Task(
-  prompt="Read .kilo/agents/auditor.md for your role.\n"
-       + "Read and execute phase task: {TASK_PATH}\n"
+  prompt="Read and execute phase task: {TASK_PATH}n"
        + "Report template: {REPORT_TEMPLATE_PATH}\n"
        + "Write findings to: {OUTPUT_PATH}\n"
        + "Base context: {BASE_CONTEXT}\n"
        + "problems_only = TRUE\n",
-
   agent="auditor",
   mode = "subagent",
   model = "{auditor}",
@@ -95,13 +93,11 @@ If missing or empty: retry once, then escalate on second failure.
 
 ```
 Task(
-  prompt="Read .kilo/agents/validator.md for your role.\n"
-       + "Read validation task: .kilo/commands/audit/phases/99-audit-validate.md\n"
+  prompt="Read validation task: .kilo/commands/audit/phases/99-audit-validate.md\n"
        + "Validate findings at: {OUTPUT_PATH}\n"
        + "Write validation report to: .ai/audit/99-validation/{PHASE_NUMBER}-{PHASE_NAME}-validated-findings.md\n"
        + "Base context: {BASE_CONTEXT}\n"
        + "problems_only = TRUE\n",
-
   agent = "validator",
   mode = "subagent",
   model = "{VALIDATOR}",

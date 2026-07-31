@@ -7,8 +7,10 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── categories
 │   │   ├── core
 │   │   ├── locations
+│   │   ├── media
 │   │   ├── moderation
 │   │   ├── search
+│   │   ├── trust
 │   │   ├── urls.py.bak
 │   │   └── users
 │   ├── config
@@ -24,7 +26,9 @@ C:\py_dev\mko_bazuna\src
 │   ├── templates
 │   │   ├── admin
 │   │   ├── ads
+│   │   ├── analytics
 │   │   ├── components
+│   │   ├── search
 │   │   └── users
 │   └── theme
 │       └── apps.py
@@ -36,6 +40,7 @@ C:\py_dev\mko_bazuna\src
 │   │   └── states
 │   ├── handlers
 │   │   ├── ad_create.py
+│   │   ├── alerts.py
 │   │   ├── contact.py
 │   │   └── login.py
 │   ├── main.py
@@ -43,7 +48,8 @@ C:\py_dev\mko_bazuna\src
 │   │   └── permissions.py
 │   ├── parsers
 │   ├── schemas
-│   │   └── message_payloads.py
+│   │   ├── message_payloads.py
+│   │   └── saved_search.py
 │   ├── services
 │   │   └── media.py
 │   ├── states.py

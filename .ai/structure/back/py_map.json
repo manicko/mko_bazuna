@@ -31,6 +31,7 @@
       "apps.ads.models",
       "apps.core.enums",
       "apps.moderation.admin_actions",
+      "apps.moderation.services.priority",
       "django.contrib"
     ],
     "classes": [
@@ -144,6 +145,18 @@
     ]
   },
   {
+    "path": "backend/apps/ads/migrations/0007_adimage_thumbnails.py",
+    "module": "backend.apps.ads.migrations.0007_adimage_thumbnails",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
     "path": "backend/apps/ads/migrations/__init__.py",
     "module": "backend.apps.ads.migrations.__init__",
     "layer": "other",
@@ -176,7 +189,10 @@
       "get_title",
       "get_description",
       "__str__",
-      "image_url"
+      "image_url",
+      "thumbnail_small_url",
+      "thumbnail_medium_url",
+      "thumbnail_large_url"
     ]
   },
   {
@@ -228,10 +244,80 @@
     ]
   },
   {
+    "path": "backend/apps/ads/tests/test_adimage_thumbnail_urls.py",
+    "module": "backend.apps.ads.tests.test_adimage_thumbnail_urls",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "apps.ads.models"
+    ],
+    "classes": [
+      "TestAdImageThumbnailUrls"
+    ],
+    "functions": [
+      "test_thumbnail_small_url_returns_url_when_set",
+      "test_thumbnail_small_url_returns_none_when_null",
+      "test_thumbnail_small_url_returns_none_when_blank",
+      "test_thumbnail_medium_url_returns_url_when_set",
+      "test_thumbnail_medium_url_returns_none_when_null",
+      "test_thumbnail_large_url_returns_url_when_set",
+      "test_thumbnail_large_url_returns_none_when_null",
+      "test_thumbnail_urls_do_not_interfere",
+      "test_all_thumbnail_urls_return_none_when_all_empty"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/tests/test_dashboard_stats.py",
+    "module": "backend.apps.ads.tests.test_dashboard_stats",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestDashboardStatsIntegration"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_make_event",
+      "setUpTestData",
+      "setUp",
+      "test_dashboard_returns_200_for_authenticated_user",
+      "test_dashboard_redirects_unauthenticated",
+      "test_context_contains_seller_stats",
+      "test_context_contains_per_ad_stats_dict",
+      "test_context_contains_time_range_options",
+      "test_context_contains_selected_time_range",
+      "test_time_range_param_parses_seven_days",
+      "test_time_range_param_parses_thirty_days",
+      "test_invalid_time_range_falls_back_to_all_time",
+      "test_stats_are_correct_all_time",
+      "test_stats_other_seller_excluded",
+      "test_html_contains_stats_card",
+      "test_html_contains_time_range_selector",
+      "test_html_contains_per_ad_stats",
+      "test_html_contains_ad_titles",
+      "test_empty_stats_when_no_events"
+    ]
+  },
+  {
     "path": "backend/apps/ads/tests/test_media_security.py",
     "module": "backend.apps.ads.tests.test_media_security",
     "layer": "other",
     "imports": [
+      "__future__",
       "collections.abc",
       "pathlib",
       "PIL",
@@ -250,13 +336,20 @@
       "apps.core.enums",
       "apps.core.enums",
       "django.test",
-      "PIL"
+      "PIL",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.enums",
+      "apps.core.enums",
+      "apps.ads.models",
+      "apps.core.enums"
     ],
     "classes": [
       "TestMediaAccessControl",
       "TestExifStripping",
       "TestPhysicalDeletion",
-      "TestPathTraversalRejection"
+      "TestPathTraversalRejection",
+      "TestMediaGateThumbnailResolution"
     ],
     "functions": [
       "isolated_media_root",
@@ -285,7 +378,15 @@
       "test_path_traversal_encoded",
       "test_path_traversal_with_slash_prefix",
       "test_path_traversal_with_null_byte",
-      "test_random_key_does_not_resolve"
+      "test_random_key_does_not_resolve",
+      "_create_ad_with_thumbnail",
+      "test_small_thumbnail_key_resolves",
+      "test_medium_thumbnail_key_resolves",
+      "test_large_thumbnail_key_resolves",
+      "test_thumbnail_key_with_draft_ad_returns_forbidden",
+      "test_thumbnail_key_staff_can_view_any_status",
+      "test_thumbnail_key_prefers_image_field_over_thumbnail_fields",
+      "test_non_existent_thumbnail_key_returns_404"
     ]
   },
   {
@@ -351,7 +452,9 @@
       "apps.users.views.consent",
       "django.contrib.auth.decorators",
       "django.http",
-      "django.shortcuts"
+      "django.shortcuts",
+      "apps.analytics.services.seller_stats",
+      "apps.core.enums"
     ],
     "classes": [],
     "functions": [
@@ -400,6 +503,7 @@
     "layer": "other",
     "imports": [
       "difflib",
+      "apps.analytics.models",
       "apps.ads.models",
       "apps.categories.models",
       "apps.core.enums",
@@ -407,7 +511,8 @@
       "apps.users.views.consent",
       "django.http",
       "django.shortcuts",
-      "django.core.paginator"
+      "django.core.paginator",
+      "django.db.models"
     ],
     "classes": [],
     "functions": [
@@ -439,14 +544,18 @@
       "django.utils"
     ],
     "classes": [
-      "AnalyticsEventAdmin"
+      "AnalyticsEventAdmin",
+      "DailyAdMetricsAdmin"
     ],
     "functions": [
       "user_link",
       "has_add_permission",
       "has_change_permission",
       "has_delete_permission",
-      "changelist_view"
+      "changelist_view",
+      "has_add_permission",
+      "has_change_permission",
+      "has_delete_permission"
     ]
   },
   {
@@ -476,6 +585,28 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/management/commands/rollup_daily_metrics.py",
+    "module": "backend.apps.analytics.management.commands.rollup_daily_metrics",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.db",
+      "django.db.models",
+      "django.utils"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
   },
   {
     "path": "backend/apps/analytics/management/commands/show_metrics.py",
@@ -510,6 +641,42 @@
     "functions": []
   },
   {
+    "path": "backend/apps/analytics/migrations/0002_analytics_event_ad_fk.py",
+    "module": "backend.apps.analytics.migrations.0002_analytics_event_ad_fk",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/migrations/0003_daily_ad_metrics.py",
+    "module": "backend.apps.analytics.migrations.0003_daily_ad_metrics",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/migrations/0004_analytics_event_fk_set_null_and_index.py",
+    "module": "backend.apps.analytics.migrations.0004_analytics_event_fk_set_null_and_index",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
     "path": "backend/apps/analytics/migrations/__init__.py",
     "module": "backend.apps.analytics.migrations.__init__",
     "layer": "other",
@@ -527,10 +694,435 @@
     ],
     "classes": [
       "AnalyticsEvent",
+      "Meta",
+      "DailyAdMetrics",
       "Meta"
     ],
     "functions": [
+      "__str__",
       "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/services/__init__.py",
+    "module": "backend.apps.analytics.services.__init__",
+    "layer": "service",
+    "imports": [
+      "apps.analytics.services.seller_stats",
+      "apps.analytics.services.trust_analytics",
+      "apps.analytics.services.moderation_analytics"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/services/moderation_analytics.py",
+    "module": "backend.apps.analytics.services.moderation_analytics",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "datetime",
+      "typing",
+      "django.db.models",
+      "django.db.models.functions",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.moderation.models"
+    ],
+    "classes": [
+      "ModerationStats",
+      "ModeratorPerformance"
+    ],
+    "functions": [
+      "get_moderation_stats",
+      "get_pending_queue_size",
+      "get_moderator_performance",
+      "get_rejection_reasons"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/services/seller_stats.py",
+    "module": "backend.apps.analytics.services.seller_stats",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.db.models",
+      "django.utils",
+      "apps.analytics.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "django.core.cache"
+    ],
+    "classes": [
+      "SellerStats"
+    ],
+    "functions": [
+      "__init__",
+      "get_stats",
+      "_cache_key",
+      "_compute"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/services/trust_analytics.py",
+    "module": "backend.apps.analytics.services.trust_analytics",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.db.models",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.trust.models"
+    ],
+    "classes": [],
+    "functions": [
+      "calculate_seller_trust_score",
+      "get_trust_level",
+      "record_trust_event",
+      "get_seller_daily_metrics"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/__init__.py",
+    "module": "backend.apps.analytics.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_ads_published.py",
+    "module": "backend.apps.analytics.tests.test_ads_published",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "apps.ads.models",
+      "apps.analytics.services",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestAdsPublishedMetric"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "setUpTestData",
+      "test_ads_published_counts_only_published",
+      "test_ads_published_with_zero_published",
+      "test_per_ad_stats_includes_all_ads"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_moderation_analytics.py",
+    "module": "backend.apps.analytics.tests.test_moderation_analytics",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.analytics.services.moderation_analytics",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestGetModerationStats",
+      "TestGetPendingQueueSize",
+      "TestGetModeratorPerformance",
+      "TestGetRejectionReasons"
+    ],
+    "functions": [
+      "_make_moderator",
+      "_make_seller",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_make_moderation_event",
+      "_make_action_log",
+      "setUpTestData",
+      "test_returns_correct_counts",
+      "test_avg_time_to_moderate_computed",
+      "test_days_parameter_filters_results",
+      "test_days_parameter_excludes_old_events",
+      "test_no_events_returns_zeros",
+      "setUpTestData",
+      "test_returns_pending_count",
+      "test_empty_queue_returns_zero",
+      "setUpTestData",
+      "test_returns_all_moderators",
+      "test_action_counts_correct",
+      "test_sorted_by_actions_descending",
+      "test_avg_time_hours_computed",
+      "test_no_actions_returns_empty_list",
+      "test_old_actions_excluded_by_days",
+      "setUpTestData",
+      "test_returns_reason_counts",
+      "test_excludes_non_reject_actions",
+      "test_ordered_by_count_descending",
+      "test_empty_when_no_rejections",
+      "test_days_parameter_excludes_old_reasons"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_rollup_daily_metrics.py",
+    "module": "backend.apps.analytics.tests.test_rollup_daily_metrics",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.core.management",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestRollupDailyMetrics"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_make_event",
+      "setUpTestData",
+      "test_dry_run_does_not_create_daily_metrics",
+      "test_dry_run_can_be_called_multiple_times",
+      "test_aggregates_ad_views_and_contacts",
+      "test_skips_ads_without_events",
+      "test_excludes_today_events",
+      "test_excludes_non_target_event_types",
+      "test_trust_score_and_avg_response_time_remain_null",
+      "test_creates_records_for_all_eligible_ads",
+      "test_runs_under_advisory_lock",
+      "test_concurrent_lock_attempt",
+      "test_idempotent_runs_produce_same_metrics",
+      "test_idempotent_does_not_create_duplicate_records"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_seller_stats.py",
+    "module": "backend.apps.analytics.tests.test_seller_stats",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.analytics.services",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestSellerStats"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_make_event",
+      "setUpTestData",
+      "_stats",
+      "test_get_stats_all_time",
+      "test_get_stats_with_time_range_7_days",
+      "test_get_stats_with_time_range_30_days",
+      "test_cache_key_format",
+      "test_empty_data_handling"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_trust_analytics.py",
+    "module": "backend.apps.analytics.tests.test_trust_analytics",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.analytics.services.trust_analytics",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.trust.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestCalculateSellerTrustScore",
+      "TestGetTrustLevel",
+      "TestRecordTrustEvent",
+      "TestGetSellerDailyMetrics"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "setUpTestData",
+      "test_base_score_no_ads_no_verification",
+      "test_published_ads_increase_score",
+      "test_published_ads_capped_at_five",
+      "test_admin_verification_adds_bonus",
+      "test_admin_verification_no_bonus_when_not_verified",
+      "test_rejected_ads_reduce_score",
+      "test_combined_published_rejected_and_verified",
+      "test_score_clamped_at_100",
+      "test_score_not_below_zero",
+      "test_other_users_ads_do_not_affect_score",
+      "test_seller_verification_does_not_exist_returns_base",
+      "test_unverified_at_zero",
+      "test_unverified_up_to_30",
+      "test_verified_starts_at_31",
+      "test_verified_up_to_60",
+      "test_trusted_starts_at_61",
+      "test_trusted_up_to_85",
+      "test_pro_starts_at_86",
+      "test_pro_at_100",
+      "test_mid_range_verified",
+      "test_mid_range_trusted",
+      "test_creates_analytics_event",
+      "test_creates_event_without_ad",
+      "test_creates_multiple_events_independently",
+      "setUpTestData",
+      "test_returns_metrics_for_seller",
+      "test_excludes_other_sellers",
+      "test_ordered_by_date_desc_then_ad_id",
+      "test_days_parameter_filters_by_cutoff",
+      "test_empty_when_no_metrics",
+      "test_returns_all_metric_fields"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/tests/test_views.py",
+    "module": "backend.apps.analytics.tests.test_views",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "unittest.mock",
+      "django.test",
+      "django.urls",
+      "django.utils",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestSellerTrustDashboardView",
+      "TestModerationAnalyticsView"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "setUpTestData",
+      "test_redirects_anonymous_to_login",
+      "test_authenticated_user_gets_200",
+      "test_uses_correct_template",
+      "test_trust_score_in_context",
+      "test_trust_level_in_context",
+      "test_daily_metrics_in_context",
+      "test_total_views_in_context",
+      "test_total_contacts_in_context",
+      "test_daily_metrics_reflects_actual_data",
+      "test_other_seller_metrics_not_included",
+      "test_empty_metrics_shows_zero",
+      "setUpTestData",
+      "test_anonymous_gets_404",
+      "test_non_staff_user_gets_404",
+      "test_staff_user_gets_200",
+      "test_superuser_gets_200",
+      "test_uses_correct_template",
+      "test_stats_in_context",
+      "test_pending_queue_size_in_context",
+      "test_moderator_performance_in_context",
+      "test_rejection_reasons_in_context",
+      "test_days_in_context",
+      "test_stats_reflects_actual_moderation_events"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/urls.py",
+    "module": "backend.apps.analytics.urls",
+    "layer": "other",
+    "imports": [
+      "apps.analytics.views.moderation_dashboard",
+      "apps.analytics.views.seller_dashboard",
+      "django.urls"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/views/__init__.py",
+    "module": "backend.apps.analytics.views.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/analytics/views/moderation_dashboard.py",
+    "module": "backend.apps.analytics.views.moderation_dashboard",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "apps.analytics.services.moderation_analytics",
+      "django.http",
+      "django.shortcuts"
+    ],
+    "classes": [],
+    "functions": [
+      "_staff_required",
+      "wrapper",
+      "moderation_analytics"
+    ]
+  },
+  {
+    "path": "backend/apps/analytics/views/seller_dashboard.py",
+    "module": "backend.apps.analytics.views.seller_dashboard",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "apps.analytics.services.trust_analytics",
+      "django.contrib.auth.decorators",
+      "django.http",
+      "django.shortcuts"
+    ],
+    "classes": [],
+    "functions": [
+      "seller_trust_dashboard"
     ]
   },
   {
@@ -678,11 +1270,17 @@
       "AdStatus",
       "AdSource",
       "AnalyticsEventType",
+      "ThumbnailSizeStrEnum",
+      "AdPriorityLevel",
+      "TrustLevel",
+      "TimeRange",
       "ModeratorActionType",
       "CategoryRejectReason",
+      "SearchSuggestionSource",
       "LanguageLocale"
     ],
     "functions": [
+      "choices",
       "values",
       "fts_config"
     ]
@@ -954,7 +1552,8 @@
     "functions": [
       "can_contact_seller",
       "get_seller_for_contact",
-      "record_contact_initiated"
+      "record_contact_initiated",
+      "record_contact_response"
     ]
   },
   {
@@ -1038,6 +1637,26 @@
       "test_consent_revoked_returns_false",
       "test_contact_pattern_matches_ad_id",
       "test_contact_pattern_extracts_ad_id"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_contact_response.py",
+    "module": "backend.apps.core.tests.test_contact_response",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.core.services.contact",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestRecordContactResponse"
+    ],
+    "functions": [
+      "test_record_contact_response_creates_event",
+      "test_record_contact_response_no_crash_on_missing_seller",
+      "test_record_contact_response_multiple_events"
     ]
   },
   {
@@ -1291,7 +1910,8 @@
     ],
     "classes": [],
     "functions": [
-      "sanitize_query_for_log"
+      "sanitize_query_for_log",
+      "sanitize_autocomplete_query"
     ]
   },
   {
@@ -1402,6 +2022,168 @@
     "functions": []
   },
   {
+    "path": "backend/apps/media/__init__.py",
+    "module": "backend.apps.media.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/apps.py",
+    "module": "backend.apps.media.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "MediaConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/management/__init__.py",
+    "module": "backend.apps.media.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/management/commands/__init__.py",
+    "module": "backend.apps.media.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/management/commands/backfill_thumbnails.py",
+    "module": "backend.apps.media.management.commands.backfill_thumbnails",
+    "layer": "other",
+    "imports": [
+      "pathlib",
+      "django.conf",
+      "django.core.management.base",
+      "django.db",
+      "django.db.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "apps.media.services.thumbnails"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle",
+      "_process_one"
+    ]
+  },
+  {
+    "path": "backend/apps/media/services/__init__.py",
+    "module": "backend.apps.media.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/services/thumbnails.py",
+    "module": "backend.apps.media.services.thumbnails",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "PIL",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "ThumbnailService"
+    ],
+    "functions": [
+      "__init__",
+      "generate_thumbnails"
+    ]
+  },
+  {
+    "path": "backend/apps/media/tests/__init__.py",
+    "module": "backend.apps.media.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/media/tests/test_backfill_thumbnails.py",
+    "module": "backend.apps.media.tests.test_backfill_thumbnails",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "collections.abc",
+      "pathlib",
+      "PIL",
+      "django.core.management",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "telegram_bot.services.media"
+    ],
+    "classes": [
+      "TestBackfillThumbnails"
+    ],
+    "functions": [
+      "isolated_media_root",
+      "seller",
+      "category",
+      "city",
+      "_make_test_image",
+      "_create_adimage_with_original",
+      "test_dry_run_reports_count",
+      "test_backfill_generates_all_thumbnails",
+      "test_backfill_partial_thumbnails_only_fills_missing",
+      "test_backfill_skips_records_with_all_thumbnails",
+      "test_backfill_missing_file_skips_gracefully",
+      "test_backfill_batch_processing",
+      "test_backfill_generated_thumbnails_are_valid_jpeg",
+      "test_backfill_zero_records_succeeds"
+    ]
+  },
+  {
+    "path": "backend/apps/media/tests/test_thumbnails.py",
+    "module": "backend.apps.media.tests.test_thumbnails",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "pathlib",
+      "PIL",
+      "apps.core.enums",
+      "apps.media.services.thumbnails"
+    ],
+    "classes": [
+      "TestThumbnailService"
+    ],
+    "functions": [
+      "_make_test_image",
+      "test_all_three_variants_returned",
+      "test_storage_key_format_follows_uuid_size_pattern",
+      "test_storage_key_with_multi_part_extension",
+      "test_atomic_write_creates_file",
+      "test_atomic_write_collision_raises_file_exists",
+      "test_small_thumbnail_generation",
+      "test_medium_thumbnail_generation",
+      "test_large_thumbnail_generation",
+      "test_aspect_ratio_preservation",
+      "test_progressive_jpeg_output",
+      "test_invalid_image_handling"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/__init__.py",
     "module": "backend.apps.moderation.__init__",
     "layer": "other",
@@ -1496,6 +2278,30 @@
     ]
   },
   {
+    "path": "backend/apps/moderation/migrations/0003_ad_moderation_priority.py",
+    "module": "backend.apps.moderation.migrations.0003_ad_moderation_priority",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/moderation/migrations/0004_ad_moderation_priority_default.py",
+    "module": "backend.apps.moderation.migrations.0004_ad_moderation_priority_default",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
     "path": "backend/apps/moderation/migrations/__init__.py",
     "module": "backend.apps.moderation.migrations.__init__",
     "layer": "other",
@@ -1515,11 +2321,14 @@
       "ModerationCriteria",
       "Meta",
       "ModeratorActionLog",
+      "Meta",
+      "AdModerationPriority",
       "Meta"
     ],
     "functions": [
       "__str__",
       "get_singleton",
+      "__str__",
       "__str__"
     ]
   },
@@ -1529,7 +2338,8 @@
     "layer": "service",
     "imports": [
       "auto_moderation",
-      "moderation_log"
+      "moderation_log",
+      "priority"
     ],
     "classes": [],
     "functions": []
@@ -1545,6 +2355,7 @@
       "apps.analytics.models",
       "apps.core.enums",
       "apps.core.utils.cache",
+      "apps.trust.services.trust_calculator",
       "apps.moderation.models",
       "apps.moderation.services.moderation_log",
       "apps.moderation.services.moderation_log"
@@ -1590,18 +2401,65 @@
     ]
   },
   {
+    "path": "backend/apps/moderation/services/priority.py",
+    "module": "backend.apps.moderation.services.priority",
+    "layer": "service",
+    "imports": [
+      "django.db.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.models",
+      "apps.moderation.services.priority_calculator"
+    ],
+    "classes": [
+      "PriorityService"
+    ],
+    "functions": [
+      "__init__",
+      "calculate_and_save",
+      "get_queued_ads",
+      "get_priority_counts"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/services/priority_calculator.py",
+    "module": "backend.apps.moderation.services.priority_calculator",
+    "layer": "service",
+    "imports": [
+      "datetime",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.models"
+    ],
+    "classes": [
+      "PriorityCalculator"
+    ],
+    "functions": [
+      "calculate_priority",
+      "_calculate_content_score",
+      "_calculate_user_score",
+      "_get_priority_level",
+      "_estimate_confidence"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/signals.py",
     "module": "backend.apps.moderation.signals",
     "layer": "other",
     "imports": [
+      "apps.ads.models",
+      "apps.core.enums",
       "apps.moderation.models",
       "apps.moderation.services.auto_moderation",
+      "apps.moderation.services.priority",
       "django.db.models.signals",
       "django.dispatch"
     ],
     "classes": [],
     "functions": [
-      "invalidate_criteria_cache_on_save"
+      "invalidate_criteria_cache_on_save",
+      "calculate_ad_priority"
     ]
   },
   {
@@ -1674,6 +2532,117 @@
     ]
   },
   {
+    "path": "backend/apps/moderation/tests/test_priority.py",
+    "module": "backend.apps.moderation.tests.test_priority",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
+      "apps.moderation.services.priority_calculator",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestPriorityCalculator"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_banned_words_setup",
+      "setUpTestData",
+      "test_banned_word_detection_in_title",
+      "test_banned_word_detection_in_description",
+      "test_banned_word_case_insensitive",
+      "test_banned_word_multiple_words_increase_score",
+      "test_banned_word_no_match_returns_zero",
+      "test_banned_word_empty_list_returns_zero",
+      "test_established_user_many_ads",
+      "test_established_user_repeat_offender",
+      "test_established_user_rejections_outside_window",
+      "test_established_user_below_ad_threshold",
+      "test_established_user_combined_bonus",
+      "test_priority_level_low_from_public_api",
+      "test_priority_level_medium_from_public_api",
+      "test_priority_level_boundaries",
+      "test_escalation_required_when_flag_count_reaches_three",
+      "test_escalation_not_required_when_low_score_and_few_flags",
+      "test_escalation_flag_logic_is_or",
+      "test_confidence_score_default_in_public_api",
+      "test_confidence_score_direct_method"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/tests/test_priority_service.py",
+    "module": "backend.apps.moderation.tests.test_priority_service",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "django.urls",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.moderation.models",
+      "apps.moderation.services.priority",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestPriorityService",
+      "TestCalculateAdPrioritySignal",
+      "TestModerationQueueView",
+      "TestBulkModerationActionView"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_staff_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_banned_words_setup",
+      "setUpTestData",
+      "test_calculate_and_save_creates_priority_record",
+      "test_calculate_and_save_updates_existing_record",
+      "test_calculate_and_save_with_banned_words",
+      "test_get_queued_ads_returns_moderation_ads",
+      "test_get_queued_ads_excludes_published_ads",
+      "test_get_queued_ads_excludes_archived_ads",
+      "test_get_queued_ads_filters_by_priority",
+      "test_get_priority_counts_returns_zero_for_empty",
+      "test_get_priority_counts_counts_correctly",
+      "test_get_priority_counts_excludes_non_moderation_ads",
+      "setUpTestData",
+      "test_signal_creates_priority_on_moderation_status",
+      "test_signal_does_not_create_priority_for_draft",
+      "test_signal_does_not_create_priority_for_published",
+      "test_signal_does_not_recalculate_existing_priority",
+      "setUpTestData",
+      "test_requires_staff",
+      "test_requires_staff_unauthenticated",
+      "test_staff_user_can_access",
+      "test_empty_queue_shows_message",
+      "test_queue_shows_ads",
+      "test_queue_filters_by_priority",
+      "test_queue_shows_priority_counts",
+      "setUpTestData",
+      "test_requires_staff_forbidden",
+      "test_requires_post_method",
+      "test_bulk_approve",
+      "test_bulk_reject",
+      "test_bulk_flag",
+      "test_bulk_errors_reported",
+      "test_unknown_action_returns_error"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/tests.py",
     "module": "backend.apps.moderation.tests",
     "layer": "other",
@@ -1733,6 +2702,8 @@
     "layer": "other",
     "imports": [
       "apps.moderation.views",
+      "apps.moderation.views.api_bulk",
+      "apps.moderation.views.queue",
       "django.urls"
     ],
     "classes": [],
@@ -1749,12 +2720,61 @@
     "functions": []
   },
   {
+    "path": "backend/apps/moderation/views/api_bulk.py",
+    "module": "backend.apps.moderation.views.api_bulk",
+    "layer": "other",
+    "imports": [
+      "apps.ads.models",
+      "apps.moderation.admin_actions",
+      "apps.moderation.services.priority",
+      "apps.moderation.views.decorators",
+      "django.http"
+    ],
+    "classes": [],
+    "functions": [
+      "bulk_moderation_action"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/views/decorators.py",
+    "module": "backend.apps.moderation.views.decorators",
+    "layer": "other",
+    "imports": [
+      "collections.abc",
+      "functools",
+      "django.http"
+    ],
+    "classes": [],
+    "functions": [
+      "staff_required",
+      "wrapper",
+      "staff_required_api",
+      "wrapper"
+    ]
+  },
+  {
+    "path": "backend/apps/moderation/views/queue.py",
+    "module": "backend.apps.moderation.views.queue",
+    "layer": "other",
+    "imports": [
+      "apps.moderation.services.priority",
+      "apps.moderation.views.decorators",
+      "django.http",
+      "django.shortcuts"
+    ],
+    "classes": [],
+    "functions": [
+      "moderation_queue"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/views/review.py",
     "module": "backend.apps.moderation.views.review",
     "layer": "other",
     "imports": [
       "apps.ads.models",
       "apps.core.enums",
+      "apps.moderation.views.decorators",
       "django.http",
       "django.shortcuts",
       "apps.moderation.admin_actions",
@@ -1763,8 +2783,6 @@
     ],
     "classes": [],
     "functions": [
-      "_staff_required",
-      "wrapper",
       "moderation_review",
       "approve_ad",
       "reject_ad",
@@ -1792,12 +2810,187 @@
     "functions": []
   },
   {
+    "path": "backend/apps/search/management/__init__.py",
+    "module": "backend.apps.search.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/management/commands/__init__.py",
+    "module": "backend.apps.search.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/management/commands/send_alerts.py",
+    "module": "backend.apps.search.management.commands.send_alerts",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "aiogram.exceptions",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "apps.search.models",
+      "apps.search.services.alert_query",
+      "django.core.management.base",
+      "django.db",
+      "django.conf",
+      "apps.users.models"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle",
+      "_dry_run_check",
+      "_send_alerts",
+      "_send_user_digests",
+      "_format_digest"
+    ]
+  },
+  {
+    "path": "backend/apps/search/migrations/0001_initial.py",
+    "module": "backend.apps.search.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/migrations/0002_searchhistory_related_name_and_index.py",
+    "module": "backend.apps.search.migrations.0002_searchhistory_related_name_and_index",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/migrations/0003_saved_search_indexes.py",
+    "module": "backend.apps.search.migrations.0003_saved_search_indexes",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/migrations/0004_fix_index_name_too_long.py",
+    "module": "backend.apps.search.migrations.0004_fix_index_name_too_long",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/migrations/__init__.py",
+    "module": "backend.apps.search.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/search/models.py",
+    "module": "backend.apps.search.models",
+    "layer": "model",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "PopularSearch",
+      "Meta",
+      "SearchHistory",
+      "Meta",
+      "SavedSearch",
+      "Meta",
+      "SavedSearchNotification",
+      "Meta"
+    ],
+    "functions": [
+      "__str__",
+      "__str__",
+      "__str__",
+      "__str__"
+    ]
+  },
+  {
     "path": "backend/apps/search/services/__init__.py",
     "module": "backend.apps.search.services.__init__",
     "layer": "service",
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/search/services/alert_query.py",
+    "module": "backend.apps.search.services.alert_query",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.contrib.postgres.search",
+      "django.db.models",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.search.models",
+      "apps.search.services.query_translator"
+    ],
+    "classes": [],
+    "functions": [
+      "find_matching_ads",
+      "record_notifications"
+    ]
+  },
+  {
+    "path": "backend/apps/search/services/entity_suggestions.py",
+    "module": "backend.apps.search.services.entity_suggestions",
+    "layer": "service",
+    "imports": [
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models"
+    ],
+    "classes": [],
+    "functions": [
+      "get_entity_suggestions"
+    ]
+  },
+  {
+    "path": "backend/apps/search/services/popular_search.py",
+    "module": "backend.apps.search.services.popular_search",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.db.models",
+      "apps.core.enums",
+      "apps.search.models"
+    ],
+    "classes": [],
+    "functions": [
+      "increment_popular_search",
+      "get_popular_suggestions"
+    ]
   },
   {
     "path": "backend/apps/search/services/query_translator.py",
@@ -1827,12 +3020,158 @@
     ]
   },
   {
+    "path": "backend/apps/search/services/rate_limit.py",
+    "module": "backend.apps.search.services.rate_limit",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.core.cache",
+      "django.http"
+    ],
+    "classes": [],
+    "functions": [
+      "rate_limit_check",
+      "_get_client_ip"
+    ]
+  },
+  {
+    "path": "backend/apps/search/services/search_history.py",
+    "module": "backend.apps.search.services.search_history",
+    "layer": "service",
+    "imports": [
+      "apps.search.models"
+    ],
+    "classes": [],
+    "functions": [
+      "record_search_history",
+      "get_user_search_history"
+    ]
+  },
+  {
     "path": "backend/apps/search/tests/__init__.py",
     "module": "backend.apps.search.tests.__init__",
     "layer": "other",
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/search/tests/test_alert_query.py",
+    "module": "backend.apps.search.tests.test_alert_query",
+    "layer": "other",
+    "imports": [
+      "django.core.management",
+      "django.utils",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.search.models",
+      "apps.search.services.alert_query",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestFindMatchingAds",
+      "TestRecordNotifications",
+      "TestSendAlertsCommand"
+    ],
+    "functions": [
+      "seller",
+      "buyer",
+      "category",
+      "subcategory",
+      "unrelated_category",
+      "city",
+      "other_city",
+      "_create_published_ad",
+      "test_returns_matching_ads_by_query",
+      "test_excludes_non_matching_ads",
+      "test_filters_by_city",
+      "test_filters_by_category_subtree",
+      "test_filters_by_price_range",
+      "test_min_price_only",
+      "test_max_price_only",
+      "test_excludes_already_notified_ads",
+      "test_no_filters_returns_all_published_ads",
+      "test_limits_to_ten_ads",
+      "test_orders_by_search_rank",
+      "test_empty_query_matches_all",
+      "test_creates_notification_records",
+      "test_ignore_conflicts_skips_duplicates",
+      "test_handles_multiple_ads",
+      "test_dry_run_logs_counts",
+      "test_dry_run_no_active_searches",
+      "test_dry_run_excludes_inactive_searches"
+    ]
+  },
+  {
+    "path": "backend/apps/search/tests/test_autocomplete.py",
+    "module": "backend.apps.search.tests.test_autocomplete",
+    "layer": "other",
+    "imports": [
+      "django.core.cache",
+      "django.test",
+      "django.utils",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.search.models",
+      "apps.search.services.entity_suggestions",
+      "apps.search.services.popular_search",
+      "apps.search.services.search_history",
+      "apps.users.models",
+      "apps.search.services.rate_limit",
+      "django.http",
+      "apps.search.models"
+    ],
+    "classes": [
+      "TestAutocompleteEndpoint",
+      "TestPopularSearchService",
+      "TestSearchHistoryService",
+      "TestEntitySuggestionsService",
+      "TestRateLimitService",
+      "TestSearchViewRecordsAutocompleteData"
+    ],
+    "functions": [
+      "seller",
+      "buyer",
+      "root_category",
+      "child_category",
+      "inactive_category",
+      "city",
+      "city2",
+      "test_autocomplete_returns_suggestions",
+      "test_autocomplete_empty_query_returns_empty",
+      "test_autocomplete_rate_limit",
+      "test_autocomplete_deduplication",
+      "test_autocomplete_anonymous_user_returns_popular_and_entities",
+      "test_autocomplete_malicious_query_sanitized",
+      "test_increment_popular_search_creates_new_entry",
+      "test_increment_popular_search_increments_existing",
+      "test_increment_popular_search_empty_query_is_noop",
+      "test_get_popular_suggestions_returns_matching_queries",
+      "test_get_popular_suggestions_no_match_returns_empty",
+      "test_get_popular_suggestions_empty_prefix",
+      "test_record_search_history_creates_entry",
+      "test_record_search_history_anonymous_is_noop",
+      "test_record_search_history_deduplicates",
+      "test_record_search_history_empty_query",
+      "test_get_user_search_history_returns_recent",
+      "test_get_user_search_history_anonymous_returns_empty",
+      "test_get_user_search_history_respects_limit",
+      "test_history_pruning",
+      "test_returns_matching_categories",
+      "test_uses_prefix_matching",
+      "test_excludes_inactive_categories",
+      "test_returns_matching_cities",
+      "test_empty_prefix_returns_empty",
+      "test_suggestion_structure",
+      "test_rate_limit_blocks_after_threshold",
+      "test_search_records_popular_search",
+      "test_search_records_user_history",
+      "test_search_anonymous_does_not_record_history"
+    ]
   },
   {
     "path": "backend/apps/search/tests/test_query_translator.py",
@@ -1900,6 +3239,7 @@
     "module": "backend.apps.search.urls",
     "layer": "other",
     "imports": [
+      "apps.search.views.autocomplete",
       "apps.search.views.search",
       "django.urls"
     ],
@@ -1915,6 +3255,25 @@
     "functions": []
   },
   {
+    "path": "backend/apps/search/views/autocomplete.py",
+    "module": "backend.apps.search.views.autocomplete",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "django.http",
+      "apps.core.enums",
+      "apps.core.utils.sanitize",
+      "apps.search.services.entity_suggestions",
+      "apps.search.services.popular_search",
+      "apps.search.services.rate_limit",
+      "apps.search.services.search_history"
+    ],
+    "classes": [],
+    "functions": [
+      "autocomplete"
+    ]
+  },
+  {
     "path": "backend/apps/search/views/search.py",
     "module": "backend.apps.search.views.search",
     "layer": "other",
@@ -1928,7 +3287,9 @@
       "django.shortcuts",
       "django.core.paginator",
       "apps.core.utils.sanitize",
+      "apps.search.services.popular_search",
       "apps.search.services.query_translator",
+      "apps.search.services.search_history",
       "difflib"
     ],
     "classes": [],
@@ -1936,6 +3297,218 @@
       "search",
       "_is_single_word",
       "_fuzzy_category_match"
+    ]
+  },
+  {
+    "path": "backend/apps/trust/__init__.py",
+    "module": "backend.apps.trust.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/apps.py",
+    "module": "backend.apps.trust.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "TrustConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/migrations/0001_initial.py",
+    "module": "backend.apps.trust.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/migrations/0002_trust_level_default.py",
+    "module": "backend.apps.trust.migrations.0002_trust_level_default",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/migrations/__init__.py",
+    "module": "backend.apps.trust.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/models.py",
+    "module": "backend.apps.trust.models",
+    "layer": "model",
+    "imports": [
+      "apps.core.enums",
+      "django.db"
+    ],
+    "classes": [
+      "SellerTrustScore",
+      "Meta",
+      "SellerVerification",
+      "Meta"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/services/__init__.py",
+    "module": "backend.apps.trust.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/services/trust_calculator.py",
+    "module": "backend.apps.trust.services.trust_calculator",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "typing",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.trust.models",
+      "apps.users.models",
+      "apps.analytics.models"
+    ],
+    "classes": [
+      "TrustCalculator"
+    ],
+    "functions": [
+      "calculate_and_save",
+      "_calculate_activity_score",
+      "_calculate_quality_score",
+      "_calculate_response_score",
+      "_calculate_rejection_rate",
+      "_count_lifetime_ads",
+      "_count_active_ads",
+      "_get_trust_level"
+    ]
+  },
+  {
+    "path": "backend/apps/trust/templatetags/__init__.py",
+    "module": "backend.apps.trust.templatetags.__init__",
+    "layer": "other",
+    "imports": [
+      "trust_tags"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/templatetags/trust_tags.py",
+    "module": "backend.apps.trust.templatetags.trust_tags",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "typing",
+      "apps.core.enums",
+      "apps.trust.models",
+      "django",
+      "django.template.loader",
+      "apps.users.models"
+    ],
+    "classes": [],
+    "functions": [
+      "render_trust_badge"
+    ]
+  },
+  {
+    "path": "backend/apps/trust/tests/__init__.py",
+    "module": "backend.apps.trust.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/trust/tests/test_trust_calculator.py",
+    "module": "backend.apps.trust.tests.test_trust_calculator",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.trust.models",
+      "apps.trust.services.trust_calculator",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestTrustCalculator"
+    ],
+    "functions": [
+      "_make_user",
+      "_make_category",
+      "_make_city",
+      "_make_ad",
+      "_make_verification",
+      "_make_event",
+      "setUpTestData",
+      "_score",
+      "test_score_with_zero_ads",
+      "test_score_with_published_ads",
+      "test_score_caps_at_activity_max",
+      "test_verification_bonus_admin",
+      "test_verification_bonus_admin_floor",
+      "test_verification_bonus_premium",
+      "test_rejection_penalty",
+      "test_full_rejection_all_rejected",
+      "test_mixed_rejected_and_moderation_failed",
+      "test_rejection_rate_persistence",
+      "test_trust_level_unverified",
+      "test_trust_level_verified_threshold",
+      "test_trust_level_trusted_threshold",
+      "test_trust_level_pro_threshold",
+      "test_response_score_with_no_contacts",
+      "test_response_score_with_contacts",
+      "test_calculate_and_save_updates_existing"
+    ]
+  },
+  {
+    "path": "backend/apps/trust/tests/test_trust_tags.py",
+    "module": "backend.apps.trust.tests.test_trust_tags",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.template",
+      "django.test",
+      "apps.core.enums",
+      "apps.trust.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "TestRenderTrustBadge"
+    ],
+    "functions": [
+      "setUpTestData",
+      "_render",
+      "test_no_badge_for_anonymous_user",
+      "test_no_badge_for_user_without_trust_score",
+      "test_no_badge_for_unverified_level",
+      "test_verified_badge_rendered",
+      "test_trusted_badge_rendered",
+      "test_pro_badge_rendered"
     ]
   },
   {
@@ -1997,6 +3570,18 @@
   {
     "path": "backend/apps/users/migrations/0002_user_chat_id.py",
     "module": "backend.apps.users.migrations.0002_user_chat_id",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/users/migrations/0003_user_telegram_premium.py",
+    "module": "backend.apps.users.migrations.0003_user_telegram_premium",
     "layer": "other",
     "imports": [
       "django.db"
@@ -2381,7 +3966,8 @@
     "layer": "other",
     "imports": [
       "login",
-      "ad_create"
+      "ad_create",
+      "alerts"
     ],
     "classes": [],
     "functions": []
@@ -2403,6 +3989,7 @@
       "telegram_bot.schemas.message_payloads",
       "telegram_bot.services.media",
       "telegram_bot.states",
+      "apps.media.services.thumbnails",
       "asgiref.sync",
       "asgiref.sync",
       "asgiref.sync",
@@ -2454,6 +4041,23 @@
       "_do_translate_to",
       "translate_all_languages",
       "translate_one"
+    ]
+  },
+  {
+    "path": "telegram_bot/handlers/alerts.py",
+    "module": "telegram_bot.handlers.alerts",
+    "layer": "other",
+    "imports": [
+      "aiogram",
+      "aiogram.filters",
+      "aiogram.fsm.context",
+      "asgiref.sync",
+      "apps.search.models"
+    ],
+    "classes": [],
+    "functions": [
+      "cmd_alerts",
+      "get_user_saved_searches"
     ]
   },
   {
@@ -2570,6 +4174,20 @@
     "functions": []
   },
   {
+    "path": "telegram_bot/schemas/saved_search.py",
+    "module": "telegram_bot.schemas.saved_search",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "pydantic"
+    ],
+    "classes": [
+      "SavedSearchQueryPayload",
+      "SavedSearchPricePayload"
+    ],
+    "functions": []
+  },
+  {
     "path": "telegram_bot/services/__init__.py",
     "module": "telegram_bot.services.__init__",
     "layer": "service",
@@ -2604,7 +4222,8 @@
       "enum"
     ],
     "classes": [
-      "AdCreateState"
+      "AdCreateState",
+      "SavedSearchState"
     ],
     "functions": []
   },
