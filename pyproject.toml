@@ -20,6 +20,8 @@ dependencies = [
     "pillow>=10.4.0",
     "gunicorn>=26.0",
     "whitenoise>=6.12.0",
+    "requests>=2.34.2",
+    "python-dotenv>=1.2.2",
 ]
 
 

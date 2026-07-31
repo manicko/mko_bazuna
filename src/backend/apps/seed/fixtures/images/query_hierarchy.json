@@ -1,0 +1,22 @@
+{
+  "kvartiry": {
+    "objects": ["apartment", "flat", "studio", "condo", "penthouse"],
+    "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "minimalist"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial"]
+  },
+  "avtomobili": {
+    "objects": ["car", "sedan", "SUV", "sports car", "classic car"],
+    "contexts": ["street", "parking", "outdoor", "showroom", "garage", "sunset", "city"],
+    "styles": ["automotive photography", "professional", "commercial", "lifestyle"]
+  },
+  "telefony": {
+    "objects": ["smartphone", "phone", "mobile phone", "tablet", "iPhone"],
+    "contexts": ["hand", "desk", "workspace", "modern", "minimal", "office"],
+    "styles": ["product photography", "commercial", "studio", "professional"]
+  },
+  "default": {
+    "objects": ["item", "product", "object"],
+    "contexts": ["on desk", "workspace", "modern", "minimal"],
+    "styles": ["photography", "stock photo", "professional"]
+  }
+}
