@@ -21,7 +21,6 @@ dependencies = [
     "gunicorn>=26.0",
     "whitenoise>=6.12.0",
     "requests>=2.34.2",
-    "python-dotenv>=1.2.2",
 ]
 
 
@@ -188,4 +187,7 @@ dev = [
     "model-bakery>=1.23.0",
     "radon>=6.0.1",
     "ruff>=0.15.20",
+    "factory-boy>=3.3.3",
+    "faker>=40.35.0",
+    "coverage>=7.15.2",
 ]

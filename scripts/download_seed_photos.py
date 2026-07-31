@@ -2,7 +2,7 @@
 """Download seed photos from Unsplash (primary) and Pexels (fallback) per category.
 
 Usage:
-    # Set API keys in .env first (see .env.example)
+    # Copy seed-images-config.example.json → seed-images-config.json, fill in API keys
     uv run python scripts/download_seed_photos.py          # single pass
     uv run python scripts/download_seed_photos.py --all     # loop until limits exhausted
     uv run python scripts/download_seed_photos.py --category avtomobili  # single category
@@ -22,7 +22,6 @@ from __future__ import annotations
 import io
 import json
 import logging
-import os
 import random
 import sys
 import time
@@ -30,7 +29,6 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -38,22 +36,40 @@ logger = logging.getLogger(__name__)
 # ─── Paths ─────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
 FIXTURES_IMAGES_DIR = PROJECT_ROOT / "src" / "backend" / "apps" / "seed" / "fixtures" / "images"
 QUERY_HIERARCHY_PATH = FIXTURES_IMAGES_DIR / "query_hierarchy.json"
 DOWNLOADED_IDS_PATH = FIXTURES_IMAGES_DIR / "downloaded_ids.json"
 MANIFEST_PATH = FIXTURES_IMAGES_DIR / "photo_manifest.json"
+CONFIG_PATH = SCRIPT_DIR / "seed-images-config.json"
+CONFIG_EXAMPLE_PATH = SCRIPT_DIR / "seed-images-config.example.json"
 
-# ─── Default config ────────────────────────────────────────────────────────
+# ─── Config loading ─────────────────────────────────────────────────────────
 
-PHOTOS_PER_CATEGORY = 3  # how many unique photos to collect per category
-MAX_IMAGE_SIZE = 100_000  # target max bytes after compression
-IMAGE_QUALITY = 75  # JPEG quality for compression
-MAX_WIDTH = 1080  # max long side in pixels
-REQUEST_TIMEOUT = 30  # seconds
 
-# Rate limit safety margins
-UNSPLASH_SAFE_LIMIT = 45  # stay under 50 req/hr to be safe
-PEXELS_SAFE_LIMIT = 150   # stay under 200 req/hr
+def load_config() -> dict[str, Any]:
+    """Load seed-images-config.json with fallback to example defaults.
+
+    The real config file (seed-images-config.json) is gitignored and holds
+    API keys. If it doesn't exist, falls back to the example file which
+    has empty keys — the user sees a clear error message.
+    """
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+
+    if CONFIG_EXAMPLE_PATH.exists():
+        logger.warning(
+            "Config not found at %s. "
+            "Copy seed-images-config.example.json → seed-images-config.json "
+            "and fill in your API keys.",
+            CONFIG_PATH,
+        )
+        with open(CONFIG_EXAMPLE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+
+    logger.error("No config file found. Create scripts/seed-images-config.json from the example.")
+    return {}
 
 # ─── API clients ───────────────────────────────────────────────────────────
 
@@ -63,8 +79,9 @@ class PhotoSource:
 
     NAME: str = ""
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, config: dict[str, Any]) -> None:
         self.api_key = api_key
+        self.config = config
         self._request_count = 0
         self._limit = 9999
         self.downloaded_ids: set[str] = set()
@@ -91,9 +108,9 @@ class UnsplashClient(PhotoSource):
 
     NAME = "unsplash"
 
-    def __init__(self, access_key: str) -> None:
-        super().__init__(access_key)
-        self._limit = UNSPLASH_SAFE_LIMIT
+    def __init__(self, access_key: str, config: dict[str, Any]) -> None:
+        super().__init__(access_key, config)
+        self._limit = config.get("unsplash_safe_limit", 45)
 
     def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
         if self.exhausted:
@@ -104,7 +121,7 @@ class UnsplashClient(PhotoSource):
         headers = {"Authorization": f"Client-ID {self.api_key}"}
         params = {"query": query, "per_page": min(per_page, 30), "page": page}
 
-        resp = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(url, headers=headers, params=params, timeout=self.config.get("request_timeout_sec", 30))
         self._request_count += 1
         resp.raise_for_status()
         data = resp.json()
@@ -124,9 +141,9 @@ class PexelsClient(PhotoSource):
 
     NAME = "pexels"
 
-    def __init__(self, api_key: str) -> None:
-        super().__init__(api_key)
-        self._limit = PEXELS_SAFE_LIMIT
+    def __init__(self, api_key: str, config: dict[str, Any]) -> None:
+        super().__init__(api_key, config)
+        self._limit = config.get("pexels_safe_limit", 150)
 
     def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
         if self.exhausted:
@@ -137,7 +154,7 @@ class PexelsClient(PhotoSource):
         headers = {"Authorization": self.api_key}
         params = {"query": query, "per_page": min(per_page, 80), "page": page}
 
-        resp = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(url, headers=headers, params=params, timeout=self.config.get("request_timeout_sec", 30))
         self._request_count += 1
         resp.raise_for_status()
         data = resp.json()
@@ -234,6 +251,7 @@ def download_and_compress(
     photo_source: PhotoSource,
     photo: dict[str, Any],
     output_path: Path,
+    config: dict[str, Any],
 ) -> bool:
     """Download a photo, compress it, and save as JPEG.
 
@@ -241,17 +259,23 @@ def download_and_compress(
         photo_source: The API client used.
         photo: Photo metadata dict from the API.
         output_path: Full path to save the JPEG.
+        config: Full config dict (for max_image_size_bytes, jpeg_quality, etc.).
 
     Returns:
         True on success, False on failure.
     """
+    timeout = config.get("request_timeout_sec", 30)
+    max_size = config.get("max_image_size_bytes", 100_000)
+    quality_start = config.get("jpeg_quality", 75)
+    max_dim = config.get("max_dimension_px", 1080)
+
     url = photo_source.download_url(photo)
     if not url:
         logger.warning("No download URL for photo %s", photo_source.photo_id(photo))
         return False
 
     try:
-        resp = requests.get(url, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.warning("Failed to download %s: %s", url, e)
@@ -268,18 +292,18 @@ def download_and_compress(
         img = img.convert("RGB")
 
     # Resize if too large
-    if img.width > MAX_WIDTH or img.height > MAX_WIDTH:
-        ratio = min(MAX_WIDTH / img.width, MAX_WIDTH / img.height)
+    if img.width > max_dim or img.height > max_dim:
+        ratio = min(max_dim / img.width, max_dim / img.height)
         new_size = (int(img.width * ratio), int(img.height * ratio))
         img = img.resize(new_size, Image.LANCZOS)
 
     # Progressive JPEG compression with size target
-    quality = IMAGE_QUALITY
+    quality = quality_start
     for _ in range(3):
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=quality, optimize=True, progressive=True)
         size = buf.tell()
-        if size <= MAX_IMAGE_SIZE or quality <= 30:
+        if size <= max_size or quality <= 30:
             buf.seek(0)
             with open(output_path, "wb") as f:
                 f.write(buf.read())
@@ -337,7 +361,7 @@ def process_category(
     hierarchy: dict[str, Any],
     photo_source: PhotoSource,
     manifest: dict[str, Any],
-    count: int = PHOTOS_PER_CATEGORY,
+    config: dict[str, Any],
 ) -> int:
     """Download photos for a single category.
 
@@ -346,17 +370,18 @@ def process_category(
         hierarchy: Query hierarchy entry for this category.
         photo_source: API client instance.
         manifest: Photo manifest dict (mutated in place).
-        count: How many photos to collect.
+        config: Full config dict.
 
     Returns:
         Number of photos successfully downloaded.
     """
+    photos_per_category = config.get("photos_per_category", 3)
     start_seq = get_next_sequence_number(category_slug, manifest)
     downloaded = 0
     attempts = 0
-    max_attempts = count * 5  # prevent infinite loops when API returns nothing new
+    max_attempts = photos_per_category * 5  # prevent infinite loops
 
-    while downloaded < count and attempts < max_attempts and not photo_source.exhausted:
+    while downloaded < photos_per_category and attempts < max_attempts and not photo_source.exhausted:
         attempts += 1
         query = compose_query(hierarchy)
 
@@ -379,7 +404,7 @@ def process_category(
             downloaded += 1
             continue
 
-        if not download_and_compress(photo_source, photo, output_path):
+        if not download_and_compress(photo_source, photo, output_path, config):
             continue
 
         # Get image dimensions for manifest
@@ -391,7 +416,7 @@ def process_category(
 
         update_manifest_for_category(manifest, category_slug, filename, width, height)
         downloaded += 1
-        logger.info("[%s] downloaded %d/%d: %s", category_slug, downloaded, count, filename)
+        logger.info("[%s] downloaded %d/%d: %s", category_slug, downloaded, photos_per_category, filename)
 
         # Small delay to be polite to the API
         time.sleep(0.5)
@@ -410,17 +435,12 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
-    # Load .env
-    load_dotenv(PROJECT_ROOT / ".env")
-    unsplash_key = os.getenv("UNSPLASH_ACCESS_KEY", "")
-    pexels_key = os.getenv("PEXELS_API_KEY", "")
-
-    if not unsplash_key and not pexels_key:
-        logger.error(
-            "No API keys found. Set UNSPLASH_ACCESS_KEY and/or PEXELS_API_KEY in %s/.env",
-            PROJECT_ROOT,
-        )
-        sys.exit(1)
+    # Load config with API keys from seed-images-config.json
+    config = load_config()
+    unsplash_key: str = config.get("UNSPLASH_ACCESS_KEY", "")
+    pexels_key: str = config.get("PEXELS_API_KEY", "")
+    use_unsplash: bool = config.get("unsplash", True)
+    use_pexels: bool = config.get("pexels", True)
 
     # Parse CLI args
     args = sys.argv[1:]
@@ -458,13 +478,26 @@ def main() -> None:
 
     # Determine photo source order
     photo_sources: list[PhotoSource] = []
-    if unsplash_key:
-        photo_sources.append(UnsplashClient(unsplash_key))
-    if pexels_key:
-        photo_sources.append(PexelsClient(pexels_key))
+    if use_unsplash and unsplash_key:
+        photo_sources.append(UnsplashClient(unsplash_key, config))
+    if use_pexels and pexels_key:
+        photo_sources.append(PexelsClient(pexels_key, config))
 
     if not photo_sources:
-        logger.error("No photo sources configured (need at least one API key)")
+        sources_enabled = []
+        if not use_unsplash:
+            sources_enabled.append("unsplash=disabled")
+        elif not unsplash_key:
+            sources_enabled.append("unsplash=no-key")
+        if not use_pexels:
+            sources_enabled.append("pexels=disabled")
+        elif not pexels_key:
+            sources_enabled.append("pexels=no-key")
+        logger.error(
+            "No photo sources configured (%s). "
+            "Check seed-images-config.json.",
+            ", ".join(sources_enabled),
+        )
         sys.exit(1)
 
     # Main loop
@@ -486,7 +519,7 @@ def main() -> None:
                     continue
 
                 source.downloaded_ids = downloaded_ids
-                n = process_category(cat_slug, hierarchy, source, manifest, PHOTOS_PER_CATEGORY)
+                n = process_category(cat_slug, hierarchy, source, manifest, config)
                 if n > 0:
                     total_downloaded += n
 

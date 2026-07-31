@@ -226,5 +226,8 @@ __marimo__/
 docker/nginx/certs/*.pem
 !docker/nginx/certs/.gitkeep
 
+# Script-specific config with API keys (never commit)
+scripts/seed-images-config.json
+
 
 

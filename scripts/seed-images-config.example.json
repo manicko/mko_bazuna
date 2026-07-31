@@ -1,0 +1,13 @@
+{
+  "UNSPLASH_ACCESS_KEY": "",
+  "PEXELS_API_KEY": "",
+  "unsplash": true,
+  "pexels": true,
+  "photos_per_category": 3,
+  "max_image_size_bytes": 100000,
+  "jpeg_quality": 75,
+  "max_dimension_px": 1080,
+  "request_timeout_sec": 30,
+  "unsplash_safe_limit": 45,
+  "pexels_safe_limit": 150
+}
