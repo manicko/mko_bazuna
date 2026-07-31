@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Item condition (e.g. excellent, good)",
+    "brand": "Product brand name",
+    "feature": "Product feature or selling point",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "rooms": "Number of rooms",
+    "area": "Area in square meters",
+    "item_age": "Age description of the item",
+    "year": "Manufacturing year",
+    "mileage": "Vehicle mileage in km",
+    "category": "Category name"
+  },
+  "templates": [
+    {
+      "id": "default_sell_1",
+      "category_slug": "default",
+      "patterns": {
+        "ru": {
+          "title": "Продам {item_age} - {condition}, {category}",
+          "description": "Продаётся {category} {item_age}. Состояние {condition}. Особенности: {feature}. Цена: {price} BAM. Город: {city}."
+        },
+        "en": {
+          "title": "{condition} {category} for sale",
+          "description": "Selling {category} ({item_age}). Condition: {condition}. Features: {feature}. Price: {price} BAM. City: {city}."
+        },
+        "bs": {
+          "title": "{category} na prodaju - {condition}",
+          "description": "Prodaje se {category} ({item_age}). Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. Grad: {city}."
+        }
+      }
+    },
+    {
+      "id": "default_buy_1",
+      "category_slug": "default",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {category} в хорошем состоянии",
+          "description": "Куплю {category}. Рассмотрю различные варианты. {condition}. {city}. Цена договорная."
+        },
+        "en": {
+          "title": "Looking to buy {category} - good condition",
+          "description": "I want to buy {category}. Considering various options. {condition}. {city}. Price negotiable."
+        },
+        "bs": {
+          "title": "Tražim {category} u dobrom stanju",
+          "description": "Želim kupiti {category}. Razmatram različite opcije. {condition}. {city}. Cijena po dogovoru."
+        }
+      }
+    }
+  ]
+}

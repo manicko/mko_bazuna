@@ -18,5 +18,7 @@
       "min": 0,
       "max": 15
     }
-  }
+  },
+  "photo_manifest_version": 1,
+  "template_version": 2
 }

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
 from apps.users.models import User
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +152,7 @@ class SeedService:
             print(f"{'=' * 50}")
 
     def _clean(self) -> None:
-        """Delete all seed data in FK-safe order.
+        """Delete all seed data in FK-safe order and cleans the seed media directory.
 
         Seed data is identified by Ad.source = 'seed'.
         Categories and Cities are NOT deleted (they are static fixtures).
@@ -182,6 +185,16 @@ class SeedService:
             # 5. Seed users (identified by having seed ads or no ads)
             if seed_user_ids:
                 User.objects.filter(id__in=seed_user_ids).delete()
+
+        # 6. Clean seed media directory
+        media_root = settings.MEDIA_ROOT
+        if isinstance(media_root, str):
+            seed_dir = os.path.join(media_root, "seed")
+        else:
+            seed_dir = str(media_root / "seed")
+        if os.path.exists(seed_dir):
+            shutil.rmtree(seed_dir, ignore_errors=True)
+            logger.info("Cleaned seed media directory: %s", seed_dir)
 
         logger.info("Cleaned existing seed data")
 

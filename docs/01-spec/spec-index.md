@@ -163,7 +163,7 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
 | **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
-| **Analytics Rollup** | Pre-aggregated daily metrics and trust analytics via management command | `DailyAdMetrics`, `TrustAnalytics`, `rollup_daily_metrics` command |
+| **Seed Content Fixtures** | Realistic bundled photos and multi-language ad templates for seed data | `ImageGenerator` manifest loading, `AdGenerator` template interpolation, `photo_manifest.json`, `ads_templates.json`, `word_lists.json` |
 
 ## Commands
 

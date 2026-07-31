@@ -1,4 +1,4 @@
-"""AdGenerator for seed data — creates fake Ad instances."""
+"""AdGenerator for seed data — creates fake Ad instances with multi-language support."""
 
 from __future__ import annotations
 
@@ -18,14 +18,33 @@ from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
-ADS_FIXTURE_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "ads.json"
+ADS_TEMPLATES_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "ads_templates.json"
+WORD_LISTS_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "word_lists.json"
+
+# Map category slugs to brand groups
+CATEGORY_GROUP_MAP: dict[str, str] = {
+    "telefony": "elektronika",
+    "kompyutery": "elektronika",
+    "foto": "elektronika",
+    "bytovaya": "elektronika",
+    "avtomobili": "avtomobili",
+    "mototsikly": "avtomobili",
+    "vodnyy": "avtomobili",
+    "zapchasti": "avtomobili",
+    "kvartiry": "nedvizhimost",
+    "doma": "nedvizhimost",
+    "kommercheskaya": "nedvizhimost",
+    "uchastki": "nedvizhimost",
+}
 
 
 class AdGenerator(BaseGenerator):
-    """Generates fake Ad instances for seed data.
+    """Generates fake Ad instances for seed data with multi-language content.
 
-    Reads title/description templates from ads.json fixture, assigns
-    random users/categories/cities, and applies status distribution weights.
+    Reads category-specific templates from ads_templates.json with variable
+    placeholders ({condition}, {brand}, {feature}, etc.) and fills them using
+    word lists and Faker generators. Generates content in Russian, English,
+    and Bosnian for each ad.
     """
 
     def __init__(
@@ -48,21 +67,129 @@ class AdGenerator(BaseGenerator):
         self.categories = categories
         self.cities = cities
         self.templates = self._load_templates()
+        self.word_lists = self._load_word_lists()
 
-    def _load_templates(self) -> list[dict[str, str]]:
-        """Load ad title/description templates from fixture file."""
-        if not ADS_FIXTURE_PATH.exists():
-            logger.warning("Ads fixture not found at %s, using fallback", ADS_FIXTURE_PATH)
-            return [{"title": "Товар", "description": "Описание товара. {category}"}]
-        with open(ADS_FIXTURE_PATH, encoding="utf-8") as f:
+    def _load_templates(self) -> dict[str, list[dict[str, Any]]]:
+        """Load ad templates from ads_templates.json, grouped by category_slug.
+
+        Returns:
+            Dict mapping category_slug to list of template dicts, plus a
+            'default' key for fallback templates.
+        """
+        if not ADS_TEMPLATES_PATH.exists():
+            logger.warning("Templates not found at %s, using fallback", ADS_TEMPLATES_PATH)
+            return {
+                "default": [
+                    {
+                        "id": "fallback_1",
+                        "patterns": {
+                            "ru": {"title": "Товар", "description": "Описание товара."},
+                            "en": {"title": "Item", "description": "Item description."},
+                            "bs": {"title": "Artikal", "description": "Opis artikla."},
+                        },
+                    }
+                ]
+            }
+
+        with open(ADS_TEMPLATES_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+
+        templates_raw = data.get("templates", [])
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for tmpl in templates_raw:
+            slug = tmpl.get("category_slug", "default")
+            grouped.setdefault(slug, []).append(tmpl)
+
+        # Ensure 'default' key exists
+        grouped.setdefault("default", [])
+        return grouped
+
+    def _load_word_lists(self) -> dict[str, Any]:
+        """Load word lists from word_lists.json.
+
+        Returns:
+            Dict with keys: conditions, brands, features, cities, item_ages.
+        """
+        if not WORD_LISTS_PATH.exists():
+            logger.warning("Word lists not found at %s, using empty dicts", WORD_LISTS_PATH)
+            return {
+                "conditions": {"ru": [], "en": [], "bs": []},
+                "brands": {"default": {"ru": [], "en": [], "bs": []}},
+                "features": {"default": {"ru": [], "en": [], "bs": []}},
+                "cities": {"ru": [], "en": [], "bs": []},
+                "item_ages": {"ru": [], "en": [], "bs": []},
+            }
+
+        with open(WORD_LISTS_PATH, encoding="utf-8") as f:
             return json.load(f)
+
+    def _fill_template(
+        self,
+        template: dict[str, Any],
+        locale: str,
+        category: Category,
+    ) -> tuple[str, str]:
+        """Fill template placeholders with word list values and Faker data.
+
+        Args:
+            template: Template dict with 'patterns' containing locale-specific
+                      'title' and 'description'.
+            locale: Language code ('ru', 'en', 'bs').
+            category: Category instance for context-aware generation.
+
+        Returns:
+            Tuple of (filled_title, filled_description).
+        """
+        patterns = template.get("patterns", {})
+        locale_patterns = patterns.get(locale, patterns.get("ru", {}))
+        title_pattern = locale_patterns.get("title", "")
+        desc_pattern = locale_patterns.get("description", "")
+
+        # Determine category group for brand selection
+        # Mapping is a plain dict[str, str]; fallback to "default"
+        category_group: str = (
+            CATEGORY_GROUP_MAP[category.slug] if category.slug in CATEGORY_GROUP_MAP else "default"
+        )
+
+        # Get word lists for this locale
+        conditions: list[str] = self.word_lists.get("conditions", {}).get(locale, [])  # type: ignore[union-attr]
+        brands_data: dict[str, Any] = self.word_lists.get("brands", {})
+        brands: list[str] = brands_data.get(category_group, brands_data.get("default", {})).get(locale, [])  # type: ignore[union-attr]
+        features_data: dict[str, Any] = self.word_lists.get("features", {})
+        features: list[str] = features_data.get(category.slug, features_data.get("default", {})).get(locale, [])  # type: ignore[union-attr]
+        cities: list[str] = self.word_lists.get("cities", {}).get(locale, [])  # type: ignore[union-attr]
+        item_ages: list[str] = self.word_lists.get("item_ages", {}).get(locale, [])  # type: ignore[union-attr]
+
+        replacements: dict[str, str] = {
+            "{condition}": random.choice(conditions) if conditions else "",
+            "{brand}": random.choice(brands) if brands else "",
+            "{feature}": random.choice(features) if features else "",
+            "{city}": random.choice(cities) if cities else "",
+            "{price}": str(self._generate_price(category) or ""),
+            "{rooms}": str(self.faker.random_int(1, 4)),
+            "{area}": str(self.faker.random_int(30, 150)),
+            "{item_age}": random.choice(item_ages) if item_ages else "",
+            "{year}": str(self.faker.random_int(2015, 2024)),
+            "{mileage}": str(self.faker.random_int(5000, 150000)),
+            "{category}": category.get_name(locale),
+        }
+
+        def _replace_vars(text: str) -> str:
+            for placeholder, value in replacements.items():
+                text = text.replace(placeholder, value)
+            return text
+
+        title = _replace_vars(title_pattern)
+        description = _replace_vars(desc_pattern)
+
+        return title, description
 
     def generate(
         self,
         ad_count: int,
         status_weights: dict[str, float] | None = None,
     ) -> list[Ad]:
-        """Generate a list of unsaved Ad instances.
+        """Generate a list of unsaved Ad instances with multi-language content.
 
         Args:
             ad_count: Number of ads to generate.
@@ -71,7 +198,8 @@ class AdGenerator(BaseGenerator):
                 uses config defaults.
 
         Returns:
-            List of Ad instances (not yet saved to DB).
+            List of Ad instances (not yet saved to DB) with all language
+            fields populated and original_language='ru'.
         """
         if status_weights is None:
             status_weights = self.config.get("status_distribution", {})
@@ -83,23 +211,42 @@ class AdGenerator(BaseGenerator):
         ads: list[Ad] = []
 
         for _ in range(ad_count):
-            template = random.choice(self.templates)
             category = random.choice(self.categories)
+
+            # Select template by category slug with fallback
+            category_templates: list[dict[str, Any]]
+            if category.slug in self.templates:
+                category_templates = self.templates[category.slug]
+            elif "default" in self.templates:
+                category_templates = self.templates["default"]
+            else:
+                category_templates = []
+            template: dict[str, Any] = (
+                random.choice(category_templates) if category_templates
+                else {"patterns": {
+                    "ru": {"title": "Товар", "description": "Описание."},
+                    "en": {"title": "Item", "description": "Description."},
+                    "bs": {"title": "Artikal", "description": "Opis."},
+                }}
+            )
+
+            # Fill templates for all languages
+            title, description = self._fill_template(template, "ru", category)
+            title_en, description_en = self._fill_template(template, "en", category)
+            title_bs, description_bs = self._fill_template(template, "bs", category)
+
             user = random.choice(self.users)
             city = random.choice(self.cities)
             status = self._weighted_status(statuses, weights)
-
-            title = template["title"]
-            description = template["description"].replace("{category}", category.name)
 
             # Generate price based on category
             price = self._generate_price(category)
 
             # Build timestamps consistent with status
-            published_at = None
-            archived_at = None
-            moderation_failed_at = None
-            rejected_at = None
+            published_at: datetime | None = None
+            archived_at: datetime | None = None
+            moderation_failed_at: datetime | None = None
+            rejected_at: datetime | None = None
 
             if status == AdStatus.PUBLISHED:
                 published_at = self._random_date(now - timedelta(days=60), now)
@@ -123,10 +270,15 @@ class AdGenerator(BaseGenerator):
                 user=user,
                 title=title,
                 description=description,
+                title_en=title_en,
+                description_en=description_en,
+                title_bs=title_bs,
+                description_bs=description_bs,
+                original_language="ru",
                 price=price,
                 category=category,
                 city=city,
-                category_name=category.name,
+                category_name=category.get_name("ru"),
                 status=status,
                 source=AdSource.SEED,
                 published_at=published_at,

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "conditions": {
+    "ru": ["отличное", "хорошее", "удовлетворительное", "идеальное", "как новый", "превосходное", "нормальное", "среднее", "приемлемое", "неплохое"],
+    "en": ["excellent", "good", "fair", "like new", "perfect", "very good", "satisfactory", "average", "acceptable", "decent"],
+    "bs": ["odlično", "dobro", "zadovoljavajuće", "kao novo", "savršeno", "vrlo dobro", "solidno", "prosječno", "prihvatljivo", "pristojno"]
+  },
+  "brands": {
+    "default": {
+      "ru": ["известный бренд", "популярный производитель", "качественный бренд", "надёжная марка"],
+      "en": ["well-known brand", "popular manufacturer", "quality brand", "reliable brand"],
+      "bs": ["poznat brend", "popularan proizvođač", "kvalitetan brend", "pouzdan brend"]
+    },
+    "elektronika": {
+      "ru": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
+      "en": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
+      "bs": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"]
+    },
+    "avtomobili": {
+      "ru": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
+      "en": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
+      "bs": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"]
+    },
+    "mototsikly": {
+      "ru": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"],
+      "en": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"],
+      "bs": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"]
+    }
+  },
+  "features": {
+    "default": {
+      "ru": ["отличное качество", "доступная цена", "удобство использования", "надёжность", "долговечность"],
+      "en": ["excellent quality", "affordable price", "ease of use", "reliability", "durability"],
+      "bs": ["odličan kvalitet", "pristupačna cijena", "jednostavnost korištenja", "pouzdanost", "trajnost"]
+    },
+    "kvartiry": {
+      "ru": ["хороший ремонт", "новая сантехника", "пластиковые окна", "развитая инфраструктура", "рядом магазины", "остановка рядом", "Wi-Fi", "кондиционер", "балкон", "парковка"],
+      "en": ["good renovation", "new plumbing", "plastic windows", "developed infrastructure", "near shops", "bus stop nearby", "Wi-Fi", "air conditioning", "balcony", "parking"],
+      "bs": ["dobra renovacija", "nova sanitarija", "plastični prozori", "razvijena infrastruktura", "blizu prodavnica", "autobuska stanica blizu", "Wi-Fi", "klima uređaj", "balkon", "parking"]
+    },
+    "avtomobili": {
+      "ru": ["полный привод", "кожаный салон", "климат-контроль", "без ДТП", "обслуживался у дилера", "экономичный", "автомат", "панорамная крыша", "подогрев сидений", "парктроники"],
+      "en": ["all-wheel drive", "leather interior", "climate control", "accident-free", "dealer serviced", "fuel efficient", "automatic", "panoramic roof", "heated seats", "parking sensors"],
+      "bs": ["pogon na sve točkove", "kožna unutrašnjost", "klima uređaj", "bez udesa", "servisiran kod dilera", "ekonomičan", "automatik", "panoramski krov", "grijana sjedišta", "senzori za parkiranje"]
+    }
+  },
+  "cities": {
+    "ru": ["Подгорица", "Никшич", "Будва", "Тиват", "Бар", "Ульцинь", "Херцег-Нови", "Котор", "Цетине", "Биело-Поле", "Плевля", "Мойковац"],
+    "en": ["Podgorica", "Niksic", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg-Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"],
+    "bs": ["Podgorica", "Nikšić", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"]
+  },
+  "item_ages": {
+    "ru": ["новый", "как новый", "почти новый", "в использовании 1 год", "в использовании 2 года", "в использовании 3 года", "в использовании 5 лет", "новый в упаковке", "с небольшим износом", "после ремонта"],
+    "en": ["new", "like new", "almost new", "used for 1 year", "used for 2 years", "used for 3 years", "used for 5 years", "new in box", "lightly used", "after repair"],
+    "bs": ["nov", "kao nov", "skoro nov", "korišten 1 godinu", "korišten 2 godine", "korišten 3 godine", "korišten 5 godina", "nov u kutiji", "lagano korišten", "poslije popravke"]
+  }
+}

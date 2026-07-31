@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
 from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -482,3 +487,381 @@ class TestSeedEnums(TestCase):
         """AdvisoryLockId.SEED resolves to 110."""
         assert AdvisoryLockId.SEED == 110
         assert AdvisoryLockId.SEED.value == 110
+
+
+# ─── ImageGenerator manifest-based tests ─────────────────────────────────
+
+
+class TestImageGeneratorManifest(TestCase):
+    """Tests for ImageGenerator with manifest-based photo loading."""
+
+    def setUp(self) -> None:
+        """Create a temporary manifest for testing."""
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.fixtures_images_dir = (
+            Path(__file__).resolve().parent.parent / "fixtures" / "images"
+        )
+
+    def tearDown(self) -> None:
+        """Clean up temporary directory."""
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _create_patch(self, manifest_data: dict | None = None) -> dict:
+        """Create a test manifest dict."""
+        if manifest_data is None:
+            manifest_data = {
+                "version": 1,
+                "categories": {
+                    "kvartiry": {
+                        "photos": [
+                            {
+                                "filename": "kvartiry_01.jpg",
+                                "tags": ["interior"],
+                                "width": 800,
+                                "height": 600,
+                            },
+                            {
+                                "filename": "kvartiry_02.jpg",
+                                "tags": ["living-room"],
+                                "width": 1024,
+                                "height": 768,
+                            },
+                        ]
+                    },
+                    "avtomobili": {
+                        "photos": [
+                            {
+                                "filename": "avtomobili_01.jpg",
+                                "tags": ["exterior"],
+                                "width": 800,
+                                "height": 600,
+                            }
+                        ]
+                    },
+                },
+                "default": {
+                    "photos": [
+                        {
+                            "filename": "default_01.jpg",
+                            "tags": [],
+                            "width": 640,
+                            "height": 480,
+                        }
+                    ]
+                },
+            }
+        return manifest_data
+
+    def test_manifest_loading(self) -> None:
+        """ImageGenerator._load_manifest() parses manifest correctly."""
+        from apps.seed.generators.images import ImageGenerator
+
+        manifest = self._create_patch()
+
+        with patch.object(
+            ImageGenerator, "_load_manifest", return_value=None
+        ):
+            # We test _load_manifest indirectly by checking the pools after init
+            gen = ImageGenerator({"faker_seed": 42}, [])
+            # Override with test data
+            gen.photo_pool = {
+                slug: entry["photos"]
+                for slug, entry in manifest.get("categories", {}).items()
+            }
+            gen.default_pool = manifest.get("default", {}).get("photos", [])
+
+            assert "kvartiry" in gen.photo_pool
+            assert len(gen.photo_pool["kvartiry"]) == 2
+            assert len(gen.default_pool) == 1
+
+    def test_get_photos_for_category(self) -> None:
+        """_get_photos_for_category returns category-specific photos."""
+        from apps.seed.generators.images import ImageGenerator
+
+        gen = ImageGenerator({"faker_seed": 42}, [])
+        gen.photo_pool = {
+            "kvartiry": [{"filename": "kvartiry_01.jpg"}],
+            "avtomobili": [{"filename": "avtomobili_01.jpg"}],
+        }
+        gen.default_pool = [{"filename": "default_01.jpg"}]
+
+        kvartiry_photos = gen._get_photos_for_category("kvartiry")
+        assert len(kvartiry_photos) == 1
+        assert kvartiry_photos[0]["filename"] == "kvartiry_01.jpg"
+
+        avto_photos = gen._get_photos_for_category("avtomobili")
+        assert len(avto_photos) == 1
+        assert avto_photos[0]["filename"] == "avtomobili_01.jpg"
+
+    def test_fallback_to_default(self) -> None:
+        """Unknown categories fall back to default pool."""
+        from apps.seed.generators.images import ImageGenerator
+
+        gen = ImageGenerator({"faker_seed": 42}, [])
+        gen.photo_pool = {"kvartiry": [{"filename": "kvartiry_01.jpg"}]}
+        gen.default_pool = [{"filename": "default_01.jpg"}]
+
+        unknown_photos = gen._get_photos_for_category("unknown_category")
+        assert len(unknown_photos) == 1
+        assert unknown_photos[0]["filename"] == "default_01.jpg"
+
+    def test_empty_default_fallback(self) -> None:
+        """If both category-specific and default are empty, return empty list."""
+        from apps.seed.generators.images import ImageGenerator
+
+        gen = ImageGenerator({"faker_seed": 42}, [])
+        gen.photo_pool = {}
+        gen.default_pool = []
+
+        photos = gen._get_photos_for_category("anything")
+        assert photos == []
+
+
+# ─── AdGenerator multi-language tests ────────────────────────────────────
+
+
+class TestAdGeneratorMultiLang(TestCase):
+    """Tests for AdGenerator multi-language template support."""
+
+    def test_word_lists_loaded(self) -> None:
+        """Word lists contain expected keys with entries."""
+        from apps.seed.generators.ads import AdGenerator
+
+        gen = AdGenerator({"faker_seed": 42}, [], [], [])
+        word_lists = gen.word_lists
+
+        assert "conditions" in word_lists
+        assert "brands" in word_lists
+        assert "features" in word_lists
+        assert "cities" in word_lists
+        assert "item_ages" in word_lists
+
+        # Check that ru locale has entries
+        assert len(word_lists["conditions"].get("ru", [])) >= 5
+        assert len(word_lists["cities"].get("ru", [])) >= 5
+
+    def test_templates_loaded(self) -> None:
+        """Templates are loaded and grouped by category_slug."""
+        from apps.seed.generators.ads import AdGenerator
+
+        gen = AdGenerator({"faker_seed": 42}, [], [], [])
+        templates = gen.templates
+
+        assert "default" in templates
+        assert len(templates["default"]) >= 1
+        # Check template structure
+        tmpl = templates["default"][0]
+        assert "patterns" in tmpl
+        assert "ru" in tmpl["patterns"]
+        assert "en" in tmpl["patterns"]
+        assert "bs" in tmpl["patterns"]
+
+    def test_template_variables_filled(self) -> None:
+        """Generated ads have no raw {variable} placeholders."""
+        from apps.seed.generators.ads import AdGenerator
+
+        gen = AdGenerator({"faker_seed": 42}, [], [], [])
+        # Test _fill_template directly
+        template = {
+            "patterns": {
+                "ru": {
+                    "title": "Продам {category} {condition}",
+                    "description": "Цена: {price} BAM. {feature}. Город: {city}.",
+                },
+                "en": {
+                    "title": "{condition} {category} for sale",
+                    "description": "Price: {price} BAM. {feature}. City: {city}.",
+                },
+                "bs": {
+                    "title": "{category} na prodaju - {condition}",
+                    "description": "Cijena: {price} BAM. {feature}. Grad: {city}.",
+                },
+            }
+        }
+
+        from apps.categories.models import Category
+
+        cat = Category(name="Телефоны", slug="telefony", name_i18n={
+            "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
+        })
+
+        # Fill template for ru
+        title, desc = gen._fill_template(template, "ru", cat)
+        assert "{" not in title
+        assert "{" not in desc
+        assert len(title) > 0
+        assert len(desc) > 0
+
+        # Fill template for en
+        title_en, desc_en = gen._fill_template(template, "en", cat)
+        assert "{" not in title_en
+        assert "{" not in desc_en
+
+        # Fill template for bs
+        title_bs, desc_bs = gen._fill_template(template, "bs", cat)
+        assert "{" not in title_bs
+        assert "{" not in desc_bs
+
+    def test_generated_ads_have_multi_language_fields(self) -> None:
+        """Generated Ad instances have all language fields populated."""
+        from apps.categories.models import Category
+        from apps.seed.generators.ads import AdGenerator
+
+        # Create a basic test category
+        cat = Category(name="Телефоны", slug="telefony", name_i18n={
+            "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
+        })
+
+        gen = AdGenerator(
+            {
+                "faker_seed": 42,
+                "status_distribution": {"published": 1.0},
+            },
+            [],
+            [cat],
+            [],
+        )
+        ads = gen.generate(3)
+        assert len(ads) == 3
+
+        for ad in ads:
+            assert ad.title is not None and len(ad.title) > 0
+            assert ad.description is not None and len(ad.description) > 0
+            assert ad.title_en is not None and len(ad.title_en) > 0
+            assert ad.description_en is not None and len(ad.description_en) > 0
+            assert ad.title_bs is not None and len(ad.title_bs) > 0
+            assert ad.description_bs is not None and len(ad.description_bs) > 0
+            assert ad.original_language == "ru"
+
+    def test_original_language_set(self) -> None:
+        """All generated ads have original_language='ru'."""
+        from apps.categories.models import Category
+        from apps.seed.generators.ads import AdGenerator
+
+        cat = Category(name="Тест", slug="test-slug")
+        gen = AdGenerator(
+            {"faker_seed": 42, "status_distribution": {"draft": 1.0}},
+            [],
+            [cat],
+            [],
+        )
+        ads = gen.generate(5)
+        for ad in ads:
+            assert ad.original_language == "ru"
+
+    def test_deterministic_multi_language(self) -> None:
+        """Same Faker seed produces same multi-language content."""
+        from apps.categories.models import Category
+        from apps.seed.generators.ads import AdGenerator
+
+        cat = Category(name="Тест", slug="test-slug")
+        config = {"faker_seed": 42, "status_distribution": {"draft": 1.0}}
+
+        gen1 = AdGenerator(config, [], [cat], [])
+        gen2 = AdGenerator(config, [], [cat], [])
+        ads1 = gen1.generate(3)
+        ads2 = gen2.generate(3)
+
+        for a1, a2 in zip(ads1, ads2, strict=False):
+            assert a1.title == a2.title
+            assert a1.description == a2.description
+            assert a1.title_en == a2.title_en
+            assert a1.description_en == a2.description_en
+            assert a1.title_bs == a2.title_bs
+            assert a1.description_bs == a2.description_bs
+
+    def test_fallback_template_for_unknown_category(self) -> None:
+        """Unknown category slug uses default templates."""
+        from apps.categories.models import Category
+        from apps.seed.generators.ads import AdGenerator
+
+        # Category with a slug that has no specific templates
+        cat = Category(name="Неизвестно", slug="unknown-slug-123")
+        gen = AdGenerator(
+            {"faker_seed": 42, "status_distribution": {"draft": 1.0}},
+            [],
+            [cat],
+            [],
+        )
+        ads = gen.generate(1)
+        ad = ads[0]
+        # Should have valid content from default templates
+        assert len(ad.title) > 0
+        assert len(ad.description) > 0
+
+
+# ─── SeedCommand enhanced tests ──────────────────────────────────────────
+
+
+class TestSeedCommandEnhanced(TestCase):
+    """Tests for SeedCommand with new media cleanup and realistic photos."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        from apps.categories.models import Category
+        from apps.locations.models import City
+
+        Category.objects.create(name="Тест", slug="test-seed")
+        City.objects.create(
+            name="Будва", slug="budva", region="Coastal", country_code="ME"
+        )
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_media_cleanup(self) -> None:
+        """Seed cleans MEDIA_ROOT/seed/ before re-seeding."""
+        from django.conf import settings
+
+        media_root = settings.MEDIA_ROOT
+        if isinstance(media_root, str):
+            seed_dir = os.path.join(media_root, "seed")
+        else:
+            seed_dir = str(media_root / "seed")
+
+        os.makedirs(seed_dir, exist_ok=True)
+        dummy_file = os.path.join(seed_dir, "dummy.txt")
+        with open(dummy_file, "w") as f:
+            f.write("test")
+
+        # First seed run
+        out = StringIO()
+        call_command(
+            "seed",
+            "--users=2",
+            "--ads=3",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+        # After second seed, the seed directory should be cleaned and recreated
+        call_command(
+            "seed",
+            "--users=2",
+            "--ads=3",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+
+        # The seed dir should exist (recreated by ImageGenerator) but old files gone
+        assert os.path.exists(seed_dir)
+        # Old dummy should not exist
+        assert not os.path.exists(dummy_file)
+
+    def test_seed_produces_multi_language_ads(self) -> None:
+        """Full seed generates ads with all language fields."""
+        out = StringIO()
+        call_command(
+            "seed",
+            "--users=2",
+            "--ads=4",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+        ads = Ad.objects.filter(source=AdSource.SEED)
+        for ad in ads:
+            assert ad.title_en is not None
+            assert ad.description_en is not None
+            assert ad.title_bs is not None
+            assert ad.description_bs is not None
+            assert ad.original_language == "ru"

@@ -1,11 +1,11 @@
-"""ImageGenerator for seed data — creates bundled demo photos and AdImage records."""
+"""ImageGenerator for seed data — creates demo photos from bundled manifest and AdImage records."""
 
 from __future__ import annotations
 
-import io
+import json
 import logging
 import os
-import uuid
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -16,65 +16,23 @@ from apps.seed.generators.base import BaseGenerator
 
 logger = logging.getLogger(__name__)
 
-# Small SVG-based JPEG placeholder data (valid JPEG header + small grey image)
-# Generated once and shared across all ads
-_SEED_IMAGE_POOL: list[bytes] | None = None
+FIXTURES_IMAGES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "images"
 
-
-def _generate_placeholder_jpeg(width: int, height: int, seed_offset: int) -> bytes:
-    """Generate a simple solid-color JPEG using Pillow.
-
-    Args:
-        width: Image width in pixels.
-        height: Image height in pixels.
-        seed_offset: Offset for color variation.
-
-    Returns:
-        JPEG bytes.
-    """
-    from PIL import Image as PILImage
-
-    # Generate a subtle color variation for variety
-    r = (50 + seed_offset * 30) % 200
-    g = (100 + seed_offset * 50) % 200
-    b = (150 + seed_offset * 70) % 200
-
-    img = PILImage.new("RGB", (width, height), (r, g, b))
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=85)
-    buf.seek(0)
-    return buf.getvalue()
-
-
-def _get_seed_image_pool() -> list[bytes]:
-    """Return a pool of generated JPEG images for seed data.
-
-    Generates 5 placeholder images with different sizes and colors.
-    """
-    global _SEED_IMAGE_POOL
-    if _SEED_IMAGE_POOL is None:
-        pool: list[bytes] = []
-        sizes = [
-            (800, 600),
-            (1024, 768),
-            (640, 480),
-            (1200, 800),
-            (900, 600),
-        ]
-        for i, (w, h) in enumerate(sizes):
-            pool.append(_generate_placeholder_jpeg(w, h, i))
-        _SEED_IMAGE_POOL = pool
-    return _SEED_IMAGE_POOL
+ManifestEntry = dict[str, Any]
 
 
 class ImageGenerator(BaseGenerator):
-    """Generates AdImage records for seed ads using bundled placeholder images.
+    """Generates AdImage records for seed ads using bundled category-tagged photos.
 
-    Phase 1 — Pre-process: Generate placeholder images, write to MEDIA_ROOT/seed/,
+    Loads a photo manifest (photo_manifest.json) that maps category slugs to photo
+    filenames. For each ad, selects photos matching the ad's category, falling back
+    to a default pool for unknown categories.
+
+    Phase 1 — Pre-process: Load manifest, read JPEG bytes, write to MEDIA_ROOT/seed/,
     generate thumbnails via ThumbnailService.
 
-    Phase 2 — Assign: For each ad, select 1-3 random images, create AdImage records
-    with proper position ordering.
+    Phase 2 — Assign: For each ad, select 1-3 random photos matching the ad's
+    category slug, create AdImage records with proper position ordering.
     """
 
     def __init__(self, config: dict[str, Any], ads: list[Ad]) -> None:
@@ -86,21 +44,87 @@ class ImageGenerator(BaseGenerator):
         """
         super().__init__(config)
         self.ads = ads
+        self.photo_pool: dict[str, list[ManifestEntry]] = {}
+        self.default_pool: list[ManifestEntry] = []
+        self._load_manifest()
+
+    def _load_manifest(self) -> None:
+        """Load photo_manifest.json and populate photo_pool and default_pool."""
+        manifest_path = FIXTURES_IMAGES_DIR / "photo_manifest.json"
+        if not manifest_path.exists():
+            logger.warning("Photo manifest not found at %s, using empty pool", manifest_path)
+            self.photo_pool = {}
+            self.default_pool = []
+            return
+
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+
+        categories = manifest.get("categories", {})
+        for category_slug, entry in categories.items():
+            self.photo_pool[category_slug] = entry.get("photos", [])
+
+        default = manifest.get("default", {})
+        self.default_pool = default.get("photos", [])
+
+        total_photos = sum(len(photos) for photos in self.photo_pool.values()) + len(self.default_pool)
+        logger.info("Loaded photo manifest: %d categories, %d photos total", len(self.photo_pool), total_photos)
+
+    def _get_photos_for_category(self, category_slug: str) -> list[ManifestEntry]:
+        """Get photos for a given category slug, falling back to default pool.
+
+        Args:
+            category_slug: The slug of the ad's category.
+
+        Returns:
+            List of manifest entries (dicts with 'filename' key).
+        """
+        return self.photo_pool.get(category_slug, self.default_pool) or self.default_pool
 
     def generate(self) -> list[AdImage]:
         """Generate AdImage records for all seed ads.
 
-        Pre-processes images once, then assigns them to ads.
+        Pre-processes manifest photos once, then assigns them to ads
+        based on each ad's category slug.
 
         Returns:
             List of AdImage instances ready for bulk_create.
         """
-        image_pool = _get_seed_image_pool()
+        all_entries: list[ManifestEntry] = []
+        for category_photos in self.photo_pool.values():
+            all_entries.extend(category_photos)
+        all_entries.extend(self.default_pool)
+
+        if not all_entries:
+            logger.warning("No photos in manifest, using empty image pool")
+            return []
+
         seed_dir = self._ensure_seed_dir()
         thumbnail_service = ThumbnailService(storage_dir=seed_dir)
 
         # Phase 1: Pre-process images
-        image_keys = self._preprocess_images(image_pool, seed_dir, thumbnail_service)
+        image_keys = self._preprocess_images(all_entries, seed_dir, thumbnail_service)
+
+        # Build lookup: category_slug -> list of storage keys
+        category_key_map: dict[str, list[str]] = {}
+        for entry in all_entries:
+            filename = entry["filename"]
+            # Determine which category this photo belongs to
+            photo_category = None
+            for cat_slug, photos in self.photo_pool.items():
+                if entry in photos:
+                    photo_category = cat_slug
+                    break
+            storage_key = f"seed/{filename}"
+            if storage_key in image_keys:
+                if photo_category:
+                    category_key_map.setdefault(photo_category, []).append(storage_key)
+                else:
+                    # Default pool photos — make them available to all categories
+                    for cat_slug in self.photo_pool:
+                        category_key_map.setdefault(cat_slug, []).append(storage_key)
+                    # Also keep as fallback
+                    category_key_map.setdefault("__default__", []).append(storage_key)
 
         # Phase 2: Assign images to ads
         image_count_config = self.config.get("image_count", {"min": 1, "max": 3})
@@ -109,9 +133,20 @@ class ImageGenerator(BaseGenerator):
 
         ad_images: list[AdImage] = []
         for ad in self.ads:
+            # Get photos for this ad's category
+            category_keys = category_key_map.get(ad.category.slug)
+            if not category_keys:
+                # Fallback to default pool
+                category_keys = category_key_map.get("__default__", image_keys)
+
             num_images = self.faker.random_int(min_images, max_images)
+            # Ensure we don't ask for more unique images than available
+            num_images = min(num_images, len(category_keys))
+            if num_images == 0:
+                continue
+
             selected = self.faker.random_elements(
-                image_keys,
+                category_keys,
                 length=num_images,
                 unique=True,
             )
@@ -140,48 +175,62 @@ class ImageGenerator(BaseGenerator):
 
     def _preprocess_images(
         self,
-        image_pool: list[bytes],
+        manifest_entries: list[ManifestEntry],
         seed_dir: str,
         thumbnail_service: ThumbnailService,
     ) -> list[str]:
-        """Pre-process all pool images: write originals, generate thumbnails.
+        """Pre-process all manifest photos: write originals, generate thumbnails.
 
         Args:
-            image_pool: List of JPEG bytes.
+            manifest_entries: List of manifest photo entries (each has 'filename').
             seed_dir: Target directory for seed images.
             thumbnail_service: ThumbnailService instance.
 
         Returns:
-            List of storage keys (e.g., "<uuid>.jpg") for the pool images.
+            List of storage keys (e.g., "seed/kvartiry_01.jpg") for all processed images.
         """
         keys: list[str] = []
-        for _i, img_bytes in enumerate(image_pool):
-            key = f"{uuid.uuid4()}.jpg"
-            original_path = os.path.join(seed_dir, key)
+        for entry in manifest_entries:
+            filename = entry["filename"]
+            fixture_path = FIXTURES_IMAGES_DIR / filename
+            if not fixture_path.exists():
+                logger.warning("Photo file not found: %s, skipping", fixture_path)
+                continue
+
+            storage_key = f"seed/{filename}"
+            original_path = os.path.join(seed_dir, filename)
+
+            # Read JPEG bytes from fixture
+            with open(fixture_path, "rb") as f:
+                img_bytes = f.read()
 
             # Write original image
             with open(original_path, "wb") as f:
                 f.write(img_bytes)
 
-            # Generate thumbnails - use O_EXCL safe path by checking existence
-            # Since ThumbnailService uses O_EXCL, clean up first if re-running
-            thumb_small = os.path.join(seed_dir, f"{os.path.splitext(key)[0]}-small.jpg")
+            # Generate thumbnails
+            thumb_small = os.path.join(seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg")
             if os.path.exists(thumb_small):
-                # Thumbnails already exist — skip regeneration
-                keys.append(key)
+                keys.append(storage_key)
                 continue
 
             try:
-                thumbnail_service.generate_thumbnails(img_bytes, key)
+                thumbnail_service.generate_thumbnails(img_bytes, filename)
             except FileExistsError:
-                logger.warning("Thumbnails already exist for %s, skipping", key)
+                logger.warning("Thumbnails already exist for %s, skipping", filename)
 
-            keys.append(key)
+            keys.append(storage_key)
 
         return keys
 
     @staticmethod
     def _thumbnail_key(original_key: str, size: str) -> str:
         """Generate thumbnail key from original key and size suffix."""
-        stem, _ = os.path.splitext(original_key)
-        return f"{stem}-{size}.jpg"
+        # original_key is like "seed/kvartiry_01.jpg"
+        # extract filename part after seed/
+        if original_key.startswith("seed/"):
+            filename = original_key[5:]
+        else:
+            filename = original_key
+        stem, _ = os.path.splitext(filename)
+        return f"seed/{stem}-{size}.jpg"
