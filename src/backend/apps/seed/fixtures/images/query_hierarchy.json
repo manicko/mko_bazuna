@@ -1,22 +1,152 @@
 {
   "kvartiry": {
-    "objects": ["apartment", "flat", "studio", "condo", "penthouse"],
-    "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "minimalist"],
-    "styles": ["photography", "real estate", "architectural", "professional", "editorial"]
+    "objects": ["apartment", "flat", "studio", "condo", "penthouse", "loft", "duplex", "townhouse", "bachelor", "maisonette"],
+    "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "minimalist", "open plan", "natural light"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "lifestyle", "interior design"]
+  },
+  "doma": {
+    "objects": ["house", "cottage", "villa", "bungalow", "chalet", "mansion", "farmhouse", "townhouse", "cabin", "estate"],
+    "contexts": ["exterior", "front facade", "garden", "swimming pool", "backyard", "residential neighborhood", "mountain view", "seaside", "suburban", "landscaped"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "aerial", "lifestyle"]
+  },
+  "kommercheskaya": {
+    "objects": ["office", "retail space", "warehouse", "storefront", "showroom", "coworking", "restaurant space", "industrial unit", "commercial building", "workshop"],
+    "contexts": ["commercial district", "business park", "downtown", "high street", "open plan office", "reception area", "meeting room", "street level", "mixed use", "modern facade"],
+    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "corporate", "minimalist"]
+  },
+  "uchastki": {
+    "objects": ["land", "plot", "lot", "acreage", "parcel", "building site", "greenfield", "landscape", "terrain", "property"],
+    "contexts": ["aerial view", "rural", "mountain", "coastal", "forest", "open field", "sunset", "surveyed", "undeveloped", "panoramic"],
+    "styles": ["photography", "landscape", "aerial", "professional", "editorial", "nature", "documentary"]
   },
   "avtomobili": {
-    "objects": ["car", "sedan", "SUV", "sports car", "classic car"],
-    "contexts": ["street", "parking", "outdoor", "showroom", "garage", "sunset", "city"],
-    "styles": ["automotive photography", "professional", "commercial", "lifestyle"]
+    "objects": ["car", "sedan", "SUV", "hatchback", "convertible", "coupe", "wagon", "pickup truck", "minivan", "electric vehicle"],
+    "contexts": ["showroom", "studio lighting", "street parking", "highway", "city street", "dealership", "garage", "sunset", "mountain road", "urban backdrop"],
+    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "mototsikly": {
+    "objects": ["motorcycle", "scooter", "cruiser", "sport bike", "dirt bike", "chopper", "moped", "touring bike", "naked bike", "enduro"],
+    "contexts": ["open road", "garage", "studio lighting", "curvy mountain road", "city street", "track day", "parking lot", "sunset ride", "urban backdrop"],
+    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "action"]
+  },
+  "vodnyy": {
+    "objects": ["boat", "yacht", "speedboat", "sailboat", "dinghy", "catamaran", "fishing boat", "RIB", "motorboat", "kayak"],
+    "contexts": ["marina", "open sea", "sunset on water", "harbor", "coastline", "lake", "mooring", "dock", "anchored", "blue water"],
+    "styles": ["photography", "maritime", "lifestyle", "professional", "editorial", "aerial", "travel"]
+  },
+  "zapchasti": {
+    "objects": ["engine", "brake disc", "spark plug", "car tire", "shock absorber", "exhaust pipe", "headlight", "transmission", "radiator", "battery", "steering wheel", "rim"],
+    "contexts": ["workshop", "garage", "workbench", "white background", "tool layout", "mechanical", "repair shop", "close up", "organized shelf"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "macro"]
   },
   "telefony": {
-    "objects": ["smartphone", "phone", "mobile phone", "tablet", "iPhone"],
-    "contexts": ["hand", "desk", "workspace", "modern", "minimal", "office"],
-    "styles": ["product photography", "commercial", "studio", "professional"]
+    "objects": ["smartphone", "mobile phone", "tablet", "iPhone", "phone case", "smartwatch", "wearable", "earbuds", "charging dock", "power bank"],
+    "contexts": ["white background", "workspace", "wooden desk", "hands holding", "coffee shop", "studio lighting", "flat lay", "lifestyle setting", "minimalist"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
   },
-  "default": {
-    "objects": ["item", "product", "object"],
-    "contexts": ["on desk", "workspace", "modern", "minimal"],
-    "styles": ["photography", "stock photo", "professional"]
+  "kompyutery": {
+    "objects": ["laptop", "desktop computer", "monitor", "keyboard", "mouse", "workstation", "notebook", "imac", "gaming pc", "ultrabook"],
+    "contexts": ["office desk", "coworking space", "home office", "wooden desk", "minimalist setup", "dual monitor", "coffee shop", "studio lighting", "workspace", "modern interior"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "foto": {
+    "objects": ["camera", "DSLR", "mirrorless camera", "lens", "tripod", "action camera", "drone", "gimbal", "light meter", "camera bag", "flash", "microphone"],
+    "contexts": ["studio", "travel backpack", "outdoor shooting", "wooden table", "equipment layout", "photographer hands", "nature backdrop", "minimalist arrangement"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "equipment"]
+  },
+  "bytovaya": {
+    "objects": ["refrigerator", "washing machine", "dishwasher", "oven", "microwave", "vacuum cleaner", "air conditioner", "kettle", "toaster", "coffee machine", "fridge", "stove"],
+    "contexts": ["modern kitchen", "laundry room", "studio lighting", "white background", "showroom", "minimalist interior", "smart home", "open plan kitchen", "clean design"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "stroitelstvo": {
+    "objects": ["construction site", "building under construction", "crane", "scaffolding", "tools", "renovation", "blueprint", "hard hat", "drill", "power tools", "work gloves", "toolbox"],
+    "contexts": ["construction site", "workshop", "sunset building", "modern architecture", "workbench", "raw interior", "under renovation", "building facade", "urban development"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "lifestyle"]
+  },
+  "krasota": {
+    "objects": ["makeup brush", "lipstick", "skincare bottle", "perfume", "face cream", "hair dryer", "mirror", "manicure", "cosmetics", "serum", "moisturizer", "eye shadow"],
+    "contexts": ["bathroom vanity", "dressing table", "studio lighting", "flat lay", "white background", "natural light", "marble surface", "spa setting", "minimalist", "luxury"],
+    "styles": ["photography", "beauty", "studio", "professional", "editorial", "lifestyle", "fashion"]
+  },
+  "obrazovanie": {
+    "objects": ["books", "laptop", "notebook", "pen", "desk", "blackboard", "pencil", "textbook", "diploma", "glasses", "backpack", "schedule"],
+    "contexts": ["classroom", "library", "study desk", "coworking space", "home office", "university campus", "quiet corner", "natural light", "minimalist study"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "educational", "corporate"]
+  },
+  "yuridicheskie": {
+    "objects": ["gavel", "law book", "contract", "briefcase", "scales of justice", "pen", "glasses", "laptop", "documents", "stamp", "folder", "badge"],
+    "contexts": ["office desk", "law library", "courtroom", "conference room", "wood paneled office", "formal meeting", "leather chair", "desk lamp", "professional setting"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "formal", "studio"]
+  },
+  "vakansii": {
+    "objects": ["laptop", "coffee cup", "notebook", "smartphone", "desk", "pen", "keyboard", "diary", "planner", "office chair", "headset", "briefcase"],
+    "contexts": ["office desk", "meeting room", "home office", "coworking space", "reception area", "open plan office", "glass building", "corridor", "modern workplace"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "lifestyle", "commercial"]
+  },
+  "rezyume": {
+    "objects": ["laptop", "resume", "coffee cup", "notebook", "smartphone", "pen", "desk", "glasses", "portfolio", "folder", "planner", "business card"],
+    "contexts": ["office desk", "coffee shop", "home office", "coworking space", "study desk", "modern interior", "natural light", "workspace", "minimalist"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "lifestyle", "studio"]
+  },
+  "sobaki": {
+    "objects": ["dog", "puppy", "labrador", "golden retriever", "German shepherd", "poodle", "beagle", "bulldog", "husky", "chihuahua"],
+    "contexts": ["park", "beach", "grass field", "sunset walk", "city street", "forest trail", "backyard", "dog owner playing", "mountain hike", "cozy home"],
+    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "outdoor", "candid"]
+  },
+  "koshki": {
+    "objects": ["cat", "kitten", "Persian cat", "Maine Coon", "Siamese cat", "British shorthair", "ragdoll", "Bengal cat", "Scottish fold", "tabby cat"],
+    "contexts": ["sunny windowsill", "cozy sofa", "cat owner cuddling", "garden", "bedroom", "warm blanket", "bookshelf", "cat tree", "morning light", "relaxed home"],
+    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "studio", "candid"]
+  },
+  "mebel": {
+    "objects": ["sofa", "table", "chair", "bed", "wardrobe", "bookshelf", "dining table", "armchair", "desk", "coffee table", "dresser", "lamp"],
+    "contexts": ["modern living room", "minimalist interior", "cozy bedroom", "dining area", "open plan", "showroom", "natural light", "scandinavian design", "industrial loft", "bright space"],
+    "styles": ["photography", "interior design", "architectural", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "odezhda": {
+    "objects": ["jacket", "jeans", "dress", "shoes", "t-shirt", "sneakers", "coat", "sweater", "boots", "suit", "scarf", "bag", "hat", "watch"],
+    "contexts": ["white background", "studio lighting", "urban street", "fashion shoot", "minimalist", "outdoor", "mannequin", "hanger", "flat lay", "natural light"],
+    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "detskie": {
+    "objects": ["baby crib", "stroller", "toy", "high chair", "baby clothes", "diaper bag", "plush toy", "mobile", "baby shoes", "blocks", "bottle", "pacifier"],
+    "contexts": ["nursery", "bright room", "play mat", "soft lighting", "pastel colors", "children room", "wooden floor", "minimalist nursery", "sunny window", "cozy corner"],
+    "styles": ["photography", "lifestyle", "studio", "professional", "editorial", "family", "soft"]
+  },
+  "sport": {
+    "objects": ["bicycle", "dumbbells", "yoga mat", "running shoes", "tennis racket", "football", "basketball", "kayak", "hiking boots", "tent", "skis", "surfboard", "jump rope", "fitness tracker"],
+    "contexts": ["gym", "outdoor trail", "beach", "mountain", "stadium", "park", "home gym", "sunset workout", "track", "lake"],
+    "styles": ["photography", "sports", "action", "professional", "editorial", "lifestyle", "outdoor"]
+  },
+  "nedvizhimost": {
+    "objects": ["building", "skyline", "new development", "residential complex", "high rise", "neighborhood", "cityscape", "construction crane", "property sign", "facade"],
+    "contexts": ["city skyline", "sunset panorama", "aerial view", "urban landscape", "downtown", "residential area", "modern architecture", "construction site", "birds eye view", "golden hour"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "aerial", "commercial"]
+  },
+  "transport": {
+    "objects": ["car", "motorcycle", "boat", "bicycle", "scooter", "truck", "SUV", "yacht", "van", "electric scooter"],
+    "contexts": ["highway", "city street", "marina", "garage", "open road", "mountain pass", "urban traffic", "sunset drive", "parking garage", "dealership"],
+    "styles": ["photography", "automotive", "lifestyle", "professional", "editorial", "travel", "commercial"]
+  },
+  "elektronika": {
+    "objects": ["smartphone", "laptop", "tablet", "smartwatch", "headphones", "camera", "speaker", "monitor", "keyboard", "drone"],
+    "contexts": ["workspace", "white background", "studio lighting", "wooden desk", "flat lay", "modern interior", "coffee shop", "home office", "minimalist", "technology setup"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "uslugi": {
+    "objects": ["laptop", "calendar", "smartphone", "notebook", "pen", "glasses", "coffee cup", "desk", "handshake", "meeting table", "planner", "briefcase"],
+    "contexts": ["modern office", "conference room", "coffee shop meeting", "coworking space", "professional desk", "glass building", "reception", "business district", "consultation", "formal setting"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "studio"]
+  },
+  "rabota": {
+    "objects": ["laptop", "desk", "office chair", "coffee cup", "notebook", "smartphone", "pen", "headset", "briefcase", "clock", "diary", "badge"],
+    "contexts": ["open plan office", "home office", "meeting room", "reception", "coworking space", "modern workspace", "city view", "corporate hallway", "morning routine", "professional setting"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "commercial"]
+  },
+  "zhivotnye": {
+    "objects": ["dog", "cat", "puppy", "kitten", "dog owner", "cat owner", "golden retriever", "labrador", "Persian cat", "Maine Coon"],
+    "contexts": ["park", "beach", "sunny home", "garden", "sunset walk", "grass field", "cozy sofa", "forest trail", "owner playing", "morning light"],
+    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "outdoor", "candid"]
   }
 }

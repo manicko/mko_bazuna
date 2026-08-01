@@ -11,7 +11,7 @@
     "item_age": "Age description of the item",
     "year": "Manufacturing year",
     "mileage": "Vehicle mileage in km",
-    "category": "Category name"
+    "category": "Category name (supplied as localized via get_name(locale))"
   },
   "templates": [
     {
@@ -19,16 +19,16 @@
       "category_slug": "default",
       "patterns": {
         "ru": {
-          "title": "Продам {item_age} - {condition}, {category}",
-          "description": "Продаётся {category} {item_age}. Состояние {condition}. Особенности: {feature}. Цена: {price} BAM. Город: {city}."
+          "title": "Продаю {category}, состояние {condition}",
+          "description": "Продаю {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM."
         },
         "en": {
-          "title": "{condition} {category} for sale",
-          "description": "Selling {category} ({item_age}). Condition: {condition}. Features: {feature}. Price: {price} BAM. City: {city}."
+          "title": "Selling {category}, {condition} condition",
+          "description": "I am selling {category}. Condition: {condition}. Features: {feature}. Price: {price} BAM."
         },
         "bs": {
-          "title": "{category} na prodaju - {condition}",
-          "description": "Prodaje se {category} ({item_age}). Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. Grad: {city}."
+          "title": "Prodajem {category}, stanje {condition}",
+          "description": "Prodajem {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM."
         }
       }
     },
@@ -37,16 +37,1186 @@
       "category_slug": "default",
       "patterns": {
         "ru": {
-          "title": "Куплю {category} в хорошем состоянии",
-          "description": "Куплю {category}. Рассмотрю различные варианты. {condition}. {city}. Цена договорная."
+          "title": "Куплю {category}, {condition}",
+          "description": "Ищу {category} в {condition} состоянии. Бюджет: {price} BAM. Особенности: {feature}. Предложения в личку."
         },
         "en": {
-          "title": "Looking to buy {category} - good condition",
-          "description": "I want to buy {category}. Considering various options. {condition}. {city}. Price negotiable."
+          "title": "Looking for {category}, {condition}",
+          "description": "Looking for {category} in {condition} condition. Budget: {price} BAM. Features: {feature}. DM me offers."
         },
         "bs": {
-          "title": "Tražim {category} u dobrom stanju",
-          "description": "Želim kupiti {category}. Razmatram različite opcije. {condition}. {city}. Cijena po dogovoru."
+          "title": "Tražim {category}, {condition}",
+          "description": "Tražim {category} u {condition} stanju. Budžet: {price} BAM. Karakteristike: {feature}. Pišite u inbox."
+        }
+      }
+    },
+    {
+      "id": "default_service_1",
+      "category_slug": "default",
+      "patterns": {
+        "ru": {
+          "title": "Предлагаю услуги: {category}",
+          "description": "Предлагаю {category}. Опыт работы: {condition}. В {city} и окрестностях. Подробности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Offering {category} services",
+          "description": "Offering {category} services. Experience: {condition}. Serving {city} and surrounding areas. Details: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Nudim usluge: {category}",
+          "description": "Nudim usluge {category}. Iskustvo: {condition}. U {city} i okolini. Detalji: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "default_buy_2",
+      "category_slug": "default",
+      "patterns": {
+        "ru": {
+          "title": "Срочно куплю {category}",
+          "description": "Срочно нужен {category}. Состояние: {condition}. Характеристики: {feature}. Готов рассмотреть предложения до {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Urgently buying {category}",
+          "description": "Urgently need {category}. Condition: {condition}. Specs: {feature}. Will consider offers up to {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Hitno kupujem {category}",
+          "description": "Hitno mi treba {category}. Stanje: {condition}. Specifikacije: {feature}. Razmotrit ću ponude do {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "kvartiry_sell_1",
+      "category_slug": "kvartiry",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {rooms}-комнатная квартира, {city}",
+          "description": "Продаю {rooms}-комнатную квартиру в {city}. Состояние: {condition}. Площадь: {area} м². Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{rooms}-room apartment for sale, {city}",
+          "description": "{rooms}-room apartment for sale in {city}. Condition: {condition}. Area: {area} m². Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Na prodaju {rooms}-soban stan, {city}",
+          "description": "Prodajem {rooms}-soban stan u {city}. Stanje: {condition}. Površina: {area} m². Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "kvartiry_sell_2",
+      "category_slug": "kvartiry",
+      "patterns": {
+        "ru": {
+          "title": "{rooms}-комнатная квартира, {city}, {area} м²",
+          "description": "Продаётся уютная {rooms}-комнатная квартира в {city}. Общая площадь {area} м². Состояние: {condition}. Район: {feature}. Срочно! Цена {price} BAM."
+        },
+        "en": {
+          "title": "{rooms}-room apartment, {city}, {area} m²",
+          "description": "Cozy {rooms}-room apartment for sale in {city}. Total area {area} m². Condition: {condition}. District: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "{rooms}-soban stan, {city}, {area} m²",
+          "description": "Na prodaju ugodan {rooms}-soban stan u {city}. Ukupna površina {area} m². Stanje: {condition}. Kvart: {feature}. Cijena {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "kvartiry_rent_1",
+      "category_slug": "kvartiry",
+      "patterns": {
+        "ru": {
+          "title": "Сдам {rooms}-комнатную квартиру, {city}",
+          "description": "Сдам {rooms}-комнатную квартиру в {city}. {condition}. Площадь: {area} м². Особенности: {feature}. Аренда: {price} BAM в месяц."
+        },
+        "en": {
+          "title": "Renting {rooms}-room apartment, {city}",
+          "description": "Renting a {rooms}-room apartment in {city}. Condition: {condition}. Area: {area} m². Features: {feature}. Rent: {price} BAM per month."
+        },
+        "bs": {
+          "title": "Izdajem {rooms}-soban stan, {city}",
+          "description": "Izdajem {rooms}-soban stan u {city}. Stanje: {condition}. Površina: {area} m². Karakteristike: {feature}. Najam: {price} BAM mjesečno."
+        }
+      }
+    },
+    {
+      "id": "doma_sell_1",
+      "category_slug": "doma",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся дом, {city}, {area} м²",
+          "description": "Продаю дом в {city}. Площадь: {area} м², {rooms} комнаты. Состояние: {condition}. Участок: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "House for sale, {city}, {area} m²",
+          "description": "House for sale in {city}. Area: {area} m², {rooms} rooms. Condition: {condition}. Land: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Kuća na prodaju, {city}, {area} m²",
+          "description": "Prodajem kuću u {city}. Površina: {area} m², {rooms} sobe. Stanje: {condition}. Zemljište: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "doma_rent_1",
+      "category_slug": "doma",
+      "patterns": {
+        "ru": {
+          "title": "Сдам дом в {city}, {rooms} комн.",
+          "description": "Сдам дом в {city}, {rooms} комнаты, {area} м². Состояние: {condition}. Инфраструктура: {feature}. Аренда: {price} BAM."
+        },
+        "en": {
+          "title": "House for rent in {city}, {rooms} rooms",
+          "description": "House for rent in {city}, {rooms} rooms, {area} m². Condition: {condition}. Infrastructure: {feature}. Rent: {price} BAM."
+        },
+        "bs": {
+          "title": "Kuća za iznajmljivanje u {city}, {rooms} sobe",
+          "description": "Izdajem kuću u {city}, {rooms} sobe, {area} m². Stanje: {condition}. Infrastruktura: {feature}. Najam: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "kommercheskaya_sell_1",
+      "category_slug": "kommercheskaya",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся коммерческое помещение, {city}",
+          "description": "Продаётся коммерческое помещение в {city}. Площадь {area} м². Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Commercial property for sale, {city}",
+          "description": "Commercial property for sale in {city}. Area {area} m². Condition: {condition}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Poslovni prostor na prodaju, {city}",
+          "description": "Poslovni prostor na prodaju u {city}. Površina {area} m². Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "kommercheskaya_rent_1",
+      "category_slug": "kommercheskaya",
+      "patterns": {
+        "ru": {
+          "title": "Аренда коммерческого помещения, {city}",
+          "description": "Сдам в аренду коммерческое помещение в {city}. Площадь: {area} м². Состояние: {condition}. Подходит для: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Commercial property for rent, {city}",
+          "description": "Commercial space for rent in {city}. Area: {area} m². Condition: {condition}. Suitable for: {feature}. Rent: {price} BAM."
+        },
+        "bs": {
+          "title": "Poslovni prostor za najam, {city}",
+          "description": "Izdajem poslovni prostor u {city}. Površina: {area} m². Stanje: {condition}. Pogodan za: {feature}. Najam: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "uchastki_sell_1",
+      "category_slug": "uchastki",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся участок, {city}, {area} соток",
+          "description": "Продаётся земельный участок в {city}. Площадь: {area} соток. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Land plot for sale, {city}, {area} acres",
+          "description": "Land plot for sale in {city}. Area: {area} acres. Condition: {condition}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Zemljište na prodaju, {city}, {area} ari",
+          "description": "Zemljište na prodaju u {city}. Površina: {area} ari. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "uchastki_rent_1",
+      "category_slug": "uchastki",
+      "patterns": {
+        "ru": {
+          "title": "Сдам участок в аренду, {city}",
+          "description": "Сдам земельный участок в аренду в {city}. Площадь: {area} соток. Состояние: {condition}. Назначение: {feature}. Аренда: {price} BAM."
+        },
+        "en": {
+          "title": "Land plot for rent, {city}",
+          "description": "Land plot for rent in {city}. Area: {area} acres. Condition: {condition}. Purpose: {feature}. Rent: {price} BAM."
+        },
+        "bs": {
+          "title": "Zemljište za najam, {city}",
+          "description": "Izdajem zemljište u {city}. Površina: {area} ari. Stanje: {condition}. Namjena: {feature}. Najam: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "nedvizhimost_any_1",
+      "category_slug": "nedvizhimost",
+      "patterns": {
+        "ru": {
+          "title": "Недвижимость в {city}, {category}",
+          "description": "Продажа и аренда недвижимости в {city}. Категория: {category}. Состояние: {condition}. Цена: {price} BAM. Подробнее: {feature}."
+        },
+        "en": {
+          "title": "Real estate in {city}, {category}",
+          "description": "Sale and rental of real estate in {city}. Category: {category}. Condition: {condition}. Price: {price} BAM. Details: {feature}."
+        },
+        "bs": {
+          "title": "Nekretnine u {city}, {category}",
+          "description": "Prodaja i najam nekretnina u {city}. Kategorija: {category}. Stanje: {condition}. Cijena: {price} BAM. Detalji: {feature}."
+        }
+      }
+    },
+    {
+      "id": "avtomobili_sell_1",
+      "category_slug": "avtomobili",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {brand}, {year} г., {mileage} км",
+          "description": "Продаю {brand}, {year} года выпуска. Пробег: {mileage} км. Состояние: {condition}. Комплектация: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{brand} for sale, {year}, {mileage} km",
+          "description": "Selling {brand}, manufactured {year}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "{brand} na prodaju, {year}, {mileage} km",
+          "description": "Prodajem {brand}, {year}. Godište. Kilometraža: {mileage} km. Stanje: {condition}. Oprema: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "avtomobili_sell_2",
+      "category_slug": "avtomobili",
+      "patterns": {
+        "ru": {
+          "title": "{brand} {year}, пробег {mileage} км",
+          "description": "Продаётся {brand} {year} года. Пробег {mileage} км. Состояние: {condition}. Дополнительно: {feature}. Торг уместен. Цена {price} BAM."
+        },
+        "en": {
+          "title": "{brand} {year}, {mileage} km",
+          "description": "{brand} {year} for sale. Mileage {mileage} km. Condition: {condition}. Extras: {feature}. Negotiable. Price {price} BAM."
+        },
+        "bs": {
+          "title": "{brand} {year}, {mileage} km",
+          "description": "{brand} {year}. na prodaju. Kilometraža {mileage} km. Stanje: {condition}. Dodatno: {feature}. Moguć dogovor. Cijena {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "avtomobili_sell_3",
+      "category_slug": "avtomobili",
+      "patterns": {
+        "ru": {
+          "title": "Срочно продаю {brand}, {year} г.",
+          "description": "Срочная продажа {brand} {year} года. Пробег: {mileage} км. Состояние: {condition}. Причина продажи: {feature}. Цена {price} BAM."
+        },
+        "en": {
+          "title": "Urgent sale: {brand}, {year}",
+          "description": "Urgent sale of {brand} {year}. Mileage: {mileage} km. Condition: {condition}. Reason for sale: {feature}. Price {price} BAM."
+        },
+        "bs": {
+          "title": "Hitna prodaja: {brand}, {year}",
+          "description": "Hitna prodaja {brand} {year}. Kilometraža: {mileage} km. Stanje: {condition}. Razlog prodaje: {feature}. Cijena {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "avtomobili_buy_1",
+      "category_slug": "avtomobili",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {brand}, до {price} BAM",
+          "description": "Ищу {brand}. Год: от {year}. Пробег: до {mileage} км. Состояние: {condition}. Бюджет до {price} BAM. Дополнительно: {feature}."
+        },
+        "en": {
+          "title": "Buying {brand}, up to {price} BAM",
+          "description": "Looking for {brand}. Year: from {year}. Mileage: up to {mileage} km. Condition: {condition}. Budget up to {price} BAM. Extra: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem {brand}, do {price} BAM",
+          "description": "Tražim {brand}. Godište: od {year}. Kilometraža: do {mileage} km. Stanje: {condition}. Budžet do {price} BAM. Dodatno: {feature}."
+        }
+      }
+    },
+    {
+      "id": "mototsikly_sell_1",
+      "category_slug": "mototsikly",
+      "patterns": {
+        "ru": {
+          "title": "Продаю мотоцикл {brand}, {year} г.",
+          "description": "Продаю мотоцикл {brand}, {year} года. Пробег: {mileage} км. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Motorcycle {brand} for sale, {year}",
+          "description": "Selling motorcycle {brand}, {year}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Motocikl {brand} na prodaju, {year}",
+          "description": "Prodajem motocikl {brand}, {year}. Kilometraža: {mileage} km. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "mototsikly_buy_1",
+      "category_slug": "mototsikly",
+      "patterns": {
+        "ru": {
+          "title": "Куплю мотоцикл {brand}, {city}",
+          "description": "Ищу мотоцикл {brand} в {city}. Год: {year}. Состояние: {condition}. Бюджет: {price} BAM. Пожелания: {feature}."
+        },
+        "en": {
+          "title": "Buying motorcycle {brand}, {city}",
+          "description": "Looking for {brand} motorcycle in {city}. Year: {year}. Condition: {condition}. Budget: {price} BAM. Wishes: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem motocikl {brand}, {city}",
+          "description": "Tražim motocikl {brand} u {city}. Godište: {year}. Stanje: {condition}. Budžet: {price} BAM. Želje: {feature}."
+        }
+      }
+    },
+    {
+      "id": "vodnyy_sell_1",
+      "category_slug": "vodnyy",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {brand}, {year} г.",
+          "description": "Продаю {brand}, {year} года. Состояние: {condition}. Особенности: {feature}. Расположение: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{brand} for sale, {year}",
+          "description": "Selling {brand}, {year}. Condition: {condition}. Features: {feature}. Location: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "{brand} na prodaju, {year}",
+          "description": "Prodajem {brand}, {year}. Stanje: {condition}. Karakteristike: {feature}. Lokacija: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "vodnyy_rent_1",
+      "category_slug": "vodnyy",
+      "patterns": {
+        "ru": {
+          "title": "Аренда водного транспорта, {city}",
+          "description": "Сдам в аренду водный транспорт. {brand}, {year} г. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM/день. {city}."
+        },
+        "en": {
+          "title": "Boat rental, {city}",
+          "description": "Boat rental. {brand}, {year}. Condition: {condition}. Features: {feature}. Price: {price} BAM/day. {city}."
+        },
+        "bs": {
+          "title": "Najam plovila, {city}",
+          "description": "Izdajem plovilo. {brand}, {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM/dan. {city}."
+        }
+      }
+    },
+    {
+      "id": "zapchasti_sell_1",
+      "category_slug": "zapchasti",
+      "patterns": {
+        "ru": {
+          "title": "Запчасти {brand}, {condition}",
+          "description": "Продаю запчасти для {brand}. Состояние: {condition}. Особенности: {feature}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{brand} parts, {condition}",
+          "description": "Selling parts for {brand}. Condition: {condition}. Features: {feature}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Dijelovi za {brand}, {condition}",
+          "description": "Prodajem dijelove za {brand}. Stanje: {condition}. Karakteristike: {feature}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "zapchasti_buy_1",
+      "category_slug": "zapchasti",
+      "patterns": {
+        "ru": {
+          "title": "Ищу запчасти {brand}, {city}",
+          "description": "Нужны запчасти для {brand}. Состояние: {condition}. Что ищу: {feature}. Бюджет: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Looking for {brand} parts, {city}",
+          "description": "Need parts for {brand}. Condition: {condition}. What I need: {feature}. Budget: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Tražim dijelove za {brand}, {city}",
+          "description": "Potrebni su mi dijelovi za {brand}. Stanje: {condition}. Šta tražim: {feature}. Budžet: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_any_1",
+      "category_slug": "transport",
+      "patterns": {
+        "ru": {
+          "title": "Транспорт: {category}, {condition}",
+          "description": "Продажа и покупка транспорта. Категория: {category}. Состояние: {condition}. Бренд: {brand}. Цена: {price} BAM. {feature}."
+        },
+        "en": {
+          "title": "Vehicles: {category}, {condition}",
+          "description": "Vehicle sale and purchase. Category: {category}. Condition: {condition}. Brand: {brand}. Price: {price} BAM. {feature}."
+        },
+        "bs": {
+          "title": "Vozila: {category}, {condition}",
+          "description": "Prodaja i kupovina vozila. Kategorija: {category}. Stanje: {condition}. Marka: {brand}. Cijena: {price} BAM. {feature}."
+        }
+      }
+    },
+    {
+      "id": "telefony_sell_1",
+      "category_slug": "telefony",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {brand}, {item_age}",
+          "description": "Продаю {brand}. Состояние: {condition}. Возраст: {item_age}. Год выпуска: {year}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {brand}, {item_age}",
+          "description": "Selling {brand}. Condition: {condition}. Age: {item_age}. Year: {year}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem {brand}, {item_age}",
+          "description": "Prodajem {brand}. Stanje: {condition}. Starost: {item_age}. Godina: {year}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "telefony_sell_2",
+      "category_slug": "telefony",
+      "patterns": {
+        "ru": {
+          "title": "{brand}, {year} г., {condition}",
+          "description": "Продаётся {brand} {year} года. Состояние: {condition}. Возраст: {item_age}. Комплектация: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{brand}, {year}, {condition}",
+          "description": "{brand} {year} for sale. Condition: {condition}. Age: {item_age}. Package includes: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "{brand}, {year}, {condition}",
+          "description": "{brand} {year} na prodaju. Stanje: {condition}. Starost: {item_age}. Paket uključuje: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "telefony_buy_1",
+      "category_slug": "telefony",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {brand}, {city}",
+          "description": "Ищу {brand}. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Город: {city}. Особенности: {feature}."
+        },
+        "en": {
+          "title": "Buying {brand}, {city}",
+          "description": "Looking for {brand}. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. City: {city}. Features: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem {brand}, {city}",
+          "description": "Tražim {brand}. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Grad: {city}. Karakteristike: {feature}."
+        }
+      }
+    },
+    {
+      "id": "kompyutery_sell_1",
+      "category_slug": "kompyutery",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {brand}, {year} г., {condition}",
+          "description": "Продаю {brand} {year} года. Состояние: {condition}. Возраст: {item_age}. Характеристики: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {brand}, {year}, {condition}",
+          "description": "Selling {brand} from {year}. Condition: {condition}. Age: {item_age}. Specs: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem {brand}, {year}, {condition}",
+          "description": "Prodajem {brand} iz {year}. Stanje: {condition}. Starost: {item_age}. Specifikacije: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "kompyutery_buy_1",
+      "category_slug": "kompyutery",
+      "patterns": {
+        "ru": {
+          "title": "Куплю компьютер {brand}, до {price} BAM",
+          "description": "Ищу {brand}. Состояние: {condition}. Возраст: {item_age}. Бюджет: до {price} BAM. Требования: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying computer {brand}, up to {price} BAM",
+          "description": "Looking for {brand} computer. Condition: {condition}. Age: {item_age}. Budget: up to {price} BAM. Requirements: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem računar {brand}, do {price} BAM",
+          "description": "Tražim {brand} računar. Stanje: {condition}. Starost: {item_age}. Budžet: do {price} BAM. Zahtjevi: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "foto_sell_1",
+      "category_slug": "foto",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {brand}, {item_age}",
+          "description": "Продаю фототехнику {brand}. Состояние: {condition}. Возраст: {item_age}. Год: {year}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {brand}, {item_age}",
+          "description": "Selling {brand} photo equipment. Condition: {condition}. Age: {item_age}. Year: {year}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem {brand}, {item_age}",
+          "description": "Prodajem foto opremu {brand}. Stanje: {condition}. Starost: {item_age}. Godina: {year}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "foto_buy_1",
+      "category_slug": "foto",
+      "patterns": {
+        "ru": {
+          "title": "Куплю фототехнику {brand}",
+          "description": "Ищу {brand}. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Нужно: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying {brand} camera gear",
+          "description": "Looking for {brand} camera equipment. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Need: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem foto opremu {brand}",
+          "description": "Tražim {brand} foto opremu. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Potrebno: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "bytovaya_sell_1",
+      "category_slug": "bytovaya",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {brand} {item_age}",
+          "description": "Продаю бытовую технику {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {brand} home appliance, {item_age}",
+          "description": "Selling {brand} home appliance. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem {brand} kućni aparat, {item_age}",
+          "description": "Prodajem kućni aparat {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "bytovaya_buy_1",
+      "category_slug": "bytovaya",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {brand}, {condition}",
+          "description": "Ищу бытовую технику {brand}. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Важно: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying {brand}, {condition}",
+          "description": "Looking for {brand} home appliance. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Important: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem {brand}, {condition}",
+          "description": "Tražim kućni aparat {brand}. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Važno: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "elektronika_any_1",
+      "category_slug": "elektronika",
+      "patterns": {
+        "ru": {
+          "title": "Электроника: {category}, {brand}",
+          "description": "Продажа электроники. Категория: {category}. Бренд: {brand}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {feature}."
+        },
+        "en": {
+          "title": "Electronics: {category}, {brand}",
+          "description": "Electronics for sale. Category: {category}. Brand: {brand}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {feature}."
+        },
+        "bs": {
+          "title": "Elektronika: {category}, {brand}",
+          "description": "Prodaja elektronike. Kategorija: {category}. Marka: {brand}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {feature}."
+        }
+      }
+    },
+    {
+      "id": "stroitelstvo_offer_1",
+      "category_slug": "stroitelstvo",
+      "patterns": {
+        "ru": {
+          "title": "Строительные услуги в {city}",
+          "description": "Предлагаю услуги по строительству и ремонту в {city}. Опыт: {condition}. Виды работ: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Construction services in {city}",
+          "description": "Offering construction and renovation services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Građevinske usluge u {city}",
+          "description": "Nudim usluge građevine i renovacije u {city}. Iskustvo: {condition}. Vrste radova: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "stroitelstvo_offer_2",
+      "category_slug": "stroitelstvo",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт под ключ, {city}",
+          "description": "Делаю ремонт под ключ в {city}. Состояние: {condition}. Материалы: {feature}. Смета от {price} BAM. Гарантия."
+        },
+        "en": {
+          "title": "Turnkey renovation, {city}",
+          "description": "I do turnkey renovation in {city}. Condition: {condition}. Materials: {feature}. Estimate from {price} BAM. Warranty included."
+        },
+        "bs": {
+          "title": "Renovacija po sistemu ključ u ruke, {city}",
+          "description": "Radim renovaciju po sistemu ključ u ruke u {city}. Stanje: {condition}. Materijali: {feature}. Procjena od {price} BAM. Garancija."
+        }
+      }
+    },
+    {
+      "id": "stroitelstvo_offer_3",
+      "category_slug": "stroitelstvo",
+      "patterns": {
+        "ru": {
+          "title": "Бригада строителей, {city}",
+          "description": "Профессиональная бригада строителей в {city}. Опыт: {condition}. Специализация: {feature}. Расценки от {price} BAM."
+        },
+        "en": {
+          "title": "Construction team, {city}",
+          "description": "Professional construction team in {city}. Experience: {condition}. Specialty: {feature}. Rates from {price} BAM."
+        },
+        "bs": {
+          "title": "Građevinski tim, {city}",
+          "description": "Profesionalni građevinski tim u {city}. Iskustvo: {condition}. Specijalnost: {feature}. Cijene od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "stroitelstvo_request_1",
+      "category_slug": "stroitelstvo",
+      "patterns": {
+        "ru": {
+          "title": "Ищу строителей в {city}",
+          "description": "Требуются строители в {city}. Условия: {condition}. Требования: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for builders in {city}",
+          "description": "Need builders in {city}. Conditions: {condition}. Requirements: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim građevince u {city}",
+          "description": "Potrebni građevinci u {city}. Uslovi: {condition}. Zahtjevi: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "krasota_offer_1",
+      "category_slug": "krasota",
+      "patterns": {
+        "ru": {
+          "title": "Услуги красоты в {city}, от {price} BAM",
+          "description": "Предлагаю услуги в сфере красоты и здоровья в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Beauty services in {city}, from {price} BAM",
+          "description": "Offering beauty and health services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Usluge ljepote u {city}, od {price} BAM",
+          "description": "Nudim usluge ljepote i zdravlja u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "krasota_request_1",
+      "category_slug": "krasota",
+      "patterns": {
+        "ru": {
+          "title": "Ищу мастера красоты, {city}",
+          "description": "Ищу мастера в {city}. Условия: {condition}. Что нужно: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a beauty master, {city}",
+          "description": "Looking for a beauty professional in {city}. Conditions: {condition}. What I need: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora ljepote, {city}",
+          "description": "Tražim majstora u {city}. Uslovi: {condition}. Šta mi treba: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "obrazovanie_offer_1",
+      "category_slug": "obrazovanie",
+      "patterns": {
+        "ru": {
+          "title": "Репетитор в {city}, {condition}",
+          "description": "Предлагаю услуги репетитора в {city}. Опыт: {condition}. Предметы: {feature}. Цена: {price} BAM/час."
+        },
+        "en": {
+          "title": "Tutor in {city}, {condition}",
+          "description": "Offering tutoring services in {city}. Experience: {condition}. Subjects: {feature}. Price: {price} BAM/hour."
+        },
+        "bs": {
+          "title": "Instruktor u {city}, {condition}",
+          "description": "Nudim instrukcije u {city}. Iskustvo: {condition}. Predmeti: {feature}. Cijena: {price} BAM/sat."
+        }
+      }
+    },
+    {
+      "id": "obrazovanie_request_1",
+      "category_slug": "obrazovanie",
+      "patterns": {
+        "ru": {
+          "title": "Ищу репетитора в {city}",
+          "description": "Ищу преподавателя в {city}. Предмет: {feature}. Уровень: {condition}. Бюджет: {price} BAM/час."
+        },
+        "en": {
+          "title": "Looking for a tutor in {city}",
+          "description": "Looking for a teacher in {city}. Subject: {feature}. Level: {condition}. Budget: {price} BAM/hour."
+        },
+        "bs": {
+          "title": "Tražim instruktora u {city}",
+          "description": "Tražim nastavnika u {city}. Predmet: {feature}. Nivo: {condition}. Budžet: {price} BAM/sat."
+        }
+      }
+    },
+    {
+      "id": "yuridicheskie_offer_1",
+      "category_slug": "yuridicheskie",
+      "patterns": {
+        "ru": {
+          "title": "Юридические услуги, {city}",
+          "description": "Оказываю юридические услуги в {city}. Опыт: {condition}. Специализация: {feature}. Консультация от {price} BAM."
+        },
+        "en": {
+          "title": "Legal services, {city}",
+          "description": "Providing legal services in {city}. Experience: {condition}. Specialization: {feature}. Consultation from {price} BAM."
+        },
+        "bs": {
+          "title": "Pravne usluge, {city}",
+          "description": "Pružam pravne usluge u {city}. Iskustvo: {condition}. Specijalizacija: {feature}. Konsultacije od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "yuridicheskie_request_1",
+      "category_slug": "yuridicheskie",
+      "patterns": {
+        "ru": {
+          "title": "Нужен юрист в {city}",
+          "description": "Требуется юрист в {city}. Вопрос: {feature}. Состояние: {condition}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need a lawyer in {city}",
+          "description": "Looking for a lawyer in {city}. Matter: {feature}. Condition: {condition}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potreban advokat u {city}",
+          "description": "Tražim advokata u {city}. Pitanje: {feature}. Stanje: {condition}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "uslugi_any_1",
+      "category_slug": "uslugi",
+      "patterns": {
+        "ru": {
+          "title": "Услуги: {category} в {city}",
+          "description": "Предлагаю и ищу услуги. Категория: {category}. Город: {city}. Опыт: {condition}. Цена: {price} BAM. {feature}."
+        },
+        "en": {
+          "title": "Services: {category} in {city}",
+          "description": "Offering and looking for services. Category: {category}. City: {city}. Experience: {condition}. Price: {price} BAM. {feature}."
+        },
+        "bs": {
+          "title": "Usluge: {category} u {city}",
+          "description": "Nudim i tražim usluge. Kategorija: {category}. Grad: {city}. Iskustvo: {condition}. Cijena: {price} BAM. {feature}."
+        }
+      }
+    },
+    {
+      "id": "vakansii_offer_1",
+      "category_slug": "vakansii",
+      "patterns": {
+        "ru": {
+          "title": "Вакансия: {feature}, {city}",
+          "description": "Требуется сотрудник в {city}. Условия: {condition}. Обязанности: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Vacancy: {feature}, {city}",
+          "description": "We are hiring in {city}. Conditions: {condition}. Responsibilities: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Konkurs: {feature}, {city}",
+          "description": "Zapošljavamo u {city}. Uslovi: {condition}. Odgovornosti: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "vakansii_request_1",
+      "category_slug": "vakansii",
+      "patterns": {
+        "ru": {
+          "title": "Ищу работу в {city}, {category}",
+          "description": "Ищу вакансию в сфере {category} в {city}. Опыт: {condition}. Навыки: {feature}. Ожидаемая зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a job in {city}, {category}",
+          "description": "Looking for a position in {category} in {city}. Experience: {condition}. Skills: {feature}. Expected salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim posao u {city}, {category}",
+          "description": "Tražim posao u oblasti {category} u {city}. Iskustvo: {condition}. Vještine: {feature}. Očekivana plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "rezyume_offer_1",
+      "category_slug": "rezyume",
+      "patterns": {
+        "ru": {
+          "title": "Резюме: {feature}, {city}",
+          "description": "Ищу работу. Сфера: {feature}. Опыт: {condition}. Город: {city}. Желаемая зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Resume: {feature}, {city}",
+          "description": "Looking for work. Field: {feature}. Experience: {condition}. City: {city}. Desired salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Biografija: {feature}, {city}",
+          "description": "Tražim posao. Oblast: {feature}. Iskustvo: {condition}. Grad: {city}. Željena plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "rezyume_request_1",
+      "category_slug": "rezyume",
+      "patterns": {
+        "ru": {
+          "title": "Ищу сотрудника, {feature}, {city}",
+          "description": "Ищу специалиста. Требования: {feature}. Опыт: {condition}. Город: {city}. Предлагаю: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for an employee, {feature}, {city}",
+          "description": "Looking for a specialist. Requirements: {feature}. Experience: {condition}. City: {city}. Offer: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim radnika, {feature}, {city}",
+          "description": "Tražim stručnjaka. Zahtjevi: {feature}. Iskustvo: {condition}. Grad: {city}. Nudim: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "rabota_any_1",
+      "category_slug": "rabota",
+      "patterns": {
+        "ru": {
+          "title": "Работа: {category}, {city}",
+          "description": "Вакансии и резюме в {city}. Категория: {category}. Опыт: {condition}. Зарплата: {price} BAM. {feature}."
+        },
+        "en": {
+          "title": "Jobs: {category}, {city}",
+          "description": "Vacancies and resumes in {city}. Category: {category}. Experience: {condition}. Salary: {price} BAM. {feature}."
+        },
+        "bs": {
+          "title": "Posao: {category}, {city}",
+          "description": "Konkursi i biografije u {city}. Kategorija: {category}. Iskustvo: {condition}. Plata: {price} BAM. {feature}."
+        }
+      }
+    },
+    {
+      "id": "sobaki_sell_1",
+      "category_slug": "sobaki",
+      "patterns": {
+        "ru": {
+          "title": "Продаются щенки, {city}",
+          "description": "Продаются щенки. Порода: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Puppies for sale, {city}",
+          "description": "Puppies for sale. Breed: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Štenci na prodaju, {city}",
+          "description": "Štenci na prodaju. Rasa: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "sobaki_give_1",
+      "category_slug": "sobaki",
+      "patterns": {
+        "ru": {
+          "title": "Отдам собаку в добрые руки, {city}",
+          "description": "Отдам собаку в добрые руки. Особенности: {feature}. Состояние: {condition}. Город: {city}. Бесплатно."
+        },
+        "en": {
+          "title": "Dog needs a good home, {city}",
+          "description": "Giving away a dog to a good home. Details: {feature}. Condition: {condition}. City: {city}. Free."
+        },
+        "bs": {
+          "title": "Pas traži dom, {city}",
+          "description": "Poklanjam psa u dobre ruke. Detalji: {feature}. Stanje: {condition}. Grad: {city}. Besplatno."
+        }
+      }
+    },
+    {
+      "id": "koshki_sell_1",
+      "category_slug": "koshki",
+      "patterns": {
+        "ru": {
+          "title": "Котята, {city}",
+          "description": "Продаются котята. Порода: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Kittens for sale, {city}",
+          "description": "Kittens for sale. Breed: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Mačići na prodaju, {city}",
+          "description": "Mačići na prodaju. Rasa: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "koshki_give_1",
+      "category_slug": "koshki",
+      "patterns": {
+        "ru": {
+          "title": "Отдам кошку, {city}",
+          "description": "Ищу дом для кошки. Особенности: {feature}. Состояние: {condition}. {city}. Отдам бесплатно."
+        },
+        "en": {
+          "title": "Cat needs a home, {city}",
+          "description": "Looking for a home for a cat. Details: {feature}. Condition: {condition}. {city}. Free."
+        },
+        "bs": {
+          "title": "Mačka traži dom, {city}",
+          "description": "Tražim dom za mačku. Detalji: {feature}. Stanje: {condition}. {city}. Poklanjam besplatno."
+        }
+      }
+    },
+    {
+      "id": "zhivotnye_any_1",
+      "category_slug": "zhivotnye",
+      "patterns": {
+        "ru": {
+          "title": "Животные: {category}, {city}",
+          "description": "Продажа и дарение животных. Категория: {category}. Город: {city}. Состояние: {condition}. Цена: {price} BAM. {feature}."
+        },
+        "en": {
+          "title": "Pets: {category}, {city}",
+          "description": "Sale and adoption of pets. Category: {category}. City: {city}. Condition: {condition}. Price: {price} BAM. {feature}."
+        },
+        "bs": {
+          "title": "Životinje: {category}, {city}",
+          "description": "Prodaja i udomljavanje životinja. Kategorija: {category}. Grad: {city}. Stanje: {condition}. Cijena: {price} BAM. {feature}."
+        }
+      }
+    },
+    {
+      "id": "mebel_sell_1",
+      "category_slug": "mebel",
+      "patterns": {
+        "ru": {
+          "title": "Продаю мебель {brand}, {item_age}",
+          "description": "Продаю мебель {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {brand} furniture, {item_age}",
+          "description": "Selling {brand} furniture. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem namještaj {brand}, {item_age}",
+          "description": "Prodajem namještaj {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "mebel_sell_2",
+      "category_slug": "mebel",
+      "patterns": {
+        "ru": {
+          "title": "{category} {brand}, {city}, {condition}",
+          "description": "Продаётся {category} {brand} в {city}. Состояние: {condition}. Возраст: {item_age}. Размеры: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "{category} {brand}, {city}, {condition}",
+          "description": "{category} by {brand} in {city} for sale. Condition: {condition}. Age: {item_age}. Dimensions: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "{category} {brand}, {city}, {condition}",
+          "description": "{category} {brand} u {city} na prodaju. Stanje: {condition}. Starost: {item_age}. Dimenzije: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "mebel_buy_1",
+      "category_slug": "mebel",
+      "patterns": {
+        "ru": {
+          "title": "Куплю мебель, {condition}",
+          "description": "Ищу мебель. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Что нужно: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying furniture, {condition}",
+          "description": "Looking for furniture. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Need: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem namještaj, {condition}",
+          "description": "Tražim namještaj. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Potrebno: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "odezhda_sell_1",
+      "category_slug": "odezhda",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {category}, {item_age}",
+          "description": "Продаю одежду и обувь. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling {category}, {item_age}",
+          "description": "Selling clothing and footwear. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem {category}, {item_age}",
+          "description": "Prodajem odjeću i obuću. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "odezhda_sell_2",
+      "category_slug": "odezhda",
+      "patterns": {
+        "ru": {
+          "title": "{category}, размер {feature}, {condition}",
+          "description": "Продаю {category}. Состояние: {condition}. Возраст: {item_age}. Размер/описание: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{category}, size {feature}, {condition}",
+          "description": "Selling {category}. Condition: {condition}. Age: {item_age}. Size/details: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{category}, veličina {feature}, {condition}",
+          "description": "Prodajem {category}. Stanje: {condition}. Starost: {item_age}. Veličina/detalji: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "odezhda_buy_1",
+      "category_slug": "odezhda",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {category}, {condition}",
+          "description": "Ищу одежду/обувь. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Интересует: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying {category}, {condition}",
+          "description": "Looking for clothing/footwear. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Interested in: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem {category}, {condition}",
+          "description": "Tražim odjeću/obuću. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Interesuje me: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "detskie_sell_1",
+      "category_slug": "detskie",
+      "patterns": {
+        "ru": {
+          "title": "Продаю детские товары, {item_age}",
+          "description": "Продаю детские товары. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling baby and kids items, {item_age}",
+          "description": "Selling baby and kids items. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem dječju robu, {item_age}",
+          "description": "Prodajem dječju robu. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "detskie_buy_1",
+      "category_slug": "detskie",
+      "patterns": {
+        "ru": {
+          "title": "Куплю детские товары, {city}",
+          "description": "Ищу детские товары в {city}. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Нужно: {feature}."
+        },
+        "en": {
+          "title": "Buying kids items, {city}",
+          "description": "Looking for kids items in {city}. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Need: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem dječju robu, {city}",
+          "description": "Tražim dječju robu u {city}. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Potrebno: {feature}."
+        }
+      }
+    },
+    {
+      "id": "sport_sell_1",
+      "category_slug": "sport",
+      "patterns": {
+        "ru": {
+          "title": "Продаю спортивные товары, {item_age}",
+          "description": "Продаю спорттовары. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Selling sports equipment, {item_age}",
+          "description": "Selling sports and leisure equipment. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Prodajem sportsku opremu, {item_age}",
+          "description": "Prodajem sportsku opremu. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "sport_sell_2",
+      "category_slug": "sport",
+      "patterns": {
+        "ru": {
+          "title": "{brand} спортинвентарь, {condition}",
+          "description": "Продаётся спортивный инвентарь {brand}. Состояние: {condition}. Возраст: {item_age}. Описание: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} sports gear, {condition}",
+          "description": "{brand} sports equipment for sale. Condition: {condition}. Age: {item_age}. Description: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} sportska oprema, {condition}",
+          "description": "{brand} sportska oprema na prodaju. Stanje: {condition}. Starost: {item_age}. Opis: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "sport_buy_1",
+      "category_slug": "sport",
+      "patterns": {
+        "ru": {
+          "title": "Куплю спортивные товары, {condition}",
+          "description": "Ищу спортивные товары. Состояние: {condition}. Возраст: {item_age}. Бюджет: {price} BAM. Интересно: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying sports equipment, {condition}",
+          "description": "Looking for sports equipment. Condition: {condition}. Age: {item_age}. Budget: {price} BAM. Interested in: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem sportsku opremu, {condition}",
+          "description": "Tražim sportsku opremu. Stanje: {condition}. Starost: {item_age}. Budžet: {price} BAM. Interesuje me: {feature}. {city}."
         }
       }
     }

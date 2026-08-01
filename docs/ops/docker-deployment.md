@@ -131,6 +131,7 @@ docker compose --env-file .env.local run --rm migrate
 | `db` | `postgres:18-alpine` | Persistent volume `postgres_data` |
 | `migrate` | Build image, runs migrations | One-shot service with advisory lock |
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
+| `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
 | `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure |
 | `nginx` | `nginx:alpine` | Ports 80/443; TLS termination |
@@ -164,6 +165,8 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `ADMIN_USERNAME` | No | Admin username (default: admin) |
 | `ADMIN_PASSWORD` | No* | Admin password; required for auto-creation |
 | `ADMIN_TELEGRAM_ID` | No | Placeholder telegram_id (default: -1) |
+| `SEED_USERS` | No | Number of demo users to generate (default: 10) |
+| `SEED_ADS` | No | Number of demo ads to generate (default: 30) |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker containers. Do not set `DATABASE_URL` in `.env.docker` when running Docker - the compose files build it from the individual database variables.
 
@@ -401,6 +404,73 @@ docker compose run --rm web uv run python src/backend/manage.py create_admin_use
 
 Then set `ADMIN_TELEGRAM_ID=-999` in your `.env` file and restart the services.
 
+## Seed Data
+
+The project includes a development-only seed command that populates the database with realistic demo data. This is useful for visual evaluation, pagination testing, and search/filter verification.
+
+### Management Command
+
+```bash
+# Run seed with defaults (10 users, 30 ads)
+uv run python src/backend/manage.py seed
+
+# Custom seed parameters
+uv run python src/backend/manage.py seed --users 50 --ads 200 --force
+
+# Custom status distribution
+uv run python src/backend/manage.py seed --status-distribution '{"published":0.7,"archived":0.1,"draft":0.1,"on_moderation":0.05,"rejected":0.05}'
+
+# Skip analytics generation
+uv run python src/backend/manage.py seed --analytics False
+```
+
+**Warning:** The seed command is **destructive** — it deletes all existing seed data before regenerating. Use `--force` to skip the confirmation prompt.
+
+#### CLI Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--users` | int | 10 | Number of demo users |
+| `--ads` | int | 30 | Number of demo ads |
+| `--force` | bool | False | Skip confirmation prompt |
+| `--status-distribution` | str | (from config) | JSON status weights, e.g. `'{"published":0.6,"archived":0.2}'` |
+| `--analytics` | bool | True | Generate view events and daily metrics |
+
+### Docker Compose
+
+The seed service is a one-shot container gated by `profiles: ["seed"]`. It runs after migrations complete and populates the database with demo data:
+
+```bash
+# Run seed with defaults
+docker compose --env-file .env.local --profile seed run --rm seed
+
+# Custom seed parameters via environment variables
+SEED_USERS=50 SEED_ADS=200 docker compose --env-file .env.local --profile seed run --rm seed
+```
+
+#### Seed Service Details
+
+- **Entrypoint:** `docker/entrypoint-seed.sh` — calls `manage.py seed --force` with `SEED_USERS` and `SEED_ADS` env var overrides
+- **Depends on:** `migrate` (condition: `service_completed_successfully`)
+- **Volumes:** mounts `media_volume` for photo generation
+- **Advisory lock:** uses session-scoped lock ID 110 to prevent concurrent seed operations
+
+### What Gets Generated
+
+| Entity | Count | Details |
+|--------|-------|---------|
+| **Categories** | 30 | Real Montenegro classifieds tree (static fixture) |
+| **Cities** | 15+ | Real Montenegro cities with regions (static fixture) |
+| **Users** | configurable | Fake sellers with unique `telegram_id`, optional username, Russian names |
+| **Ads** | configurable | Category-specific ads with multi-language titles/descriptions (ru/en/bs) |
+| **Images** | ~90 bundled | CC0 photos (3-16 per category), 1-3 per ad, 3 thumbnail sizes |
+| **Analytics events** | auto | `AD_VIEWED` events spread over 90 days |
+| **DailyAdMetrics** | auto | Per-ad-per-day view count rollups |
+
+### Deterministic Output
+
+The seed command produces deterministic output: running with the same parameters produces identical data. This is achieved via `Faker.seed_instance(42)` (configurable in `seed.default.json`).
+
 ## Monitoring & Logging
 
 ### Container Health
@@ -484,6 +554,6 @@ docker compose run --rm web uv run python src/backend/manage.py makemigrations -
 
 - [Local HTTPS with mkcert](local-https-mkcert.md) - Development HTTPS setup for production parity
 - [Database Restore Runbook](restore.md)
-- [Architecture Structure](docs/01-spec/architecture-structure.md)
-- [Technical Specification](docs/01-spec/technical-specification.md)
-- [DB Schema](docs/02-database/db-schema.md)
+- [Architecture Structure](../01-spec/architecture-structure.md)
+- [Technical Specification](../01-spec/technical-specification.md)
+- [DB Schema](../02-database/db-schema.md)

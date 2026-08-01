@@ -1,5 +1,5 @@
 ---
-name: spec-preparetion
+name: spec-preparation
 description: Analyze a product request, resolve ambiguities, coordinate research and produce a development-ready specification.
 ---
 

@@ -161,6 +161,27 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **ModerationAnalytics service**: aggregates moderation statistics — pending queue size, moderator performance metrics, rejection reason breakdowns.
 - **Auto-moderation integration**: `_pass_moderation()` and `_fail_moderation()` now create `AnalyticsEvent` records with `ad_id` for moderation tracking (`MODERATION_APPROVED`, `MODERATION_REJECTED`, `MODERATION_FLAGGED`).
 
+### R. Seed data module (development-only)
+- **Purpose:** Development-only demo data generation for visual evaluation, pagination testing, search/filter verification, and load testing.
+- **Architecture:** A zero-model Django app (`apps.seed`) with no migrations. Registered in `INSTALLED_APPS` as `"apps.seed"`.
+- **Management command:** `python manage.py seed [--users N] [--ads N] [--force] [--status-distribution JSON] [--analytics BOOL]`.
+- **Generators** (all use `bulk_create` with chunking, no individual saves):
+  - `UserGenerator` — creates fake seller users via Faker (`ru_RU`). Uses `itertools.count()` for unique `telegram_id`/`chat_id`. 30% probability of non-null `username`.
+  - `AdGenerator` — creates ads referencing existing users/categories/cities. Reads category-specific templates from `ads_templates.json` (51+ templates across 30 categories). Multi-language support: populates `title`/`description` (ru), `title_en`/`description_en`, `title_bs`/`description_bs`, sets `original_language = "ru"`. Variable interpolation via `word_lists.json` (conditions, brands, features, cities, item_ages).
+  - `ImageGenerator` — loads bundled CC0 photos from `photo_manifest.json` (~90 photos across 30 categories, 3-16 per category). Selects photos by ad category slug, falls back to default pool. Pre-processes all photos once: writes to `MEDIA_ROOT/seed/`, generates 3 thumbnail sizes via `ThumbnailService`.
+  - `AnalyticsGenerator` — creates `AnalyticsEvent` records (`AD_VIEWED`) spread across 90 days with recent-biased distribution. Optionally creates `DailyAdMetrics` rollup records.
+- **SeedService orchestrator:** Coordinates all generators, cleans seedable tables in FK-safe order (`DailyAdMetrics` → `AnalyticsEvent` → `AdImage` → `Ad` → seed `User`) plus `MEDIA_ROOT/seed/` directory. Uses session-scoped advisory lock ID 110 to prevent concurrent seeds.
+- **Configuration:** `config/seed.default.json` — tunable parameters (status distribution weights, image count range, analytics range, Faker seed).
+- **Static fixtures:**
+  - `fixtures/categories.json` — real Montenegro classifieds category tree (django-mptt compatible, Russian names, 30 categories).
+  - `fixtures/cities.json` — real Montenegro cities with `country_code="ME"`, regions, slugs.
+  - `fixtures/ads_templates.json` — 50+ hierarchical templates with per-category patterns in ru/en/bs.
+  - `fixtures/word_lists.json` — per-language word lists for template variable interpolation.
+  - `fixtures/images/` — ~90 bundled CC0 JPEGs (≤100KB each, EXIF stripped) + `photo_manifest.json`.
+- **Docker Compose integration:** One-shot `seed` service gated by `profiles: ["seed"]`. Follows `create_admin` pattern: `depends_on: migrate (completed)`, environment variables `SEED_USERS`/`SEED_ADS`, mounts `media_volume`. Run with `docker compose --profile seed run --rm seed`.
+- **AdSource:** Seed ads are tagged with `AdSource.SEED = "seed"` for identification and cleanup.
+- **Constraints:** Development-only (never run in production). Deterministic output via `Faker.seed_instance(42)`. No network dependencies at seed time (all resources bundled). Repo size increase ~9MB for photos (no Git LFS needed).
+
 ## Functional Stories by Role
 
 Full user stories (acceptance behavior per role) are the single source of truth in

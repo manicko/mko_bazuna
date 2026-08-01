@@ -77,6 +77,13 @@ src/
 │   │   │   ├── signals.py
 │   │   │   ├── tests.py
 │   │   │   └── urls.py
+│   │   ├── seed/                  # dev-only demo data generation (no models)
+│   │   │   ├── config/               # seed.default.json
+│   │   │   ├── fixtures/             # categories.json, cities.json, ads_templates.json, word_lists.json, images/
+│   │   │   ├── generators/           # UserGenerator, AdGenerator, ImageGenerator, AnalyticsGenerator
+│   │   │   ├── management/commands/  # seed.py
+│   │   │   ├── services/             # SeedService orchestrator
+│   │   │   └── tests/                # test_seed.py
 │   │   ├── search/                # PostgreSQL FTS (search_vector, GIN, russian) — no haystack/whoosh
 │   │   │   ├── migrations/
 │   │   │   ├── services/             # alert_query, entity_suggestions, popular_search, query_translator, rate_limit, search_history
@@ -141,6 +148,9 @@ src/
 | `db` | `postgres:18-alpine` + volume + healthcheck (`pg_isready`) | — |
 | `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application --bind 0.0.0.0:8000` | Mounts `media_volume`; `env_file: .env`; `depends_on migrate` (completed successfully); port 8000 NOT published. |
 | `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on migrate`; `restart: unless-stopped`. |
+| `migrate` | Same image; one-shot migration | Runs `entrypoint.sh` with `migrate` command; session-scoped advisory lock ID 100. |
+| `create_admin` | Same image; one-shot admin creation | Runs `entrypoint-create-admin.sh`; session-scoped advisory lock ID 101. Idempotent. |
+| `seed` | Same image; one-shot demo data | Runs `entrypoint-seed.sh`; gated by `profiles: ["seed"]`. Populates DB with demo data. Session-scoped advisory lock ID 110. |
 | `nginx` | `nginx:alpine`; ports 80/443 | Mounts `media_volume` (ro); `proxy_pass → web:8000`; serves `/media/`; TLS. Static files served via whitenoise proxy. |
 
 Volumes: `postgres_data`, `media_volume`. Static files baked into image via whitenoise; nginx serves `/media/` only.
@@ -226,8 +236,13 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 5 | `cleanup_login_tokens` |
 | 6 | `purge_failed_ads` |
 | 7 | `purge_rejected_ads` |
+| 8 | `rollup_daily_metrics` |
+| 9 | `alert_delivery_task` |
+| 10 | `queue_processing` |
 | 100 | `migrate` (session-scoped, pre-PgBouncer) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
+| 102 | `backfill_thumbnails` |
+| 110 | `seed` (session-scoped, prevents concurrent seed operations) |
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not
