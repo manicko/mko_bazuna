@@ -25,8 +25,7 @@ The Mko Bazuna classifieds board needs a scalable architecture for ad categories
    - **Транспорт** (Auto)
    - **Товары** (Goods)
    - **Животные** (Animals)
-   - **Работа** (Jobs)
-   - **Услуги** (Services)
+   - **Услуги, работа, вакансии** (Services)
    - **Бизнес** (Business)
    - **Благотворительность** (Charity / Free stuff)
    
