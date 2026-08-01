@@ -1,0 +1,437 @@
+Canonical Category Tree for Mko Bazuna (Базуна)
+==================================================
+
+Based on analysis of Avito category structures, market demand patterns, and the 8 agreed top-level sections.
+
+Top-level categories (8 fixed):
+  1. Недвижимость (Real Estate)
+  2. Транспорт (Auto)
+  3. Товары (Goods)
+  4. Животные (Animals)
+  5. Работа (Jobs)
+  6. Услуги (Services)
+  7. Бизнес (Business)
+  8. Благотворительность (Charity / Free stuff) — NO MPTT children, auto-populated via CategoryPath when price=0
+
+Key principles:
+- Max depth: L1 → L2 → L3 → L4
+- Categories answer only "Что является объектом объявления?" (What is the object?)
+- Listing purposes and features are stored in LookupGroup tables, NOT in the category tree
+- Categories marked [DEFERRED] are excluded from initial launch due to low demand
+
+Legend:
+  [DEFERRED] = Low-demand / niche category, deferred to future releases
+  (alt path) = Available via CategoryPath (alternative parent route)
+  (auto) = Auto-populated based on business rule (e.g., price=0)
+
+================================================================================
+# TREE STARTING BELOW
+================================================================================
+
+L0 [root] Все категории (8 subs)
+  L1 [1] Недвижимость
+    L2 [1] Квартиры (listing_purpose: Продажа, Долгосрочная аренда, Посуточная аренда, listing_feature: Вторичка,  Новостройки)
+    L2 [2] Дома, дачи, коттеджи (listing_purpose: Продажа, Долгосрочная аренда, Посуточная аренда, listing_feature: Вторичка,  Новостройки)
+    L2 [3] Комнаты (listing_purpose: Продажа, Долгосрочная аренда, Посуточная аренда, listing_feature: Вторичка,  Новостройки)
+    L2 [4] Гаражи и машиноместа (listing_purpose: Продажа, Долгосрочная аренда)
+    L2 [5] Земельные участки (listing_purpose: Продажа, Долгосрочная аренда)
+    L2 [7] Прочая недвижимость (listing_purpose: Продажа, Аренда)
+  L1 [2] Транспорт (listing_purpose: Продажа, Аренда)
+    L2 [1] Автомобили 
+    L2 [2] Мотоциклы и мототехника
+      L3 [1] Мотоциклы 
+      L3 [2] Мопеды и скутеры 
+      [DEFERRED] L3 [3] Снегоходы
+      [DEFERRED] L3 [4] Квадроциклы и багги
+    L2 [3] Грузовики и спецтехника
+      L3 [1] Грузовики 
+      L3 [2] Сельхозтехника 
+      L3 [3] Коммерческий транспорт
+      [DEFERRED] L3 [4] Экскаваторы
+      [DEFERRED] L3 [5] Автобусы
+      [DEFERRED] L3 [6] Автодома
+      [DEFERRED] L3 [7] Автокраны
+      [DEFERRED] L3 [8] Бульдозеры
+      [DEFERRED] L3 [9] Коммунальная техника
+      [DEFERRED] L3 [10] Навесное оборудование
+      [DEFERRED] L3 [11] Погрузчики
+      [DEFERRED] L3 [12] Строительная техника
+      [DEFERRED] L3 [13] Техника для лесозаготовки
+      [DEFERRED] L3 [14] Другое
+    L2 [4] Водный транспорт (listing_purpose: Продажа, Аренда)
+      L3 [1] Катера и яхты 
+      L3 [2] Моторные лодки
+      L3 [3] Вёсельные лодки
+      L3 [4] Гидроциклы 
+    L2 [5] Запчасти и аксессуары (alt path from Товары.Запчасти, listing_purpose: Продажа))
+      L3 [1] Запчасти 
+      L3 [2] Шины, диски и колёса 
+      L3 [3] Аксессуары
+      L3 [4] Инструменты (alt path)
+      L3 [5] Экипировка (alt path)
+      L3 [6] Масла и автохимия 
+      L3 [7] Противоугонные устройства 
+      L3 [8] GPS-навигаторы 
+      L3 [9] Аудио- и видеотехника (alt path)
+      L3 [10] Багажники и фаркопы 
+      L3 [11] Прицепы 
+  L1 [3] Товары  (listing_purpose: Продажа)
+    L2 [1] Одежда, обувь, аксессуары
+      L3 [1] Женская одежда
+      L3 [2] Женская обувь 
+      L3 [3] Мужская одежда 
+      L3 [4] Мужская обувь 
+      L3 [5] Сумки, рюкзаки и чемоданы 
+      L3 [6] Аксессуары 
+    L2 [2] Детская одежда и обувь
+      L3 [1] Для девочек
+      L3 [2] Для мальчиков 
+    L2 [3] Товары для детей и игрушки
+      L3 [1] Игрушки 
+      L3 [2] Детские коляски 
+      L3 [3] Автомобильные кресла
+      L3 [4] Детская мебель
+      L3 [5] Товары для кормления
+      L3 [6] Товары для купания
+      L3 [7] Товары для школы
+      L3 [8] Постельные принадлежности
+      [DEFERRED] L3 [9] Самокаты и беговелы (детские)
+      [DEFERRED] L3 [10] Детская гигиена
+    L2 [4] Красота и здоровье
+      L3 [1] Макияж и маникюр
+      L3 [2] Парфюмерия
+      L3 [3] Уход и гигиена
+      L3 [4] Средства для волос
+      L3 [5] Приборы и аксессуары
+      L3 [6] Медицинские изделия
+      [DEFERRED] L3 [7] БАДы
+    L2 [5] Часы и украшения
+      L3 [1] Ювелирные изделия
+      L3 [2] Часы
+      L3 [3] Бижутерия
+    L2 [6] Для дома и дачи
+      L3 [1] Мебель и интерьер
+      L3 [2] Ремонт и строительство
+      L3 [3] Бытовая техника
+      L3 [4] Продукты питания
+      L3 [5] Растения
+      L3 [6] Посуда и товары для кухни
+    L2 [7] Электроника
+      L3 [1] Телефоны
+      L3 [2] Аудио и видео
+      L3 [3] Компьютеры
+      L3 [4] Ноутбуки
+      L3 [5] Планшеты
+      L3 [6] Фототехника
+      L3 [7] Игры, приставки, программы
+      L3 [8] Другое
+    L2 [8] Хобби и отдых
+      L3 [1] Велосипеды (alt path from Транспорт, listing_purpose: Продажа, Прокат)
+      L3 [2] Книги и журналы
+      L3 [3] Музыкальные инструменты
+      L3 [4] Спорт и отдых
+      [DEFERRED] L3 [5] Билеты и путешествия
+      L3 [6] Охота и рыбалка
+      [DEFERRED] L3 [7] Коллекционирование
+
+  L1 [4] Животные (listing_purpose: Продажа, Отдаю, Потеряные, Найденные)
+    L2 [1] Собаки
+    L2 [2] Кошки
+    L2 [3] Птицы
+    L2 [4] Рыбы и аквариумные животные
+    L2 [5] Другие животные
+      L3 [1] Кролики
+      L3 [2] Грызуны
+      L3 [3] Рептилии
+      L3 [4] Амфибии
+      L3 [5] С/х животные
+      L3 [6] Хорьки
+      L3 [7] Лошади
+      L3 [8] Другое
+    L2 [6] Товары для животных
+      L3 [1] Корм и сухой корм
+      L3 [2] Игрушки для животных
+      L3 [3] Аксессуары для животных
+      L3 [4] Для собак и кошек
+      L3 [5] Для птиц
+  L1 [5] Услуги, Работа, Вакансии (listing_purpose: Предлагаю работу, Ищу работу, Предлагаю услуги)
+    L2 [1] IT, интернет, телеком 
+    L2 [2] Маркетинг, реклама, PR 
+    L2 [3] Продажи
+    L2 [4] Управление персоналом 
+    L2 [5] Образование, наука 
+    L2 [6] Медицина, фармацевтика 
+    L2 [7] Юриспруденция
+    L2 [10] Гостиничный бизнес и туризм
+    L2 [11] Доставка, грузоперевозки и логистика
+    L2 [14] Уборка и клининг
+    L2 [15] Консалтинг
+    L2 [16] НКО и общественная деятельность
+    L2 [17] Общественное питание
+    L2 [18] Охрана и общественный порядок
+    L2 [19] Переработка отходов
+    L2 [27] Ремонт
+        L2 [1] Ремонт техники 
+        L2 [2] Ремонт одежды
+        L2 [2] Ремонт оборудования
+        L2 [2] Ремонт и отделка помещений
+    L2 [28] Розничная и оптовая торговля
+    L2 [29] Сельское хозяйство
+    L2 [30] Склады и хранилища
+    L2 [33] Строительство жилых и коммерческих объектов
+    L2 [34] Строительство промышленных и инфраструктурных объектов
+    L2 [35] Такси и пассажирские перевозки
+    L2 [39] Фитнес, салоны красоты, спа
+    L2 [40] Архитектура и дизайн
+    L2 [41] Бытовые и персональные услуги
+    L2 [43] Искусство и развлечения
+    L2 [44] Организация мероприятий
+    L2 [4] Бухгалтерия, финансы
+    L2 [5] Управление персоналом
+    L2 [6] Образование, наука
+    L2 [10] Без опыта, студенты
+    L2 [12] Охрана, безопасность
+    L2 [13] Транспорт, логистика
+    L2 [14] Строительство
+    L2 [15] Рестораны
+    L2 [17] Курьерская доставка
+    L2 [18] Консультирование
+    L2 [19] Госслужба, НКО
+    L2 [20] Домашний персонал
+    L2 [21] ЖКХ, эксплуатация
+    L2 [22] Искусство, развлечения
+    L2 [24] Страхование
+    L2 [2] Репетиторство и обучение     
+      L3 [1] Уборка квартир
+    L2 [5] Оцифровка и IT-услуги
+      L3 [1] Настройка ПК/ноутбуков (listing_purpose: Предлагаю услугу)
+      L3 [2] Ремонт смартфонов (listing_purpose: Предлагаю услугу)
+      L3 [3] Программирование и разработка
+      L3 [4] Создание сайтов и приложений
+      [DEFERRED] L3 [5] Продвижение в соцсетях и SEO
+      [DEFERRED] L3 [6] Дизайн и графика
+    L2 [6] Общие услуги
+      L3 [1] Стрижка/укладка волос
+      L3 [2] Массаж
+      L3 [3] Фотосессии
+      L3 [4] Услуги флориста
+      L3 [5] Выгул собак
+      L3 [6] Психология и терапия
+    L2 [7] Строительные услуги
+      [DEFERRED] L3 [1] Строительство домов и коттеджей
+      L3 [2] Ремонт квартир
+      L3 [3] Терассы
+      L3 [4] Монтаж напольных покрытий
+      L3 [5] Штукатурные и шпаклёвочные работы
+      L3 [5] Сантехника
+      L3 [5] Гидроизоляция
+      L3 [5] Электрика
+
+
+  L1 [7] Бизнес
+    L2 [1] Готовый бизнес(listing_purpose: Продажа)
+      [DEFERRED] L3 [2] Франшизы
+    L2 [2] Оборудование для бизнеса (listing_purpose: Продажа, Аренда)
+      L3 [1] Торговое оборудование
+      L3 [2] Пищевое оборудование
+      L3 [3] Офисное оборудование
+      L3 [4] Промышленное оборудование
+      L3 [5] Логистика и склад
+      L3 [6] Для салона красоты
+      L3 [7] Для автобизнеса
+      L3 [10] Медицинское оборудование
+    L2 [3] Коммерческая недвижимость (listing_purpose: Продажа, Аренда)
+      L3 Офисы
+      L3 Свободного назначения
+      L3 Торговые площади
+      L3 Склады
+      L3 Земельные участки (commercial)
+    L2 [8] Услуги (alt path from Услуги)
+      L3 [1] Бухгалтерия
+      L3 [2] Юридические услуги
+      L3 [3] Налоги
+      L3 [4] Оценка недвижимости
+      L3 [4] Переводы
+      [DEFERRED] L3 [5] Бизнес-консалтинг
+
+  L1 [8] Благотворительность (auto-populated)
+    (No MPTT children — populated via CategoryPath when Ad.price = 0 or NULL)
+    System rule: When Ad.price = 0 or NULL → CategoryPath(category=<ad's category>, parent=Благотворительность, is_automatic=True)
+    When price changes from 0 to positive → remove automatic CategoryPath
+
+================================================================================
+# ALTERNATIVE PATHS (CategoryPath — non-MPTT navigation only)
+================================================================================
+
+The following categories appear under multiple parent categories. The canonical
+parent is the first listed; alternative paths use CategoryPath model.
+
+1. Велосипеды (Bicycles)
+   - Canonical path: Товары → Хобби и отдых → Велосипеды
+   - Alternative path: Транспорт → Велосипеды (via CategoryPath)
+
+2. Запчасти и аксессуары (Auto Parts & Accessories)
+   - Canonical path: Транспорт → Запчасти и аксессуары
+   - Alternative path: Товары → Запчасти и аксессуары (via CategoryPath)
+
+3. [DEFERRED] Офисы (Offices - commercial real estate)
+   - Canonical path: Недвижимость → Коммерческая недвижимость → Офисы
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Офисы (via CategoryPath)
+
+4. Земельные участки (Land plots - commercial)
+   - Canonical path: Недвижимость → Земельные участки
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Земельные участки (commercial) (via CategoryPath)
+
+5. Гаражи и машиноместа
+   - Canonical path: Недвижимость → Гаражи и машиноместа
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Гаражи и машиноместа (via CategoryPath)
+
+6. [DEFERRED] Свободного назначения
+   - Canonical path: Недвижимость → Коммерческая недвижимость → Свободного назначения
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Свободного назначения (via CategoryPath)
+
+7. [DEFERRED] Торговые площади
+   - Canonical path: Недвижимость → Коммерческая недвижимость → Торговые площади
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Торговые площади (via CategoryPath)
+
+8. [DEFERRED] Склады
+   - Canonical path: Недвижимость → Коммерческая недвижимость → Склады
+   - Alternative path: [DEFERRED] Бизнес → Недвижимость для бизнеса → Склады (via CategoryPath)
+
+9. Стройматериалы (Building materials)
+   - Canonical path: Товары → Для дома и дачи → Ремонт и строительство → Стройматериалы
+   - Alternative path: [DEFERRED] Стройматериалы и сырье → Стройматериалы (via CategoryPath)
+
+10. Готовые строения и срубы
+    - Canonical path: Товары → Для дома и дачи → Ремонт и строительство → Готовые строения и срубы
+    - Alternative path: [DEFERRED] Стройматериалы и сырье → Готовые строения и срубы (via CategoryPath)
+
+================================================================================
+# GLOBAL LISTING PURPOSES (LookupGroup: listing_purpose)
+================================================================================
+
+Applied to ALL categories — each category picks a subset.
+
+| Code | Slug | RU Name |
+|------|------|---------|
+| sell | sell | Продажа |
+| rent_long | rent-long | Долгосрочная аренда |
+| rent_short | rent-short | Посуточная аренда |
+| give_away | give-away | Отдаю бесплатно |
+| want_to_buy | want-to-buy | Ищу для покупки |
+| offer_service | offer-service | Предлагаю услугу |
+| seek_service | seek-service | Ищу услугу |
+| offer_tutoring | offer-tutoring | Предлагаю обучение |
+| seek_tutoring | seek-tutoring | Ищу преподавателя |
+| rent_item | rent-item | Прокат |
+| job_offer | job-offer | Предлагаю работу |
+| job_seek | job-seek | Ищу работу |
+
+================================================================================
+# GLOBAL LISTING FEATURES (LookupGroup: listing_feature)
+================================================================================
+
+Applied to ALL categories — each category picks a subset.
+
+| Code | Slug | RU Name |
+|------|------|---------|
+| new | new | Новый |
+| used | used | Б/У |
+| with_photo | with-photo | С фото |
+| with_video | with-video | С видео |
+| delivery_available | delivery | Доставка есть |
+| pickup_available | pickup | Самовывоз |
+| price_negotiable | negotiable | Торг уместен |
+| credit_available | credit | В кредит |
+| exchange_available | exchange | В обмен |
+| installment_available | installment | Рассрочка |
+| urgent | urgent | Срочно |
+| luxury | luxury | Премиум |
+| eco_friendly | eco | Экологично |
+| handmade | handmade | Сделано вручную |
+| branded | branded | Брендированный |
+| custom_order | custom | Под заказ |
+| warranty | warranty | С гарантией |
+| no_warranty | no-warranty | Без гарантии |
+| original_packaging | packaging | Оригинальная упаковка |
+| import | import | Импорт |
+| local_production | local | Местное производство |
+| energy_efficient | efficient | Энергоэффективный |
+| smart_home | smart-home | Умный дом |
+| commercial_purpose | commercial | Коммерческое назначение |
+| residential_purpose | residential | Жилое назначение |
+
+================================================================================
+# SUMMARY OF DEFERRED CATEGORIES
+================================================================================
+
+Total Avito L3 categories: ~230
+Active (non-deferred): ~85
+Deferred: ~145
+
+Deferred categories by top-level section:
+
+Недвижимость:
+  - Коммерческая недвижимость (most sub-items deferred, kept parent for structure)
+  - Зарубежная недвижимость
+  - Свободного назначения, Торговые площади
+
+Транспорт:
+  - Вездеходы, Картинг, Снегоходы, Квадроциклы и багги (within Мотоциклы и мототехника)
+  - Экскаваторы, Автобусы, Автодома, Автокраны, Бульдозеры, Коммунальная техника,
+    Навесное оборудование, Погрузчики, Строительная техника, Техника для лесозаготовки
+    (within Грузовики и спецтехника)
+  - Вёсльные лодки, Гидроциклы (within Водный транспорт)
+  - Рейлинги, Экспедиционные багажники, Автобоксы, КУНГ, Бортовые прицепы, Эвакуаторы, Щётки стеклоочистителя, Защита и декор, Набор автомобилиста, Отопительное оборудование (within auto accessories)
+
+Товары:
+  - Винтажные образы, Деловой стиль, Жизнь в движении, Время отдохнуть, Как на праздник (lifestyle)
+  - Самокаты и беговелы, Детская гигиена (within Товары для детей)
+  - БАДы (within Красота и здоровье)
+  - Оргтехника и расходники, Электронные книги (within Электроника)
+  - Билеты и путешествия, Охота и рыбалка, Коллекционирование (within Хобби и отдых)
+  - Вся категория "Стройматериалы и сырье" (deferred as L2, sub-items deferred)
+    *** NOTE: This is the #1 priority category for un-deferring in Phase 2.
+        Market evidence: kupujemprodajem.com "Građevinarstvo" ranks 5th with 7M pageviews
+        (Montenegro/Serbia building materials demand is measurable) ***
+
+Животные:
+  - Потерянные и найденные животные (both sub-items)
+
+Работа:
+  - ~40 specialized industry subcategories under "Ищу работу" (all except IT, Маркетинг, Продажи,
+    Управление персоналом, Образование, Медицина, Юриспруденция, Банки, Без опыта, Высший менеджмент, Охрана)
+  - ~15 specialized subcategories under "Ищу сотрудника" (all except core ones)
+
+Услуги:
+  - Программирование и разработка, Создание сайтов и приложений, Продвижение и SEO,
+    Дизайн и графика (within IT-услуги)
+  - Фотосессии, Услуги флориста, Выгул собак, Психология и терапия (within Общие услуги)
+  - All subcategories under "Строительные услуги" (5 items)
+  - All subcategories under "Бизнес-услуги" (5 items)
+
+Бизнес:
+  - Франшизы (partial)
+  - Промышленное, Логистика, Склад, Для салона красоты, Для автобизнеса, Майнинг,
+    Лабораторное, Медицинское, Телекоммуникационное (within Оборудование для бизнеса)
+  - Вся категория "ПО для бизнеса" (9 sub-items)
+
+================================================================================
+# NOTES
+================================================================================
+
+1. Благотворительность (Charity) — L1 [8]
+   - Is a real top-level Category in MPTT tree but has NO direct MPTT children
+   - Populated automatically via CategoryPath when Ad.price = 0 or NULL
+   - System creates: CategoryPath(category=<ad's canonical category>, parent=Благотворительность, is_automatic=True)
+   - When price changes from 0 to positive → automatic CategoryPath removed
+   - Sellers cannot manually post into Благотворительность
+
+2. Listing purposes and features are NOT part of the category tree.
+   They are stored in LookupGroup tables (listing_purpose, listing_feature).
+   Each category defines which purposes and features it supports via M2M through tables.
+
+3. Alternative paths (CategoryPath) are for navigation only — they do not change the
+   canonical MPTT parent. Ad.category always points to the canonical category.
+
+4. Slugs are copied from old IDs or left empty. New IDs assigned during migration.
