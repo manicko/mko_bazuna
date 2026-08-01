@@ -20,9 +20,9 @@ The Mko Bazuna classifieds board needs a scalable architecture for ad categories
    - All lookups are cacheable and indexed for search/filtering
    - No EAV pattern is used (standard PostgreSQL FK/M:N only)
 
-3. **Top-level category structure** — the category hierarchy must be organized under 8 fixed top-level sections:
+3. **Top-level category structure** — the category hierarchy must be organized under 7 fixed top-level sections:
    - **Недвижимость** (Real Estate)
-   - **Транспорт** (Auto)
+   - **Транспорт** (Transport)
    - **Товары** (Goods)
    - **Животные** (Animals)
    - **Услуги, работа, вакансии** (Services)
@@ -184,10 +184,16 @@ LookupItem:
 **CategoryListingPurpose:**
 ```
 CategoryListingPurpose:
-  id             — AutoField (PK)
-  category       — FK -> Category (CASCADE)
+  id              — AutoField (PK)
+  category        — FK -> Category (CASCADE)
   listing_purpose — FK -> LookupItem (CASCADE, group restricted to listing_purpose at app level)
+  is_default      — BooleanField(default=False, help_text="Default purpose for this category; used for auto-select when seller doesn't choose explicitly")
 ```
+
+- Unique constraint: `(category, listing_purpose)` — no duplicate purpose bindings
+- Only one purpose per category can have `is_default = True` (enforced at application level)
+- If a category has exactly 1 linked purpose → it is treated as default by application logic, regardless of the `is_default` flag
+- If a category has 2+ linked purposes and one has `is_default = True` → pre-select that one in UI
 
 **CategoryListingFeature:**
 ```
@@ -197,8 +203,21 @@ CategoryListingFeature:
   feature        — FK -> LookupItem (CASCADE, group restricted to listing_feature at app level)
 ```
 
-- Unique constraint: `(category, listing_purpose)` and `(category, feature)` pairs
-- These are pure M:N through tables (no additional metadata columns)
+- Unique constraint: `(category, feature)` pairs
+- Pure M:N through table (no additional metadata columns for Phase 1)
+
+#### Default Purpose Selection Logic (Application Rule)
+
+The bot FSM and any future posting UI follows this rule when selecting listing_purpose:
+
+1. Query `CategoryListingPurpose` for the ad's category
+2. If count == 1 → auto-select that purpose, **skip the purpose selection step** entirely in the bot FSM
+3. If count > 1 → check `is_default`:
+   - If one purpose has `is_default = True` → pre-select it, show choice with default highlighted
+   - If no purpose has `is_default = True` → show choice without pre-selection, seller must pick
+4. If count == 0 → this should not happen (category setup ensures at least one purpose), but fall back to a system-configured default or block posting
+
+This keeps the posting flow efficient: categories like "Телефоны" with only `sell` as purpose skip the step entirely. Categories like "Квартиры" with `sell`, `rent`, `rent_request` show the choice with one pre-selected if admin configured a default.
 
 ### 2.3 Ad Model Changes
 
@@ -355,7 +374,7 @@ AdFeature:
 1. **Category uniqueness** — a category entity exists once; alternative paths are additional *ways to find it*, not separate entities. Slug is globally unique.
 2. **Ad category scope** — an ad always belongs to exactly one canonical category (FK). Alternative paths (including auto-paths to Благотворительность) don't duplicate ads.
 3. **Navigation priority** — canonical MPTT tree is primary navigation; alternative paths are supplemental.
-4. **Top-level categories are fixed** — the 8 top-level sections (Недвижимость, Авто, Товары, Животные, Работа, Услуги, Бизнес, Благотворительность) are defined upfront and should not change without re-categorization of existing content.
+4. **Top-level categories are fixed** — the 7 top-level sections (Недвижимость, Авто, Товары, Животные, Услуги-работа-вакансии, Бизнес, Благотворительность) are defined upfront and should not change without re-categorization of existing content.
 5. **Lookup group extensibility** — `listing_purpose` and `listing_feature` are shipped with the project; new groups can be added by admin at any time.
 6. **Bot primary interface** — in Phase 1, sellers post only through Telegram bot. Web posting is deferred.
 7. **Single currency** — price is in BAM only (multi-currency deferred per YAGNI).
