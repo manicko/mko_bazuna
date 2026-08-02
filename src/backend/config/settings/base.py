@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "apps.moderation",
     "apps.search",
     "apps.media",
+    "apps.lookups",
     "apps.trust",
     "apps.analytics",
     "apps.seed",

@@ -2,6 +2,7 @@
 Django admin registration for ads app.
 
 Admin with status/category/city/date filters and reject/ban actions.
+Includes listing_purpose and features display for lookup integration.
 """
 
 import logging
@@ -49,6 +50,14 @@ def action_ad_link(obj: AdImage) -> str:
 action_ad_link.short_description = "Ad ID"  # type: ignore[attr-defined]
 
 
+def features_list(obj: Ad) -> str:
+    """Display features as comma-separated slugs."""
+    return ", ".join(f.slug for f in obj.features.all())
+
+
+features_list.short_description = "Features"  # type: ignore[attr-defined]
+
+
 @admin.register(Ad)
 class AdAdmin(admin.ModelAdmin):
     """
@@ -63,18 +72,27 @@ class AdAdmin(admin.ModelAdmin):
         "status",
         "category",
         "city",
+        "listing_purpose",
         user_link,
         "published_at",
         rejected_reason,
     ]
-    list_filter = ["status", "category", "city", "created_at", "published_at",
-                       "moderation_priority__priority_level"]
+    list_filter = [
+        "status",
+        "category",
+        "city",
+        "listing_purpose",
+        "created_at",
+        "published_at",
+        "moderation_priority__priority_level",
+    ]
     search_fields = ["title", "description"]
     readonly_fields = [
         "moderation_failed_at",
         "rejected_at",
         "published_by",
         "moderated_by",
+        "listing_purpose",
     ]
     date_hierarchy = "created_at"
     actions = ["action_reject", "action_ban_user", "action_soft_delete", "action_approve"]
@@ -82,8 +100,8 @@ class AdAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """Optimize queryset with related select and priority prefetch."""
         qs = super().get_queryset(request)
-        return qs.select_related("user", "category", "city").prefetch_related(
-            "moderation_priority"
+        return qs.select_related("user", "category", "city", "listing_purpose").prefetch_related(
+            "moderation_priority", "features"
         )
 
     def has_view_permission(self, request, obj=None) -> bool:

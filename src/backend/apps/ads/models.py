@@ -5,7 +5,10 @@ Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 """
 
 
+import os
+
 from apps.core.enums import AdSource, AdStatus
+from apps.lookups.enums import LookupGroupCode
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
@@ -61,6 +64,24 @@ class Ad(models.Model):
         on_delete=models.PROTECT,
         related_name="ads",
         help_text="Ad city location",
+    )
+
+    # Listing purpose and features (lookup integration)
+    listing_purpose = models.ForeignKey(
+        "lookups.LookupItem",
+        on_delete=models.PROTECT,
+        limit_choices_to={"group__code": LookupGroupCode.LISTING_PURPOSE},
+        related_name="ads",
+        null=True,
+        blank=True,
+        help_text="What the user wants to do with the object",
+    )
+    features = models.ManyToManyField(
+        "lookups.LookupItem",
+        through="ads.AdFeature",
+        through_fields=("ad", "feature"),
+        blank=True,
+        related_name="featured_ads",
     )
 
     # Denormalized category name (editable=False, trigger-synced)
@@ -376,6 +397,13 @@ class AdImage(models.Model):
         null=True,
         help_text="Storage key for large thumbnail (<uuid>-large.jpg)",
     )
+    sha256 = models.CharField(
+        max_length=64,
+        db_index=True,
+        blank=True,
+        default="",
+        help_text="SHA-256 hex digest for deduplication",
+    )
 
     class Meta:
         db_table = "ad_images"
@@ -383,6 +411,40 @@ class AdImage(models.Model):
 
     def __str__(self) -> str:
         return f"AdImage {self.id} for Ad {self.ad_id}"
+
+    def save(self, *args, **kwargs) -> None:
+        """Override save to auto-compute SHA-256 on creation and skip duplicates.
+
+        If the same user already has an AdImage with the same SHA-256 hash,
+        the duplicate is not created (returns early).
+        """
+        from apps.media.services.hash_service import FileHashService
+
+        if self._state.adding or not self.sha256:
+            media_root = settings.MEDIA_ROOT
+            if isinstance(media_root, str):
+                file_path = os.path.join(media_root, self.image)
+            else:
+                file_path = str(media_root / self.image)
+
+            if os.path.exists(file_path):
+                file_hash = FileHashService.calculate_sha256(file_path)
+                self.sha256 = file_hash
+
+                # Check for existing duplicate by same user
+                if self._state.adding and self.ad_id:
+                    user_id = Ad.objects.filter(id=self.ad_id).values_list(
+                        "user_id", flat=True
+                    ).first()
+                    if user_id:
+                        duplicate = AdImage.objects.filter(
+                            sha256=file_hash,
+                            ad__user_id=user_id,
+                        ).exclude(id=self.id).exists()
+                        if duplicate:
+                            return  # Skip duplicate
+
+        super().save(*args, **kwargs)
 
     @property
     def image_url(self) -> str:
@@ -406,3 +468,33 @@ class AdImage(models.Model):
         if self.thumbnail_large:
             return f"{settings.MEDIA_URL}{self.thumbnail_large}"
         return None
+
+
+class AdFeature(models.Model):
+    """Through model for Ad ↔ LookupItem (listing_feature) M:N relationship.
+
+    Stores the display order of features on the ad page.
+    """
+
+    ad = models.ForeignKey(
+        Ad,
+        on_delete=models.CASCADE,
+        related_name="ad_features",
+    )
+    feature = models.ForeignKey(
+        "lookups.LookupItem",
+        on_delete=models.CASCADE,
+        limit_choices_to={"group__code": LookupGroupCode.LISTING_FEATURE},
+    )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order of this feature on the ad page",
+    )
+
+    class Meta:
+        db_table = "ad_features"
+        unique_together = [("ad", "feature")]
+        ordering = ["sort_order"]
+
+    def __str__(self) -> str:
+        return f"Ad {self.ad_id} -> {self.feature.slug}"

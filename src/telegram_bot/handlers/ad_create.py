@@ -12,6 +12,7 @@ from aiogram import Bot, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from django.conf import settings
 
 from apps.ads.models import Ad, AdImage
@@ -39,6 +40,8 @@ class AdCreateForm(StatesGroup):
     """FSM states for ad creation."""
 
     category = AdCreateState.CATEGORY
+    purpose = AdCreateState.PURPOSE
+    features = AdCreateState.FEATURES
     city = AdCreateState.CITY
     title = AdCreateState.TITLE
     description = AdCreateState.DESCRIPTION
@@ -109,11 +112,8 @@ async def process_category(message: types.Message, state: FSMContext) -> None:
 
     if len(categories) == 1:
         await state.update_data(category_id=categories[0].id)
-        await state.set_state(AdCreateForm.city)
-        await message.answer(
-            f"Category: {categories[0].name}\n"
-            "Now select a city. Send a city name."
-        )
+        # Resolve listing purposes for this category
+        await process_category_selected(message, state, categories[0])
         return
 
     # Show top 3-5 suggestions
@@ -126,6 +126,122 @@ async def process_category(message: types.Message, state: FSMContext) -> None:
         f"Please choose a category:\n{suggestion_text}\n"
         "Reply with the number or full category name."
     )
+
+
+async def process_category_selected(
+    message: types.Message, state: FSMContext, category: Category
+) -> None:
+    """Handle category selection: resolve purposes and determine next step."""
+    purposes = await get_resolved_purposes(category.id)
+
+    if not purposes:
+        # Fallback: no purposes configured — use sell as default
+        default_purpose = await get_lookup_item_by_slug("sell")
+        if default_purpose:
+            await state.update_data(listing_purpose_id=default_purpose.id)
+            await proceed_to_features_or_city(message, state, category.id)
+        else:
+            await message.answer(
+                "No listing purposes configured for this category. "
+                "Please contact support."
+            )
+        return
+
+    if len(purposes) == 1:
+        # Single purpose: auto-select, skip to features
+        await state.update_data(listing_purpose_id=purposes[0].id)
+        await proceed_to_features_or_city(message, state, category.id)
+        return
+
+    # Multiple purposes: show choice
+    default_purpose = await get_default_purpose(category.id, purposes)
+    keyboard = build_purpose_keyboard(purposes, default_purpose.slug if default_purpose else None)
+    await state.set_state(AdCreateForm.purpose)
+    await message.answer(
+        f"Category: {category.name}\n"
+        "Select the purpose of your listing:",
+        reply_markup=keyboard,
+    )
+
+
+async def proceed_to_features_or_city(
+    message: types.Message, state: FSMContext, category_id: int
+) -> None:
+    """Resolve features and either show them or skip to city selection."""
+    features = await get_resolved_features(category_id)
+
+    if features:
+        await state.set_state(AdCreateForm.features)
+        await state.update_data(feature_ids=[])
+        keyboard = build_feature_keyboard(features, set())
+        await message.answer(
+            "Select features for your listing (optional):\n"
+            "Tap to toggle, then tap Done.",
+            reply_markup=keyboard,
+        )
+    else:
+        # No features: skip to city
+        await state.set_state(AdCreateForm.city)
+        await message.answer(
+            "Now select a city. Send a city name."
+        )
+
+
+# --- Purpose step ---
+@router.callback_query(AdCreateForm.purpose, lambda c: c.data and c.data.startswith("purpose:"))
+async def process_purpose(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process purpose selection from inline keyboard."""
+    if not callback.data or not callback.message:
+        return
+
+    slug = callback.data.replace("purpose:", "")
+    purpose_item = await get_lookup_item_by_slug(slug)
+    if not purpose_item:
+        await callback.answer("Purpose not found.")
+        return
+
+    await state.update_data(listing_purpose_id=purpose_item.id)
+    data = await state.get_data()
+    await callback.answer()
+
+    await proceed_to_features_or_city(
+        callback.message, state, data.get("category_id")
+    )
+
+
+# --- Features step ---
+@router.callback_query(AdCreateForm.features)
+async def process_features(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process feature toggles from inline keyboard."""
+    if not callback.data or not callback.message:
+        return
+
+    data = await state.get_data()
+    selected_ids = set(data.get("feature_ids", []))
+
+    if callback.data == "features_done":
+        await state.update_data(feature_ids=list(selected_ids))
+        await callback.answer()
+        await state.set_state(AdCreateForm.city)
+        await callback.message.answer(
+            "Now select a city. Send a city name."
+        )
+        return
+
+    if callback.data.startswith("feature:"):
+        feature_id = int(callback.data.replace("feature:", ""))
+        if feature_id in selected_ids:
+            selected_ids.discard(feature_id)
+        else:
+            selected_ids.add(feature_id)
+
+        await state.update_data(feature_ids=list(selected_ids))
+
+        # Update keyboard with new selection state
+        features = await get_resolved_features(data.get("category_id"))
+        keyboard = build_feature_keyboard(features, selected_ids)
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
+        await callback.answer()
 
 
 # --- City step ---
@@ -301,6 +417,12 @@ async def show_preview(message: types.Message, data: dict) -> None:
     """Show ad preview before submission."""
     category = await get_category(data.get("category_id"))
     city = await get_city(data.get("city_id"))
+    purpose = await get_lookup_item(data.get("listing_purpose_id"))
+    purpose_name = purpose.name_i18n.get("ru", purpose.slug) if purpose and purpose.name_i18n else (purpose.slug if purpose else "N/A")
+    feature_ids = data.get("feature_ids", [])
+    feature_names = ", ".join(
+        await get_feature_names(feature_ids)
+    ) if feature_ids else "None"
 
     preview_text = (
         f"Ad Preview:\n\n"
@@ -308,6 +430,8 @@ async def show_preview(message: types.Message, data: dict) -> None:
         f"Description: {data.get('description', 'N/A')[:100]}...\n"
         f"Price: {data.get('price', 'N/A')} BAM\n"
         f"Category: {category.name if category else 'N/A'}\n"
+        f"Purpose: {purpose_name}\n"
+        f"Features: {feature_names}\n"
         f"City: {city.name if city else 'N/A'}\n"
     )
 
@@ -352,6 +476,8 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             price=data.get("price"),
             photos=data.get("photos", []),
             user_id=data.get("user_id"),
+            listing_purpose_id=data.get("listing_purpose_id"),
+            feature_ids=data.get("feature_ids"),
         )
 
         if is_valid:
@@ -547,6 +673,8 @@ async def update_ad_and_moderate(
     title_en: str = "",
     desc_en: str = "",
     original_language: str | None = None,
+    listing_purpose_id: int | None = None,
+    feature_ids: list[int] | None = None,
 ) -> tuple[bool, list[str]]:
     """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
 
@@ -582,7 +710,15 @@ async def update_ad_and_moderate(
         if original_language:
             ad.original_language = original_language
 
+        # Save listing purpose
+        if listing_purpose_id:
+            ad.listing_purpose_id = listing_purpose_id
+
         ad.save()
+
+        # Save features (M2M via through model)
+        if feature_ids is not None:
+            ad.features.set(feature_ids)
 
         # Create AdImage records and generate thumbnails
         for photo in photos:
@@ -655,3 +791,136 @@ async def translate_all_languages(text: str, target_locales: list[str]) -> dict[
         *[translate_one(text, loc) for loc in target_locales]
     )
     return dict(zip(target_locales, results, strict=True))
+
+
+# --- Purpose / Feature helper functions ---
+
+async def get_resolved_purposes(category_id: int) -> list:
+    """Get resolved listing purposes for a category."""
+    from asgiref.sync import sync_to_async
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
+
+    @sync_to_async
+    def _get():
+        from apps.categories.models import Category
+        try:
+            cat = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return []
+        resolver = CategoryLookupResolver()
+        return list(resolver.get_resolved_purposes(cat))
+
+    return await _get()
+
+
+async def get_resolved_features(category_id: int) -> list:
+    """Get resolved listing features for a category."""
+    from asgiref.sync import sync_to_async
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
+
+    @sync_to_async
+    def _get():
+        from apps.categories.models import Category
+        try:
+            cat = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return []
+        resolver = CategoryLookupResolver()
+        return list(resolver.get_resolved_features(cat))
+
+    return await _get()
+
+
+async def get_default_purpose(category_id: int, purposes: list) -> object | None:
+    """Get the default purpose for a category, if configured."""
+    from asgiref.sync import sync_to_async
+    from apps.categories.models import CategoryListingPurpose
+
+    @sync_to_async
+    def _get():
+        try:
+            clp = CategoryListingPurpose.objects.get(
+                category_id=category_id,
+                is_default=True,
+            )
+            return clp.listing_purpose
+        except CategoryListingPurpose.DoesNotExist:
+            return None
+
+    return await _get()
+
+
+async def get_lookup_item_by_slug(slug: str):
+    """Get a LookupItem by slug."""
+    from asgiref.sync import sync_to_async
+    from apps.lookups.models import LookupItem
+
+    @sync_to_async
+    def _get():
+        try:
+            return LookupItem.objects.get(slug=slug)
+        except LookupItem.DoesNotExist:
+            return None
+
+    return await _get()
+
+
+async def get_lookup_item(item_id: int | None):
+    """Get a LookupItem by ID."""
+    if item_id is None:
+        return None
+    from asgiref.sync import sync_to_async
+    from apps.lookups.models import LookupItem
+
+    @sync_to_async
+    def _get():
+        try:
+            return LookupItem.objects.get(id=item_id)
+        except LookupItem.DoesNotExist:
+            return None
+
+    return await _get()
+
+
+async def get_feature_names(feature_ids: list[int]) -> list[str]:
+    """Get feature names as localized strings."""
+    from asgiref.sync import sync_to_async
+    from apps.lookups.models import LookupItem
+
+    @sync_to_async
+    def _get():
+        items = LookupItem.objects.filter(id__in=feature_ids)
+        names = []
+        for item in items:
+            if item.name_i18n and isinstance(item.name_i18n, dict):
+                names.append(item.name_i18n.get("ru", item.slug))
+            else:
+                names.append(item.slug)
+        return names
+
+    return await _get()
+
+
+def build_purpose_keyboard(purposes: list, default_slug: str | None = None) -> types.InlineKeyboardMarkup:
+    """Build inline keyboard for purpose selection."""
+    builder = InlineKeyboardBuilder()
+    for purpose in purposes:
+        text = purpose.name_i18n.get("ru", purpose.slug) if purpose.name_i18n else purpose.slug
+        if purpose.slug == default_slug:
+            text = f"✅ {text}"
+        builder.button(text=text, callback_data=f"purpose:{purpose.slug}")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def build_feature_keyboard(features: list, selected_ids: set) -> types.InlineKeyboardMarkup:
+    """Build inline keyboard for feature multi-selection."""
+    builder = InlineKeyboardBuilder()
+    for feature in features:
+        text = feature.name_i18n.get("ru", feature.slug) if feature.name_i18n else feature.slug
+        if feature.id in selected_ids:
+            text = f"✅ {text}"
+        builder.button(text=text, callback_data=f"feature:{feature.id}")
+    builder.button(text="✔️ Done", callback_data="features_done")
+    builder.adjust(2)
+    return builder.as_markup()

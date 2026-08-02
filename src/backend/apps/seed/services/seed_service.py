@@ -199,32 +199,18 @@ class SeedService:
         logger.info("Cleaned existing seed data")
 
     def _load_category_fixtures(self) -> list[Category]:
-        """Load category fixtures from JSON file.
+        """Load categories via catalog builder.
+
+        Replaces the old JSON fixture approach with the same builder module
+        used by the catalog data migration.
 
         Returns:
             List of Category instances saved to DB.
         """
-        fixture_path = FIXTURES_DIR / "categories.json"
-        if not fixture_path.exists():
-            logger.warning("Categories fixture not found at %s", fixture_path)
-            return []
+        CONFIG_PATH = "apps/categories/catalog/categories.yaml"
+        from apps.categories.catalog.builder import load_catalog
 
-        from django.core.serializers import deserialize
-
-        with open(fixture_path, encoding="utf-8") as f:
-            data = f.read()
-
-        objs: list[Category] = []
-        for deserialized in deserialize("json", data):
-            obj = deserialized.object
-            objs.append(obj)
-
-        # Bulk create categories
-        Category.objects.bulk_create(objs, ignore_conflicts=True)
-
-        # Rebuild MPTT tree
-        Category.objects.rebuild()
-
+        load_catalog(CONFIG_PATH)
         return list(Category.objects.all())
 
     def _load_city_fixtures(self) -> list[City]:

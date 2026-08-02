@@ -1,0 +1,800 @@
+# Canonical catalog configuration for Mko Bazuna
+# Source of truth for categories, lookups, and category path bindings.
+# Generated from .ai/problems/categories_tree_bazuna.md
+
+lookups:
+  listing_purpose:
+    - slug: sell
+      name_i18n: {ru: "Продажа", bs: "Prodaja", en: "Sell"}
+      sort_order: 1
+    - slug: give-away
+      name_i18n: {ru: "Отдаю бесплатно", bs: "Poklanjam", en: "Give away"}
+      sort_order: 2
+    - slug: rent
+      name_i18n: {ru: "Аренда", bs: "Iznajmljivanje", en: "Rent"}
+      sort_order: 3
+    - slug: rent-short
+      name_i18n: {ru: "Посуточная аренда", bs: "Dnevni najam", en: "Short-term rent"}
+      sort_order: 4
+    - slug: lost
+      name_i18n: {ru: "Потерянные", bs: "Izgubljeno", en: "Lost"}
+      sort_order: 5
+    - slug: found
+      name_i18n: {ru: "Найденные", bs: "Pronađeno", en: "Found"}
+      sort_order: 6
+    - slug: offer-service
+      name_i18n: {ru: "Предлагаю услугу", bs: "Nudim uslugu", en: "Offer service"}
+      sort_order: 7
+    - slug: seek-service
+      name_i18n: {ru: "Ищу услугу", bs: "Tražim uslugu", en: "Seek service"}
+      sort_order: 8
+    - slug: job-offer
+      name_i18n: {ru: "Предлагаю работу", bs: "Nudim posao", en: "Job offer"}
+      sort_order: 9
+    - slug: job-seek
+      name_i18n: {ru: "Ищу работу", bs: "Tražim posao", en: "Job seek"}
+      sort_order: 10
+
+  listing_feature:
+    - slug: new
+      name_i18n: {ru: "Новый", bs: "Novo", en: "New"}
+      sort_order: 1
+    - slug: used
+      name_i18n: {ru: "Б/У", bs: "Polovno", en: "Used"}
+      sort_order: 2
+    - slug: delivery
+      name_i18n: {ru: "Доставка есть", bs: "Dostava", en: "Delivery available"}
+      sort_order: 3
+    - slug: pickup
+      name_i18n: {ru: "Самовывоз", bs: "Lično preuzimanje", en: "Pickup"}
+      sort_order: 4
+    - slug: negotiable
+      name_i18n: {ru: "Торг уместен", bs: "Pogodba moguća", en: "Negotiable"}
+      sort_order: 5
+    - slug: credit
+      name_i18n: {ru: "В кредит", bs: "Na kredit", en: "Credit available"}
+      sort_order: 6
+    - slug: exchange
+      name_i18n: {ru: "В обмен", bs: "Zamjena", en: "Exchange"}
+      sort_order: 7
+    - slug: installment
+      name_i18n: {ru: "Рассрочка", bs: "Rate", en: "Installment"}
+      sort_order: 8
+    - slug: urgent
+      name_i18n: {ru: "Срочно", bs: "Hitno", en: "Urgent"}
+      sort_order: 9
+    - slug: luxury
+      name_i18n: {ru: "Премиум", bs: "Luksuz", en: "Luxury"}
+      sort_order: 10
+    - slug: eco
+      name_i18n: {ru: "Экологично", bs: "Eko", en: "Eco-friendly"}
+      sort_order: 11
+    - slug: handmade
+      name_i18n: {ru: "Сделано вручную", bs: "Ručni rad", en: "Handmade"}
+      sort_order: 12
+    - slug: branded
+      name_i18n: {ru: "Брендированный", bs: "Brendiran", en: "Branded"}
+      sort_order: 13
+    - slug: custom
+      name_i18n: {ru: "Под заказ", bs: "Po narudžbi", en: "Custom order"}
+      sort_order: 14
+    - slug: warranty
+      name_i18n: {ru: "С гарантией", bs: "Garantija", en: "With warranty"}
+      sort_order: 15
+    - slug: packaging
+      name_i18n: {ru: "Оригинальная упаковка", bs: "Originalno pakovanje", en: "Original packaging"}
+      sort_order: 16
+    - slug: import
+      name_i18n: {ru: "Импорт", bs: "Uvoz", en: "Import"}
+      sort_order: 17
+    - slug: local
+      name_i18n: {ru: "Местное производство", bs: "Lokalna proizvodnja", en: "Local production"}
+      sort_order: 18
+    - slug: smart-home
+      name_i18n: {ru: "Умный дом", bs: "Pametna kuća", en: "Smart home"}
+      sort_order: 19
+
+categories:
+  - slug: real-estate
+    name: "Недвижимость"
+    name_i18n: {ru: "Недвижимость", bs: "Nekretnine", en: "Real Estate"}
+    listing_purpose_override: [sell, rent, rent-short]
+    listing_feature_override: [negotiable, credit, installment, urgent, luxury, smart-home, eco, exchange]
+    children:
+      - slug: apartments
+        name: "Квартиры"
+        name_i18n: {ru: "Квартиры", bs: "Stanovi", en: "Apartments"}
+      - slug: houses
+        name: "Дома, дачи, коттеджи"
+        name_i18n: {ru: "Дома, дачи, коттеджи", bs: "Kuće, vikendice", en: "Houses, Cottages"}
+      - slug: rooms
+        name: "Комнаты"
+        name_i18n: {ru: "Комнаты", bs: "Sobe", en: "Rooms"}
+      - slug: garages
+        name: "Гаражи и машиноместа"
+        name_i18n: {ru: "Гаражи и машиноместа", bs: "Garaže", en: "Garages"}
+        listing_purpose_override: [sell, rent]
+      - slug: land-plots
+        name: "Земельные участки"
+        name_i18n: {ru: "Земельные участки", bs: "Zemljišta", en: "Land Plots"}
+        listing_purpose_override: [sell, rent]
+      - slug: other-real-estate
+        name: "Прочая недвижимость"
+        name_i18n: {ru: "Прочая недвижимость", bs: "Ostale nekretnine", en: "Other Real Estate"}
+        listing_purpose_override: [sell, rent]
+      - slug: commercial-real-estate
+        name: "Коммерческая недвижимость"
+        name_i18n: {ru: "Коммерческая недвижимость", bs: "Komercijalne nekretnine", en: "Commercial Real Estate"}
+        listing_purpose_override: [sell, rent]
+        children:
+          - slug: offices
+            name: "Офисы"
+            name_i18n: {ru: "Офисы", bs: "Kancelarije", en: "Offices"}
+          - slug: flex-space
+            name: "Свободного назначения"
+            name_i18n: {ru: "Свободного назначения", bs: "Slobodne namjene", en: "Flex Space"}
+          - slug: retail-spaces
+            name: "Торговые площади"
+            name_i18n: {ru: "Торговые площади", bs: "Poslovni prostori", en: "Retail Spaces"}
+          - slug: warehouses
+            name: "Склады"
+            name_i18n: {ru: "Склады", bs: "Skladišta", en: "Warehouses"}
+          - slug: commercial-land
+            name: "Земельные участки (коммерческие)"
+            name_i18n: {ru: "Земельные участки (коммерческие)", bs: "Komercijalna zemljišta", en: "Commercial Land"}
+
+  - slug: transport
+    name: "Транспорт"
+    name_i18n: {ru: "Транспорт", bs: "Transport", en: "Transport"}
+    listing_purpose_override: [sell, rent]
+    listing_feature_override: [new, used, delivery, pickup, negotiable, credit, exchange, urgent, warranty]
+    children:
+      - slug: cars
+        name: "Автомобили"
+        name_i18n: {ru: "Автомобили", bs: "Automobili", en: "Cars"}
+      - slug: motorcycles
+        name: "Мотоциклы и мототехника"
+        name_i18n: {ru: "Мотоциклы и мототехника", bs: "Motocikli", en: "Motorcycles"}
+        children:
+          - slug: motorcycles-sub
+            name: "Мотоциклы"
+            name_i18n: {ru: "Мотоциклы", bs: "Motocikli", en: "Motorcycles"}
+          - slug: scooters
+            name: "Мопеды и скутеры"
+            name_i18n: {ru: "Мопеды и скутеры", bs: "Mopedi i skuteri", en: "Scooters"}
+          - slug: bicycles
+            name: "Велосипеды"
+            name_i18n: {ru: "Велосипеды", bs: "Bicikli", en: "Bicycles"}
+          - slug: scooters-scooters
+            name: "Самокаты"
+            name_i18n: {ru: "Самокаты", bs: "Trotineti", en: "Scooters"}
+      - slug: trucks
+        name: "Грузовики и спецтехника"
+        name_i18n: {ru: "Грузовики и спецтехника", bs: "Kamioni", en: "Trucks"}
+        children:
+          - slug: trucks-sub
+            name: "Грузовики"
+            name_i18n: {ru: "Грузовики", bs: "Kamioni", en: "Trucks"}
+          - slug: agricultural-machinery
+            name: "Сельхозтехника"
+            name_i18n: {ru: "Сельхозтехника", bs: "Poljoprivredna mehanizacija", en: "Agricultural Machinery"}
+          - slug: commercial-vehicles
+            name: "Коммерческий транспорт"
+            name_i18n: {ru: "Коммерческий транспорт", bs: "Komercijalna vozila", en: "Commercial Vehicles"}
+          - slug: campers
+            name: "Автодома"
+            name_i18n: {ru: "Автодома", bs: "Kamperi", en: "Campers"}
+      - slug: water-transport
+        name: "Водный транспорт"
+        name_i18n: {ru: "Водный транспорт", bs: "Vodeni transport", en: "Water Transport"}
+        children:
+          - slug: boats-yachts
+            name: "Катера и яхты"
+            name_i18n: {ru: "Катера и яхты", bs: "Brodovi i jahte", en: "Boats and Yachts"}
+          - slug: motorboats
+            name: "Моторные лодки"
+            name_i18n: {ru: "Моторные лодки", bs: "Motorni čamci", en: "Motorboats"}
+          - slug: sailing-boats
+            name: "Вёсельные лодки"
+            name_i18n: {ru: "Вёсельные лодки", bs: "Veslački čamci", en: "Sailing Boats"}
+          - slug: personal-watercraft
+            name: "Гидроциклы"
+            name_i18n: {ru: "Гидроциклы", bs: "Vodeni skuteri", en: "Personal Watercraft"}
+      - slug: auto-parts
+        name: "Запчасти и аксессуары"
+        name_i18n: {ru: "Запчасти и аксессуары", bs: "Rezervni dijelovi", en: "Auto Parts"}
+        listing_purpose_override: [sell]
+        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty, packaging, branded, import, local]
+        children:
+          - slug: parts
+            name: "Запчасти"
+            name_i18n: {ru: "Запчасти", bs: "Rezervni dijelovi", en: "Parts"}
+          - slug: tires-wheels
+            name: "Шины, диски и колёса"
+            name_i18n: {ru: "Шины, диски и колёса", bs: "Gume i felge", en: "Tires and Wheels"}
+          - slug: auto-accessories
+            name: "Аксессуары"
+            name_i18n: {ru: "Аксессуары", bs: "Dodatna oprema", en: "Accessories"}
+          - slug: auto-tools
+            name: "Инструменты"
+            name_i18n: {ru: "Инструменты", bs: "Alat", en: "Tools"}
+          - slug: auto-equipment
+            name: "Экипировка"
+            name_i18n: {ru: "Экипировка", bs: "Oprema", en: "Equipment"}
+          - slug: oils-chemicals
+            name: "Масла и автохимия"
+            name_i18n: {ru: "Масла и автохимия", bs: "Ulja i autohemija", en: "Oils and Chemicals"}
+          - slug: anti-theft
+            name: "Противоугонные устройства"
+            name_i18n: {ru: "Противоугонные устройства", bs: "Protivprovalni uređaji", en: "Anti-theft Devices"}
+          - slug: gps-navigators
+            name: "GPS-навигаторы"
+            name_i18n: {ru: "GPS-навигаторы", bs: "GPS navigatori", en: "GPS Navigators"}
+          - slug: auto-audio-video
+            name: "Аудио- и видеотехника"
+            name_i18n: {ru: "Аудио- и видеотехника", bs: "Audio i video", en: "Audio and Video"}
+          - slug: roof-boxes-hitches
+            name: "Багажники и фаркопы"
+            name_i18n: {ru: "Багажники и фаркопы", bs: "Krovni nosači", en: "Roof Boxes and Hitches"}
+          - slug: trailers
+            name: "Прицепы"
+            name_i18n: {ru: "Прицепы", bs: "Prikolice", en: "Trailers"}
+
+  - slug: goods
+    name: "Товары"
+    name_i18n: {ru: "Товары", bs: "Roba", en: "Goods"}
+    listing_purpose_override: [sell]
+    listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, handmade, branded, custom, warranty, packaging, import, local, eco]
+    children:
+      - slug: clothing-shoes-accessories
+        name: "Одежда, обувь, аксессуары"
+        name_i18n: {ru: "Одежда, обувь, аксессуары", bs: "Odjeća, obuća, dodaci", en: "Clothing, Shoes, Accessories"}
+        children:
+          - slug: women-clothing
+            name: "Женская одежда"
+            name_i18n: {ru: "Женская одежда", bs: "Ženska odjeća", en: "Women's Clothing"}
+          - slug: women-shoes
+            name: "Женская обувь"
+            name_i18n: {ru: "Женская обувь", bs: "Ženska obuća", en: "Women's Shoes"}
+          - slug: men-clothing
+            name: "Мужская одежда"
+            name_i18n: {ru: "Мужская одежда", bs: "Muška odjeća", en: "Men's Clothing"}
+          - slug: men-shoes
+            name: "Мужская обувь"
+            name_i18n: {ru: "Мужская обувь", bs: "Muška obuća", en: "Men's Shoes"}
+          - slug: bags-luggage
+            name: "Сумки, рюкзаки и чемоданы"
+            name_i18n: {ru: "Сумки, рюкзаки и чемоданы", bs: "Torbe i ruksaci", en: "Bags and Luggage"}
+          - slug: accessories
+            name: "Аксессуары"
+            name_i18n: {ru: "Аксессуары", bs: "Dodaci", en: "Accessories"}
+      - slug: kids-clothing-shoes
+        name: "Детская одежда и обувь"
+        name_i18n: {ru: "Детская одежда и обувь", bs: "Dječija odjeća i obuća", en: "Kids' Clothing and Shoes"}
+        children:
+          - slug: girls
+            name: "Для девочек"
+            name_i18n: {ru: "Для девочек", bs: "Za djevojčice", en: "For Girls"}
+          - slug: boys
+            name: "Для мальчиков"
+            name_i18n: {ru: "Для мальчиков", bs: "Za dječake", en: "For Boys"}
+      - slug: kids-products-toys
+        name: "Товары для детей и игрушки"
+        name_i18n: {ru: "Товары для детей и игрушки", bs: "Dječiji proizvodi i igračke", en: "Kids' Products and Toys"}
+        children:
+          - slug: toys
+            name: "Игрушки"
+            name_i18n: {ru: "Игрушки", bs: "Igračke", en: "Toys"}
+          - slug: strollers
+            name: "Детские коляски"
+            name_i18n: {ru: "Детские коляски", bs: "Dječija kolica", en: "Strollers"}
+          - slug: car-seats
+            name: "Автомобильные кресла"
+            name_i18n: {ru: "Автомобильные кресла", bs: "Auto sjedalice", en: "Car Seats"}
+          - slug: kids-furniture
+            name: "Детская мебель"
+            name_i18n: {ru: "Детская мебель", bs: "Dječiji namještaj", en: "Kids' Furniture"}
+          - slug: feeding-products
+            name: "Товары для кормления"
+            name_i18n: {ru: "Товары для кормления", bs: "Proizvodi za hranjenje", en: "Feeding Products"}
+          - slug: bath-products
+            name: "Товары для купания"
+            name_i18n: {ru: "Товары для купания", bs: "Proizvodi za kupanje", en: "Bath Products"}
+          - slug: school-supplies
+            name: "Товары для школы"
+            name_i18n: {ru: "Товары для школы", bs: "Školski pribor", en: "School Supplies"}
+          - slug: bed-linen
+            name: "Постельные принадлежности"
+            name_i18n: {ru: "Постельные принадлежности", bs: "Posteljina", en: "Bed Linen"}
+          - slug: kids-scooters-bikes
+            name: "Самокаты и беговелы"
+            name_i18n: {ru: "Самокаты и беговелы", bs: "Trotineti i bicikli", en: "Kids' Scooters and Bikes"}
+          - slug: kids-hygiene
+            name: "Детская гигиена"
+            name_i18n: {ru: "Детская гигиена", bs: "Dječija higijena", en: "Kids' Hygiene"}
+      - slug: beauty-health
+        name: "Красота и здоровье"
+        name_i18n: {ru: "Красота и здоровье", bs: "Ljepota i zdravlje", en: "Beauty and Health"}
+        children:
+          - slug: makeup-manicure
+            name: "Макияж и маникюр"
+            name_i18n: {ru: "Макияж и маникюр", bs: "Šminka i manikir", en: "Makeup and Manicure"}
+          - slug: perfumes
+            name: "Парфюмерия"
+            name_i18n: {ru: "Парфюмерия", bs: "Parfemi", en: "Perfumes"}
+          - slug: care-hygiene
+            name: "Уход и гигиена"
+            name_i18n: {ru: "Уход и гигиена", bs: "Njega i higijena", en: "Care and Hygiene"}
+          - slug: hair-care
+            name: "Средства для волос"
+            name_i18n: {ru: "Средства для волос", bs: "Proizvodi za kosu", en: "Hair Care"}
+          - slug: beauty-appliances
+            name: "Приборы и аксессуары"
+            name_i18n: {ru: "Приборы и аксессуары", bs: "Aparati i dodaci", en: "Appliances and Accessories"}
+          - slug: medical-products
+            name: "Медицинские изделия"
+            name_i18n: {ru: "Медицинские изделия", bs: "Medicinski proizvodi", en: "Medical Products"}
+      - slug: watches-jewelry
+        name: "Часы и украшения"
+        name_i18n: {ru: "Часы и украшения", bs: "Satovi i nakit", en: "Watches and Jewelry"}
+        children:
+          - slug: jewelry
+            name: "Ювелирные изделия"
+            name_i18n: {ru: "Ювелирные изделия", bs: "Nakit", en: "Jewelry"}
+          - slug: watches
+            name: "Часы"
+            name_i18n: {ru: "Часы", bs: "Satovi", en: "Watches"}
+          - slug: costume-jewelry
+            name: "Бижутерия"
+            name_i18n: {ru: "Бижутерия", bs: "Bižuterija", en: "Costume Jewelry"}
+      - slug: home-garden
+        name: "Для дома и дачи"
+        name_i18n: {ru: "Для дома и дачи", bs: "Za dom i baštu", en: "Home and Garden"}
+        children:
+          - slug: furniture-interior
+            name: "Мебель и интерьер"
+            name_i18n: {ru: "Мебель и интерьер", bs: "Namještaj", en: "Furniture and Interior"}
+          - slug: repair-construction
+            name: "Ремонт и строительство"
+            name_i18n: {ru: "Ремонт и строительство", bs: "Popravka i gradnja", en: "Repair and Construction"}
+          - slug: appliances
+            name: "Бытовая техника"
+            name_i18n: {ru: "Бытовая техника", bs: "Kućni aparati", en: "Appliances"}
+          - slug: food-products
+            name: "Продукты питания"
+            name_i18n: {ru: "Продукты питания", bs: "Prehrambeni proizvodi", en: "Food Products"}
+            listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, local, eco, import]
+          - slug: plants
+            name: "Растения"
+            name_i18n: {ru: "Растения", bs: "Biljke", en: "Plants"}
+            listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, local, eco]
+          - slug: kitchen-dining
+            name: "Посуда и товары для кухни"
+            name_i18n: {ru: "Посуда и товары для кухни", bs: "Posuđe", en: "Kitchen and Dining"}
+      - slug: electronics
+        name: "Электроника"
+        name_i18n: {ru: "Электроника", bs: "Elektronika", en: "Electronics"}
+        children:
+          - slug: phones
+            name: "Телефоны"
+            name_i18n: {ru: "Телефоны", bs: "Telefoni", en: "Phones"}
+          - slug: audio-video
+            name: "Аудио и видео"
+            name_i18n: {ru: "Аудио и видео", bs: "Audio i video", en: "Audio and Video"}
+          - slug: computers
+            name: "Компьютеры"
+            name_i18n: {ru: "Компьютеры", bs: "Računari", en: "Computers"}
+          - slug: laptops
+            name: "Ноутбуки"
+            name_i18n: {ru: "Ноутбуки", bs: "Laptopovi", en: "Laptops"}
+          - slug: tablets
+            name: "Планшеты"
+            name_i18n: {ru: "Планшеты", bs: "Tableti", en: "Tablets"}
+          - slug: cameras
+            name: "Фототехника"
+            name_i18n: {ru: "Фототехника", bs: "Foto oprema", en: "Cameras"}
+          - slug: games-consoles-software
+            name: "Игры, приставки, программы"
+            name_i18n: {ru: "Игры, приставки, программы", bs: "Igre, konzole", en: "Games, Consoles, Software"}
+          - slug: other-electronics
+            name: "Другое"
+            name_i18n: {ru: "Другое", bs: "Ostalo", en: "Other"}
+      - slug: hobby-leisure
+        name: "Хобби и отдых"
+        name_i18n: {ru: "Хобби и отдых", bs: "Hobi i slobodno vrijeme", en: "Hobby and Leisure"}
+        children:
+          - slug: hobby-bicycles
+            name: "Велосипеды"
+            name_i18n: {ru: "Велосипеды", bs: "Bicikli", en: "Bicycles"}
+          - slug: hobby-scooters
+            name: "Самокаты"
+            name_i18n: {ru: "Самокаты", bs: "Trotineti", en: "Scooters"}
+          - slug: books-magazines
+            name: "Книги и журналы"
+            name_i18n: {ru: "Книги и журналы", bs: "Knjige i časopisi", en: "Books and Magazines"}
+          - slug: musical-instruments
+            name: "Музыкальные инструменты"
+            name_i18n: {ru: "Музыкальные инструменты", bs: "Muzički instrumenti", en: "Musical Instruments"}
+          - slug: sports-outdoors
+            name: "Спорт и отдых"
+            name_i18n: {ru: "Спорт и отдых", bs: "Sport i rekreacija", en: "Sports and Outdoors"}
+          - slug: tickets-travel
+            name: "Билеты и путешествия"
+            name_i18n: {ru: "Билеты и путешествия", bs: "Ulaznice i putovanja", en: "Tickets and Travel"}
+          - slug: hunting-fishing
+            name: "Охота и рыбалка"
+            name_i18n: {ru: "Охота и рыбалка", bs: "Lov i ribolov", en: "Hunting and Fishing"}
+
+  - slug: animals
+    name: "Животные"
+    name_i18n: {ru: "Животные", bs: "Životinje", en: "Animals"}
+    listing_purpose_override: [sell, give-away, lost, found]
+    listing_feature_override: [delivery, pickup, negotiable, urgent]
+    children:
+      - slug: dogs
+        name: "Собаки"
+        name_i18n: {ru: "Собаки", bs: "Psi", en: "Dogs"}
+      - slug: cats
+        name: "Кошки"
+        name_i18n: {ru: "Кошки", bs: "Mačke", en: "Cats"}
+      - slug: birds
+        name: "Птицы"
+        name_i18n: {ru: "Птицы", bs: "Ptice", en: "Birds"}
+      - slug: fish-aquarium
+        name: "Рыбы и аквариумные животные"
+        name_i18n: {ru: "Рыбы и аквариумные животные", bs: "Ribe i akvarijumi", en: "Fish and Aquarium"}
+      - slug: other-animals
+        name: "Другие животные"
+        name_i18n: {ru: "Другие животные", bs: "Ostale životinje", en: "Other Animals"}
+      - slug: pet-supplies
+        name: "Товары для животных"
+        name_i18n: {ru: "Товары для животных", bs: "Proizvodi za životinje", en: "Pet Supplies"}
+        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty, branded, import, local]
+        children:
+          - slug: pet-food
+            name: "Корм и сухой корм"
+            name_i18n: {ru: "Корм и сухой корм", bs: "Hrana za životinje", en: "Pet Food"}
+          - slug: pet-toys
+            name: "Игрушки для животных"
+            name_i18n: {ru: "Игрушки для животных", bs: "Igračke za životinje", en: "Pet Toys"}
+          - slug: pet-accessories
+            name: "Аксессуары для животных"
+            name_i18n: {ru: "Аксессуары для животных", bs: "Dodaci za životinje", en: "Pet Accessories"}
+          - slug: pet-dogs-cats
+            name: "Для собак и кошек"
+            name_i18n: {ru: "Для собак и кошек", bs: "Za pse i mačke", en: "For Dogs and Cats"}
+          - slug: pet-birds
+            name: "Для птиц"
+            name_i18n: {ru: "Для птиц", bs: "Za ptice", en: "For Birds"}
+
+  - slug: services-jobs
+    name: "Услуги, работа, вакансии"
+    name_i18n: {ru: "Услуги, работа, вакансии", bs: "Usluge, posao", en: "Services, Jobs"}
+    listing_purpose_override: [job-seek, job-offer, seek-service, offer-service]
+    listing_feature_override: [negotiable, urgent]
+    children:
+      - slug: repair-service
+        name: "Ремонт и сервис"
+        name_i18n: {ru: "Ремонт и сервис", bs: "Popravka i servis", en: "Repair Service"}
+        children:
+          - slug: phone-repair
+            name: "Ремонт телефонов"
+            name_i18n: {ru: "Ремонт телефонов", bs: "Popravka telefona", en: "Phone Repair"}
+          - slug: laptop-pc-repair
+            name: "Ремонт ноутбуков и ПК"
+            name_i18n: {ru: "Ремонт ноутбуков и ПК", bs: "Popravka laptopova", en: "Laptop and PC Repair"}
+          - slug: appliance-repair
+            name: "Ремонт бытовой техники"
+            name_i18n: {ru: "Ремонт бытовой техники", bs: "Popravka kućnih aparata", en: "Appliance Repair"}
+          - slug: clothing-repair
+            name: "Пошив и ремонт одежды"
+            name_i18n: {ru: "Пошив и ремонт одежды", bs: "Krojenje i popravka", en: "Clothing Repair"}
+          - slug: shoe-repair
+            name: "Ремонт обуви"
+            name_i18n: {ru: "Ремонт обуви", bs: "Popravka obuće", en: "Shoe Repair"}
+          - slug: car-repair
+            name: "Ремонт авто"
+            name_i18n: {ru: "Ремонт авто", bs: "Popravka automobila", en: "Car Repair"}
+      - slug: construction-renovation
+        name: "Строительство и ремонт помещений"
+        name_i18n: {ru: "Строительство и ремонт помещений", bs: "Građevina i renoviranje", en: "Construction and Renovation"}
+        children:
+          - slug: flooring-installation
+            name: "Монтаж напольных покрытий"
+            name_i18n: {ru: "Монтаж напольных покрытий", bs: "Montaža podova", en: "Flooring Installation"}
+          - slug: plastering
+            name: "Штукатурка и шпаклёвка"
+            name_i18n: {ru: "Штукатурка и шпаклёвка", bs: "Gipsanje", en: "Plastering"}
+          - slug: plumbing
+            name: "Сантехника"
+            name_i18n: {ru: "Сантехника", bs: "Vodovod", en: "Plumbing"}
+          - slug: waterproofing
+            name: "Гидроизоляция"
+            name_i18n: {ru: "Гидроизоляция", bs: "Hidroizolacija", en: "Waterproofing"}
+          - slug: electrical
+            name: "Электрика"
+            name_i18n: {ru: "Электрика", bs: "Elektrika", en: "Electrical"}
+          - slug: ac-installation
+            name: "Монтаж и обслуживание кондиционеров"
+            name_i18n: {ru: "Монтаж и обслуживание кондиционеров", bs: "Montaža klima", en: "AC Installation"}
+          - slug: terraces-balconies
+            name: "Терассы и балконы"
+            name_i18n: {ru: "Терассы и балконы", bs: "Terase i balkoni", en: "Terraces and Balconies"}
+          - slug: commercial-construction
+            name: "Строительство коммерческих помещений"
+            name_i18n: {ru: "Строительство коммерческих помещений", bs: "Komercijalna gradnja", en: "Commercial Construction"}
+          - slug: residential-construction
+            name: "Строительство жилых помещений"
+            name_i18n: {ru: "Строительство жилых помещений", bs: "Stambena gradnja", en: "Residential Construction"}
+      - slug: it-computers
+        name: "IT и компьютеры"
+        name_i18n: {ru: "IT и компьютеры", bs: "IT i računari", en: "IT and Computers"}
+        children:
+          - slug: pc-setup
+            name: "Настройка ПК и ноутбуков"
+            name_i18n: {ru: "Настройка ПК и ноутбуков", bs: "Podešavanje računara", en: "PC Setup"}
+          - slug: programming
+            name: "Программирование"
+            name_i18n: {ru: "Программирование", bs: "Programiranje", en: "Programming"}
+          - slug: web-development
+            name: "Создание сайтов и приложений"
+            name_i18n: {ru: "Создание сайтов и приложений", bs: "Izgradnja web stranica", en: "Web Development"}
+      - slug: beauty-health-services
+        name: "Красота и здоровье"
+        name_i18n: {ru: "Красота и здоровье", bs: "Ljepota i zdravlje", en: "Beauty and Health"}
+        children:
+          - slug: hair-styling
+            name: "Стрижка и укладка волос"
+            name_i18n: {ru: "Стрижка и укладка волос", bs: "Šišanje", en: "Hair Styling"}
+          - slug: manicure
+            name: "Маникюр"
+            name_i18n: {ru: "Маникюр", bs: "Manikir", en: "Manicure"}
+          - slug: pedicure
+            name: "Педикюр"
+            name_i18n: {ru: "Педикюр", bs: "Pedikir", en: "Pedicure"}
+          - slug: skincare
+            name: "Уход за кожей"
+            name_i18n: {ru: "Уход за кожей", bs: "Njega kože", en: "Skincare"}
+          - slug: hair-care-services
+            name: "Уход за волосами"
+            name_i18n: {ru: "Уход за волосами", bs: "Njega kose", en: "Hair Care"}
+          - slug: massage
+            name: "Массаж"
+            name_i18n: {ru: "Массаж", bs: "Masaža", en: "Massage"}
+          - slug: sport-fitness
+            name: "Спорт и фитнес"
+            name_i18n: {ru: "Спорт и фитнес", bs: "Sport i fitnes", en: "Sport and Fitness"}
+          - slug: beauty-salons-spa
+            name: "Салоны красоты и SPA"
+            name_i18n: {ru: "Салоны красоты и SPA", bs: "Saloni ljepote", en: "Beauty Salons and SPA"}
+          - slug: psychology
+            name: "Психология"
+            name_i18n: {ru: "Психология", bs: "Psihologija", en: "Psychology"}
+          - slug: medicine
+            name: "Медицина"
+            name_i18n: {ru: "Медицина", bs: "Medicina", en: "Medicine"}
+      - slug: transport-logistics
+        name: "Транспорт и перевозки"
+        name_i18n: {ru: "Транспорт и перевозки", bs: "Transport", en: "Transport and Logistics"}
+        children:
+          - slug: tow-truck
+            name: "Эвакуатор"
+            name_i18n: {ru: "Эвакуатор", bs: "Šlep služba", en: "Tow Truck"}
+          - slug: taxi
+            name: "Такси"
+            name_i18n: {ru: "Такси", bs: "Taksi", en: "Taxi"}
+          - slug: delivery-courier
+            name: "Перевозки, курьерская доставка"
+            name_i18n: {ru: "Перевозки, курьерская доставка", bs: "Kurirska dostava", en: "Delivery and Courier"}
+          - slug: freight
+            name: "Грузоперевозки"
+            name_i18n: {ru: "Грузоперевозки", bs: "Transport tereta", en: "Freight"}
+      - slug: cleaning
+        name: "Уборка"
+        name_i18n: {ru: "Уборка", bs: "Čišćenje", en: "Cleaning"}
+        children:
+          - slug: apartment-cleaning
+            name: "Уборка квартир"
+            name_i18n: {ru: "Уборка квартир", bs: "Čišćenje stanova", en: "Apartment Cleaning"}
+          - slug: carpet-cleaning
+            name: "Химчистка ковров и мебели"
+            name_i18n: {ru: "Химчистка ковров и мебели", bs: "Hemijsko čišćenje", en: "Carpet Cleaning"}
+          - slug: office-cleaning
+            name: "Уборка офисов"
+            name_i18n: {ru: "Уборка офисов", bs: "Čišćenje ureda", en: "Office Cleaning"}
+          - slug: cleaning-service
+            name: "Клининг"
+            name_i18n: {ru: "Клининг", bs: "Usluge čišćenja", en: "Cleaning Service"}
+      - slug: events-entertainment
+        name: "Мероприятия и развлечения"
+        name_i18n: {ru: "Мероприятия и развлечения", bs: "Događaji", en: "Events and Entertainment"}
+        children:
+          - slug: arts
+            name: "Искусство"
+            name_i18n: {ru: "Искусство", bs: "Umjetnost", en: "Arts"}
+          - slug: event-planning
+            name: "Организация мероприятий"
+            name_i18n: {ru: "Организация мероприятий", bs: "Planiranje događaja", en: "Event Planning"}
+          - slug: photoshoots
+            name: "Фотосессии"
+            name_i18n: {ru: "Фотосессии", bs: "Fotografisanje", en: "Photoshoots"}
+          - slug: florist
+            name: "Услуги флориста"
+            name_i18n: {ru: "Услуги флориста", bs: "Cvjećarske usluge", en: "Florist"}
+      - slug: tutoring-education
+        name: "Репетиторство и обучение"
+        name_i18n: {ru: "Репетиторство и обучение", bs: "Poduke", en: "Tutoring and Education"}
+        children:
+          - slug: tutors
+            name: "Репетиторы"
+            name_i18n: {ru: "Репетиторы", bs: "Instruktori", en: "Tutors"}
+          - slug: courses-training
+            name: "Курсы и тренинги"
+            name_i18n: {ru: "Курсы и тренинги", bs: "Kursevi", en: "Courses and Training"}
+      - slug: finance-legal
+        name: "Финансы и юридические услуги"
+        name_i18n: {ru: "Финансы и юридические услуги", bs: "Finansije i pravne usluge", en: "Finance and Legal"}
+        children:
+          - slug: accounting
+            name: "Бухгалтерия"
+            name_i18n: {ru: "Бухгалтерия", bs: "Računovodstvo", en: "Accounting"}
+          - slug: legal-services
+            name: "Юридические услуги"
+            name_i18n: {ru: "Юридические услуги", bs: "Pravne usluge", en: "Legal Services"}
+          - slug: tax-planning
+            name: "Налоговое планирование"
+            name_i18n: {ru: "Налоговое планирование", bs: "Poresko planiranje", en: "Tax Planning"}
+          - slug: property-valuation
+            name: "Оценка недвижимости"
+            name_i18n: {ru: "Оценка недвижимости", bs: "Procjena nekretnina", en: "Property Valuation"}
+          - slug: translations
+            name: "Переводы"
+            name_i18n: {ru: "Переводы", bs: "Prevod", en: "Translations"}
+      - slug: security
+        name: "Охрана"
+        name_i18n: {ru: "Охрана", bs: "Sigurnost", en: "Security"}
+      - slug: home-services
+        name: "Домашние услуги"
+        name_i18n: {ru: "Домашние услуги", bs: "Kućne usluge", en: "Home Services"}
+        children:
+          - slug: dog-walking
+            name: "Выгул собак"
+            name_i18n: {ru: "Выгул собак", bs: "Šetanje pasa", en: "Dog Walking"}
+          - slug: housekeeping
+            name: "Домашний персонал"
+            name_i18n: {ru: "Домашний персонал", bs: "Kućno osoblje", en: "Housekeeping"}
+          - slug: home-food-service
+            name: "Пищевое обслуживание"
+            name_i18n: {ru: "Пищевое обслуживание", bs: "Usluga hrane", en: "Food Service"}
+      - slug: no-experience-jobs
+        name: "Без опыта, подработка, студенты"
+        name_i18n: {ru: "Без опыта, подработка, студенты", bs: "Bez iskustva", en: "No Experience Jobs"}
+        listing_purpose_override: [job-seek]
+        listing_feature_override: [negotiable]
+      - slug: food-service-jobs
+        name: "Общественное питание"
+        name_i18n: {ru: "Общественное питание", bs: "Ugostiteljstvo", en: "Food Service"}
+        children:
+          - slug: restaurants
+            name: "Рестораны"
+            name_i18n: {ru: "Рестораны", bs: "Restorani", en: "Restaurants"}
+          - slug: catering
+            name: "Общественное питание"
+            name_i18n: {ru: "Общественное питание", bs: "Catering", en: "Catering"}
+      - slug: agriculture
+        name: "Сельское хозяйство"
+        name_i18n: {ru: "Сельское хозяйство", bs: "Poljoprivreda", en: "Agriculture"}
+      - slug: trading
+        name: "Торговля"
+        name_i18n: {ru: "Торговля", bs: "Trgovina", en: "Trading"}
+      - slug: warehousing
+        name: "Склады"
+        name_i18n: {ru: "Склады", bs: "Skladištenje", en: "Warehousing"}
+      - slug: other-services
+        name: "Прочие услуги"
+        name_i18n: {ru: "Прочие услуги", bs: "Ostale usluge", en: "Other Services"}
+
+  - slug: business
+    name: "Бизнес"
+    name_i18n: {ru: "Бизнес", bs: "Biznis", en: "Business"}
+    listing_purpose_override: [sell, rent]
+    listing_feature_override: [new, used, delivery, pickup, negotiable, credit, installment, urgent, warranty, luxury]
+    children:
+      - slug: ready-business
+        name: "Готовый бизнес"
+        name_i18n: {ru: "Готовый бизнес", bs: "Gotov biznis", en: "Ready Business"}
+        listing_purpose_override: [sell]
+        listing_feature_override: [negotiable, urgent, credit, installment, luxury]
+      - slug: business-equipment
+        name: "Оборудование для бизнеса"
+        name_i18n: {ru: "Оборудование для бизнеса", bs: "Poslovna oprema", en: "Business Equipment"}
+        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty]
+        children:
+          - slug: retail-equipment
+            name: "Торговое оборудование"
+            name_i18n: {ru: "Торговое оборудование", bs: "Prodajna oprema", en: "Retail Equipment"}
+          - slug: food-equipment
+            name: "Пищевое оборудование"
+            name_i18n: {ru: "Пищевое оборудование", bs: "Prehrambena oprema", en: "Food Equipment"}
+          - slug: office-equipment
+            name: "Офисное оборудование"
+            name_i18n: {ru: "Офисное оборудование", bs: "Kancelarijska oprema", en: "Office Equipment"}
+          - slug: industrial-equipment
+            name: "Промышленное оборудование"
+            name_i18n: {ru: "Промышленное оборудование", bs: "Industrijska oprema", en: "Industrial Equipment"}
+          - slug: logistics-warehouse
+            name: "Логистика и склад"
+            name_i18n: {ru: "Логистика и склад", bs: "Logistika", en: "Logistics and Warehouse"}
+          - slug: beauty-equipment
+            name: "Для салона красоты"
+            name_i18n: {ru: "Для салона красоты", bs: "Oprema za salone", en: "Beauty Equipment"}
+          - slug: auto-business-equipment
+            name: "Для автобизнеса"
+            name_i18n: {ru: "Для автобизнеса", bs: "Auto oprema", en: "Auto Business Equipment"}
+          - slug: medical-equipment
+            name: "Медицинское оборудование"
+            name_i18n: {ru: "Медицинское оборудование", bs: "Medicinska oprema", en: "Medical Equipment"}
+      - slug: business-commercial-real-estate
+        name: "Коммерческая недвижимость"
+        name_i18n: {ru: "Коммерческая недвижимость", bs: "Komercijalne nekretnine", en: "Commercial Real Estate"}
+        children:
+          - slug: business-offices
+            name: "Офисы"
+            name_i18n: {ru: "Офисы", bs: "Kancelarije", en: "Offices"}
+          - slug: business-flex-space
+            name: "Свободного назначения"
+            name_i18n: {ru: "Свободного назначения", bs: "Slobodne namjene", en: "Flex Space"}
+          - slug: business-retail-spaces
+            name: "Торговые площади"
+            name_i18n: {ru: "Торговые площади", bs: "Poslovni prostori", en: "Retail Spaces"}
+          - slug: business-warehouses
+            name: "Склады"
+            name_i18n: {ru: "Склады", bs: "Skladišta", en: "Warehouses"}
+          - slug: business-commercial-land
+            name: "Земельные участки (коммерческие)"
+            name_i18n: {ru: "Земельные участки (коммерческие)", bs: "Komercijalna zemljišta", en: "Commercial Land"}
+      - slug: business-services
+        name: "Услуги"
+        name_i18n: {ru: "Услуги", bs: "Usluge", en: "Services"}
+        children:
+          - slug: business-accounting
+            name: "Бухгалтерия"
+            name_i18n: {ru: "Бухгалтерия", bs: "Računovodstvo", en: "Accounting"}
+          - slug: business-legal-services
+            name: "Юридические услуги"
+            name_i18n: {ru: "Юридические услуги", bs: "Pravne usluge", en: "Legal Services"}
+          - slug: business-taxes
+            name: "Налоги"
+            name_i18n: {ru: "Налоги", bs: "Porezi", en: "Taxes"}
+          - slug: business-property-valuation
+            name: "Оценка недвижимости"
+            name_i18n: {ru: "Оценка недвижимости", bs: "Procjena nekretnina", en: "Property Valuation"}
+          - slug: business-translations
+            name: "Переводы"
+            name_i18n: {ru: "Переводы", bs: "Prevod", en: "Translations"}
+
+  - slug: charity
+    name: "Благотворительность"
+    name_i18n: {ru: "Благотворительность", bs: "Humanitarnost", en: "Charity"}
+    listing_purpose_override: [give-away]
+    listing_feature_override: []
+
+category_paths:
+  - category: auto-parts
+    parent: goods
+    sort_order: 1
+  - category: bicycles
+    parent: transport
+    sort_order: 1
+  - category: hobby-bicycles
+    parent: transport
+    sort_order: 2
+  - category: hobby-scooters
+    parent: transport
+    sort_order: 3
+  - category: business-commercial-real-estate
+    parent: real-estate
+    sort_order: 1
+  - category: business-services
+    parent: services-jobs
+    sort_order: 1

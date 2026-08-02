@@ -12,6 +12,8 @@ class AdCreateState(StrEnum):
     """States for the ad creation FSM."""
 
     CATEGORY = "category"
+    PURPOSE = "purpose"
+    FEATURES = "features"
     CITY = "city"
     TITLE = "title"
     DESCRIPTION = "description"

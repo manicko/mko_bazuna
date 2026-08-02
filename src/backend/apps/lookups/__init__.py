@@ -1,0 +1,1 @@
+"""Lookups app — universal reference data system."""
