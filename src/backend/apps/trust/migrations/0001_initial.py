@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("users", "0002"),
+        ("users", "0002_user_chat_id"),
     ]
 
     operations = [
