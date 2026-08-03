@@ -164,9 +164,10 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
 | **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
-| **Seed Data Module** | Development-only demo data generation with configurable CLI parameters | `apps.seed` app, `SeedService`, `UserGenerator`, `AdGenerator`, `ImageGenerator`, `AnalyticsGenerator`, `Seed` advisory lock (ID 110) |
+| **Seed Data Module** | Development-only demo data generation with configurable CLI parameters | `apps.seed` app, `SeedService`, `UserGenerator`, `AdGenerator`, `ImageGenerator`, `AnalyticsGenerator`, `Seed` advisory lock (ID 110). See [`docs/seed-workflow.md`](../seed-workflow.md) for full workflow documentation. |
 | **Seed Content Fixtures** | Realistic bundled photos and multi-language ad templates for seed data | `ImageGenerator` manifest loading, `AdGenerator` template interpolation, `photo_manifest.json`, `ads_templates.json`, `word_lists.json` |
 | **Category & Lookup Architecture** | Universal reference data system with multi-parent category navigation, config-driven catalog builder, and inheritance-based lookup resolution | `apps.lookups` app (LookupGroup, LookupItem), `CategoryPath` multi-parent model, `CategoryLookupResolver` service, `categories.yaml` + `builder.py`, `FileHashService` for photo dedup |
+| **Seed-Category Integration Audit** | Audited and remediated seed module to be fully compatible with the canonical `categories.yaml` category system; removed old-slug references, orphaned fixtures, and dead code; documented the seed workflow | `apps.seed` code/test updates, `.ai/llm-tasks/seed-content-generation.md` rewrite, `scripts/seed-images-config.json` bump, `docs/seed-workflow.md` |
 
 ## Commands
 

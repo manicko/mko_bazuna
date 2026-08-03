@@ -141,9 +141,9 @@ class TestAdGenerator(TestCase):
         # Create categories
         cls.categories = []
         cat_data = [
-            ("Недвижимость", "nedvizhimost"),
-            ("Автомобили", "avtomobili"),
-            ("Электроника", "elektronika"),
+            ("Недвижимость", "real-estate"),
+            ("Автомобили", "cars"),
+            ("Электроника", "phones"),
         ]
         for name, slug in cat_data:
             cat = Category.objects.create(name=name, slug=slug)
@@ -512,26 +512,26 @@ class TestImageGeneratorManifest(TestCase):
             manifest_data = {
                 "version": 1,
                 "categories": {
-                    "kvartiry": {
+                    "apartments": {
                         "photos": [
                             {
-                                "filename": "kvartiry_01.jpg",
+                                "filename": "apartments_01.jpg",
                                 "tags": ["interior"],
                                 "width": 800,
                                 "height": 600,
                             },
                             {
-                                "filename": "kvartiry_02.jpg",
+                                "filename": "apartments_02.jpg",
                                 "tags": ["living-room"],
                                 "width": 1024,
                                 "height": 768,
                             },
                         ]
                     },
-                    "avtomobili": {
+                    "cars": {
                         "photos": [
                             {
-                                "filename": "avtomobili_01.jpg",
+                                "filename": "cars_01.jpg",
                                 "tags": ["exterior"],
                                 "width": 800,
                                 "height": 600,
@@ -570,8 +570,8 @@ class TestImageGeneratorManifest(TestCase):
             }
             gen.default_pool = manifest.get("default", {}).get("photos", [])
 
-            assert "kvartiry" in gen.photo_pool
-            assert len(gen.photo_pool["kvartiry"]) == 2
+            assert "apartments" in gen.photo_pool
+            assert len(gen.photo_pool["apartments"]) == 2
             assert len(gen.default_pool) == 1
 
     def test_get_photos_for_category(self) -> None:
@@ -580,25 +580,25 @@ class TestImageGeneratorManifest(TestCase):
 
         gen = ImageGenerator({"faker_seed": 42}, [])
         gen.photo_pool = {
-            "kvartiry": [{"filename": "kvartiry_01.jpg"}],
-            "avtomobili": [{"filename": "avtomobili_01.jpg"}],
+            "apartments": [{"filename": "apartments_01.jpg"}],
+            "cars": [{"filename": "cars_01.jpg"}],
         }
         gen.default_pool = [{"filename": "default_01.jpg"}]
 
-        kvartiry_photos = gen._get_photos_for_category("kvartiry")
+        kvartiry_photos = gen._get_photos_for_category("apartments")
         assert len(kvartiry_photos) == 1
-        assert kvartiry_photos[0]["filename"] == "kvartiry_01.jpg"
+        assert kvartiry_photos[0]["filename"] == "apartments_01.jpg"
 
-        avto_photos = gen._get_photos_for_category("avtomobili")
+        avto_photos = gen._get_photos_for_category("cars")
         assert len(avto_photos) == 1
-        assert avto_photos[0]["filename"] == "avtomobili_01.jpg"
+        assert avto_photos[0]["filename"] == "cars_01.jpg"
 
     def test_fallback_to_default(self) -> None:
         """Unknown categories fall back to default pool."""
         from apps.seed.generators.images import ImageGenerator
 
         gen = ImageGenerator({"faker_seed": 42}, [])
-        gen.photo_pool = {"kvartiry": [{"filename": "kvartiry_01.jpg"}]}
+        gen.photo_pool = {"apartments": [{"filename": "apartments_01.jpg"}]}
         gen.default_pool = [{"filename": "default_01.jpg"}]
 
         unknown_photos = gen._get_photos_for_category("unknown_category")
@@ -681,7 +681,7 @@ class TestAdGeneratorMultiLang(TestCase):
 
         from apps.categories.models import Category
 
-        cat = Category(name="Телефоны", slug="telefony", name_i18n={
+        cat = Category(name="Телефоны", slug="phones", name_i18n={
             "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
         })
 
@@ -708,7 +708,7 @@ class TestAdGeneratorMultiLang(TestCase):
         from apps.seed.generators.ads import AdGenerator
 
         # Create a basic test category
-        cat = Category(name="Телефоны", slug="telefony", name_i18n={
+        cat = Category(name="Телефоны", slug="phones", name_i18n={
             "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
         })
 
@@ -865,3 +865,165 @@ class TestSeedCommandEnhanced(TestCase):
             assert ad.title_bs is not None
             assert ad.description_bs is not None
             assert ad.original_language == "ru"
+
+
+# ─── Seed category integration tests ─────────────────────────────────────
+
+
+class TestSeedCategoryIntegration(TestCase):
+    """Integration tests verifying the full seed pipeline with the new category system.
+
+    Tests that:
+    - Categories load via the catalog builder from categories.yaml
+    - AdGenerator creates ads referencing valid category slugs
+    - Photo manifest loading works with ImageGenerator
+    - Full seed command produces valid data end-to-end
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Load categories via catalog builder and create prerequisite data."""
+        from apps.categories.catalog.builder import load_catalog
+
+        CATALOG_PATH = "apps/categories/catalog/categories.yaml"
+        load_catalog(CATALOG_PATH)
+
+        City.objects.create(
+            name="Будва", slug="budva", region="Coastal", country_code="ME"
+        )
+        City.objects.create(
+            name="Подгорица", slug="podgorica", region="Central", country_code="ME"
+        )
+
+    def test_builder_loads_all_leaf_slugs(self) -> None:
+        """Builder loads all 171 leaf category slugs from categories.yaml."""
+        leaf_slugs_from_yaml = {
+            "ac-installation", "accessories", "accounting", "agricultural-machinery",
+            "agriculture", "anti-theft", "apartment-cleaning", "apartments",
+            "appliance-repair", "appliances", "arts", "audio-video",
+            "auto-accessories", "auto-audio-video", "auto-business-equipment",
+            "auto-equipment", "auto-tools", "bags-luggage", "bath-products",
+            "beauty-appliances", "beauty-equipment", "beauty-salons-spa",
+            "bed-linen", "bicycles", "birds", "boats-yachts", "books-magazines",
+            "boys", "business-accounting", "business-commercial-land",
+            "business-flex-space", "business-legal-services", "business-offices",
+            "business-property-valuation", "business-retail-spaces", "business-taxes",
+            "business-translations", "business-warehouses", "cameras", "campers",
+            "car-repair", "car-seats", "care-hygiene", "carpet-cleaning", "cars",
+            "catering", "cats", "charity", "cleaning-service", "clothing-repair",
+            "commercial-construction", "commercial-land", "commercial-vehicles",
+            "computers", "costume-jewelry", "courses-training", "delivery-courier",
+            "dog-walking", "dogs", "electrical", "event-planning", "feeding-products",
+            "fish-aquarium", "flex-space", "flooring-installation", "florist",
+            "food-equipment", "food-products", "freight", "furniture-interior",
+            "games-consoles-software", "garages", "girls", "gps-navigators",
+            "hair-care", "hair-care-services", "hair-styling", "hobby-bicycles",
+            "hobby-scooters", "home-food-service", "housekeeping", "houses",
+            "hunting-fishing", "industrial-equipment", "jewelry", "kids-furniture",
+            "kids-hygiene", "kids-scooters-bikes", "kitchen-dining", "land-plots",
+            "laptop-pc-repair", "laptops", "legal-services", "logistics-warehouse",
+            "makeup-manicure", "manicure", "massage", "medical-equipment",
+            "medical-products", "medicine", "men-clothing", "men-shoes", "motorboats",
+            "motorcycles-sub", "musical-instruments", "no-experience-jobs",
+            "office-cleaning", "office-equipment", "offices", "oils-chemicals",
+            "other-animals", "other-electronics", "other-real-estate",
+            "other-services", "parts", "pc-setup", "pedicure", "perfumes",
+            "personal-watercraft", "pet-accessories", "pet-birds", "pet-dogs-cats",
+            "pet-food", "pet-toys", "phone-repair", "phones", "photoshoots",
+            "plants", "plastering", "plumbing", "programming", "property-valuation",
+            "psychology", "ready-business", "repair-construction",
+            "residential-construction", "restaurants", "retail-equipment",
+            "retail-spaces", "roof-boxes-hitches", "rooms", "sailing-boats",
+            "school-supplies", "scooters", "scooters-scooters", "security",
+            "shoe-repair", "skincare", "sport-fitness", "sports-outdoors",
+            "strollers", "tablets", "tax-planning", "taxi", "terraces-balconies",
+            "tickets-travel", "tires-wheels", "tow-truck", "toys", "trading",
+            "trailers", "translations", "trucks-sub", "tutors", "warehouses",
+            "warehousing", "watches", "waterproofing", "web-development",
+            "women-clothing", "women-shoes",
+        }
+        db_slugs = set(
+            Category.objects.exclude(slug__in=["test-seed", "test-analytics", "test", "test-city"]).values_list("slug", flat=True)
+        )
+        # At minimum, all leaf slugs from YAML should be present in DB
+        missing = leaf_slugs_from_yaml - db_slugs
+        assert not missing, f"Missing leaf slugs in DB: {missing}"
+
+    def test_ad_generator_with_builder_categories(self) -> None:
+        """AdGenerator creates ads with valid category slugs from builder."""
+        categories = list(Category.objects.exclude(slug__in=["test-seed", "test-analytics", "test", "test-city"]))
+        self.assertGreater(len(categories), 0, "No categories loaded from builder")
+
+        # Create users
+        users = []
+        for i in range(3):
+            user = User.objects.create(
+                username=f"int-user{i}",
+                telegram_id=2000 + i,
+                chat_id=2000 + i,
+                password="!",
+            )
+            users.append(user)
+
+        cities = list(City.objects.all())
+        self.assertGreater(len(cities), 0, "No cities available")
+
+        gen = AdGenerator(
+            {"faker_seed": 42, "status_distribution": {"published": 1.0}},
+            users,
+            categories,
+            cities,
+        )
+        ads = gen.generate(10)
+        self.assertEqual(len(ads), 10)
+
+        for ad in ads:
+            # All ads should reference categories from the builder
+            self.assertIsNotNone(ad.category)
+            # Category slug should exist in the DB
+            self.assertTrue(
+                Category.objects.filter(slug=ad.category.slug).exists(),
+                f"Ad references unknown category slug: {ad.category.slug}",
+            )
+            # Price should be generated for all ads
+            self.assertIsNotNone(ad.price)
+            # Multi-language fields should be populated
+            self.assertIsNotNone(ad.title)
+            self.assertIsNotNone(ad.title_en)
+            self.assertIsNotNone(ad.title_bs)
+
+    def test_photo_manifest_loading(self) -> None:
+        """ImageGenerator loads the photo manifest (even if empty)."""
+        gen = ImageGenerator(
+            {"faker_seed": 42, "image_count": {"min": 1, "max": 2}},
+            [],
+        )
+        # Manifest always exists (empty stub at minimum)
+        self.assertIsNotNone(gen.photo_pool)
+        self.assertIsNotNone(gen.default_pool)
+
+    def test_full_seed_with_builder_categories(self) -> None:
+        """Full seed command produces ads with valid category references."""
+        out = StringIO()
+        call_command(
+            "seed",
+            "--users=2",
+            "--ads=5",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+        ads = Ad.objects.filter(source=AdSource.SEED)
+        self.assertEqual(ads.count(), 5)
+
+        for ad in ads:
+            # All ads should reference categories from the builder
+            self.assertIsNotNone(ad.category)
+            self.assertTrue(
+                Category.objects.filter(slug=ad.category.slug).exists(),
+                f"Ad references unknown category slug: {ad.category.slug}",
+            )
+            # Multi-language content
+            self.assertIsNotNone(ad.title_en)
+            self.assertIsNotNone(ad.title_bs)
+            self.assertEqual(ad.original_language, "ru")

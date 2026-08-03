@@ -2,76 +2,73 @@
 
 ## Objective
 
-Generate two JSON fixture files for the seed data system of Mko Bazuna (Telegram-driven classifieds board, Avito-like, launch market Montenegro):
+Generate three JSON fixture files for the seed data system of Mko Bazuna (Telegram-driven classifieds board, Avito-like, launch market Montenegro):
 
 1. **`ads_templates.json`** — ad text templates with multi-language variable interpolation
 2. **`query_hierarchy.json`** — photo search query hierarchies per category
+3. **`word_lists.json`** — brand names, feature lists, conditions, cities, and item ages
 
 ---
 
 ## Context
 
-The project has **30 categories** (3-level mptt tree) already defined in `fixtures/categories.json`. Every ad on the site has:
+The project has **171 leaf categories** defined in the canonical `categories.yaml` file at `src/backend/apps/categories/catalog/categories.yaml`. Every ad on the site has:
 - Russian title + description (base storage language)
 - English title + description (`title_en`, `description_en`)
 - Bosnian title + description (`title_bs`, `description_bs`)
 - `original_language = "ru"`
 
-The `AdGenerator` class fills templates using variable placeholders and word lists from `fixtures/word_lists.json`.
+The `AdGenerator` class fills templates using variable placeholders and word lists from the generated files.
+
+### Category Source
+
+Do NOT use inline category lists. Read `categories.yaml` programmatically using:
+
+```bash
+python -c "
+import yaml
+with open('src/backend/apps/categories/catalog/categories.yaml', encoding='utf-8') as f:
+    data = yaml.safe_load(f)
+stack = list(data['categories'])
+leaf = []
+while stack:
+    c = stack.pop()
+    kids = c.get('children')
+    if kids:
+        stack.extend(kids)
+    else:
+        leaf.append(c['slug'])
+for slug in sorted(leaf):
+    print(slug)
+"
+```
+
+This extracts all 171 leaf category slugs. The top-level section slugs (7 total) are: `real-estate`, `transport`, `goods`, `animals`, `services-jobs`, `business`, `charity`.
 
 ---
 
-## Categories (30 total)
+## Workflow: 7 Sessions + Merge
 
-### Real Estate (parent: Недвижимость)
-1. `kvartiry` — Квартиры (Apartments)
-2. `doma` — Дома и коттеджи (Houses & Cottages)
-3. `kommercheskaya` — Коммерческая недвижимость (Commercial Property)
-4. `uchastki` — Земельные участки (Land Plots)
+Because there are 171 leaf categories, split the work into **7 sessions**, one per top-level section. Each session produces **partial output files** for all three outputs.
 
-### Vehicles (parent: Транспорт)
-5. `avtomobili` — Автомобили (Cars)
-6. `mototsikly` — Мотоциклы и скутеры (Motorcycles)
-7. `vodnyy` — Водный транспорт (Boats)
-8. `zapchasti` — Запчасти и аксессуары (Parts & Accessories)
+### Session Breakdown
 
-### Electronics (parent: Электроника)
-9. `telefony` — Телефоны и планшеты (Phones & Tablets)
-10. `kompyutery` — Компьютеры и ноутбуки (Computers & Laptops)
-11. `foto` — Фото и видеотехника (Photo & Video)
-12. `bytovaya` — Бытовая техника (Home Appliances)
-
-### Services (parent: Услуги)
-13. `stroitelstvo` — Строительство и ремонт (Construction & Renovation)
-14. `krasota` — Красота и здоровье (Beauty & Health)
-15. `obrazovanie` — Образование и репетиторство (Education & Tutoring)
-16. `yuridicheskie` — Юридические услуги (Legal Services)
-
-### Jobs (parent: Работа)
-17. `vakansii` — Вакансии (Vacancies)
-18. `rezyume` — Резюме (Resumes)
-
-### Pets (parent: Животные)
-19. `sobaki` — Собаки (Dogs)
-20. `koshki` — Кошки (Cats)
-
-### Other top-level
-21. `mebel` — Мебель (Furniture)
-22. `odezhda` — Одежда и обувь (Clothing & Footwear)
-23. `detskie` — Детские товары (Baby & Kids)
-24. `sport` — Спорт и отдых (Sports & Leisure)
-25. `nedvizhimost` — Недвижимость (Real Estate, parent)
-26. `transport` — Транспорт (Vehicles, parent)
-27. `elektronika` — Электроника (Electronics, parent)
-28. `uslugi` — Услуги (Services, parent)
-29. `rabota` — Работа (Jobs, parent)
-30. `zhivotnye` — Животные (Pets, parent)
+| Session | Top-level Section | Leaf Count | Output Files |
+|---------|------------------|------------|--------------|
+| 1 | `real-estate` | 11 | `ads_templates.real-estate.json`, `query_hierarchy.real-estate.json`, `word_lists.real-estate.json` |
+| 2 | `transport` | 24 | `ads_templates.transport.json`, `query_hierarchy.transport.json`, `word_lists.transport.json` |
+| 3 | `goods` | 49 | `ads_templates.goods.json`, `query_hierarchy.goods.json`, `word_lists.goods.json` |
+| 4 | `animals` | 10 | `ads_templates.animals.json`, `query_hierarchy.animals.json`, `word_lists.animals.json` |
+| 5 | `services-jobs` | 59 | `ads_templates.services-jobs.json`, `query_hierarchy.services-jobs.json`, `word_lists.services-jobs.json` |
+| 6 | `business` | 19 | `ads_templates.business.json`, `query_hierarchy.business.json`, `word_lists.business.json` |
+| 7 | `charity` | 1 | `ads_templates.charity.json`, `query_hierarchy.charity.json`, `word_lists.charity.json` |
 
 ---
 
 ## Output 1: `ads_templates.json`
 
 ### Format
+
 ```json
 {
   "version": 2,
@@ -91,7 +88,7 @@ The `AdGenerator` class fills templates using variable placeholders and word lis
   "templates": [
     {
       "id": "unique_template_id",
-      "category_slug": "kvartiry",
+      "category_slug": "apartments",
       "patterns": {
         "ru": {
           "title": "Pattern with {variable} placeholders",
@@ -111,12 +108,16 @@ The `AdGenerator` class fills templates using variable placeholders and word lis
 }
 ```
 
-### Variables available for use
+### Template ID Format
+
+Use IDs like `{section}_{slug}_{NN}` (e.g., `real-estate_apartments_01`, `transport_cars_01`).
+
+### Variables Available
 
 | Variable | Source | When to use |
 |----------|--------|-------------|
 | `{condition}` | word_lists.json → conditions | Always |
-| `{brand}` | word_lists.json → brands | Electronics, Vehicles, Furniture |
+| `{brand}` | word_lists.json → brands | Electronics, Vehicles, Furniture, Appliances |
 | `{feature}` | word_lists.json → features | Always (context-specific) |
 | `{city}` | word_lists.json → cities | Real Estate, Services |
 | `{price}` | Auto-generated by AdGenerator | Always |
@@ -129,22 +130,28 @@ The `AdGenerator` class fills templates using variable placeholders and word lis
 
 ### Requirements
 
-- **Minimum 50 template entries** across all categories
-- **At least 2 templates per leaf category** (non-parent categories)
+- **Minimum 2 templates per leaf category** (non-parent categories)
+- **4 default/fallback templates** must be preserved (category_slug: "default"):
+  - `default_sell_1` — generic selling template
+  - `default_buy_1` — generic buying template
+  - `default_offer_1` — generic service offer
+  - `default_seek_1` — generic service seek
 - Reflect realistic Avito-style classifieds language patterns
 - Templates should vary: some "selling", some "buying", some "service offering"
-- Russian (ru) should sound native, English (en) natural but slightly simplified, Bosnian (bs) should be grammatically correct
+- Russian (ru) should sound native, English (en) natural but slightly simplified, Bosnian (bs) should be grammatically correct (Montenegro Latin script)
 - Keep titles concise (under 80 chars), descriptions under 300 chars
 - Do NOT use placeholder variables that don't fit the category context (e.g. don't use `{mileage}` for furniture)
+- Use `listing_purpose_override` and `listing_feature_override` from `categories.yaml` to determine appropriate template angles
 
 ---
 
 ## Output 2: `query_hierarchy.json`
 
 ### Format
+
 ```json
 {
-  "kvartiry": {
+  "apartments": {
     "objects": ["apartment", "flat", "studio", "condo", "penthouse"],
     "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "minimalist"],
     "styles": ["photography", "real estate", "architectural", "professional", "editorial"]
@@ -155,17 +162,18 @@ The `AdGenerator` class fills templates using variable placeholders and word lis
 
 ### Requirements
 
-- One entry per category slug (30 total)
+- One entry per leaf category slug (171 total when merged)
 - Each entry must have 5-15 `objects`, 5-10 `contexts`, 3-8 `styles`
 - Objects: English nouns describing the category items
 - Contexts: English phrases describing environment/setting
 - Styles: English descriptors for photo aesthetic
 - All must be suitable for stock photography search (realistic, non-commercial, non-adult)
 - Avoid brand names, avoid people unless category demands it (beauty, pets)
-- For categories where photos don't make sense (education, legal, resumes, vacancies) — provide generic "business" contexts
+- For categories where photos don't make sense (education, legal, etc.) — provide generic "business" contexts
 
 ### Query generation formula (for context)
-The script combines:
+
+The download script combines:
 ```
 random(object) + " " + random(context) + " " + random(style)
 ```
@@ -174,10 +182,181 @@ Example: `"apartment modern design architectural photography"`
 
 ---
 
-## Directory structure for output
+## Output 3: `word_lists.json`
 
-Place both files at:
+### Format
+
+```json
+{
+  "version": 1,
+  "conditions": {
+    "ru": ["отличное", "хорошее", "удовлетворительное", "идеальное", "как новый", "превосходное", "нормальное", "среднее", "приемлемое", "неплохое"],
+    "en": ["excellent", "good", "fair", "like new", "perfect", "very good", "satisfactory", "average", "acceptable", "decent"],
+    "bs": ["odlično", "dobro", "zadovoljavajuće", "kao novo", "savršeno", "vrlo dobro", "solidno", "prosječno", "prihvatljivo", "pristojno"]
+  },
+  "brands": {
+    "real_estate": {
+      "ru": ["известный застройщик", "популярная компания", "качественная компания", "надёжный застройщик"],
+      "en": ["well-known developer", "popular company", "quality builder", "reliable developer"],
+      "bs": ["poznat investitor", "popularna kompanija", "kvalitetan graditelj", "pouzdan investitor"]
+    },
+    "transport": {
+      "ru": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
+      "en": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
+      "bs": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"]
+    },
+    "goods": {
+      "ru": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
+      "en": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
+      "bs": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"]
+    },
+    "animals": {
+      "ru": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"],
+      "en": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"],
+      "bs": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"]
+    },
+    "services": {
+      "ru": ["профессионал", "мастер с опытом", "специалист", "команда профессионалов", "сертифицированный мастер"],
+      "en": ["professional", "experienced master", "specialist", "team of professionals", "certified master"],
+      "bs": ["profesionalac", "majstor sa iskustvom", "specijalista", "tim profesionalaca", "certificirani majstor"]
+    },
+    "business": {
+      "ru": ["известный бренд", "популярный производитель", "качественный бренд", "надёжная марка"],
+      "en": ["well-known brand", "popular manufacturer", "quality brand", "reliable brand"],
+      "bs": ["poznat brend", "popularan proizvođač", "kvalitetan brend", "pouzdan brend"]
+    },
+    "charity": {
+      "ru": ["благотворительный фонд", "волонтёрская организация", "общественная организация"],
+      "en": ["charity foundation", "volunteer organization", "public organization"],
+      "bs": ["humanitarna fondacija", "volonterska organizacija", "javna organizacija"]
+    },
+    "default": {
+      "ru": ["известный бренд", "популярный производитель", "качественный бренд", "надёжная марка"],
+      "en": ["well-known brand", "popular manufacturer", "quality brand", "reliable brand"],
+      "bs": ["poznat brend", "popularan proizvođač", "kvalitetan brend", "pouzdan brend"]
+    }
+  },
+  "features": {
+    "default": {
+      "ru": ["отличное качество", "доступная цена", "удобство использования", "надёжность", "долговечность"],
+      "en": ["excellent quality", "affordable price", "ease of use", "reliability", "durability"],
+      "bs": ["odličan kvalitet", "pristupačna cijena", "jednostavnost korištenja", "pouzdanost", "trajnost"]
+    }
+  },
+  "cities": {
+    "ru": ["Подгорица", "Никшич", "Будва", "Тиват", "Бар", "Ульцинь", "Херцег-Нови", "Котор", "Цетине", "Биело-Поле", "Плевля", "Мойковац"],
+    "en": ["Podgorica", "Niksic", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg-Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"],
+    "bs": ["Podgorica", "Nikšić", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"]
+  },
+  "item_ages": {
+    "ru": ["новый", "свежий", "недавно куплен", "этого года", "прошлогодний", "несколько лет", "старый", "антикварный"],
+    "en": ["new", "fresh", "recently purchased", "this year's", "last year's", "few years old", "old", "antique"],
+    "bs": ["nov", "svjež", "nedavno kupljen", "ovogodišnji", "prošlogodišnji", "nekoliko godina star", "star", "antikni"]
+  }
+}
+```
+
+### Requirements
+
+- `brands` keyed by group identifiers: `real_estate`, `transport`, `goods`, `animals`, `services`, `business`, `charity`, `default`
+- `features` keyed by individual leaf category slugs (at minimum the most common categories, otherwise use `default`)
+- `conditions`, `cities`, `item_ages` are per-language (ru, en, bs) and unchanged in structure
+- Each language array should have 8-12 entries
+
+---
+
+## Merge + Validate Phase
+
+After all 7 sessions produce partial files, merge them into the final fixture files:
+
+### Merge Steps
+
+1. **`ads_templates.json`**: Combine all `templates` arrays from `ads_templates.*.json` files, then add the 4 default templates at the beginning. Ensure no duplicate `id` values.
+
+2. **`query_hierarchy.json`**: Merge all entries from `query_hierarchy.*.json` files into a single root object. Ensure no duplicate slugs.
+
+3. **`word_lists.json`**: Merge `brands` groups from all section files. Merge `features` by leaf slug. Merge `conditions`, `cities`, `item_ages` — these should be identical across sections, keep one copy.
+
+### Validation Script
+
+Run this Python script to validate the merged output:
+
+```python
+import json, yaml, sys
+
+# Load categories.yaml
+with open("src/backend/apps/categories/catalog/categories.yaml", encoding="utf-8") as f:
+    catalog = yaml.safe_load(f)
+
+# Extract all leaf slugs
+stack = list(catalog["categories"])
+leaf_slugs = set()
+while stack:
+    c = stack.pop()
+    kids = c.get("children")
+    if kids:
+        stack.extend(kids)
+    else:
+        leaf_slugs.add(c["slug"])
+
+errors = []
+
+# Validate ads_templates.json
+with open("src/backend/apps/seed/fixtures/ads_templates.json", encoding="utf-8") as f:
+    templates = json.load(f)
+template_ids = set()
+for t in templates.get("templates", []):
+    tid = t.get("id")
+    if tid in template_ids:
+        errors.append(f"Duplicate template ID: {tid}")
+    template_ids.add(tid)
+    slug = t.get("category_slug", "")
+    if slug not in leaf_slugs and slug != "default":
+        errors.append(f"Unknown slug in template {tid}: {slug}")
+    for lang in ["ru", "en", "bs"]:
+        if not t.get("patterns", {}).get(lang):
+            errors.append(f"Missing language {lang} in template {tid}")
+
+# Validate query_hierarchy.json
+with open("src/backend/apps/seed/fixtures/images/query_hierarchy.json", encoding="utf-8") as f:
+    queries = json.load(f)
+for slug in queries:
+    if slug not in leaf_slugs:
+        errors.append(f"Unknown slug in query_hierarchy: {slug}")
+    for key in ["objects", "contexts", "styles"]:
+        if not queries[slug].get(key):
+            errors.append(f"Missing {key} for slug {slug} in query_hierarchy")
+
+# Validate word_lists.json
+with open("src/backend/apps/seed/fixtures/word_lists.json", encoding="utf-8") as f:
+    word_lists = json.load(f)
+for key in ["conditions", "brands", "features", "cities", "item_ages"]:
+    if key not in word_lists:
+        errors.append(f"Missing key in word_lists: {key}")
+
+if errors:
+    print(f"VALIDATION FAILED: {len(errors)} errors")
+    for e in errors:
+        print(f"  - {e}")
+    sys.exit(1)
+else:
+    print("VALIDATION PASSED — all checks OK")
+```
+
+---
+
+## Directory Structure for Output
+
+Place final files at:
 ```
 src/backend/apps/seed/fixtures/ads_templates.json
 src/backend/apps/seed/fixtures/images/query_hierarchy.json
+src/backend/apps/seed/fixtures/word_lists.json
+```
+
+Place partial section files at:
+```
+src/backend/apps/seed/fixtures/ads_templates.{section}.json
+src/backend/apps/seed/fixtures/images/query_hierarchy.{section}.json
+src/backend/apps/seed/fixtures/word_lists.{section}.json
 ```
