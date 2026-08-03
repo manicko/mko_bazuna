@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "brands": {
+    "services": {
+      "ru": ["профессионал", "мастер с опытом", "специалист", "команда профессионалов", "сертифицированный мастер", "опытный мастер", "профессиональная команда", "квалифицированный специалист"],
+      "en": ["professional", "experienced master", "specialist", "team of professionals", "certified master", "experienced craftsman", "professional team", "qualified specialist"],
+      "bs": ["profesionalac", "majstor sa iskustvom", "specijalista", "tim profesionalaca", "certificirani majstor", "iskusan majstor", "profesionalni tim", "kvalifikovani stručnjak"]
+    }
+  },
+  "features": {
+    "ac-installation": {
+      "ru": ["установка кондиционера", "монтаж сплит-системы", "обслуживание кондиционеров", "диагностика неисправностей", "заправка фреоном", "чистка кондиционера", "ремонт компрессора", "замена вентилятора", "продажа и установка", "выезд мастера"],
+      "en": ["air conditioner installation", "split system mounting", "AC maintenance", "fault diagnostics", "refrigerant refill", "AC cleaning", "compressor repair", "fan replacement", "sales and installation", "master visit"],
+      "bs": ["ugradnja klima uređaja", "montaža split sistema", "servis klima", "dijagnostika kvarova", "punjenje freonom", "čišćenje klime", "popravka kompresora", "zamjena ventilatora", "prodaja i ugradnja", "dolazak majstora"]
+    },
+    "accounting": {
+      "ru": ["бухгалтерское сопровождение", "налоговая отчётность", "ведение учёта", "аудит и консалтинг", "расчёт зарплаты", "первичная документация", "налоговая оптимизация", "восстановление учёта", "финансовый анализ", "отчётность для ООО и ИП"],
+      "en": ["accounting support", "tax reporting", "bookkeeping", "audit and consulting", "payroll calculation", "primary documentation", "tax optimization", "accounting restoration", "financial analysis", "reporting for LLC and sole traders"],
+      "bs": ["knjigovodstvena podrška", "poresko izvještavanje", "vođenje knjiga", "revizija i savjetovanje", "obračun plata", "primarna dokumentacija", "poreska optimizacija", "obnova knjigovodstva", "finansijska analiza", "izvještaji za DOO i preduzetnike"]
+    },
+    "agriculture": {
+      "ru": ["сельхоз работы", "вспашка полей", "посев и посадка", "сбор урожая", "обработка растений", "полив и орошение", "аренда техники", "уход за садом", "удобрение почвы", "сельхоз консультации"],
+      "en": ["farm work", "field plowing", "sowing and planting", "harvesting", "plant treatment", "irrigation", "equipment rental", "orchard maintenance", "soil fertilization", "agricultural consulting"],
+      "bs": ["poljoprivredni radovi", "oranje njiva", "sjetva i sadnja", "berba", "tretman biljaka", "navodnjavanje", "iznajmljivanje opreme", "održavanje voćnjaka", "đubrenje zemljišta", "poljoprivredno savjetovanje"]
+    },
+    "apartment-cleaning": {
+      "ru": ["генеральная уборка", "уборка после ремонта", "еженедельная уборка", "мытье окон", "чистка ковров", "уборка кухни", "уборка санузла", "дезинфекция", "глажка белья", "уборка балкона"],
+      "en": ["deep cleaning", "post-renovation cleaning", "weekly cleaning", "window washing", "carpet cleaning", "kitchen cleaning", "bathroom cleaning", "disinfection", "ironing", "balcony cleaning"],
+      "bs": ["dubinsko čišćenje", "čišćenje poslije renovacije", "sedmično čišćenje", "pranje prozora", "čišćenje tepiha", "čišćenje kuhinje", "čišćenje kupatila", "dezinfekcija", "peglanje", "čišćenje balkona"]
+    },
+    "appliance-repair": {
+      "ru": ["ремонт холодильников", "ремонт стиральных машин", "ремонт посудомоечных машин", "ремонт духовок", "ремонт пылесосов", "ремонт бойлеров", "ремонт электроплит", "диагностика", "замена запчастей", "сервисное обслуживание"],
+      "en": ["refrigerator repair", "washing machine repair", "dishwasher repair", "oven repair", "vacuum cleaner repair", "boiler repair", "electric stove repair", "diagnostics", "spare parts replacement", "maintenance service"],
+      "bs": ["popravka frižidera", "popravka veš mašina", "popravka mašina za sudove", "popravka rerni", "popravka usisivača", "popravka bojlera", "popravka električnih šporeta", "dijagnostika", "zamjena dijelova", "servis"]
+    },
+    "arts": {
+      "ru": ["художественные работы", "картины на заказ", "портрет по фото", "роспись стен", "графический рисунок", "оформление интерьера", "скульптура", "цифровое искусство", "иллюстрация", "мастер-класс"],
+      "en": ["artwork", "paintings on commission", "portrait from photo", "wall painting", "graphic drawing", "interior decoration", "sculpture", "digital art", "illustration", "master class"],
+      "bs": ["umjetnički radovi", "slike po narudžbi", "portret po fotografiji", "zidno slikarstvo", "grafički crtež", "uređenje interijera", "skulptura", "digitalna umjetnost", "ilustracija", "majstorska radionica"]
+    },
+    "beauty-salons-spa": {
+      "ru": ["салон красоты", "спа процедуры", "уход за лицом", "обёртывание", "массаж лица", "чистка кожи", "SPA-программы", "подарочные сертификаты", "релаксация", "комплексный уход"],
+      "en": ["beauty salon", "spa treatments", "facial care", "body wrap", "facial massage", "skin cleansing", "SPA programs", "gift certificates", "relaxation", "comprehensive care"],
+      "bs": ["salon ljepote", "SPA tretmani", "njega lica", "obloge", "masaža lica", "čišćenje kože", "SPA programi", "poklon sertifikati", "relaksacija", "sveobuhvatna njega"]
+    },
+    "car-repair": {
+      "ru": ["ремонт двигателя", "замена масла", "диагностика авто", "кузовной ремонт", "замена тормозов", "шиномонтаж", "компьютерная диагностика", "замена сцепления", "ремонт подвески", "выхлопная система"],
+      "en": ["engine repair", "oil change", "car diagnostics", "body repair", "brake replacement", "tire fitting", "computer diagnostics", "clutch replacement", "suspension repair", "exhaust system"],
+      "bs": ["popravka motora", "zamjena ulja", "dijagnostika auta", "limarija", "zamjena kočnica", "montaža guma", "kompjuterska dijagnostika", "zamjena kvačila", "popravka ovjesa", "auspuh sistem"]
+    },
+    "carpet-cleaning": {
+      "ru": ["химчистка ковров", "чистка ковролина", "выведение пятен", "обработка паром", "сушка ковров", "антибактериальная обработка", "чистка на дому", "чистка паласов", "освежение цвета", "глубокая очистка"],
+      "en": ["dry cleaning carpets", "carpet runner cleaning", "stain removal", "steam treatment", "carpet drying", "antibacterial treatment", "on-site cleaning", "rug cleaning", "color refreshing", "deep cleaning"],
+      "bs": ["hemijsko čišćenje tepiha", "čišćenje tepih podova", "uklanjanje fleka", "tretman parom", "sušenje tepiha", "antibakterijski tretman", "čišćenje na licu mjesta", "čišćenje ćilima", "osvježenje boje", "dubinsko čišćenje"]
+    },
+    "catering": {
+      "ru": ["кейтеринг на мероприятие", "банкетное обслуживание", "выездное питание", "шведский стол", "фуршеты", "корпоративное питание", "доставка готовых обедов", "стол на свадьбу", "кофе-брейк", "меню на заказ"],
+      "en": ["event catering", "banquet service", "off-site catering", "buffet", "receptions", "corporate meals", "ready meal delivery", "wedding table", "coffee break", "custom menu"],
+      "bs": ["ketering za događaje", "banket servis", "terenski ketering", "švedski sto", "recepcije", "korporativna ishrana", "dostava gotovih obroka", "svadbeni sto", "pauza za kafu", "meni po narudžbi"]
+    },
+    "cleaning-service": {
+      "ru": ["уборка помещений", "клининг", "ежедневная уборка", "мойка окон", "чистка мягкой мебели", "химчистка", "уборка офисов", "дезинфекция", "уборка после пожара", "уборка территории"],
+      "en": ["premises cleaning", "cleaning service", "daily cleaning", "window washing", "upholstery cleaning", "dry cleaning", "office cleaning", "disinfection", "fire damage cleaning", "outdoor cleaning"],
+      "bs": ["čišćenje prostorija", "klining servis", "dnevno čišćenje", "pranje prozora", "čišćenje tapeciranog namještaja", "hemijsko čišćenje", "čišćenje kancelarija", "dezinfekcija", "čišćenje nakon požara", "čišćenje terena"]
+    },
+    "clothing-repair": {
+      "ru": ["ремонт одежды", "ушивка вещей", "замена молнии", "подгонка по фигуре", "штопка", "замена пуговиц", "ремонт пальто", "перешивка джинсов", "ремонт подкладки", "срочный ремонт"],
+      "en": ["clothing repair", "alteration", "zipper replacement", "fitting adjustment", "darning", "button replacement", "coat repair", "jeans alteration", "lining repair", "urgent repair"],
+      "bs": ["popravka odjeće", "prešivanje", "zamjena rajsferšlusa", "prilagođavanje", "krpljenje", "zamjena dugmadi", "popravka kaputa", "prepravka farmerki", "popravka postave", "hitna popravka"]
+    },
+    "commercial-construction": {
+      "ru": ["строительство коммерческих объектов", "офисный ремонт", "складское строительство", "отделка помещений", "фасадные работы", "бетонирование", "металлоконструкции", "проектная документация", "генподряд", "реконструкция зданий"],
+      "en": ["commercial construction", "office renovation", "warehouse construction", "interior finishing", "facade work", "concreting", "steel structures", "project documentation", "general contracting", "building reconstruction"],
+      "bs": ["komercijalna gradnja", "kancelarijska renovacija", "skladišna gradnja", "unutrašnja obrada", "fasadni radovi", "betoniranje", "metalne konstrukcije", "projektna dokumentacija", "generalno izvođenje", "rekonstrukcija objekata"]
+    },
+    "courses-training": {
+      "ru": ["обучающие курсы", "повышение квалификации", "профессиональное обучение", "онлайн курс", "индивидуальное обучение", "групповые занятия", "тренинг", "семинар", "практическое занятие", "сертификация"],
+      "en": ["training courses", "professional development", "vocational training", "online course", "individual tuition", "group lessons", "training", "seminar", "practical workshop", "certification"],
+      "bs": ["kursevi obuke", "profesionalno usavršavanje", "stručno osposobljavanje", "online kurs", "individualna nastava", "grupni časovi", "trening", "seminar", "praktična radionica", "certifikacija"]
+    },
+    "delivery-courier": {
+      "ru": ["доставка по городу", "экспресс доставка", "курьерская служба", "доставка документов", "доставка посылок", "грузоперевозки", "доставка еды", "междугородняя доставка", "срочная доставка", "велокурьер"],
+      "en": ["city delivery", "express delivery", "courier service", "document delivery", "parcel delivery", "cargo shipping", "food delivery", "intercity delivery", "urgent delivery", "bicycle courier"],
+      "bs": ["dostava po gradu", "ekspres dostava", "kurirska služba", "dostava dokumenata", "dostava paketa", "transport tereta", "dostava hrane", "međugradska dostava", "hitna dostava", "biciklistički kurir"]
+    },
+    "dog-walking": {
+      "ru": ["выгул собак", "дневной дог-ситтинг", "активный выгул", "индивидуальный выгул", "групповой выгул", "выгул щенков", "тренировка на улице", "выгул с фотоотчётом", "утренний выгул", "вечерний выгул"],
+      "en": ["dog walking", "day dog sitting", "active walk", "individual walking", "group walking", "puppy walking", "outdoor training", "walking with photo report", "morning walk", "evening walk"],
+      "bs": ["izvođenje pasa", "dnevno čuvanje pasa", "aktivna šetnja", "individualna šetnja", "grupna šetnja", "izvođenje štenaca", "trening napolju", "šetnja sa foto izvještajem", "jutarnja šetnja", "večernja šetnja"]
+    },
+    "electrical": {
+      "ru": ["электромонтажные работы", "замена проводки", "установка розеток", "монтаж освещения", "электрощит", "замена автоматов", "ремонт электропроводки", "установка люстры", "заземление", "вызов электрика"],
+      "en": ["electrical work", "wiring replacement", "socket installation", "lighting installation", "electrical panel", "breaker replacement", "wiring repair", "chandelier installation", "grounding", "electrician call"],
+      "bs": ["električarski radovi", "zamjena instalacija", "ugradnja utičnica", "montaža rasvjete", "električna tabla", "zamjena osigurača", "popravka instalacija", "ugradnja lustera", "uzemljenje", "poziv električara"]
+    },
+    "event-planning": {
+      "ru": ["организация мероприятий", "свадебный организатор", "планирование корпоратива", "день рождения", "team-building", "декорирование зала", "подбор площадки", "развлекательная программа", "координация события", "праздничный сценарий"],
+      "en": ["event organization", "wedding planner", "corporate event planning", "birthday party", "team building", "hall decoration", "venue selection", "entertainment program", "event coordination", "party script"],
+      "bs": ["organizacija događaja", "svadbeni planer", "planiranje korporativa", "rođendan", "tim bilding", "dekoraćija sale", "odabir mjesta", "zabavni program", "koordinacija događaja", "scenario proslave"]
+    },
+    "flooring-installation": {
+      "ru": ["укладка ламината", "настил паркета", "укладка плитки", "наливной пол", "укладка линолеума", "тёплый пол", "ремонт пола", "шлифовка паркета", "ковролин", "плинтусы"],
+      "en": ["laminate flooring", "parquet installation", "tile laying", "self-leveling floor", "linoleum installation", "heated floor", "floor repair", "parquet sanding", "carpet fitting", "skirting boards"],
+      "bs": ["postavljanje laminata", "postavljanje parketa", "postavljanje pločica", "samorazlivajući pod", "postavljanje linoleuma", "podno grijanje", "popravka poda", "brušenje parketa", "tepih pod", "lajsne"]
+    },
+    "florist": {
+      "ru": ["букеты на заказ", "свадебная флористика", "цветочная композиция", "доставка цветов", "оформление зала цветами", "живые цветы", "комнатные растения", "букет невесты", "интерьерная флористика", "корзина цветов"],
+      "en": ["bouquets on order", "wedding floristry", "floral arrangement", "flower delivery", "hall decoration with flowers", "fresh flowers", "houseplants", "bridal bouquet", "interior floristry", "flower basket"],
+      "bs": ["buketi po narudžbi", "svadbena floristika", "cvjetni aranžman", "dostava cvijeća", "dekoraćija sale cvijećem", "svježe cvijeće", "sobne biljke", "mladenkin buket", "interijerska floristika", "korpa cvijeća"]
+    },
+    "freight": {
+      "ru": ["грузоперевозки", "междугородние перевозки", "международные перевозки", "перевозка мебели", "переезд квартиры", "офисный переезд", "доставка стройматериалов", "аренда грузовика", "сборный груз", "перевозка техники"],
+      "en": ["cargo transportation", "intercity transport", "international transport", "furniture transport", "apartment moving", "office relocation", "building materials delivery", "truck rental", "groupage cargo", "equipment transport"],
+      "bs": ["transport tereta", "međugradski transport", "međunarodni transport", "transport namještaja", "preseljenje stana", "kancelarijska selidba", "dostava građevinskog materijala", "iznajmljivanje kamiona", "skupni teret", "transport opreme"]
+    },
+    "hair-care-services": {
+      "ru": ["стрижка", "укладка волос", "окрашивание волос", "лечение волос", "восстановление волос", "ламинирование", "мелирование", "коса", "причёска на свадьбу", "вечерняя укладка"],
+      "en": ["haircut", "hair styling", "hair coloring", "hair treatment", "hair restoration", "lamination", "highlights", "braiding", "wedding hairstyle", "evening styling"],
+      "bs": ["šišanje", "oblikovanje kose", "farbanje kose", "tretman kose", "obnova kose", "laminacija", "pramenovi", "pletenje", "svadbena frizura", "večernje oblikovanje"]
+    },
+    "hair-styling": {
+      "ru": ["укладка", "свадебная причёска", "вечерняя причёска", "химическая завивка", "выпрямление волос", "причёска на выпускной", "плетение кос", "наращивание волос", "причёска с аксессуарами", "модная стрижка"],
+      "en": ["styling", "wedding hairstyle", "evening hairstyle", "perm", "hair straightening", "prom hairstyle", "braiding", "hair extensions", "hairstyle with accessories", "trendy haircut"],
+      "bs": ["oblikovanje", "svadbena frizura", "večernja frizura", "trajna", "ispravljanje kose", "frizura za maturu", "pletenje", "ekstenzije kose", "frizura sa aksesoarima", "moderno šišanje"]
+    },
+    "home-food-service": {
+      "ru": ["приготовление еды на дом", "домашние обеды", "свежая выпечка", "торты на заказ", "пироги и пицца", "диетическое питание", "детское меню", "полуфабрикаты", "вареники и пельмени", "домашняя кухня"],
+      "en": ["home cooking service", "home lunches", "fresh pastries", "cakes on order", "pies and pizza", "diet meals", "children's menu", "semi-prepared meals", "dumplings and pelmeni", "home cuisine"],
+      "bs": ["priprema hrane kod kuće", "kućni ručkovi", "svježi kolači", "torte po narudžbi", "pite i pizza", "dijetalna hrana", "dječiji meni", "poluproizvodi", "knedle i pelmeni", "domaća kuhinja"]
+    },
+    "housekeeping": {
+      "ru": ["помощь по хозяйству", "уборка дома", "глажка и стирка", "приготовление еды", "присмотр за детьми", "мытьё окон", "уход за пожилыми", "покупка продуктов", "работа по дому", "генеральная уборка"],
+      "en": ["housekeeping", "home cleaning", "ironing and laundry", "cooking", "childcare", "window washing", "elderly care", "groceries shopping", "household chores", "deep cleaning"],
+      "bs": ["pomoć u domaćinstvu", "čišćenje doma", "peglanje i pranje", "kuhanje", "čuvanje djece", "pranje prozora", "njega starijih", "kupovina namirnica", "kućni poslovi", "dubinsko čišćenje"]
+    },
+    "laptop-pc-repair": {
+      "ru": ["ремонт ноутбуков", "замена матрицы", "чистка от пыли", "замена термопасты", "ремонт материнской платы", "восстановление данных", "замена аккумулятора", "ремонт ПК", "замена клавиатуры", "настройка системы"],
+      "en": ["laptop repair", "screen replacement", "dust cleaning", "thermal paste replacement", "motherboard repair", "data recovery", "battery replacement", "PC repair", "keyboard replacement", "system setup"],
+      "bs": ["popravka laptopova", "zamjena ekrana", "čišćenje prašine", "zamjena termalne paste", "popravka matične ploče", "oporavak podataka", "zamjena baterije", "popravka računara", "zamjena tastature", "podešavanje sistema"]
+    },
+    "legal-services": {
+      "ru": ["юридическая консультация", "составление договоров", "судебное представительство", "регистрация компаний", "лицензирование", "наследственные дела", "земельное право", "трудовые споры", "семейное право", "арбитраж"],
+      "en": ["legal consultation", "contract drafting", "court representation", "company registration", "licensing", "inheritance matters", "land law", "labor disputes", "family law", "arbitration"],
+      "bs": ["pravno savjetovanje", "sastavljanje ugovora", "sudsko zastupanje", "registracija firmi", "licenciranje", "nasljedna pitanja", "zemljišno pravo", "radni sporovi", "porodično pravo", "arbitraža"]
+    },
+    "manicure": {
+      "ru": ["маникюр", "покрытие гель-лаком", "наращивание ногтей", "дизайн ногтей", "педикюр", "уход за кутикулой", "коррекция ногтей", "шеллак", "укрепление ногтей", "японский маникюр"],
+      "en": ["manicure", "gel polish coating", "nail extensions", "nail design", "pedicure", "cuticle care", "nail correction", "shellac", "nail strengthening", "Japanese manicure"],
+      "bs": ["manikir", "gel lak", "nadogradnja noktiju", "dizajn noktiju", "pedikir", "njega zanoktica", "korekcija noktiju", "šelak", "jačanje noktiju", "japanski manikir"]
+    },
+    "massage": {
+      "ru": ["классический массаж", "антицеллюлитный массаж", "спортивный массаж", "расслабляющий массаж", "точечный массаж", "медовый массаж", "массаж спины", "лимфодренажный массаж", "стоун-терапия", "тайский массаж"],
+      "en": ["classic massage", "anti-cellulite massage", "sports massage", "relaxing massage", "acupressure", "honey massage", "back massage", "lymphatic drainage massage", "stone therapy", "Thai massage"],
+      "bs": ["klasična masaža", "anticelulit masaža", "sportska masaža", "relaks masaža", "akupresura", "medena masaža", "masaža leđa", "limfna drenaža", "terapija kamenom", "tajlandska masaža"]
+    },
+    "medicine": {
+      "ru": ["медицинские услуги", "консультация врача", "анализы на дому", "физиотерапия", "медосмотр", "вакцинация", "сестринский уход", "капельница на дому", "реабилитация", "врачебный приём"],
+      "en": ["medical services", "doctor consultation", "home lab tests", "physiotherapy", "medical checkup", "vaccination", "nursing care", "home IV therapy", "rehabilitation", "doctor appointment"],
+      "bs": ["medicinske usluge", "ljekarska konsultacija", "analize kod kuće", "fizioterapija", "ljekarski pregled", "vakcinacija", "sestrinska njega", "infuzija kod kuće", "rehabilitacija", "ljekarski prijem"]
+    },
+    "no-experience-jobs": {
+      "ru": ["работа без опыта", "обучение на месте", "первая работа", "стажировка", "помощник", "уборщик", "курьер без опыта", "разнорабочий", "упаковщик", "вакансия для студентов"],
+      "en": ["no experience job", "on-the-job training", "first job", "internship", "assistant", "cleaner", "courier no experience", "general worker", "packer", "student vacancy"],
+      "bs": ["posao bez iskustva", "obuka na radnom mjestu", "prvi posao", "pripravništvo", "pomoćnik", "čistač", "kurir bez iskustva", "fizički radnik", "paker", "konkurs za studente"]
+    },
+    "office-cleaning": {
+      "ru": ["уборка офисов", "клининг после ремонта", "ежедневная уборка", "мойка окон в офисе", "чистка ковролина", "вынос мусора", "чистка оргтехники", "дезинфекция офиса", "уборка туалетов", "полировка мебели"],
+      "en": ["office cleaning", "post-renovation cleaning", "daily cleaning", "office window washing", "carpet cleaning", "waste removal", "office equipment cleaning", "office disinfection", "toilet cleaning", "furniture polishing"],
+      "bs": ["čišćenje kancelarija", "čišćenje poslije renovacije", "dnevno čišćenje", "pranje prozora u kancelariji", "čišćenje tepih podova", "odvoz smeća", "čišćenje opreme", "dezinfekcija kancelarije", "čišćenje toaleta", "poliranje namještaja"]
+    },
+    "other-services": {
+      "ru": ["разные услуги", "помощь на дому", "мелкий ремонт", "консультация", "сборка мебели", "покраска стен", "поклейка обоев", "установка техники", "заказ запчастей", "разовые работы"],
+      "en": ["various services", "home help", "minor repairs", "consultation", "furniture assembly", "wall painting", "wallpapering", "appliance installation", "parts ordering", "one-time jobs"],
+      "bs": ["razne usluge", "pomoć u kući", "sitne popravke", "konsultacije", "montaža namještaja", "krečenje", "lijepljenje tapeta", "ugradnja opreme", "narudžba dijelova", "jednokratni poslovi"]
+    },
+    "pc-setup": {
+      "ru": ["сборка ПК", "настройка компьютера", "установка Windows", "установка программ", "подключение периферии", "настройка сети", "антивирус", "апгрейд компьютера", "замена комплектующих", "настройка BIOS"],
+      "en": ["PC assembly", "computer setup", "Windows installation", "software installation", "peripheral setup", "network configuration", "antivirus", "PC upgrade", "component replacement", "BIOS configuration"],
+      "bs": ["sastavljanje računara", "podešavanje računara", "instalacija Windows", "instalacija softvera", "povezivanje periferije", "podešavanje mreže", "antivirus", "nadogradnja računara", "zamjena komponenti", "BIOS podešavanje"]
+    },
+    "pedicure": {
+      "ru": ["педикюр", "аппаратный педикюр", "классический педикюр", "покрытие гель-лаком", "уход за стопами", "удаление натоптышей", "массаж ног", "Spa-педикюр", "обработка ногтей", "парафинотерапия"],
+      "en": ["pedicure", "machine pedicure", "classic pedicure", "gel polish coating", "foot care", "callus removal", "foot massage", "Spa pedicure", "nail treatment", "paraffin therapy"],
+      "bs": ["pedikir", "aparatni pedikir", "klasični pedikir", "gel lak", "njega stopala", "uklanjanje kurje oči", "masaža stopala", "Spa pedikir", "tretman noktiju", "parafinska terapija"]
+    },
+    "phone-repair": {
+      "ru": ["ремонт телефонов", "замена экрана", "замена аккумулятора", "ремонт разъёма", "замена корпуса", "ремонт после воды", "ремонт камеры", "замена динамика", "прошивка телефона", "диагностика"],
+      "en": ["phone repair", "screen replacement", "battery replacement", "charging port repair", "housing replacement", "water damage repair", "camera repair", "speaker replacement", "phone firmware", "diagnostics"],
+      "bs": ["popravka telefona", "zamjena ekrana", "zamjena baterije", "popravka konektora", "zamjena kućišta", "popravka poslije vode", "popravka kamere", "zamjena zvučnika", "firmver telefona", "dijagnostika"]
+    },
+    "photoshoots": {
+      "ru": ["фотосъёмка", "свадебная фотосъёмка", "портретная съёмка", "предметная съёмка", "репортажная съёмка", "семейная фотосессия", "фотосъёмка интерьера", "детская съёмка", "коммерческая съёмка", "обработка фото"],
+      "en": ["photoshoot", "wedding photography", "portrait session", "product photography", "reportage", "family photoshoot", "interior photography", "children's shoot", "commercial photography", "photo editing"],
+      "bs": ["fotografisanje", "svadbeno fotografisanje", "portretna sesija", "produkt fotografija", "reportaža", "porodična sesija", "fotografisanje interijera", "dječije fotografisanje", "komercijalno fotografisanje", "obrada fotografija"]
+    },
+    "plastering": {
+      "ru": ["штукатурные работы", "выравнивание стен", "штукатурка по маякам", "шпаклёвка", "декоративная штукатурка", "венецианская штукатурка", "оштукатуривание откосов", "грунтовка стен", "ремонт штукатурки", "фасадная штукатурка"],
+      "en": ["plastering", "wall leveling", "plastering on beacons", "puttying", "decorative plaster", "Venetian plaster", "slope plastering", "wall priming", "plaster repair", "facade plaster"],
+      "bs": ["malterisanje", "izravnavanje zidova", "malterisanje po svjetionicima", "gletovanje", "dekorativni malter", "venecijanski malter", "malterisanje kosina", "grundiranje zidova", "popravka maltera", "fasadni malter"]
+    },
+    "plumbing": {
+      "ru": ["сантехнические работы", "замена труб", "установка сантехники", "ремонт унитаза", "прочистка канализации", "замена смесителя", "установка раковины", "монтаж ванны", "замена радиатора", "бурение скважин"],
+      "en": ["plumbing work", "pipe replacement", "plumbing installation", "toilet repair", "drain cleaning", "faucet replacement", "sink installation", "bathtub installation", "radiator replacement", "well drilling"],
+      "bs": ["vodoinstalaterski radovi", "zamjena cijevi", "ugradnja sanitarija", "popravka wc šolje", "čišćenje kanalizacije", "zamjena slavine", "ugradnja umivaonika", "montaža kade", "zamjena radijatora", "bušenje bunara"]
+    },
+    "programming": {
+      "ru": ["разработка сайтов", "программирование", "веб-приложения", "мобильные приложения", "разработка ботов", "базы данных", "API интеграция", "техническая поддержка", "фронтенд разработка", "бэкенд разработка"],
+      "en": ["website development", "programming", "web applications", "mobile apps", "bot development", "databases", "API integration", "technical support", "frontend development", "backend development"],
+      "bs": ["razvoj sajtova", "programiranje", "web aplikacije", "mobilne aplikacije", "razvoj botova", "baze podataka", "API integracija", "tehnička podrška", "frontend razvoj", "backend razvoj"]
+    },
+    "property-valuation": {
+      "ru": ["оценка недвижимости", "рыночная стоимость", "кадастровая оценка", "экспертиза объекта", "оценка квартиры", "оценка дома", "оценка коммерческой недвижимости", "оценка участка", "отчёт об оценке", "судебная оценка"],
+      "en": ["property valuation", "market value", "cadastral valuation", "property inspection", "apartment valuation", "house valuation", "commercial property valuation", "land valuation", "valuation report", "forensic valuation"],
+      "bs": ["procjena nekretnina", "tržišna vrijednost", "katastarska procjena", "stručni pregled", "procjena stana", "procjena kuće", "procjena komercijalnih nekretnina", "procjena zemljišta", "izvještaj o procjeni", "sudska procjena"]
+    },
+    "psychology": {
+      "ru": ["консультация психолога", "семейная терапия", "индивидуальная терапия", "онлайн-консультация", "детский психолог", "когнитивно-поведенческая терапия", "арт-терапия", "психосоматика", "преодоление стресса", "личностный рост"],
+      "en": ["psychologist consultation", "family therapy", "individual therapy", "online consultation", "child psychologist", "cognitive behavioral therapy", "art therapy", "psychosomatics", "stress management", "personal growth"],
+      "bs": ["psihološko savjetovanje", "porodična terapija", "individualna terapija", "online konsultacija", "dječiji psiholog", "kognitivno bihevioralna terapija", "art terapija", "psihosomatika", "upravljanje stresom", "lični razvoj"]
+    },
+    "residential-construction": {
+      "ru": ["строительство домов", "коттеджи под ключ", "фундаментные работы", "возведение стен", "кровельные работы", "кладка кирпича", "монолитное строительство", "деревянные дома", "проектирование домов", "отделка фасада"],
+      "en": ["house construction", "turnkey cottages", "foundation work", "wall erection", "roofing", "bricklaying", "monolithic construction", "timber houses", "house design", "facade finishing"],
+      "bs": ["izgradnja kuća", "vikendice ključ u ruke", "temeljni radovi", "podizanje zidova", "krovopokrivački radovi", "zidanje ciglom", "monolitna gradnja", "drvene kuće", "projektovanje kuća", "fasadna obrada"]
+    },
+    "restaurants": {
+      "ru": ["ресторан", "доставка из ресторана", "бизнес-ланч", "меню на заказ", "бронирование столиков", "живая музыка", "банкетный зал", "детский праздник", "дегустационное меню", "выездное обслуживание"],
+      "en": ["restaurant", "restaurant delivery", "business lunch", "menu on order", "table reservation", "live music", "banquet hall", "children's party", "tasting menu", "off-site service"],
+      "bs": ["restoran", "dostava iz restorana", "business ručak", "meni po narudžbi", "rezervacija stolova", "živa muzika", "banket sala", "dječija proslava", "degustacioni meni", "terenski servis"]
+    },
+    "security": {
+      "ru": ["охрана объектов", "сигнализация", "видеонаблюдение", "пультовая охрана", "физическая охрана", "монтаж камер", "контроль доступа", "пожарная сигнализация", "охрана мероприятий", "лицензированная охрана"],
+      "en": ["object security", "alarm system", "CCTV", "central monitoring", "physical security", "camera installation", "access control", "fire alarm", "event security", "licensed security"],
+      "bs": ["obezbjeđenje objekata", "alarmni sistem", "video nadzor", "centralno obezbjeđenje", "fizičko obezbjeđenje", "montaža kamera", "kontrola pristupa", "protivpožarni alarm", "obezbjeđenje događaja", "licencirano obezbjeđenje"]
+    },
+    "shoe-repair": {
+      "ru": ["ремонт обуви", "замена набойки", "замена молнии", "ремонт каблука", "растяжка обуви", "прошивка подошвы", "замок на сапогах", "клейка подошвы", "реставрация обуви", "ремонт сумок"],
+      "en": ["shoe repair", "heel tip replacement", "zipper replacement", "heel repair", "shoe stretching", "sole stitching", "boot zipper", "sole gluing", "shoe restoration", "bag repair"],
+      "bs": ["popravka obuće", "zamjena đona", "zamjena rajsferšlusa", "popravka pete", "rastezanje obuće", "šivenje đona", "rajcferšlus na čizmama", "lijepljenje đona", "restauracija obuće", "popravka torbi"]
+    },
+    "skincare": {
+      "ru": ["уход за кожей", "чистка лица", "пилинг", "увлажнение кожи", "маски для лица", "антивозрастной уход", "микротоки", "косметология", "чистка пор", "сыворотки для лица"],
+      "en": ["skincare", "facial cleansing", "peeling", "skin hydration", "face masks", "anti-aging care", "microcurrents", "cosmetology", "pore cleansing", "facial serums"],
+      "bs": ["njega kože", "čišćenje lica", "piling", "hidratacija kože", "maske za lice", "anti-age njega", "mikrostruje", "kozmetologija", "čišćenje pora", "serumi za lice"]
+    },
+    "sport-fitness": {
+      "ru": ["персональные тренировки", "фитнес инструктор", "тренировки в зале", "онлайн тренировки", "йога", "пилатес", "функциональный тренинг", "кардио тренировка", "растяжка", "кроссфит"],
+      "en": ["personal training", "fitness instructor", "gym training", "online workouts", "yoga", "Pilates", "functional training", "cardio workout", "stretching", "CrossFit"],
+      "bs": ["lični trening", "fitness instruktor", "trening u teretani", "online vježbe", "joga", "pilates", "funkcionalni trening", "kardio trening", "istezanje", "crossfit"]
+    },
+    "tax-planning": {
+      "ru": ["налоговое планирование", "налоговая декларация", "налоговый учёт", "оптимизация налогов", "консультация по налогам", "учёт НДС", "отчётность в налоговую", "налоговая нагрузка", "бухгалтерия для ИП", "налоговая отчётность онлайн"],
+      "en": ["tax planning", "tax return", "tax accounting", "tax optimization", "tax consultation", "VAT accounting", "tax authority reporting", "tax burden", "bookkeeping for entrepreneurs", "online tax reporting"],
+      "bs": ["poresko planiranje", "poreska prijava", "poresko knjigovodstvo", "optimizacija poreza", "poresko savjetovanje", "PDV obračun", "izvještavanje poreskoj", "poresko opterećenje", "knjigovodstvo za preduzetnike", "online poresko izvještavanje"]
+    },
+    "taxi": {
+      "ru": ["такси по городу", "междугороднее такси", "трансфер в аэропорт", "детское такси", "женский водитель", "такси с кондиционером", "ночное такси", "заказ такси", "групповой трансфер", "корпоративное такси"],
+      "en": ["city taxi", "intercity taxi", "airport transfer", "kid's taxi", "female driver", "taxi with AC", "night taxi", "taxi booking", "group transfer", "corporate taxi"],
+      "bs": ["gradski taksi", "međugradski taksi", "transfer do aerodroma", "dječiji taksi", "ženski vozač", "taksi sa klimom", "noćni taksi", "rezervacija taksija", "grupni transfer", "korporativni taksi"]
+    },
+    "terraces-balconies": {
+      "ru": ["строительство террас", "остекление балконов", "отделка балкона", "настил террасы", "кровля террасы", "ограждения балкона", "утепление балкона", "деревянная терраса", "алюминиевые конструкции", "входная группа"],
+      "en": ["terrace construction", "balcony glazing", "balcony finishing", "terrace decking", "terrace roofing", "balcony railings", "balcony insulation", "wooden terrace", "aluminum structures", "entrance group"],
+      "bs": ["izgradnja terasa", "zastakljivanje balkona", "obrada balkona", "podovi za terase", "krov terase", "balkonske ograde", "izolacija balkona", "drvene terase", "aluminijumske konstrukcije", "ulazna grupa"]
+    },
+    "tow-truck": {
+      "ru": ["эвакуатор", "буксировка авто", "эвакуация мотоцикла", "эвакуация грузовика", "срочный вызов эвакуатора", "эвакуация после ДТП", "погрузка техники", "эвакуация из ямы", "круглосуточный эвакуатор", "эвакуация спецтехники"],
+      "en": ["tow truck", "car towing", "motorcycle towing", "truck towing", "urgent towing", "accident towing", "equipment loading", "ditch recovery", "24/7 towing", "heavy machinery towing"],
+      "bs": ["šlep služba", "vuča automobila", "vuča motocikla", "vuča kamiona", "hitna vuča", "vuča poslije udesa", "utovar opreme", "izvlačenje iz jame", "24/7 šlep", "vuča specijalne opreme"]
+    },
+    "trading": {
+      "ru": ["торговля", "оптовая продажа", "закупка товаров", "дистрибуция", "трейдинг", "электронная коммерция", "сбыт продукции", "торговый агент", "посреднические услуги", "складская продажа"],
+      "en": ["trading", "wholesale sales", "goods procurement", "distribution", "trading operations", "e-commerce", "product sales", "trading agent", "brokerage services", "warehouse sales"],
+      "bs": ["trgovina", "veleprodaja", "nabavka robe", "distribucija", "trgovinske operacije", "e-trgovina", "prodaja proizvoda", "trgovinski agent", "posredničke usluge", "skladišna prodaja"]
+    },
+    "translations": {
+      "ru": ["перевод текстов", "устный перевод", "письменный перевод", "нотариальный перевод", "технический перевод", "юридический перевод", "медицинский перевод", "локализация", "редактура перевода", "срочный перевод"],
+      "en": ["text translation", "interpretation", "written translation", "notarized translation", "technical translation", "legal translation", "medical translation", "localization", "translation editing", "urgent translation"],
+      "bs": ["prevođenje tekstova", "usmeno prevođenje", "pisani prevod", "ovjereni prevod", "tehnički prevod", "pravni prevod", "medicinski prevod", "lokalizacija", "uređivanje prevoda", "hitni prevod"]
+    },
+    "tutors": {
+      "ru": ["репетитор", "индивидуальные занятия", "подготовка к экзаменам", "иностранные языки", "математика", "физика", "русский язык", "английский язык", "помощь студентам", "начальная школа"],
+      "en": ["tutor", "private lessons", "exam preparation", "foreign languages", "mathematics", "physics", "Russian language", "English language", "student help", "primary school"],
+      "bs": ["instruktor", "privatni časovi", "priprema za ispite", "strani jezici", "matematika", "fizika", "ruski jezik", "engleski jezik", "pomoć studentima", "osnovna škola"]
+    },
+    "warehousing": {
+      "ru": ["складские услуги", "хранение товаров", "ответственное хранение", "аренда склада", "складская логистика", "комплектация заказов", "учёт товаров", "паллетное хранение", "временное хранение", "складские операции"],
+      "en": ["warehousing services", "goods storage", "custodial storage", "warehouse rental", "warehouse logistics", "order picking", "inventory accounting", "pallet storage", "temporary storage", "warehouse operations"],
+      "bs": ["skladišne usluge", "čuvanje robe", "odgovorno skladištenje", "najam skladišta", "skladišna logistika", "kompletiranje narudžbi", "evidencija robe", "paletno skladištenje", "privremeno skladištenje", "skladišne operacije"]
+    },
+    "waterproofing": {
+      "ru": ["гидроизоляция", "гидроизоляция подвала", "гидроизоляция кровли", "гидроизоляция ванной", "инъекционная гидроизоляция", "обмазочная гидроизоляция", "гидроизоляция фундамента", "герметизация швов", "кровельные работы", "ремонт кровли"],
+      "en": ["waterproofing", "basement waterproofing", "roof waterproofing", "bathroom waterproofing", "injection waterproofing", "coating waterproofing", "foundation waterproofing", "joint sealing", "roofing work", "roof repair"],
+      "bs": ["hidroizolacija", "hidroizolacija podruma", "hidroizolacija krova", "hidroizolacija kupatila", "injekciona hidroizolacija", "premazna hidroizolacija", "hidroizolacija temelja", "zaptivanje spojeva", "krovopokrivački radovi", "popravka krova"]
+    },
+    "web-development": {
+      "ru": ["создание сайтов", "разработка интернет-магазина", "лендинг", "CRM система", "сайт под ключ", "SEO оптимизация", "адаптивный дизайн", "сайт на WordPress", "сайт визитка", "поддержка сайта"],
+      "en": ["website creation", "e-commerce development", "landing page", "CRM system", "turnkey website", "SEO optimization", "responsive design", "WordPress site", "business card site", "website maintenance"],
+      "bs": ["kreiranje sajtova", "razvoj internet prodavnice", "landing stranica", "CRM sistem", "sajt ključ u ruke", "SEO optimizacija", "responzivni dizajn", "WordPress sajt", "vizitka sajt", "održavanje sajta"]
+    }
+  }
+}

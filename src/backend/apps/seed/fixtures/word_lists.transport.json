@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "brands": {
+    "transport": {
+      "ru": ["Toyota", "BMW", "Mercedes-Benz", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault", "Škoda", "Peugeot", "Fiat", "Opel", "Suzuki", "Kia", "Mazda", "Volvo"],
+      "en": ["Toyota", "BMW", "Mercedes-Benz", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault", "Skoda", "Peugeot", "Fiat", "Opel", "Suzuki", "Kia", "Mazda", "Volvo"],
+      "bs": ["Toyota", "BMW", "Mercedes-Benz", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault", "Škoda", "Peugeot", "Fiat", "Opel", "Suzuki", "Kia", "Mazda", "Volvo"]
+    }
+  },
+  "features": {
+    "cars": {
+      "ru": ["полный привод", "кожаный салон", "климат-контроль", "без ДТП", "обслуживался у дилера", "экономичный", "автоматическая коробка", "панорамная крыша", "подогрев сидений", "парктроники", "камера заднего вида", "Bluetooth", "круиз-контроль", "литые диски"],
+      "en": ["all-wheel drive", "leather interior", "climate control", "accident-free", "dealer serviced", "fuel efficient", "automatic transmission", "panoramic roof", "heated seats", "parking sensors", "rear view camera", "Bluetooth", "cruise control", "alloy wheels"],
+      "bs": ["pogon na sve točkove", "kožna unutrašnjost", "klima uređaj", "bez udesa", "servisiran kod dilera", "ekonomičan", "automatski mjenjač", "panoramski krov", "grijana sjedišta", "senzori za parkiranje", "kamera za vožnju unazad", "Bluetooth", "tempomat", "aluminijske felge"]
+    },
+    "motorcycles-sub": {
+      "ru": ["ABS", "спортивный выхлоп", "подогрев ручек", "ветровое стекло", "кофры", "центральная подставка", "сигнализация", "новая резина", "цепь", "регулируемая подвеска", "светодиодные фары", "квикшифтер"],
+      "en": ["ABS", "sports exhaust", "heated grips", "windshield", "panniers", "center stand", "alarm system", "new tires", "chain drive", "adjustable suspension", "LED headlights", "quick shifter"],
+      "bs": ["ABS", "sportski auspuh", "grijane ručice", "vjetrobran", "kofri", "centralni stalak", "alarmni sistem", "nove gume", "lančani pogon", "podesivi ovjes", "LED farovi", "kvikšifter"]
+    },
+    "scooters": {
+      "ru": ["экономичный", "лёгкий", "автомат", "багажник", "дисковые тормоза", "светодиодная оптика", "электростартер", "складной", "новые шины", "защита от кражи", "комфортное сиденье", "большой пробег на баке"],
+      "en": ["fuel efficient", "lightweight", "automatic", "luggage compartment", "disc brakes", "LED lighting", "electric start", "foldable", "new tires", "anti-theft", "comfort seat", "long range per tank"],
+      "bs": ["ekonomičan", "lagan", "automatik", "prtljažnik", "diskovne kočnice", "LED svjetla", "električni starter", "sklopiv", "nove gume", "anti-theft sistem", "udobno sjedište", "duga vožnja po rezervoaru"]
+    },
+    "bicycles": {
+      "ru": ["алюминиевая рама", "дисковые тормоза", "амортизационная вилка", "27 скоростей", "карбоновая рама", "колёса 29 дюймов", "гидравлические тормоза", "передняя подвеска", "багажник", "крылья", "свет", "педали"],
+      "en": ["aluminum frame", "disc brakes", "suspension fork", "27 speeds", "carbon frame", "29 inch wheels", "hydraulic brakes", "front suspension", "rear rack", "fenders", "lights", "pedals"],
+      "bs": ["aluminijumski ram", "diskovne kočnice", "amortizaciona viljuška", "27 brzina", "karbonski ram", "29 inčni točkovi", "hidraulične kočnice", "prednji ovjes", "nosač prtljaga", "blatobrani", "svjetla", "pedale"]
+    },
+    "scooters-scooters": {
+      "ru": ["новый двигатель", "свежий ремонт", "тихий", "экономичный", "лёгкий запуск", "свет", "зеркала", "проведено ТО", "чистый", "документы в порядке", "скорость до 45 км/ч", "двухтактный"],
+      "en": ["new engine", "recently serviced", "quiet", "fuel efficient", "easy start", "lights", "mirrors", "service done", "clean", "documents in order", "speed up to 45 kmh", "two stroke"],
+      "bs": ["nov motor", "servisiran", "tih", "ekonomičan", "lako paljenje", "svjetla", "retrovizori", "izvršen servis", "čist", "dokumenti u redu", "brzina do 45 kmh", "dvotaktni"]
+    },
+    "trucks-sub": {
+      "ru": ["дизель", "турбонаддув", "гидроусилитель", "кондиционер", "бортовой компьютер", "подогрев зеркал", "кран-манипулятор", "самосвальный кузов", "рефрижератор", "тент", "длинная база", "двойная кабина"],
+      "en": ["diesel", "turbocharged", "power steering", "air conditioning", "onboard computer", "heated mirrors", "crane", "dump body", "refrigerated", "tarpaulin", "long wheelbase", "crew cab"],
+      "bs": ["dizel", "turbopunjač", "servo upravljač", "klima uređaj", "kompjuter u kabini", "grijani retrovizori", "dizalica", "kiper sistem", "hlađenje", "cerada", "duga međuosovina", "dupla kabina"]
+    },
+    "agricultural-machinery": {
+      "ru": ["четырехколесный привод", "кондиционер в кабине", "навигация GPS", "мощный двигатель", "низкий расход топлива", "гидравлика", "передний погрузчик", "косилка", "прицепное устройство", "шины низкого давления", "защитная дуга", "цифровая панель"],
+      "en": ["four wheel drive", "cab air conditioning", "GPS navigation", "powerful engine", "low fuel consumption", "hydraulics", "front loader", "mower attachment", "tow hitch", "low pressure tires", "roll bar", "digital dashboard"],
+      "bs": ["pogon na četiri točka", "klima u kabini", "GPS navigacija", "snažan motor", "mala potrošnja goriva", "hidraulika", "prednji utovarivač", "kosilica", "vučni uređaj", "gume niskog pritiska", "zaštitni luk", "digitalna tabla"]
+    },
+    "commercial-vehicles": {
+      "ru": ["дизель", "кондиционер", "гидроборт", "раздвижная дверь", "высокий потолок", "стойки для груза", "парктроник", "подогрев зеркал", "грузоподъёмность", "полный привод", "короткая база", "сигнализация"],
+      "en": ["diesel", "air conditioning", "lift gate", "sliding door", "high roof", "cargo tie downs", "parking sensors", "heated mirrors", "payload capacity", "all wheel drive", "short wheelbase", "alarm"],
+      "bs": ["dizel", "klima uređaj", "hidraulična rampa", "klizna vrata", "visoki krov", "vezice za teret", "senzori za parkiranje", "grijani retrovizori", "nosivost", "pogon na sve točkove", "kratka međuosovina", "alarm"]
+    },
+    "campers": {
+      "ru": ["автономное отопление", "холодильник", "душ и туалет", "солнечные панели", "газовая плита", "кондиционер", "навес", "спальное место на 4", "подогрев пола", "внешний душ", "спутниковое ТВ", "резервуар для воды"],
+      "en": ["autonomous heating", "refrigerator", "shower and toilet", "solar panels", "gas stove", "air conditioning", "awning", "sleeps 4", "heated floor", "outdoor shower", "satellite TV", "fresh water tank"],
+      "bs": ["autonomno grijanje", "frižider", "tuš i wc", "solarni paneli", "plinski šporet", "klima uređaj", "tenda", "spava 4 osobe", "grijani pod", "vanjski tuš", "satelitska TV", "rezervoar za vodu"]
+    },
+    "boats-yachts": {
+      "ru": ["GPS", "автопилот", "эхолот", "радар", "кокпит", "каюта", "камбуз", "лебёдка", "парусное оборудование", "подвесной мотор", "якорь", "спасательные жилеты", "навигационные огни", "VHF радио"],
+      "en": ["GPS", "autopilot", "fish finder", "radar", "cockpit", "cabin", "galley", "winch", "sailing rig", "outboard motor", "anchor", "life jackets", "navigation lights", "VHF radio"],
+      "bs": ["GPS", "autopilot", "eholot", "radar", "kokpit", "kabina", "kuhinja", "vitlo", "jedriličarska oprema", "vanbrodski motor", "sidro", "prsluci za spašavanje", "navigaciona svjetla", "VHF radio"]
+    },
+    "motorboats": {
+      "ru": ["подвесной мотор", "эхолот", "трейлер", "бензин", "навигационные огни", "сиденья", "рулевое управление", "антенна", "якорь", "бак для топлива", "спасательный круг", "тентом"],
+      "en": ["outboard motor", "fish finder", "trailer included", "gasoline", "navigation lights", "seats", "steering system", "antenna", "anchor", "fuel tank", "life buoy", "bimini top"],
+      "bs": ["vanbrodski motor", "eholot", "prikolica uključena", "benzin", "navigaciona svjetla", "sjedišta", "sistem upravljanja", "antena", "sidro", "rezervoar goriva", "prsten za spašavanje", "tenda"]
+    },
+    "sailing-boats": {
+      "ru": ["паруса", "лебёдки", "автопилот", "GPS", "кокпит", "камбуз", "каюта", "радио", "якорь", "спасательное оборудование", "ходовые огни", "ветроуказатель", "такелаж"],
+      "en": ["sails", "winches", "autopilot", "GPS", "cockpit", "galley", "cabin", "VHF radio", "anchor", "safety equipment", "navigation lights", "wind indicator", "rigging"],
+      "bs": ["jedra", "vitla", "autopilot", "GPS", "kokpit", "kuhinja", "kabina", "VHF radio", "sidro", "sigurnosna oprema", "navigaciona svjetla", "pokazivač vjetra", "konopi i oprema"]
+    },
+    "personal-watercraft": {
+      "ru": ["четырёхтактный", "обратный клапан", "зеркала", "буксировочный трос", "чехол", "ключ безопасности", "смотровая площадка", "водомет", "регулируемый руль", "Bluetooth аудио", "GPS спидометр", "отсек для хранения"],
+      "en": ["four stroke", "reverse system", "mirrors", "tow rope", "cover", "safety lanyard", "boarding platform", "jet drive", "adjustable handlebars", "Bluetooth audio", "GPS speedometer", "storage compartment"],
+      "bs": ["četvorotaktni", "sistem za rikverc", "retrovizori", "uže za vuču", "zaštitna navlaka", "sigurnosna traka", "platforma za ulazak", "mlazni pogon", "podesivi upravljač", "Bluetooth audio", "GPS brzinomjer", "pretinac za odlaganje"]
+    },
+    "parts": {
+      "ru": ["OEM", "совместим с", "новая деталь", "оригинал", "гарантия", "доставка", "крепёж в комплекте", "проверено", "высокое качество", "со склада", "чугун", "нержавейка", "хромированный", "керамический"],
+      "en": ["OEM", "compatible with", "new part", "original", "warranty", "delivery available", "mounting kit included", "tested", "high quality", "in stock", "cast iron", "stainless steel", "chrome plated", "ceramic"],
+      "bs": ["OEM", "kompatibilno sa", "novi dio", "original", "garancija", "dostava moguća", "montažni komplet uključen", "testirano", "visok kvalitet", "na lageru", "liveno gvožđe", "nerđajući čelik", "hromirani", "keramički"]
+    },
+    "tires-wheels": {
+      "ru": ["зимние шины", "летние шины", "всесезонные", "шипованные", "литой диск", "штампованный диск", "новая резина", "балансировка", "R17", "R16", "R18", "профиль 55", "индекс скорости V", "широкий профиль"],
+      "en": ["winter tires", "summer tires", "all season", "studded", "alloy rim", "steel rim", "new rubber", "balanced", "R17", "R16", "R18", "aspect ratio 55", "speed rating V", "wide profile"],
+      "bs": ["zimske gume", "ljetnje gume", "sve sezone", "sa šiljcima", "aluminijumska felga", "čelična felga", "nova guma", "balansirano", "R17", "R16", "R18", "profil 55", "brzinski indeks V", "široki profil"]
+    },
+    "auto-accessories": {
+      "ru": ["универсальный", "легко устанавливается", "высокое качество", "чёрный матовый", "нержавейка", "комплект", "полировка", "светодиодный", "автомобильный", "водонепроницаемый", "противоскользящий", "с хромированием"],
+      "en": ["universal fit", "easy to install", "high quality", "matte black", "stainless steel", "set", "polished", "LED", "automotive grade", "waterproof", "non slip", "chrome finish"],
+      "bs": ["univerzalno", "lako za montažu", "visok kvalitet", "mat crna", "nerđajući čelik", "set", "polirano", "LED", "automobilski kvalitet", "vodootporno", "protiv klizanja", "hrom završna obrada"]
+    },
+    "auto-tools": {
+      "ru": ["набор", "хром-ванадий", "трещотка", "ударный", "диэлектрический", "телескопический", "с подсветкой", "сумка в комплекте", "лазерная маркировка", "двусторонний", "магнитный", "усиленный"],
+      "en": ["set", "chrome vanadium", "ratchet", "impact", "insulated", "telescopic", "with LED light", "carry case included", "laser etched", "double sided", "magnetic", "reinforced"],
+      "bs": ["set", "hrom vanadijum", "reket", "udarni", "izolovan", "teleskopski", "sa LED svjetlom", "torbica uključena", "laserom gravirano", "dvostrani", "magnetni", "ojačan"]
+    },
+    "auto-equipment": {
+      "ru": ["профессиональный", "электрический", "пневматический", "цифровой дисплей", "автоматический", "1000 кг", "2000 кг", "складной", "быстросъёмный", "регулируемый", "с защитой", "сертифицированный"],
+      "en": ["professional grade", "electric", "pneumatic", "digital display", "automatic", "1000 kg capacity", "2000 kg capacity", "foldable", "quick release", "adjustable", "with safety guard", "certified"],
+      "bs": ["profesionalnog kvaliteta", "električni", "pneumatski", "digitalni displej", "automatski", "kapacitet 1000 kg", "kapacitet 2000 kg", "sklopiv", "brzo otpuštanje", "podesiv", "sa zaštitom", "certifikovan"]
+    },
+    "oils-chemicals": {
+      "ru": ["5W-30", "5W-40", "10W-40", "синтетика", "полусинтетика", "минералка", "концентрат", "готовый к использованию", "API SN", "ACEA C3", "длинный срок хранения", "с объёмом 5 литров"],
+      "en": ["5W-30", "5W-40", "10W-40", "fully synthetic", "semi synthetic", "mineral", "concentrate", "ready to use", "API SN", "ACEA C3", "long shelf life", "5 liter bottle"],
+      "bs": ["5W-30", "5W-40", "10W-40", "potpuno sintetičko", "polusintetičko", "mineralno", "koncentrat", "spreman za upotrebu", "API SN", "ACEA C3", "dug rok trajanja", "boca od 5 litara"]
+    },
+    "anti-theft": {
+      "ru": ["автоматический", "датчик удара", "датчик наклона", "обратная связь", "GPS мониторинг", "автозапуск", "беспроводной", "сирена", "сложный ключ", "вибрация", "защита от сканирования", "радиус 1 км"],
+      "en": ["automatic", "shock sensor", "tilt sensor", "two way", "GPS monitoring", "remote start", "wireless", "siren", "complex key", "vibration sensor", "anti scan protection", "1 km range"],
+      "bs": ["automatski", "senzor udara", "senzor nagiba", "dvosmjerni", "GPS praćenje", "daljinsko pokretanje", "bežični", "sirena", "složen ključ", "senzor vibracija", "anti sken zaštita", "domet 1 km"]
+    },
+    "gps-navigators": {
+      "ru": ["большой экран", "сенсорный дисплей", "еврокарты", "обновление карт", "голосовые подсказки", "Bluetooth", "WiFi", "пробки онлайн", "камера заднего вида", "навигация по полосам", "3D карты", "быстрый процессор"],
+      "en": ["large screen", "touch display", "European maps", "map updates", "voice guidance", "Bluetooth", "WiFi", "live traffic", "rear camera input", "lane guidance", "3D maps", "fast processor"],
+      "bs": ["veliki ekran", "touch displej", "mape Evrope", "ažuriranje mapa", "glasovna navigacija", "Bluetooth", "WiFi", "promet uživo", "ulaz za stražnju kameru", "navigacija po trakama", "3D mape", "brz procesor"]
+    },
+    "auto-audio-video": {
+      "ru": ["MP3", "USB вход", "AUX", "радио RDS", "Bluetooth громкая связь", "сабвуфер", "усилитель", "2-х полосный", "4 канала", "пульт ДУ", "светодиодная подсветка", "FM/AM"],
+      "en": ["MP3 playback", "USB input", "AUX input", "RDS radio", "Bluetooth handsfree", "subwoofer", "amplifier", "2 way", "4 channel", "remote control", "LED backlight", "FM/AM tuner"],
+      "bs": ["MP3 reprodukcija", "USB ulaz", "AUX ulaz", "RDS radio", "Bluetooth handsfree", "subwoofer", "pojačalo", "dvostruki sistem", "4 kanala", "daljinski upravljač", "LED pozadinsko svjetlo", "FM/AM tjuner"]
+    },
+    "roof-boxes-hitches": {
+      "ru": ["аэродинамичный", "двустороннее открытие", "центральный замок", "быстросъёмный", "максимальная нагрузка", "75 кг", "100 кг", "алюминий", "пластик", "универсальный", "с кронштейнами", "противоугонный"],
+      "en": ["aerodynamic", "dual side opening", "center lock", "quick release", "max load 75 kg", "max load 100 kg", "aluminum", "plastic", "universal fit", "brackets included", "anti theft", "locking system"],
+      "bs": ["aerodinamičan", "otvaranje sa obje strane", "centralna brava", "brzo otpuštanje", "maksimalno opterećenje 75 kg", "maksimalno opterećenje 100 kg", "aluminijum", "plastika", "univerzalno", "nosači uključeni", "anti theft", "sistem zaključavanja"]
+    },
+    "trailers": {
+      "ru": ["одноосный", "двухосный", "тормоза", "бортовой", "самосвальный", "тентом", "легковой", "грузовой", "трап", "подножка", "свет", "регистрация"],
+      "en": ["single axle", "tandem axle", "brakes", "side walls", "tipping", "tarpaulin cover", "light duty", "heavy duty", "ramp", "jockey wheel", "lights", "registered"],
+      "bs": ["jedna osovina", "dvije osovine", "kočnice", "bočne strane", "kiper", "cerada", "laka prikolica", "teška prikolica", "rampa", "potporna nožica", "svjetla", "registrovana"]
+    }
+  }
+}

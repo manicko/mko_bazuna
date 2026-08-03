@@ -1,6 +1,2268 @@
 {
   "version": 1,
-  "categories": {},
+  "categories": {
+    "massage": {
+      "photos": [
+        {
+          "filename": "massage_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "massage_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "massage_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "personal-watercraft": {
+      "photos": [
+        {
+          "filename": "personal-watercraft_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "personal-watercraft_02.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "personal-watercraft_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "freight": {
+      "photos": [
+        {
+          "filename": "freight_01.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "freight_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "freight_03.jpg",
+          "width": 718,
+          "height": 1080
+        }
+      ]
+    },
+    "other-electronics": {
+      "photos": [
+        {
+          "filename": "other-electronics_01.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "other-electronics_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "other-electronics_03.jpg",
+          "width": 1080,
+          "height": 607
+        }
+      ]
+    },
+    "beauty-appliances": {
+      "photos": [
+        {
+          "filename": "beauty-appliances_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "beauty-appliances_02.jpg",
+          "width": 864,
+          "height": 1080
+        },
+        {
+          "filename": "beauty-appliances_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "food-equipment": {
+      "photos": [
+        {
+          "filename": "food-equipment_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "food-equipment_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "food-equipment_03.jpg",
+          "width": 794,
+          "height": 1080
+        }
+      ]
+    },
+    "costume-jewelry": {
+      "photos": [
+        {
+          "filename": "costume-jewelry_01.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "costume-jewelry_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "costume-jewelry_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "parts": {
+      "photos": [
+        {
+          "filename": "parts_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "parts_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "parts_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "hair-styling": {
+      "photos": [
+        {
+          "filename": "hair-styling_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "hair-styling_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "hair-styling_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "pet-birds": {
+      "photos": [
+        {
+          "filename": "pet-birds_01.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "pet-birds_02.jpg",
+          "width": 718,
+          "height": 1080
+        },
+        {
+          "filename": "pet-birds_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "legal-services": {
+      "photos": [
+        {
+          "filename": "legal-services_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "legal-services_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "legal-services_03.jpg",
+          "width": 718,
+          "height": 1080
+        }
+      ]
+    },
+    "motorcycles-sub": {
+      "photos": [
+        {
+          "filename": "motorcycles-sub_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "motorcycles-sub_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "motorcycles-sub_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "car-repair": {
+      "photos": [
+        {
+          "filename": "car-repair_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "car-repair_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "car-repair_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "kids-hygiene": {
+      "photos": [
+        {
+          "filename": "kids-hygiene_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "kids-hygiene_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "kids-hygiene_03.jpg",
+          "width": 1080,
+          "height": 718
+        }
+      ]
+    },
+    "home-food-service": {
+      "photos": [
+        {
+          "filename": "home-food-service_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "home-food-service_02.jpg",
+          "width": 1080,
+          "height": 721
+        },
+        {
+          "filename": "home-food-service_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "medical-products": {
+      "photos": [
+        {
+          "filename": "medical-products_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "medical-products_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "medical-products_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "care-hygiene": {
+      "photos": [
+        {
+          "filename": "care-hygiene_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "care-hygiene_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "care-hygiene_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "phones": {
+      "photos": [
+        {
+          "filename": "phones_01.jpg",
+          "width": 1080,
+          "height": 809
+        },
+        {
+          "filename": "phones_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "phones_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "clothing-repair": {
+      "photos": [
+        {
+          "filename": "clothing-repair_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "clothing-repair_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "clothing-repair_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "jewelry": {
+      "photos": [
+        {
+          "filename": "jewelry_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "jewelry_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "jewelry_03.jpg",
+          "width": 723,
+          "height": 1080
+        }
+      ]
+    },
+    "girls": {
+      "photos": [
+        {
+          "filename": "girls_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "girls_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "girls_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "roof-boxes-hitches": {
+      "photos": [
+        {
+          "filename": "roof-boxes-hitches_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "roof-boxes-hitches_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "roof-boxes-hitches_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "bicycles": {
+      "photos": [
+        {
+          "filename": "bicycles_01.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "bicycles_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "bicycles_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "flex-space": {
+      "photos": [
+        {
+          "filename": "flex-space_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "flex-space_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "flex-space_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "hair-care-services": {
+      "photos": [
+        {
+          "filename": "hair-care-services_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "hair-care-services_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "hair-care-services_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "phone-repair": {
+      "photos": [
+        {
+          "filename": "phone-repair_01.jpg",
+          "width": 1080,
+          "height": 697
+        },
+        {
+          "filename": "phone-repair_02.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "phone-repair_03.jpg",
+          "width": 1080,
+          "height": 686
+        }
+      ]
+    },
+    "ac-installation": {
+      "photos": [
+        {
+          "filename": "ac-installation_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "ac-installation_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "ac-installation_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "plastering": {
+      "photos": [
+        {
+          "filename": "plastering_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "plastering_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "plastering_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "psychology": {
+      "photos": [
+        {
+          "filename": "psychology_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "psychology_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "psychology_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "agricultural-machinery": {
+      "photos": [
+        {
+          "filename": "agricultural-machinery_01.jpg",
+          "width": 1080,
+          "height": 715
+        },
+        {
+          "filename": "agricultural-machinery_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "agricultural-machinery_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "skincare": {
+      "photos": [
+        {
+          "filename": "skincare_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "skincare_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "skincare_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "auto-equipment": {
+      "photos": [
+        {
+          "filename": "auto-equipment_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "auto-equipment_02.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "auto-equipment_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "no-experience-jobs": {
+      "photos": [
+        {
+          "filename": "no-experience-jobs_01.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "no-experience-jobs_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "no-experience-jobs_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "business-retail-spaces": {
+      "photos": [
+        {
+          "filename": "business-retail-spaces_01.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "business-retail-spaces_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "business-retail-spaces_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "boys": {
+      "photos": [
+        {
+          "filename": "boys_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "boys_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "boys_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "pet-food": {
+      "photos": [
+        {
+          "filename": "pet-food_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "pet-food_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "pet-food_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "business-warehouses": {
+      "photos": [
+        {
+          "filename": "business-warehouses_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-warehouses_02.jpg",
+          "width": 1080,
+          "height": 606
+        },
+        {
+          "filename": "business-warehouses_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "tablets": {
+      "photos": [
+        {
+          "filename": "tablets_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "tablets_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "tablets_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "auto-audio-video": {
+      "photos": [
+        {
+          "filename": "auto-audio-video_01.jpg",
+          "width": 733,
+          "height": 1080
+        },
+        {
+          "filename": "auto-audio-video_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "auto-audio-video_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "land-plots": {
+      "photos": [
+        {
+          "filename": "land-plots_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "land-plots_02.jpg",
+          "width": 1080,
+          "height": 809
+        },
+        {
+          "filename": "land-plots_03.jpg",
+          "width": 1080,
+          "height": 810
+        }
+      ]
+    },
+    "games-consoles-software": {
+      "photos": [
+        {
+          "filename": "games-consoles-software_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "games-consoles-software_02.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "games-consoles-software_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "car-seats": {
+      "photos": [
+        {
+          "filename": "car-seats_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "car-seats_02.jpg",
+          "width": 1080,
+          "height": 721
+        },
+        {
+          "filename": "car-seats_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "oils-chemicals": {
+      "photos": [
+        {
+          "filename": "oils-chemicals_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "oils-chemicals_02.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "oils-chemicals_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "trucks-sub": {
+      "photos": [
+        {
+          "filename": "trucks-sub_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "trucks-sub_02.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "trucks-sub_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "hobby-scooters": {
+      "photos": [
+        {
+          "filename": "hobby-scooters_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "hobby-scooters_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "hobby-scooters_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "motorboats": {
+      "photos": [
+        {
+          "filename": "motorboats_01.jpg",
+          "width": 606,
+          "height": 1080
+        },
+        {
+          "filename": "motorboats_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "motorboats_03.jpg",
+          "width": 761,
+          "height": 1080
+        }
+      ]
+    },
+    "garages": {
+      "photos": [
+        {
+          "filename": "garages_01.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "garages_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "garages_03.jpg",
+          "width": 685,
+          "height": 1080
+        }
+      ]
+    },
+    "trading": {
+      "photos": [
+        {
+          "filename": "trading_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "trading_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "trading_03.jpg",
+          "width": 770,
+          "height": 1080
+        }
+      ]
+    },
+    "courses-training": {
+      "photos": [
+        {
+          "filename": "courses-training_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "courses-training_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "courses-training_03.jpg",
+          "width": 706,
+          "height": 1080
+        }
+      ]
+    },
+    "delivery-courier": {
+      "photos": [
+        {
+          "filename": "delivery-courier_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "delivery-courier_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "delivery-courier_03.jpg",
+          "width": 1080,
+          "height": 810
+        }
+      ]
+    },
+    "business-flex-space": {
+      "photos": [
+        {
+          "filename": "business-flex-space_01.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "business-flex-space_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-flex-space_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "books-magazines": {
+      "photos": [
+        {
+          "filename": "books-magazines_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "books-magazines_02.jpg",
+          "width": 1080,
+          "height": 678
+        },
+        {
+          "filename": "books-magazines_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "audio-video": {
+      "photos": [
+        {
+          "filename": "audio-video_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "audio-video_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "audio-video_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "industrial-equipment": {
+      "photos": [
+        {
+          "filename": "industrial-equipment_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "industrial-equipment_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "industrial-equipment_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "business-property-valuation": {
+      "photos": [
+        {
+          "filename": "business-property-valuation_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "business-property-valuation_02.jpg",
+          "width": 715,
+          "height": 1080
+        },
+        {
+          "filename": "business-property-valuation_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "pet-dogs-cats": {
+      "photos": [
+        {
+          "filename": "pet-dogs-cats_01.jpg",
+          "width": 652,
+          "height": 1080
+        },
+        {
+          "filename": "pet-dogs-cats_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "pet-dogs-cats_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "event-planning": {
+      "photos": [
+        {
+          "filename": "event-planning_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "event-planning_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "event-planning_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "houses": {
+      "photos": [
+        {
+          "filename": "houses_01.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "houses_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "houses_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "beauty-equipment": {
+      "photos": [
+        {
+          "filename": "beauty-equipment_01.jpg",
+          "width": 864,
+          "height": 1080
+        },
+        {
+          "filename": "beauty-equipment_02.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "beauty-equipment_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "tax-planning": {
+      "photos": [
+        {
+          "filename": "tax-planning_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "tax-planning_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "tax-planning_03.jpg",
+          "width": 1080,
+          "height": 719
+        }
+      ]
+    },
+    "business-translations": {
+      "photos": [
+        {
+          "filename": "business-translations_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "business-translations_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-translations_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "catering": {
+      "photos": [
+        {
+          "filename": "catering_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "catering_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "catering_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "kids-scooters-bikes": {
+      "photos": [
+        {
+          "filename": "kids-scooters-bikes_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "kids-scooters-bikes_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "kids-scooters-bikes_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "flooring-installation": {
+      "photos": [
+        {
+          "filename": "flooring-installation_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "flooring-installation_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "flooring-installation_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "waterproofing": {
+      "photos": [
+        {
+          "filename": "waterproofing_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "waterproofing_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "waterproofing_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "auto-accessories": {
+      "photos": [
+        {
+          "filename": "auto-accessories_01.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "auto-accessories_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "auto-accessories_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "business-legal-services": {
+      "photos": [
+        {
+          "filename": "business-legal-services_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-legal-services_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-legal-services_03.jpg",
+          "width": 809,
+          "height": 1080
+        }
+      ]
+    },
+    "other-animals": {
+      "photos": [
+        {
+          "filename": "other-animals_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "other-animals_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "other-animals_03.jpg",
+          "width": 721,
+          "height": 1080
+        }
+      ]
+    },
+    "ready-business": {
+      "photos": [
+        {
+          "filename": "ready-business_01.jpg",
+          "width": 809,
+          "height": 1080
+        },
+        {
+          "filename": "ready-business_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "ready-business_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "business-commercial-land": {
+      "photos": [
+        {
+          "filename": "business-commercial-land_01.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "business-commercial-land_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "business-commercial-land_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "cats": {
+      "photos": [
+        {
+          "filename": "cats_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "cats_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "cats_03.jpg",
+          "width": 1080,
+          "height": 718
+        }
+      ]
+    },
+    "laptop-pc-repair": {
+      "photos": [
+        {
+          "filename": "laptop-pc-repair_01.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "laptop-pc-repair_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "laptop-pc-repair_03.jpg",
+          "width": 607,
+          "height": 1080
+        }
+      ]
+    },
+    "security": {
+      "photos": [
+        {
+          "filename": "security_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "security_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "security_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "commercial-vehicles": {
+      "photos": [
+        {
+          "filename": "commercial-vehicles_01.jpg",
+          "width": 879,
+          "height": 1080
+        },
+        {
+          "filename": "commercial-vehicles_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "commercial-vehicles_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "pet-accessories": {
+      "photos": [
+        {
+          "filename": "pet-accessories_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "pet-accessories_02.jpg",
+          "width": 1080,
+          "height": 756
+        },
+        {
+          "filename": "pet-accessories_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "women-shoes": {
+      "photos": [
+        {
+          "filename": "women-shoes_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "women-shoes_02.jpg",
+          "width": 1080,
+          "height": 1080
+        },
+        {
+          "filename": "women-shoes_03.jpg",
+          "width": 1080,
+          "height": 1080
+        }
+      ]
+    },
+    "restaurants": {
+      "photos": [
+        {
+          "filename": "restaurants_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "restaurants_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "restaurants_03.jpg",
+          "width": 1080,
+          "height": 719
+        }
+      ]
+    },
+    "business-offices": {
+      "photos": [
+        {
+          "filename": "business-offices_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "business-offices_02.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "business-offices_03.jpg",
+          "width": 1080,
+          "height": 810
+        }
+      ]
+    },
+    "offices": {
+      "photos": [
+        {
+          "filename": "offices_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "offices_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "offices_03.jpg",
+          "width": 1080,
+          "height": 740
+        }
+      ]
+    },
+    "sailing-boats": {
+      "photos": [
+        {
+          "filename": "sailing-boats_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "sailing-boats_02.jpg",
+          "width": 1080,
+          "height": 754
+        },
+        {
+          "filename": "sailing-boats_03.jpg",
+          "width": 1080,
+          "height": 607
+        }
+      ]
+    },
+    "accounting": {
+      "photos": [
+        {
+          "filename": "accounting_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "accounting_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "accounting_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "carpet-cleaning": {
+      "photos": [
+        {
+          "filename": "carpet-cleaning_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "carpet-cleaning_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "carpet-cleaning_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "sport-fitness": {
+      "photos": [
+        {
+          "filename": "sport-fitness_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "sport-fitness_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "sport-fitness_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "auto-tools": {
+      "photos": [
+        {
+          "filename": "auto-tools_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "auto-tools_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "auto-tools_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "fish-aquarium": {
+      "photos": [
+        {
+          "filename": "fish-aquarium_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "fish-aquarium_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "fish-aquarium_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "photoshoots": {
+      "photos": [
+        {
+          "filename": "photoshoots_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "photoshoots_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "photoshoots_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "birds": {
+      "photos": [
+        {
+          "filename": "birds_01.jpg",
+          "width": 809,
+          "height": 1080
+        },
+        {
+          "filename": "birds_02.jpg",
+          "width": 1080,
+          "height": 938
+        },
+        {
+          "filename": "birds_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "campers": {
+      "photos": [
+        {
+          "filename": "campers_01.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "campers_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "campers_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "toys": {
+      "photos": [
+        {
+          "filename": "toys_01.jpg",
+          "width": 1080,
+          "height": 719
+        },
+        {
+          "filename": "toys_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "toys_03.jpg",
+          "width": 719,
+          "height": 1080
+        }
+      ]
+    },
+    "rooms": {
+      "photos": [
+        {
+          "filename": "rooms_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "rooms_02.jpg",
+          "width": 718,
+          "height": 1080
+        },
+        {
+          "filename": "rooms_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "charity": {
+      "photos": [
+        {
+          "filename": "charity_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "charity_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "charity_03.jpg",
+          "width": 1080,
+          "height": 718
+        }
+      ]
+    },
+    "office-cleaning": {
+      "photos": [
+        {
+          "filename": "office-cleaning_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "office-cleaning_02.jpg",
+          "width": 1080,
+          "height": 810
+        },
+        {
+          "filename": "office-cleaning_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "apartments": {
+      "photos": [
+        {
+          "filename": "apartments_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "apartments_02.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "apartments_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "scooters": {
+      "photos": [
+        {
+          "filename": "scooters_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "scooters_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "scooters_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "other-services": {
+      "photos": [
+        {
+          "filename": "other-services_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "other-services_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "other-services_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "furniture-interior": {
+      "photos": [
+        {
+          "filename": "furniture-interior_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "furniture-interior_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "furniture-interior_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "shoe-repair": {
+      "photos": [
+        {
+          "filename": "shoe-repair_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "shoe-repair_02.jpg",
+          "width": 1080,
+          "height": 863
+        },
+        {
+          "filename": "shoe-repair_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "retail-equipment": {
+      "photos": [
+        {
+          "filename": "retail-equipment_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "retail-equipment_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "retail-equipment_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "programming": {
+      "photos": [
+        {
+          "filename": "programming_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "programming_02.jpg",
+          "width": 1080,
+          "height": 809
+        },
+        {
+          "filename": "programming_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "appliances": {
+      "photos": [
+        {
+          "filename": "appliances_01.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "appliances_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "appliances_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "bags-luggage": {
+      "photos": [
+        {
+          "filename": "bags-luggage_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "bags-luggage_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "bags-luggage_03.jpg",
+          "width": 1080,
+          "height": 719
+        }
+      ]
+    },
+    "business-taxes": {
+      "photos": [
+        {
+          "filename": "business-taxes_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-taxes_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "business-taxes_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "gps-navigators": {
+      "photos": [
+        {
+          "filename": "gps-navigators_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "gps-navigators_02.jpg",
+          "width": 1080,
+          "height": 864
+        },
+        {
+          "filename": "gps-navigators_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "tires-wheels": {
+      "photos": [
+        {
+          "filename": "tires-wheels_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "tires-wheels_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "tires-wheels_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "men-clothing": {
+      "photos": [
+        {
+          "filename": "men-clothing_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "men-clothing_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "men-clothing_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "plants": {
+      "photos": [
+        {
+          "filename": "plants_01.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "plants_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "plants_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "manicure": {
+      "photos": [
+        {
+          "filename": "manicure_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "manicure_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "manicure_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "taxi": {
+      "photos": [
+        {
+          "filename": "taxi_01.jpg",
+          "width": 1080,
+          "height": 721
+        },
+        {
+          "filename": "taxi_02.jpg",
+          "width": 810,
+          "height": 1080
+        },
+        {
+          "filename": "taxi_03.jpg",
+          "width": 1080,
+          "height": 715
+        }
+      ]
+    },
+    "pedicure": {
+      "photos": [
+        {
+          "filename": "pedicure_01.jpg",
+          "width": 1080,
+          "height": 724
+        },
+        {
+          "filename": "pedicure_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "pedicure_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "men-shoes": {
+      "photos": [
+        {
+          "filename": "men-shoes_01.jpg",
+          "width": 922,
+          "height": 1080
+        },
+        {
+          "filename": "men-shoes_02.jpg",
+          "width": 719,
+          "height": 1080
+        },
+        {
+          "filename": "men-shoes_03.jpg",
+          "width": 1080,
+          "height": 1080
+        }
+      ]
+    },
+    "warehouses": {
+      "photos": [
+        {
+          "filename": "warehouses_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "warehouses_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "warehouses_03.jpg",
+          "width": 1080,
+          "height": 721
+        }
+      ]
+    },
+    "appliance-repair": {
+      "photos": [
+        {
+          "filename": "appliance-repair_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "appliance-repair_02.jpg",
+          "width": 607,
+          "height": 1080
+        },
+        {
+          "filename": "appliance-repair_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "hunting-fishing": {
+      "photos": [
+        {
+          "filename": "hunting-fishing_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "hunting-fishing_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "hunting-fishing_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "strollers": {
+      "photos": [
+        {
+          "filename": "strollers_01.jpg",
+          "width": 1080,
+          "height": 846
+        },
+        {
+          "filename": "strollers_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "strollers_03.jpg",
+          "width": 810,
+          "height": 1080
+        }
+      ]
+    },
+    "sports-outdoors": {
+      "photos": [
+        {
+          "filename": "sports-outdoors_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "sports-outdoors_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "sports-outdoors_03.jpg",
+          "width": 1080,
+          "height": 720
+        }
+      ]
+    },
+    "warehousing": {
+      "photos": [
+        {
+          "filename": "warehousing_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "warehousing_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "warehousing_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "auto-business-equipment": {
+      "photos": [
+        {
+          "filename": "auto-business-equipment_01.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "auto-business-equipment_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "auto-business-equipment_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "kitchen-dining": {
+      "photos": [
+        {
+          "filename": "kitchen-dining_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "kitchen-dining_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "kitchen-dining_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "dog-walking": {
+      "photos": [
+        {
+          "filename": "dog-walking_01.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "dog-walking_02.jpg",
+          "width": 720,
+          "height": 1080
+        },
+        {
+          "filename": "dog-walking_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    }
+  },
   "default": {
     "photos": []
   }

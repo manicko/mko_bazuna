@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "brands": {
+    "goods": {
+      "ru": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus", "Nike", "Adidas", "Zara", "H&M", "IKEA", "Bosch", "Philips", "Panasonic", "Braun", "Gorenje"],
+      "en": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus", "Nike", "Adidas", "Zara", "H&M", "IKEA", "Bosch", "Philips", "Panasonic", "Braun", "Gorenje"],
+      "bs": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus", "Nike", "Adidas", "Zara", "H&M", "IKEA", "Bosch", "Philips", "Panasonic", "Braun", "Gorenje"]
+    }
+  },
+  "features": {
+    "accessories": {
+      "ru": ["кожаный ремешок", "нержавеющая сталь", "стильный дизайн", "универсальный размер", "лёгкий вес", "прочный материал", "регулируемая длина", "магнитная застёжка", "подарочная упаковка", "повседневный стиль"],
+      "en": ["leather strap", "stainless steel", "stylish design", "universal size", "lightweight", "durable material", "adjustable length", "magnetic clasp", "gift packaging", "casual style"],
+      "bs": ["kožni kaiš", "nerđajući čelik", "stilski dizajn", "univerzalna veličina", "lagan", "izdržljiv materijal", "podesiva dužina", "magnetska kopča", "poklon pakovanje", "ležerni stil"]
+    },
+    "appliances": {
+      "ru": ["энергосберегающий", "низкий уровень шума", "быстрое приготовление", "большой объём", "цифровое управление", "автоматическая программа", "защита от детей", "таймер", "лёгкая очистка", "компактный размер"],
+      "en": ["energy efficient", "low noise level", "quick cooking", "large capacity", "digital control", "automatic program", "child lock", "timer", "easy clean", "compact size"],
+      "bs": ["energetski efikasan", "nizak nivo buke", "brzo kuhanje", "veliki kapacitet", "digitalno upravljanje", "automatski program", "zaštita za djecu", "tajmer", "lako čišćenje", "kompaktna veličina"]
+    },
+    "audio-video": {
+      "ru": ["беспроводной", "Bluetooth 5.2", "шумоподавление", "стереозвук", "долгое время работы", "водозащита", "пульт ДУ", "HDMI ARC", "Dolby Atmos", "светодиодный дисплей"],
+      "en": ["wireless", "Bluetooth 5.2", "noise cancelling", "stereo sound", "long battery life", "water resistant", "remote control", "HDMI ARC", "Dolby Atmos", "LED display"],
+      "bs": ["bežični", "Bluetooth 5.2", "poništavanje buke", "stereo zvuk", "dugo trajanje baterije", "otporan na vodu", "daljinski upravljač", "HDMI ARC", "Dolby Atmos", "LED ekran"]
+    },
+    "bags-luggage": {
+      "ru": ["колёсики 360", "встроенный замок", "водонепроницаемый", "отделение для ноутбука", "телескопическая ручка", "лёгкий алюминий", "большой объём", "органайзер внутри", "ремни для одежды", "усиленные углы"],
+      "en": ["360 spinner wheels", "built-in lock", "waterproof", "laptop compartment", "telescopic handle", "lightweight aluminum", "large capacity", "internal organizer", "clothing straps", "reinforced corners"],
+      "bs": ["360 točkići", "ugrađena brava", "vodootporan", "pretinac za laptop", "teleskopska ručka", "lagan aluminijum", "veliki kapacitet", "unutrašnji organizator", "kaïševi za odjeću", "ojačani uglovi"]
+    },
+    "bath-products": {
+      "ru": ["натуральные масла", "органический состав", "гипоаллергенный", "приятный аромат", "увлажняющий эффект", "без парабенов", "детская формула", "восстанавливающий", "пенящийся", "экономный расход"],
+      "en": ["natural oils", "organic formula", "hypoallergenic", "pleasant fragrance", "moisturizing effect", "paraben free", "baby formula", "restorative", "foaming", "economical use"],
+      "bs": ["prirodna ulja", "organska formula", "hipoalergeno", "ugodan miris", "hidratantni efekat", "bez parabena", "bebi formula", "obnavljajući", "pjenušav", "ekonomična upotreba"]
+    },
+    "beauty-appliances": {
+      "ru": ["ионная технология", "керамическое покрытие", "несколько насадок", "регулировка температуры", "беспроводной", "быстрый нагрев", "компактный", "защита от перегрева", "долговечный мотор", "эргономичная ручка"],
+      "en": ["ionic technology", "ceramic coating", "multiple attachments", "temperature control", "cordless", "quick heat up", "compact", "overheat protection", "long-life motor", "ergonomic handle"],
+      "bs": ["jonska tehnologija", "keramički premaz", "više nastavaka", "regulacija temperature", "bežični", "brzo zagrijavanje", "kompaktan", "zaštita od pregrijavanja", "motor dugog vijeka", "ergonomska ručka"]
+    },
+    "bed-linen": {
+      "ru": ["100% хлопок", "сатиновое переплетение", "высокая плотность", "не линяет", "гипоаллергенный", "дышащий", "мягкий на ощупь", "евро размер", "на резинке", "комплект 2 шт"],
+      "en": ["100% cotton", "sateen weave", "high thread count", "colorfast", "hypoallergenic", "breathable", "soft touch", "euro size", "fitted sheet", "set of 2"],
+      "bs": ["100% pamuk", "saten vez", "velika gustina", "ne bledi", "hipoalergeno", "prozračan", "mekan na dodir", "euro veličina", "sa gumicom", "set od 2"]
+    },
+    "books-magazines": {
+      "ru": ["бестселлер", "новая в плёнке", "подарочное издание", "с иллюстрациями", "твердая обложка", "букинистическое", "серийное издание", "автограф автора", "редкое издание", "коллекционирование"],
+      "en": ["bestseller", "new in wrap", "gift edition", "illustrated", "hardcover", "used book", "series edition", "author signed", "rare edition", "collectible"],
+      "bs": ["bestseller", "nov u foliji", "poklon izdanje", "ilustrovano", "tvrdi povez", "polovna knjiga", "serijsko izdanje", "potpis autora", "rijetko izdanje", "kolekcionarsko"]
+    },
+    "boys": {
+      "ru": ["хлопок 100%", "модный принт", "регулируемые бретели", "натуральные ткани", "застёжка на кнопках", "светоотражатели", "удобный крой", "для школы", "спортивный стиль", "комплект из 3"],
+      "en": ["100% cotton", "trendy print", "adjustable straps", "natural fabrics", "snap button closure", "reflectors", "comfortable fit", "for school", "sporty style", "set of 3"],
+      "bs": ["100% pamuk", "moderan print", "podesive naramenice", "prirodne tkanine", "kopčanje na dugmad", "reflektori", "udoban kroj", "za školu", "sportski stil", "set od 3"]
+    },
+    "cameras": {
+      "ru": ["полнокадровая матрица", "стабилизация изображения", "4K видеосъёмка", "быстрый автофокус", "сменная оптика", "защита от пыли", "высокое ISO", "серийная съёмка", "сенсорный экран", "Wi-Fi передача"],
+      "en": ["full frame sensor", "image stabilization", "4K video", "fast autofocus", "interchangeable lens", "dust protection", "high ISO", "burst shooting", "touchscreen", "WiFi transfer"],
+      "bs": ["full frame senzor", "stabilizacija slike", "4K video", "brz autofokus", "izmjenjivi objektiv", "zaštita od prašine", "visok ISO", "burst režim", "touchscreen", "WiFi prijenos"]
+    },
+    "car-seats": {
+      "ru": ["группа 0+/1", "установка против хода", "крепление Isofix", "боковая защита", "регулировка наклона", "съёмный чехол", "пятиточечные ремни", "алюминиевый каркас", "ортопедическая спинка", "легкий вес"],
+      "en": ["group 0+/1", "rear facing", "Isofix mount", "side protection", "recline adjustment", "removable cover", "5-point harness", "aluminum frame", "orthopedic back", "lightweight"],
+      "bs": ["grupa 0+/1", "okrenut prema nazad", "Isofix montaža", "bočna zaštita", "podešavanje nagiba", "skidiva presvlaka", "5-tačkasti pojasevi", "aluminijumski okvir", "ortopedska leđa", "lagan"]
+    },
+    "care-hygiene": {
+      "ru": ["натуральный состав", "без спирта", "увлажняющий", "детская формула", "с алоэ вера", "антибактериальный", "гипоаллергенный", "без отдушек", "экономичная упаковка", "тестировано дерматологами"],
+      "en": ["natural ingredients", "alcohol free", "moisturizing", "baby formula", "with aloe vera", "antibacterial", "hypoallergenic", "unscented", "economy pack", "dermatologist tested"],
+      "bs": ["prirodni sastojci", "bez alkohola", "hidratantan", "bebi formula", "sa aloe verom", "antibakterijski", "hipoalergeno", "bez mirisa", "ekonomično pakovanje", "dermatološki testirano"]
+    },
+    "computers": {
+      "ru": ["SSD накопитель", "16 ГБ RAM", "процессор Intel Core i7", "дискретная графика", "охлаждение жидкостное", "RGB подсветка", "модульная конструкция", "беспроводная связь Wi-Fi 6", "порты USB-C", "тихий режим"],
+      "en": ["SSD storage", "16 GB RAM", "Intel Core i7 processor", "dedicated graphics", "liquid cooling", "RGB lighting", "modular design", "WiFi 6", "USB-C ports", "silent mode"],
+      "bs": ["SSD disk", "16 GB RAM", "Intel Core i7 procesor", "dedicated grafika", "tečno hlađenje", "RGB osvjetljenje", "modularni dizajn", "WiFi 6", "USB-C portovi", "tihi režim"]
+    },
+    "costume-jewelry": {
+      "ru": ["сплав с позолотой", "стразы Swarovski", "винтажный стиль", "лёгкий вес", "удлинённая подвеска", "регулируемая цепочка", "комплект серьги+кольцо", "эмалевое покрытие", "филигрань", "подарочная коробочка"],
+      "en": ["gold plated alloy", "Swarovski crystals", "vintage style", "lightweight", "long pendant", "adjustable chain", "earring + ring set", "enamel coating", "filigree", "gift box"],
+      "bs": ["pozlaćena legura", "Swarovski kristali", "vintage stil", "lagan", "dugačak privjesak", "podesivi lanac", "set minđuše+prsten", "emajlirani premaz", "filigran", "poklon kutija"]
+    },
+    "feeding-products": {
+      "ru": ["силиконовые соски", "антиколиковая система", "медленный поток", "BPA-free пластик", "подогрев в бутылочке", "удобная ручка", "герметичная крышка", "стерилизация в микроволновке", "набор 3 шт", "с маркировкой объёма"],
+      "en": ["silicone teat", "anti-colic system", "slow flow", "BPA-free plastic", "bottle warmer", "easy grip handle", "leak proof lid", "microwave sterilizable", "set of 3", "volume markings"],
+      "bs": ["silikonska duda", "antikolik sistem", "spori protok", "BPA-free plastika", "grijanje flašice", "udobna ručka", "nepropusni poklopac", "sterilizacija u mikrotalasnoj", "set od 3", "oznake zapremine"]
+    },
+    "food-products": {
+      "ru": ["органическое производство", "без ГМО", "натуральный вкус", "домашняя упаковка", "свежий урожай", "местный продукт", "ручная работа", "без сахара", "веганский состав", "крафтовое производство"],
+      "en": ["organic production", "GMO free", "natural taste", "homemade packaging", "fresh harvest", "local product", "handmade", "sugar free", "vegan recipe", "craft production"],
+      "bs": ["organska proizvodnja", "bez GMO", "prirodan ukus", "domaće pakovanje", "svježa berba", "lokalni proizvod", "ručni rad", "bez šećera", "veganski recept", "craft proizvodnja"]
+    },
+    "furniture-interior": {
+      "ru": ["массив дуба", "натуральный шпон", "матовая отделка", "раздвижная система", "трансформер", "встроенная подсветка", "мягкое сиденье", "регулируемая высота", "складная конструкция", "экокожа"],
+      "en": ["solid oak", "natural veneer", "matte finish", "sliding system", "transformer", "built-in lighting", "soft seat", "adjustable height", "foldable design", "eco leather"],
+      "bs": ["puni hrast", "prirodni furnir", "mat završna obrada", "klizni sistem", "transformabilan", "ugrađeno osvjetljenje", "meko sjedište", "podesiva visina", "sklopivi dizajn", "eko koža"]
+    },
+    "games-consoles-software": {
+      "ru": ["цифровая версия", "новый в плёнке", "геймпад в комплекте", "мультиплеер", "4K графика", "поддержка VR", "SSD быстрая загрузка", "беспроводной контроллер", "предзаказ", "коллекционное издание"],
+      "en": ["digital version", "new sealed", "controller included", "multiplayer", "4K graphics", "VR support", "SSD fast loading", "wireless controller", "pre-order", "collector's edition"],
+      "bs": ["digitalna verzija", "nov u foliji", "kontroler uključen", "multiplayer", "4K grafika", "VR podrška", "SSD brzo učitavanje", "bežični kontroler", "prednarudžba", "kolekcionarsko izdanje"]
+    },
+    "girls": {
+      "ru": ["нежные тона", "кружевная отделка", "атласная лента", "пышная юбка", "цветочный принт", "мягкий трикотаж", "удобная резинка", "блестящий декор", "комплект платье+повязка", "для особого случая"],
+      "en": ["soft colors", "lace trim", "satin ribbon", "fluffy skirt", "floral print", "soft knit", "comfortable elastic", "sparkly decor", "dress + headband set", "special occasion"],
+      "bs": ["nježne boje", "čipkasti rub", "saten traka", "pufnasta suknja", "cvjetni print", "mekani trikotaž", "udobna gumica", "sjajni dekor", "set haljina+traka", "za posebne prilike"]
+    },
+    "hair-care": {
+      "ru": ["без сульфатов", "кератиновый комплекс", "масло арганы", "восстановление волос", "термозащита", "объём от корней", "для окрашенных волос", "увлажнение по всей длине", "против выпадения", "профессиональная линия"],
+      "en": ["sulfate free", "keratin complex", "argan oil", "hair repair", "heat protectant", "root volume", "for colored hair", "moisture throughout", "anti hair loss", "professional line"],
+      "bs": ["bez sulfata", "keratinski kompleks", "arganovo ulje", "obnavljanje kose", "termozaštita", "volumen iz korijena", "za farbanu kosu", "hidratacija duž cijele dužine", "protiv opadanja", "profesionalna linija"]
+    },
+    "hobby-bicycles": {
+      "ru": ["алюминиевая рама", "дисковые тормоза", "24 скорости", "амортизационная вилка", "быстросъёмные колёса", "светоотражатели", "крылья в комплекте", "багажник", "накатистые покрышки", "для города и бездорожья"],
+      "en": ["aluminum frame", "disc brakes", "24 speeds", "suspension fork", "quick release wheels", "reflectors", "mudguards included", "luggage rack", "smooth tires", "city and offroad"],
+      "bs": ["aluminijumski ram", "disk kočnice", "24 brzine", "viljuška amortizera", "brzo skidanje točkova", "reflektori", "blatobrani uključeni", "nosač prtljaga", "glatke gume", "grad i offroad"]
+    },
+    "hobby-scooters": {
+      "ru": ["складной механизм", "электродвигатель", "литий-ионный аккумулятор", "дальность 25 км", "пневматические шины", "дисковый тормоз", "алюминиевая дека", "светодиодная подсветка", "регулируемый руль", "максимальная скорость 25 км/ч"],
+      "en": ["folding mechanism", "electric motor", "lithium battery", "25 km range", "pneumatic tires", "disc brake", "aluminum deck", "LED lights", "adjustable handlebars", "max speed 25 km/h"],
+      "bs": ["sklopivi mehanizam", "elektromotor", "litijumska baterija", "25 km domet", "pneumatske gume", "disk kočnica", "aluminijumska deka", "LED svjetla", "podesivi upravljač", "max brzina 25 km/h"]
+    },
+    "hunting-fishing": {
+      "ru": ["телескопическое удилище", "катушка безынерционная", "плетёный шнур", "термо-костюм", "оптический прицел", "складной нож", "герметичный кейс", "манок с электроникой", "камуфляжная расцветка", "водонепроницаемый"],
+      "en": ["telescopic rod", "spinning reel", "braided line", "thermal suit", "optical scope", "folding knife", "waterproof case", "electronic caller", "camouflage pattern", "water resistant"],
+      "bs": ["teleskopski štap", "bacačka mašinica", "pletena struna", "termo odijelo", "optički nišan", "sklopivi nož", "vodootporna kutija", "elektronski vabac", "kamuf lažna šara", "otporan na vodu"]
+    },
+    "jewelry": {
+      "ru": ["проба 585", "с бриллиантами", "червонное золото", "верижка плетение", "фиангиты", "ручная работа", "сертификат подлинности", "ювелирная эмаль", "позолота 999 пробы", "родиевое покрытие"],
+      "en": ["14k gold", "with diamonds", "rose gold", "chain weave", "cubic zirconia", "handmade", "certificate of authenticity", "jewelers enamel", "24k gold plated", "rhodium plated"],
+      "bs": ["14k zlato", "sa dijamantima", "ružičasto zlato", "lančano pletenje", "kubni cirkonijum", "ručni rad", "sertifikat autentičnosti", "zlatarska emajl", "24k pozlata", "rodijumski premaz"]
+    },
+    "kids-furniture": {
+      "ru": ["регулируемая спинка", "защитные бортики", "экологичный материал", "без острых углов", "с ящиками", "растущая конструкция", "яркий дизайн", "легко моется", "устойчивая конструкция", "нетоксичная краска"],
+      "en": ["adjustable backrest", "safety rails", "eco-friendly material", "rounded corners", "with drawers", "growing design", "colorful design", "easy to clean", "stable construction", "non-toxic paint"],
+      "bs": ["podesivi naslon", "sigurnosne ograde", "ekološki materijal", "bez oštrih uglova", "sa fiokama", "rastući dizajn", "šareni dizajn", "lako se čisti", "stabilna konstrukcija", "netoksična boja"]
+    },
+    "kids-hygiene": {
+      "ru": ["детская формула 0+", "гипоаллергенный", "без слёз", "не щиплет глазки", "натуральные экстракты", "рН-нейтральный", "жидкое мыло", "пенка для ванны", "влажные салфетки", "крем под подгузник"],
+      "en": ["baby formula 0+", "hypoallergenic", "no tears", "gentle on eyes", "natural extracts", "pH neutral", "liquid soap", "bath foam", "wet wipes", "diaper cream"],
+      "bs": ["bebi formula 0+", "hipoalergeno", "bez suza", "ne peče oči", "prirodni ekstrakti", "pH neutralan", "tečni sapun", "pjena za kupanje", "vlažne maramice", "krema za pelene"]
+    },
+    "kids-scooters-bikes": {
+      "ru": ["безопасная конструкция", "боковые колёсики", "складной руль", "тормоз ручной", "защита цепи", "светоотражатели", "резиновые ручки", "стальная рама", "регулируемое сиденье", "надувные шины"],
+      "en": ["safe design", "training wheels", "folding handlebars", "hand brake", "chain guard", "reflectors", "rubber grips", "steel frame", "adjustable seat", "pneumatic tires"],
+      "bs": ["siguran dizajn", "bočni točkići", "sklopivi upravljač", "ručna kočnica", "zaštita lanca", "reflektori", "gumene ručke", "čelični ram", "podesivo sjedište", "pneumatske gume"]
+    },
+    "kitchen-dining": {
+      "ru": ["нержавеющая сталь", "антипригарное покрытие", "подходит для индукции", "стеклянная крышка", "эргономичная ручка", "набор 5 предметов", "духовка до 250°C", "моется в посудомойке", "хиты продаж", "складная конструкция"],
+      "en": ["stainless steel", "non-stick coating", "induction compatible", "glass lid", "ergonomic handle", "5-piece set", "oven safe to 250°C", "dishwasher safe", "bestseller", "foldable design"],
+      "bs": ["nerđajući čelik", "non-stick premaz", "pogodno za indukciju", "stakleni poklopac", "ergonomska ručka", "set od 5 komada", "sigurno u pećnici do 250°C", "sigurno za mašinu za sudove", "bestseller", "sklopivi dizajn"]
+    },
+    "laptops": {
+      "ru": ["SSD 512 ГБ", "16 ГБ оперативной памяти", "экран 15.6 Full HD", "процессор Intel i5", "вес 1.8 кг", "аккумулятор 8 часов", "клавиатура с подсветкой", "тонкий корпус", "металлический корпус", "Windows 11"],
+      "en": ["SSD 512 GB", "16 GB RAM", "15.6 Full HD display", "Intel i5 processor", "weight 1.8 kg", "8 hour battery", "backlit keyboard", "slim chassis", "metal body", "Windows 11"],
+      "bs": ["SSD 512 GB", "16 GB RAM", "15.6 Full HD ekran", "Intel i5 procesor", "težina 1.8 kg", "8 sati baterija", "osvijetljena tastatura", "tanak profi l", "metalno kućište", "Windows 11"]
+    },
+    "makeup-manicure": {
+      "ru": ["стойкая формула", "сатиновый финиш", "пигментированный", "без талька", "веганская косметика", "кисть в комплекте", "зеркальный блеск", "гель-лак", "набор 12 цветов", "натуральные пигменты"],
+      "en": ["long-lasting formula", "satin finish", "highly pigmented", "talc free", "vegan cosmetics", "brush included", "mirror shine", "gel polish", "12 color set", "natural pigments"],
+      "bs": ["dugotrajna formula", "satin finiš", "visoko pigmentiran", "bez talka", "veganska kozmetika", "četkica uključena", "zrcalni sjaj", "gel lak", "set 12 boja", "prirodni pigmenti"]
+    },
+    "medical-products": {
+      "ru": ["стерильная упаковка", "точный измеритель", "ЖК дисплей", "автоматическое отключение", "память измерений", "компактный размер", "работает от батареек", "манжета универсальная", "звуковой сигнал", "гарантия 2 года"],
+      "en": ["sterile packaging", "accurate meter", "LCD display", "auto shut off", "memory storage", "compact size", "battery operated", "universal cuff", "audio alert", "2 year warranty"],
+      "bs": ["sterilno pakovanje", "precizan mjerač", "LCD ekran", "automatsko isključivanje", "memorija mjerenja", "kompaktna veličina", "na baterije", "univerzalna manžetna", "zvučni signal", "2 godine garancije"]
+    },
+    "men-clothing": {
+      "ru": ["размер M-XXXL", "хлопок/полиэстер", "прямой крой", "застёжка на молнии", "накладные карманы", "дышащая ткань", "классический стиль", "спортивная модель", "капюшон", "светоотражающие элементы"],
+      "en": ["size M-XXXL", "cotton/polyester", "straight cut", "zip closure", "cargo pockets", "breathable fabric", "classic style", "sporty model", "hooded", "reflective elements"],
+      "bs": ["veličina M-XXXL", "pamuk/poliestar", "ravni kroj", "rajsferšlus", "džepovi sa preklopcem", "prozračna tkanina", "klasični stil", "sportski model", "sa kapuljačom", "reflektirajući elementi"]
+    },
+    "men-shoes": {
+      "ru": ["размер 39-46", "натуральная кожа", "кожаная стелька", "прошивка по периметру", "полиуретановая подошва", "классические", "кроссовки", "мокасины", "зимние утеплённые", "ортопедическая колодка"],
+      "en": ["size 39-46", "genuine leather", "leather insole", "stitched perimeter", "polyurethane sole", "classic shoes", "sneakers", "moccasins", "winter insulated", "orthopedic last"],
+      "bs": ["veličina 39-46", "prava koža", "kožni uložak", "šivena periferija", "poliuretanski đon", "klasične cipele", "patike", "mokasine", "zimske izolovane", "ortopedska kalupa"]
+    },
+    "musical-instruments": {
+      "ru": ["классическая гитара", "еловая дека", "машинка тремоло", "встроенный тюнер", "нейлоновые струны", "кейс в комплекте", "регулируемый гриф", "лакированная поверхность", "пьедестал и педаль", "микрофон конденсаторный"],
+      "en": ["classic guitar", "spruce top", "tremolo bridge", "built-in tuner", "nylon strings", "case included", "adjustable neck", "lacquered finish", "stand and pedal", "condenser microphone"],
+      "bs": ["klasična gitara", "smrečina rezonantna ploča", "tremolo most", "ugrađeni tjuner", "najlonske žice", "futrola uključena", "podesivi vrat", "lakirana površina", "stalak i pedala", "kondenzatorski mikrofon"]
+    },
+    "other-electronics": {
+      "ru": ["беспроводной зарядник", "USB-C порт", "светодиодный индикатор", "защита от короткого замыкания", "компактный размер", "алюминиевый корпус", "совместимость с Qi", "быстрая зарядка", "настольный органайзер", "длина кабеля 1.5 м"],
+      "en": ["wireless charger", "USB-C port", "LED indicator", "short circuit protection", "compact size", "aluminum body", "Qi compatible", "fast charging", "desk organizer", "cable length 1.5 m"],
+      "bs": ["bežični punjač", "USB-C port", "LED indikator", "zaštita od kratkog spoja", "kompaktna veličina", "aluminijumsko kućište", "Qi kompatibilan", "brzo punjenje", "stoni organizator", "dužina kabla 1.5 m"]
+    },
+    "perfumes": {
+      "ru": ["парфюмерная вода", "туалетная вода", "стойкость 8+ часов", "древесные ноты", "цветочный аромат", "цитрусовая свежесть", "ориентальная база", "мужской аромат", "женский аромат", "унисекс"],
+      "en": ["eau de parfum", "eau de toilette", "8+ hour longevity", "woody notes", "floral scent", "citrus freshness", "oriental base", "men's fragrance", "women's fragrance", "unisex"],
+      "bs": ["parfemska voda", "toaletna voda", "8+ sati trajanja", "drvene note", "cvjetni miris", "citrusna svježina", "orijentalna baza", "muški miris", "ženski miris", "uniseks"]
+    },
+    "phones": {
+      "ru": ["64 МП камера", "AMOLED дисплей", "128 ГБ памяти", "аккумулятор 5000 мАч", "процессор 8 ядер", "быстрая зарядка 33W", "защита IP68", "без царапин", "оригинальный дисплей", "комплект с зарядкой"],
+      "en": ["64 MP camera", "AMOLED display", "128 GB storage", "5000 mAh battery", "octa-core processor", "33W fast charging", "IP68 rating", "no scratches", "original display", "charger included"],
+      "bs": ["64 MP kamera", "AMOLED ekran", "128 GB memorije", "5000 mAh baterija", "osmojezgreni procesor", "33W brzo punjenje", "IP68 zaštita", "bez ogrebotina", "originalni ekran", "punjač uključen"]
+    },
+    "plants": {
+      "ru": ["комнатное растение", "в горшке 12 см", "неприхотливый уход", "очищает воздух", "декоративные листья", "цветущий вид", "суккулент", "пальма", "фикус", "монстера"],
+      "en": ["indoor plant", "pot 12 cm", "easy care", "air purifying", "ornamental leaves", "flowering variety", "succulent", "palm tree", "ficus", "monstera"],
+      "bs": ["sobna biljka", "saksija 12 cm", "laka njega", "pročišćava zrak", "ukrasno lišće", "cvjetna sorta", "sukulent", "palma", "ficus", "monstera"]
+    },
+    "repair-construction": {
+      "ru": ["аккумуляторная дрель", "лазерный уровень", "перфоратор 800W", "набор бит и свёрл", "телескопическая ручка", "складной метр", "защитные очки", "кейс для хранения", "бесщеточный двигатель", "регулировка оборотов"],
+      "en": ["cordless drill", "laser level", "800W hammer drill", "bit and drill set", "telescopic handle", "folding measuring tape", "safety goggles", "storage case", "brushless motor", "variable speed"],
+      "bs": ["akumulatorska bušilica", "laserski nivo", "800W čekić bušilica", "set nastavaka i burgija", "teleskopska ručka", "sklopivi metar", "zaštitne naočale", "kutija za odlaganje", "beščetni motor", "podesiva brzina"]
+    },
+    "school-supplies": {
+      "ru": ["набор 24 цвета", "твёрдость HB", "ластик в комплекте", "точилка с контейнером", "треугольная форма", "эргономичный корпус", "пенал большой", "акварельные краски", "альбом 40 листов", "набор линеек"],
+      "en": ["24 color set", "HB hardness", "eraser included", "sharpener with container", "triangular shape", "ergonomic body", "large pencil case", "watercolor paints", "40 sheet sketchbook", "ruler set"],
+      "bs": ["set 24 boje", "HB tvrdoća", "gumica uključena", "šiljilo sa kontejnerom", "trouglasti oblik", "ergonomsko tijelo", "velika pernica", "akvarel boje", "40 listova blok", "set lenjira"]
+    },
+    "sports-outdoors": {
+      "ru": ["лёгкая конструкция", "дышащая сетка", "анатомическая подошва", "быстросохнущий материал", "компрессионная посадка", "влагоотводящий", "защита суставов", "регулируемые лямки", "карманы на молнии", "светоотражатель"],
+      "en": ["lightweight design", "mesh ventilation", "anatomical sole", "quick dry material", "compression fit", "moisture wicking", "joint protection", "adjustable straps", "zippered pockets", "reflector"],
+      "bs": ["lagani dizajn", "mrežasta ventilacija", "anatomski đon", "brzosušeći materijal", "kompresiono prijanjanje", "upija vlagu", "zaštita zglobova", "podesive naramenice", "džepovi na rajsferšlus", "reflektor"]
+    },
+    "strollers": {
+      "ru": ["складная рама", "регулировка спинки", "большая корзина", "алюминиевый каркас", "амортизация колёс", "поворотные передние колёса", "тент от солнца", "пятиточечные ремни", "съёмная люлька", "один касанием складывается"],
+      "en": ["foldable frame", "reclining backrest", "large basket", "aluminum frame", "wheel suspension", "swivel front wheels", "sun canopy", "5-point harness", "removable bassinet", "one-hand fold"],
+      "bs": ["sklopivi ram", "podesivi naslon", "velika korpa", "aluminijumski okvir", "amortizacija točkova", "okretni prednji točkovi", "nadstrešnica", "5-tačkasti pojasevi", "skidiva korpa", "jednom rukom sklapanje"]
+    },
+    "tablets": {
+      "ru": ["экран 10.5 дюймов", "64 ГБ памяти", "Wi-Fi + LTE", "поддержка стилуса", "долгое время работы", "тонкий корпус", "алюминиевая задняя панель", "камера 12 МП", "детский режим", "разъём для наушников"],
+      "en": ["10.5 inch display", "64 GB storage", "WiFi + LTE", "stylus support", "long battery life", "slim chassis", "aluminum back panel", "12 MP camera", "kids mode", "headphone jack"],
+      "bs": ["10.5 inčni ekran", "64 GB memorije", "WiFi + LTE", "podrška za olovku", "dugo trajanje baterije", "tanak profi l", "aluminijumska zadnja ploča", "12 MP kamera", "dječji režim", "priključak za slušalice"]
+    },
+    "tickets-travel": {
+      "ru": ["электронный билет", "возвратный", "багаж включён", "выбор места", "страховка включена", "скидка при раннем бронировании", "трансфер", "гид в подарок", "детский билет 50%", "VIP-зал"],
+      "en": ["e-ticket", "refundable", "baggage included", "seat selection", "insurance included", "early bird discount", "transfer included", "free guide", "child ticket 50%", "VIP lounge"],
+      "bs": ["e-karta", "povratna", "prtljag uključen", "izbor sjedišta", "osiguranje uključeno", "popust za ranu rezervaciju", "transfer uključen", "besplatan vodič", "dječja karta 50%", "VIP salon"]
+    },
+    "toys": {
+      "ru": ["развивающая игрушка", "безопасные материалы", "звуковые эффекты", "световые эффекты", "батарейки включены", "для детей 3+", "мягкий плюш", "конструктор 100 деталей", "радиоуправление", "интерактивная"],
+      "en": ["educational toy", "safe materials", "sound effects", "light effects", "batteries included", "for ages 3+", "soft plush", "100 piece building set", "remote control", "interactive"],
+      "bs": ["edukativna igračka", "sigurni materijali", "zvučni efekti", "svjetlosni efekti", "baterije uključene", "za djecu 3+", "mekani pliš", "100 komada konstruktor", "daljinsko upravljanje", "interaktivna"]
+    },
+    "watches": {
+      "ru": ["водозащита 50 м", "сапфировое стекло", "механический механизм", "хронограф", "кожаный ремешок", "стальной корпус", "люминесцентные стрелки", "окошки даты", "автоподзавод", "керамический безель"],
+      "en": ["50 m water resistance", "sapphire crystal", "mechanical movement", "chronograph", "leather strap", "steel case", "luminous hands", "date window", "self-winding", "ceramic bezel"],
+      "bs": ["50 m otpornost na vodu", "safirno staklo", "mehanički mehanizam", "hronograf", "kožni kaiš", "čelično kućište", "luminescentne kazaljke", "prozorčić za datum", "automatsko navijanje", "keramički bezel"]
+    },
+    "women-clothing": {
+      "ru": ["размер XS-XL", "лёгкая струящаяся ткань", "круглый вырез", "пояс в комплекте", "ажурная вставка", "длина миди", "рукав 3/4", "застёжка сзади", "декольте", "драпировка"],
+      "en": ["size XS-XL", "light flowing fabric", "round neckline", "belt included", "lace insert", "midi length", "3/4 sleeve", "back closure", "sweetheart neckline", "draping"],
+      "bs": ["veličina XS-XL", "lagana lepršava tkanina", "okrugli dekolte", "pojas uključen", "čipkasti umetak", "midi dužina", "3/4 rukav", "kopčanje straga", "duboki dekolte", "draperija"]
+    },
+    "women-shoes": {
+      "ru": ["размер 35-41", "натуральная замша", "кожаная подкладка", "каблук 7 см", "платформа 3 см", "острая носочка", "босоножки", "туфли-лодочки", "балетки", "кроссовки на платформе"],
+      "en": ["size 35-41", "genuine suede", "leather lining", "7 cm heel", "3 cm platform", "pointed toe", "sandals", "pumps", "ballet flats", "platform sneakers"],
+      "bs": ["veličina 35-41", "prava antilop", "kožna postava", "5 cm potpetica", "3 cm platforma", "šiljati vrh", "sandale", "luknje", "baletanke", "patike sa platformom"]
+    }
+  }
+}

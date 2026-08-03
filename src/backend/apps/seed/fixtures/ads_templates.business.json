@@ -1,0 +1,699 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Item condition (e.g. excellent, good)",
+    "brand": "Product brand name",
+    "feature": "Product feature or selling point",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "item_age": "Age description of the item",
+    "year": "Manufacturing year",
+    "category": "Category name (supplied as localized via get_name(locale))"
+  },
+  "templates": [
+    {
+      "id": "business_ready-business_01",
+      "category_slug": "ready-business",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся готовый бизнес, {city}",
+          "description": "Продаю готовый {category} в {city}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Ready business for sale, {city}",
+          "description": "Selling a ready-made {category} in {city}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Gotov biznis na prodaju, {city}",
+          "description": "Prodajem gotov {category} u {city}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_ready-business_02",
+      "category_slug": "ready-business",
+      "patterns": {
+        "ru": {
+          "title": "Действующий бизнес, {city}, прибыльный",
+          "description": "Продаю действующий {category} в {city}. Стабильный доход. Состояние: {condition}. Подробности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Operating business, {city}, profitable",
+          "description": "Selling an operating {category} in {city}. Steady income. Condition: {condition}. Details: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Aktivan biznis, {city}, profitabilan",
+          "description": "Prodajem aktivan {category} u {city}. Stabilan prihod. Stanje: {condition}. Detalji: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_retail-equipment_01",
+      "category_slug": "retail-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {brand} {category}, {city}",
+          "description": "Продаю {category} {brand}. Состояние: {condition}. Год выпуска: {year}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "{brand} {category} for sale, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "{brand} {category} na prodaju, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_retail-equipment_02",
+      "category_slug": "retail-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для магазина, {city}",
+          "description": "Продаю {category} для магазина. Бренд: {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Retail equipment, {city}",
+          "description": "Selling {category} for store. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Oprema za prodavnicu, {city}",
+          "description": "Prodajem {category} za radnju. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_food-equipment_01",
+      "category_slug": "food-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {brand} {category}, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год: {year}. Использование: {item_age}. Характеристики: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "{brand} {category} for sale, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Usage: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "{brand} {category} na prodaju, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Korištenje: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_food-equipment_02",
+      "category_slug": "food-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для общепита, {city}",
+          "description": "Продам {category} для кафе/ресторана. Бренд: {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Food service equipment, {city}",
+          "description": "Selling {category} for cafe/restaurant. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Oprema za ugostiteljstvo, {city}",
+          "description": "Prodajem {category} za kafić/restoran. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_office-equipment_01",
+      "category_slug": "office-equipment",
+      "patterns": {
+        "ru": {
+          "title": "{brand} {category}, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год выпуска: {year}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "{brand} {category}, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "{brand} {category}, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_office-equipment_02",
+      "category_slug": "office-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Офисное оборудование, {city}",
+          "description": "Продаю {category} для офиса. Бренд: {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Office equipment, {city}",
+          "description": "Selling {category} for office. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kancelarijska oprema, {city}",
+          "description": "Prodajem {category} za kancelariju. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_industrial-equipment_01",
+      "category_slug": "industrial-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Промышленное оборудование {brand}, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год: {year}. Наработка: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Industrial equipment {brand}, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Service hours: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Industrijska oprema {brand}, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Radni sati: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_industrial-equipment_02",
+      "category_slug": "industrial-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для производства, {city}",
+          "description": "Продаю {category} для производства. Бренд: {brand}. Состояние: {condition}. Технические характеристики: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Manufacturing equipment, {city}",
+          "description": "Selling {category} for production. Brand: {brand}. Condition: {condition}. Specifications: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Proizvodna oprema, {city}",
+          "description": "Prodajem {category} za proizvodnju. Brend: {brand}. Stanje: {condition}. Specifikacije: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_logistics-warehouse_01",
+      "category_slug": "logistics-warehouse",
+      "patterns": {
+        "ru": {
+          "title": "Складское оборудование {brand}, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год выпуска: {year}. Эксплуатация: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Warehouse equipment {brand}, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Usage: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Skladišna oprema {brand}, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Upotreba: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_logistics-warehouse_02",
+      "category_slug": "logistics-warehouse",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для склада, {city}",
+          "description": "Продаю {category} для склада. Бренд: {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Warehouse logistics equipment, {city}",
+          "description": "Selling {category} for warehouse. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Logistička oprema za skladište, {city}",
+          "description": "Prodajem {category} za skladište. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_beauty-equipment_01",
+      "category_slug": "beauty-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для салона красоты, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год: {year}. Использование: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Beauty salon equipment, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Usage: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Oprema za kozmetički salon, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Korištenje: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_beauty-equipment_02",
+      "category_slug": "beauty-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Профессиональное оборудование для красоты, {city}",
+          "description": "Продаю профессиональный {category}. Бренд: {brand}. Состояние: {condition}. Характеристики: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Professional beauty equipment, {city}",
+          "description": "Selling professional {category}. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Profesionalna oprema za ljepotu, {city}",
+          "description": "Prodajem profesionalni {category}. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_auto-business-equipment_01",
+      "category_slug": "auto-business-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Автосервисное оборудование {brand}, {city}",
+          "description": "Продаю {brand} {category} для автосервиса. Состояние: {condition}. Год: {year}. Износ: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Auto service equipment {brand}, {city}",
+          "description": "Selling {brand} {category} for auto workshop. Condition: {condition}. Year: {year}. Wear: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Auto servisna oprema {brand}, {city}",
+          "description": "Prodajem {brand} {category} za auto servis. Stanje: {condition}. Godina: {year}. Istrošenost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_auto-business-equipment_02",
+      "category_slug": "auto-business-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для автосервиса, {city}",
+          "description": "Продаю {category} для автосервиса. Бренд: {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Auto workshop equipment, {city}",
+          "description": "Selling {category} for auto workshop. Brand: {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Oprema za auto servis, {city}",
+          "description": "Prodajem {category} za auto servis. Brend: {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_medical-equipment_01",
+      "category_slug": "medical-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Медицинское оборудование {brand}, {city}",
+          "description": "Продаю {brand} {category}. Состояние: {condition}. Год выпуска: {year}. Эксплуатация: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Medical equipment {brand}, {city}",
+          "description": "Selling {brand} {category}. Condition: {condition}. Year: {year}. Service life: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Medicinska oprema {brand}, {city}",
+          "description": "Prodajem {brand} {category}. Stanje: {condition}. Godina: {year}. Vijek trajanja: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_medical-equipment_02",
+      "category_slug": "medical-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Оборудование для клиники, {city}",
+          "description": "Продаю {category} для медицинского центра. Бренд: {brand}. Состояние: {condition}. Характеристики: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Clinic equipment, {city}",
+          "description": "Selling {category} for medical centre. Brand: {brand}. Condition: {condition}. Specifications: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Oprema za kliniku, {city}",
+          "description": "Prodajem {category} za medicinski centar. Brend: {brand}. Stanje: {condition}. Specifikacije: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "business_business-offices_01",
+      "category_slug": "business-offices",
+      "patterns": {
+        "ru": {
+          "title": "Офис в аренду, {city}",
+          "description": "Сдам офис в {city}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Office for rent, {city}",
+          "description": "Renting an office in {city}. Condition: {condition}. Features: {feature}. Price: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Kancelarija za najam, {city}",
+          "description": "Izdajem kancelariju u {city}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "business_business-offices_02",
+      "category_slug": "business-offices",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся офисное помещение, {city}",
+          "description": "Продаю офис в {city}. Состояние: {condition}. Планировка: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Office space for sale, {city}",
+          "description": "Selling office in {city}. Condition: {condition}. Layout: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kancelarijski prostor na prodaju, {city}",
+          "description": "Prodajem kancelariju u {city}. Stanje: {condition}. Raspored: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-flex-space_01",
+      "category_slug": "business-flex-space",
+      "patterns": {
+        "ru": {
+          "title": "Гибкое коммерческое пространство, {city}",
+          "description": "Сдам гибкое пространство в {city}. Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Flexible commercial space, {city}",
+          "description": "Renting flexible space in {city}. Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Fleksibilan poslovni prostor, {city}",
+          "description": "Izdajem fleksibilan prostor u {city}. Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "business_business-flex-space_02",
+      "category_slug": "business-flex-space",
+      "patterns": {
+        "ru": {
+          "title": "Универсальное помещение, {city}",
+          "description": "Продаю универсальное помещение в {city}. Состояние: {condition}. Возможности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Versatile commercial space, {city}",
+          "description": "Selling versatile commercial space in {city}. Condition: {condition}. Potential uses: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Univerzalan poslovni prostor, {city}",
+          "description": "Prodajem univerzalan prostor u {city}. Stanje: {condition}. Mogućnosti: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-retail-spaces_01",
+      "category_slug": "business-retail-spaces",
+      "patterns": {
+        "ru": {
+          "title": "Торговое помещение в аренду, {city}",
+          "description": "Сдам торговое помещение в {city}. Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Retail space for rent, {city}",
+          "description": "Renting retail space in {city}. Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Prodajni prostor za najam, {city}",
+          "description": "Izdajem prodajni prostor u {city}. Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "business_business-retail-spaces_02",
+      "category_slug": "business-retail-spaces",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся торговое помещение, {city}",
+          "description": "Продаю торговое помещение в {city}. Состояние: {condition}. Расположение: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Retail premises for sale, {city}",
+          "description": "Selling retail premises in {city}. Condition: {condition}. Location: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajni prostor na prodaju, {city}",
+          "description": "Prodajem prodajni prostor u {city}. Stanje: {condition}. Lokacija: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-warehouses_01",
+      "category_slug": "business-warehouses",
+      "patterns": {
+        "ru": {
+          "title": "Склад в аренду, {city}",
+          "description": "Сдам склад в {city}. Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Warehouse for rent, {city}",
+          "description": "Renting a warehouse in {city}. Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Skladište za najam, {city}",
+          "description": "Izdajem skladište u {city}. Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "business_business-warehouses_02",
+      "category_slug": "business-warehouses",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся складское помещение, {city}",
+          "description": "Продаю склад в {city}. Состояние: {condition}. Доступ: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Warehouse for sale, {city}",
+          "description": "Selling a warehouse in {city}. Condition: {condition}. Access: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Skladište na prodaju, {city}",
+          "description": "Prodajem skladište u {city}. Stanje: {condition}. Pristup: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-commercial-land_01",
+      "category_slug": "business-commercial-land",
+      "patterns": {
+        "ru": {
+          "title": "Коммерческая земля, {city}",
+          "description": "Продаю коммерческий участок в {city}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Commercial land, {city}",
+          "description": "Selling commercial land in {city}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Komercijalno zemljište, {city}",
+          "description": "Prodajem komercijalno zemljište u {city}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-commercial-land_02",
+      "category_slug": "business-commercial-land",
+      "patterns": {
+        "ru": {
+          "title": "Участок под коммерческую застройку, {city}",
+          "description": "Продаю участок под коммерческую застройку в {city}. Состояние: {condition}. Разрешения: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Plot for commercial development, {city}",
+          "description": "Selling plot for commercial development in {city}. Condition: {condition}. Permits: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Zemljište za komercijalni razvoj, {city}",
+          "description": "Prodajem zemljište za komercijalni razvoj u {city}. Stanje: {condition}. Dozvole: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-accounting_01",
+      "category_slug": "business-accounting",
+      "patterns": {
+        "ru": {
+          "title": "Услуги бухгалтера, {city}",
+          "description": "Предлагаю услуги {category} в {city}. Опыт: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Accounting services, {city}",
+          "description": "Offering {category} services in {city}. Experience: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Računovodstvene usluge, {city}",
+          "description": "Nudim usluge {category} u {city}. Iskustvo: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-accounting_02",
+      "category_slug": "business-accounting",
+      "patterns": {
+        "ru": {
+          "title": "Бухгалтерское сопровождение бизнеса",
+          "description": "Предлагаю {category} для вашего бизнеса. Опыт: {condition}. Работаю в {city}. Преимущества: {feature}. Стоимость: {price} EUR."
+        },
+        "en": {
+          "title": "Business accounting support",
+          "description": "Offering {category} for your business. Experience: {condition}. Serving {city}. Advantages: {feature}. Cost: {price} EUR."
+        },
+        "bs": {
+          "title": "Računovodstvena podrška biznisu",
+          "description": "Nudim {category} za vaš biznis. Iskustvo: {condition}. Radim u {city}. Prednosti: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-legal-services_01",
+      "category_slug": "business-legal-services",
+      "patterns": {
+        "ru": {
+          "title": "Юридические услуги для бизнеса, {city}",
+          "description": "Предлагаю {category} в {city}. Опыт работы: {condition}. Специализация: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Legal services for business, {city}",
+          "description": "Offering {category} in {city}. Experience: {condition}. Specialisation: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Pravne usluge za biznis, {city}",
+          "description": "Nudim {category} u {city}. Radno iskustvo: {condition}. Specijalizacija: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-legal-services_02",
+      "category_slug": "business-legal-services",
+      "patterns": {
+        "ru": {
+          "title": "Помощь юриста для предпринимателей",
+          "description": "Юридическая поддержка бизнеса в {city}. Опыт: {condition}. Услуги: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Legal assistance for entrepreneurs",
+          "description": "Legal support for businesses in {city}. Experience: {condition}. Services: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Pravna pomoć za preduzetnike",
+          "description": "Pravna podrška biznisu u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-taxes_01",
+      "category_slug": "business-taxes",
+      "patterns": {
+        "ru": {
+          "title": "Налоговое консультирование, {city}",
+          "description": "Предлагаю {category} в {city}. Опыт: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Tax consulting, {city}",
+          "description": "Offering {category} in {city}. Experience: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Poresko savjetovanje, {city}",
+          "description": "Nudim {category} u {city}. Iskustvo: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-taxes_02",
+      "category_slug": "business-taxes",
+      "patterns": {
+        "ru": {
+          "title": "Помощь с налоговой отчётностью",
+          "description": "Помогу с {category} в {city}. Опыт: {condition}. Преимущества: {feature}. Стоимость: {price} EUR."
+        },
+        "en": {
+          "title": "Tax return assistance",
+          "description": "Help with {category} in {city}. Experience: {condition}. Benefits: {feature}. Cost: {price} EUR."
+        },
+        "bs": {
+          "title": "Pomoć sa poreskom prijavom",
+          "description": "Pomoć sa {category} u {city}. Iskustvo: {condition}. Prednosti: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-property-valuation_01",
+      "category_slug": "business-property-valuation",
+      "patterns": {
+        "ru": {
+          "title": "Оценка недвижимости, {city}",
+          "description": "Предлагаю {category} в {city}. Опыт: {condition}. Сроки: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Property valuation, {city}",
+          "description": "Offering {category} in {city}. Experience: {condition}. Turnaround: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Procjena nekretnina, {city}",
+          "description": "Nudim {category} u {city}. Iskustvo: {condition}. Rokovi: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-property-valuation_02",
+      "category_slug": "business-property-valuation",
+      "patterns": {
+        "ru": {
+          "title": "Профессиональная оценка коммерческой недвижимости",
+          "description": "Провожу {category} в {city}. Квалификация: {condition}. Детали: {feature}. Стоимость: {price} EUR."
+        },
+        "en": {
+          "title": "Professional commercial property valuation",
+          "description": "Conducting {category} in {city}. Qualifications: {condition}. Details: {feature}. Fee: {price} EUR."
+        },
+        "bs": {
+          "title": "Profesionalna procjena komercijalnih nekretnina",
+          "description": "Vršim {category} u {city}. Kvalifikacije: {condition}. Detalji: {feature}. Naknada: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-translations_01",
+      "category_slug": "business-translations",
+      "patterns": {
+        "ru": {
+          "title": "Услуги перевода, {city}",
+          "description": "Предлагаю {category} в {city}. Языки: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Translation services, {city}",
+          "description": "Offering {category} in {city}. Languages: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Usluge prevođenja, {city}",
+          "description": "Nudim {category} u {city}. Jezici: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "business_business-translations_02",
+      "category_slug": "business-translations",
+      "patterns": {
+        "ru": {
+          "title": "Письменный и устный перевод, {city}",
+          "description": "Профессиональный {category} в {city}. Опыт: {condition}. Направления: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Written and oral translation, {city}",
+          "description": "Professional {category} in {city}. Experience: {condition}. Specialisations: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Pismeno i usmeno prevođenje, {city}",
+          "description": "Profesionalni {category} u {city}. Iskustvo: {condition}. Specijalnosti: {feature}. Cijena: {price} EUR."
+        }
+      }
+    }
+  ]
+}

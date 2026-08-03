@@ -1,0 +1,2100 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Experience level or service quality (e.g. professional, beginner)",
+    "feature": "Specialization, skills, or what's included in the service",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "category": "Category name (supplied as localized via get_name(locale))"
+  },
+  "templates": [
+    {
+      "id": "services-jobs_ac-installation_01",
+      "category_slug": "ac-installation",
+      "patterns": {
+        "ru": {
+          "title": "Установка кондиционеров в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по установке и обслуживанию кондиционеров в {city}. Опыт: {condition}. Особенности: {feature}. Цена от {price} BAM. Выезд мастера."
+        },
+        "en": {
+          "title": "AC installation in {city}, from {price} BAM",
+          "description": "Offering air conditioner installation and maintenance in {city}. Experience: {condition}. Features: {feature}. Price from {price} BAM. Master visit included."
+        },
+        "bs": {
+          "title": "Montaža klima uređaja u {city}, od {price} BAM",
+          "description": "Nudim usluge montaže i servisa klima uređaja u {city}. Iskustvo: {condition}. Karakteristike: {feature}. Cijena od {price} BAM. Dolazak majstora."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_ac-installation_02",
+      "category_slug": "ac-installation",
+      "patterns": {
+        "ru": {
+          "title": "Нужен мастер по кондиционерам в {city}",
+          "description": "Ищу мастера по установке и ремонту кондиционеров в {city}. Опыт: {condition}. Работы: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for an AC technician in {city}",
+          "description": "Looking for an air conditioning technician in {city}. Experience: {condition}. Work needed: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora za klime u {city}",
+          "description": "Tražim majstora za montažu i popravku klima u {city}. Iskustvo: {condition}. Posao: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_accounting_01",
+      "category_slug": "accounting",
+      "patterns": {
+        "ru": {
+          "title": "Бухгалтерские услуги в {city}, от {price} BAM",
+          "description": "Оказываю профессиональные бухгалтерские услуги в {city}. Опыт: {condition}. Услуги: {feature}. Стоимость от {price} BAM."
+        },
+        "en": {
+          "title": "Accounting services in {city}, from {price} BAM",
+          "description": "Providing professional accounting services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Knjigovodstvene usluge u {city}, od {price} BAM",
+          "description": "Pružam profesionalne knjigovodstvene usluge u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_accounting_02",
+      "category_slug": "accounting",
+      "patterns": {
+        "ru": {
+          "title": "Ищу бухгалтера в {city}",
+          "description": "Требуется опытный бухгалтер в {city}. Условия: {condition}. Обязанности: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for an accountant in {city}",
+          "description": "Experienced accountant needed in {city}. Conditions: {condition}. Responsibilities: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim knjigovođu u {city}",
+          "description": "Potreban iskusan knjigovođa u {city}. Uslovi: {condition}. Odgovornosti: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_agriculture_01",
+      "category_slug": "agriculture",
+      "patterns": {
+        "ru": {
+          "title": "Сельхоз услуги в {city}, от {price} BAM",
+          "description": "Предлагаю сельскохозяйственные услуги в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Agricultural services in {city}, from {price} BAM",
+          "description": "Offering agricultural services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Poljoprivredne usluge u {city}, od {price} BAM",
+          "description": "Nudim poljoprivredne usluge u {city}. Iskustvo: {condition}. Radovi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_agriculture_02",
+      "category_slug": "agriculture",
+      "patterns": {
+        "ru": {
+          "title": "Ищу работников в сельское хозяйство, {city}",
+          "description": "Требуются работники для сельхоз работ в {city}. Условия: {condition}. Работы: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Hiring farm workers in {city}",
+          "description": "Workers needed for agricultural work in {city}. Conditions: {condition}. Tasks: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim poljoprivredne radnike, {city}",
+          "description": "Potrebni radnici za poljoprivredne radove u {city}. Uslovi: {condition}. Poslovi: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_apartment-cleaning_01",
+      "category_slug": "apartment-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Уборка квартир в {city}, от {price} BAM",
+          "description": "Предлагаю профессиональную уборку квартир в {city}. Опыт: {condition}. Что входит: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Apartment cleaning in {city}, from {price} BAM",
+          "description": "Offering professional apartment cleaning in {city}. Experience: {condition}. Included: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Čišćenje stanova u {city}, od {price} BAM",
+          "description": "Nudim profesionalno čišćenje stanova u {city}. Iskustvo: {condition}. Uključeno: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_apartment-cleaning_02",
+      "category_slug": "apartment-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Ищу уборщицу для квартиры, {city}",
+          "description": "Ищу помощницу по уборке квартиры в {city}. Требования: {condition}. Объём: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for apartment cleaning help, {city}",
+          "description": "Looking for cleaning help for my apartment in {city}. Requirements: {condition}. Scope: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim pomoć za čišćenje stana, {city}",
+          "description": "Tražim pomoć za čišćenje stana u {city}. Zahtjevi: {condition}. Obim: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_appliance-repair_01",
+      "category_slug": "appliance-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт бытовой техники в {city}, от {price} BAM",
+          "description": "Ремонтирую бытовую технику в {city}. Опыт: {condition}. Виды ремонта: {feature}. Цена от {price} BAM. Гарантия."
+        },
+        "en": {
+          "title": "Appliance repair in {city}, from {price} BAM",
+          "description": "I repair household appliances in {city}. Experience: {condition}. Types of repairs: {feature}. Price from {price} BAM. Warranty included."
+        },
+        "bs": {
+          "title": "Popravka kućnih aparata u {city}, od {price} BAM",
+          "description": "Popravljam kućne aparate u {city}. Iskustvo: {condition}. Vrste popravki: {feature}. Cijena od {price} BAM. Garancija."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_appliance-repair_02",
+      "category_slug": "appliance-repair",
+      "patterns": {
+        "ru": {
+          "title": "Нужен мастер по ремонту техники, {city}",
+          "description": "Срочно нужен мастер по ремонту бытовой техники в {city}. Условия: {condition}. Техника: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need an appliance repair technician, {city}",
+          "description": "Urgently need an appliance repair technician in {city}. Conditions: {condition}. Appliance: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potreban majstor za popravku aparata, {city}",
+          "description": "Hitno potreban majstor za popravku kućnih aparata u {city}. Uslovi: {condition}. Aparat: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_arts_01",
+      "category_slug": "arts",
+      "patterns": {
+        "ru": {
+          "title": "Художественные услуги в {city}, от {price} BAM",
+          "description": "Предлагаю художественные услуги в {city}. Опыт: {condition}. Стиль и техника: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Art services in {city}, from {price} BAM",
+          "description": "Offering art services in {city}. Experience: {condition}. Style and technique: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Umjetničke usluge u {city}, od {price} BAM",
+          "description": "Nudim umjetničke usluge u {city}. Iskustvo: {condition}. Stil i tehnika: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_arts_02",
+      "category_slug": "arts",
+      "patterns": {
+        "ru": {
+          "title": "Заказ художественных работ, {city}",
+          "description": "Ищу художника в {city} для заказа работы. Требования: {condition}. Что нужно: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Commissioning artwork in {city}",
+          "description": "Looking for an artist in {city} for a commission. Requirements: {condition}. What I need: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Naručivanje umjetničkih radova, {city}",
+          "description": "Tražim umjetnika u {city} za narudžbu. Zahtjevi: {condition}. Šta mi treba: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_beauty-salons-spa_01",
+      "category_slug": "beauty-salons-spa",
+      "patterns": {
+        "ru": {
+          "title": "Спа и салон красоты в {city}, от {price} BAM",
+          "description": "Предлагаю услуги салона красоты и SPA в {city}. Опыт: {condition}. Процедуры: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Spa and beauty salon in {city}, from {price} BAM",
+          "description": "Offering beauty salon and SPA services in {city}. Experience: {condition}. Treatments: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "SPA i salon ljepote u {city}, od {price} BAM",
+          "description": "Nudim usluge salona ljepote i SPA u {city}. Iskustvo: {condition}. Tretmani: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_beauty-salons-spa_02",
+      "category_slug": "beauty-salons-spa",
+      "patterns": {
+        "ru": {
+          "title": "Ищу косметолога / мастера SPA, {city}",
+          "description": "Ищу мастера в салон красоты / SPA в {city}. Условия: {condition}. Требования: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a beautician / SPA master, {city}",
+          "description": "Looking for a beauty/SPA specialist in {city}. Conditions: {condition}. Requirements: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim kozmetičara / SPA majstora, {city}",
+          "description": "Tražim majstora u salon ljepote / SPA u {city}. Uslovi: {condition}. Zahtjevi: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_car-repair_01",
+      "category_slug": "car-repair",
+      "patterns": {
+        "ru": {
+          "title": "Автосервис в {city}, ремонт от {price} BAM",
+          "description": "Предлагаю услуги автосервиса в {city}. Опыт: {condition}. Виды работ: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Car repair in {city}, from {price} BAM",
+          "description": "Offering auto repair services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Auto servis u {city}, popravka od {price} BAM",
+          "description": "Nudim usluge auto servisa u {city}. Iskustvo: {condition}. Vrste radova: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_car-repair_02",
+      "category_slug": "car-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ищу автослесаря / автомеханика, {city}",
+          "description": "Требуется автомеханик в {city}. Условия: {condition}. Обязанности: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a car mechanic, {city}",
+          "description": "Auto mechanic needed in {city}. Conditions: {condition}. Responsibilities: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim auto mehaničara, {city}",
+          "description": "Potreban auto mehaničar u {city}. Uslovi: {condition}. Odgovornosti: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_carpet-cleaning_01",
+      "category_slug": "carpet-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Чистка ковров в {city}, от {price} BAM",
+          "description": "Профессиональная чистка ковров и ковролина в {city}. Опыт: {condition}. Методы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Carpet cleaning in {city}, from {price} BAM",
+          "description": "Professional carpet and rug cleaning in {city}. Experience: {condition}. Methods: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Čišćenje tepiha u {city}, od {price} BAM",
+          "description": "Profesionalno čišćenje tepiha u {city}. Iskustvo: {condition}. Metode: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_carpet-cleaning_02",
+      "category_slug": "carpet-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Нужна чистка ковра / ковролина, {city}",
+          "description": "Ищу услуги по чистке ковра в {city}. Тип: {condition}. Ковёр: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need carpet / rug cleaning, {city}",
+          "description": "Looking for carpet cleaning services in {city}. Type: {condition}. Carpet: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebno čišćenje tepiha, {city}",
+          "description": "Tražim usluge čišćenja tepiha u {city}. Tip: {condition}. Tepih: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_catering_01",
+      "category_slug": "catering",
+      "patterns": {
+        "ru": {
+          "title": "Кейтеринг в {city}, от {price} BAM",
+          "description": "Предлагаю кейтеринговое обслуживание в {city}. Опыт: {condition}. Меню: {feature}. Цена от {price} BAM на человека."
+        },
+        "en": {
+          "title": "Catering in {city}, from {price} BAM",
+          "description": "Offering catering services in {city}. Experience: {condition}. Menu: {feature}. Price from {price} BAM per person."
+        },
+        "bs": {
+          "title": "Ketering u {city}, od {price} BAM",
+          "description": "Nudim ketering usluge u {city}. Iskustvo: {condition}. Meni: {feature}. Cijena od {price} BAM po osobi."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_catering_02",
+      "category_slug": "catering",
+      "patterns": {
+        "ru": {
+          "title": "Заказ кейтеринга на мероприятие, {city}",
+          "description": "Ищу кейтеринг для мероприятия в {city}. Тип: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for catering for an event, {city}",
+          "description": "Looking for catering for my event in {city}. Type: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim ketering za događaj, {city}",
+          "description": "Tražim ketering za moj događaj u {city}. Tip: {condition}. Preferencije: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_cleaning-service_01",
+      "category_slug": "cleaning-service",
+      "patterns": {
+        "ru": {
+          "title": "Клининг в {city}, уборка от {price} BAM",
+          "description": "Предлагаю клининговые услуги в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Cleaning service in {city}, from {price} BAM",
+          "description": "Offering cleaning services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Klining usluge u {city}, od {price} BAM",
+          "description": "Nudim usluge čišćenja u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_cleaning-service_02",
+      "category_slug": "cleaning-service",
+      "patterns": {
+        "ru": {
+          "title": "Нужна уборка помещения, {city}",
+          "description": "Ищу клининговую службу в {city}. Тип уборки: {condition}. Объём: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need cleaning service, {city}",
+          "description": "Looking for a cleaning service in {city}. Type of cleaning: {condition}. Scope: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebna usluga čišćenja, {city}",
+          "description": "Tražim servis za čišćenje u {city}. Vrsta čišćenja: {condition}. Obim: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_clothing-repair_01",
+      "category_slug": "clothing-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт и пошив одежды в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по ремонту и пошиву одежды в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Clothing repair and tailoring in {city}, from {price} BAM",
+          "description": "Offering clothing repair and tailoring services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Popravka i šivenje odjeće u {city}, od {price} BAM",
+          "description": "Nudim usluge popravke i šivenja odjeće u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_clothing-repair_02",
+      "category_slug": "clothing-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ищу портного / швею в {city}",
+          "description": "Требуется портной или швея в {city}. Условия: {condition}. Заказы: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a tailor / seamstress in {city}",
+          "description": "Tailor or seamstress needed in {city}. Conditions: {condition}. Orders: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim krojača / švalju u {city}",
+          "description": "Potreban krojač ili švalja u {city}. Uslovi: {condition}. Narudžbe: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_commercial-construction_01",
+      "category_slug": "commercial-construction",
+      "patterns": {
+        "ru": {
+          "title": "Коммерческое строительство в {city}, от {price} BAM",
+          "description": "Предлагаю услуги коммерческого строительства в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Commercial construction in {city}, from {price} BAM",
+          "description": "Offering commercial construction services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Komercijalna gradnja u {city}, od {price} BAM",
+          "description": "Nudim usluge komercijalne gradnje u {city}. Iskustvo: {condition}. Radovi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_commercial-construction_02",
+      "category_slug": "commercial-construction",
+      "patterns": {
+        "ru": {
+          "title": "Ищу строительную бригаду для коммерческого объекта, {city}",
+          "description": "Требуется строительная бригада для коммерческого объекта в {city}. Условия: {condition}. Объект: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a construction crew for commercial project, {city}",
+          "description": "Need a construction crew for a commercial project in {city}. Conditions: {condition}. Project: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim građevinski tim za komercijalni objekat, {city}",
+          "description": "Potreban građevinski tim za komercijalni objekat u {city}. Uslovi: {condition}. Objekat: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_courses-training_01",
+      "category_slug": "courses-training",
+      "patterns": {
+        "ru": {
+          "title": "Курсы и обучение в {city}, от {price} BAM",
+          "description": "Предлагаю обучающие курсы в {city}. Опыт преподавателя: {condition}. Направления: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Courses and training in {city}, from {price} BAM",
+          "description": "Offering training courses in {city}. Teacher experience: {condition}. Subjects: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Kursevi i obuka u {city}, od {price} BAM",
+          "description": "Nudim kurseve obuke u {city}. Iskustvo predavača: {condition}. Predmeti: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_courses-training_02",
+      "category_slug": "courses-training",
+      "patterns": {
+        "ru": {
+          "title": "Ищу курсы / обучение, {city}",
+          "description": "Ищу курсы или тренинг в {city}. Тема: {condition}. Формат: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for courses / training, {city}",
+          "description": "Looking for courses or training in {city}. Topic: {condition}. Format: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim kurseve / obuku, {city}",
+          "description": "Tražim kurseve ili trening u {city}. Tema: {condition}. Format: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_delivery-courier_01",
+      "category_slug": "delivery-courier",
+      "patterns": {
+        "ru": {
+          "title": "Курьерская доставка в {city}, от {price} BAM",
+          "description": "Предлагаю курьерские услуги по доставке в {city}. Опыт: {condition}. Доставка: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Courier delivery in {city}, from {price} BAM",
+          "description": "Offering courier delivery services in {city}. Experience: {condition}. Delivery: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Kurirska dostava u {city}, od {price} BAM",
+          "description": "Nudim kurirske usluge dostave u {city}. Iskustvo: {condition}. Dostava: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_delivery-courier_02",
+      "category_slug": "delivery-courier",
+      "patterns": {
+        "ru": {
+          "title": "Ищу курьера для доставки, {city}",
+          "description": "Требуется курьер для доставки в {city}. Условия: {condition}. Доставки: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a delivery courier, {city}",
+          "description": "Courier needed for deliveries in {city}. Conditions: {condition}. Deliveries: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim kurira za dostavu, {city}",
+          "description": "Potreban kurir za dostave u {city}. Uslovi: {condition}. Dostave: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_dog-walking_01",
+      "category_slug": "dog-walking",
+      "patterns": {
+        "ru": {
+          "title": "Выгул собак в {city}, от {price} BAM",
+          "description": "Предлагаю услуги выгула собак в {city}. Опыт: {condition}. Особенности: {feature}. Цена от {price} BAM за прогулку."
+        },
+        "en": {
+          "title": "Dog walking in {city}, from {price} BAM",
+          "description": "Offering dog walking services in {city}. Experience: {condition}. Details: {feature}. Price from {price} BAM per walk."
+        },
+        "bs": {
+          "title": "Izvođenje pasa u {city}, od {price} BAM",
+          "description": "Nudim usluge izvođenja pasa u {city}. Iskustvo: {condition}. Detalji: {feature}. Cijena od {price} BAM po šetnji."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_dog-walking_02",
+      "category_slug": "dog-walking",
+      "patterns": {
+        "ru": {
+          "title": "Ищу человека для выгула собаки, {city}",
+          "description": "Ищу ответственного человека для выгула собаки в {city}. Условия: {condition}. О собаке: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a dog walker, {city}",
+          "description": "Looking for a responsible dog walker in {city}. Conditions: {condition}. About the dog: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim osobu za izvođenje psa, {city}",
+          "description": "Tražim odgovornu osobu za izvođenje psa u {city}. Uslovi: {condition}. O psu: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_electrical_01",
+      "category_slug": "electrical",
+      "patterns": {
+        "ru": {
+          "title": "Электрик в {city}, услуги от {price} BAM",
+          "description": "Предлагаю услуги электрика в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Electrician in {city}, services from {price} BAM",
+          "description": "Offering electrical services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Električar u {city}, usluge od {price} BAM",
+          "description": "Nudim električarske usluge u {city}. Iskustvo: {condition}. Radovi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_electrical_02",
+      "category_slug": "electrical",
+      "patterns": {
+        "ru": {
+          "title": "Нужен электрик, {city}",
+          "description": "Ищу квалифицированного электрика в {city}. Условия: {condition}. Работы: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need an electrician, {city}",
+          "description": "Looking for a qualified electrician in {city}. Conditions: {condition}. Work needed: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potreban električar, {city}",
+          "description": "Tražim kvalifikovanog električara u {city}. Uslovi: {condition}. Radovi: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_event-planning_01",
+      "category_slug": "event-planning",
+      "patterns": {
+        "ru": {
+          "title": "Организация мероприятий в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по организации мероприятий в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Event planning in {city}, from {price} BAM",
+          "description": "Offering event planning services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Organizacija događaja u {city}, od {price} BAM",
+          "description": "Nudim usluge organizacije događaja u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_event-planning_02",
+      "category_slug": "event-planning",
+      "patterns": {
+        "ru": {
+          "title": "Ищу организатора мероприятий, {city}",
+          "description": "Ищу организатора для мероприятия в {city}. Тип: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for an event planner, {city}",
+          "description": "Looking for an event planner in {city}. Type: {condition}. Requirements: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim organizatora događaja, {city}",
+          "description": "Tražim organizatora za događaj u {city}. Tip: {condition}. Zahtjevi: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_flooring-installation_01",
+      "category_slug": "flooring-installation",
+      "patterns": {
+        "ru": {
+          "title": "Укладка напольных покрытий в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по укладке напольных покрытий в {city}. Опыт: {condition}. Материалы: {feature}. Цена от {price} BAM за м²."
+        },
+        "en": {
+          "title": "Flooring installation in {city}, from {price} BAM",
+          "description": "Offering flooring installation services in {city}. Experience: {condition}. Materials: {feature}. Price from {price} BAM per m²."
+        },
+        "bs": {
+          "title": "Postavljanje podnih obloga u {city}, od {price} BAM",
+          "description": "Nudim usluge postavljanja podnih obloga u {city}. Iskustvo: {condition}. Materijali: {feature}. Cijena od {price} BAM po m²."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_flooring-installation_02",
+      "category_slug": "flooring-installation",
+      "patterns": {
+        "ru": {
+          "title": "Нужен мастер по укладке пола, {city}",
+          "description": "Ищу мастера по укладке напольных покрытий в {city}. Условия: {condition}. Тип покрытия: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a flooring specialist, {city}",
+          "description": "Looking for a flooring installation specialist in {city}. Conditions: {condition}. Floor type: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora za postavljanje podova, {city}",
+          "description": "Tražim majstora za postavljanje podnih obloga u {city}. Uslovi: {condition}. Tip poda: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_florist_01",
+      "category_slug": "florist",
+      "patterns": {
+        "ru": {
+          "title": "Цветы и букеты в {city}, от {price} BAM",
+          "description": "Предлагаю флористические услуги в {city}. Опыт: {condition}. Композиции: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Florist services in {city}, from {price} BAM",
+          "description": "Offering florist services in {city}. Experience: {condition}. Arrangements: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Cvjećarske usluge u {city}, od {price} BAM",
+          "description": "Nudim cvjećarske usluge u {city}. Iskustvo: {condition}. Aranžmani: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_florist_02",
+      "category_slug": "florist",
+      "patterns": {
+        "ru": {
+          "title": "Заказ букета / цветов в {city}",
+          "description": "Хочу заказать букет или цветочную композицию в {city}. Повод: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Ordering a bouquet / flowers in {city}",
+          "description": "I want to order a bouquet or floral arrangement in {city}. Occasion: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Narudžba buketa / cvijeća u {city}",
+          "description": "Želim naručiti buket ili cvjetni aranžman u {city}. Povod: {condition}. Preferencije: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_freight_01",
+      "category_slug": "freight",
+      "patterns": {
+        "ru": {
+          "title": "Грузоперевозки в {city}, от {price} BAM",
+          "description": "Предлагаю услуги грузоперевозок в {city} и по региону. Опыт: {condition}. Транспорт: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Freight services in {city}, from {price} BAM",
+          "description": "Offering freight transportation services in {city} and region. Experience: {condition}. Transport: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Transport tereta u {city}, od {price} BAM",
+          "description": "Nudim usluge transporta tereta u {city} i regionu. Iskustvo: {condition}. Transport: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_freight_02",
+      "category_slug": "freight",
+      "patterns": {
+        "ru": {
+          "title": "Нужны грузоперевозки / переезд, {city}",
+          "description": "Ищу транспорт для перевозки груза в {city}. Груз: {condition}. Маршрут: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need freight / moving services, {city}",
+          "description": "Looking for transport for cargo in {city}. Cargo: {condition}. Route: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potreban transport / selidba, {city}",
+          "description": "Tražim transport za teret u {city}. Teret: {condition}. Ruta: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_hair-care-services_01",
+      "category_slug": "hair-care-services",
+      "patterns": {
+        "ru": {
+          "title": "Уход за волосами в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по уходу за волосами в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Hair care services in {city}, from {price} BAM",
+          "description": "Offering hair care services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Njega kose u {city}, od {price} BAM",
+          "description": "Nudim usluge njege kose u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_hair-care-services_02",
+      "category_slug": "hair-care-services",
+      "patterns": {
+        "ru": {
+          "title": "Ищу парикмахера / мастера по волосам, {city}",
+          "description": "Ищу мастера по уходу за волосами в {city}. Условия: {condition}. Услуги: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a hair stylist / care specialist, {city}",
+          "description": "Looking for a hair care specialist in {city}. Conditions: {condition}. Services: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim frizera / majstora za kosu, {city}",
+          "description": "Tražim majstora za njegu kose u {city}. Uslovi: {condition}. Usluge: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_hair-styling_01",
+      "category_slug": "hair-styling",
+      "patterns": {
+        "ru": {
+          "title": "Стрижки и укладки в {city}, от {price} BAM",
+          "description": "Предлагаю услуги парикмахера-стилиста в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Hair styling in {city}, from {price} BAM",
+          "description": "Offering hairstylist services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Šišanje i oblikovanje u {city}, od {price} BAM",
+          "description": "Nudim usluge frizera-stiliste u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_hair-styling_02",
+      "category_slug": "hair-styling",
+      "patterns": {
+        "ru": {
+          "title": "Ищу стилиста / парикмахера, {city}",
+          "description": "Ищу опытного стилиста или парикмахера в {city}. Условия: {condition}. Тип причёски: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a stylist / hairdresser, {city}",
+          "description": "Looking for an experienced stylist or hairdresser in {city}. Conditions: {condition}. Hairstyle type: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim stilistu / frizera, {city}",
+          "description": "Tražim iskusnog stilistu ili frizera u {city}. Uslovi: {condition}. Tip frizure: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_home-food-service_01",
+      "category_slug": "home-food-service",
+      "patterns": {
+        "ru": {
+          "title": "Домашняя еда в {city}, от {price} BAM",
+          "description": "Предлагаю домашнюю еду и выпечку в {city}. Опыт: {condition}. Меню: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Home food service in {city}, from {price} BAM",
+          "description": "Offering home-cooked food and pastries in {city}. Experience: {condition}. Menu: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Domaća hrana u {city}, od {price} BAM",
+          "description": "Nudim domaću hranu i kolače u {city}. Iskustvo: {condition}. Meni: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_home-food-service_02",
+      "category_slug": "home-food-service",
+      "patterns": {
+        "ru": {
+          "title": "Хочу заказать домашнюю еду, {city}",
+          "description": "Ищу, кто готовит домашнюю еду на заказ в {city}. Тип кухни: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for home-cooked food, {city}",
+          "description": "Looking for someone who cooks home meals on order in {city}. Cuisine type: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Želim naručiti domaću hranu, {city}",
+          "description": "Tražim nekoga ko kuha domaću hranu po narudžbi u {city}. Tip kuhinje: {condition}. Želje: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_housekeeping_01",
+      "category_slug": "housekeeping",
+      "patterns": {
+        "ru": {
+          "title": "Помощь по хозяйству в {city}, от {price} BAM",
+          "description": "Предлагаю помощь по хозяйству в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Housekeeping in {city}, from {price} BAM",
+          "description": "Offering housekeeping services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Pomoć u domaćinstvu u {city}, od {price} BAM",
+          "description": "Nudim pomoć u domaćinstvu u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_housekeeping_02",
+      "category_slug": "housekeeping",
+      "patterns": {
+        "ru": {
+          "title": "Ищу домработницу / помощницу, {city}",
+          "description": "Ищу помощницу по хозяйству в {city}. Условия: {condition}. Обязанности: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a housekeeper / helper, {city}",
+          "description": "Looking for a housekeeping helper in {city}. Conditions: {condition}. Duties: {feature}. Payment: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim pomoćnicu u domaćinstvu, {city}",
+          "description": "Tražim pomoćnicu za domaćinstvo u {city}. Uslovi: {condition}. Obaveze: {feature}. Plaćanje: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_laptop-pc-repair_01",
+      "category_slug": "laptop-pc-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт ноутбуков и ПК в {city}, от {price} BAM",
+          "description": "Предлагаю ремонт ноутбуков и компьютеров в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Laptop and PC repair in {city}, from {price} BAM",
+          "description": "Offering laptop and computer repair services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Popravka laptopova i računara u {city}, od {price} BAM",
+          "description": "Nudim popravku laptopova i računara u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_laptop-pc-repair_02",
+      "category_slug": "laptop-pc-repair",
+      "patterns": {
+        "ru": {
+          "title": "Сломался ноутбук / ПК, нужен мастер, {city}",
+          "description": "Ищу мастера по ремонту ноутбуков или ПК в {city}. Проблема: {condition}. Модель: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Broken laptop / PC, need a technician, {city}",
+          "description": "Looking for a laptop or PC repair technician in {city}. Issue: {condition}. Model: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Pokvaren laptop / računar, treba majstor, {city}",
+          "description": "Tražim majstora za popravku laptopa ili računara u {city}. Problem: {condition}. Model: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_legal-services_01",
+      "category_slug": "legal-services",
+      "patterns": {
+        "ru": {
+          "title": "Юридические услуги в {city}, от {price} BAM",
+          "description": "Оказываю юридические услуги в {city}. Опыт: {condition}. Специализация: {feature}. Консультация от {price} BAM."
+        },
+        "en": {
+          "title": "Legal services in {city}, from {price} BAM",
+          "description": "Providing legal services in {city}. Experience: {condition}. Specialization: {feature}. Consultation from {price} BAM."
+        },
+        "bs": {
+          "title": "Pravne usluge u {city}, od {price} BAM",
+          "description": "Pružam pravne usluge u {city}. Iskustvo: {condition}. Specijalizacija: {feature}. Konsultacije od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_legal-services_02",
+      "category_slug": "legal-services",
+      "patterns": {
+        "ru": {
+          "title": "Нужен юрист / адвокат в {city}",
+          "description": "Требуется юрист или адвокат в {city}. Вопрос: {condition}. Сложность: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need a lawyer / attorney in {city}",
+          "description": "Looking for a lawyer or attorney in {city}. Matter: {condition}. Complexity: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potreban advokat / pravnik u {city}",
+          "description": "Tražim advokata ili pravnika u {city}. Pitanje: {condition}. Složenost: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_manicure_01",
+      "category_slug": "manicure",
+      "patterns": {
+        "ru": {
+          "title": "Маникюр в {city}, от {price} BAM",
+          "description": "Предлагаю услуги маникюра в {city}. Опыт: {condition}. Дизайн: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Manicure in {city}, from {price} BAM",
+          "description": "Offering manicure services in {city}. Experience: {condition}. Designs: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Manikir u {city}, od {price} BAM",
+          "description": "Nudim usluge manikira u {city}. Iskustvo: {condition}. Dizajn: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_manicure_02",
+      "category_slug": "manicure",
+      "patterns": {
+        "ru": {
+          "title": "Ищу мастера маникюра, {city}",
+          "description": "Ищу мастера маникюра в {city}. Условия: {condition}. Покрытие: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a manicure master, {city}",
+          "description": "Looking for a manicure specialist in {city}. Conditions: {condition}. Coating: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora manikira, {city}",
+          "description": "Tražim majstora manikira u {city}. Uslovi: {condition}. Premaz: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_massage_01",
+      "category_slug": "massage",
+      "patterns": {
+        "ru": {
+          "title": "Массаж в {city}, от {price} BAM",
+          "description": "Предлагаю услуги массажа в {city}. Опыт: {condition}. Виды массажа: {feature}. Цена от {price} BAM за сеанс."
+        },
+        "en": {
+          "title": "Massage in {city}, from {price} BAM",
+          "description": "Offering massage services in {city}. Experience: {condition}. Types: {feature}. Price from {price} BAM per session."
+        },
+        "bs": {
+          "title": "Masaža u {city}, od {price} BAM",
+          "description": "Nudim usluge masaže u {city}. Iskustvo: {condition}. Vrste masaže: {feature}. Cijena od {price} BAM po sesiji."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_massage_02",
+      "category_slug": "massage",
+      "patterns": {
+        "ru": {
+          "title": "Ищу массажиста в {city}",
+          "description": "Ищу опытного массажиста в {city}. Условия: {condition}. Вид массажа: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a massage therapist in {city}",
+          "description": "Looking for an experienced massage therapist in {city}. Conditions: {condition}. Type: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim masažera u {city}",
+          "description": "Tražim iskusnog masažera u {city}. Uslovi: {condition}. Vrsta masaže: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_medicine_01",
+      "category_slug": "medicine",
+      "patterns": {
+        "ru": {
+          "title": "Медицинские услуги в {city}, от {price} BAM",
+          "description": "Предлагаю медицинские услуги в {city}. Опыт: {condition}. Специализация: {feature}. Приём от {price} BAM."
+        },
+        "en": {
+          "title": "Medical services in {city}, from {price} BAM",
+          "description": "Offering medical services in {city}. Experience: {condition}. Specialization: {feature}. Appointment from {price} BAM."
+        },
+        "bs": {
+          "title": "Medicinske usluge u {city}, od {price} BAM",
+          "description": "Nudim medicinske usluge u {city}. Iskustvo: {condition}. Specijalizacija: {feature}. Pregled od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_medicine_02",
+      "category_slug": "medicine",
+      "patterns": {
+        "ru": {
+          "title": "Ищу врача / медицинского специалиста, {city}",
+          "description": "Ищу врача или медицинского работника в {city}. Специальность: {condition}. Требования: {feature}. Оплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a doctor / medical specialist, {city}",
+          "description": "Looking for a doctor or medical professional in {city}. Specialty: {condition}. Requirements: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim ljekara / medicinskog stručnjaka, {city}",
+          "description": "Tražim ljekara ili medicinskog radnika u {city}. Specijalnost: {condition}. Zahtjevi: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_no-experience-jobs_01",
+      "category_slug": "no-experience-jobs",
+      "patterns": {
+        "ru": {
+          "title": "Ищу работу без опыта, {city}",
+          "description": "Ищу работу в {city} без опыта. Желаемая сфера: {feature}. Готовность: {condition}. Ожидаемая зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a job with no experience, {city}",
+          "description": "Looking for a job in {city} with no experience required. Desired field: {feature}. Availability: {condition}. Expected salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim posao bez iskustva, {city}",
+          "description": "Tražim posao u {city} bez iskustva. Željena oblast: {feature}. Dostupnost: {condition}. Očekivana plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_no-experience-jobs_02",
+      "category_slug": "no-experience-jobs",
+      "patterns": {
+        "ru": {
+          "title": "Вакансия без опыта работы, {city}",
+          "description": "Требуется сотрудник без опыта в {city}. Условия: {condition}. Обучение: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "No experience job vacancy, {city}",
+          "description": "We are hiring with no experience required in {city}. Conditions: {condition}. Training: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Konkurs bez iskustva, {city}",
+          "description": "Zapošljavamo bez iskustva u {city}. Uslovi: {condition}. Obuka: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_office-cleaning_01",
+      "category_slug": "office-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Уборка офисов в {city}, от {price} BAM",
+          "description": "Предлагаю профессиональную уборку офисов в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Office cleaning in {city}, from {price} BAM",
+          "description": "Offering professional office cleaning in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Čišćenje kancelarija u {city}, od {price} BAM",
+          "description": "Nudim profesionalno čišćenje kancelarija u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_office-cleaning_02",
+      "category_slug": "office-cleaning",
+      "patterns": {
+        "ru": {
+          "title": "Нужна уборка офиса, {city}",
+          "description": "Ищу клининговую службу для офиса в {city}. Периодичность: {condition}. Площадь: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Office cleaning needed, {city}",
+          "description": "Looking for a cleaning service for my office in {city}. Frequency: {condition}. Area: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebno čišćenje kancelarije, {city}",
+          "description": "Tražim servis za čišćenje kancelarije u {city}. Učestalost: {condition}. Površina: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_other-services_01",
+      "category_slug": "other-services",
+      "patterns": {
+        "ru": {
+          "title": "Разные услуги в {city}, от {price} BAM",
+          "description": "Предлагаю различные услуги в {city}. Опыт: {condition}. Что могу: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Various services in {city}, from {price} BAM",
+          "description": "Offering various services in {city}. Experience: {condition}. What I can do: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Razne usluge u {city}, od {price} BAM",
+          "description": "Nudim razne usluge u {city}. Iskustvo: {condition}. Šta mogu: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_other-services_02",
+      "category_slug": "other-services",
+      "patterns": {
+        "ru": {
+          "title": "Ищу разные услуги / помощь, {city}",
+          "description": "Ищу человека для оказания услуги в {city}. Тип: {condition}. Описание: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for various services / help, {city}",
+          "description": "Looking for someone to provide a service in {city}. Type: {condition}. Description: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim razne usluge / pomoć, {city}",
+          "description": "Tražim osobu za pružanje usluge u {city}. Tip: {condition}. Opis: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_pc-setup_01",
+      "category_slug": "pc-setup",
+      "patterns": {
+        "ru": {
+          "title": "Сборка и настройка ПК в {city}, от {price} BAM",
+          "description": "Предлагаю сборку и настройку компьютеров в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "PC setup and assembly in {city}, from {price} BAM",
+          "description": "Offering PC assembly and setup services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Sastavljanje i podešavanje računara u {city}, od {price} BAM",
+          "description": "Nudim sastavljanje i podešavanje računara u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_pc-setup_02",
+      "category_slug": "pc-setup",
+      "patterns": {
+        "ru": {
+          "title": "Нужна сборка / настройка ПК, {city}",
+          "description": "Ищу специалиста по сборке и настройке ПК в {city}. Конфигурация: {condition}. Цель: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need PC assembly / setup, {city}",
+          "description": "Looking for a PC assembly and setup specialist in {city}. Configuration: {condition}. Purpose: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebno sastavljanje / podešavanje računara, {city}",
+          "description": "Tražim specijalistu za sastavljanje i podešavanje računara u {city}. Konfiguracija: {condition}. Namjena: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_pedicure_01",
+      "category_slug": "pedicure",
+      "patterns": {
+        "ru": {
+          "title": "Педикюр в {city}, от {price} BAM",
+          "description": "Предлагаю услуги педикюра в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Pedicure in {city}, from {price} BAM",
+          "description": "Offering pedicure services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Pedikir u {city}, od {price} BAM",
+          "description": "Nudim usluge pedikira u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_pedicure_02",
+      "category_slug": "pedicure",
+      "patterns": {
+        "ru": {
+          "title": "Ищу мастера педикюра, {city}",
+          "description": "Ищу мастера педикюра в {city}. Условия: {condition}. Покрытие: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a pedicure master, {city}",
+          "description": "Looking for a pedicure specialist in {city}. Conditions: {condition}. Coating: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora pedikira, {city}",
+          "description": "Tražim majstora pedikira u {city}. Uslovi: {condition}. Premaz: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_phone-repair_01",
+      "category_slug": "phone-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт телефонов в {city}, от {price} BAM",
+          "description": "Предлагаю ремонт телефонов и смартфонов в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM. Гарантия."
+        },
+        "en": {
+          "title": "Phone repair in {city}, from {price} BAM",
+          "description": "Offering phone and smartphone repair in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM. Warranty."
+        },
+        "bs": {
+          "title": "Popravka telefona u {city}, od {price} BAM",
+          "description": "Nudim popravku telefona i pametnih telefona u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM. Garancija."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_phone-repair_02",
+      "category_slug": "phone-repair",
+      "patterns": {
+        "ru": {
+          "title": "Разбил телефон, нужен ремонт, {city}",
+          "description": "Ищу мастера по ремонту телефонов в {city}. Проблема: {condition}. Модель: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Broken phone, need repair, {city}",
+          "description": "Looking for a phone repair technician in {city}. Issue: {condition}. Model: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Razbio sam telefon, treba popravka, {city}",
+          "description": "Tražim majstora za popravku telefona u {city}. Problem: {condition}. Model: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_photoshoots_01",
+      "category_slug": "photoshoots",
+      "patterns": {
+        "ru": {
+          "title": "Фотосъёмка в {city}, от {price} BAM",
+          "description": "Предлагаю услуги фотосъёмки в {city}. Опыт: {condition}. Виды съёмки: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Photoshoot in {city}, from {price} BAM",
+          "description": "Offering photography services in {city}. Experience: {condition}. Types: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Fotografisanje u {city}, od {price} BAM",
+          "description": "Nudim usluge fotografisanja u {city}. Iskustvo: {condition}. Vrste: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_photoshoots_02",
+      "category_slug": "photoshoots",
+      "patterns": {
+        "ru": {
+          "title": "Ищу фотографа для съёмки, {city}",
+          "description": "Ищу фотографа в {city} для проведения съёмки. Повод: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a photographer, {city}",
+          "description": "Looking for a photographer in {city} for a shoot. Occasion: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim fotografa za snimanje, {city}",
+          "description": "Tražim fotografa u {city} za snimanje. Povod: {condition}. Preferencije: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_plastering_01",
+      "category_slug": "plastering",
+      "patterns": {
+        "ru": {
+          "title": "Штукатурные работы в {city}, от {price} BAM",
+          "description": "Предлагаю штукатурные работы в {city}. Опыт: {condition}. Виды работ: {feature}. Цена от {price} BAM за м²."
+        },
+        "en": {
+          "title": "Plastering in {city}, from {price} BAM",
+          "description": "Offering plastering services in {city}. Experience: {condition}. Types: {feature}. Price from {price} BAM per m²."
+        },
+        "bs": {
+          "title": "Malterisanje u {city}, od {price} BAM",
+          "description": "Nudim maltererske usluge u {city}. Iskustvo: {condition}. Vrste: {feature}. Cijena od {price} BAM po m²."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_plastering_02",
+      "category_slug": "plastering",
+      "patterns": {
+        "ru": {
+          "title": "Нужен штукатур / маляр, {city}",
+          "description": "Ищу штукатура в {city} для работ. Условия: {condition}. Объём: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a plasterer, {city}",
+          "description": "Looking for a plasterer in {city} for work. Conditions: {condition}. Scope: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim maltera, {city}",
+          "description": "Tražim maltera u {city} za radove. Uslovi: {condition}. Obim: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_plumbing_01",
+      "category_slug": "plumbing",
+      "patterns": {
+        "ru": {
+          "title": "Сантехник в {city}, услуги от {price} BAM",
+          "description": "Предлагаю сантехнические услуги в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Plumber in {city}, services from {price} BAM",
+          "description": "Offering plumbing services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Vodoinstalater u {city}, usluge od {price} BAM",
+          "description": "Nudim vodoinstalaterske usluge u {city}. Iskustvo: {condition}. Radovi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_plumbing_02",
+      "category_slug": "plumbing",
+      "patterns": {
+        "ru": {
+          "title": "Течёт вода / нужен сантехник, {city}",
+          "description": "Ищу сантехника в {city} для ремонта. Проблема: {condition}. Работы: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Water leak / need a plumber, {city}",
+          "description": "Looking for a plumber in {city} for repairs. Issue: {condition}. Work needed: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Curenje vode / potreban vodoinstalater, {city}",
+          "description": "Tražim vodoinstalatera u {city} za popravku. Problem: {condition}. Potrebni radovi: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_programming_01",
+      "category_slug": "programming",
+      "patterns": {
+        "ru": {
+          "title": "Услуги программиста в {city}, от {price} BAM",
+          "description": "Предлагаю услуги программиста и разработчика в {city}. Опыт: {condition}. Технологии: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Programming services in {city}, from {price} BAM",
+          "description": "Offering programmer and developer services in {city}. Experience: {condition}. Technologies: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Usluge programera u {city}, od {price} BAM",
+          "description": "Nudim usluge programera i developera u {city}. Iskustvo: {condition}. Tehnologije: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_programming_02",
+      "category_slug": "programming",
+      "patterns": {
+        "ru": {
+          "title": "Нужен программист / разработчик, {city}",
+          "description": "Ищу программиста или разработчика в {city}. Задача: {condition}. Стек: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a programmer / developer, {city}",
+          "description": "Looking for a programmer or developer in {city}. Task: {condition}. Stack: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim programera / developera, {city}",
+          "description": "Tražim programera ili developera u {city}. Zadatak: {condition}. Stack: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_property-valuation_01",
+      "category_slug": "property-valuation",
+      "patterns": {
+        "ru": {
+          "title": "Оценка недвижимости в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по оценке недвижимости в {city}. Опыт: {condition}. Тип оценки: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Property valuation in {city}, from {price} BAM",
+          "description": "Offering property valuation services in {city}. Experience: {condition}. Type: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Procjena nekretnina u {city}, od {price} BAM",
+          "description": "Nudim usluge procjene nekretnina u {city}. Iskustvo: {condition}. Tip: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_property-valuation_02",
+      "category_slug": "property-valuation",
+      "patterns": {
+        "ru": {
+          "title": "Нужна оценка недвижимости, {city}",
+          "description": "Ищу оценщика недвижимости в {city}. Объект: {condition}. Цель: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need property valuation, {city}",
+          "description": "Looking for a property valuer in {city}. Property: {condition}. Purpose: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebna procjena nekretnina, {city}",
+          "description": "Tražim procjenitelja nekretnina u {city}. Nekretnina: {condition}. Svrha: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_psychology_01",
+      "category_slug": "psychology",
+      "patterns": {
+        "ru": {
+          "title": "Услуги психолога в {city}, от {price} BAM",
+          "description": "Предлагаю консультации психолога в {city}. Опыт: {condition}. Направления: {feature}. Консультация от {price} BAM."
+        },
+        "en": {
+          "title": "Psychology services in {city}, from {price} BAM",
+          "description": "Offering psychologist consultations in {city}. Experience: {condition}. Areas: {feature}. Consultation from {price} BAM."
+        },
+        "bs": {
+          "title": "Usluge psihologa u {city}, od {price} BAM",
+          "description": "Nudim konsultacije psihologa u {city}. Iskustvo: {condition}. Područja: {feature}. Konsultacije od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_psychology_02",
+      "category_slug": "psychology",
+      "patterns": {
+        "ru": {
+          "title": "Ищу психолога в {city}",
+          "description": "Ищу психолога для консультации в {city}. Запрос: {condition}. Формат: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a psychologist in {city}",
+          "description": "Looking for a psychologist for consultation in {city}. Issue: {condition}. Format: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim psihologa u {city}",
+          "description": "Tražim psihologa za konsultaciju u {city}. Problem: {condition}. Format: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_residential-construction_01",
+      "category_slug": "residential-construction",
+      "patterns": {
+        "ru": {
+          "title": "Строительство домов в {city}, от {price} BAM",
+          "description": "Предлагаю строительство жилых домов в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Residential construction in {city}, from {price} BAM",
+          "description": "Offering residential house construction in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Izgradnja kuća u {city}, od {price} BAM",
+          "description": "Nudim izgradnju stambenih kuća u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_residential-construction_02",
+      "category_slug": "residential-construction",
+      "patterns": {
+        "ru": {
+          "title": "Ищу строителей для дома, {city}",
+          "description": "Требуется строительная бригада для дома в {city}. Условия: {condition}. Проект: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for house builders, {city}",
+          "description": "Need a construction crew for a house in {city}. Conditions: {condition}. Project: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim graditelje za kuću, {city}",
+          "description": "Potreban građevinski tim za kuću u {city}. Uslovi: {condition}. Projekat: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_restaurants_01",
+      "category_slug": "restaurants",
+      "patterns": {
+        "ru": {
+          "title": "Ресторан / доставка еды, {city}",
+          "description": "Предлагаю услуги ресторана и доставку блюд в {city}. Опыт: {condition}. Меню: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Restaurant / food delivery, {city}",
+          "description": "Offering restaurant services and meal delivery in {city}. Experience: {condition}. Menu: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Restoran / dostava hrane, {city}",
+          "description": "Nudim usluge restorana i dostavu jela u {city}. Iskustvo: {condition}. Meni: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_restaurants_02",
+      "category_slug": "restaurants",
+      "patterns": {
+        "ru": {
+          "title": "Ищу повара / работника в ресторан, {city}",
+          "description": "Требуется повар или сотрудник в ресторан в {city}. Условия: {condition}. Должность: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a chef / restaurant worker, {city}",
+          "description": "Chef or restaurant staff needed in {city}. Conditions: {condition}. Position: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim kuvara / radnika u restoran, {city}",
+          "description": "Potreban kuvar ili radnik u restoran u {city}. Uslovi: {condition}. Pozicija: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_security_01",
+      "category_slug": "security",
+      "patterns": {
+        "ru": {
+          "title": "Охрана и безопасность в {city}, от {price} BAM",
+          "description": "Предлагаю услуги охраны и безопасности в {city}. Опыт: {condition}. Услуги: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Security services in {city}, from {price} BAM",
+          "description": "Offering security and safety services in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Obezbjeđenje i sigurnost u {city}, od {price} BAM",
+          "description": "Nudim usluge obezbjeđenja i sigurnosti u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_security_02",
+      "category_slug": "security",
+      "patterns": {
+        "ru": {
+          "title": "Ищу охранника / сотрудника безопасности, {city}",
+          "description": "Требуется охранник или сотрудник службы безопасности в {city}. Условия: {condition}. Объект: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a security guard, {city}",
+          "description": "Security guard or safety officer needed in {city}. Conditions: {condition}. Site: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim čuvara / radnika obezbjeđenja, {city}",
+          "description": "Potreban čuvar ili radnik obezbjeđenja u {city}. Uslovi: {condition}. Objekat: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_shoe-repair_01",
+      "category_slug": "shoe-repair",
+      "patterns": {
+        "ru": {
+          "title": "Ремонт обуви в {city}, от {price} BAM",
+          "description": "Предлагаю ремонт и реставрацию обуви в {city}. Опыт: {condition}. Работы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Shoe repair in {city}, from {price} BAM",
+          "description": "Offering shoe repair and restoration in {city}. Experience: {condition}. Services: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Popravka obuće u {city}, od {price} BAM",
+          "description": "Nudim popravku i restauraciju obuće u {city}. Iskustvo: {condition}. Usluge: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_shoe-repair_02",
+      "category_slug": "shoe-repair",
+      "patterns": {
+        "ru": {
+          "title": "Нужен мастер по ремонту обуви, {city}",
+          "description": "Ищу мастера по ремонту обуви в {city}. Что нужно: {condition}. Тип обуви: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a shoe repair craftsman, {city}",
+          "description": "Looking for a shoe repair specialist in {city}. What I need: {condition}. Shoe type: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim majstora za popravku obuće, {city}",
+          "description": "Tražim majstora za popravku obuće u {city}. Šta treba: {condition}. Tip obuće: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_skincare_01",
+      "category_slug": "skincare",
+      "patterns": {
+        "ru": {
+          "title": "Уход за кожей в {city}, от {price} BAM",
+          "description": "Предлагаю услуги по уходу за кожей в {city}. Опыт: {condition}. Процедуры: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Skincare services in {city}, from {price} BAM",
+          "description": "Offering skincare services in {city}. Experience: {condition}. Treatments: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Njega kože u {city}, od {price} BAM",
+          "description": "Nudim usluge njege kože u {city}. Iskustvo: {condition}. Tretmani: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_skincare_02",
+      "category_slug": "skincare",
+      "patterns": {
+        "ru": {
+          "title": "Ищу косметолога / специалиста по уходу за кожей, {city}",
+          "description": "Ищу косметолога в {city}. Проблема кожи: {condition}. Процедуры: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a skincare specialist, {city}",
+          "description": "Looking for a cosmetologist in {city}. Skin concern: {condition}. Treatments: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim kozmetičara / stručnjaka za njegu kože, {city}",
+          "description": "Tražim kozmetičara u {city}. Problem s kožom: {condition}. Tretmani: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_sport-fitness_01",
+      "category_slug": "sport-fitness",
+      "patterns": {
+        "ru": {
+          "title": "Фитнес тренировки в {city}, от {price} BAM",
+          "description": "Предлагаю персональные тренировки и фитнес услуги в {city}. Опыт: {condition}. Направления: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Fitness training in {city}, from {price} BAM",
+          "description": "Offering personal training and fitness services in {city}. Experience: {condition}. Programs: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Fitnes trening u {city}, od {price} BAM",
+          "description": "Nudim lične treninge i fitnes usluge u {city}. Iskustvo: {condition}. Programi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_sport-fitness_02",
+      "category_slug": "sport-fitness",
+      "patterns": {
+        "ru": {
+          "title": "Ищу фитнес тренера / инструктора, {city}",
+          "description": "Ищу фитнес тренера в {city}. Цель: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a fitness trainer / instructor, {city}",
+          "description": "Looking for a fitness trainer in {city}. Goal: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim fitnes trenera / instruktora, {city}",
+          "description": "Tražim fitnes trenera u {city}. Cilj: {condition}. Preferencije: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tax-planning_01",
+      "category_slug": "tax-planning",
+      "patterns": {
+        "ru": {
+          "title": "Налоговое консультирование в {city}, от {price} BAM",
+          "description": "Предлагаю услуги налогового планирования в {city}. Опыт: {condition}. Услуги: {feature}. Консультация от {price} BAM."
+        },
+        "en": {
+          "title": "Tax planning in {city}, from {price} BAM",
+          "description": "Offering tax planning services in {city}. Experience: {condition}. Services: {feature}. Consultation from {price} BAM."
+        },
+        "bs": {
+          "title": "Poresko savjetovanje u {city}, od {price} BAM",
+          "description": "Nudim usluge poreskog planiranja u {city}. Iskustvo: {condition}. Usluge: {feature}. Konsultacije od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tax-planning_02",
+      "category_slug": "tax-planning",
+      "patterns": {
+        "ru": {
+          "title": "Нужен налоговый консультант / бухгалтер, {city}",
+          "description": "Ищу налогового консультанта в {city}. Вопрос: {condition}. Сфера: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a tax advisor / accountant, {city}",
+          "description": "Looking for a tax advisor in {city}. Question: {condition}. Scope: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim poreskog savjetnika / knjigovođu, {city}",
+          "description": "Tražim poreskog savjetnika u {city}. Pitanje: {condition}. Oblast: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_taxi_01",
+      "category_slug": "taxi",
+      "patterns": {
+        "ru": {
+          "title": "Такси в {city}, поездка от {price} BAM",
+          "description": "Предлагаю услуги такси в {city}. Водитель: {condition}. Условия: {feature}. Цена от {price} BAM за поездку."
+        },
+        "en": {
+          "title": "Taxi in {city}, ride from {price} BAM",
+          "description": "Offering taxi services in {city}. Driver: {condition}. Conditions: {feature}. Price from {price} BAM per ride."
+        },
+        "bs": {
+          "title": "Taksi u {city}, vožnja od {price} BAM",
+          "description": "Nudim taksi usluge u {city}. Vozač: {condition}. Uslovi: {feature}. Cijena od {price} BAM po vožnji."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_taxi_02",
+      "category_slug": "taxi",
+      "patterns": {
+        "ru": {
+          "title": "Ищу такси / водителя, {city}",
+          "description": "Ищу такси или частного водителя в {city}. Маршрут: {condition}. Пожелания: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a taxi / driver, {city}",
+          "description": "Looking for a taxi or private driver in {city}. Route: {condition}. Preferences: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim taksi / vozača, {city}",
+          "description": "Tražim taksi ili privatnog vozača u {city}. Ruta: {condition}. Preferencije: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_terraces-balconies_01",
+      "category_slug": "terraces-balconies",
+      "patterns": {
+        "ru": {
+          "title": "Строительство террас и балконов в {city}, от {price} BAM",
+          "description": "Предлагаю строительство и отделку террас и балконов в {city}. Опыт: {condition}. Материалы: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Terrace and balcony construction in {city}, from {price} BAM",
+          "description": "Offering terrace and balcony construction and finishing in {city}. Experience: {condition}. Materials: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Izgradnja terasa i balkona u {city}, od {price} BAM",
+          "description": "Nudim izgradnju i obradu terasa i balkona u {city}. Iskustvo: {condition}. Materijali: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_terraces-balconies_02",
+      "category_slug": "terraces-balconies",
+      "patterns": {
+        "ru": {
+          "title": "Нужна терраса / балкон под ключ, {city}",
+          "description": "Ищу строителей для террасы или балкона в {city}. Тип: {condition}. Размер: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need a terrace / balcony turnkey, {city}",
+          "description": "Looking for builders for a terrace or balcony in {city}. Type: {condition}. Size: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebna terasa / balkon ključ u ruke, {city}",
+          "description": "Tražim graditelje za terasu ili balkon u {city}. Tip: {condition}. Veličina: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tow-truck_01",
+      "category_slug": "tow-truck",
+      "patterns": {
+        "ru": {
+          "title": "Эвакуатор в {city}, вызов от {price} BAM",
+          "description": "Предлагаю услуги эвакуатора в {city}. Опыт: {condition}. Тип техники: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Tow truck in {city}, call from {price} BAM",
+          "description": "Offering tow truck services in {city}. Experience: {condition}. Vehicle type: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Šlep služba u {city}, poziv od {price} BAM",
+          "description": "Nudim usluge šlepa u {city}. Iskustvo: {condition}. Tip vozila: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tow-truck_02",
+      "category_slug": "tow-truck",
+      "patterns": {
+        "ru": {
+          "title": "Срочно нужен эвакуатор, {city}",
+          "description": "Ищу эвакуатор в {city}. Срочность: {condition}. Автомобиль: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Urgently need a tow truck, {city}",
+          "description": "Looking for a tow truck in {city}. Urgency: {condition}. Vehicle: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Hitno potreban šlep, {city}",
+          "description": "Tražim šlep u {city}. Hitnost: {condition}. Vozilo: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_trading_01",
+      "category_slug": "trading",
+      "patterns": {
+        "ru": {
+          "title": "Торговля / купля-продажа в {city}",
+          "description": "Предлагаю услуги в сфере торговли в {city}. Опыт: {condition}. Товары: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Trading / commerce in {city}",
+          "description": "Offering services in the trading sector in {city}. Experience: {condition}. Goods: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Trgovina / kupoprodaja u {city}",
+          "description": "Nudim usluge u oblasti trgovine u {city}. Iskustvo: {condition}. Roba: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_trading_02",
+      "category_slug": "trading",
+      "patterns": {
+        "ru": {
+          "title": "Ищу торгового представителя / менеджера, {city}",
+          "description": "Требуется торговый представитель в {city}. Условия: {condition}. Товар: {feature}. Зарплата: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a sales representative / manager, {city}",
+          "description": "Sales representative needed in {city}. Conditions: {condition}. Product: {feature}. Salary: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim trgovinskog predstavnika / menadžera, {city}",
+          "description": "Potreban trgovinski predstavnik u {city}. Uslovi: {condition}. Proizvod: {feature}. Plata: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_translations_01",
+      "category_slug": "translations",
+      "patterns": {
+        "ru": {
+          "title": "Переводы в {city}, от {price} BAM",
+          "description": "Предлагаю услуги перевода в {city}. Опыт: {condition}. Языки: {feature}. Цена от {price} BAM за страницу."
+        },
+        "en": {
+          "title": "Translation services in {city}, from {price} BAM",
+          "description": "Offering translation services in {city}. Experience: {condition}. Languages: {feature}. Price from {price} BAM per page."
+        },
+        "bs": {
+          "title": "Prevodilačke usluge u {city}, od {price} BAM",
+          "description": "Nudim usluge prevođenja u {city}. Iskustvo: {condition}. Jezici: {feature}. Cijena od {price} BAM po stranici."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_translations_02",
+      "category_slug": "translations",
+      "patterns": {
+        "ru": {
+          "title": "Нужен переводчик в {city}",
+          "description": "Ищу переводчика в {city}. Языковая пара: {condition}. Тип перевода: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a translator in {city}",
+          "description": "Looking for a translator in {city}. Language pair: {condition}. Type: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim prevodioca u {city}",
+          "description": "Tražim prevodioca u {city}. Jezički par: {condition}. Tip prevoda: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tutors_01",
+      "category_slug": "tutors",
+      "patterns": {
+        "ru": {
+          "title": "Репетитор в {city}, от {price} BAM/час",
+          "description": "Предлагаю услуги репетитора в {city}. Опыт: {condition}. Предметы: {feature}. Цена: {price} BAM/час."
+        },
+        "en": {
+          "title": "Tutor in {city}, from {price} BAM/hour",
+          "description": "Offering tutoring services in {city}. Experience: {condition}. Subjects: {feature}. Price: {price} BAM/hour."
+        },
+        "bs": {
+          "title": "Instruktor u {city}, od {price} BAM/sat",
+          "description": "Nudim instrukcije u {city}. Iskustvo: {condition}. Predmeti: {feature}. Cijena: {price} BAM/sat."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_tutors_02",
+      "category_slug": "tutors",
+      "patterns": {
+        "ru": {
+          "title": "Ищу репетитора / учителя, {city}",
+          "description": "Ищу репетитора в {city}. Предмет: {condition}. Уровень: {feature}. Бюджет: {price} BAM/час."
+        },
+        "en": {
+          "title": "Looking for a tutor / teacher, {city}",
+          "description": "Looking for a tutor in {city}. Subject: {condition}. Level: {feature}. Budget: {price} BAM/hour."
+        },
+        "bs": {
+          "title": "Tražim instruktora / nastavnika, {city}",
+          "description": "Tražim instruktora u {city}. Predmet: {condition}. Nivo: {feature}. Budžet: {price} BAM/sat."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_warehousing_01",
+      "category_slug": "warehousing",
+      "patterns": {
+        "ru": {
+          "title": "Складские услуги в {city}, от {price} BAM",
+          "description": "Предлагаю складские услуги в {city}. Опыт: {condition}. Условия: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Warehousing services in {city}, from {price} BAM",
+          "description": "Offering warehousing services in {city}. Experience: {condition}. Conditions: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Skladišne usluge u {city}, od {price} BAM",
+          "description": "Nudim skladišne usluge u {city}. Iskustvo: {condition}. Uslovi: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_warehousing_02",
+      "category_slug": "warehousing",
+      "patterns": {
+        "ru": {
+          "title": "Ищу складское помещение / услуги хранения, {city}",
+          "description": "Ищу складские услуги в {city}. Требования: {condition}. Объём: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for warehousing / storage, {city}",
+          "description": "Looking for warehousing services in {city}. Requirements: {condition}. Volume: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim skladišni prostor / usluge skladištenja, {city}",
+          "description": "Tražim skladišne usluge u {city}. Zahtjevi: {condition}. Obim: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_waterproofing_01",
+      "category_slug": "waterproofing",
+      "patterns": {
+        "ru": {
+          "title": "Гидроизоляция в {city}, от {price} BAM",
+          "description": "Предлагаю услуги гидроизоляции в {city}. Опыт: {condition}. Виды работ: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Waterproofing in {city}, from {price} BAM",
+          "description": "Offering waterproofing services in {city}. Experience: {condition}. Types: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Hidroizolacija u {city}, od {price} BAM",
+          "description": "Nudim usluge hidroizolacije u {city}. Iskustvo: {condition}. Vrste: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_waterproofing_02",
+      "category_slug": "waterproofing",
+      "patterns": {
+        "ru": {
+          "title": "Нужна гидроизоляция / кровельные работы, {city}",
+          "description": "Ищу мастера по гидроизоляции в {city}. Объект: {condition}. Объём: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Need waterproofing / roofing work, {city}",
+          "description": "Looking for a waterproofing specialist in {city}. Site: {condition}. Scope: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Potrebna hidroizolacija / krovopokrivački radovi, {city}",
+          "description": "Tražim majstora za hidroizolaciju u {city}. Objekat: {condition}. Obim: {feature}. Budžet: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_web-development_01",
+      "category_slug": "web-development",
+      "patterns": {
+        "ru": {
+          "title": "Создание сайтов в {city}, от {price} BAM",
+          "description": "Предлагаю веб-разработку и создание сайтов в {city}. Опыт: {condition}. Технологии: {feature}. Цена от {price} BAM."
+        },
+        "en": {
+          "title": "Web development in {city}, from {price} BAM",
+          "description": "Offering web development and website creation in {city}. Experience: {condition}. Technologies: {feature}. Price from {price} BAM."
+        },
+        "bs": {
+          "title": "Web razvoj u {city}, od {price} BAM",
+          "description": "Nudim web razvoj i kreiranje sajtova u {city}. Iskustvo: {condition}. Tehnologije: {feature}. Cijena od {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "services-jobs_web-development_02",
+      "category_slug": "web-development",
+      "patterns": {
+        "ru": {
+          "title": "Нужен веб-разработчик / создание сайта, {city}",
+          "description": "Ищу веб-разработчика для создания сайта в {city}. Тип: {condition}. Требования: {feature}. Бюджет: {price} BAM."
+        },
+        "en": {
+          "title": "Looking for a web developer / website creation, {city}",
+          "description": "Looking for a web developer to create a website in {city}. Type: {condition}. Requirements: {feature}. Budget: {price} BAM."
+        },
+        "bs": {
+          "title": "Tražim web developera / kreiranje sajta, {city}",
+          "description": "Tražim web developera za kreiranje sajta u {city}. Tip: {condition}. Zahtjevi: {feature}. Budžet: {price} BAM."
+        }
+      }
+    }
+  ]
+}

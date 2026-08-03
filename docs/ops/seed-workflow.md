@@ -112,7 +112,9 @@ Configuration file: `scripts/seed-images-config.json`
 ### Running the Download Script
 
 ```bash
-python scripts/download_seed_photos.py --all
+python scripts/download_seed_photos.py          # single pass
+python scripts/download_seed_photos.py --all     # loop until limits exhausted
+python scripts/download_seed_photos.py --category avtomobili  # single category
 ```
 
 The script:

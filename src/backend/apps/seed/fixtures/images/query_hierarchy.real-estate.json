@@ -1,0 +1,57 @@
+{
+  "apartments": {
+    "objects": ["apartment", "flat", "studio", "condo", "penthouse", "loft", "duplex", "bachelor", "maisonette", "townhouse"],
+    "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "open plan", "natural light", "city view"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "lifestyle", "interior design"]
+  },
+  "houses": {
+    "objects": ["house", "villa", "cottage", "bungalow", "mansion", "farmhouse", "chalet", "cabin", "estate", "residence"],
+    "contexts": ["exterior", "front facade", "garden", "swimming pool", "backyard", "residential neighborhood", "mountain view", "seaside", "suburban", "landscaped"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "aerial", "lifestyle"]
+  },
+  "rooms": {
+    "objects": ["room", "bedroom", "living space", "attic room", "basement room", "guest room", "dormitory", "shared room", "ensuite", "studio room"],
+    "contexts": ["cozy bedroom", "shared apartment", "furnished room", "student housing", "city center", "neighborhood street", "sunny window", "minimalist decor"],
+    "styles": ["photography", "real estate", "interior design", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "garages": {
+    "objects": ["garage", "parking space", "carport", "underground parking", "garage box", "parking spot", "covered parking", "multi-level garage", "lock-up garage", "storage unit"],
+    "contexts": ["garage interior", "roller door", "parking building", "underground", "security gate", "residential complex", "automatic door", "well lit", "concrete floor"],
+    "styles": ["photography", "architectural", "industrial", "professional", "editorial", "documentary", "commercial"]
+  },
+  "land-plots": {
+    "objects": ["land", "plot", "lot", "acreage", "parcel", "building site", "greenfield", "landscape", "terrain", "property"],
+    "contexts": ["aerial view", "rural", "mountain", "coastal", "forest", "open field", "sunset", "surveyed", "undeveloped", "panoramic"],
+    "styles": ["photography", "landscape", "aerial", "professional", "editorial", "nature", "documentary"]
+  },
+  "other-real-estate": {
+    "objects": ["property", "real estate", "investment property", "multi-family", "mixed use", "complex", "building", "development site", "parking lot", "infrastructure"],
+    "contexts": ["construction site", "real estate development", "city skyline", "property sign", "agent showing", "key handover", "modern building", "urban landscape"],
+    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "commercial", "documentary"]
+  },
+  "offices": {
+    "objects": ["office", "coworking", "meeting room", "executive suite", "business center", "open plan office", "private office", "shared office", "conference room", "reception"],
+    "contexts": ["modern office", "business district", "downtown", "corporate interior", "desk setup", "waiting area", "glass facade", "conference table", "natural light"],
+    "styles": ["photography", "corporate", "architectural", "professional", "editorial", "commercial", "minimalist"]
+  },
+  "flex-space": {
+    "objects": ["flex space", "mixed use space", "workshop", "showroom", "studio", "maker space", "converted space", "multi-purpose room", "open floor", "creative space"],
+    "contexts": ["open interior", "high ceiling", "industrial chic", "concrete walls", "warehouse conversion", "large windows", "exposed brick", "bright space"],
+    "styles": ["photography", "architectural", "industrial", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "retail-spaces": {
+    "objects": ["retail space", "storefront", "shop", "boutique", "showroom", "kiosk", "restaurant space", "cafe space", "salon", "gallery"],
+    "contexts": ["high street", "shopping center", "shop window", "commercial street", "pedestrian zone", "store interior", "display shelves", "modern facade"],
+    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "lifestyle", "retail"]
+  },
+  "warehouses": {
+    "objects": ["warehouse", "storage facility", "industrial unit", "logistics center", "distribution center", "depot", "cold storage", "factory", "workshop", "loading bay"],
+    "contexts": ["warehouse interior", "high shelving", "loading dock", "industrial area", "logistics hub", "open floor", "metal racking", "concrete floor", "roll up door"],
+    "styles": ["photography", "industrial", "architectural", "professional", "editorial", "commercial", "documentary"]
+  },
+  "commercial-land": {
+    "objects": ["commercial land", "business park", "industrial plot", "retail plot", "development site", "commercial lot", "mixed use site", "investment land", "corner lot", "prime location"],
+    "contexts": ["aerial view", "business district", "highway frontage", "urban development", "cleared lot", "survey markers", "road access", "sunrise", "city outskirts"],
+    "styles": ["photography", "aerial", "landscape", "professional", "editorial", "commercial", "architectural"]
+  }
+}

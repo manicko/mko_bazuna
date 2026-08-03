@@ -1,152 +1,6145 @@
 {
-  "kvartiry": {
-    "objects": ["apartment", "flat", "studio", "condo", "penthouse", "loft", "duplex", "townhouse", "bachelor", "maisonette"],
-    "contexts": ["interior", "living room", "modern design", "renovated", "furnished", "bright", "cozy", "minimalist", "open plan", "natural light"],
-    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "lifestyle", "interior design"]
+  "apartments": {
+    "objects": [
+      "apartment",
+      "flat",
+      "studio",
+      "condo",
+      "penthouse",
+      "loft",
+      "duplex",
+      "bachelor",
+      "maisonette",
+      "townhouse"
+    ],
+    "contexts": [
+      "interior",
+      "living room",
+      "modern design",
+      "renovated",
+      "furnished",
+      "bright",
+      "cozy",
+      "open plan",
+      "natural light",
+      "city view"
+    ],
+    "styles": [
+      "photography",
+      "real estate",
+      "architectural",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "interior design"
+    ]
   },
-  "doma": {
-    "objects": ["house", "cottage", "villa", "bungalow", "chalet", "mansion", "farmhouse", "townhouse", "cabin", "estate"],
-    "contexts": ["exterior", "front facade", "garden", "swimming pool", "backyard", "residential neighborhood", "mountain view", "seaside", "suburban", "landscaped"],
-    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "aerial", "lifestyle"]
+  "houses": {
+    "objects": [
+      "house",
+      "villa",
+      "cottage",
+      "bungalow",
+      "mansion",
+      "farmhouse",
+      "chalet",
+      "cabin",
+      "estate",
+      "residence"
+    ],
+    "contexts": [
+      "exterior",
+      "front facade",
+      "garden",
+      "swimming pool",
+      "backyard",
+      "residential neighborhood",
+      "mountain view",
+      "seaside",
+      "suburban",
+      "landscaped"
+    ],
+    "styles": [
+      "photography",
+      "real estate",
+      "architectural",
+      "professional",
+      "editorial",
+      "aerial",
+      "lifestyle"
+    ]
   },
-  "kommercheskaya": {
-    "objects": ["office", "retail space", "warehouse", "storefront", "showroom", "coworking", "restaurant space", "industrial unit", "commercial building", "workshop"],
-    "contexts": ["commercial district", "business park", "downtown", "high street", "open plan office", "reception area", "meeting room", "street level", "mixed use", "modern facade"],
-    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "corporate", "minimalist"]
+  "rooms": {
+    "objects": [
+      "room",
+      "bedroom",
+      "living space",
+      "attic room",
+      "basement room",
+      "guest room",
+      "dormitory",
+      "shared room",
+      "ensuite",
+      "studio room"
+    ],
+    "contexts": [
+      "cozy bedroom",
+      "shared apartment",
+      "furnished room",
+      "student housing",
+      "city center",
+      "neighborhood street",
+      "sunny window",
+      "minimalist decor"
+    ],
+    "styles": [
+      "photography",
+      "real estate",
+      "interior design",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
   },
-  "uchastki": {
-    "objects": ["land", "plot", "lot", "acreage", "parcel", "building site", "greenfield", "landscape", "terrain", "property"],
-    "contexts": ["aerial view", "rural", "mountain", "coastal", "forest", "open field", "sunset", "surveyed", "undeveloped", "panoramic"],
-    "styles": ["photography", "landscape", "aerial", "professional", "editorial", "nature", "documentary"]
+  "garages": {
+    "objects": [
+      "garage",
+      "parking space",
+      "carport",
+      "underground parking",
+      "garage box",
+      "parking spot",
+      "covered parking",
+      "multi-level garage",
+      "lock-up garage",
+      "storage unit"
+    ],
+    "contexts": [
+      "garage interior",
+      "roller door",
+      "parking building",
+      "underground",
+      "security gate",
+      "residential complex",
+      "automatic door",
+      "well lit",
+      "concrete floor"
+    ],
+    "styles": [
+      "photography",
+      "architectural",
+      "industrial",
+      "professional",
+      "editorial",
+      "documentary",
+      "commercial"
+    ]
   },
-  "avtomobili": {
-    "objects": ["car", "sedan", "SUV", "hatchback", "convertible", "coupe", "wagon", "pickup truck", "minivan", "electric vehicle"],
-    "contexts": ["showroom", "studio lighting", "street parking", "highway", "city street", "dealership", "garage", "sunset", "mountain road", "urban backdrop"],
-    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  "land-plots": {
+    "objects": [
+      "land",
+      "plot",
+      "lot",
+      "acreage",
+      "parcel",
+      "building site",
+      "greenfield",
+      "landscape",
+      "terrain",
+      "property"
+    ],
+    "contexts": [
+      "aerial view",
+      "rural",
+      "mountain",
+      "coastal",
+      "forest",
+      "open field",
+      "sunset",
+      "surveyed",
+      "undeveloped",
+      "panoramic"
+    ],
+    "styles": [
+      "photography",
+      "landscape",
+      "aerial",
+      "professional",
+      "editorial",
+      "nature",
+      "documentary"
+    ]
   },
-  "mototsikly": {
-    "objects": ["motorcycle", "scooter", "cruiser", "sport bike", "dirt bike", "chopper", "moped", "touring bike", "naked bike", "enduro"],
-    "contexts": ["open road", "garage", "studio lighting", "curvy mountain road", "city street", "track day", "parking lot", "sunset ride", "urban backdrop"],
-    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "action"]
+  "other-real-estate": {
+    "objects": [
+      "property",
+      "real estate",
+      "investment property",
+      "multi-family",
+      "mixed use",
+      "complex",
+      "building",
+      "development site",
+      "parking lot",
+      "infrastructure"
+    ],
+    "contexts": [
+      "construction site",
+      "real estate development",
+      "city skyline",
+      "property sign",
+      "agent showing",
+      "key handover",
+      "modern building",
+      "urban landscape"
+    ],
+    "styles": [
+      "photography",
+      "real estate",
+      "architectural",
+      "professional",
+      "editorial",
+      "commercial",
+      "documentary"
+    ]
   },
-  "vodnyy": {
-    "objects": ["boat", "yacht", "speedboat", "sailboat", "dinghy", "catamaran", "fishing boat", "RIB", "motorboat", "kayak"],
-    "contexts": ["marina", "open sea", "sunset on water", "harbor", "coastline", "lake", "mooring", "dock", "anchored", "blue water"],
-    "styles": ["photography", "maritime", "lifestyle", "professional", "editorial", "aerial", "travel"]
+  "offices": {
+    "objects": [
+      "office",
+      "coworking",
+      "meeting room",
+      "executive suite",
+      "business center",
+      "open plan office",
+      "private office",
+      "shared office",
+      "conference room",
+      "reception"
+    ],
+    "contexts": [
+      "modern office",
+      "business district",
+      "downtown",
+      "corporate interior",
+      "desk setup",
+      "waiting area",
+      "glass facade",
+      "conference table",
+      "natural light"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "architectural",
+      "professional",
+      "editorial",
+      "commercial",
+      "minimalist"
+    ]
   },
-  "zapchasti": {
-    "objects": ["engine", "brake disc", "spark plug", "car tire", "shock absorber", "exhaust pipe", "headlight", "transmission", "radiator", "battery", "steering wheel", "rim"],
-    "contexts": ["workshop", "garage", "workbench", "white background", "tool layout", "mechanical", "repair shop", "close up", "organized shelf"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "macro"]
+  "flex-space": {
+    "objects": [
+      "flex space",
+      "mixed use space",
+      "workshop",
+      "showroom",
+      "studio",
+      "maker space",
+      "converted space",
+      "multi-purpose room",
+      "open floor",
+      "creative space"
+    ],
+    "contexts": [
+      "open interior",
+      "high ceiling",
+      "industrial chic",
+      "concrete walls",
+      "warehouse conversion",
+      "large windows",
+      "exposed brick",
+      "bright space"
+    ],
+    "styles": [
+      "photography",
+      "architectural",
+      "industrial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
   },
-  "telefony": {
-    "objects": ["smartphone", "mobile phone", "tablet", "iPhone", "phone case", "smartwatch", "wearable", "earbuds", "charging dock", "power bank"],
-    "contexts": ["white background", "workspace", "wooden desk", "hands holding", "coffee shop", "studio lighting", "flat lay", "lifestyle setting", "minimalist"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  "retail-spaces": {
+    "objects": [
+      "retail space",
+      "storefront",
+      "shop",
+      "boutique",
+      "showroom",
+      "kiosk",
+      "restaurant space",
+      "cafe space",
+      "salon",
+      "gallery"
+    ],
+    "contexts": [
+      "high street",
+      "shopping center",
+      "shop window",
+      "commercial street",
+      "pedestrian zone",
+      "store interior",
+      "display shelves",
+      "modern facade"
+    ],
+    "styles": [
+      "photography",
+      "commercial",
+      "architectural",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "retail"
+    ]
   },
-  "kompyutery": {
-    "objects": ["laptop", "desktop computer", "monitor", "keyboard", "mouse", "workstation", "notebook", "imac", "gaming pc", "ultrabook"],
-    "contexts": ["office desk", "coworking space", "home office", "wooden desk", "minimalist setup", "dual monitor", "coffee shop", "studio lighting", "workspace", "modern interior"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  "warehouses": {
+    "objects": [
+      "warehouse",
+      "storage facility",
+      "industrial unit",
+      "logistics center",
+      "distribution center",
+      "depot",
+      "cold storage",
+      "factory",
+      "workshop",
+      "loading bay"
+    ],
+    "contexts": [
+      "warehouse interior",
+      "high shelving",
+      "loading dock",
+      "industrial area",
+      "logistics hub",
+      "open floor",
+      "metal racking",
+      "concrete floor",
+      "roll up door"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "architectural",
+      "professional",
+      "editorial",
+      "commercial",
+      "documentary"
+    ]
   },
-  "foto": {
-    "objects": ["camera", "DSLR", "mirrorless camera", "lens", "tripod", "action camera", "drone", "gimbal", "light meter", "camera bag", "flash", "microphone"],
-    "contexts": ["studio", "travel backpack", "outdoor shooting", "wooden table", "equipment layout", "photographer hands", "nature backdrop", "minimalist arrangement"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "equipment"]
+  "commercial-land": {
+    "objects": [
+      "commercial land",
+      "business park",
+      "industrial plot",
+      "retail plot",
+      "development site",
+      "commercial lot",
+      "mixed use site",
+      "investment land",
+      "corner lot",
+      "prime location"
+    ],
+    "contexts": [
+      "aerial view",
+      "business district",
+      "highway frontage",
+      "urban development",
+      "cleared lot",
+      "survey markers",
+      "road access",
+      "sunrise",
+      "city outskirts"
+    ],
+    "styles": [
+      "photography",
+      "aerial",
+      "landscape",
+      "professional",
+      "editorial",
+      "commercial",
+      "architectural"
+    ]
   },
-  "bytovaya": {
-    "objects": ["refrigerator", "washing machine", "dishwasher", "oven", "microwave", "vacuum cleaner", "air conditioner", "kettle", "toaster", "coffee machine", "fridge", "stove"],
-    "contexts": ["modern kitchen", "laundry room", "studio lighting", "white background", "showroom", "minimalist interior", "smart home", "open plan kitchen", "clean design"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  "cars": {
+    "objects": [
+      "sedan",
+      "SUV",
+      "hatchback",
+      "convertible",
+      "coupe",
+      "wagon",
+      "pickup truck",
+      "minivan",
+      "electric vehicle",
+      "sports car",
+      "limousine",
+      "crossover",
+      "muscle car",
+      "compact car",
+      "luxury sedan"
+    ],
+    "contexts": [
+      "showroom",
+      "studio lighting",
+      "street parking",
+      "highway",
+      "city street",
+      "dealership",
+      "garage",
+      "sunset",
+      "mountain road",
+      "urban backdrop"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
   },
-  "stroitelstvo": {
-    "objects": ["construction site", "building under construction", "crane", "scaffolding", "tools", "renovation", "blueprint", "hard hat", "drill", "power tools", "work gloves", "toolbox"],
-    "contexts": ["construction site", "workshop", "sunset building", "modern architecture", "workbench", "raw interior", "under renovation", "building facade", "urban development"],
-    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "lifestyle"]
+  "motorcycles-sub": {
+    "objects": [
+      "motorcycle",
+      "cruiser",
+      "sport bike",
+      "dirt bike",
+      "chopper",
+      "touring bike",
+      "naked bike",
+      "enduro",
+      "adventure bike",
+      "cafe racer",
+      "dual sport",
+      "electric motorcycle"
+    ],
+    "contexts": [
+      "open road",
+      "garage",
+      "studio lighting",
+      "curvy mountain road",
+      "city street",
+      "track day",
+      "parking lot",
+      "sunset ride",
+      "urban backdrop",
+      "off road trail"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "action"
+    ]
   },
-  "krasota": {
-    "objects": ["makeup brush", "lipstick", "skincare bottle", "perfume", "face cream", "hair dryer", "mirror", "manicure", "cosmetics", "serum", "moisturizer", "eye shadow"],
-    "contexts": ["bathroom vanity", "dressing table", "studio lighting", "flat lay", "white background", "natural light", "marble surface", "spa setting", "minimalist", "luxury"],
-    "styles": ["photography", "beauty", "studio", "professional", "editorial", "lifestyle", "fashion"]
+  "scooters": {
+    "objects": [
+      "scooter",
+      "Vespa",
+      "electric scooter",
+      "moped",
+      "kick scooter",
+      "motor scooter",
+      "maxi scooter",
+      "three wheel scooter",
+      "commuter scooter",
+      "retro scooter"
+    ],
+    "contexts": [
+      "city street",
+      "urban sidewalk",
+      "parking lot",
+      "studio lighting",
+      "cobblestone street",
+      "beach promenade",
+      "garage",
+      "sunny day",
+      "old town",
+      "modern building"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "studio",
+      "lifestyle",
+      "editorial",
+      "travel",
+      "urban"
+    ]
   },
-  "obrazovanie": {
-    "objects": ["books", "laptop", "notebook", "pen", "desk", "blackboard", "pencil", "textbook", "diploma", "glasses", "backpack", "schedule"],
-    "contexts": ["classroom", "library", "study desk", "coworking space", "home office", "university campus", "quiet corner", "natural light", "minimalist study"],
-    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "educational", "corporate"]
+  "bicycles": {
+    "objects": [
+      "mountain bike",
+      "road bike",
+      "city bike",
+      "electric bicycle",
+      "hybrid bike",
+      "BMX",
+      "cruiser bike",
+      "folding bike",
+      "gravel bike",
+      "kids bike",
+      "cargo bike",
+      "fat bike",
+      "fixie",
+      "touring bike",
+      "cyclocross"
+    ],
+    "contexts": [
+      "mountain trail",
+      "city park",
+      "bike lane",
+      "forest path",
+      "coastal road",
+      "garage",
+      "studio lighting",
+      "sunset ride",
+      "urban street",
+      "gravel road"
+    ],
+    "styles": [
+      "photography",
+      "sports",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "action",
+      "travel"
+    ]
   },
-  "yuridicheskie": {
-    "objects": ["gavel", "law book", "contract", "briefcase", "scales of justice", "pen", "glasses", "laptop", "documents", "stamp", "folder", "badge"],
-    "contexts": ["office desk", "law library", "courtroom", "conference room", "wood paneled office", "formal meeting", "leather chair", "desk lamp", "professional setting"],
-    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "formal", "studio"]
+  "scooters-scooters": {
+    "objects": [
+      "moped",
+      "electric moped",
+      "gas moped",
+      "vintage moped",
+      "scooter moped",
+      "two stroke moped",
+      "classic moped",
+      "restored moped",
+      "commuter moped",
+      "retro moped"
+    ],
+    "contexts": [
+      "city street",
+      "garage",
+      "studio lighting",
+      "urban alley",
+      "parking spot",
+      "old town",
+      "workshop",
+      "sunset",
+      "courtyard",
+      "sidewalk"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "studio",
+      "lifestyle",
+      "editorial",
+      "retro",
+      "urban"
+    ]
   },
-  "vakansii": {
-    "objects": ["laptop", "coffee cup", "notebook", "smartphone", "desk", "pen", "keyboard", "diary", "planner", "office chair", "headset", "briefcase"],
-    "contexts": ["office desk", "meeting room", "home office", "coworking space", "reception area", "open plan office", "glass building", "corridor", "modern workplace"],
-    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "lifestyle", "commercial"]
+  "trucks-sub": {
+    "objects": [
+      "truck",
+      "box truck",
+      "flatbed truck",
+      "dump truck",
+      "semi truck",
+      "delivery truck",
+      "cargo truck",
+      "tow truck",
+      "refrigerated truck",
+      "tipper truck",
+      "tanker truck",
+      "pickup truck"
+    ],
+    "contexts": [
+      "highway",
+      "construction site",
+      "warehouse dock",
+      "industrial area",
+      "city street",
+      "truck stop",
+      "loading bay",
+      "logistics center",
+      "open road",
+      "dealership lot"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "industrial",
+      "professional",
+      "editorial",
+      "commercial",
+      "documentary"
+    ]
   },
-  "rezyume": {
-    "objects": ["laptop", "resume", "coffee cup", "notebook", "smartphone", "pen", "desk", "glasses", "portfolio", "folder", "planner", "business card"],
-    "contexts": ["office desk", "coffee shop", "home office", "coworking space", "study desk", "modern interior", "natural light", "workspace", "minimalist"],
-    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "lifestyle", "studio"]
+  "agricultural-machinery": {
+    "objects": [
+      "tractor",
+      "combine harvester",
+      "plow",
+      "cultivator",
+      "baler",
+      "sprayer",
+      "seeder",
+      "forage harvester",
+      "telehandler",
+      "farm trailer",
+      "tiller",
+      "irrigation system",
+      "hay rake",
+      "manure spreader",
+      "front loader"
+    ],
+    "contexts": [
+      "farm field",
+      "sunset harvest",
+      "barn",
+      "rural landscape",
+      "cultivated land",
+      "wheat field",
+      "green pasture",
+      "workshop",
+      "open countryside",
+      "autumn harvest"
+    ],
+    "styles": [
+      "photography",
+      "agricultural",
+      "editorial",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "landscape"
+    ]
   },
-  "sobaki": {
-    "objects": ["dog", "puppy", "labrador", "golden retriever", "German shepherd", "poodle", "beagle", "bulldog", "husky", "chihuahua"],
-    "contexts": ["park", "beach", "grass field", "sunset walk", "city street", "forest trail", "backyard", "dog owner playing", "mountain hike", "cozy home"],
-    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "outdoor", "candid"]
+  "commercial-vehicles": {
+    "objects": [
+      "van",
+      "cargo van",
+      "passenger van",
+      "minibus",
+      "delivery van",
+      "panel van",
+      "refrigerated van",
+      "box van",
+      "pickup",
+      "utility vehicle",
+      "ambulance",
+      "police van",
+      "shuttle bus",
+      "work van",
+      "eurocargo"
+    ],
+    "contexts": [
+      "city delivery",
+      "warehouse",
+      "commercial street",
+      "loading area",
+      "fleet parking",
+      "business district",
+      "highway",
+      "urban street",
+      "worksite",
+      "logistics hub"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "commercial",
+      "professional",
+      "editorial",
+      "industrial",
+      "documentary"
+    ]
   },
-  "koshki": {
-    "objects": ["cat", "kitten", "Persian cat", "Maine Coon", "Siamese cat", "British shorthair", "ragdoll", "Bengal cat", "Scottish fold", "tabby cat"],
-    "contexts": ["sunny windowsill", "cozy sofa", "cat owner cuddling", "garden", "bedroom", "warm blanket", "bookshelf", "cat tree", "morning light", "relaxed home"],
-    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "studio", "candid"]
+  "campers": {
+    "objects": [
+      "campervan",
+      "motorhome",
+      "RV",
+      "travel trailer",
+      "fifth wheel",
+      "pop up camper",
+      "truck camper",
+      "conversion van",
+      "camper shell",
+      "teardrop trailer",
+      "class A motorhome",
+      "class B van",
+      "class C motorhome",
+      "off road camper",
+      "vintage camper"
+    ],
+    "contexts": [
+      "mountain campsite",
+      "lakeside",
+      "forest clearing",
+      "ocean view",
+      "campground",
+      "sunset road",
+      "national park",
+      "open highway",
+      "pine forest",
+      "desert landscape"
+    ],
+    "styles": [
+      "photography",
+      "travel",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "adventure",
+      "documentary"
+    ]
   },
-  "mebel": {
-    "objects": ["sofa", "table", "chair", "bed", "wardrobe", "bookshelf", "dining table", "armchair", "desk", "coffee table", "dresser", "lamp"],
-    "contexts": ["modern living room", "minimalist interior", "cozy bedroom", "dining area", "open plan", "showroom", "natural light", "scandinavian design", "industrial loft", "bright space"],
-    "styles": ["photography", "interior design", "architectural", "professional", "editorial", "lifestyle", "minimalist"]
+  "boats-yachts": {
+    "objects": [
+      "yacht",
+      "sailboat",
+      "motor yacht",
+      "superyacht",
+      "catamaran",
+      "luxury yacht",
+      "cruising yacht",
+      "gulets",
+      "ketch",
+      "sloop",
+      "schooner",
+      "cabin cruiser",
+      "fishing yacht",
+      "sport yacht",
+      "expedition yacht"
+    ],
+    "contexts": [
+      "marina",
+      "open sea",
+      "sunset on water",
+      "harbor",
+      "coastline",
+      "bay",
+      "mooring",
+      "dock",
+      "anchored",
+      "blue water",
+      "luxury port",
+      "Adriatic sea"
+    ],
+    "styles": [
+      "photography",
+      "maritime",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "aerial",
+      "travel"
+    ]
   },
-  "odezhda": {
-    "objects": ["jacket", "jeans", "dress", "shoes", "t-shirt", "sneakers", "coat", "sweater", "boots", "suit", "scarf", "bag", "hat", "watch"],
-    "contexts": ["white background", "studio lighting", "urban street", "fashion shoot", "minimalist", "outdoor", "mannequin", "hanger", "flat lay", "natural light"],
-    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  "motorboats": {
+    "objects": [
+      "speedboat",
+      "motorboat",
+      "RIB",
+      "fishing boat",
+      "bowrider",
+      "center console",
+      "cuddy cabin",
+      "deck boat",
+      "offshore boat",
+      "runabout",
+      "ski boat",
+      "pontoon boat",
+      "aluminum boat",
+      "bass boat",
+      "bay boat"
+    ],
+    "contexts": [
+      "marina",
+      "open sea",
+      "coastal waters",
+      "lake",
+      "river",
+      "speed on water",
+      "docking",
+      "sunset cruise",
+      "fishing trip",
+      "water sports"
+    ],
+    "styles": [
+      "photography",
+      "maritime",
+      "action",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "travel"
+    ]
   },
-  "detskie": {
-    "objects": ["baby crib", "stroller", "toy", "high chair", "baby clothes", "diaper bag", "plush toy", "mobile", "baby shoes", "blocks", "bottle", "pacifier"],
-    "contexts": ["nursery", "bright room", "play mat", "soft lighting", "pastel colors", "children room", "wooden floor", "minimalist nursery", "sunny window", "cozy corner"],
-    "styles": ["photography", "lifestyle", "studio", "professional", "editorial", "family", "soft"]
+  "sailing-boats": {
+    "objects": [
+      "sailboat",
+      "yacht",
+      "sloop",
+      "catamaran",
+      "ketch",
+      "schooner",
+      "dinghy",
+      "daysailer",
+      "trimaran",
+      "cutter",
+      "yawl",
+      "offshore racer",
+      "cruising sailboat",
+      "classic sailboat",
+      "wooden sailboat"
+    ],
+    "contexts": [
+      "marina",
+      "open ocean",
+      "calm sea",
+      "sunset sailing",
+      "harbor",
+      "coastal breeze",
+      "race start",
+      "anchored bay",
+      "blue water",
+      "island view"
+    ],
+    "styles": [
+      "photography",
+      "maritime",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "aerial",
+      "documentary"
+    ]
   },
-  "sport": {
-    "objects": ["bicycle", "dumbbells", "yoga mat", "running shoes", "tennis racket", "football", "basketball", "kayak", "hiking boots", "tent", "skis", "surfboard", "jump rope", "fitness tracker"],
-    "contexts": ["gym", "outdoor trail", "beach", "mountain", "stadium", "park", "home gym", "sunset workout", "track", "lake"],
-    "styles": ["photography", "sports", "action", "professional", "editorial", "lifestyle", "outdoor"]
+  "personal-watercraft": {
+    "objects": [
+      "jet ski",
+      "personal watercraft",
+      "wave runner",
+      "sea doo",
+      "stand up jet ski",
+      "luxury watercraft",
+      "sport watercraft",
+      "touring watercraft",
+      "electric watercraft",
+      "kid friendly watercraft"
+    ],
+    "contexts": [
+      "ocean waves",
+      "lake splash",
+      "coastal ride",
+      "water sports",
+      "summer day",
+      "beach",
+      "speed on water",
+      "sunset ride",
+      "marina departure",
+      "azure water"
+    ],
+    "styles": [
+      "photography",
+      "action",
+      "lifestyle",
+      "sports",
+      "editorial",
+      "travel",
+      "commercial"
+    ]
   },
-  "nedvizhimost": {
-    "objects": ["building", "skyline", "new development", "residential complex", "high rise", "neighborhood", "cityscape", "construction crane", "property sign", "facade"],
-    "contexts": ["city skyline", "sunset panorama", "aerial view", "urban landscape", "downtown", "residential area", "modern architecture", "construction site", "birds eye view", "golden hour"],
-    "styles": ["photography", "real estate", "architectural", "professional", "editorial", "aerial", "commercial"]
+  "parts": {
+    "objects": [
+      "engine",
+      "brake disc",
+      "spark plug",
+      "shock absorber",
+      "exhaust pipe",
+      "headlight",
+      "transmission",
+      "radiator",
+      "battery",
+      "steering wheel",
+      "alternator",
+      "starter motor",
+      "clutch kit",
+      "fuel pump",
+      "timing belt"
+    ],
+    "contexts": [
+      "workshop",
+      "garage",
+      "workbench",
+      "white background",
+      "tool layout",
+      "mechanical",
+      "repair shop",
+      "close up",
+      "organized shelf",
+      "auto parts store"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technical",
+      "macro"
+    ]
   },
-  "transport": {
-    "objects": ["car", "motorcycle", "boat", "bicycle", "scooter", "truck", "SUV", "yacht", "van", "electric scooter"],
-    "contexts": ["highway", "city street", "marina", "garage", "open road", "mountain pass", "urban traffic", "sunset drive", "parking garage", "dealership"],
-    "styles": ["photography", "automotive", "lifestyle", "professional", "editorial", "travel", "commercial"]
+  "tires-wheels": {
+    "objects": [
+      "car tire",
+      "alloy wheel",
+      "steel rim",
+      "winter tire",
+      "summer tire",
+      "all season tire",
+      "rim",
+      "hubcap",
+      "tire set",
+      "spare tire",
+      "off road tire",
+      "performance tire",
+      "truck tire",
+      "motorcycle tire",
+      "valve stem"
+    ],
+    "contexts": [
+      "garage",
+      "tire shop",
+      "white background",
+      "studio lighting",
+      "warehouse",
+      "showroom",
+      "workshop floor",
+      "tire rack",
+      "wheel alignment",
+      "display stand"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technical",
+      "commercial"
+    ]
   },
-  "elektronika": {
-    "objects": ["smartphone", "laptop", "tablet", "smartwatch", "headphones", "camera", "speaker", "monitor", "keyboard", "drone"],
-    "contexts": ["workspace", "white background", "studio lighting", "wooden desk", "flat lay", "modern interior", "coffee shop", "home office", "minimalist", "technology setup"],
-    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  "auto-accessories": {
+    "objects": [
+      "seat cover",
+      "floor mat",
+      "steering wheel cover",
+      "phone holder",
+      "sun shade",
+      "car charger",
+      "dashboard cover",
+      "window visor",
+      "bumper protector",
+      "side mirror",
+      "license plate frame",
+      "gear shifter knob",
+      "car cover",
+      "cup holder",
+      "trunk organizer"
+    ],
+    "contexts": [
+      "car interior",
+      "dashboard",
+      "studio lighting",
+      "white background",
+      "showroom",
+      "garage",
+      "flat lay",
+      "drivers seat",
+      "retail display",
+      "product shelf"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
   },
-  "uslugi": {
-    "objects": ["laptop", "calendar", "smartphone", "notebook", "pen", "glasses", "coffee cup", "desk", "handshake", "meeting table", "planner", "briefcase"],
-    "contexts": ["modern office", "conference room", "coffee shop meeting", "coworking space", "professional desk", "glass building", "reception", "business district", "consultation", "formal setting"],
-    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "studio"]
+  "auto-tools": {
+    "objects": [
+      "wrench set",
+      "screwdriver set",
+      "socket set",
+      "jack stand",
+      "oil filter wrench",
+      "multimeter",
+      "car jack",
+      "diagnostic scanner",
+      "ratchet set",
+      "tire inflator",
+      "jump starter",
+      "tool box",
+      "breaker bar",
+      "torque wrench",
+      "pliers set"
+    ],
+    "contexts": [
+      "workshop",
+      "garage bench",
+      "tool chest",
+      "white background",
+      "mechanical work",
+      "tool layout",
+      "repair shop",
+      "studio lighting",
+      "organized tools",
+      "professional garage"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technical",
+      "industrial"
+    ]
   },
-  "rabota": {
-    "objects": ["laptop", "desk", "office chair", "coffee cup", "notebook", "smartphone", "pen", "headset", "briefcase", "clock", "diary", "badge"],
-    "contexts": ["open plan office", "home office", "meeting room", "reception", "coworking space", "modern workspace", "city view", "corporate hallway", "morning routine", "professional setting"],
-    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "commercial"]
+  "auto-equipment": {
+    "objects": [
+      "car lift",
+      "tire changer",
+      "wheel balancer",
+      "compressor",
+      "paint gun",
+      "welder",
+      "engine crane",
+      "parts washer",
+      "diagnostic equipment",
+      "smoke machine",
+      "hydraulic press",
+      "brake lathe",
+      "battery charger",
+      "work light",
+      "extraction system"
+    ],
+    "contexts": [
+      "auto workshop",
+      "professional garage",
+      "service center",
+      "studio lighting",
+      "mechanical bay",
+      "repair facility",
+      "white background",
+      "industrial setting",
+      "tool layout",
+      "equipment showroom"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "industrial",
+      "professional",
+      "editorial",
+      "technical",
+      "commercial"
+    ]
   },
-  "zhivotnye": {
-    "objects": ["dog", "cat", "puppy", "kitten", "dog owner", "cat owner", "golden retriever", "labrador", "Persian cat", "Maine Coon"],
-    "contexts": ["park", "beach", "sunny home", "garden", "sunset walk", "grass field", "cozy sofa", "forest trail", "owner playing", "morning light"],
-    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "outdoor", "candid"]
+  "oils-chemicals": {
+    "objects": [
+      "motor oil",
+      "coolant",
+      "brake fluid",
+      "transmission fluid",
+      "windshield washer",
+      "engine cleaner",
+      "oil additive",
+      "fuel additive",
+      "grease",
+      "antifreeze",
+      "power steering fluid",
+      "rust remover",
+      "degreaser",
+      "paint",
+      "lubricant spray"
+    ],
+    "contexts": [
+      "garage shelf",
+      "workshop bench",
+      "white background",
+      "studio lighting",
+      "auto parts store",
+      "product display",
+      "flat lay",
+      "packaging shot",
+      "retail shelf",
+      "professional workshop"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "commercial",
+      "technical"
+    ]
+  },
+  "anti-theft": {
+    "objects": [
+      "car alarm",
+      "steering wheel lock",
+      "GPS tracker",
+      "immobilizer",
+      "locking lug nuts",
+      "disklok",
+      "pedal lock",
+      "hood lock",
+      "kill switch",
+      "siren",
+      "motion sensor",
+      "camera system",
+      "window etching",
+      "VIN etching",
+      "tilt sensor"
+    ],
+    "contexts": [
+      "car interior",
+      "dashboard install",
+      "workshop bench",
+      "white background",
+      "studio lighting",
+      "security showroom",
+      "garage install",
+      "professional fitment",
+      "product packaging",
+      "flat lay"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technical",
+      "commercial"
+    ]
+  },
+  "gps-navigators": {
+    "objects": [
+      "GPS navigator",
+      "car GPS",
+      "portable GPS",
+      "GPS tracker",
+      "navigation system",
+      "dashboard GPS",
+      "marine GPS",
+      "handheld GPS",
+      "GPS antenna",
+      "navigation screen",
+      "touchscreen GPS",
+      "GPS mount",
+      "power cord",
+      "SD card GPS",
+      "GPS module"
+    ],
+    "contexts": [
+      "car dashboard",
+      "windshield mount",
+      "studio lighting",
+      "white background",
+      "navigation screen",
+      "road trip",
+      "route display",
+      "map view",
+      "professional install",
+      "sunny drive"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technology",
+      "commercial"
+    ]
+  },
+  "auto-audio-video": {
+    "objects": [
+      "car stereo",
+      "speaker",
+      "subwoofer",
+      "amplifier",
+      "head unit",
+      "touch screen radio",
+      "bluetooth receiver",
+      "car monitor",
+      "sound system",
+      "tweeter",
+      "woofer",
+      "crossover",
+      "equalizer",
+      "dash cam",
+      "rear view camera"
+    ],
+    "contexts": [
+      "car interior",
+      "dashboard install",
+      "studio lighting",
+      "white background",
+      "audio showroom",
+      "workshop install",
+      "custom setup",
+      "flat lay",
+      "professional fitment",
+      "retail display"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technology",
+      "lifestyle"
+    ]
+  },
+  "roof-boxes-hitches": {
+    "objects": [
+      "roof box",
+      "roof rack",
+      "tow bar",
+      "trailer hitch",
+      "bike rack",
+      "ski rack",
+      "roof basket",
+      "cargo carrier",
+      "hitch receiver",
+      "roof bars",
+      "cross bars",
+      "thule box",
+      "folding hitch",
+      "hitch ball",
+      "roof pod"
+    ],
+    "contexts": [
+      "car roof",
+      "garage install",
+      "studio lighting",
+      "white background",
+      "outdoor setup",
+      "road trip ready",
+      "showroom display",
+      "professional install",
+      "product packaging",
+      "mounting hardware"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "trailers": {
+    "objects": [
+      "utility trailer",
+      "boat trailer",
+      "horse trailer",
+      "cargo trailer",
+      "flatbed trailer",
+      "enclosed trailer",
+      "dump trailer",
+      "car trailer",
+      "motorcycle trailer",
+      "livestock trailer",
+      "tilt trailer",
+      "equipment trailer",
+      "landscape trailer",
+      "water trailer",
+      "tandem axle trailer"
+    ],
+    "contexts": [
+      "parking lot",
+      "garage",
+      "open field",
+      "highway",
+      "dealership lot",
+      "workshop",
+      "tow vehicle",
+      "storage yard",
+      "outdoor storage",
+      "campground"
+    ],
+    "styles": [
+      "photography",
+      "automotive",
+      "industrial",
+      "professional",
+      "editorial",
+      "documentary",
+      "commercial"
+    ]
+  },
+  "accessories": {
+    "objects": [
+      "watch strap",
+      "sunglasses",
+      "scarf",
+      "belt",
+      "wallet",
+      "keychain",
+      "hair clip",
+      "bracelet",
+      "brooch",
+      "gloves",
+      "tie",
+      "hat"
+    ],
+    "contexts": [
+      "white background",
+      "studio lighting",
+      "flat lay",
+      "wooden surface",
+      "fashion shoot",
+      "natural light",
+      "minimalist",
+      "velvet display",
+      "urban street style"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "appliances": {
+    "objects": [
+      "refrigerator",
+      "washing machine",
+      "dishwasher",
+      "oven",
+      "microwave",
+      "vacuum cleaner",
+      "air conditioner",
+      "kettle",
+      "toaster",
+      "coffee machine",
+      "blender",
+      "iron"
+    ],
+    "contexts": [
+      "modern kitchen",
+      "laundry room",
+      "white background",
+      "studio lighting",
+      "showroom",
+      "minimalist interior",
+      "smart home",
+      "clean design",
+      "open plan kitchen"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "audio-video": {
+    "objects": [
+      "headphones",
+      "speaker",
+      "soundbar",
+      "earbuds",
+      "turntable",
+      "home theater",
+      "microphone",
+      "amplifier",
+      "subwoofer",
+      "projector",
+      "receiver",
+      "cable set"
+    ],
+    "contexts": [
+      "studio lighting",
+      "wooden desk",
+      "minimalist setup",
+      "home office",
+      "dark background",
+      "neon glow",
+      "flat lay",
+      "workspace",
+      "lifestyle setting",
+      "music studio"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "bags-luggage": {
+    "objects": [
+      "suitcase",
+      "backpack",
+      "handbag",
+      "duffel bag",
+      "tote bag",
+      "travel bag",
+      "weekender",
+      "crossbody bag",
+      "clutch",
+      "luggage set",
+      "organizer pouch",
+      "shoulder bag"
+    ],
+    "contexts": [
+      "white background",
+      "airport lounge",
+      "travel flat lay",
+      "studio lighting",
+      "hotel room",
+      "street fashion",
+      "outdoor travel",
+      "minimalist",
+      "packing arrangement"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "travel",
+      "lifestyle"
+    ]
+  },
+  "bath-products": {
+    "objects": [
+      "shower gel",
+      "bath bomb",
+      "body lotion",
+      "shampoo",
+      "soap bar",
+      "bath salt",
+      "sponge",
+      "loofah",
+      "body oil",
+      "bathrobe",
+      "towel set",
+      "bath mat"
+    ],
+    "contexts": [
+      "bathroom shelf",
+      "spa setting",
+      "white background",
+      "flat lay",
+      "marble surface",
+      "natural light",
+      "bamboo tray",
+      "relaxation corner",
+      "studio lighting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "beauty",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "beauty-appliances": {
+    "objects": [
+      "hair dryer",
+      "hair straightener",
+      "curling iron",
+      "epilator",
+      "electric shaver",
+      "facial steamer",
+      "massage gun",
+      "hair clipper",
+      "nail dryer",
+      "led face mask",
+      "trimmer",
+      "scalp massager"
+    ],
+    "contexts": [
+      "white background",
+      "bathroom vanity",
+      "studio lighting",
+      "beauty salon",
+      "flat lay",
+      "closet shelf",
+      "marble counter",
+      "minimalist setup",
+      "pink backdrop"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "beauty",
+      "professional",
+      "editorial",
+      "commercial"
+    ]
+  },
+  "bed-linen": {
+    "objects": [
+      "bed sheet set",
+      "duvet cover",
+      "pillowcase",
+      "blanket",
+      "quilt",
+      "mattress topper",
+      "throw blanket",
+      "bedspread",
+      "fitted sheet",
+      "pillow set",
+      "bamboo sheet",
+      "flannel sheet"
+    ],
+    "contexts": [
+      "bright bedroom",
+      "hotel style bed",
+      "natural light",
+      "minimalist decor",
+      "soft focus",
+      "white linen",
+      "cozy interior",
+      "scandinavian style",
+      "rumpled bed"
+    ],
+    "styles": [
+      "photography",
+      "interior design",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "minimalist",
+      "studio"
+    ]
+  },
+  "books-magazines": {
+    "objects": [
+      "hardcover book",
+      "paperback",
+      "magazine",
+      "comic book",
+      "textbook",
+      "cookbook",
+      "art book",
+      "novel",
+      "encyclopedia",
+      "children book",
+      "calendar",
+      "journal"
+    ],
+    "contexts": [
+      "bookshelf",
+      "wooden desk",
+      "coffee table",
+      "library",
+      "flat lay",
+      "reading nook",
+      "natural light",
+      "stacked arrangement",
+      "vintage setting"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "minimalist",
+      "studio"
+    ]
+  },
+  "boys": {
+    "objects": [
+      "t shirt",
+      "jeans",
+      "jacket",
+      "sneakers",
+      "pajama set",
+      "sweater",
+      "shorts",
+      "hoodie",
+      "shirt",
+      "tracksuit",
+      "socks set",
+      "hat"
+    ],
+    "contexts": [
+      "white background",
+      "playroom",
+      "outdoor playground",
+      "hanger display",
+      "flat lay",
+      "kids bedroom",
+      "studio lighting",
+      "spring park",
+      "colorful setting"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "family"
+    ]
+  },
+  "cameras": {
+    "objects": [
+      "DSLR camera",
+      "mirrorless camera",
+      "lens",
+      "tripod",
+      "action camera",
+      "drone",
+      "gimbal",
+      "light meter",
+      "camera bag",
+      "flash",
+      "memory card",
+      "battery grip"
+    ],
+    "contexts": [
+      "studio",
+      "travel backpack",
+      "white background",
+      "outdoor shooting",
+      "wooden table",
+      "equipment layout",
+      "photographer hands",
+      "nature backdrop",
+      "minimalist arrangement"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "car-seats": {
+    "objects": [
+      "baby car seat",
+      "booster seat",
+      "infant carrier",
+      "car seat base",
+      "travel system",
+      "convertible seat",
+      "group 1 seat",
+      "group 2 seat",
+      "isofix base",
+      "sun shade",
+      "seat protector",
+      "belt adjuster"
+    ],
+    "contexts": [
+      "car interior",
+      "studio lighting",
+      "white background",
+      "family car",
+      "installation demo",
+      "parked car",
+      "showroom",
+      "rear seat",
+      "lifestyle setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "family"
+    ]
+  },
+  "care-hygiene": {
+    "objects": [
+      "baby lotion",
+      "diaper cream",
+      "baby oil",
+      "baby powder",
+      "wet wipes",
+      "baby wash",
+      "sunscreen",
+      "lip balm",
+      "hand sanitizer",
+      "toothpaste",
+      "baby shampoo",
+      "body spray"
+    ],
+    "contexts": [
+      "white background",
+      "bathroom shelf",
+      "flat lay",
+      "nursery",
+      "studio lighting",
+      "pastel backdrop",
+      "marble surface",
+      "minimalist",
+      "natural light"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "beauty",
+      "professional",
+      "editorial",
+      "lifestyle"
+    ]
+  },
+  "computers": {
+    "objects": [
+      "desktop computer",
+      "monitor",
+      "keyboard",
+      "mouse",
+      "workstation",
+      "gaming PC",
+      "all in one",
+      "computer case",
+      "graphics card",
+      "RAM module",
+      "SSD drive",
+      "cooling fan"
+    ],
+    "contexts": [
+      "office desk",
+      "gaming setup",
+      "home office",
+      "wooden desk",
+      "minimalist",
+      "dual monitor",
+      "RGB lighting",
+      "studio lighting",
+      "workspace",
+      "modern interior"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "technology",
+      "lifestyle"
+    ]
+  },
+  "costume-jewelry": {
+    "objects": [
+      "necklace",
+      "earrings",
+      "ring",
+      "bracelet",
+      "anklet",
+      "hair clip",
+      "brooch",
+      "cufflinks",
+      "choker",
+      "body chain",
+      "tiara",
+      "nose ring"
+    ],
+    "contexts": [
+      "white background",
+      "velvet display",
+      "studio lighting",
+      "fashion shoot",
+      "jewelry box",
+      "mannequin",
+      "natural light",
+      "flat lay",
+      "marble surface",
+      "luxury setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "feeding-products": {
+    "objects": [
+      "baby bottle",
+      "nipple",
+      "bottle warmer",
+      "sterilizer",
+      "sippy cup",
+      "baby bowl",
+      "baby spoon",
+      "high chair tray",
+      "breast pump",
+      "milk storage bag",
+      "burp cloth",
+      "pacifier"
+    ],
+    "contexts": [
+      "nursery",
+      "white background",
+      "kitchen counter",
+      "studio lighting",
+      "flat lay",
+      "pastel backdrop",
+      "parent hands",
+      "play mat",
+      "natural light"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "family"
+    ]
+  },
+  "food-products": {
+    "objects": [
+      "honey jar",
+      "olive oil",
+      "jam",
+      "cheese",
+      "dried herbs",
+      "spice mix",
+      "pasta",
+      "chocolate",
+      "snack pack",
+      "coffee beans",
+      "tea set",
+      "biscuit tin"
+    ],
+    "contexts": [
+      "wooden table",
+      "farmhouse kitchen",
+      "natural light",
+      "rustic setting",
+      "ceramic bowl",
+      "flat lay",
+      "garden background",
+      "wicker basket",
+      "marble counter"
+    ],
+    "styles": [
+      "photography",
+      "food",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "commercial",
+      "studio"
+    ]
+  },
+  "furniture-interior": {
+    "objects": [
+      "sofa",
+      "armchair",
+      "coffee table",
+      "dining table",
+      "chair",
+      "bookshelf",
+      "wardrobe",
+      "bed frame",
+      "dresser",
+      "sideboard",
+      "lamp",
+      "rug"
+    ],
+    "contexts": [
+      "modern living room",
+      "minimalist interior",
+      "cozy bedroom",
+      "dining area",
+      "open plan",
+      "showroom",
+      "natural light",
+      "scandinavian design",
+      "industrial loft",
+      "bright space"
+    ],
+    "styles": [
+      "photography",
+      "interior design",
+      "architectural",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "games-consoles-software": {
+    "objects": [
+      "game console",
+      "controller",
+      "video game",
+      "gaming headset",
+      "console stand",
+      "charging dock",
+      "VR headset",
+      "gaming chair",
+      "steering wheel",
+      "memory card",
+      "game disc",
+      "subscription card"
+    ],
+    "contexts": [
+      "gaming setup",
+      "RGB lighting",
+      "living room TV",
+      "wooden desk",
+      "dark ambient",
+      "flat lay",
+      "neon lights",
+      "gamer room",
+      "studio lighting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "editorial",
+      "lifestyle",
+      "technology",
+      "commercial"
+    ]
+  },
+  "girls": {
+    "objects": [
+      "dress",
+      "skirt",
+      "blouse",
+      "leggings",
+      "cardigan",
+      "tights",
+      "hair bow",
+      "sneakers",
+      "sandals",
+      "swimsuit",
+      "pajama set",
+      "winter coat"
+    ],
+    "contexts": [
+      "white background",
+      "pink bedroom",
+      "flat lay",
+      "hanger display",
+      "playroom",
+      "spring garden",
+      "kids closet",
+      "studio lighting",
+      "pastel colors"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "family"
+    ]
+  },
+  "hair-care": {
+    "objects": [
+      "shampoo",
+      "conditioner",
+      "hair mask",
+      "hair oil",
+      "hair spray",
+      "hair gel",
+      "hair serum",
+      "dry shampoo",
+      "hair dye",
+      "leave-in conditioner",
+      "heat protectant",
+      "hair brush"
+    ],
+    "contexts": [
+      "bathroom shelf",
+      "white background",
+      "studio lighting",
+      "flat lay",
+      "salon setting",
+      "marble counter",
+      "natural light",
+      "minimalist",
+      "beauty mirror"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "beauty",
+      "professional",
+      "editorial",
+      "lifestyle"
+    ]
+  },
+  "hobby-bicycles": {
+    "objects": [
+      "mountain bike",
+      "road bike",
+      "city bike",
+      "electric bike",
+      "children bike",
+      "bike helmet",
+      "bike lock",
+      "water bottle",
+      "bike pump",
+      "bike light",
+      "cycling gloves",
+      "saddle bag"
+    ],
+    "contexts": [
+      "forest trail",
+      "city street",
+      "mountain path",
+      "garage",
+      "park",
+      "sunset ride",
+      "studio lighting",
+      "cycling track",
+      "seaside promenade",
+      "white background"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "sports",
+      "editorial",
+      "lifestyle",
+      "outdoor"
+    ]
+  },
+  "hobby-scooters": {
+    "objects": [
+      "kick scooter",
+      "electric scooter",
+      "scooter helmet",
+      "scooter gloves",
+      "scooter bag",
+      "foldable scooter",
+      "offroad scooter",
+      "scooter bell",
+      "scooter lock",
+      "charging cable",
+      "replacement tire",
+      "handlebar grips"
+    ],
+    "contexts": [
+      "city street",
+      "park path",
+      "white background",
+      "urban setting",
+      "studio lighting",
+      "bike lane",
+      "sunset",
+      "sidewalk",
+      "parking lot",
+      "evening ride"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "sports",
+      "editorial",
+      "lifestyle",
+      "urban"
+    ]
+  },
+  "hunting-fishing": {
+    "objects": [
+      "fishing rod",
+      "reel",
+      "fishing lure",
+      "tackle box",
+      "hunting knife",
+      "rifle scope",
+      "camouflage jacket",
+      "fishing net",
+      "survival kit",
+      "headlamp",
+      "thermos",
+      "gps device"
+    ],
+    "contexts": [
+      "lake shore",
+      "mountain stream",
+      "forest clearing",
+      "workshop bench",
+      "white background",
+      "sunrise river",
+      "woodland setting",
+      "outdoor gear spread",
+      "hunting blind"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "outdoor",
+      "editorial",
+      "lifestyle",
+      "documentary"
+    ]
+  },
+  "jewelry": {
+    "objects": [
+      "gold ring",
+      "silver necklace",
+      "diamond earrings",
+      "gold bracelet",
+      "pearl necklace",
+      "engagement ring",
+      "wedding band",
+      "gold chain",
+      "pendant",
+      "cufflinks",
+      "signet ring",
+      "charm bracelet"
+    ],
+    "contexts": [
+      "velvet display",
+      "white background",
+      "studio lighting",
+      "jewelry box",
+      "luxury setting",
+      "natural light",
+      "mannequin",
+      "flat lay",
+      "marble surface",
+      "dark background"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "luxury",
+      "commercial"
+    ]
+  },
+  "kids-furniture": {
+    "objects": [
+      "crib",
+      "changing table",
+      "kids bed",
+      "bunk bed",
+      "play table",
+      "kids chair",
+      "bookshelf",
+      "toy chest",
+      "nightstand",
+      "wardrobe",
+      "desk",
+      "rocking horse"
+    ],
+    "contexts": [
+      "nursery",
+      "kids bedroom",
+      "bright room",
+      "soft lighting",
+      "pastel colors",
+      "playful design",
+      "wooden floor",
+      "minimalist nursery",
+      "sunny window",
+      "cozy corner"
+    ],
+    "styles": [
+      "photography",
+      "interior design",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "family",
+      "minimalist"
+    ]
+  },
+  "kids-hygiene": {
+    "objects": [
+      "baby shampoo",
+      "baby soap",
+      "baby washcloth",
+      "hooded towel",
+      "baby toothbrush",
+      "baby toothpaste",
+      "nail scissors",
+      "hair brush set",
+      "bath thermometer",
+      "baby powder",
+      "baby lotion",
+      "ear thermometer"
+    ],
+    "contexts": [
+      "nursery",
+      "white background",
+      "bathroom shelf",
+      "flat lay",
+      "pastel backdrop",
+      "studio lighting",
+      "baby bath",
+      "soft towel",
+      "natural light"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "baby",
+      "professional",
+      "editorial",
+      "lifestyle"
+    ]
+  },
+  "kids-scooters-bikes": {
+    "objects": [
+      "balance bike",
+      "kids bicycle",
+      "training wheels",
+      "kick scooter",
+      "tricycle",
+      "bike helmet",
+      "knee pads",
+      "elbow pads",
+      "bike bell",
+      "stabilizer set",
+      "bike basket",
+      "water bottle holder"
+    ],
+    "contexts": [
+      "park path",
+      "playground",
+      "driveway",
+      "garden",
+      "white background",
+      "kids playing",
+      "sunny day",
+      "studio lighting",
+      "sidewalk",
+      "spring park"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "kids",
+      "editorial",
+      "lifestyle",
+      "outdoor"
+    ]
+  },
+  "kitchen-dining": {
+    "objects": [
+      "cookware set",
+      "frying pan",
+      "saucepan",
+      "knife set",
+      "cutting board",
+      "mixing bowl",
+      "measuring cup",
+      "baking dish",
+      "colander",
+      "peeler",
+      "kitchen scale",
+      "spice jar set"
+    ],
+    "contexts": [
+      "modern kitchen",
+      "white background",
+      "wooden table",
+      "flat lay",
+      "studio lighting",
+      "minimalist",
+      "marble counter",
+      "hanging rack",
+      "open shelving",
+      "natural light"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "editorial",
+      "lifestyle",
+      "commercial",
+      "minimalist"
+    ]
+  },
+  "laptops": {
+    "objects": [
+      "laptop",
+      "notebook",
+      "ultrabook",
+      "gaming laptop",
+      "macbook",
+      "chromebook",
+      "laptop stand",
+      "laptop bag",
+      "cooling pad",
+      "usb hub",
+      "external drive",
+      "laptop charger"
+    ],
+    "contexts": [
+      "office desk",
+      "coffee shop",
+      "home office",
+      "wooden desk",
+      "minimalist setup",
+      "coworking space",
+      "studio lighting",
+      "natural light",
+      "white background",
+      "lifestyle setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "makeup-manicure": {
+    "objects": [
+      "lipstick",
+      "eyeshadow palette",
+      "foundation",
+      "concealer",
+      "blush",
+      "mascara",
+      "eyeliner",
+      "nail polish",
+      "makeup brush set",
+      "beauty sponge",
+      "setting spray",
+      "makeup bag"
+    ],
+    "contexts": [
+      "white background",
+      "vanity table",
+      "studio lighting",
+      "flat lay",
+      "marble surface",
+      "beauty mirror",
+      "natural light",
+      "pink backdrop",
+      "luxury setting",
+      "fashion shoot"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "beauty",
+      "editorial",
+      "fashion",
+      "lifestyle"
+    ]
+  },
+  "medical-products": {
+    "objects": [
+      "blood pressure monitor",
+      "thermometer",
+      "pulse oximeter",
+      "glucose meter",
+      "inhaler",
+      "hearing aid",
+      "massage pillow",
+      "knee brace",
+      "back support",
+      "elastic bandage",
+      "first aid kit",
+      "wheelchair"
+    ],
+    "contexts": [
+      "white background",
+      "studio lighting",
+      "medical office",
+      "pharmacy shelf",
+      "clean surface",
+      "healthcare setting",
+      "flat lay",
+      "minimalist",
+      "clinical setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "medical",
+      "commercial"
+    ]
+  },
+  "men-clothing": {
+    "objects": [
+      "suit",
+      "shirt",
+      "jacket",
+      "jeans",
+      "chinos",
+      "sweater",
+      "t shirt",
+      "hoodie",
+      "coat",
+      "blazer",
+      "vest",
+      "shorts"
+    ],
+    "contexts": [
+      "white background",
+      "hanger display",
+      "studio lighting",
+      "urban street",
+      "mannequin",
+      "fashion flat lay",
+      "minimalist wardrobe",
+      "natural light",
+      "business setting"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "men-shoes": {
+    "objects": [
+      "dress shoes",
+      "sneakers",
+      "loafers",
+      "boots",
+      "moccasins",
+      "oxfords",
+      "derby shoes",
+      "sandals",
+      "slippers",
+      "chukka boots",
+      "winter boots",
+      "running shoes"
+    ],
+    "contexts": [
+      "white background",
+      "studio lighting",
+      "urban street",
+      "shoe rack",
+      "leather detail",
+      "outdoor pavement",
+      "mannequin feet",
+      "natural light",
+      "flat lay",
+      "fashion shoot"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "musical-instruments": {
+    "objects": [
+      "acoustic guitar",
+      "electric guitar",
+      "piano keyboard",
+      "violin",
+      "drum set",
+      "flute",
+      "saxophone",
+      "trumpet",
+      "ukulele",
+      "amplifier",
+      "guitar pedal",
+      "microphone stand"
+    ],
+    "contexts": [
+      "music studio",
+      "stage lighting",
+      "white background",
+      "wooden floor",
+      "concert setting",
+      "home studio",
+      "vintage room",
+      "instrument case",
+      "wall mounted"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "music"
+    ]
+  },
+  "other-electronics": {
+    "objects": [
+      "power bank",
+      "charging cable",
+      "phone case",
+      "screen protector",
+      "smart plug",
+      "wifi router",
+      "extension cord",
+      "cable organizer",
+      "phone stand",
+      "smart watch band",
+      "usb hub",
+      "car charger"
+    ],
+    "contexts": [
+      "white background",
+      "workspace",
+      "desk organizer",
+      "studio lighting",
+      "flat lay",
+      "minimalist",
+      "home office",
+      "dark background",
+      "travel kit"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "perfumes": {
+    "objects": [
+      "perfume bottle",
+      "cologne",
+      "eau de toilette",
+      "rollerball",
+      "perfume oil",
+      "gift set",
+      "body mist",
+      "solid perfume",
+      "perfume sample",
+      "atomizer",
+      "perfume tray",
+      "scented candle"
+    ],
+    "contexts": [
+      "white background",
+      "vanity table",
+      "studio lighting",
+      "flat lay",
+      "marble surface",
+      "natural light",
+      "luxury setting",
+      "gift arrangement",
+      "minimalist",
+      "dark background"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "lifestyle",
+      "luxury"
+    ]
+  },
+  "phones": {
+    "objects": [
+      "smartphone",
+      "iPhone",
+      "android phone",
+      "phone case",
+      "screen protector",
+      "charging cable",
+      "power bank",
+      "phone stand",
+      "wireless charger",
+      "car mount",
+      "selfie stick",
+      "pop socket"
+    ],
+    "contexts": [
+      "white background",
+      "workspace",
+      "wooden desk",
+      "hands holding",
+      "coffee shop",
+      "studio lighting",
+      "flat lay",
+      "lifestyle setting",
+      "minimalist",
+      "dark backdrop"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "plants": {
+    "objects": [
+      "potted plant",
+      "succulent",
+      "cactus",
+      "fern",
+      "monstera",
+      "ficus",
+      "palm",
+      "orchid",
+      "rose bush",
+      "lavender",
+      "bonsai tree",
+      "bamboo"
+    ],
+    "contexts": [
+      "bright windowsill",
+      "living room corner",
+      "terracotta pot",
+      "greenhouse",
+      "white wall",
+      "minimalist interior",
+      "natural light",
+      "garden setting",
+      "ceramic pot",
+      "sunny balcony"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "minimalist",
+      "interior design",
+      "nature"
+    ]
+  },
+  "repair-construction": {
+    "objects": [
+      "drill",
+      "hammer",
+      "screwdriver set",
+      "wrench",
+      "measuring tape",
+      "level",
+      "pliers",
+      "saw",
+      "utility knife",
+      "tool box",
+      "safety helmet",
+      "work gloves"
+    ],
+    "contexts": [
+      "workshop bench",
+      "construction site",
+      "white background",
+      "tool layout",
+      "garage wall",
+      "pegboard display",
+      "studio lighting",
+      "renovation setting",
+      "power tools on shelf"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "industrial",
+      "lifestyle"
+    ]
+  },
+  "school-supplies": {
+    "objects": [
+      "notebook",
+      "pen set",
+      "pencil case",
+      "backpack",
+      "calculator",
+      "ruler set",
+      "compass",
+      "markers",
+      "colored pencils",
+      "eraser",
+      "glue stick",
+      "scissors"
+    ],
+    "contexts": [
+      "desk setup",
+      "white background",
+      "flat lay",
+      "classroom",
+      "study desk",
+      "colorful arrangement",
+      "natural light",
+      "minimalist",
+      "organized layout",
+      "back to school"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "editorial",
+      "lifestyle",
+      "educational",
+      "commercial"
+    ]
+  },
+  "sports-outdoors": {
+    "objects": [
+      "running shoes",
+      "yoga mat",
+      "dumbbells",
+      "resistance band",
+      "hiking boots",
+      "tent",
+      "sleeping bag",
+      "backpack",
+      "climbing rope",
+      "kettlebell",
+      "fitness tracker",
+      "water bottle"
+    ],
+    "contexts": [
+      "gym",
+      "mountain trail",
+      "beach workout",
+      "forest camp",
+      "white background",
+      "home gym",
+      "sunset workout",
+      "outdoor adventure",
+      "park",
+      "studio lighting"
+    ],
+    "styles": [
+      "photography",
+      "sports",
+      "product",
+      "outdoor",
+      "editorial",
+      "lifestyle",
+      "action"
+    ]
+  },
+  "strollers": {
+    "objects": [
+      "baby stroller",
+      "umbrella stroller",
+      "twin stroller",
+      "jogging stroller",
+      "travel stroller",
+      "stroller organizer",
+      "rain cover",
+      "footmuff",
+      "sun canopy",
+      "stroller seat liner",
+      "buggy board",
+      "stroller hook"
+    ],
+    "contexts": [
+      "park path",
+      "city sidewalk",
+      "white background",
+      "studio lighting",
+      "family walk",
+      "sunny day",
+      "outdoor cafe",
+      "lifestyle setting",
+      "spring park"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "family"
+    ]
+  },
+  "tablets": {
+    "objects": [
+      "tablet",
+      "iPad",
+      "android tablet",
+      "stylus pen",
+      "tablet case",
+      "tablet stand",
+      "keyboard folio",
+      "screen protector",
+      "drawing tablet",
+      "kids tablet",
+      "usb hub",
+      "bluetooth keyboard"
+    ],
+    "contexts": [
+      "white background",
+      "wooden desk",
+      "home office",
+      "coffee shop",
+      "hands holding",
+      "studio lighting",
+      "flat lay",
+      "couch surfing",
+      "minimalist",
+      "lifestyle setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "technology"
+    ]
+  },
+  "tickets-travel": {
+    "objects": [
+      "plane ticket",
+      "boarding pass",
+      "passport",
+      "travel guide",
+      "map",
+      "luggage tag",
+      "travel insurance",
+      "voucher",
+      "ticket stub",
+      "hotel reservation",
+      "currency",
+      "souvenir magnet"
+    ],
+    "contexts": [
+      "flat lay",
+      "passport in hand",
+      "airport lounge",
+      "coffee shop table",
+      "travel desk",
+      "world map background",
+      "boarding gate",
+      "vacation packing",
+      "beach towel"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "travel",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "commercial"
+    ]
+  },
+  "toys": {
+    "objects": [
+      "building blocks",
+      "action figure",
+      "doll",
+      "puzzle",
+      "stuffed animal",
+      "board game",
+      "car toy",
+      "play dough",
+      "train set",
+      "kite",
+      "yo yo",
+      "slime"
+    ],
+    "contexts": [
+      "playroom floor",
+      "white background",
+      "kids table",
+      "colorful setting",
+      "studio lighting",
+      "flat lay",
+      "toy box",
+      "natural light",
+      "bedroom corner",
+      "play mat"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "kids",
+      "editorial",
+      "lifestyle",
+      "family"
+    ]
+  },
+  "watches": {
+    "objects": [
+      "wristwatch",
+      "chronograph",
+      "diver watch",
+      "dress watch",
+      "smartwatch",
+      "pocket watch",
+      "watch band",
+      "watch box",
+      "watch winder",
+      "stopwatch",
+      "alarm clock",
+      "wall clock"
+    ],
+    "contexts": [
+      "wrist shot",
+      "white background",
+      "watch box",
+      "studio lighting",
+      "leather strap",
+      "suit sleeve",
+      "natural light",
+      "macro detail",
+      "luxury setting",
+      "minimalist"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "fashion",
+      "editorial",
+      "lifestyle",
+      "luxury"
+    ]
+  },
+  "women-clothing": {
+    "objects": [
+      "dress",
+      "blouse",
+      "skirt",
+      "jacket",
+      "jeans",
+      "trousers",
+      "cardigan",
+      "blazer",
+      "jumpsuit",
+      "top",
+      "trench coat",
+      "leggings"
+    ],
+    "contexts": [
+      "white background",
+      "hanger display",
+      "studio lighting",
+      "fashion shoot",
+      "mannequin",
+      "closet rack",
+      "natural light",
+      "urban street",
+      "flat lay",
+      "minimalist"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "women-shoes": {
+    "objects": [
+      "heels",
+      "flats",
+      "sandals",
+      "boots",
+      "sneakers",
+      "wedges",
+      "pumps",
+      "ballet flats",
+      "ankle boots",
+      "espadrilles",
+      "winter boots",
+      "wedding shoes"
+    ],
+    "contexts": [
+      "white background",
+      "studio lighting",
+      "fashion shoot",
+      "shoe closet",
+      "marble floor",
+      "natural light",
+      "flat lay",
+      "mannequin feet",
+      "urban street",
+      "luxury setting"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "dogs": {
+    "objects": [
+      "dog",
+      "puppy",
+      "labrador",
+      "golden retriever",
+      "German shepherd",
+      "poodle",
+      "beagle",
+      "bulldog",
+      "husky",
+      "chihuahua",
+      "doberman",
+      "border collie"
+    ],
+    "contexts": [
+      "park",
+      "beach",
+      "grass field",
+      "sunset walk",
+      "city street",
+      "forest trail",
+      "backyard",
+      "dog owner playing",
+      "mountain hike",
+      "cozy home"
+    ],
+    "styles": [
+      "pet photography",
+      "lifestyle",
+      "outdoor",
+      "professional",
+      "editorial",
+      "candid",
+      "studio"
+    ]
+  },
+  "cats": {
+    "objects": [
+      "cat",
+      "kitten",
+      "Persian cat",
+      "Maine Coon",
+      "Siamese cat",
+      "British shorthair",
+      "ragdoll",
+      "Bengal cat",
+      "Scottish fold",
+      "tabby cat",
+      "sphynx",
+      "abyssinian"
+    ],
+    "contexts": [
+      "sunny windowsill",
+      "cozy sofa",
+      "cat owner cuddling",
+      "garden",
+      "bedroom",
+      "warm blanket",
+      "bookshelf",
+      "cat tree",
+      "morning light",
+      "relaxed home"
+    ],
+    "styles": [
+      "pet photography",
+      "lifestyle",
+      "studio",
+      "professional",
+      "editorial",
+      "candid",
+      "indoor"
+    ]
+  },
+  "birds": {
+    "objects": [
+      "bird",
+      "parrot",
+      "budgie",
+      "cockatiel",
+      "lovebird",
+      "canary",
+      "parakeet",
+      "finch",
+      "macaw",
+      "African grey",
+      "cockatoo",
+      "conure"
+    ],
+    "contexts": [
+      "bird cage",
+      "aviary",
+      "sunny window",
+      "perch",
+      "garden",
+      "pet store",
+      "bird owner hand",
+      "natural habitat",
+      "wooden stand",
+      "close up"
+    ],
+    "styles": [
+      "pet photography",
+      "lifestyle",
+      "studio",
+      "professional",
+      "editorial",
+      "close up",
+      "nature"
+    ]
+  },
+  "fish-aquarium": {
+    "objects": [
+      "fish",
+      "aquarium",
+      "tropical fish",
+      "goldfish",
+      "betta fish",
+      "angelfish",
+      "guppy",
+      "neon tetra",
+      "koi",
+      "discus fish",
+      "aquarium tank",
+      "cichlid"
+    ],
+    "contexts": [
+      "aquarium interior",
+      "planted tank",
+      "blue light",
+      "coral reef",
+      "aquascape",
+      "pet store",
+      "home decor",
+      "bubbles",
+      "LED aquarium",
+      "ornamental fish tank"
+    ],
+    "styles": [
+      "aquarium photography",
+      "studio",
+      "professional",
+      "editorial",
+      "macro",
+      "nature",
+      "dark background"
+    ]
+  },
+  "other-animals": {
+    "objects": [
+      "hamster",
+      "guinea pig",
+      "rabbit",
+      "chinchilla",
+      "ferret",
+      "turtle",
+      "lizard",
+      "snake",
+      "hedgehog",
+      "degus",
+      "gerbil",
+      "mouse"
+    ],
+    "contexts": [
+      "cage",
+      "terrarium",
+      "wooden table",
+      "home interior",
+      "studio lighting",
+      "pet owner hands",
+      "white background",
+      "garden grass",
+      "cozy bedding",
+      "play area"
+    ],
+    "styles": [
+      "pet photography",
+      "studio",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "macro",
+      "candid"
+    ]
+  },
+  "pet-food": {
+    "objects": [
+      "pet food bag",
+      "dog food",
+      "cat food",
+      "kibble",
+      "wet food",
+      "treats",
+      "food bowl",
+      "food storage",
+      "grain free food",
+      "premium pet food",
+      "natural pet food",
+      "dried food"
+    ],
+    "contexts": [
+      "pet store",
+      "studio lighting",
+      "white background",
+      "kitchen counter",
+      "product display",
+      "shelf",
+      "home pantry",
+      "food bowl setting",
+      "minimalist",
+      "flat lay"
+    ],
+    "styles": [
+      "product photography",
+      "studio",
+      "commercial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "pet-toys": {
+    "objects": [
+      "dog toy",
+      "cat toy",
+      "plush toy",
+      "chew toy",
+      "rubber ball",
+      "rope toy",
+      "feather wand",
+      "laser pointer",
+      "squeaky toy",
+      "tunnel",
+      "puzzle toy",
+      "frisbee"
+    ],
+    "contexts": [
+      "studio lighting",
+      "white background",
+      "playful setting",
+      "pet store shelf",
+      "grass outdoor",
+      "home floor",
+      "action shot",
+      "product display",
+      "bright background",
+      "minimalist"
+    ],
+    "styles": [
+      "product photography",
+      "studio",
+      "commercial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "action"
+    ]
+  },
+  "pet-accessories": {
+    "objects": [
+      "pet bed",
+      "collar",
+      "leash",
+      "harness",
+      "pet bowl",
+      "carrier",
+      "cat house",
+      "scratching post",
+      "grooming brush",
+      "water fountain",
+      "pet mat",
+      "name tag"
+    ],
+    "contexts": [
+      "studio lighting",
+      "white background",
+      "home interior",
+      "pet store",
+      "product display",
+      "cozy corner",
+      "living room",
+      "shelf display",
+      "minimalist",
+      "lifestyle setting"
+    ],
+    "styles": [
+      "product photography",
+      "studio",
+      "commercial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "pet-dogs-cats": {
+    "objects": [
+      "dog collar",
+      "cat harness",
+      "leash set",
+      "pet shampoo",
+      "grooming kit",
+      "pet bed",
+      "feeding bowl",
+      "training pad",
+      "nail clipper",
+      "pet comb",
+      "toothbrush",
+      "pet towel"
+    ],
+    "contexts": [
+      "studio lighting",
+      "white background",
+      "pet store",
+      "product display",
+      "home shelf",
+      "lifestyle setting",
+      "minimalist",
+      "wooden surface",
+      "organized layout",
+      "bright studio"
+    ],
+    "styles": [
+      "product photography",
+      "studio",
+      "commercial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "pet-birds": {
+    "objects": [
+      "bird cage",
+      "bird feeder",
+      "bird perch",
+      "bird bath",
+      "cage cover",
+      "seed mix",
+      "cuttlebone",
+      "bird toy",
+      "water dispenser",
+      "nesting box",
+      "bird swing",
+      "millet spray"
+    ],
+    "contexts": [
+      "studio lighting",
+      "white background",
+      "pet store",
+      "aviary setting",
+      "home interior",
+      "product display",
+      "garden",
+      "shelf",
+      "minimalist",
+      "flat lay"
+    ],
+    "styles": [
+      "product photography",
+      "studio",
+      "commercial",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "ac-installation": {
+    "objects": [
+      "air conditioner",
+      "split system",
+      "ventilator",
+      "compressor",
+      "remote control",
+      "toolbox",
+      "wrench set",
+      "ladder",
+      "coolant tank",
+      "wall mount bracket"
+    ],
+    "contexts": [
+      "workshop",
+      "building facade",
+      "interior wall",
+      "professional tools",
+      "service van",
+      "technical setup",
+      "modern equipment",
+      "workbench"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "technical"
+    ]
+  },
+  "accounting": {
+    "objects": [
+      "calculator",
+      "ledger book",
+      "laptop",
+      "pen",
+      "documents",
+      "stamp",
+      "glasses",
+      "folder",
+      "spreadsheet",
+      "profit chart"
+    ],
+    "contexts": [
+      "office desk",
+      "modern office",
+      "conference room",
+      "coworking space",
+      "professional setting",
+      "financial documents",
+      "laptop screen",
+      "reception"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "studio"
+    ]
+  },
+  "agriculture": {
+    "objects": [
+      "tractor",
+      "field",
+      "crops",
+      "tiller",
+      "watering system",
+      "greenhouse",
+      "farmer",
+      "fresh vegetables",
+      "harvest",
+      "orchard"
+    ],
+    "contexts": [
+      "rural field",
+      "sunrise farm",
+      "open countryside",
+      "green valley",
+      "irrigation system",
+      "farm equipment",
+      "harvest season",
+      "cultivated land",
+      "sunset agriculture",
+      "organic farm"
+    ],
+    "styles": [
+      "photography",
+      "nature",
+      "documentary",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "outdoor"
+    ]
+  },
+  "apartment-cleaning": {
+    "objects": [
+      "vacuum cleaner",
+      "mop",
+      "bucket",
+      "cleaning spray",
+      "microfiber cloth",
+      "sponge",
+      "broom",
+      "rubber gloves",
+      "spray bottle",
+      "window squeegee"
+    ],
+    "contexts": [
+      "living room",
+      "modern apartment",
+      "bright interior",
+      "clean kitchen",
+      "sparkling window",
+      "polished floor",
+      "minimalist home",
+      "tidy bedroom",
+      "fresh interior",
+      "cleaning service"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "commercial",
+      "minimalist"
+    ]
+  },
+  "appliance-repair": {
+    "objects": [
+      "screwdriver set",
+      "multimeter",
+      "wrench",
+      "circuit board",
+      "spare parts",
+      "toolbox",
+      "soldering iron",
+      "washing machine",
+      "refrigerator",
+      "workbench"
+    ],
+    "contexts": [
+      "workshop",
+      "repair bench",
+      "technical setup",
+      "garage workshop",
+      "professional tools",
+      "service center",
+      "electrical parts",
+      "organized workspace"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "technical",
+      "studio"
+    ]
+  },
+  "arts": {
+    "objects": [
+      "paintbrush",
+      "canvas",
+      "palette",
+      "paint tubes",
+      "easel",
+      "sculpture",
+      "pencil sketch",
+      "watercolor",
+      "oil painting",
+      "art studio"
+    ],
+    "contexts": [
+      "art studio",
+      "natural light",
+      "creative workspace",
+      "easel setup",
+      "gallery setting",
+      "paint splattered",
+      "designer desk",
+      "colorful palette",
+      "workshop",
+      "artist hands"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "creative",
+      "studio"
+    ]
+  },
+  "beauty-salons-spa": {
+    "objects": [
+      "massage table",
+      "essential oils",
+      "candle",
+      "towel set",
+      "bathrobe",
+      "spa stone",
+      "incense",
+      "flower petals",
+      "relaxation chair",
+      "steamer"
+    ],
+    "contexts": [
+      "spa interior",
+      "relaxation room",
+      "candlelit",
+      "soft lighting",
+      "marble surface",
+      "tranquil setting",
+      "aroma therapy",
+      "luxury spa",
+      "botanical decor",
+      "calming atmosphere"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "luxury",
+      "minimalist"
+    ]
+  },
+  "car-repair": {
+    "objects": [
+      "car engine",
+      "wrench",
+      "car lift",
+      "tire",
+      "brake disc",
+      "oil can",
+      "tool chest",
+      "diagnostic scanner",
+      "car hood",
+      "grease gun"
+    ],
+    "contexts": [
+      "auto repair shop",
+      "garage",
+      "car lift station",
+      "mechanic tools",
+      "workshop bench",
+      "car parts shelf",
+      "service bay",
+      "oil change station",
+      "tire rack",
+      "under hood"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "technical",
+      "commercial"
+    ]
+  },
+  "carpet-cleaning": {
+    "objects": [
+      "carpet",
+      "steam cleaner",
+      "cleaning brush",
+      "spray nozzle",
+      "vacuum hose",
+      "cleaning solution",
+      "microfiber cloth",
+      "extractor machine",
+      "rug beater",
+      "protective gloves"
+    ],
+    "contexts": [
+      "living room floor",
+      "clean carpet",
+      "bright interior",
+      "sparkling clean",
+      "fresh home",
+      "professional equipment",
+      "large rug",
+      "after cleaning",
+      "upholstery",
+      "staircase carpet"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "documentary",
+      "commercial"
+    ]
+  },
+  "catering": {
+    "objects": [
+      "buffet table",
+      "chafing dish",
+      "platter",
+      "wine glass",
+      "napkin",
+      "centerpiece",
+      "catering tray",
+      "silverware",
+      "food warmer",
+      "serving bowl"
+    ],
+    "contexts": [
+      "banquet hall",
+      "wedding venue",
+      "garden party",
+      "corporate event",
+      "outdoor catering",
+      "restaurant kitchen",
+      "buffet setup",
+      "elegant table",
+      "catering truck",
+      "event preparation"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "commercial",
+      "documentary",
+      "culinary"
+    ]
+  },
+  "cleaning-service": {
+    "objects": [
+      "cleaning cart",
+      "vacuum cleaner",
+      "mop bucket",
+      "spray bottle",
+      "brush set",
+      "duster",
+      "window cleaner",
+      "gloves",
+      "cleaning cloth",
+      "disinfectant"
+    ],
+    "contexts": [
+      "residential interior",
+      "office hallway",
+      "clean room",
+      "modern kitchen",
+      "sparkling window",
+      "organized cart",
+      "cleaning service van",
+      "professional equipment"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "commercial",
+      "documentary"
+    ]
+  },
+  "clothing-repair": {
+    "objects": [
+      "sewing machine",
+      "needle",
+      "thread spool",
+      "thimble",
+      "scissors",
+      "zipper",
+      "fabric",
+      "button",
+      "measuring tape",
+      "iron"
+    ],
+    "contexts": [
+      "tailor workshop",
+      "sewing table",
+      "mannequin",
+      "fabric shelf",
+      "alteration bench",
+      "bright studio",
+      "organized threads",
+      "professional atelier"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "studio",
+      "craft"
+    ]
+  },
+  "commercial-construction": {
+    "objects": [
+      "building crane",
+      "scaffolding",
+      "blueprint",
+      "hard hat",
+      "concrete mixer",
+      "steel beam",
+      "construction worker",
+      "power drill",
+      "safety vest",
+      "excavator"
+    ],
+    "contexts": [
+      "construction site",
+      "commercial building",
+      "steel framework",
+      "urban development",
+      "sunset construction",
+      "modern architecture",
+      "site office",
+      "scaffolding structure"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "commercial"
+    ]
+  },
+  "courses-training": {
+    "objects": [
+      "whiteboard",
+      "laptop",
+      "notebook",
+      "pen",
+      "projector",
+      "desk chair",
+      "textbook",
+      "certificate",
+      "classroom table",
+      "student desk"
+    ],
+    "contexts": [
+      "classroom",
+      "training room",
+      "conference hall",
+      "modern workshop",
+      "study desk",
+      "presentation screen",
+      "learning environment",
+      "group session",
+      "bright classroom",
+      "professional training"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "educational",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "corporate"
+    ]
+  },
+  "delivery-courier": {
+    "objects": [
+      "delivery van",
+      "bicycle",
+      "package box",
+      "scanner",
+      "uniform",
+      "helmet",
+      "map",
+      "smartphone",
+      "parcel envelope",
+      "delivery bag"
+    ],
+    "contexts": [
+      "city street",
+      "urban delivery",
+      "doorstep handover",
+      "busy sidewalk",
+      "packages loaded",
+      "courier on move",
+      "apartment entrance",
+      "logistics hub",
+      "morning delivery",
+      "warehouse sorting"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "documentary",
+      "urban",
+      "commercial"
+    ]
+  },
+  "dog-walking": {
+    "objects": [
+      "dog leash",
+      "dog",
+      "puppy",
+      "harness",
+      "treat bag",
+      "poop bag",
+      "water bottle",
+      "dog collar",
+      "ball toy",
+      "dog paws"
+    ],
+    "contexts": [
+      "city park",
+      "green grass",
+      "sunset walk",
+      "neighborhood street",
+      "beach promenade",
+      "morning walk",
+      "forest path",
+      "dog friendly area",
+      "outdoor adventure",
+      "happy pet"
+    ],
+    "styles": [
+      "photography",
+      "pet",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "outdoor",
+      "candid"
+    ]
+  },
+  "electrical": {
+    "objects": [
+      "wire spool",
+      "voltmeter",
+      "screwdriver",
+      "pliers",
+      "circuit breaker",
+      "electrical panel",
+      "cable cutter",
+      "light switch",
+      "socket",
+      "insulation tape"
+    ],
+    "contexts": [
+      "workshop",
+      "electrical panel",
+      "new installation",
+      "technical setup",
+      "workbench",
+      "building interior",
+      "professional tools",
+      "organized cables"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "technical",
+      "studio"
+    ]
+  },
+  "event-planning": {
+    "objects": [
+      "planner notebook",
+      "calendar",
+      "venue photo",
+      "color swatches",
+      "table decor",
+      "ribbon",
+      "invitation card",
+      "balloon",
+      "table arrangement",
+      "seating chart"
+    ],
+    "contexts": [
+      "wedding venue",
+      "conference room",
+      "garden setup",
+      "banquet hall",
+      "decorated table",
+      "event space",
+      "party decoration",
+      "floral arrangement",
+      "elegant dining",
+      "reception area"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "commercial",
+      "documentary",
+      "creative"
+    ]
+  },
+  "flooring-installation": {
+    "objects": [
+      "laminate board",
+      "tile cutter",
+      "level tool",
+      "knee pads",
+      "measuring tape",
+      "hammer",
+      "floor saw",
+      "adhesive bucket",
+      "trowel",
+      "underlayment roll"
+    ],
+    "contexts": [
+      "new floor installation",
+      "renovated room",
+      "construction site",
+      "workbench",
+      "professional tools",
+      "interior under renovation",
+      "tile layout",
+      "wood floor finish"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "lifestyle"
+    ]
+  },
+  "florist": {
+    "objects": [
+      "bouquet",
+      "rose",
+      "tulip",
+      "flower vase",
+      "wrapping paper",
+      "ribbon",
+      "shears",
+      "potted plant",
+      "lavender",
+      "sunflower"
+    ],
+    "contexts": [
+      "flower shop",
+      "garden",
+      "wedding decoration",
+      "fresh flowers",
+      "colorful display",
+      "greenhouse",
+      "floral arrangement",
+      "morning market",
+      "boutique interior",
+      "flower delivery"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "commercial",
+      "documentary",
+      "creative"
+    ]
+  },
+  "freight": {
+    "objects": [
+      "truck",
+      "cargo container",
+      "pallet",
+      "forklift",
+      "loading ramp",
+      "cargo strap",
+      "shipping label",
+      "semi trailer",
+      "box truck",
+      "warehouse door"
+    ],
+    "contexts": [
+      "loading dock",
+      "highway",
+      "warehouse interior",
+      "logistics hub",
+      "container yard",
+      "interstate transport",
+      "parking lot",
+      "industrial area",
+      "cargo sorting",
+      "transport depot"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "commercial",
+      "transport"
+    ]
+  },
+  "hair-care-services": {
+    "objects": [
+      "hairbrush",
+      "scissors",
+      "hair dryer",
+      "comb",
+      "hair clips",
+      "styling chair",
+      "mirror",
+      "shampoo bottle",
+      "hair straightener",
+      "curling iron"
+    ],
+    "contexts": [
+      "salon interior",
+      "styling station",
+      "mirror reflection",
+      "hair washing area",
+      "bright salon",
+      "modern decor",
+      "professional tools",
+      "salon chair row",
+      "treatment room",
+      "hair product shelf"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "commercial"
+    ]
+  },
+  "hair-styling": {
+    "objects": [
+      "styling comb",
+      "hair spray",
+      "curling tongs",
+      "hair dryer",
+      "hair pins",
+      "elastic band",
+      "diffuser",
+      "flat iron",
+      "velvet cushion",
+      "hair accessories"
+    ],
+    "contexts": [
+      "salon chair",
+      "wedding hairstyle",
+      "evening event",
+      "studio lighting",
+      "professional mirror",
+      "styling products",
+      "model session",
+      "hair tutorial",
+      "backstage prep",
+      "fashion show"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "fashion",
+      "studio"
+    ]
+  },
+  "home-food-service": {
+    "objects": [
+      "casserole dish",
+      "soup pot",
+      "baking tray",
+      "cake stand",
+      "wooden spoon",
+      "cooking apron",
+      "food container",
+      "fresh ingredients",
+      "delivery bag",
+      "meal box"
+    ],
+    "contexts": [
+      "home kitchen",
+      "family dinner table",
+      "fresh ingredients",
+      "cooking preparation",
+      "cozy dining",
+      "homemade pastry",
+      "warm interior",
+      "kitchen counter",
+      "meal packaging",
+      "food delivery"
+    ],
+    "styles": [
+      "photography",
+      "culinary",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "documentary",
+      "food"
+    ]
+  },
+  "housekeeping": {
+    "objects": [
+      "broom",
+      "dustpan",
+      "mop",
+      "bucket",
+      "spray bottle",
+      "duster",
+      "gloves",
+      "apron",
+      "cleaning brush",
+      "trash bag"
+    ],
+    "contexts": [
+      "clean home",
+      "bright living room",
+      "organized bedroom",
+      "tidy kitchen",
+      "sparkling bathroom",
+      "neat shelf",
+      "polished floor",
+      "sunlit interior",
+      "domestic setting",
+      "professional cleaning"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "documentary",
+      "studio",
+      "domestic"
+    ]
+  },
+  "laptop-pc-repair": {
+    "objects": [
+      "laptop",
+      "screwdriver",
+      "circuit board",
+      "thermal paste",
+      "RAM module",
+      "hard drive",
+      "fan",
+      "keyboard",
+      "screen panel",
+      "anti static mat"
+    ],
+    "contexts": [
+      "repair workshop",
+      "workbench",
+      "technical setup",
+      "electronic components",
+      "service center",
+      "professional tools",
+      "organized workspace",
+      "circuit close up"
+    ],
+    "styles": [
+      "photography",
+      "technical",
+      "documentary",
+      "professional",
+      "editorial",
+      "studio",
+      "industrial"
+    ]
+  },
+  "legal-services": {
+    "objects": [
+      "law book",
+      "gavel",
+      "contract",
+      "briefcase",
+      "scales of justice",
+      "stamp",
+      "pen",
+      "glasses",
+      "folder",
+      "badge"
+    ],
+    "contexts": [
+      "law office",
+      "courtroom",
+      "library",
+      "conference room",
+      "wood paneled office",
+      "formal desk",
+      "leather chair",
+      "legal documents",
+      "consultation room",
+      "professional setting"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "corporate",
+      "professional",
+      "documentary",
+      "formal",
+      "studio"
+    ]
+  },
+  "manicure": {
+    "objects": [
+      "nail polish",
+      "nail file",
+      "cuticle pusher",
+      "nail clipper",
+      "UV lamp",
+      "gel polish",
+      "nail art brush",
+      "hand cream",
+      "manicure table",
+      "nail drill"
+    ],
+    "contexts": [
+      "salon table",
+      "manicure station",
+      "soft lighting",
+      "polished nails",
+      "beauty studio",
+      "hand massage",
+      "relaxation setting",
+      "professional tools",
+      "nail color display",
+      "spa interior"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "fashion"
+    ]
+  },
+  "massage": {
+    "objects": [
+      "massage table",
+      "towel",
+      "essential oil",
+      "stone set",
+      "candle",
+      "relaxation music",
+      "bamboo stick",
+      "massage roller",
+      "aroma diffuser",
+      "soft robe"
+    ],
+    "contexts": [
+      "spa room",
+      "dim lighting",
+      "relaxing atmosphere",
+      "calm interior",
+      "candlelit room",
+      "bamboo decor",
+      "zen setting",
+      "therapeutic session",
+      "natural materials",
+      "tranquil space"
+    ],
+    "styles": [
+      "photography",
+      "wellness",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "luxury",
+      "minimalist"
+    ]
+  },
+  "medicine": {
+    "objects": [
+      "stethoscope",
+      "medical mask",
+      "thermometer",
+      "prescription pad",
+      "pill bottle",
+      "syringe",
+      "gloves",
+      "blood pressure monitor",
+      "medical chart",
+      "doctor coat"
+    ],
+    "contexts": [
+      "doctor office",
+      "hospital corridor",
+      "clean examination room",
+      "medical cabinet",
+      "consultation desk",
+      "white interior",
+      "professional setting",
+      "clinical environment",
+      "modern clinic",
+      "waiting area"
+    ],
+    "styles": [
+      "photography",
+      "medical",
+      "editorial",
+      "professional",
+      "documentary",
+      "clinical",
+      "studio"
+    ]
+  },
+  "no-experience-jobs": {
+    "objects": [
+      "laptop",
+      "notebook",
+      "pen",
+      "coffee cup",
+      "smartphone",
+      "resume",
+      "badge",
+      "headset",
+      "calendar",
+      "desk lamp"
+    ],
+    "contexts": [
+      "modern office",
+      "coworking space",
+      "meeting room",
+      "training room",
+      "reception desk",
+      "open plan",
+      "welcome sign",
+      "team workspace",
+      "interview room",
+      "glass building"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "office-cleaning": {
+    "objects": [
+      "cleaning cart",
+      "vacuum cleaner",
+      "mop",
+      "window squeegee",
+      "trash bin",
+      "spray bottle",
+      "duster",
+      "microfiber cloth",
+      "rubber gloves",
+      "floor polisher"
+    ],
+    "contexts": [
+      "office corridor",
+      "open plan office",
+      "reception area",
+      "conference room",
+      "clean desk",
+      "modern workplace",
+      "glass facade",
+      "lobby floor",
+      "meeting room",
+      "office kitchen"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "commercial",
+      "lifestyle"
+    ]
+  },
+  "other-services": {
+    "objects": [
+      "toolbox",
+      "smartphone",
+      "calendar",
+      "notebook",
+      "pen",
+      "handshake",
+      "measuring tape",
+      "screwdriver",
+      "laptop",
+      "work gloves"
+    ],
+    "contexts": [
+      "workshop",
+      "home setting",
+      "professional desk",
+      "consultation",
+      "service call",
+      "modern interior",
+      "workbench",
+      "client meeting",
+      "flexible workspace",
+      "outdoor job"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "documentary",
+      "commercial",
+      "studio"
+    ]
+  },
+  "pc-setup": {
+    "objects": [
+      "desktop computer",
+      "monitor",
+      "keyboard",
+      "mouse",
+      "cable set",
+      "screwdriver",
+      "power supply",
+      "graphics card",
+      "motherboard",
+      "USB hub"
+    ],
+    "contexts": [
+      "computer desk",
+      "gaming setup",
+      "home office",
+      "tech workspace",
+      "cable management",
+      "dual monitor",
+      "modern PC",
+      "workstation",
+      "bright interior",
+      "minimalist desk"
+    ],
+    "styles": [
+      "photography",
+      "technology",
+      "editorial",
+      "professional",
+      "studio",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "pedicure": {
+    "objects": [
+      "foot basin",
+      "pumice stone",
+      "nail file",
+      "foot cream",
+      "toe separator",
+      "nail polish",
+      "towel",
+      "pedicure chair",
+      "foot roller",
+      "cuticle oil"
+    ],
+    "contexts": [
+      "salon station",
+      "spa interior",
+      "relaxing foot bath",
+      "soft lighting",
+      "beauty studio",
+      "comfortable chair",
+      "professional tools",
+      "polished toes",
+      "calm atmosphere",
+      "wellness setting"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "studio",
+      "luxury"
+    ]
+  },
+  "phone-repair": {
+    "objects": [
+      "smartphone",
+      "screwdriver set",
+      "suction cup",
+      "spudger",
+      "replacement screen",
+      "battery",
+      "magnifying glass",
+      "microscope",
+      "motherboard",
+      "tweezer set"
+    ],
+    "contexts": [
+      "repair bench",
+      "workshop",
+      "technical close up",
+      "component tray",
+      "soldering station",
+      "professional tools",
+      "electronic repair",
+      "service counter",
+      "organized parts",
+      "anti static mat"
+    ],
+    "styles": [
+      "photography",
+      "technical",
+      "editorial",
+      "professional",
+      "documentary",
+      "studio",
+      "industrial"
+    ]
+  },
+  "photoshoots": {
+    "objects": [
+      "camera",
+      "lens",
+      "tripod",
+      "lighting kit",
+      "reflector",
+      "backdrop",
+      "memory card",
+      "camera bag",
+      "flash",
+      "light stand"
+    ],
+    "contexts": [
+      "photo studio",
+      "outdoor shoot",
+      "golden hour",
+      "indoor session",
+      "model portrait",
+      "product photography",
+      "natural light",
+      "studio backdrop",
+      "creative lighting",
+      "fashion shoot"
+    ],
+    "styles": [
+      "photography",
+      "fashion",
+      "editorial",
+      "professional",
+      "studio",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "plastering": {
+    "objects": [
+      "trowel",
+      "plaster float",
+      "mixing bucket",
+      "plastering hawk",
+      "spatula",
+      "level",
+      "sandpaper",
+      "joint compound",
+      "corner bead",
+      "mixing drill"
+    ],
+    "contexts": [
+      "construction site",
+      "wall finishing",
+      "interior renovation",
+      "new building",
+      "professional tools",
+      "work in progress",
+      "plaster texture",
+      "smooth wall finish",
+      "building interior",
+      "renovation room"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "lifestyle"
+    ]
+  },
+  "plumbing": {
+    "objects": [
+      "pipe wrench",
+      "plunger",
+      "plumber snake",
+      "pipe cutter",
+      "soldering torch",
+      "faucet",
+      "shower head",
+      "sink drain",
+      "water heater",
+      "PVC pipe"
+    ],
+    "contexts": [
+      "bathroom renovation",
+      "kitchen sink",
+      "workshop",
+      "under sink",
+      "basement pipes",
+      "professional tools",
+      "service van",
+      "repair job",
+      "new installation",
+      "tool organizer"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "technical",
+      "lifestyle"
+    ]
+  },
+  "programming": {
+    "objects": [
+      "laptop",
+      "code editor screen",
+      "keyboard",
+      "mouse",
+      "coffee mug",
+      "notebook",
+      "monitor setup",
+      "server rack",
+      "USB drive",
+      "headset"
+    ],
+    "contexts": [
+      "modern office",
+      "home office",
+      "coworking space",
+      "dual monitor desk",
+      "tech startup",
+      "minimalist workspace",
+      "code on screen",
+      "night coding",
+      "glass office",
+      "creative tech"
+    ],
+    "styles": [
+      "photography",
+      "technology",
+      "editorial",
+      "professional",
+      "lifestyle",
+      "corporate",
+      "minimalist"
+    ]
+  },
+  "property-valuation": {
+    "objects": [
+      "clipboard",
+      "measuring tape",
+      "camera",
+      "laptop",
+      "blueprint",
+      "property sign",
+      "calculator",
+      "keys",
+      "valuation report",
+      "laser measurer"
+    ],
+    "contexts": [
+      "residential street",
+      "building facade",
+      "apartment interior",
+      "modern kitchen",
+      "garden view",
+      "commercial front",
+      "city view",
+      "new development",
+      "property inspection",
+      "consultation office"
+    ],
+    "styles": [
+      "photography",
+      "real estate",
+      "editorial",
+      "professional",
+      "documentary",
+      "architectural",
+      "commercial"
+    ]
+  },
+  "psychology": {
+    "objects": [
+      "couch",
+      "notebook",
+      "pen",
+      "tissues box",
+      "clock",
+      "plant",
+      "bookshelf",
+      "calm painting",
+      "lamp",
+      "cozy chair"
+    ],
+    "contexts": [
+      "therapy room",
+      "calm interior",
+      "comfortable setting",
+      "warm lighting",
+      "peaceful decor",
+      "soft colors",
+      "professional office",
+      "supportive environment",
+      "quiet space",
+      "bookshelf background"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "minimalist",
+      "studio"
+    ]
+  },
+  "residential-construction": {
+    "objects": [
+      "foundation blocks",
+      "brick wall",
+      "roof tiles",
+      "cement mixer",
+      "wooden beam",
+      "level",
+      "safety helmet",
+      "excavator",
+      "crane",
+      "house frame"
+    ],
+    "contexts": [
+      "house construction",
+      "building site",
+      "new development",
+      "suburban neighborhood",
+      "foundation work",
+      "roofing work",
+      "sunset building",
+      "modern home",
+      "residential area",
+      "framing structure"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "lifestyle"
+    ]
+  },
+  "restaurants": {
+    "objects": [
+      "dining table",
+      "chair set",
+      "menu board",
+      "wine glass",
+      "plate",
+      "chef hat",
+      "kitchen hood",
+      "serving tray",
+      "candle",
+      "tablecloth"
+    ],
+    "contexts": [
+      "restaurant interior",
+      "cozy dining",
+      "modern decor",
+      "open kitchen",
+      "outdoor terrace",
+      "romantic setting",
+      "busy dinner service",
+      "bar counter",
+      "warm lighting",
+      "garden dining"
+    ],
+    "styles": [
+      "photography",
+      "culinary",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "commercial",
+      "interior"
+    ]
+  },
+  "security": {
+    "objects": [
+      "security camera",
+      "monitor screen",
+      "alarm panel",
+      "keypad",
+      "guard uniform",
+      "badge",
+      "flashlight",
+      "fence gate",
+      "motion sensor",
+      "lock system"
+    ],
+    "contexts": [
+      "control room",
+      "building entrance",
+      "surveillance center",
+      "commercial facility",
+      "security booth",
+      "monitor wall",
+      "front gate",
+      "modern office",
+      "parking lot",
+      "warehouse perimeter"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "industrial",
+      "studio"
+    ]
+  },
+  "shoe-repair": {
+    "objects": [
+      "shoe last",
+      "leather piece",
+      "cobbler hammer",
+      "awl",
+      "thread wax",
+      "sole rubber",
+      "shoe polish",
+      "brush",
+      "heel block",
+      "cutting knife"
+    ],
+    "contexts": [
+      "cobbler workshop",
+      "repair bench",
+      "old tools",
+      "craftsmanship",
+      "leather work",
+      "traditional shop",
+      "organized shelf",
+      "shoe collection",
+      "workbench detail",
+      "repair station"
+    ],
+    "styles": [
+      "photography",
+      "craft",
+      "documentary",
+      "professional",
+      "editorial",
+      "studio",
+      "lifestyle"
+    ]
+  },
+  "skincare": {
+    "objects": [
+      "face cream jar",
+      "serum bottle",
+      "cleansing brush",
+      "face mask",
+      "cotton pad",
+      "spatula",
+      "mirror",
+      "toner bottle",
+      "sunscreen",
+      "eye cream"
+    ],
+    "contexts": [
+      "bathroom vanity",
+      "dressing table",
+      "studio lighting",
+      "flat lay",
+      "white background",
+      "natural light",
+      "marble surface",
+      "spa setting",
+      "minimalist",
+      "luxury skincare"
+    ],
+    "styles": [
+      "photography",
+      "beauty",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "luxury"
+    ]
+  },
+  "sport-fitness": {
+    "objects": [
+      "dumbbell",
+      "yoga mat",
+      "treadmill",
+      "kettlebell",
+      "fitness band",
+      "barbell",
+      "jump rope",
+      "water bottle",
+      "towel",
+      "gym bag"
+    ],
+    "contexts": [
+      "gym interior",
+      "home workout",
+      "fitness studio",
+      "outdoor training",
+      "modern equipment",
+      "sunset run",
+      "personal training",
+      "group class",
+      "sport hall",
+      "weight room"
+    ],
+    "styles": [
+      "photography",
+      "sports",
+      "fitness",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "action"
+    ]
+  },
+  "tax-planning": {
+    "objects": [
+      "calculator",
+      "tax form",
+      "folder",
+      "pen",
+      "laptop",
+      "stamp",
+      "glass of water",
+      "documents stack",
+      "calendar",
+      "ledger"
+    ],
+    "contexts": [
+      "office desk",
+      "home office",
+      "financial documents",
+      "modern study",
+      "professional setting",
+      "calculator and papers",
+      "organized desk",
+      "consultation room",
+      "coworking space",
+      "tax papers"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "studio"
+    ]
+  },
+  "taxi": {
+    "objects": [
+      "car",
+      "taxi sign",
+      "steering wheel",
+      "meter",
+      "back seat",
+      "smartphone holder",
+      "door handle",
+      "seatbelt",
+      "headrest",
+      "dashboard"
+    ],
+    "contexts": [
+      "city street",
+      "taxi rank",
+      "airport pickup",
+      "night driving",
+      "urban traffic",
+      "historic old town",
+      "street lighting",
+      "passenger door",
+      "hailing taxi",
+      "modern vehicle"
+    ],
+    "styles": [
+      "photography",
+      "lifestyle",
+      "editorial",
+      "professional",
+      "documentary",
+      "urban",
+      "commercial"
+    ]
+  },
+  "terraces-balconies": {
+    "objects": [
+      "wooden deck",
+      "glass railing",
+      "outdoor furniture",
+      "awning",
+      "plant pot",
+      "terrace tile",
+      "roof section",
+      "aluminum frame",
+      "balcony floor",
+      "sun shade"
+    ],
+    "contexts": [
+      "modern balcony",
+      "rooftop terrace",
+      "sea view",
+      "mountain panorama",
+      "garden terrace",
+      "summer house",
+      "sunset view",
+      "new construction",
+      "outdoor living",
+      "city view balcony"
+    ],
+    "styles": [
+      "photography",
+      "architectural",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "documentary",
+      "outdoor"
+    ]
+  },
+  "tow-truck": {
+    "objects": [
+      "tow truck",
+      "winch cable",
+      "tow hook",
+      "wheel lift",
+      "safety chain",
+      "warning light",
+      "flatbed",
+      "tool box",
+      "gloves",
+      "reflector triangle"
+    ],
+    "contexts": [
+      "highway shoulder",
+      "accident scene",
+      "city street",
+      "garage depot",
+      "emergency service",
+      "vehicle recovery",
+      "roadside assistance",
+      "night call",
+      "parking lot",
+      "truck station"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "commercial",
+      "action"
+    ]
+  },
+  "trading": {
+    "objects": [
+      "laptop",
+      "chart screen",
+      "smartphone",
+      "pen",
+      "notebook",
+      "calculator",
+      "business card",
+      "handshake",
+      "coin",
+      "briefcase"
+    ],
+    "contexts": [
+      "office desk",
+      "trading floor",
+      "meeting room",
+      "warehouse visit",
+      "market stall",
+      "business district",
+      "consultation",
+      "stock market",
+      "modern workspace",
+      "buyer meeting"
+    ],
+    "styles": [
+      "photography",
+      "corporate",
+      "editorial",
+      "professional",
+      "documentary",
+      "commercial",
+      "lifestyle"
+    ]
+  },
+  "translations": {
+    "objects": [
+      "dictionary",
+      "laptop",
+      "pen",
+      "notebook",
+      "glasses",
+      "documents stack",
+      "coffee cup",
+      "headset",
+      "book shelf",
+      "text pages"
+    ],
+    "contexts": [
+      "desk workspace",
+      "home office",
+      "library",
+      "quiet study",
+      "professional translator",
+      "bilingual documents",
+      "modern interior",
+      "coworking space",
+      "study lamp",
+      "language books"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "lifestyle",
+      "professional",
+      "documentary",
+      "studio",
+      "corporate"
+    ]
+  },
+  "tutors": {
+    "objects": [
+      "textbook",
+      "whiteboard",
+      "pen",
+      "notebook",
+      "laptop",
+      "pencil case",
+      "desk",
+      "chair",
+      "clock",
+      "diploma"
+    ],
+    "contexts": [
+      "classroom",
+      "home study",
+      "library",
+      "private lesson",
+      "bright room",
+      "learning desk",
+      "quiet space",
+      "educational setting",
+      "study corner",
+      "student workspace"
+    ],
+    "styles": [
+      "photography",
+      "educational",
+      "lifestyle",
+      "professional",
+      "editorial",
+      "documentary",
+      "corporate"
+    ]
+  },
+  "warehousing": {
+    "objects": [
+      "warehouse rack",
+      "pallet",
+      "forklift",
+      "cardboard box",
+      "shrink wrap",
+      "barcode scanner",
+      "safety vest",
+      "loading dock",
+      "inventory shelf",
+      "warehouse door"
+    ],
+    "contexts": [
+      "warehouse interior",
+      "high shelving",
+      "logistics center",
+      "inventory row",
+      "shipping area",
+      "industrial zone",
+      "order picking",
+      "storage facility",
+      "stacked pallets",
+      "distribution hub"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "commercial",
+      "logistics"
+    ]
+  },
+  "waterproofing": {
+    "objects": [
+      "sealant tube",
+      "waterproof membrane",
+      "roller brush",
+      "rubber sheet",
+      "putty knife",
+      "caulking gun",
+      "protective gloves",
+      "spray bottle",
+      "tarpaulin",
+      "drain pipe"
+    ],
+    "contexts": [
+      "basement wall",
+      "bathroom renovation",
+      "roof surface",
+      "building foundation",
+      "construction site",
+      "outdoor concrete",
+      "water treatment",
+      "professional tools",
+      "damp proofing",
+      "exterior wall"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "technical"
+    ]
+  },
+  "web-development": {
+    "objects": [
+      "laptop",
+      "code on screen",
+      "smartphone mockup",
+      "wireframe",
+      "sketch pad",
+      "mouse",
+      "coffee cup",
+      "server cabinet",
+      "graphics tablet",
+      "responsive display"
+    ],
+    "contexts": [
+      "modern office",
+      "home office",
+      "coworking space",
+      "dual monitor desk",
+      "tech startup",
+      "creative studio",
+      "code editor",
+      "project planning",
+      "minimalist desk",
+      "bright interior"
+    ],
+    "styles": [
+      "photography",
+      "technology",
+      "editorial",
+      "professional",
+      "lifestyle",
+      "corporate",
+      "minimalist"
+    ]
+  },
+  "ready-business": {
+    "objects": [
+      "storefront",
+      "coffee shop",
+      "restaurant interior",
+      "retail shop",
+      "bakery",
+      "cafe",
+      "convenience store",
+      "boutique",
+      "bar",
+      "grocery store"
+    ],
+    "contexts": [
+      "store interior",
+      "commercial street",
+      "shopping district",
+      "downtown",
+      "high foot traffic",
+      "open for business",
+      "storefront facade",
+      "neighbourhood shop",
+      "business signage",
+      "busy commercial area"
+    ],
+    "styles": [
+      "photography",
+      "commercial",
+      "editorial",
+      "professional",
+      "documentary",
+      "lifestyle",
+      "architectural"
+    ]
+  },
+  "retail-equipment": {
+    "objects": [
+      "shelving unit",
+      "cash register",
+      "display case",
+      "barcode scanner",
+      "price tag",
+      "shopping cart",
+      "mannequin",
+      "rack",
+      "pos terminal",
+      "security tag"
+    ],
+    "contexts": [
+      "retail store",
+      "showroom",
+      "commercial interior",
+      "well lit shop",
+      "merchandise display",
+      "product shelf",
+      "store layout",
+      "checkout counter",
+      "sales floor",
+      "retail environment"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "commercial",
+      "industrial"
+    ]
+  },
+  "food-equipment": {
+    "objects": [
+      "commercial oven",
+      "refrigerator",
+      "stainless steel counter",
+      "mixer",
+      "fryer",
+      "ice machine",
+      "grill",
+      "dishwasher",
+      "range hood",
+      "blast chiller"
+    ],
+    "contexts": [
+      "commercial kitchen",
+      "restaurant kitchen",
+      "cafe kitchen",
+      "stainless steel worktop",
+      "kitchen hood system",
+      "food prep area",
+      "clean kitchen",
+      "professional cooking",
+      "baking station",
+      "catering setup"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "commercial",
+      "industrial"
+    ]
+  },
+  "office-equipment": {
+    "objects": [
+      "office desk",
+      "office chair",
+      "filing cabinet",
+      "printer",
+      "paper shredder",
+      "conference table",
+      "bookcase",
+      "whiteboard",
+      "monitor arm",
+      "desk lamp"
+    ],
+    "contexts": [
+      "modern office",
+      "coworking space",
+      "open plan office",
+      "conference room",
+      "reception area",
+      "home office",
+      "corporate interior",
+      "minimalist workspace",
+      "bright office",
+      "professional setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "corporate",
+      "minimalist"
+    ]
+  },
+  "industrial-equipment": {
+    "objects": [
+      "conveyor belt",
+      "forklift",
+      "industrial compressor",
+      "lathe machine",
+      "welding machine",
+      "industrial boiler",
+      "hydraulic press",
+      "assembly line",
+      "electric motor",
+      "industrial pump"
+    ],
+    "contexts": [
+      "factory floor",
+      "industrial workshop",
+      "manufacturing plant",
+      "production line",
+      "warehouse facility",
+      "heavy machinery",
+      "industrial setting",
+      "steel structure",
+      "workstation",
+      "loading bay"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "architectural",
+      "technical"
+    ]
+  },
+  "logistics-warehouse": {
+    "objects": [
+      "pallet rack",
+      "forklift",
+      "warehouse shelf",
+      "cardboard box",
+      "stretch wrap",
+      "pallet",
+      "dock leveler",
+      "hand pallet truck",
+      "conveyor system",
+      "storage bin"
+    ],
+    "contexts": [
+      "warehouse interior",
+      "logistics centre",
+      "fulfilment centre",
+      "high ceiling storage",
+      "packing station",
+      "loading dock",
+      "distribution centre",
+      "stockroom",
+      "industrial shelving",
+      "supply chain facility"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "documentary",
+      "professional",
+      "editorial",
+      "commercial",
+      "architectural"
+    ]
+  },
+  "beauty-equipment": {
+    "objects": [
+      "salon chair",
+      "hair dryer",
+      "beauty bed",
+      "manicure table",
+      "makeup mirror",
+      "steamer",
+      "hair clipper",
+      "facial machine",
+      "nail lamp",
+      "beauty trolley"
+    ],
+    "contexts": [
+      "beauty salon",
+      "hair salon interior",
+      "spa treatment room",
+      "modern salon",
+      "clean white interior",
+      "professional beauty studio",
+      "cosmetology clinic",
+      "wellness centre",
+      "nail studio",
+      "luxury spa"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "commercial"
+    ]
+  },
+  "auto-business-equipment": {
+    "objects": [
+      "car lift",
+      "tire changer",
+      "diagnostic tool",
+      "wheel balancer",
+      "air compressor",
+      "tool chest",
+      "engine hoist",
+      "paint spray booth",
+      "impact wrench",
+      "oil drain pan"
+    ],
+    "contexts": [
+      "auto workshop",
+      "car repair garage",
+      "service bay",
+      "mechanical workshop",
+      "tire service",
+      "car detailing studio",
+      "diagnostic station",
+      "professional garage",
+      "lift bay",
+      "automotive centre"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "product",
+      "professional",
+      "editorial",
+      "technical",
+      "commercial"
+    ]
+  },
+  "medical-equipment": {
+    "objects": [
+      "examination table",
+      "patient monitor",
+      "ultrasound machine",
+      "stethoscope",
+      "surgical light",
+      "defibrillator",
+      "centrifuge",
+      "infusion pump",
+      "autoclave",
+      "diagnostic scanner"
+    ],
+    "contexts": [
+      "medical clinic",
+      "hospital room",
+      "doctor office",
+      "sterile environment",
+      "treatment room",
+      "surgery preparation",
+      "diagnostic centre",
+      "modern healthcare",
+      "clean clinical space",
+      "laboratory setting"
+    ],
+    "styles": [
+      "photography",
+      "product",
+      "studio",
+      "professional",
+      "editorial",
+      "medical",
+      "commercial"
+    ]
+  },
+  "business-offices": {
+    "objects": [
+      "office building",
+      "coworking space",
+      "meeting room",
+      "executive office",
+      "open plan workspace",
+      "reception lobby",
+      "glass facade",
+      "conference hall",
+      "private office",
+      "shared workspace"
+    ],
+    "contexts": [
+      "business district",
+      "downtown area",
+      "commercial centre",
+      "modern building",
+      "corporate hub",
+      "central location",
+      "glass tower",
+      "city centre",
+      "business park",
+      "urban commercial zone"
+    ],
+    "styles": [
+      "photography",
+      "commercial",
+      "architectural",
+      "professional",
+      "editorial",
+      "corporate",
+      "minimalist"
+    ]
+  },
+  "business-flex-space": {
+    "objects": [
+      "open workspace",
+      "event space",
+      "showroom",
+      "creative studio",
+      "exhibition hall",
+      "meeting area",
+      "multi purpose room",
+      "loft space",
+      "pop up shop",
+      "art gallery space"
+    ],
+    "contexts": [
+      "flexible layout",
+      "modern interior",
+      "commercial district",
+      "converted warehouse",
+      "industrial chic",
+      "open ceiling",
+      "high ceilings",
+      "bright natural light",
+      "adaptable floor plan",
+      "mixed use building"
+    ],
+    "styles": [
+      "photography",
+      "commercial",
+      "architectural",
+      "professional",
+      "editorial",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "business-retail-spaces": {
+    "objects": [
+      "shop front",
+      "store interior",
+      "retail unit",
+      "ground floor space",
+      "high street shop",
+      "kiosk",
+      "showroom",
+      "corner shop",
+      "arcade unit",
+      "department space"
+    ],
+    "contexts": [
+      "shopping street",
+      "commercial corridor",
+      "retail zone",
+      "pedestrian area",
+      "store window",
+      "entrance facade",
+      "busy intersection",
+      "shopping centre",
+      "street level access",
+      "window display"
+    ],
+    "styles": [
+      "photography",
+      "commercial",
+      "architectural",
+      "professional",
+      "editorial",
+      "real estate",
+      "urban"
+    ]
+  },
+  "business-warehouses": {
+    "objects": [
+      "warehouse building",
+      "storage facility",
+      "logistics hub",
+      "industrial unit",
+      "cold storage",
+      "distribution depot",
+      "fulfilment centre",
+      "cross dock",
+      "storage shed",
+      "container yard"
+    ],
+    "contexts": [
+      "industrial zone",
+      "logistics park",
+      "warehouse district",
+      "truck access",
+      "loading dock",
+      "high clearance",
+      "security gate",
+      "industrial area",
+      "transport corridor",
+      "cargo handling"
+    ],
+    "styles": [
+      "photography",
+      "industrial",
+      "architectural",
+      "professional",
+      "editorial",
+      "commercial",
+      "documentary"
+    ]
+  },
+  "business-commercial-land": {
+    "objects": [
+      "building plot",
+      "development site",
+      "greenfield",
+      "brownfield",
+      "land parcel",
+      "construction lot",
+      "zoned land",
+      "commercial lot",
+      "undeveloped site",
+      "industrial land"
+    ],
+    "contexts": [
+      "commercial zone",
+      "development area",
+      "road frontage",
+      "urban fringe",
+      "industrial park",
+      "highway access",
+      "surveyed land",
+      "building permit ready",
+      "flat terrain",
+      "utilities available"
+    ],
+    "styles": [
+      "photography",
+      "landscape",
+      "aerial",
+      "professional",
+      "editorial",
+      "architectural",
+      "documentary"
+    ]
+  },
+  "business-accounting": {
+    "objects": [
+      "calculator",
+      "ledger book",
+      "laptop",
+      "documents folder",
+      "accounting report",
+      "pen",
+      "stamp",
+      "spreadsheet",
+      "balance sheet",
+      "receipt"
+    ],
+    "contexts": [
+      "modern office",
+      "accounting firm",
+      "desk workspace",
+      "professional setting",
+      "financial documents",
+      "calculator and papers",
+      "organised desk",
+      "corporate environment",
+      "business meeting",
+      "home office"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "corporate",
+      "professional",
+      "documentary",
+      "minimalist",
+      "studio"
+    ]
+  },
+  "business-legal-services": {
+    "objects": [
+      "law book",
+      "contract",
+      "briefcase",
+      "gavel",
+      "scales of justice",
+      "legal document",
+      "stamp",
+      "office desk",
+      "leather chair",
+      "certificate"
+    ],
+    "contexts": [
+      "law office",
+      "legal library",
+      "conference room",
+      "formal meeting",
+      "wood panelled office",
+      "professional consultation",
+      "corporate law firm",
+      "modern legal practice",
+      "client meeting",
+      "court building"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "corporate",
+      "professional",
+      "documentary",
+      "formal",
+      "studio"
+    ]
+  },
+  "business-taxes": {
+    "objects": [
+      "tax form",
+      "calculator",
+      "laptop",
+      "pencil",
+      "calendar",
+      "folder",
+      "bank statements",
+      "receipt stack",
+      "stamp",
+      "official document"
+    ],
+    "contexts": [
+      "office desk",
+      "accounting workspace",
+      "tax season",
+      "professional consultation",
+      "financial planning",
+      "calculator and papers",
+      "filing documents",
+      "home office",
+      "corporate setting",
+      "paperwork organisation"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "corporate",
+      "professional",
+      "documentary",
+      "minimalist",
+      "studio"
+    ]
+  },
+  "business-property-valuation": {
+    "objects": [
+      "building facade",
+      "measuring tape",
+      "clipboard",
+      "valuation report",
+      "camera",
+      "property deed",
+      "blueprint",
+      "laptop",
+      "notepad",
+      "house model"
+    ],
+    "contexts": [
+      "property inspection",
+      "real estate appraisal",
+      "commercial building",
+      "office visit",
+      "on site assessment",
+      "urban location",
+      "architectural survey",
+      "professional evaluation",
+      "residential area",
+      "city street"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "real estate",
+      "professional",
+      "documentary",
+      "architectural",
+      "commercial"
+    ]
+  },
+  "business-translations": {
+    "objects": [
+      "dictionary",
+      "laptop",
+      "notebook",
+      "pen",
+      "globe",
+      "language book",
+      "headphones",
+      "microphone",
+      "translation document",
+      "certificate"
+    ],
+    "contexts": [
+      "office desk",
+      "translation bureau",
+      "laptop workspace",
+      "language study",
+      "international business",
+      "bilingual document",
+      "professional translator",
+      "home office",
+      "modern workspace",
+      "cross cultural communication"
+    ],
+    "styles": [
+      "photography",
+      "editorial",
+      "corporate",
+      "professional",
+      "documentary",
+      "minimalist",
+      "lifestyle"
+    ]
+  },
+  "charity": {
+    "objects": [
+      "donation",
+      "charity",
+      "volunteer",
+      "helping hand",
+      "food donation",
+      "clothing donation",
+      "community",
+      "fundraising",
+      "charity box",
+      "kindness"
+    ],
+    "contexts": [
+      "community center",
+      "donation drive",
+      "volunteer event",
+      "charity shop",
+      "helping others",
+      "solidarity",
+      "food bank",
+      "neighborhood support"
+    ],
+    "styles": [
+      "photography",
+      "documentary",
+      "editorial",
+      "humanitarian",
+      "lifestyle",
+      "compassionate",
+      "community"
+    ]
   }
 }

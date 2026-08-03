@@ -1,57 +1,7361 @@
 {
   "version": 1,
   "conditions": {
-    "ru": ["отличное", "хорошее", "удовлетворительное", "идеальное", "как новый", "превосходное", "нормальное", "среднее", "приемлемое", "неплохое"],
-    "en": ["excellent", "good", "fair", "like new", "perfect", "very good", "satisfactory", "average", "acceptable", "decent"],
-    "bs": ["odlično", "dobro", "zadovoljavajuće", "kao novo", "savršeno", "vrlo dobro", "solidno", "prosječno", "prihvatljivo", "pristojno"]
+    "ru": [
+      "отличное",
+      "хорошее",
+      "удовлетворительное",
+      "идеальное",
+      "как новый",
+      "превосходное",
+      "нормальное",
+      "среднее",
+      "приемлемое",
+      "неплохое"
+    ],
+    "en": [
+      "excellent",
+      "good",
+      "fair",
+      "like new",
+      "perfect",
+      "very good",
+      "satisfactory",
+      "average",
+      "acceptable",
+      "decent"
+    ],
+    "bs": [
+      "odlično",
+      "dobro",
+      "zadovoljavajuće",
+      "kao novo",
+      "savršeno",
+      "vrlo dobro",
+      "solidno",
+      "prosječno",
+      "prihvatljivo",
+      "pristojno"
+    ]
   },
   "brands": {
+    "real_estate": {
+      "ru": [
+        "известный застройщик",
+        "строительная компания",
+        "девелоперская фирма",
+        "Bemax",
+        "Pobjeda Group",
+        "Investmont",
+        "Montenegro Properties",
+        "Adriatic Development",
+        "Alpe Adria Group",
+        "Dukley Group",
+        "Budvanska Rivijera",
+        "Porto Montenegro"
+      ],
+      "en": [
+        "well-known developer",
+        "construction company",
+        "development firm",
+        "Bemax",
+        "Pobjeda Group",
+        "Investmont",
+        "Montenegro Properties",
+        "Adriatic Development",
+        "Alpe Adria Group",
+        "Dukley Group",
+        "Budvanska Rivijera",
+        "Porto Montenegro"
+      ],
+      "bs": [
+        "poznat investitor",
+        "građevinska kompanija",
+        "razvojna firma",
+        "Bemax",
+        "Pobjeda Group",
+        "Investmont",
+        "Montenegro Properties",
+        "Adriatic Development",
+        "Alpe Adria Group",
+        "Dukley Group",
+        "Budvanska Rivijera",
+        "Porto Montenegro"
+      ]
+    },
+    "transport": {
+      "ru": [
+        "Toyota",
+        "BMW",
+        "Mercedes-Benz",
+        "Volkswagen",
+        "Audi",
+        "Honda",
+        "Ford",
+        "Nissan",
+        "Hyundai",
+        "Renault",
+        "Škoda",
+        "Peugeot",
+        "Fiat",
+        "Opel",
+        "Suzuki",
+        "Kia",
+        "Mazda",
+        "Volvo"
+      ],
+      "en": [
+        "Toyota",
+        "BMW",
+        "Mercedes-Benz",
+        "Volkswagen",
+        "Audi",
+        "Honda",
+        "Ford",
+        "Nissan",
+        "Hyundai",
+        "Renault",
+        "Skoda",
+        "Peugeot",
+        "Fiat",
+        "Opel",
+        "Suzuki",
+        "Kia",
+        "Mazda",
+        "Volvo"
+      ],
+      "bs": [
+        "Toyota",
+        "BMW",
+        "Mercedes-Benz",
+        "Volkswagen",
+        "Audi",
+        "Honda",
+        "Ford",
+        "Nissan",
+        "Hyundai",
+        "Renault",
+        "Škoda",
+        "Peugeot",
+        "Fiat",
+        "Opel",
+        "Suzuki",
+        "Kia",
+        "Mazda",
+        "Volvo"
+      ]
+    },
+    "goods": {
+      "ru": [
+        "Samsung",
+        "Apple",
+        "Sony",
+        "LG",
+        "Xiaomi",
+        "Lenovo",
+        "HP",
+        "Dell",
+        "Canon",
+        "Asus",
+        "Nike",
+        "Adidas",
+        "Zara",
+        "H&M",
+        "IKEA",
+        "Bosch",
+        "Philips",
+        "Panasonic",
+        "Braun",
+        "Gorenje"
+      ],
+      "en": [
+        "Samsung",
+        "Apple",
+        "Sony",
+        "LG",
+        "Xiaomi",
+        "Lenovo",
+        "HP",
+        "Dell",
+        "Canon",
+        "Asus",
+        "Nike",
+        "Adidas",
+        "Zara",
+        "H&M",
+        "IKEA",
+        "Bosch",
+        "Philips",
+        "Panasonic",
+        "Braun",
+        "Gorenje"
+      ],
+      "bs": [
+        "Samsung",
+        "Apple",
+        "Sony",
+        "LG",
+        "Xiaomi",
+        "Lenovo",
+        "HP",
+        "Dell",
+        "Canon",
+        "Asus",
+        "Nike",
+        "Adidas",
+        "Zara",
+        "H&M",
+        "IKEA",
+        "Bosch",
+        "Philips",
+        "Panasonic",
+        "Braun",
+        "Gorenje"
+      ]
+    },
+    "animals": {
+      "ru": [
+        "Royal Canin",
+        "Purina",
+        "Acana",
+        "Hill's",
+        "Pedigree",
+        "Whiskas",
+        "Trixie",
+        "Ferplast",
+        "Savic",
+        "Tetra"
+      ],
+      "en": [
+        "Royal Canin",
+        "Purina",
+        "Acana",
+        "Hill's",
+        "Pedigree",
+        "Whiskas",
+        "Trixie",
+        "Ferplast",
+        "Savic",
+        "Tetra"
+      ],
+      "bs": [
+        "Royal Canin",
+        "Purina",
+        "Acana",
+        "Hill's",
+        "Pedigree",
+        "Whiskas",
+        "Trixie",
+        "Ferplast",
+        "Savic",
+        "Tetra"
+      ]
+    },
+    "services": {
+      "ru": [
+        "профессионал",
+        "мастер с опытом",
+        "специалист",
+        "команда профессионалов",
+        "сертифицированный мастер",
+        "опытный мастер",
+        "профессиональная команда",
+        "квалифицированный специалист"
+      ],
+      "en": [
+        "professional",
+        "experienced master",
+        "specialist",
+        "team of professionals",
+        "certified master",
+        "experienced craftsman",
+        "professional team",
+        "qualified specialist"
+      ],
+      "bs": [
+        "profesionalac",
+        "majstor sa iskustvom",
+        "specijalista",
+        "tim profesionalaca",
+        "certificirani majstor",
+        "iskusan majstor",
+        "profesionalni tim",
+        "kvalifikovani stručnjak"
+      ]
+    },
+    "business": {
+      "ru": [
+        "известный бренд",
+        "популярный производитель",
+        "качественный бренд",
+        "надёжная марка",
+        "проверенный производитель",
+        "профессиональный бренд",
+        "ведущий производитель",
+        "сертифицированное оборудование",
+        "премиальный бренд",
+        "европейский производитель"
+      ],
+      "en": [
+        "well-known brand",
+        "popular manufacturer",
+        "quality brand",
+        "reliable brand",
+        "trusted manufacturer",
+        "professional brand",
+        "leading manufacturer",
+        "certified equipment",
+        "premium brand",
+        "European manufacturer"
+      ],
+      "bs": [
+        "poznat brend",
+        "popularan proizvođač",
+        "kvalitetan brend",
+        "pouzdan brend",
+        "provjeren proizvođač",
+        "profesionalni brend",
+        "vodeći proizvođač",
+        "certificirana oprema",
+        "premium brend",
+        "evropski proizvođač"
+      ]
+    },
+    "charity": {
+      "ru": [
+        "благотворительный фонд",
+        "волонтёрская организация",
+        "общественная организация",
+        "фонд помощи",
+        "волонтёрское объединение"
+      ],
+      "en": [
+        "charity foundation",
+        "volunteer organization",
+        "public organization",
+        "aid foundation",
+        "volunteer association"
+      ],
+      "bs": [
+        "humanitarna fondacija",
+        "volonterska organizacija",
+        "javna organizacija",
+        "fondacija za pomoć",
+        "volontersko udruženje"
+      ]
+    },
     "default": {
-      "ru": ["известный бренд", "популярный производитель", "качественный бренд", "надёжная марка"],
-      "en": ["well-known brand", "popular manufacturer", "quality brand", "reliable brand"],
-      "bs": ["poznat brend", "popularan proizvođač", "kvalitetan brend", "pouzdan brend"]
-    },
-    "elektronika": {
-      "ru": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
-      "en": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"],
-      "bs": ["Samsung", "Apple", "Sony", "LG", "Xiaomi", "Lenovo", "HP", "Dell", "Canon", "Asus"]
-    },
-    "avtomobili": {
-      "ru": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
-      "en": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"],
-      "bs": ["Toyota", "BMW", "Mercedes", "Volkswagen", "Audi", "Honda", "Ford", "Nissan", "Hyundai", "Renault"]
-    },
-    "mototsikly": {
-      "ru": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"],
-      "en": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"],
-      "bs": ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Aprilia", "Harley-Davidson", "Piaggio"]
+      "ru": [
+        "известный бренд",
+        "популярный производитель",
+        "качественный бренд",
+        "надёжная марка"
+      ],
+      "en": [
+        "well-known brand",
+        "popular manufacturer",
+        "quality brand",
+        "reliable brand"
+      ],
+      "bs": [
+        "poznat brend",
+        "popularan proizvođač",
+        "kvalitetan brend",
+        "pouzdan brend"
+      ]
     }
   },
   "features": {
-    "default": {
-      "ru": ["отличное качество", "доступная цена", "удобство использования", "надёжность", "долговечность"],
-      "en": ["excellent quality", "affordable price", "ease of use", "reliability", "durability"],
-      "bs": ["odličan kvalitet", "pristupačna cijena", "jednostavnost korištenja", "pouzdanost", "trajnost"]
+    "apartments": {
+      "ru": [
+        "хороший ремонт",
+        "новая сантехника",
+        "пластиковые окна",
+        "развитая инфраструктура",
+        "рядом магазины",
+        "остановка рядом",
+        "Wi-Fi",
+        "кондиционер",
+        "балкон",
+        "парковка",
+        "лифт",
+        "панорамный вид"
+      ],
+      "en": [
+        "good renovation",
+        "new plumbing",
+        "plastic windows",
+        "developed infrastructure",
+        "near shops",
+        "bus stop nearby",
+        "Wi-Fi",
+        "air conditioning",
+        "balcony",
+        "parking",
+        "elevator",
+        "panoramic view"
+      ],
+      "bs": [
+        "dobra renovacija",
+        "nova sanitarija",
+        "plastični prozori",
+        "razvijena infrastruktura",
+        "blizu prodavnica",
+        "autobuska stanica blizu",
+        "Wi-Fi",
+        "klima uređaj",
+        "balkon",
+        "parking",
+        "lift",
+        "panoramski pogled"
+      ]
     },
-    "kvartiry": {
-      "ru": ["хороший ремонт", "новая сантехника", "пластиковые окна", "развитая инфраструктура", "рядом магазины", "остановка рядом", "Wi-Fi", "кондиционер", "балкон", "парковка"],
-      "en": ["good renovation", "new plumbing", "plastic windows", "developed infrastructure", "near shops", "bus stop nearby", "Wi-Fi", "air conditioning", "balcony", "parking"],
-      "bs": ["dobra renovacija", "nova sanitarija", "plastični prozori", "razvijena infrastruktura", "blizu prodavnica", "autobuska stanica blizu", "Wi-Fi", "klima uređaj", "balkon", "parking"]
+    "houses": {
+      "ru": [
+        "свой участок",
+        "сад",
+        "бассейн",
+        "терраса",
+        "камин",
+        "гараж на две машины",
+        "автономное отопление",
+        "забор по периметру",
+        "вид на море",
+        "тихий район",
+        "новая кровля",
+        "гостевая парковка"
+      ],
+      "en": [
+        "private plot",
+        "garden",
+        "swimming pool",
+        "terrace",
+        "fireplace",
+        "two-car garage",
+        "independent heating",
+        "perimeter fence",
+        "sea view",
+        "quiet neighborhood",
+        "new roof",
+        "guest parking"
+      ],
+      "bs": [
+        "vlastito zemljište",
+        "vrt",
+        "bazen",
+        "terasa",
+        "kamin",
+        "garaža za dva automobila",
+        "autonomno grijanje",
+        "ograda po obodu",
+        "pogled na more",
+        "miran kvart",
+        "nov krov",
+        "parking za goste"
+      ]
     },
-    "avtomobili": {
-      "ru": ["полный привод", "кожаный салон", "климат-контроль", "без ДТП", "обслуживался у дилера", "экономичный", "автомат", "панорамная крыша", "подогрев сидений", "парктроники"],
-      "en": ["all-wheel drive", "leather interior", "climate control", "accident-free", "dealer serviced", "fuel efficient", "automatic", "panoramic roof", "heated seats", "parking sensors"],
-      "bs": ["pogon na sve točkove", "kožna unutrašnjost", "klima uređaj", "bez udesa", "servisiran kod dilera", "ekonomičan", "automatik", "panoramski krov", "grijana sjedišta", "senzori za parkiranje"]
+    "rooms": {
+      "ru": [
+        "мебель включена",
+        "Wi-Fi",
+        "отдельный вход",
+        "совместная кухня",
+        "стиральная машина",
+        "холодильник",
+        "рядом метро",
+        "тихие соседи",
+        "чистота",
+        "хорошая компания",
+        "центральное отопление",
+        "проветриваемое помещение"
+      ],
+      "en": [
+        "furniture included",
+        "Wi-Fi",
+        "separate entrance",
+        "shared kitchen",
+        "washing machine",
+        "refrigerator",
+        "near metro",
+        "quiet neighbors",
+        "cleanliness",
+        "good company",
+        "central heating",
+        "ventilated room"
+      ],
+      "bs": [
+        "namještaj uključen",
+        "Wi-Fi",
+        "poseban ulaz",
+        "zajednička kuhinja",
+        "mašina za pranje",
+        "frižider",
+        "blizu metroa",
+        "tihi susjedi",
+        "čistoća",
+        "dobro društvo",
+        "centralno grijanje",
+        "prozračna soba"
+      ]
+    },
+    "garages": {
+      "ru": [
+        "автоматические ворота",
+        "сигнализация",
+        "освещение",
+        "бетонный пол",
+        "вентиляция",
+        "смотровая яма",
+        "стеллажи",
+        "электричество",
+        "высокий потолок",
+        "близко к дому",
+        "отапливаемый",
+        "круглосуточный доступ"
+      ],
+      "en": [
+        "automatic door",
+        "alarm system",
+        "lighting",
+        "concrete floor",
+        "ventilation",
+        "inspection pit",
+        "shelving",
+        "electricity",
+        "high ceiling",
+        "close to home",
+        "heated",
+        "24-hour access"
+      ],
+      "bs": [
+        "automatizovana vrata",
+        "alarmni sistem",
+        "rasvjeta",
+        "betonski pod",
+        "ventilacija",
+        "kontrolna jama",
+        "regali",
+        "struja",
+        "visok plafon",
+        "blizu kuće",
+        "grijan",
+        "non-stop pristup"
+      ]
+    },
+    "land-plots": {
+      "ru": [
+        "электричество на участке",
+        "вода на участке",
+        "ровный участок",
+        "подъездная дорога",
+        "рядом море",
+        "лес рядом",
+        "панорамный вид",
+        "кадастровый номер",
+        "отсутствие обременений",
+        "газификация",
+        "подведена канализация",
+        "хорошая экология"
+      ],
+      "en": [
+        "electricity on site",
+        "water on site",
+        "flat terrain",
+        "access road",
+        "near the sea",
+        "forest nearby",
+        "panoramic view",
+        "cadastral number",
+        "no encumbrances",
+        "gas supply",
+        "sewerage connected",
+        "good ecology"
+      ],
+      "bs": [
+        "struja na parceli",
+        "voda na parceli",
+        "ravan teren",
+        "pristupni put",
+        "blizu mora",
+        "šuma u blizini",
+        "panoramski pogled",
+        "katastarski broj",
+        "bez tereta",
+        "plinifikacija",
+        "kanalizacija priključena",
+        "dobra ekologija"
+      ]
+    },
+    "other-real-estate": {
+      "ru": [
+        "выгодное расположение",
+        "хорошая транспортная доступность",
+        "подходит под бизнес",
+        "перспективный район",
+        "развитая инфраструктура",
+        "рядом школа",
+        "рядом больница",
+        "круглосуточная охрана",
+        "видеонаблюдение",
+        "новая отделка",
+        "отличная планировка",
+        "высокая ликвидность"
+      ],
+      "en": [
+        "good location",
+        "good transport links",
+        "suitable for business",
+        "promising area",
+        "developed infrastructure",
+        "near school",
+        "near hospital",
+        "24-hour security",
+        "video surveillance",
+        "new finish",
+        "excellent layout",
+        "high liquidity"
+      ],
+      "bs": [
+        "povoljna lokacija",
+        "dobra saobraćajna povezanost",
+        "pogodno za posao",
+        "perspektivna oblast",
+        "razvijena infrastruktura",
+        "blizu škole",
+        "blizu bolnice",
+        "non-stop obezbjeđenje",
+        "video nadzor",
+        "nova završna obrada",
+        "odličan raspored",
+        "visoka likvidnost"
+      ]
+    },
+    "offices": {
+      "ru": [
+        "открытая планировка",
+        "конференц-зал",
+        "кухонный уголок",
+        "приёмная",
+        "интернет",
+        "кондиционер",
+        "охрана",
+        "парковка для сотрудников",
+        "центральное расположение",
+        "бизнес-центр класса A",
+        "ресепшн",
+        "свой санузел"
+      ],
+      "en": [
+        "open plan layout",
+        "conference room",
+        "kitchenette",
+        "reception area",
+        "internet",
+        "air conditioning",
+        "security",
+        "employee parking",
+        "central location",
+        "class A business center",
+        "reception desk",
+        "private bathroom"
+      ],
+      "bs": [
+        "otvoren plan",
+        "konferencijska sala",
+        "kuhinjski kutak",
+        "recepcija",
+        "internet",
+        "klima uređaj",
+        "obezbjeđenje",
+        "parking za zaposlene",
+        "centralna lokacija",
+        "poslovni centar A klase",
+        "recepcijski pult",
+        "privatni WC"
+      ]
+    },
+    "flex-space": {
+      "ru": [
+        "высокие потолки",
+        "большие окна",
+        "бетонные стены",
+        "открытое пространство",
+        "грузовой лифт",
+        "погрузочная зона",
+        "электричество 380V",
+        "отопление",
+        "вентиляция",
+        "собственный вход",
+        "раздвижные ворота",
+        "парковка"
+      ],
+      "en": [
+        "high ceilings",
+        "large windows",
+        "concrete walls",
+        "open space",
+        "freight elevator",
+        "loading area",
+        "380V electricity",
+        "heating",
+        "ventilation",
+        "private entrance",
+        "sliding doors",
+        "parking"
+      ],
+      "bs": [
+        "visoki plafoni",
+        "veliki prozori",
+        "betonski zidovi",
+        "otvoren prostor",
+        "teretni lift",
+        "utovarna zona",
+        "struja 380V",
+        "grijanje",
+        "ventilacija",
+        "vlastiti ulaz",
+        "klizna vrata",
+        "parking"
+      ]
+    },
+    "retail-spaces": {
+      "ru": [
+        "витринные окна",
+        "высокий пешеходный трафик",
+        "центр города",
+        "отдельный вход",
+        "открытая планировка",
+        "кондиционер",
+        "сигнализация",
+        "роллеты",
+        "вывеска",
+        "парковка для клиентов",
+        "свой санузел",
+        "торговый зал 1 этаж"
+      ],
+      "en": [
+        "display windows",
+        "high foot traffic",
+        "city center",
+        "separate entrance",
+        "open layout",
+        "air conditioning",
+        "alarm system",
+        "roller shutters",
+        "signage",
+        "customer parking",
+        "private toilet",
+        "ground floor sales area"
+      ],
+      "bs": [
+        "izložbeni prozori",
+        "veliki pješački promet",
+        "centar grada",
+        "poseban ulaz",
+        "otvoren raspored",
+        "klima uređaj",
+        "alarmni sistem",
+        "rolo zavjese",
+        "natpis",
+        "parking za klijente",
+        "privatni WC",
+        "prodajni prostor u prizemlju"
+      ]
+    },
+    "warehouses": {
+      "ru": [
+        "высокие потолки",
+        "погрузочная рампа",
+        "стеллажная система",
+        "бетонный пол",
+        "пожарная сигнализация",
+        "отопление склада",
+        "круглосуточная охрана",
+        "видеонаблюдение",
+        "электричество 380V",
+        "грузовой лифт",
+        "подъезд для фур",
+        "вентиляция"
+      ],
+      "en": [
+        "high ceilings",
+        "loading ramp",
+        "racking system",
+        "concrete floor",
+        "fire alarm",
+        "warehouse heating",
+        "24-hour security",
+        "video surveillance",
+        "380V electricity",
+        "freight elevator",
+        "truck access",
+        "ventilation"
+      ],
+      "bs": [
+        "visoki plafoni",
+        "utovarna rampa",
+        "regalni sistem",
+        "betonski pod",
+        "protivpožarni alarm",
+        "grijanje skladišta",
+        "non-stop obezbjeđenje",
+        "video nadzor",
+        "struja 380V",
+        "teretni lift",
+        "pristup za kamione",
+        "ventilacija"
+      ]
+    },
+    "commercial-land": {
+      "ru": [
+        "выгодное расположение",
+        "рядом трасса",
+        "подъездные пути",
+        "электричество",
+        "вода",
+        "газ",
+        "плоский участок",
+        "кадастровый номер",
+        "разрешённая застройка",
+        "хорошая видимость",
+        "рядом город",
+        "перспективное место"
+      ],
+      "en": [
+        "prime location",
+        "near highway",
+        "access roads",
+        "electricity",
+        "water supply",
+        "gas",
+        "flat plot",
+        "cadastral number",
+        "building permit",
+        "good visibility",
+        "near city",
+        "promising location"
+      ],
+      "bs": [
+        "odlična lokacija",
+        "blizu autoputa",
+        "pristupni putevi",
+        "struja",
+        "vodosnabdijevanje",
+        "plin",
+        "ravna parcela",
+        "katastarski broj",
+        "građevinska dozvola",
+        "dobra vidljivost",
+        "blizu grada",
+        "perspektivna lokacija"
+      ]
+    },
+    "cars": {
+      "ru": [
+        "полный привод",
+        "кожаный салон",
+        "климат-контроль",
+        "без ДТП",
+        "обслуживался у дилера",
+        "экономичный",
+        "автоматическая коробка",
+        "панорамная крыша",
+        "подогрев сидений",
+        "парктроники",
+        "камера заднего вида",
+        "Bluetooth",
+        "круиз-контроль",
+        "литые диски"
+      ],
+      "en": [
+        "all-wheel drive",
+        "leather interior",
+        "climate control",
+        "accident-free",
+        "dealer serviced",
+        "fuel efficient",
+        "automatic transmission",
+        "panoramic roof",
+        "heated seats",
+        "parking sensors",
+        "rear view camera",
+        "Bluetooth",
+        "cruise control",
+        "alloy wheels"
+      ],
+      "bs": [
+        "pogon na sve točkove",
+        "kožna unutrašnjost",
+        "klima uređaj",
+        "bez udesa",
+        "servisiran kod dilera",
+        "ekonomičan",
+        "automatski mjenjač",
+        "panoramski krov",
+        "grijana sjedišta",
+        "senzori za parkiranje",
+        "kamera za vožnju unazad",
+        "Bluetooth",
+        "tempomat",
+        "aluminijske felge"
+      ]
+    },
+    "motorcycles-sub": {
+      "ru": [
+        "ABS",
+        "спортивный выхлоп",
+        "подогрев ручек",
+        "ветровое стекло",
+        "кофры",
+        "центральная подставка",
+        "сигнализация",
+        "новая резина",
+        "цепь",
+        "регулируемая подвеска",
+        "светодиодные фары",
+        "квикшифтер"
+      ],
+      "en": [
+        "ABS",
+        "sports exhaust",
+        "heated grips",
+        "windshield",
+        "panniers",
+        "center stand",
+        "alarm system",
+        "new tires",
+        "chain drive",
+        "adjustable suspension",
+        "LED headlights",
+        "quick shifter"
+      ],
+      "bs": [
+        "ABS",
+        "sportski auspuh",
+        "grijane ručice",
+        "vjetrobran",
+        "kofri",
+        "centralni stalak",
+        "alarmni sistem",
+        "nove gume",
+        "lančani pogon",
+        "podesivi ovjes",
+        "LED farovi",
+        "kvikšifter"
+      ]
+    },
+    "scooters": {
+      "ru": [
+        "экономичный",
+        "лёгкий",
+        "автомат",
+        "багажник",
+        "дисковые тормоза",
+        "светодиодная оптика",
+        "электростартер",
+        "складной",
+        "новые шины",
+        "защита от кражи",
+        "комфортное сиденье",
+        "большой пробег на баке"
+      ],
+      "en": [
+        "fuel efficient",
+        "lightweight",
+        "automatic",
+        "luggage compartment",
+        "disc brakes",
+        "LED lighting",
+        "electric start",
+        "foldable",
+        "new tires",
+        "anti-theft",
+        "comfort seat",
+        "long range per tank"
+      ],
+      "bs": [
+        "ekonomičan",
+        "lagan",
+        "automatik",
+        "prtljažnik",
+        "diskovne kočnice",
+        "LED svjetla",
+        "električni starter",
+        "sklopiv",
+        "nove gume",
+        "anti-theft sistem",
+        "udobno sjedište",
+        "duga vožnja po rezervoaru"
+      ]
+    },
+    "bicycles": {
+      "ru": [
+        "алюминиевая рама",
+        "дисковые тормоза",
+        "амортизационная вилка",
+        "27 скоростей",
+        "карбоновая рама",
+        "колёса 29 дюймов",
+        "гидравлические тормоза",
+        "передняя подвеска",
+        "багажник",
+        "крылья",
+        "свет",
+        "педали"
+      ],
+      "en": [
+        "aluminum frame",
+        "disc brakes",
+        "suspension fork",
+        "27 speeds",
+        "carbon frame",
+        "29 inch wheels",
+        "hydraulic brakes",
+        "front suspension",
+        "rear rack",
+        "fenders",
+        "lights",
+        "pedals"
+      ],
+      "bs": [
+        "aluminijumski ram",
+        "diskovne kočnice",
+        "amortizaciona viljuška",
+        "27 brzina",
+        "karbonski ram",
+        "29 inčni točkovi",
+        "hidraulične kočnice",
+        "prednji ovjes",
+        "nosač prtljaga",
+        "blatobrani",
+        "svjetla",
+        "pedale"
+      ]
+    },
+    "scooters-scooters": {
+      "ru": [
+        "новый двигатель",
+        "свежий ремонт",
+        "тихий",
+        "экономичный",
+        "лёгкий запуск",
+        "свет",
+        "зеркала",
+        "проведено ТО",
+        "чистый",
+        "документы в порядке",
+        "скорость до 45 км/ч",
+        "двухтактный"
+      ],
+      "en": [
+        "new engine",
+        "recently serviced",
+        "quiet",
+        "fuel efficient",
+        "easy start",
+        "lights",
+        "mirrors",
+        "service done",
+        "clean",
+        "documents in order",
+        "speed up to 45 kmh",
+        "two stroke"
+      ],
+      "bs": [
+        "nov motor",
+        "servisiran",
+        "tih",
+        "ekonomičan",
+        "lako paljenje",
+        "svjetla",
+        "retrovizori",
+        "izvršen servis",
+        "čist",
+        "dokumenti u redu",
+        "brzina do 45 kmh",
+        "dvotaktni"
+      ]
+    },
+    "trucks-sub": {
+      "ru": [
+        "дизель",
+        "турбонаддув",
+        "гидроусилитель",
+        "кондиционер",
+        "бортовой компьютер",
+        "подогрев зеркал",
+        "кран-манипулятор",
+        "самосвальный кузов",
+        "рефрижератор",
+        "тент",
+        "длинная база",
+        "двойная кабина"
+      ],
+      "en": [
+        "diesel",
+        "turbocharged",
+        "power steering",
+        "air conditioning",
+        "onboard computer",
+        "heated mirrors",
+        "crane",
+        "dump body",
+        "refrigerated",
+        "tarpaulin",
+        "long wheelbase",
+        "crew cab"
+      ],
+      "bs": [
+        "dizel",
+        "turbopunjač",
+        "servo upravljač",
+        "klima uređaj",
+        "kompjuter u kabini",
+        "grijani retrovizori",
+        "dizalica",
+        "kiper sistem",
+        "hlađenje",
+        "cerada",
+        "duga međuosovina",
+        "dupla kabina"
+      ]
+    },
+    "agricultural-machinery": {
+      "ru": [
+        "четырехколесный привод",
+        "кондиционер в кабине",
+        "навигация GPS",
+        "мощный двигатель",
+        "низкий расход топлива",
+        "гидравлика",
+        "передний погрузчик",
+        "косилка",
+        "прицепное устройство",
+        "шины низкого давления",
+        "защитная дуга",
+        "цифровая панель"
+      ],
+      "en": [
+        "four wheel drive",
+        "cab air conditioning",
+        "GPS navigation",
+        "powerful engine",
+        "low fuel consumption",
+        "hydraulics",
+        "front loader",
+        "mower attachment",
+        "tow hitch",
+        "low pressure tires",
+        "roll bar",
+        "digital dashboard"
+      ],
+      "bs": [
+        "pogon na četiri točka",
+        "klima u kabini",
+        "GPS navigacija",
+        "snažan motor",
+        "mala potrošnja goriva",
+        "hidraulika",
+        "prednji utovarivač",
+        "kosilica",
+        "vučni uređaj",
+        "gume niskog pritiska",
+        "zaštitni luk",
+        "digitalna tabla"
+      ]
+    },
+    "commercial-vehicles": {
+      "ru": [
+        "дизель",
+        "кондиционер",
+        "гидроборт",
+        "раздвижная дверь",
+        "высокий потолок",
+        "стойки для груза",
+        "парктроник",
+        "подогрев зеркал",
+        "грузоподъёмность",
+        "полный привод",
+        "короткая база",
+        "сигнализация"
+      ],
+      "en": [
+        "diesel",
+        "air conditioning",
+        "lift gate",
+        "sliding door",
+        "high roof",
+        "cargo tie downs",
+        "parking sensors",
+        "heated mirrors",
+        "payload capacity",
+        "all wheel drive",
+        "short wheelbase",
+        "alarm"
+      ],
+      "bs": [
+        "dizel",
+        "klima uređaj",
+        "hidraulična rampa",
+        "klizna vrata",
+        "visoki krov",
+        "vezice za teret",
+        "senzori za parkiranje",
+        "grijani retrovizori",
+        "nosivost",
+        "pogon na sve točkove",
+        "kratka međuosovina",
+        "alarm"
+      ]
+    },
+    "campers": {
+      "ru": [
+        "автономное отопление",
+        "холодильник",
+        "душ и туалет",
+        "солнечные панели",
+        "газовая плита",
+        "кондиционер",
+        "навес",
+        "спальное место на 4",
+        "подогрев пола",
+        "внешний душ",
+        "спутниковое ТВ",
+        "резервуар для воды"
+      ],
+      "en": [
+        "autonomous heating",
+        "refrigerator",
+        "shower and toilet",
+        "solar panels",
+        "gas stove",
+        "air conditioning",
+        "awning",
+        "sleeps 4",
+        "heated floor",
+        "outdoor shower",
+        "satellite TV",
+        "fresh water tank"
+      ],
+      "bs": [
+        "autonomno grijanje",
+        "frižider",
+        "tuš i wc",
+        "solarni paneli",
+        "plinski šporet",
+        "klima uređaj",
+        "tenda",
+        "spava 4 osobe",
+        "grijani pod",
+        "vanjski tuš",
+        "satelitska TV",
+        "rezervoar za vodu"
+      ]
+    },
+    "boats-yachts": {
+      "ru": [
+        "GPS",
+        "автопилот",
+        "эхолот",
+        "радар",
+        "кокпит",
+        "каюта",
+        "камбуз",
+        "лебёдка",
+        "парусное оборудование",
+        "подвесной мотор",
+        "якорь",
+        "спасательные жилеты",
+        "навигационные огни",
+        "VHF радио"
+      ],
+      "en": [
+        "GPS",
+        "autopilot",
+        "fish finder",
+        "radar",
+        "cockpit",
+        "cabin",
+        "galley",
+        "winch",
+        "sailing rig",
+        "outboard motor",
+        "anchor",
+        "life jackets",
+        "navigation lights",
+        "VHF radio"
+      ],
+      "bs": [
+        "GPS",
+        "autopilot",
+        "eholot",
+        "radar",
+        "kokpit",
+        "kabina",
+        "kuhinja",
+        "vitlo",
+        "jedriličarska oprema",
+        "vanbrodski motor",
+        "sidro",
+        "prsluci za spašavanje",
+        "navigaciona svjetla",
+        "VHF radio"
+      ]
+    },
+    "motorboats": {
+      "ru": [
+        "подвесной мотор",
+        "эхолот",
+        "трейлер",
+        "бензин",
+        "навигационные огни",
+        "сиденья",
+        "рулевое управление",
+        "антенна",
+        "якорь",
+        "бак для топлива",
+        "спасательный круг",
+        "тентом"
+      ],
+      "en": [
+        "outboard motor",
+        "fish finder",
+        "trailer included",
+        "gasoline",
+        "navigation lights",
+        "seats",
+        "steering system",
+        "antenna",
+        "anchor",
+        "fuel tank",
+        "life buoy",
+        "bimini top"
+      ],
+      "bs": [
+        "vanbrodski motor",
+        "eholot",
+        "prikolica uključena",
+        "benzin",
+        "navigaciona svjetla",
+        "sjedišta",
+        "sistem upravljanja",
+        "antena",
+        "sidro",
+        "rezervoar goriva",
+        "prsten za spašavanje",
+        "tenda"
+      ]
+    },
+    "sailing-boats": {
+      "ru": [
+        "паруса",
+        "лебёдки",
+        "автопилот",
+        "GPS",
+        "кокпит",
+        "камбуз",
+        "каюта",
+        "радио",
+        "якорь",
+        "спасательное оборудование",
+        "ходовые огни",
+        "ветроуказатель",
+        "такелаж"
+      ],
+      "en": [
+        "sails",
+        "winches",
+        "autopilot",
+        "GPS",
+        "cockpit",
+        "galley",
+        "cabin",
+        "VHF radio",
+        "anchor",
+        "safety equipment",
+        "navigation lights",
+        "wind indicator",
+        "rigging"
+      ],
+      "bs": [
+        "jedra",
+        "vitla",
+        "autopilot",
+        "GPS",
+        "kokpit",
+        "kuhinja",
+        "kabina",
+        "VHF radio",
+        "sidro",
+        "sigurnosna oprema",
+        "navigaciona svjetla",
+        "pokazivač vjetra",
+        "konopi i oprema"
+      ]
+    },
+    "personal-watercraft": {
+      "ru": [
+        "четырёхтактный",
+        "обратный клапан",
+        "зеркала",
+        "буксировочный трос",
+        "чехол",
+        "ключ безопасности",
+        "смотровая площадка",
+        "водомет",
+        "регулируемый руль",
+        "Bluetooth аудио",
+        "GPS спидометр",
+        "отсек для хранения"
+      ],
+      "en": [
+        "four stroke",
+        "reverse system",
+        "mirrors",
+        "tow rope",
+        "cover",
+        "safety lanyard",
+        "boarding platform",
+        "jet drive",
+        "adjustable handlebars",
+        "Bluetooth audio",
+        "GPS speedometer",
+        "storage compartment"
+      ],
+      "bs": [
+        "četvorotaktni",
+        "sistem za rikverc",
+        "retrovizori",
+        "uže za vuču",
+        "zaštitna navlaka",
+        "sigurnosna traka",
+        "platforma za ulazak",
+        "mlazni pogon",
+        "podesivi upravljač",
+        "Bluetooth audio",
+        "GPS brzinomjer",
+        "pretinac za odlaganje"
+      ]
+    },
+    "parts": {
+      "ru": [
+        "OEM",
+        "совместим с",
+        "новая деталь",
+        "оригинал",
+        "гарантия",
+        "доставка",
+        "крепёж в комплекте",
+        "проверено",
+        "высокое качество",
+        "со склада",
+        "чугун",
+        "нержавейка",
+        "хромированный",
+        "керамический"
+      ],
+      "en": [
+        "OEM",
+        "compatible with",
+        "new part",
+        "original",
+        "warranty",
+        "delivery available",
+        "mounting kit included",
+        "tested",
+        "high quality",
+        "in stock",
+        "cast iron",
+        "stainless steel",
+        "chrome plated",
+        "ceramic"
+      ],
+      "bs": [
+        "OEM",
+        "kompatibilno sa",
+        "novi dio",
+        "original",
+        "garancija",
+        "dostava moguća",
+        "montažni komplet uključen",
+        "testirano",
+        "visok kvalitet",
+        "na lageru",
+        "liveno gvožđe",
+        "nerđajući čelik",
+        "hromirani",
+        "keramički"
+      ]
+    },
+    "tires-wheels": {
+      "ru": [
+        "зимние шины",
+        "летние шины",
+        "всесезонные",
+        "шипованные",
+        "литой диск",
+        "штампованный диск",
+        "новая резина",
+        "балансировка",
+        "R17",
+        "R16",
+        "R18",
+        "профиль 55",
+        "индекс скорости V",
+        "широкий профиль"
+      ],
+      "en": [
+        "winter tires",
+        "summer tires",
+        "all season",
+        "studded",
+        "alloy rim",
+        "steel rim",
+        "new rubber",
+        "balanced",
+        "R17",
+        "R16",
+        "R18",
+        "aspect ratio 55",
+        "speed rating V",
+        "wide profile"
+      ],
+      "bs": [
+        "zimske gume",
+        "ljetnje gume",
+        "sve sezone",
+        "sa šiljcima",
+        "aluminijumska felga",
+        "čelična felga",
+        "nova guma",
+        "balansirano",
+        "R17",
+        "R16",
+        "R18",
+        "profil 55",
+        "brzinski indeks V",
+        "široki profil"
+      ]
+    },
+    "auto-accessories": {
+      "ru": [
+        "универсальный",
+        "легко устанавливается",
+        "высокое качество",
+        "чёрный матовый",
+        "нержавейка",
+        "комплект",
+        "полировка",
+        "светодиодный",
+        "автомобильный",
+        "водонепроницаемый",
+        "противоскользящий",
+        "с хромированием"
+      ],
+      "en": [
+        "universal fit",
+        "easy to install",
+        "high quality",
+        "matte black",
+        "stainless steel",
+        "set",
+        "polished",
+        "LED",
+        "automotive grade",
+        "waterproof",
+        "non slip",
+        "chrome finish"
+      ],
+      "bs": [
+        "univerzalno",
+        "lako za montažu",
+        "visok kvalitet",
+        "mat crna",
+        "nerđajući čelik",
+        "set",
+        "polirano",
+        "LED",
+        "automobilski kvalitet",
+        "vodootporno",
+        "protiv klizanja",
+        "hrom završna obrada"
+      ]
+    },
+    "auto-tools": {
+      "ru": [
+        "набор",
+        "хром-ванадий",
+        "трещотка",
+        "ударный",
+        "диэлектрический",
+        "телескопический",
+        "с подсветкой",
+        "сумка в комплекте",
+        "лазерная маркировка",
+        "двусторонний",
+        "магнитный",
+        "усиленный"
+      ],
+      "en": [
+        "set",
+        "chrome vanadium",
+        "ratchet",
+        "impact",
+        "insulated",
+        "telescopic",
+        "with LED light",
+        "carry case included",
+        "laser etched",
+        "double sided",
+        "magnetic",
+        "reinforced"
+      ],
+      "bs": [
+        "set",
+        "hrom vanadijum",
+        "reket",
+        "udarni",
+        "izolovan",
+        "teleskopski",
+        "sa LED svjetlom",
+        "torbica uključena",
+        "laserom gravirano",
+        "dvostrani",
+        "magnetni",
+        "ojačan"
+      ]
+    },
+    "auto-equipment": {
+      "ru": [
+        "профессиональный",
+        "электрический",
+        "пневматический",
+        "цифровой дисплей",
+        "автоматический",
+        "1000 кг",
+        "2000 кг",
+        "складной",
+        "быстросъёмный",
+        "регулируемый",
+        "с защитой",
+        "сертифицированный"
+      ],
+      "en": [
+        "professional grade",
+        "electric",
+        "pneumatic",
+        "digital display",
+        "automatic",
+        "1000 kg capacity",
+        "2000 kg capacity",
+        "foldable",
+        "quick release",
+        "adjustable",
+        "with safety guard",
+        "certified"
+      ],
+      "bs": [
+        "profesionalnog kvaliteta",
+        "električni",
+        "pneumatski",
+        "digitalni displej",
+        "automatski",
+        "kapacitet 1000 kg",
+        "kapacitet 2000 kg",
+        "sklopiv",
+        "brzo otpuštanje",
+        "podesiv",
+        "sa zaštitom",
+        "certifikovan"
+      ]
+    },
+    "oils-chemicals": {
+      "ru": [
+        "5W-30",
+        "5W-40",
+        "10W-40",
+        "синтетика",
+        "полусинтетика",
+        "минералка",
+        "концентрат",
+        "готовый к использованию",
+        "API SN",
+        "ACEA C3",
+        "длинный срок хранения",
+        "с объёмом 5 литров"
+      ],
+      "en": [
+        "5W-30",
+        "5W-40",
+        "10W-40",
+        "fully synthetic",
+        "semi synthetic",
+        "mineral",
+        "concentrate",
+        "ready to use",
+        "API SN",
+        "ACEA C3",
+        "long shelf life",
+        "5 liter bottle"
+      ],
+      "bs": [
+        "5W-30",
+        "5W-40",
+        "10W-40",
+        "potpuno sintetičko",
+        "polusintetičko",
+        "mineralno",
+        "koncentrat",
+        "spreman za upotrebu",
+        "API SN",
+        "ACEA C3",
+        "dug rok trajanja",
+        "boca od 5 litara"
+      ]
+    },
+    "anti-theft": {
+      "ru": [
+        "автоматический",
+        "датчик удара",
+        "датчик наклона",
+        "обратная связь",
+        "GPS мониторинг",
+        "автозапуск",
+        "беспроводной",
+        "сирена",
+        "сложный ключ",
+        "вибрация",
+        "защита от сканирования",
+        "радиус 1 км"
+      ],
+      "en": [
+        "automatic",
+        "shock sensor",
+        "tilt sensor",
+        "two way",
+        "GPS monitoring",
+        "remote start",
+        "wireless",
+        "siren",
+        "complex key",
+        "vibration sensor",
+        "anti scan protection",
+        "1 km range"
+      ],
+      "bs": [
+        "automatski",
+        "senzor udara",
+        "senzor nagiba",
+        "dvosmjerni",
+        "GPS praćenje",
+        "daljinsko pokretanje",
+        "bežični",
+        "sirena",
+        "složen ključ",
+        "senzor vibracija",
+        "anti sken zaštita",
+        "domet 1 km"
+      ]
+    },
+    "gps-navigators": {
+      "ru": [
+        "большой экран",
+        "сенсорный дисплей",
+        "еврокарты",
+        "обновление карт",
+        "голосовые подсказки",
+        "Bluetooth",
+        "WiFi",
+        "пробки онлайн",
+        "камера заднего вида",
+        "навигация по полосам",
+        "3D карты",
+        "быстрый процессор"
+      ],
+      "en": [
+        "large screen",
+        "touch display",
+        "European maps",
+        "map updates",
+        "voice guidance",
+        "Bluetooth",
+        "WiFi",
+        "live traffic",
+        "rear camera input",
+        "lane guidance",
+        "3D maps",
+        "fast processor"
+      ],
+      "bs": [
+        "veliki ekran",
+        "touch displej",
+        "mape Evrope",
+        "ažuriranje mapa",
+        "glasovna navigacija",
+        "Bluetooth",
+        "WiFi",
+        "promet uživo",
+        "ulaz za stražnju kameru",
+        "navigacija po trakama",
+        "3D mape",
+        "brz procesor"
+      ]
+    },
+    "auto-audio-video": {
+      "ru": [
+        "MP3",
+        "USB вход",
+        "AUX",
+        "радио RDS",
+        "Bluetooth громкая связь",
+        "сабвуфер",
+        "усилитель",
+        "2-х полосный",
+        "4 канала",
+        "пульт ДУ",
+        "светодиодная подсветка",
+        "FM/AM"
+      ],
+      "en": [
+        "MP3 playback",
+        "USB input",
+        "AUX input",
+        "RDS radio",
+        "Bluetooth handsfree",
+        "subwoofer",
+        "amplifier",
+        "2 way",
+        "4 channel",
+        "remote control",
+        "LED backlight",
+        "FM/AM tuner"
+      ],
+      "bs": [
+        "MP3 reprodukcija",
+        "USB ulaz",
+        "AUX ulaz",
+        "RDS radio",
+        "Bluetooth handsfree",
+        "subwoofer",
+        "pojačalo",
+        "dvostruki sistem",
+        "4 kanala",
+        "daljinski upravljač",
+        "LED pozadinsko svjetlo",
+        "FM/AM tjuner"
+      ]
+    },
+    "roof-boxes-hitches": {
+      "ru": [
+        "аэродинамичный",
+        "двустороннее открытие",
+        "центральный замок",
+        "быстросъёмный",
+        "максимальная нагрузка",
+        "75 кг",
+        "100 кг",
+        "алюминий",
+        "пластик",
+        "универсальный",
+        "с кронштейнами",
+        "противоугонный"
+      ],
+      "en": [
+        "aerodynamic",
+        "dual side opening",
+        "center lock",
+        "quick release",
+        "max load 75 kg",
+        "max load 100 kg",
+        "aluminum",
+        "plastic",
+        "universal fit",
+        "brackets included",
+        "anti theft",
+        "locking system"
+      ],
+      "bs": [
+        "aerodinamičan",
+        "otvaranje sa obje strane",
+        "centralna brava",
+        "brzo otpuštanje",
+        "maksimalno opterećenje 75 kg",
+        "maksimalno opterećenje 100 kg",
+        "aluminijum",
+        "plastika",
+        "univerzalno",
+        "nosači uključeni",
+        "anti theft",
+        "sistem zaključavanja"
+      ]
+    },
+    "trailers": {
+      "ru": [
+        "одноосный",
+        "двухосный",
+        "тормоза",
+        "бортовой",
+        "самосвальный",
+        "тентом",
+        "легковой",
+        "грузовой",
+        "трап",
+        "подножка",
+        "свет",
+        "регистрация"
+      ],
+      "en": [
+        "single axle",
+        "tandem axle",
+        "brakes",
+        "side walls",
+        "tipping",
+        "tarpaulin cover",
+        "light duty",
+        "heavy duty",
+        "ramp",
+        "jockey wheel",
+        "lights",
+        "registered"
+      ],
+      "bs": [
+        "jedna osovina",
+        "dvije osovine",
+        "kočnice",
+        "bočne strane",
+        "kiper",
+        "cerada",
+        "laka prikolica",
+        "teška prikolica",
+        "rampa",
+        "potporna nožica",
+        "svjetla",
+        "registrovana"
+      ]
+    },
+    "accessories": {
+      "ru": [
+        "кожаный ремешок",
+        "нержавеющая сталь",
+        "стильный дизайн",
+        "универсальный размер",
+        "лёгкий вес",
+        "прочный материал",
+        "регулируемая длина",
+        "магнитная застёжка",
+        "подарочная упаковка",
+        "повседневный стиль"
+      ],
+      "en": [
+        "leather strap",
+        "stainless steel",
+        "stylish design",
+        "universal size",
+        "lightweight",
+        "durable material",
+        "adjustable length",
+        "magnetic clasp",
+        "gift packaging",
+        "casual style"
+      ],
+      "bs": [
+        "kožni kaiš",
+        "nerđajući čelik",
+        "stilski dizajn",
+        "univerzalna veličina",
+        "lagan",
+        "izdržljiv materijal",
+        "podesiva dužina",
+        "magnetska kopča",
+        "poklon pakovanje",
+        "ležerni stil"
+      ]
+    },
+    "appliances": {
+      "ru": [
+        "энергосберегающий",
+        "низкий уровень шума",
+        "быстрое приготовление",
+        "большой объём",
+        "цифровое управление",
+        "автоматическая программа",
+        "защита от детей",
+        "таймер",
+        "лёгкая очистка",
+        "компактный размер"
+      ],
+      "en": [
+        "energy efficient",
+        "low noise level",
+        "quick cooking",
+        "large capacity",
+        "digital control",
+        "automatic program",
+        "child lock",
+        "timer",
+        "easy clean",
+        "compact size"
+      ],
+      "bs": [
+        "energetski efikasan",
+        "nizak nivo buke",
+        "brzo kuhanje",
+        "veliki kapacitet",
+        "digitalno upravljanje",
+        "automatski program",
+        "zaštita za djecu",
+        "tajmer",
+        "lako čišćenje",
+        "kompaktna veličina"
+      ]
+    },
+    "audio-video": {
+      "ru": [
+        "беспроводной",
+        "Bluetooth 5.2",
+        "шумоподавление",
+        "стереозвук",
+        "долгое время работы",
+        "водозащита",
+        "пульт ДУ",
+        "HDMI ARC",
+        "Dolby Atmos",
+        "светодиодный дисплей"
+      ],
+      "en": [
+        "wireless",
+        "Bluetooth 5.2",
+        "noise cancelling",
+        "stereo sound",
+        "long battery life",
+        "water resistant",
+        "remote control",
+        "HDMI ARC",
+        "Dolby Atmos",
+        "LED display"
+      ],
+      "bs": [
+        "bežični",
+        "Bluetooth 5.2",
+        "poništavanje buke",
+        "stereo zvuk",
+        "dugo trajanje baterije",
+        "otporan na vodu",
+        "daljinski upravljač",
+        "HDMI ARC",
+        "Dolby Atmos",
+        "LED ekran"
+      ]
+    },
+    "bags-luggage": {
+      "ru": [
+        "колёсики 360",
+        "встроенный замок",
+        "водонепроницаемый",
+        "отделение для ноутбука",
+        "телескопическая ручка",
+        "лёгкий алюминий",
+        "большой объём",
+        "органайзер внутри",
+        "ремни для одежды",
+        "усиленные углы"
+      ],
+      "en": [
+        "360 spinner wheels",
+        "built-in lock",
+        "waterproof",
+        "laptop compartment",
+        "telescopic handle",
+        "lightweight aluminum",
+        "large capacity",
+        "internal organizer",
+        "clothing straps",
+        "reinforced corners"
+      ],
+      "bs": [
+        "360 točkići",
+        "ugrađena brava",
+        "vodootporan",
+        "pretinac za laptop",
+        "teleskopska ručka",
+        "lagan aluminijum",
+        "veliki kapacitet",
+        "unutrašnji organizator",
+        "kaïševi za odjeću",
+        "ojačani uglovi"
+      ]
+    },
+    "bath-products": {
+      "ru": [
+        "натуральные масла",
+        "органический состав",
+        "гипоаллергенный",
+        "приятный аромат",
+        "увлажняющий эффект",
+        "без парабенов",
+        "детская формула",
+        "восстанавливающий",
+        "пенящийся",
+        "экономный расход"
+      ],
+      "en": [
+        "natural oils",
+        "organic formula",
+        "hypoallergenic",
+        "pleasant fragrance",
+        "moisturizing effect",
+        "paraben free",
+        "baby formula",
+        "restorative",
+        "foaming",
+        "economical use"
+      ],
+      "bs": [
+        "prirodna ulja",
+        "organska formula",
+        "hipoalergeno",
+        "ugodan miris",
+        "hidratantni efekat",
+        "bez parabena",
+        "bebi formula",
+        "obnavljajući",
+        "pjenušav",
+        "ekonomična upotreba"
+      ]
+    },
+    "beauty-appliances": {
+      "ru": [
+        "ионная технология",
+        "керамическое покрытие",
+        "несколько насадок",
+        "регулировка температуры",
+        "беспроводной",
+        "быстрый нагрев",
+        "компактный",
+        "защита от перегрева",
+        "долговечный мотор",
+        "эргономичная ручка"
+      ],
+      "en": [
+        "ionic technology",
+        "ceramic coating",
+        "multiple attachments",
+        "temperature control",
+        "cordless",
+        "quick heat up",
+        "compact",
+        "overheat protection",
+        "long-life motor",
+        "ergonomic handle"
+      ],
+      "bs": [
+        "jonska tehnologija",
+        "keramički premaz",
+        "više nastavaka",
+        "regulacija temperature",
+        "bežični",
+        "brzo zagrijavanje",
+        "kompaktan",
+        "zaštita od pregrijavanja",
+        "motor dugog vijeka",
+        "ergonomska ručka"
+      ]
+    },
+    "bed-linen": {
+      "ru": [
+        "100% хлопок",
+        "сатиновое переплетение",
+        "высокая плотность",
+        "не линяет",
+        "гипоаллергенный",
+        "дышащий",
+        "мягкий на ощупь",
+        "евро размер",
+        "на резинке",
+        "комплект 2 шт"
+      ],
+      "en": [
+        "100% cotton",
+        "sateen weave",
+        "high thread count",
+        "colorfast",
+        "hypoallergenic",
+        "breathable",
+        "soft touch",
+        "euro size",
+        "fitted sheet",
+        "set of 2"
+      ],
+      "bs": [
+        "100% pamuk",
+        "saten vez",
+        "velika gustina",
+        "ne bledi",
+        "hipoalergeno",
+        "prozračan",
+        "mekan na dodir",
+        "euro veličina",
+        "sa gumicom",
+        "set od 2"
+      ]
+    },
+    "books-magazines": {
+      "ru": [
+        "бестселлер",
+        "новая в плёнке",
+        "подарочное издание",
+        "с иллюстрациями",
+        "твердая обложка",
+        "букинистическое",
+        "серийное издание",
+        "автограф автора",
+        "редкое издание",
+        "коллекционирование"
+      ],
+      "en": [
+        "bestseller",
+        "new in wrap",
+        "gift edition",
+        "illustrated",
+        "hardcover",
+        "used book",
+        "series edition",
+        "author signed",
+        "rare edition",
+        "collectible"
+      ],
+      "bs": [
+        "bestseller",
+        "nov u foliji",
+        "poklon izdanje",
+        "ilustrovano",
+        "tvrdi povez",
+        "polovna knjiga",
+        "serijsko izdanje",
+        "potpis autora",
+        "rijetko izdanje",
+        "kolekcionarsko"
+      ]
+    },
+    "boys": {
+      "ru": [
+        "хлопок 100%",
+        "модный принт",
+        "регулируемые бретели",
+        "натуральные ткани",
+        "застёжка на кнопках",
+        "светоотражатели",
+        "удобный крой",
+        "для школы",
+        "спортивный стиль",
+        "комплект из 3"
+      ],
+      "en": [
+        "100% cotton",
+        "trendy print",
+        "adjustable straps",
+        "natural fabrics",
+        "snap button closure",
+        "reflectors",
+        "comfortable fit",
+        "for school",
+        "sporty style",
+        "set of 3"
+      ],
+      "bs": [
+        "100% pamuk",
+        "moderan print",
+        "podesive naramenice",
+        "prirodne tkanine",
+        "kopčanje na dugmad",
+        "reflektori",
+        "udoban kroj",
+        "za školu",
+        "sportski stil",
+        "set od 3"
+      ]
+    },
+    "cameras": {
+      "ru": [
+        "полнокадровая матрица",
+        "стабилизация изображения",
+        "4K видеосъёмка",
+        "быстрый автофокус",
+        "сменная оптика",
+        "защита от пыли",
+        "высокое ISO",
+        "серийная съёмка",
+        "сенсорный экран",
+        "Wi-Fi передача"
+      ],
+      "en": [
+        "full frame sensor",
+        "image stabilization",
+        "4K video",
+        "fast autofocus",
+        "interchangeable lens",
+        "dust protection",
+        "high ISO",
+        "burst shooting",
+        "touchscreen",
+        "WiFi transfer"
+      ],
+      "bs": [
+        "full frame senzor",
+        "stabilizacija slike",
+        "4K video",
+        "brz autofokus",
+        "izmjenjivi objektiv",
+        "zaštita od prašine",
+        "visok ISO",
+        "burst režim",
+        "touchscreen",
+        "WiFi prijenos"
+      ]
+    },
+    "car-seats": {
+      "ru": [
+        "группа 0+/1",
+        "установка против хода",
+        "крепление Isofix",
+        "боковая защита",
+        "регулировка наклона",
+        "съёмный чехол",
+        "пятиточечные ремни",
+        "алюминиевый каркас",
+        "ортопедическая спинка",
+        "легкий вес"
+      ],
+      "en": [
+        "group 0+/1",
+        "rear facing",
+        "Isofix mount",
+        "side protection",
+        "recline adjustment",
+        "removable cover",
+        "5-point harness",
+        "aluminum frame",
+        "orthopedic back",
+        "lightweight"
+      ],
+      "bs": [
+        "grupa 0+/1",
+        "okrenut prema nazad",
+        "Isofix montaža",
+        "bočna zaštita",
+        "podešavanje nagiba",
+        "skidiva presvlaka",
+        "5-tačkasti pojasevi",
+        "aluminijumski okvir",
+        "ortopedska leđa",
+        "lagan"
+      ]
+    },
+    "care-hygiene": {
+      "ru": [
+        "натуральный состав",
+        "без спирта",
+        "увлажняющий",
+        "детская формула",
+        "с алоэ вера",
+        "антибактериальный",
+        "гипоаллергенный",
+        "без отдушек",
+        "экономичная упаковка",
+        "тестировано дерматологами"
+      ],
+      "en": [
+        "natural ingredients",
+        "alcohol free",
+        "moisturizing",
+        "baby formula",
+        "with aloe vera",
+        "antibacterial",
+        "hypoallergenic",
+        "unscented",
+        "economy pack",
+        "dermatologist tested"
+      ],
+      "bs": [
+        "prirodni sastojci",
+        "bez alkohola",
+        "hidratantan",
+        "bebi formula",
+        "sa aloe verom",
+        "antibakterijski",
+        "hipoalergeno",
+        "bez mirisa",
+        "ekonomično pakovanje",
+        "dermatološki testirano"
+      ]
+    },
+    "computers": {
+      "ru": [
+        "SSD накопитель",
+        "16 ГБ RAM",
+        "процессор Intel Core i7",
+        "дискретная графика",
+        "охлаждение жидкостное",
+        "RGB подсветка",
+        "модульная конструкция",
+        "беспроводная связь Wi-Fi 6",
+        "порты USB-C",
+        "тихий режим"
+      ],
+      "en": [
+        "SSD storage",
+        "16 GB RAM",
+        "Intel Core i7 processor",
+        "dedicated graphics",
+        "liquid cooling",
+        "RGB lighting",
+        "modular design",
+        "WiFi 6",
+        "USB-C ports",
+        "silent mode"
+      ],
+      "bs": [
+        "SSD disk",
+        "16 GB RAM",
+        "Intel Core i7 procesor",
+        "dedicated grafika",
+        "tečno hlađenje",
+        "RGB osvjetljenje",
+        "modularni dizajn",
+        "WiFi 6",
+        "USB-C portovi",
+        "tihi režim"
+      ]
+    },
+    "costume-jewelry": {
+      "ru": [
+        "сплав с позолотой",
+        "стразы Swarovski",
+        "винтажный стиль",
+        "лёгкий вес",
+        "удлинённая подвеска",
+        "регулируемая цепочка",
+        "комплект серьги+кольцо",
+        "эмалевое покрытие",
+        "филигрань",
+        "подарочная коробочка"
+      ],
+      "en": [
+        "gold plated alloy",
+        "Swarovski crystals",
+        "vintage style",
+        "lightweight",
+        "long pendant",
+        "adjustable chain",
+        "earring + ring set",
+        "enamel coating",
+        "filigree",
+        "gift box"
+      ],
+      "bs": [
+        "pozlaćena legura",
+        "Swarovski kristali",
+        "vintage stil",
+        "lagan",
+        "dugačak privjesak",
+        "podesivi lanac",
+        "set minđuše+prsten",
+        "emajlirani premaz",
+        "filigran",
+        "poklon kutija"
+      ]
+    },
+    "feeding-products": {
+      "ru": [
+        "силиконовые соски",
+        "антиколиковая система",
+        "медленный поток",
+        "BPA-free пластик",
+        "подогрев в бутылочке",
+        "удобная ручка",
+        "герметичная крышка",
+        "стерилизация в микроволновке",
+        "набор 3 шт",
+        "с маркировкой объёма"
+      ],
+      "en": [
+        "silicone teat",
+        "anti-colic system",
+        "slow flow",
+        "BPA-free plastic",
+        "bottle warmer",
+        "easy grip handle",
+        "leak proof lid",
+        "microwave sterilizable",
+        "set of 3",
+        "volume markings"
+      ],
+      "bs": [
+        "silikonska duda",
+        "antikolik sistem",
+        "spori protok",
+        "BPA-free plastika",
+        "grijanje flašice",
+        "udobna ručka",
+        "nepropusni poklopac",
+        "sterilizacija u mikrotalasnoj",
+        "set od 3",
+        "oznake zapremine"
+      ]
+    },
+    "food-products": {
+      "ru": [
+        "органическое производство",
+        "без ГМО",
+        "натуральный вкус",
+        "домашняя упаковка",
+        "свежий урожай",
+        "местный продукт",
+        "ручная работа",
+        "без сахара",
+        "веганский состав",
+        "крафтовое производство"
+      ],
+      "en": [
+        "organic production",
+        "GMO free",
+        "natural taste",
+        "homemade packaging",
+        "fresh harvest",
+        "local product",
+        "handmade",
+        "sugar free",
+        "vegan recipe",
+        "craft production"
+      ],
+      "bs": [
+        "organska proizvodnja",
+        "bez GMO",
+        "prirodan ukus",
+        "domaće pakovanje",
+        "svježa berba",
+        "lokalni proizvod",
+        "ručni rad",
+        "bez šećera",
+        "veganski recept",
+        "craft proizvodnja"
+      ]
+    },
+    "furniture-interior": {
+      "ru": [
+        "массив дуба",
+        "натуральный шпон",
+        "матовая отделка",
+        "раздвижная система",
+        "трансформер",
+        "встроенная подсветка",
+        "мягкое сиденье",
+        "регулируемая высота",
+        "складная конструкция",
+        "экокожа"
+      ],
+      "en": [
+        "solid oak",
+        "natural veneer",
+        "matte finish",
+        "sliding system",
+        "transformer",
+        "built-in lighting",
+        "soft seat",
+        "adjustable height",
+        "foldable design",
+        "eco leather"
+      ],
+      "bs": [
+        "puni hrast",
+        "prirodni furnir",
+        "mat završna obrada",
+        "klizni sistem",
+        "transformabilan",
+        "ugrađeno osvjetljenje",
+        "meko sjedište",
+        "podesiva visina",
+        "sklopivi dizajn",
+        "eko koža"
+      ]
+    },
+    "games-consoles-software": {
+      "ru": [
+        "цифровая версия",
+        "новый в плёнке",
+        "геймпад в комплекте",
+        "мультиплеер",
+        "4K графика",
+        "поддержка VR",
+        "SSD быстрая загрузка",
+        "беспроводной контроллер",
+        "предзаказ",
+        "коллекционное издание"
+      ],
+      "en": [
+        "digital version",
+        "new sealed",
+        "controller included",
+        "multiplayer",
+        "4K graphics",
+        "VR support",
+        "SSD fast loading",
+        "wireless controller",
+        "pre-order",
+        "collector's edition"
+      ],
+      "bs": [
+        "digitalna verzija",
+        "nov u foliji",
+        "kontroler uključen",
+        "multiplayer",
+        "4K grafika",
+        "VR podrška",
+        "SSD brzo učitavanje",
+        "bežični kontroler",
+        "prednarudžba",
+        "kolekcionarsko izdanje"
+      ]
+    },
+    "girls": {
+      "ru": [
+        "нежные тона",
+        "кружевная отделка",
+        "атласная лента",
+        "пышная юбка",
+        "цветочный принт",
+        "мягкий трикотаж",
+        "удобная резинка",
+        "блестящий декор",
+        "комплект платье+повязка",
+        "для особого случая"
+      ],
+      "en": [
+        "soft colors",
+        "lace trim",
+        "satin ribbon",
+        "fluffy skirt",
+        "floral print",
+        "soft knit",
+        "comfortable elastic",
+        "sparkly decor",
+        "dress + headband set",
+        "special occasion"
+      ],
+      "bs": [
+        "nježne boje",
+        "čipkasti rub",
+        "saten traka",
+        "pufnasta suknja",
+        "cvjetni print",
+        "mekani trikotaž",
+        "udobna gumica",
+        "sjajni dekor",
+        "set haljina+traka",
+        "za posebne prilike"
+      ]
+    },
+    "hair-care": {
+      "ru": [
+        "без сульфатов",
+        "кератиновый комплекс",
+        "масло арганы",
+        "восстановление волос",
+        "термозащита",
+        "объём от корней",
+        "для окрашенных волос",
+        "увлажнение по всей длине",
+        "против выпадения",
+        "профессиональная линия"
+      ],
+      "en": [
+        "sulfate free",
+        "keratin complex",
+        "argan oil",
+        "hair repair",
+        "heat protectant",
+        "root volume",
+        "for colored hair",
+        "moisture throughout",
+        "anti hair loss",
+        "professional line"
+      ],
+      "bs": [
+        "bez sulfata",
+        "keratinski kompleks",
+        "arganovo ulje",
+        "obnavljanje kose",
+        "termozaštita",
+        "volumen iz korijena",
+        "za farbanu kosu",
+        "hidratacija duž cijele dužine",
+        "protiv opadanja",
+        "profesionalna linija"
+      ]
+    },
+    "hobby-bicycles": {
+      "ru": [
+        "алюминиевая рама",
+        "дисковые тормоза",
+        "24 скорости",
+        "амортизационная вилка",
+        "быстросъёмные колёса",
+        "светоотражатели",
+        "крылья в комплекте",
+        "багажник",
+        "накатистые покрышки",
+        "для города и бездорожья"
+      ],
+      "en": [
+        "aluminum frame",
+        "disc brakes",
+        "24 speeds",
+        "suspension fork",
+        "quick release wheels",
+        "reflectors",
+        "mudguards included",
+        "luggage rack",
+        "smooth tires",
+        "city and offroad"
+      ],
+      "bs": [
+        "aluminijumski ram",
+        "disk kočnice",
+        "24 brzine",
+        "viljuška amortizera",
+        "brzo skidanje točkova",
+        "reflektori",
+        "blatobrani uključeni",
+        "nosač prtljaga",
+        "glatke gume",
+        "grad i offroad"
+      ]
+    },
+    "hobby-scooters": {
+      "ru": [
+        "складной механизм",
+        "электродвигатель",
+        "литий-ионный аккумулятор",
+        "дальность 25 км",
+        "пневматические шины",
+        "дисковый тормоз",
+        "алюминиевая дека",
+        "светодиодная подсветка",
+        "регулируемый руль",
+        "максимальная скорость 25 км/ч"
+      ],
+      "en": [
+        "folding mechanism",
+        "electric motor",
+        "lithium battery",
+        "25 km range",
+        "pneumatic tires",
+        "disc brake",
+        "aluminum deck",
+        "LED lights",
+        "adjustable handlebars",
+        "max speed 25 km/h"
+      ],
+      "bs": [
+        "sklopivi mehanizam",
+        "elektromotor",
+        "litijumska baterija",
+        "25 km domet",
+        "pneumatske gume",
+        "disk kočnica",
+        "aluminijumska deka",
+        "LED svjetla",
+        "podesivi upravljač",
+        "max brzina 25 km/h"
+      ]
+    },
+    "hunting-fishing": {
+      "ru": [
+        "телескопическое удилище",
+        "катушка безынерционная",
+        "плетёный шнур",
+        "термо-костюм",
+        "оптический прицел",
+        "складной нож",
+        "герметичный кейс",
+        "манок с электроникой",
+        "камуфляжная расцветка",
+        "водонепроницаемый"
+      ],
+      "en": [
+        "telescopic rod",
+        "spinning reel",
+        "braided line",
+        "thermal suit",
+        "optical scope",
+        "folding knife",
+        "waterproof case",
+        "electronic caller",
+        "camouflage pattern",
+        "water resistant"
+      ],
+      "bs": [
+        "teleskopski štap",
+        "bacačka mašinica",
+        "pletena struna",
+        "termo odijelo",
+        "optički nišan",
+        "sklopivi nož",
+        "vodootporna kutija",
+        "elektronski vabac",
+        "kamuf lažna šara",
+        "otporan na vodu"
+      ]
+    },
+    "jewelry": {
+      "ru": [
+        "проба 585",
+        "с бриллиантами",
+        "червонное золото",
+        "верижка плетение",
+        "фиангиты",
+        "ручная работа",
+        "сертификат подлинности",
+        "ювелирная эмаль",
+        "позолота 999 пробы",
+        "родиевое покрытие"
+      ],
+      "en": [
+        "14k gold",
+        "with diamonds",
+        "rose gold",
+        "chain weave",
+        "cubic zirconia",
+        "handmade",
+        "certificate of authenticity",
+        "jewelers enamel",
+        "24k gold plated",
+        "rhodium plated"
+      ],
+      "bs": [
+        "14k zlato",
+        "sa dijamantima",
+        "ružičasto zlato",
+        "lančano pletenje",
+        "kubni cirkonijum",
+        "ručni rad",
+        "sertifikat autentičnosti",
+        "zlatarska emajl",
+        "24k pozlata",
+        "rodijumski premaz"
+      ]
+    },
+    "kids-furniture": {
+      "ru": [
+        "регулируемая спинка",
+        "защитные бортики",
+        "экологичный материал",
+        "без острых углов",
+        "с ящиками",
+        "растущая конструкция",
+        "яркий дизайн",
+        "легко моется",
+        "устойчивая конструкция",
+        "нетоксичная краска"
+      ],
+      "en": [
+        "adjustable backrest",
+        "safety rails",
+        "eco-friendly material",
+        "rounded corners",
+        "with drawers",
+        "growing design",
+        "colorful design",
+        "easy to clean",
+        "stable construction",
+        "non-toxic paint"
+      ],
+      "bs": [
+        "podesivi naslon",
+        "sigurnosne ograde",
+        "ekološki materijal",
+        "bez oštrih uglova",
+        "sa fiokama",
+        "rastući dizajn",
+        "šareni dizajn",
+        "lako se čisti",
+        "stabilna konstrukcija",
+        "netoksična boja"
+      ]
+    },
+    "kids-hygiene": {
+      "ru": [
+        "детская формула 0+",
+        "гипоаллергенный",
+        "без слёз",
+        "не щиплет глазки",
+        "натуральные экстракты",
+        "рН-нейтральный",
+        "жидкое мыло",
+        "пенка для ванны",
+        "влажные салфетки",
+        "крем под подгузник"
+      ],
+      "en": [
+        "baby formula 0+",
+        "hypoallergenic",
+        "no tears",
+        "gentle on eyes",
+        "natural extracts",
+        "pH neutral",
+        "liquid soap",
+        "bath foam",
+        "wet wipes",
+        "diaper cream"
+      ],
+      "bs": [
+        "bebi formula 0+",
+        "hipoalergeno",
+        "bez suza",
+        "ne peče oči",
+        "prirodni ekstrakti",
+        "pH neutralan",
+        "tečni sapun",
+        "pjena za kupanje",
+        "vlažne maramice",
+        "krema za pelene"
+      ]
+    },
+    "kids-scooters-bikes": {
+      "ru": [
+        "безопасная конструкция",
+        "боковые колёсики",
+        "складной руль",
+        "тормоз ручной",
+        "защита цепи",
+        "светоотражатели",
+        "резиновые ручки",
+        "стальная рама",
+        "регулируемое сиденье",
+        "надувные шины"
+      ],
+      "en": [
+        "safe design",
+        "training wheels",
+        "folding handlebars",
+        "hand brake",
+        "chain guard",
+        "reflectors",
+        "rubber grips",
+        "steel frame",
+        "adjustable seat",
+        "pneumatic tires"
+      ],
+      "bs": [
+        "siguran dizajn",
+        "bočni točkići",
+        "sklopivi upravljač",
+        "ručna kočnica",
+        "zaštita lanca",
+        "reflektori",
+        "gumene ručke",
+        "čelični ram",
+        "podesivo sjedište",
+        "pneumatske gume"
+      ]
+    },
+    "kitchen-dining": {
+      "ru": [
+        "нержавеющая сталь",
+        "антипригарное покрытие",
+        "подходит для индукции",
+        "стеклянная крышка",
+        "эргономичная ручка",
+        "набор 5 предметов",
+        "духовка до 250°C",
+        "моется в посудомойке",
+        "хиты продаж",
+        "складная конструкция"
+      ],
+      "en": [
+        "stainless steel",
+        "non-stick coating",
+        "induction compatible",
+        "glass lid",
+        "ergonomic handle",
+        "5-piece set",
+        "oven safe to 250°C",
+        "dishwasher safe",
+        "bestseller",
+        "foldable design"
+      ],
+      "bs": [
+        "nerđajući čelik",
+        "non-stick premaz",
+        "pogodno za indukciju",
+        "stakleni poklopac",
+        "ergonomska ručka",
+        "set od 5 komada",
+        "sigurno u pećnici do 250°C",
+        "sigurno za mašinu za sudove",
+        "bestseller",
+        "sklopivi dizajn"
+      ]
+    },
+    "laptops": {
+      "ru": [
+        "SSD 512 ГБ",
+        "16 ГБ оперативной памяти",
+        "экран 15.6 Full HD",
+        "процессор Intel i5",
+        "вес 1.8 кг",
+        "аккумулятор 8 часов",
+        "клавиатура с подсветкой",
+        "тонкий корпус",
+        "металлический корпус",
+        "Windows 11"
+      ],
+      "en": [
+        "SSD 512 GB",
+        "16 GB RAM",
+        "15.6 Full HD display",
+        "Intel i5 processor",
+        "weight 1.8 kg",
+        "8 hour battery",
+        "backlit keyboard",
+        "slim chassis",
+        "metal body",
+        "Windows 11"
+      ],
+      "bs": [
+        "SSD 512 GB",
+        "16 GB RAM",
+        "15.6 Full HD ekran",
+        "Intel i5 procesor",
+        "težina 1.8 kg",
+        "8 sati baterija",
+        "osvijetljena tastatura",
+        "tanak profi l",
+        "metalno kućište",
+        "Windows 11"
+      ]
+    },
+    "makeup-manicure": {
+      "ru": [
+        "стойкая формула",
+        "сатиновый финиш",
+        "пигментированный",
+        "без талька",
+        "веганская косметика",
+        "кисть в комплекте",
+        "зеркальный блеск",
+        "гель-лак",
+        "набор 12 цветов",
+        "натуральные пигменты"
+      ],
+      "en": [
+        "long-lasting formula",
+        "satin finish",
+        "highly pigmented",
+        "talc free",
+        "vegan cosmetics",
+        "brush included",
+        "mirror shine",
+        "gel polish",
+        "12 color set",
+        "natural pigments"
+      ],
+      "bs": [
+        "dugotrajna formula",
+        "satin finiš",
+        "visoko pigmentiran",
+        "bez talka",
+        "veganska kozmetika",
+        "četkica uključena",
+        "zrcalni sjaj",
+        "gel lak",
+        "set 12 boja",
+        "prirodni pigmenti"
+      ]
+    },
+    "medical-products": {
+      "ru": [
+        "стерильная упаковка",
+        "точный измеритель",
+        "ЖК дисплей",
+        "автоматическое отключение",
+        "память измерений",
+        "компактный размер",
+        "работает от батареек",
+        "манжета универсальная",
+        "звуковой сигнал",
+        "гарантия 2 года"
+      ],
+      "en": [
+        "sterile packaging",
+        "accurate meter",
+        "LCD display",
+        "auto shut off",
+        "memory storage",
+        "compact size",
+        "battery operated",
+        "universal cuff",
+        "audio alert",
+        "2 year warranty"
+      ],
+      "bs": [
+        "sterilno pakovanje",
+        "precizan mjerač",
+        "LCD ekran",
+        "automatsko isključivanje",
+        "memorija mjerenja",
+        "kompaktna veličina",
+        "na baterije",
+        "univerzalna manžetna",
+        "zvučni signal",
+        "2 godine garancije"
+      ]
+    },
+    "men-clothing": {
+      "ru": [
+        "размер M-XXXL",
+        "хлопок/полиэстер",
+        "прямой крой",
+        "застёжка на молнии",
+        "накладные карманы",
+        "дышащая ткань",
+        "классический стиль",
+        "спортивная модель",
+        "капюшон",
+        "светоотражающие элементы"
+      ],
+      "en": [
+        "size M-XXXL",
+        "cotton/polyester",
+        "straight cut",
+        "zip closure",
+        "cargo pockets",
+        "breathable fabric",
+        "classic style",
+        "sporty model",
+        "hooded",
+        "reflective elements"
+      ],
+      "bs": [
+        "veličina M-XXXL",
+        "pamuk/poliestar",
+        "ravni kroj",
+        "rajsferšlus",
+        "džepovi sa preklopcem",
+        "prozračna tkanina",
+        "klasični stil",
+        "sportski model",
+        "sa kapuljačom",
+        "reflektirajući elementi"
+      ]
+    },
+    "men-shoes": {
+      "ru": [
+        "размер 39-46",
+        "натуральная кожа",
+        "кожаная стелька",
+        "прошивка по периметру",
+        "полиуретановая подошва",
+        "классические",
+        "кроссовки",
+        "мокасины",
+        "зимние утеплённые",
+        "ортопедическая колодка"
+      ],
+      "en": [
+        "size 39-46",
+        "genuine leather",
+        "leather insole",
+        "stitched perimeter",
+        "polyurethane sole",
+        "classic shoes",
+        "sneakers",
+        "moccasins",
+        "winter insulated",
+        "orthopedic last"
+      ],
+      "bs": [
+        "veličina 39-46",
+        "prava koža",
+        "kožni uložak",
+        "šivena periferija",
+        "poliuretanski đon",
+        "klasične cipele",
+        "patike",
+        "mokasine",
+        "zimske izolovane",
+        "ortopedska kalupa"
+      ]
+    },
+    "musical-instruments": {
+      "ru": [
+        "классическая гитара",
+        "еловая дека",
+        "машинка тремоло",
+        "встроенный тюнер",
+        "нейлоновые струны",
+        "кейс в комплекте",
+        "регулируемый гриф",
+        "лакированная поверхность",
+        "пьедестал и педаль",
+        "микрофон конденсаторный"
+      ],
+      "en": [
+        "classic guitar",
+        "spruce top",
+        "tremolo bridge",
+        "built-in tuner",
+        "nylon strings",
+        "case included",
+        "adjustable neck",
+        "lacquered finish",
+        "stand and pedal",
+        "condenser microphone"
+      ],
+      "bs": [
+        "klasična gitara",
+        "smrečina rezonantna ploča",
+        "tremolo most",
+        "ugrađeni tjuner",
+        "najlonske žice",
+        "futrola uključena",
+        "podesivi vrat",
+        "lakirana površina",
+        "stalak i pedala",
+        "kondenzatorski mikrofon"
+      ]
+    },
+    "other-electronics": {
+      "ru": [
+        "беспроводной зарядник",
+        "USB-C порт",
+        "светодиодный индикатор",
+        "защита от короткого замыкания",
+        "компактный размер",
+        "алюминиевый корпус",
+        "совместимость с Qi",
+        "быстрая зарядка",
+        "настольный органайзер",
+        "длина кабеля 1.5 м"
+      ],
+      "en": [
+        "wireless charger",
+        "USB-C port",
+        "LED indicator",
+        "short circuit protection",
+        "compact size",
+        "aluminum body",
+        "Qi compatible",
+        "fast charging",
+        "desk organizer",
+        "cable length 1.5 m"
+      ],
+      "bs": [
+        "bežični punjač",
+        "USB-C port",
+        "LED indikator",
+        "zaštita od kratkog spoja",
+        "kompaktna veličina",
+        "aluminijumsko kućište",
+        "Qi kompatibilan",
+        "brzo punjenje",
+        "stoni organizator",
+        "dužina kabla 1.5 m"
+      ]
+    },
+    "perfumes": {
+      "ru": [
+        "парфюмерная вода",
+        "туалетная вода",
+        "стойкость 8+ часов",
+        "древесные ноты",
+        "цветочный аромат",
+        "цитрусовая свежесть",
+        "ориентальная база",
+        "мужской аромат",
+        "женский аромат",
+        "унисекс"
+      ],
+      "en": [
+        "eau de parfum",
+        "eau de toilette",
+        "8+ hour longevity",
+        "woody notes",
+        "floral scent",
+        "citrus freshness",
+        "oriental base",
+        "men's fragrance",
+        "women's fragrance",
+        "unisex"
+      ],
+      "bs": [
+        "parfemska voda",
+        "toaletna voda",
+        "8+ sati trajanja",
+        "drvene note",
+        "cvjetni miris",
+        "citrusna svježina",
+        "orijentalna baza",
+        "muški miris",
+        "ženski miris",
+        "uniseks"
+      ]
+    },
+    "phones": {
+      "ru": [
+        "64 МП камера",
+        "AMOLED дисплей",
+        "128 ГБ памяти",
+        "аккумулятор 5000 мАч",
+        "процессор 8 ядер",
+        "быстрая зарядка 33W",
+        "защита IP68",
+        "без царапин",
+        "оригинальный дисплей",
+        "комплект с зарядкой"
+      ],
+      "en": [
+        "64 MP camera",
+        "AMOLED display",
+        "128 GB storage",
+        "5000 mAh battery",
+        "octa-core processor",
+        "33W fast charging",
+        "IP68 rating",
+        "no scratches",
+        "original display",
+        "charger included"
+      ],
+      "bs": [
+        "64 MP kamera",
+        "AMOLED ekran",
+        "128 GB memorije",
+        "5000 mAh baterija",
+        "osmojezgreni procesor",
+        "33W brzo punjenje",
+        "IP68 zaštita",
+        "bez ogrebotina",
+        "originalni ekran",
+        "punjač uključen"
+      ]
+    },
+    "plants": {
+      "ru": [
+        "комнатное растение",
+        "в горшке 12 см",
+        "неприхотливый уход",
+        "очищает воздух",
+        "декоративные листья",
+        "цветущий вид",
+        "суккулент",
+        "пальма",
+        "фикус",
+        "монстера"
+      ],
+      "en": [
+        "indoor plant",
+        "pot 12 cm",
+        "easy care",
+        "air purifying",
+        "ornamental leaves",
+        "flowering variety",
+        "succulent",
+        "palm tree",
+        "ficus",
+        "monstera"
+      ],
+      "bs": [
+        "sobna biljka",
+        "saksija 12 cm",
+        "laka njega",
+        "pročišćava zrak",
+        "ukrasno lišće",
+        "cvjetna sorta",
+        "sukulent",
+        "palma",
+        "ficus",
+        "monstera"
+      ]
+    },
+    "repair-construction": {
+      "ru": [
+        "аккумуляторная дрель",
+        "лазерный уровень",
+        "перфоратор 800W",
+        "набор бит и свёрл",
+        "телескопическая ручка",
+        "складной метр",
+        "защитные очки",
+        "кейс для хранения",
+        "бесщеточный двигатель",
+        "регулировка оборотов"
+      ],
+      "en": [
+        "cordless drill",
+        "laser level",
+        "800W hammer drill",
+        "bit and drill set",
+        "telescopic handle",
+        "folding measuring tape",
+        "safety goggles",
+        "storage case",
+        "brushless motor",
+        "variable speed"
+      ],
+      "bs": [
+        "akumulatorska bušilica",
+        "laserski nivo",
+        "800W čekić bušilica",
+        "set nastavaka i burgija",
+        "teleskopska ručka",
+        "sklopivi metar",
+        "zaštitne naočale",
+        "kutija za odlaganje",
+        "beščetni motor",
+        "podesiva brzina"
+      ]
+    },
+    "school-supplies": {
+      "ru": [
+        "набор 24 цвета",
+        "твёрдость HB",
+        "ластик в комплекте",
+        "точилка с контейнером",
+        "треугольная форма",
+        "эргономичный корпус",
+        "пенал большой",
+        "акварельные краски",
+        "альбом 40 листов",
+        "набор линеек"
+      ],
+      "en": [
+        "24 color set",
+        "HB hardness",
+        "eraser included",
+        "sharpener with container",
+        "triangular shape",
+        "ergonomic body",
+        "large pencil case",
+        "watercolor paints",
+        "40 sheet sketchbook",
+        "ruler set"
+      ],
+      "bs": [
+        "set 24 boje",
+        "HB tvrdoća",
+        "gumica uključena",
+        "šiljilo sa kontejnerom",
+        "trouglasti oblik",
+        "ergonomsko tijelo",
+        "velika pernica",
+        "akvarel boje",
+        "40 listova blok",
+        "set lenjira"
+      ]
+    },
+    "sports-outdoors": {
+      "ru": [
+        "лёгкая конструкция",
+        "дышащая сетка",
+        "анатомическая подошва",
+        "быстросохнущий материал",
+        "компрессионная посадка",
+        "влагоотводящий",
+        "защита суставов",
+        "регулируемые лямки",
+        "карманы на молнии",
+        "светоотражатель"
+      ],
+      "en": [
+        "lightweight design",
+        "mesh ventilation",
+        "anatomical sole",
+        "quick dry material",
+        "compression fit",
+        "moisture wicking",
+        "joint protection",
+        "adjustable straps",
+        "zippered pockets",
+        "reflector"
+      ],
+      "bs": [
+        "lagani dizajn",
+        "mrežasta ventilacija",
+        "anatomski đon",
+        "brzosušeći materijal",
+        "kompresiono prijanjanje",
+        "upija vlagu",
+        "zaštita zglobova",
+        "podesive naramenice",
+        "džepovi na rajsferšlus",
+        "reflektor"
+      ]
+    },
+    "strollers": {
+      "ru": [
+        "складная рама",
+        "регулировка спинки",
+        "большая корзина",
+        "алюминиевый каркас",
+        "амортизация колёс",
+        "поворотные передние колёса",
+        "тент от солнца",
+        "пятиточечные ремни",
+        "съёмная люлька",
+        "один касанием складывается"
+      ],
+      "en": [
+        "foldable frame",
+        "reclining backrest",
+        "large basket",
+        "aluminum frame",
+        "wheel suspension",
+        "swivel front wheels",
+        "sun canopy",
+        "5-point harness",
+        "removable bassinet",
+        "one-hand fold"
+      ],
+      "bs": [
+        "sklopivi ram",
+        "podesivi naslon",
+        "velika korpa",
+        "aluminijumski okvir",
+        "amortizacija točkova",
+        "okretni prednji točkovi",
+        "nadstrešnica",
+        "5-tačkasti pojasevi",
+        "skidiva korpa",
+        "jednom rukom sklapanje"
+      ]
+    },
+    "tablets": {
+      "ru": [
+        "экран 10.5 дюймов",
+        "64 ГБ памяти",
+        "Wi-Fi + LTE",
+        "поддержка стилуса",
+        "долгое время работы",
+        "тонкий корпус",
+        "алюминиевая задняя панель",
+        "камера 12 МП",
+        "детский режим",
+        "разъём для наушников"
+      ],
+      "en": [
+        "10.5 inch display",
+        "64 GB storage",
+        "WiFi + LTE",
+        "stylus support",
+        "long battery life",
+        "slim chassis",
+        "aluminum back panel",
+        "12 MP camera",
+        "kids mode",
+        "headphone jack"
+      ],
+      "bs": [
+        "10.5 inčni ekran",
+        "64 GB memorije",
+        "WiFi + LTE",
+        "podrška za olovku",
+        "dugo trajanje baterije",
+        "tanak profi l",
+        "aluminijumska zadnja ploča",
+        "12 MP kamera",
+        "dječji režim",
+        "priključak za slušalice"
+      ]
+    },
+    "tickets-travel": {
+      "ru": [
+        "электронный билет",
+        "возвратный",
+        "багаж включён",
+        "выбор места",
+        "страховка включена",
+        "скидка при раннем бронировании",
+        "трансфер",
+        "гид в подарок",
+        "детский билет 50%",
+        "VIP-зал"
+      ],
+      "en": [
+        "e-ticket",
+        "refundable",
+        "baggage included",
+        "seat selection",
+        "insurance included",
+        "early bird discount",
+        "transfer included",
+        "free guide",
+        "child ticket 50%",
+        "VIP lounge"
+      ],
+      "bs": [
+        "e-karta",
+        "povratna",
+        "prtljag uključen",
+        "izbor sjedišta",
+        "osiguranje uključeno",
+        "popust za ranu rezervaciju",
+        "transfer uključen",
+        "besplatan vodič",
+        "dječja karta 50%",
+        "VIP salon"
+      ]
+    },
+    "toys": {
+      "ru": [
+        "развивающая игрушка",
+        "безопасные материалы",
+        "звуковые эффекты",
+        "световые эффекты",
+        "батарейки включены",
+        "для детей 3+",
+        "мягкий плюш",
+        "конструктор 100 деталей",
+        "радиоуправление",
+        "интерактивная"
+      ],
+      "en": [
+        "educational toy",
+        "safe materials",
+        "sound effects",
+        "light effects",
+        "batteries included",
+        "for ages 3+",
+        "soft plush",
+        "100 piece building set",
+        "remote control",
+        "interactive"
+      ],
+      "bs": [
+        "edukativna igračka",
+        "sigurni materijali",
+        "zvučni efekti",
+        "svjetlosni efekti",
+        "baterije uključene",
+        "za djecu 3+",
+        "mekani pliš",
+        "100 komada konstruktor",
+        "daljinsko upravljanje",
+        "interaktivna"
+      ]
+    },
+    "watches": {
+      "ru": [
+        "водозащита 50 м",
+        "сапфировое стекло",
+        "механический механизм",
+        "хронограф",
+        "кожаный ремешок",
+        "стальной корпус",
+        "люминесцентные стрелки",
+        "окошки даты",
+        "автоподзавод",
+        "керамический безель"
+      ],
+      "en": [
+        "50 m water resistance",
+        "sapphire crystal",
+        "mechanical movement",
+        "chronograph",
+        "leather strap",
+        "steel case",
+        "luminous hands",
+        "date window",
+        "self-winding",
+        "ceramic bezel"
+      ],
+      "bs": [
+        "50 m otpornost na vodu",
+        "safirno staklo",
+        "mehanički mehanizam",
+        "hronograf",
+        "kožni kaiš",
+        "čelično kućište",
+        "luminescentne kazaljke",
+        "prozorčić za datum",
+        "automatsko navijanje",
+        "keramički bezel"
+      ]
+    },
+    "women-clothing": {
+      "ru": [
+        "размер XS-XL",
+        "лёгкая струящаяся ткань",
+        "круглый вырез",
+        "пояс в комплекте",
+        "ажурная вставка",
+        "длина миди",
+        "рукав 3/4",
+        "застёжка сзади",
+        "декольте",
+        "драпировка"
+      ],
+      "en": [
+        "size XS-XL",
+        "light flowing fabric",
+        "round neckline",
+        "belt included",
+        "lace insert",
+        "midi length",
+        "3/4 sleeve",
+        "back closure",
+        "sweetheart neckline",
+        "draping"
+      ],
+      "bs": [
+        "veličina XS-XL",
+        "lagana lepršava tkanina",
+        "okrugli dekolte",
+        "pojas uključen",
+        "čipkasti umetak",
+        "midi dužina",
+        "3/4 rukav",
+        "kopčanje straga",
+        "duboki dekolte",
+        "draperija"
+      ]
+    },
+    "women-shoes": {
+      "ru": [
+        "размер 35-41",
+        "натуральная замша",
+        "кожаная подкладка",
+        "каблук 7 см",
+        "платформа 3 см",
+        "острая носочка",
+        "босоножки",
+        "туфли-лодочки",
+        "балетки",
+        "кроссовки на платформе"
+      ],
+      "en": [
+        "size 35-41",
+        "genuine suede",
+        "leather lining",
+        "7 cm heel",
+        "3 cm platform",
+        "pointed toe",
+        "sandals",
+        "pumps",
+        "ballet flats",
+        "platform sneakers"
+      ],
+      "bs": [
+        "veličina 35-41",
+        "prava antilop",
+        "kožna postava",
+        "5 cm potpetica",
+        "3 cm platforma",
+        "šiljati vrh",
+        "sandale",
+        "luknje",
+        "baletanke",
+        "patike sa platformom"
+      ]
+    },
+    "dogs": {
+      "ru": [
+        "лабрадор",
+        "овчарка",
+        "золотистый ретривер",
+        "хаски",
+        "чихуахуа",
+        "дружелюбный",
+        "активный",
+        "спокойный",
+        "сторожевой",
+        "для семьи",
+        "маленький",
+        "большой"
+      ],
+      "en": [
+        "labrador",
+        "shepherd",
+        "golden retriever",
+        "husky",
+        "chihuahua",
+        "friendly",
+        "active",
+        "calm",
+        "guard dog",
+        "family dog",
+        "small breed",
+        "large breed"
+      ],
+      "bs": [
+        "labrador",
+        "pastir",
+        "zlatni retriver",
+        "haski",
+        "čivava",
+        "prijateljski",
+        "aktivan",
+        "smiren",
+        "čuvar",
+        "porodičan",
+        "mala rasa",
+        "velika rasa"
+      ]
+    },
+    "cats": {
+      "ru": [
+        "персидская",
+        "мейн-кун",
+        "сиамская",
+        "британская",
+        "сфинкс",
+        "абиссинская",
+        "ласковая",
+        "игривая",
+        "для дома",
+        "гипоаллергенная",
+        "короткошёрстная",
+        "длинношёрстная"
+      ],
+      "en": [
+        "Persian",
+        "Maine Coon",
+        "Siamese",
+        "British shorthair",
+        "sphynx",
+        "Abyssinian",
+        "affectionate",
+        "playful",
+        "indoor",
+        "hypoallergenic",
+        "short hair",
+        "long hair"
+      ],
+      "bs": [
+        "persijska",
+        "mejn kun",
+        "sijamska",
+        "britanska kratkodlaka",
+        "sfinga",
+        "abisinska",
+        "privržena",
+        "razigrana",
+        "kućna",
+        "hipoalergena",
+        "kratka dlaka",
+        "duga dlaka"
+      ]
+    },
+    "birds": {
+      "ru": [
+        "волнистый попугай",
+        "канарейка",
+        "корелла",
+        "неразлучник",
+        "жако",
+        "какаду",
+        "ара",
+        "говорящий",
+        "ручной",
+        "певчий",
+        "маленький",
+        "яркий"
+      ],
+      "en": [
+        "budgie",
+        "canary",
+        "cockatiel",
+        "lovebird",
+        "African grey",
+        "cockatoo",
+        "macaw",
+        "talking",
+        "tame",
+        "singing",
+        "small",
+        "colourful"
+      ],
+      "bs": [
+        "tigrica",
+        "kanarinac",
+        "kakadu",
+        "nemogućka",
+        "afrički sivi",
+        "kakadu",
+        "ara",
+        "koji priča",
+        "pitom",
+        "pjevač",
+        "mali",
+        "šaren"
+      ]
+    },
+    "fish-aquarium": {
+      "ru": [
+        "гуппи",
+        "неон",
+        "скалярия",
+        "петушок",
+        "золотая рыбка",
+        "цихлида",
+        "дискус",
+        "меченосец",
+        "аквариум 50л",
+        "аквариум 100л",
+        "пресноводные",
+        "морские"
+      ],
+      "en": [
+        "guppy",
+        "neon tetra",
+        "angelfish",
+        "betta",
+        "goldfish",
+        "cichlid",
+        "discus",
+        "swordtail",
+        "50L aquarium",
+        "100L aquarium",
+        "freshwater",
+        "saltwater"
+      ],
+      "bs": [
+        "gupi",
+        "neon tetra",
+        "skalar",
+        "beta",
+        "zlatna ribica",
+        "ciklida",
+        "diskusa",
+        "mačorepac",
+        "50L akvarijum",
+        "100L akvarijum",
+        "slatkovodne",
+        "morske"
+      ]
+    },
+    "other-animals": {
+      "ru": [
+        "хомяк",
+        "морская свинка",
+        "кролик",
+        "шиншилла",
+        "хорёк",
+        "черепаха",
+        "ящерица",
+        "декоративный",
+        "ласковый",
+        "ручной",
+        "короткошёрстный",
+        "пушистый"
+      ],
+      "en": [
+        "hamster",
+        "guinea pig",
+        "rabbit",
+        "chinchilla",
+        "ferret",
+        "turtle",
+        "lizard",
+        "decorative",
+        "gentle",
+        "tame",
+        "short hair",
+        "fluffy"
+      ],
+      "bs": [
+        "hrčak",
+        "zamorče",
+        "zec",
+        "činčila",
+        "tvor",
+        "kornjača",
+        "gušter",
+        "dekorativni",
+        "nežan",
+        "pitom",
+        "kratka dlaka",
+        "puhast"
+      ]
+    },
+    "pet-food": {
+      "ru": [
+        "сухой корм",
+        "влажный корм",
+        "корм для щенков",
+        "корм для котят",
+        "беззерновой",
+        "натуральный",
+        "лечебный",
+        "холистик",
+        "консервы",
+        "лакомства",
+        "для стерилизованных",
+        "класс премиум"
+      ],
+      "en": [
+        "dry food",
+        "wet food",
+        "puppy food",
+        "kitten food",
+        "grain free",
+        "natural",
+        "veterinary diet",
+        "holistic",
+        "canned food",
+        "treats",
+        "for neutered",
+        "premium class"
+      ],
+      "bs": [
+        "suva hrana",
+        "mokra hrana",
+        "hrana za štence",
+        "hrana za mačiće",
+        "bez žitarica",
+        "prirodna",
+        "veterinarska dijeta",
+        "holistička",
+        "konzervirana",
+        "poslastice",
+        "za kastrirane",
+        "premium klasa"
+      ]
+    },
+    "pet-toys": {
+      "ru": [
+        "мяч",
+        "пищалка",
+        "канат",
+        "плюшевая",
+        "интерактивная",
+        "лазер",
+        "перо",
+        "трекинговый",
+        "головоломка",
+        "летающая тарелка",
+        "для жевания",
+        "для собак"
+      ],
+      "en": [
+        "ball",
+        "squeaky",
+        "rope",
+        "plush",
+        "interactive",
+        "laser",
+        "feather",
+        "fetch toy",
+        "puzzle toy",
+        "frisbee",
+        "chew toy",
+        "for dogs"
+      ],
+      "bs": [
+        "lopta",
+        "pištaljka",
+        "konopac",
+        "plišana",
+        "interaktivna",
+        "laser",
+        "pero",
+        "dohvati igračku",
+        "zagonetka",
+        "frizbi",
+        "za žvakanje",
+        "za pse"
+      ]
+    },
+    "pet-accessories": {
+      "ru": [
+        "лежак",
+        "домик",
+        "миска",
+        "ошейник",
+        "поводок",
+        "шлейка",
+        "переноска",
+        "когтеточка",
+        "щётка",
+        "поилка",
+        "автокормушка",
+        "коврик"
+      ],
+      "en": [
+        "pet bed",
+        "pet house",
+        "bowl",
+        "collar",
+        "leash",
+        "harness",
+        "carrier",
+        "scratching post",
+        "brush",
+        "water fountain",
+        "auto feeder",
+        "mat"
+      ],
+      "bs": [
+        "krevet",
+        "kućica",
+        "zdjela",
+        "ogrlica",
+        "povodac",
+        "prsluk",
+        "nosač",
+        "grebalica",
+        "četka",
+        "pojilica",
+        "automatska hranilica",
+        "podloga"
+      ]
+    },
+    "pet-dogs-cats": {
+      "ru": [
+        "шампунь",
+        "груминг",
+        "капли от блох",
+        "витамины",
+        "когтерез",
+        "игрушка для кошек",
+        "игрушка для собак",
+        "намордник",
+        "подгузники",
+        "совместные товары",
+        "комбинированный",
+        "универсальный"
+      ],
+      "en": [
+        "shampoo",
+        "grooming kit",
+        "flea drops",
+        "vitamins",
+        "nail clipper",
+        "cat toy",
+        "dog toy",
+        "muzzle",
+        "pet diapers",
+        "dual purpose",
+        "combo pack",
+        "universal"
+      ],
+      "bs": [
+        "šampon",
+        "grooming set",
+        "kapi protiv buva",
+        "vitamini",
+        "rezač noktiju",
+        "igračka za mačke",
+        "igračka za pse",
+        "brnjica",
+        "pedive za ljubimce",
+        "kombinovano",
+        "kombinacija",
+        "univerzalno"
+      ]
+    },
+    "pet-birds": {
+      "ru": [
+        "клетка",
+        "кормушка",
+        "поилка",
+        "жёрдочка",
+        "кальций",
+        "игрушка",
+        "зерносмесь",
+        "гнездо",
+        "качели",
+        "купалка",
+        "наполнитель",
+        "спрей"
+      ],
+      "en": [
+        "cage",
+        "feeder",
+        "water dispenser",
+        "perch",
+        "calcium",
+        "toy",
+        "seed mix",
+        "nesting box",
+        "swing",
+        "bird bath",
+        "litter",
+        "spray"
+      ],
+      "bs": [
+        "kavez",
+        "hranilica",
+        "pojilica",
+        "sjedalica",
+        "kalcijum",
+        "igračka",
+        "mješavina sjemena",
+        "gnijezdo",
+        "ljuljaška",
+        "kupka",
+        "podloga",
+        "sprej"
+      ]
+    },
+    "ac-installation": {
+      "ru": [
+        "установка кондиционера",
+        "монтаж сплит-системы",
+        "обслуживание кондиционеров",
+        "диагностика неисправностей",
+        "заправка фреоном",
+        "чистка кондиционера",
+        "ремонт компрессора",
+        "замена вентилятора",
+        "продажа и установка",
+        "выезд мастера"
+      ],
+      "en": [
+        "air conditioner installation",
+        "split system mounting",
+        "AC maintenance",
+        "fault diagnostics",
+        "refrigerant refill",
+        "AC cleaning",
+        "compressor repair",
+        "fan replacement",
+        "sales and installation",
+        "master visit"
+      ],
+      "bs": [
+        "ugradnja klima uređaja",
+        "montaža split sistema",
+        "servis klima",
+        "dijagnostika kvarova",
+        "punjenje freonom",
+        "čišćenje klime",
+        "popravka kompresora",
+        "zamjena ventilatora",
+        "prodaja i ugradnja",
+        "dolazak majstora"
+      ]
+    },
+    "accounting": {
+      "ru": [
+        "бухгалтерское сопровождение",
+        "налоговая отчётность",
+        "ведение учёта",
+        "аудит и консалтинг",
+        "расчёт зарплаты",
+        "первичная документация",
+        "налоговая оптимизация",
+        "восстановление учёта",
+        "финансовый анализ",
+        "отчётность для ООО и ИП"
+      ],
+      "en": [
+        "accounting support",
+        "tax reporting",
+        "bookkeeping",
+        "audit and consulting",
+        "payroll calculation",
+        "primary documentation",
+        "tax optimization",
+        "accounting restoration",
+        "financial analysis",
+        "reporting for LLC and sole traders"
+      ],
+      "bs": [
+        "knjigovodstvena podrška",
+        "poresko izvještavanje",
+        "vođenje knjiga",
+        "revizija i savjetovanje",
+        "obračun plata",
+        "primarna dokumentacija",
+        "poreska optimizacija",
+        "obnova knjigovodstva",
+        "finansijska analiza",
+        "izvještaji za DOO i preduzetnike"
+      ]
+    },
+    "agriculture": {
+      "ru": [
+        "сельхоз работы",
+        "вспашка полей",
+        "посев и посадка",
+        "сбор урожая",
+        "обработка растений",
+        "полив и орошение",
+        "аренда техники",
+        "уход за садом",
+        "удобрение почвы",
+        "сельхоз консультации"
+      ],
+      "en": [
+        "farm work",
+        "field plowing",
+        "sowing and planting",
+        "harvesting",
+        "plant treatment",
+        "irrigation",
+        "equipment rental",
+        "orchard maintenance",
+        "soil fertilization",
+        "agricultural consulting"
+      ],
+      "bs": [
+        "poljoprivredni radovi",
+        "oranje njiva",
+        "sjetva i sadnja",
+        "berba",
+        "tretman biljaka",
+        "navodnjavanje",
+        "iznajmljivanje opreme",
+        "održavanje voćnjaka",
+        "đubrenje zemljišta",
+        "poljoprivredno savjetovanje"
+      ]
+    },
+    "apartment-cleaning": {
+      "ru": [
+        "генеральная уборка",
+        "уборка после ремонта",
+        "еженедельная уборка",
+        "мытье окон",
+        "чистка ковров",
+        "уборка кухни",
+        "уборка санузла",
+        "дезинфекция",
+        "глажка белья",
+        "уборка балкона"
+      ],
+      "en": [
+        "deep cleaning",
+        "post-renovation cleaning",
+        "weekly cleaning",
+        "window washing",
+        "carpet cleaning",
+        "kitchen cleaning",
+        "bathroom cleaning",
+        "disinfection",
+        "ironing",
+        "balcony cleaning"
+      ],
+      "bs": [
+        "dubinsko čišćenje",
+        "čišćenje poslije renovacije",
+        "sedmično čišćenje",
+        "pranje prozora",
+        "čišćenje tepiha",
+        "čišćenje kuhinje",
+        "čišćenje kupatila",
+        "dezinfekcija",
+        "peglanje",
+        "čišćenje balkona"
+      ]
+    },
+    "appliance-repair": {
+      "ru": [
+        "ремонт холодильников",
+        "ремонт стиральных машин",
+        "ремонт посудомоечных машин",
+        "ремонт духовок",
+        "ремонт пылесосов",
+        "ремонт бойлеров",
+        "ремонт электроплит",
+        "диагностика",
+        "замена запчастей",
+        "сервисное обслуживание"
+      ],
+      "en": [
+        "refrigerator repair",
+        "washing machine repair",
+        "dishwasher repair",
+        "oven repair",
+        "vacuum cleaner repair",
+        "boiler repair",
+        "electric stove repair",
+        "diagnostics",
+        "spare parts replacement",
+        "maintenance service"
+      ],
+      "bs": [
+        "popravka frižidera",
+        "popravka veš mašina",
+        "popravka mašina za sudove",
+        "popravka rerni",
+        "popravka usisivača",
+        "popravka bojlera",
+        "popravka električnih šporeta",
+        "dijagnostika",
+        "zamjena dijelova",
+        "servis"
+      ]
+    },
+    "arts": {
+      "ru": [
+        "художественные работы",
+        "картины на заказ",
+        "портрет по фото",
+        "роспись стен",
+        "графический рисунок",
+        "оформление интерьера",
+        "скульптура",
+        "цифровое искусство",
+        "иллюстрация",
+        "мастер-класс"
+      ],
+      "en": [
+        "artwork",
+        "paintings on commission",
+        "portrait from photo",
+        "wall painting",
+        "graphic drawing",
+        "interior decoration",
+        "sculpture",
+        "digital art",
+        "illustration",
+        "master class"
+      ],
+      "bs": [
+        "umjetnički radovi",
+        "slike po narudžbi",
+        "portret po fotografiji",
+        "zidno slikarstvo",
+        "grafički crtež",
+        "uređenje interijera",
+        "skulptura",
+        "digitalna umjetnost",
+        "ilustracija",
+        "majstorska radionica"
+      ]
+    },
+    "beauty-salons-spa": {
+      "ru": [
+        "салон красоты",
+        "спа процедуры",
+        "уход за лицом",
+        "обёртывание",
+        "массаж лица",
+        "чистка кожи",
+        "SPA-программы",
+        "подарочные сертификаты",
+        "релаксация",
+        "комплексный уход"
+      ],
+      "en": [
+        "beauty salon",
+        "spa treatments",
+        "facial care",
+        "body wrap",
+        "facial massage",
+        "skin cleansing",
+        "SPA programs",
+        "gift certificates",
+        "relaxation",
+        "comprehensive care"
+      ],
+      "bs": [
+        "salon ljepote",
+        "SPA tretmani",
+        "njega lica",
+        "obloge",
+        "masaža lica",
+        "čišćenje kože",
+        "SPA programi",
+        "poklon sertifikati",
+        "relaksacija",
+        "sveobuhvatna njega"
+      ]
+    },
+    "car-repair": {
+      "ru": [
+        "ремонт двигателя",
+        "замена масла",
+        "диагностика авто",
+        "кузовной ремонт",
+        "замена тормозов",
+        "шиномонтаж",
+        "компьютерная диагностика",
+        "замена сцепления",
+        "ремонт подвески",
+        "выхлопная система"
+      ],
+      "en": [
+        "engine repair",
+        "oil change",
+        "car diagnostics",
+        "body repair",
+        "brake replacement",
+        "tire fitting",
+        "computer diagnostics",
+        "clutch replacement",
+        "suspension repair",
+        "exhaust system"
+      ],
+      "bs": [
+        "popravka motora",
+        "zamjena ulja",
+        "dijagnostika auta",
+        "limarija",
+        "zamjena kočnica",
+        "montaža guma",
+        "kompjuterska dijagnostika",
+        "zamjena kvačila",
+        "popravka ovjesa",
+        "auspuh sistem"
+      ]
+    },
+    "carpet-cleaning": {
+      "ru": [
+        "химчистка ковров",
+        "чистка ковролина",
+        "выведение пятен",
+        "обработка паром",
+        "сушка ковров",
+        "антибактериальная обработка",
+        "чистка на дому",
+        "чистка паласов",
+        "освежение цвета",
+        "глубокая очистка"
+      ],
+      "en": [
+        "dry cleaning carpets",
+        "carpet runner cleaning",
+        "stain removal",
+        "steam treatment",
+        "carpet drying",
+        "antibacterial treatment",
+        "on-site cleaning",
+        "rug cleaning",
+        "color refreshing",
+        "deep cleaning"
+      ],
+      "bs": [
+        "hemijsko čišćenje tepiha",
+        "čišćenje tepih podova",
+        "uklanjanje fleka",
+        "tretman parom",
+        "sušenje tepiha",
+        "antibakterijski tretman",
+        "čišćenje na licu mjesta",
+        "čišćenje ćilima",
+        "osvježenje boje",
+        "dubinsko čišćenje"
+      ]
+    },
+    "catering": {
+      "ru": [
+        "кейтеринг на мероприятие",
+        "банкетное обслуживание",
+        "выездное питание",
+        "шведский стол",
+        "фуршеты",
+        "корпоративное питание",
+        "доставка готовых обедов",
+        "стол на свадьбу",
+        "кофе-брейк",
+        "меню на заказ"
+      ],
+      "en": [
+        "event catering",
+        "banquet service",
+        "off-site catering",
+        "buffet",
+        "receptions",
+        "corporate meals",
+        "ready meal delivery",
+        "wedding table",
+        "coffee break",
+        "custom menu"
+      ],
+      "bs": [
+        "ketering za događaje",
+        "banket servis",
+        "terenski ketering",
+        "švedski sto",
+        "recepcije",
+        "korporativna ishrana",
+        "dostava gotovih obroka",
+        "svadbeni sto",
+        "pauza za kafu",
+        "meni po narudžbi"
+      ]
+    },
+    "cleaning-service": {
+      "ru": [
+        "уборка помещений",
+        "клининг",
+        "ежедневная уборка",
+        "мойка окон",
+        "чистка мягкой мебели",
+        "химчистка",
+        "уборка офисов",
+        "дезинфекция",
+        "уборка после пожара",
+        "уборка территории"
+      ],
+      "en": [
+        "premises cleaning",
+        "cleaning service",
+        "daily cleaning",
+        "window washing",
+        "upholstery cleaning",
+        "dry cleaning",
+        "office cleaning",
+        "disinfection",
+        "fire damage cleaning",
+        "outdoor cleaning"
+      ],
+      "bs": [
+        "čišćenje prostorija",
+        "klining servis",
+        "dnevno čišćenje",
+        "pranje prozora",
+        "čišćenje tapeciranog namještaja",
+        "hemijsko čišćenje",
+        "čišćenje kancelarija",
+        "dezinfekcija",
+        "čišćenje nakon požara",
+        "čišćenje terena"
+      ]
+    },
+    "clothing-repair": {
+      "ru": [
+        "ремонт одежды",
+        "ушивка вещей",
+        "замена молнии",
+        "подгонка по фигуре",
+        "штопка",
+        "замена пуговиц",
+        "ремонт пальто",
+        "перешивка джинсов",
+        "ремонт подкладки",
+        "срочный ремонт"
+      ],
+      "en": [
+        "clothing repair",
+        "alteration",
+        "zipper replacement",
+        "fitting adjustment",
+        "darning",
+        "button replacement",
+        "coat repair",
+        "jeans alteration",
+        "lining repair",
+        "urgent repair"
+      ],
+      "bs": [
+        "popravka odjeće",
+        "prešivanje",
+        "zamjena rajsferšlusa",
+        "prilagođavanje",
+        "krpljenje",
+        "zamjena dugmadi",
+        "popravka kaputa",
+        "prepravka farmerki",
+        "popravka postave",
+        "hitna popravka"
+      ]
+    },
+    "commercial-construction": {
+      "ru": [
+        "строительство коммерческих объектов",
+        "офисный ремонт",
+        "складское строительство",
+        "отделка помещений",
+        "фасадные работы",
+        "бетонирование",
+        "металлоконструкции",
+        "проектная документация",
+        "генподряд",
+        "реконструкция зданий"
+      ],
+      "en": [
+        "commercial construction",
+        "office renovation",
+        "warehouse construction",
+        "interior finishing",
+        "facade work",
+        "concreting",
+        "steel structures",
+        "project documentation",
+        "general contracting",
+        "building reconstruction"
+      ],
+      "bs": [
+        "komercijalna gradnja",
+        "kancelarijska renovacija",
+        "skladišna gradnja",
+        "unutrašnja obrada",
+        "fasadni radovi",
+        "betoniranje",
+        "metalne konstrukcije",
+        "projektna dokumentacija",
+        "generalno izvođenje",
+        "rekonstrukcija objekata"
+      ]
+    },
+    "courses-training": {
+      "ru": [
+        "обучающие курсы",
+        "повышение квалификации",
+        "профессиональное обучение",
+        "онлайн курс",
+        "индивидуальное обучение",
+        "групповые занятия",
+        "тренинг",
+        "семинар",
+        "практическое занятие",
+        "сертификация"
+      ],
+      "en": [
+        "training courses",
+        "professional development",
+        "vocational training",
+        "online course",
+        "individual tuition",
+        "group lessons",
+        "training",
+        "seminar",
+        "practical workshop",
+        "certification"
+      ],
+      "bs": [
+        "kursevi obuke",
+        "profesionalno usavršavanje",
+        "stručno osposobljavanje",
+        "online kurs",
+        "individualna nastava",
+        "grupni časovi",
+        "trening",
+        "seminar",
+        "praktična radionica",
+        "certifikacija"
+      ]
+    },
+    "delivery-courier": {
+      "ru": [
+        "доставка по городу",
+        "экспресс доставка",
+        "курьерская служба",
+        "доставка документов",
+        "доставка посылок",
+        "грузоперевозки",
+        "доставка еды",
+        "междугородняя доставка",
+        "срочная доставка",
+        "велокурьер"
+      ],
+      "en": [
+        "city delivery",
+        "express delivery",
+        "courier service",
+        "document delivery",
+        "parcel delivery",
+        "cargo shipping",
+        "food delivery",
+        "intercity delivery",
+        "urgent delivery",
+        "bicycle courier"
+      ],
+      "bs": [
+        "dostava po gradu",
+        "ekspres dostava",
+        "kurirska služba",
+        "dostava dokumenata",
+        "dostava paketa",
+        "transport tereta",
+        "dostava hrane",
+        "međugradska dostava",
+        "hitna dostava",
+        "biciklistički kurir"
+      ]
+    },
+    "dog-walking": {
+      "ru": [
+        "выгул собак",
+        "дневной дог-ситтинг",
+        "активный выгул",
+        "индивидуальный выгул",
+        "групповой выгул",
+        "выгул щенков",
+        "тренировка на улице",
+        "выгул с фотоотчётом",
+        "утренний выгул",
+        "вечерний выгул"
+      ],
+      "en": [
+        "dog walking",
+        "day dog sitting",
+        "active walk",
+        "individual walking",
+        "group walking",
+        "puppy walking",
+        "outdoor training",
+        "walking with photo report",
+        "morning walk",
+        "evening walk"
+      ],
+      "bs": [
+        "izvođenje pasa",
+        "dnevno čuvanje pasa",
+        "aktivna šetnja",
+        "individualna šetnja",
+        "grupna šetnja",
+        "izvođenje štenaca",
+        "trening napolju",
+        "šetnja sa foto izvještajem",
+        "jutarnja šetnja",
+        "večernja šetnja"
+      ]
+    },
+    "electrical": {
+      "ru": [
+        "электромонтажные работы",
+        "замена проводки",
+        "установка розеток",
+        "монтаж освещения",
+        "электрощит",
+        "замена автоматов",
+        "ремонт электропроводки",
+        "установка люстры",
+        "заземление",
+        "вызов электрика"
+      ],
+      "en": [
+        "electrical work",
+        "wiring replacement",
+        "socket installation",
+        "lighting installation",
+        "electrical panel",
+        "breaker replacement",
+        "wiring repair",
+        "chandelier installation",
+        "grounding",
+        "electrician call"
+      ],
+      "bs": [
+        "električarski radovi",
+        "zamjena instalacija",
+        "ugradnja utičnica",
+        "montaža rasvjete",
+        "električna tabla",
+        "zamjena osigurača",
+        "popravka instalacija",
+        "ugradnja lustera",
+        "uzemljenje",
+        "poziv električara"
+      ]
+    },
+    "event-planning": {
+      "ru": [
+        "организация мероприятий",
+        "свадебный организатор",
+        "планирование корпоратива",
+        "день рождения",
+        "team-building",
+        "декорирование зала",
+        "подбор площадки",
+        "развлекательная программа",
+        "координация события",
+        "праздничный сценарий"
+      ],
+      "en": [
+        "event organization",
+        "wedding planner",
+        "corporate event planning",
+        "birthday party",
+        "team building",
+        "hall decoration",
+        "venue selection",
+        "entertainment program",
+        "event coordination",
+        "party script"
+      ],
+      "bs": [
+        "organizacija događaja",
+        "svadbeni planer",
+        "planiranje korporativa",
+        "rođendan",
+        "tim bilding",
+        "dekoraćija sale",
+        "odabir mjesta",
+        "zabavni program",
+        "koordinacija događaja",
+        "scenario proslave"
+      ]
+    },
+    "flooring-installation": {
+      "ru": [
+        "укладка ламината",
+        "настил паркета",
+        "укладка плитки",
+        "наливной пол",
+        "укладка линолеума",
+        "тёплый пол",
+        "ремонт пола",
+        "шлифовка паркета",
+        "ковролин",
+        "плинтусы"
+      ],
+      "en": [
+        "laminate flooring",
+        "parquet installation",
+        "tile laying",
+        "self-leveling floor",
+        "linoleum installation",
+        "heated floor",
+        "floor repair",
+        "parquet sanding",
+        "carpet fitting",
+        "skirting boards"
+      ],
+      "bs": [
+        "postavljanje laminata",
+        "postavljanje parketa",
+        "postavljanje pločica",
+        "samorazlivajući pod",
+        "postavljanje linoleuma",
+        "podno grijanje",
+        "popravka poda",
+        "brušenje parketa",
+        "tepih pod",
+        "lajsne"
+      ]
+    },
+    "florist": {
+      "ru": [
+        "букеты на заказ",
+        "свадебная флористика",
+        "цветочная композиция",
+        "доставка цветов",
+        "оформление зала цветами",
+        "живые цветы",
+        "комнатные растения",
+        "букет невесты",
+        "интерьерная флористика",
+        "корзина цветов"
+      ],
+      "en": [
+        "bouquets on order",
+        "wedding floristry",
+        "floral arrangement",
+        "flower delivery",
+        "hall decoration with flowers",
+        "fresh flowers",
+        "houseplants",
+        "bridal bouquet",
+        "interior floristry",
+        "flower basket"
+      ],
+      "bs": [
+        "buketi po narudžbi",
+        "svadbena floristika",
+        "cvjetni aranžman",
+        "dostava cvijeća",
+        "dekoraćija sale cvijećem",
+        "svježe cvijeće",
+        "sobne biljke",
+        "mladenkin buket",
+        "interijerska floristika",
+        "korpa cvijeća"
+      ]
+    },
+    "freight": {
+      "ru": [
+        "грузоперевозки",
+        "междугородние перевозки",
+        "международные перевозки",
+        "перевозка мебели",
+        "переезд квартиры",
+        "офисный переезд",
+        "доставка стройматериалов",
+        "аренда грузовика",
+        "сборный груз",
+        "перевозка техники"
+      ],
+      "en": [
+        "cargo transportation",
+        "intercity transport",
+        "international transport",
+        "furniture transport",
+        "apartment moving",
+        "office relocation",
+        "building materials delivery",
+        "truck rental",
+        "groupage cargo",
+        "equipment transport"
+      ],
+      "bs": [
+        "transport tereta",
+        "međugradski transport",
+        "međunarodni transport",
+        "transport namještaja",
+        "preseljenje stana",
+        "kancelarijska selidba",
+        "dostava građevinskog materijala",
+        "iznajmljivanje kamiona",
+        "skupni teret",
+        "transport opreme"
+      ]
+    },
+    "hair-care-services": {
+      "ru": [
+        "стрижка",
+        "укладка волос",
+        "окрашивание волос",
+        "лечение волос",
+        "восстановление волос",
+        "ламинирование",
+        "мелирование",
+        "коса",
+        "причёска на свадьбу",
+        "вечерняя укладка"
+      ],
+      "en": [
+        "haircut",
+        "hair styling",
+        "hair coloring",
+        "hair treatment",
+        "hair restoration",
+        "lamination",
+        "highlights",
+        "braiding",
+        "wedding hairstyle",
+        "evening styling"
+      ],
+      "bs": [
+        "šišanje",
+        "oblikovanje kose",
+        "farbanje kose",
+        "tretman kose",
+        "obnova kose",
+        "laminacija",
+        "pramenovi",
+        "pletenje",
+        "svadbena frizura",
+        "večernje oblikovanje"
+      ]
+    },
+    "hair-styling": {
+      "ru": [
+        "укладка",
+        "свадебная причёска",
+        "вечерняя причёска",
+        "химическая завивка",
+        "выпрямление волос",
+        "причёска на выпускной",
+        "плетение кос",
+        "наращивание волос",
+        "причёска с аксессуарами",
+        "модная стрижка"
+      ],
+      "en": [
+        "styling",
+        "wedding hairstyle",
+        "evening hairstyle",
+        "perm",
+        "hair straightening",
+        "prom hairstyle",
+        "braiding",
+        "hair extensions",
+        "hairstyle with accessories",
+        "trendy haircut"
+      ],
+      "bs": [
+        "oblikovanje",
+        "svadbena frizura",
+        "večernja frizura",
+        "trajna",
+        "ispravljanje kose",
+        "frizura za maturu",
+        "pletenje",
+        "ekstenzije kose",
+        "frizura sa aksesoarima",
+        "moderno šišanje"
+      ]
+    },
+    "home-food-service": {
+      "ru": [
+        "приготовление еды на дом",
+        "домашние обеды",
+        "свежая выпечка",
+        "торты на заказ",
+        "пироги и пицца",
+        "диетическое питание",
+        "детское меню",
+        "полуфабрикаты",
+        "вареники и пельмени",
+        "домашняя кухня"
+      ],
+      "en": [
+        "home cooking service",
+        "home lunches",
+        "fresh pastries",
+        "cakes on order",
+        "pies and pizza",
+        "diet meals",
+        "children's menu",
+        "semi-prepared meals",
+        "dumplings and pelmeni",
+        "home cuisine"
+      ],
+      "bs": [
+        "priprema hrane kod kuće",
+        "kućni ručkovi",
+        "svježi kolači",
+        "torte po narudžbi",
+        "pite i pizza",
+        "dijetalna hrana",
+        "dječiji meni",
+        "poluproizvodi",
+        "knedle i pelmeni",
+        "domaća kuhinja"
+      ]
+    },
+    "housekeeping": {
+      "ru": [
+        "помощь по хозяйству",
+        "уборка дома",
+        "глажка и стирка",
+        "приготовление еды",
+        "присмотр за детьми",
+        "мытьё окон",
+        "уход за пожилыми",
+        "покупка продуктов",
+        "работа по дому",
+        "генеральная уборка"
+      ],
+      "en": [
+        "housekeeping",
+        "home cleaning",
+        "ironing and laundry",
+        "cooking",
+        "childcare",
+        "window washing",
+        "elderly care",
+        "groceries shopping",
+        "household chores",
+        "deep cleaning"
+      ],
+      "bs": [
+        "pomoć u domaćinstvu",
+        "čišćenje doma",
+        "peglanje i pranje",
+        "kuhanje",
+        "čuvanje djece",
+        "pranje prozora",
+        "njega starijih",
+        "kupovina namirnica",
+        "kućni poslovi",
+        "dubinsko čišćenje"
+      ]
+    },
+    "laptop-pc-repair": {
+      "ru": [
+        "ремонт ноутбуков",
+        "замена матрицы",
+        "чистка от пыли",
+        "замена термопасты",
+        "ремонт материнской платы",
+        "восстановление данных",
+        "замена аккумулятора",
+        "ремонт ПК",
+        "замена клавиатуры",
+        "настройка системы"
+      ],
+      "en": [
+        "laptop repair",
+        "screen replacement",
+        "dust cleaning",
+        "thermal paste replacement",
+        "motherboard repair",
+        "data recovery",
+        "battery replacement",
+        "PC repair",
+        "keyboard replacement",
+        "system setup"
+      ],
+      "bs": [
+        "popravka laptopova",
+        "zamjena ekrana",
+        "čišćenje prašine",
+        "zamjena termalne paste",
+        "popravka matične ploče",
+        "oporavak podataka",
+        "zamjena baterije",
+        "popravka računara",
+        "zamjena tastature",
+        "podešavanje sistema"
+      ]
+    },
+    "legal-services": {
+      "ru": [
+        "юридическая консультация",
+        "составление договоров",
+        "судебное представительство",
+        "регистрация компаний",
+        "лицензирование",
+        "наследственные дела",
+        "земельное право",
+        "трудовые споры",
+        "семейное право",
+        "арбитраж"
+      ],
+      "en": [
+        "legal consultation",
+        "contract drafting",
+        "court representation",
+        "company registration",
+        "licensing",
+        "inheritance matters",
+        "land law",
+        "labor disputes",
+        "family law",
+        "arbitration"
+      ],
+      "bs": [
+        "pravno savjetovanje",
+        "sastavljanje ugovora",
+        "sudsko zastupanje",
+        "registracija firmi",
+        "licenciranje",
+        "nasljedna pitanja",
+        "zemljišno pravo",
+        "radni sporovi",
+        "porodično pravo",
+        "arbitraža"
+      ]
+    },
+    "manicure": {
+      "ru": [
+        "маникюр",
+        "покрытие гель-лаком",
+        "наращивание ногтей",
+        "дизайн ногтей",
+        "педикюр",
+        "уход за кутикулой",
+        "коррекция ногтей",
+        "шеллак",
+        "укрепление ногтей",
+        "японский маникюр"
+      ],
+      "en": [
+        "manicure",
+        "gel polish coating",
+        "nail extensions",
+        "nail design",
+        "pedicure",
+        "cuticle care",
+        "nail correction",
+        "shellac",
+        "nail strengthening",
+        "Japanese manicure"
+      ],
+      "bs": [
+        "manikir",
+        "gel lak",
+        "nadogradnja noktiju",
+        "dizajn noktiju",
+        "pedikir",
+        "njega zanoktica",
+        "korekcija noktiju",
+        "šelak",
+        "jačanje noktiju",
+        "japanski manikir"
+      ]
+    },
+    "massage": {
+      "ru": [
+        "классический массаж",
+        "антицеллюлитный массаж",
+        "спортивный массаж",
+        "расслабляющий массаж",
+        "точечный массаж",
+        "медовый массаж",
+        "массаж спины",
+        "лимфодренажный массаж",
+        "стоун-терапия",
+        "тайский массаж"
+      ],
+      "en": [
+        "classic massage",
+        "anti-cellulite massage",
+        "sports massage",
+        "relaxing massage",
+        "acupressure",
+        "honey massage",
+        "back massage",
+        "lymphatic drainage massage",
+        "stone therapy",
+        "Thai massage"
+      ],
+      "bs": [
+        "klasična masaža",
+        "anticelulit masaža",
+        "sportska masaža",
+        "relaks masaža",
+        "akupresura",
+        "medena masaža",
+        "masaža leđa",
+        "limfna drenaža",
+        "terapija kamenom",
+        "tajlandska masaža"
+      ]
+    },
+    "medicine": {
+      "ru": [
+        "медицинские услуги",
+        "консультация врача",
+        "анализы на дому",
+        "физиотерапия",
+        "медосмотр",
+        "вакцинация",
+        "сестринский уход",
+        "капельница на дому",
+        "реабилитация",
+        "врачебный приём"
+      ],
+      "en": [
+        "medical services",
+        "doctor consultation",
+        "home lab tests",
+        "physiotherapy",
+        "medical checkup",
+        "vaccination",
+        "nursing care",
+        "home IV therapy",
+        "rehabilitation",
+        "doctor appointment"
+      ],
+      "bs": [
+        "medicinske usluge",
+        "ljekarska konsultacija",
+        "analize kod kuće",
+        "fizioterapija",
+        "ljekarski pregled",
+        "vakcinacija",
+        "sestrinska njega",
+        "infuzija kod kuće",
+        "rehabilitacija",
+        "ljekarski prijem"
+      ]
+    },
+    "no-experience-jobs": {
+      "ru": [
+        "работа без опыта",
+        "обучение на месте",
+        "первая работа",
+        "стажировка",
+        "помощник",
+        "уборщик",
+        "курьер без опыта",
+        "разнорабочий",
+        "упаковщик",
+        "вакансия для студентов"
+      ],
+      "en": [
+        "no experience job",
+        "on-the-job training",
+        "first job",
+        "internship",
+        "assistant",
+        "cleaner",
+        "courier no experience",
+        "general worker",
+        "packer",
+        "student vacancy"
+      ],
+      "bs": [
+        "posao bez iskustva",
+        "obuka na radnom mjestu",
+        "prvi posao",
+        "pripravništvo",
+        "pomoćnik",
+        "čistač",
+        "kurir bez iskustva",
+        "fizički radnik",
+        "paker",
+        "konkurs za studente"
+      ]
+    },
+    "office-cleaning": {
+      "ru": [
+        "уборка офисов",
+        "клининг после ремонта",
+        "ежедневная уборка",
+        "мойка окон в офисе",
+        "чистка ковролина",
+        "вынос мусора",
+        "чистка оргтехники",
+        "дезинфекция офиса",
+        "уборка туалетов",
+        "полировка мебели"
+      ],
+      "en": [
+        "office cleaning",
+        "post-renovation cleaning",
+        "daily cleaning",
+        "office window washing",
+        "carpet cleaning",
+        "waste removal",
+        "office equipment cleaning",
+        "office disinfection",
+        "toilet cleaning",
+        "furniture polishing"
+      ],
+      "bs": [
+        "čišćenje kancelarija",
+        "čišćenje poslije renovacije",
+        "dnevno čišćenje",
+        "pranje prozora u kancelariji",
+        "čišćenje tepih podova",
+        "odvoz smeća",
+        "čišćenje opreme",
+        "dezinfekcija kancelarije",
+        "čišćenje toaleta",
+        "poliranje namještaja"
+      ]
+    },
+    "other-services": {
+      "ru": [
+        "разные услуги",
+        "помощь на дому",
+        "мелкий ремонт",
+        "консультация",
+        "сборка мебели",
+        "покраска стен",
+        "поклейка обоев",
+        "установка техники",
+        "заказ запчастей",
+        "разовые работы"
+      ],
+      "en": [
+        "various services",
+        "home help",
+        "minor repairs",
+        "consultation",
+        "furniture assembly",
+        "wall painting",
+        "wallpapering",
+        "appliance installation",
+        "parts ordering",
+        "one-time jobs"
+      ],
+      "bs": [
+        "razne usluge",
+        "pomoć u kući",
+        "sitne popravke",
+        "konsultacije",
+        "montaža namještaja",
+        "krečenje",
+        "lijepljenje tapeta",
+        "ugradnja opreme",
+        "narudžba dijelova",
+        "jednokratni poslovi"
+      ]
+    },
+    "pc-setup": {
+      "ru": [
+        "сборка ПК",
+        "настройка компьютера",
+        "установка Windows",
+        "установка программ",
+        "подключение периферии",
+        "настройка сети",
+        "антивирус",
+        "апгрейд компьютера",
+        "замена комплектующих",
+        "настройка BIOS"
+      ],
+      "en": [
+        "PC assembly",
+        "computer setup",
+        "Windows installation",
+        "software installation",
+        "peripheral setup",
+        "network configuration",
+        "antivirus",
+        "PC upgrade",
+        "component replacement",
+        "BIOS configuration"
+      ],
+      "bs": [
+        "sastavljanje računara",
+        "podešavanje računara",
+        "instalacija Windows",
+        "instalacija softvera",
+        "povezivanje periferije",
+        "podešavanje mreže",
+        "antivirus",
+        "nadogradnja računara",
+        "zamjena komponenti",
+        "BIOS podešavanje"
+      ]
+    },
+    "pedicure": {
+      "ru": [
+        "педикюр",
+        "аппаратный педикюр",
+        "классический педикюр",
+        "покрытие гель-лаком",
+        "уход за стопами",
+        "удаление натоптышей",
+        "массаж ног",
+        "Spa-педикюр",
+        "обработка ногтей",
+        "парафинотерапия"
+      ],
+      "en": [
+        "pedicure",
+        "machine pedicure",
+        "classic pedicure",
+        "gel polish coating",
+        "foot care",
+        "callus removal",
+        "foot massage",
+        "Spa pedicure",
+        "nail treatment",
+        "paraffin therapy"
+      ],
+      "bs": [
+        "pedikir",
+        "aparatni pedikir",
+        "klasični pedikir",
+        "gel lak",
+        "njega stopala",
+        "uklanjanje kurje oči",
+        "masaža stopala",
+        "Spa pedikir",
+        "tretman noktiju",
+        "parafinska terapija"
+      ]
+    },
+    "phone-repair": {
+      "ru": [
+        "ремонт телефонов",
+        "замена экрана",
+        "замена аккумулятора",
+        "ремонт разъёма",
+        "замена корпуса",
+        "ремонт после воды",
+        "ремонт камеры",
+        "замена динамика",
+        "прошивка телефона",
+        "диагностика"
+      ],
+      "en": [
+        "phone repair",
+        "screen replacement",
+        "battery replacement",
+        "charging port repair",
+        "housing replacement",
+        "water damage repair",
+        "camera repair",
+        "speaker replacement",
+        "phone firmware",
+        "diagnostics"
+      ],
+      "bs": [
+        "popravka telefona",
+        "zamjena ekrana",
+        "zamjena baterije",
+        "popravka konektora",
+        "zamjena kućišta",
+        "popravka poslije vode",
+        "popravka kamere",
+        "zamjena zvučnika",
+        "firmver telefona",
+        "dijagnostika"
+      ]
+    },
+    "photoshoots": {
+      "ru": [
+        "фотосъёмка",
+        "свадебная фотосъёмка",
+        "портретная съёмка",
+        "предметная съёмка",
+        "репортажная съёмка",
+        "семейная фотосессия",
+        "фотосъёмка интерьера",
+        "детская съёмка",
+        "коммерческая съёмка",
+        "обработка фото"
+      ],
+      "en": [
+        "photoshoot",
+        "wedding photography",
+        "portrait session",
+        "product photography",
+        "reportage",
+        "family photoshoot",
+        "interior photography",
+        "children's shoot",
+        "commercial photography",
+        "photo editing"
+      ],
+      "bs": [
+        "fotografisanje",
+        "svadbeno fotografisanje",
+        "portretna sesija",
+        "produkt fotografija",
+        "reportaža",
+        "porodična sesija",
+        "fotografisanje interijera",
+        "dječije fotografisanje",
+        "komercijalno fotografisanje",
+        "obrada fotografija"
+      ]
+    },
+    "plastering": {
+      "ru": [
+        "штукатурные работы",
+        "выравнивание стен",
+        "штукатурка по маякам",
+        "шпаклёвка",
+        "декоративная штукатурка",
+        "венецианская штукатурка",
+        "оштукатуривание откосов",
+        "грунтовка стен",
+        "ремонт штукатурки",
+        "фасадная штукатурка"
+      ],
+      "en": [
+        "plastering",
+        "wall leveling",
+        "plastering on beacons",
+        "puttying",
+        "decorative plaster",
+        "Venetian plaster",
+        "slope plastering",
+        "wall priming",
+        "plaster repair",
+        "facade plaster"
+      ],
+      "bs": [
+        "malterisanje",
+        "izravnavanje zidova",
+        "malterisanje po svjetionicima",
+        "gletovanje",
+        "dekorativni malter",
+        "venecijanski malter",
+        "malterisanje kosina",
+        "grundiranje zidova",
+        "popravka maltera",
+        "fasadni malter"
+      ]
+    },
+    "plumbing": {
+      "ru": [
+        "сантехнические работы",
+        "замена труб",
+        "установка сантехники",
+        "ремонт унитаза",
+        "прочистка канализации",
+        "замена смесителя",
+        "установка раковины",
+        "монтаж ванны",
+        "замена радиатора",
+        "бурение скважин"
+      ],
+      "en": [
+        "plumbing work",
+        "pipe replacement",
+        "plumbing installation",
+        "toilet repair",
+        "drain cleaning",
+        "faucet replacement",
+        "sink installation",
+        "bathtub installation",
+        "radiator replacement",
+        "well drilling"
+      ],
+      "bs": [
+        "vodoinstalaterski radovi",
+        "zamjena cijevi",
+        "ugradnja sanitarija",
+        "popravka wc šolje",
+        "čišćenje kanalizacije",
+        "zamjena slavine",
+        "ugradnja umivaonika",
+        "montaža kade",
+        "zamjena radijatora",
+        "bušenje bunara"
+      ]
+    },
+    "programming": {
+      "ru": [
+        "разработка сайтов",
+        "программирование",
+        "веб-приложения",
+        "мобильные приложения",
+        "разработка ботов",
+        "базы данных",
+        "API интеграция",
+        "техническая поддержка",
+        "фронтенд разработка",
+        "бэкенд разработка"
+      ],
+      "en": [
+        "website development",
+        "programming",
+        "web applications",
+        "mobile apps",
+        "bot development",
+        "databases",
+        "API integration",
+        "technical support",
+        "frontend development",
+        "backend development"
+      ],
+      "bs": [
+        "razvoj sajtova",
+        "programiranje",
+        "web aplikacije",
+        "mobilne aplikacije",
+        "razvoj botova",
+        "baze podataka",
+        "API integracija",
+        "tehnička podrška",
+        "frontend razvoj",
+        "backend razvoj"
+      ]
+    },
+    "property-valuation": {
+      "ru": [
+        "оценка недвижимости",
+        "рыночная стоимость",
+        "кадастровая оценка",
+        "экспертиза объекта",
+        "оценка квартиры",
+        "оценка дома",
+        "оценка коммерческой недвижимости",
+        "оценка участка",
+        "отчёт об оценке",
+        "судебная оценка"
+      ],
+      "en": [
+        "property valuation",
+        "market value",
+        "cadastral valuation",
+        "property inspection",
+        "apartment valuation",
+        "house valuation",
+        "commercial property valuation",
+        "land valuation",
+        "valuation report",
+        "forensic valuation"
+      ],
+      "bs": [
+        "procjena nekretnina",
+        "tržišna vrijednost",
+        "katastarska procjena",
+        "stručni pregled",
+        "procjena stana",
+        "procjena kuće",
+        "procjena komercijalnih nekretnina",
+        "procjena zemljišta",
+        "izvještaj o procjeni",
+        "sudska procjena"
+      ]
+    },
+    "psychology": {
+      "ru": [
+        "консультация психолога",
+        "семейная терапия",
+        "индивидуальная терапия",
+        "онлайн-консультация",
+        "детский психолог",
+        "когнитивно-поведенческая терапия",
+        "арт-терапия",
+        "психосоматика",
+        "преодоление стресса",
+        "личностный рост"
+      ],
+      "en": [
+        "psychologist consultation",
+        "family therapy",
+        "individual therapy",
+        "online consultation",
+        "child psychologist",
+        "cognitive behavioral therapy",
+        "art therapy",
+        "psychosomatics",
+        "stress management",
+        "personal growth"
+      ],
+      "bs": [
+        "psihološko savjetovanje",
+        "porodična terapija",
+        "individualna terapija",
+        "online konsultacija",
+        "dječiji psiholog",
+        "kognitivno bihevioralna terapija",
+        "art terapija",
+        "psihosomatika",
+        "upravljanje stresom",
+        "lični razvoj"
+      ]
+    },
+    "residential-construction": {
+      "ru": [
+        "строительство домов",
+        "коттеджи под ключ",
+        "фундаментные работы",
+        "возведение стен",
+        "кровельные работы",
+        "кладка кирпича",
+        "монолитное строительство",
+        "деревянные дома",
+        "проектирование домов",
+        "отделка фасада"
+      ],
+      "en": [
+        "house construction",
+        "turnkey cottages",
+        "foundation work",
+        "wall erection",
+        "roofing",
+        "bricklaying",
+        "monolithic construction",
+        "timber houses",
+        "house design",
+        "facade finishing"
+      ],
+      "bs": [
+        "izgradnja kuća",
+        "vikendice ključ u ruke",
+        "temeljni radovi",
+        "podizanje zidova",
+        "krovopokrivački radovi",
+        "zidanje ciglom",
+        "monolitna gradnja",
+        "drvene kuće",
+        "projektovanje kuća",
+        "fasadna obrada"
+      ]
+    },
+    "restaurants": {
+      "ru": [
+        "ресторан",
+        "доставка из ресторана",
+        "бизнес-ланч",
+        "меню на заказ",
+        "бронирование столиков",
+        "живая музыка",
+        "банкетный зал",
+        "детский праздник",
+        "дегустационное меню",
+        "выездное обслуживание"
+      ],
+      "en": [
+        "restaurant",
+        "restaurant delivery",
+        "business lunch",
+        "menu on order",
+        "table reservation",
+        "live music",
+        "banquet hall",
+        "children's party",
+        "tasting menu",
+        "off-site service"
+      ],
+      "bs": [
+        "restoran",
+        "dostava iz restorana",
+        "business ručak",
+        "meni po narudžbi",
+        "rezervacija stolova",
+        "živa muzika",
+        "banket sala",
+        "dječija proslava",
+        "degustacioni meni",
+        "terenski servis"
+      ]
+    },
+    "security": {
+      "ru": [
+        "охрана объектов",
+        "сигнализация",
+        "видеонаблюдение",
+        "пультовая охрана",
+        "физическая охрана",
+        "монтаж камер",
+        "контроль доступа",
+        "пожарная сигнализация",
+        "охрана мероприятий",
+        "лицензированная охрана"
+      ],
+      "en": [
+        "object security",
+        "alarm system",
+        "CCTV",
+        "central monitoring",
+        "physical security",
+        "camera installation",
+        "access control",
+        "fire alarm",
+        "event security",
+        "licensed security"
+      ],
+      "bs": [
+        "obezbjeđenje objekata",
+        "alarmni sistem",
+        "video nadzor",
+        "centralno obezbjeđenje",
+        "fizičko obezbjeđenje",
+        "montaža kamera",
+        "kontrola pristupa",
+        "protivpožarni alarm",
+        "obezbjeđenje događaja",
+        "licencirano obezbjeđenje"
+      ]
+    },
+    "shoe-repair": {
+      "ru": [
+        "ремонт обуви",
+        "замена набойки",
+        "замена молнии",
+        "ремонт каблука",
+        "растяжка обуви",
+        "прошивка подошвы",
+        "замок на сапогах",
+        "клейка подошвы",
+        "реставрация обуви",
+        "ремонт сумок"
+      ],
+      "en": [
+        "shoe repair",
+        "heel tip replacement",
+        "zipper replacement",
+        "heel repair",
+        "shoe stretching",
+        "sole stitching",
+        "boot zipper",
+        "sole gluing",
+        "shoe restoration",
+        "bag repair"
+      ],
+      "bs": [
+        "popravka obuće",
+        "zamjena đona",
+        "zamjena rajsferšlusa",
+        "popravka pete",
+        "rastezanje obuće",
+        "šivenje đona",
+        "rajcferšlus na čizmama",
+        "lijepljenje đona",
+        "restauracija obuće",
+        "popravka torbi"
+      ]
+    },
+    "skincare": {
+      "ru": [
+        "уход за кожей",
+        "чистка лица",
+        "пилинг",
+        "увлажнение кожи",
+        "маски для лица",
+        "антивозрастной уход",
+        "микротоки",
+        "косметология",
+        "чистка пор",
+        "сыворотки для лица"
+      ],
+      "en": [
+        "skincare",
+        "facial cleansing",
+        "peeling",
+        "skin hydration",
+        "face masks",
+        "anti-aging care",
+        "microcurrents",
+        "cosmetology",
+        "pore cleansing",
+        "facial serums"
+      ],
+      "bs": [
+        "njega kože",
+        "čišćenje lica",
+        "piling",
+        "hidratacija kože",
+        "maske za lice",
+        "anti-age njega",
+        "mikrostruje",
+        "kozmetologija",
+        "čišćenje pora",
+        "serumi za lice"
+      ]
+    },
+    "sport-fitness": {
+      "ru": [
+        "персональные тренировки",
+        "фитнес инструктор",
+        "тренировки в зале",
+        "онлайн тренировки",
+        "йога",
+        "пилатес",
+        "функциональный тренинг",
+        "кардио тренировка",
+        "растяжка",
+        "кроссфит"
+      ],
+      "en": [
+        "personal training",
+        "fitness instructor",
+        "gym training",
+        "online workouts",
+        "yoga",
+        "Pilates",
+        "functional training",
+        "cardio workout",
+        "stretching",
+        "CrossFit"
+      ],
+      "bs": [
+        "lični trening",
+        "fitness instruktor",
+        "trening u teretani",
+        "online vježbe",
+        "joga",
+        "pilates",
+        "funkcionalni trening",
+        "kardio trening",
+        "istezanje",
+        "crossfit"
+      ]
+    },
+    "tax-planning": {
+      "ru": [
+        "налоговое планирование",
+        "налоговая декларация",
+        "налоговый учёт",
+        "оптимизация налогов",
+        "консультация по налогам",
+        "учёт НДС",
+        "отчётность в налоговую",
+        "налоговая нагрузка",
+        "бухгалтерия для ИП",
+        "налоговая отчётность онлайн"
+      ],
+      "en": [
+        "tax planning",
+        "tax return",
+        "tax accounting",
+        "tax optimization",
+        "tax consultation",
+        "VAT accounting",
+        "tax authority reporting",
+        "tax burden",
+        "bookkeeping for entrepreneurs",
+        "online tax reporting"
+      ],
+      "bs": [
+        "poresko planiranje",
+        "poreska prijava",
+        "poresko knjigovodstvo",
+        "optimizacija poreza",
+        "poresko savjetovanje",
+        "PDV obračun",
+        "izvještavanje poreskoj",
+        "poresko opterećenje",
+        "knjigovodstvo za preduzetnike",
+        "online poresko izvještavanje"
+      ]
+    },
+    "taxi": {
+      "ru": [
+        "такси по городу",
+        "междугороднее такси",
+        "трансфер в аэропорт",
+        "детское такси",
+        "женский водитель",
+        "такси с кондиционером",
+        "ночное такси",
+        "заказ такси",
+        "групповой трансфер",
+        "корпоративное такси"
+      ],
+      "en": [
+        "city taxi",
+        "intercity taxi",
+        "airport transfer",
+        "kid's taxi",
+        "female driver",
+        "taxi with AC",
+        "night taxi",
+        "taxi booking",
+        "group transfer",
+        "corporate taxi"
+      ],
+      "bs": [
+        "gradski taksi",
+        "međugradski taksi",
+        "transfer do aerodroma",
+        "dječiji taksi",
+        "ženski vozač",
+        "taksi sa klimom",
+        "noćni taksi",
+        "rezervacija taksija",
+        "grupni transfer",
+        "korporativni taksi"
+      ]
+    },
+    "terraces-balconies": {
+      "ru": [
+        "строительство террас",
+        "остекление балконов",
+        "отделка балкона",
+        "настил террасы",
+        "кровля террасы",
+        "ограждения балкона",
+        "утепление балкона",
+        "деревянная терраса",
+        "алюминиевые конструкции",
+        "входная группа"
+      ],
+      "en": [
+        "terrace construction",
+        "balcony glazing",
+        "balcony finishing",
+        "terrace decking",
+        "terrace roofing",
+        "balcony railings",
+        "balcony insulation",
+        "wooden terrace",
+        "aluminum structures",
+        "entrance group"
+      ],
+      "bs": [
+        "izgradnja terasa",
+        "zastakljivanje balkona",
+        "obrada balkona",
+        "podovi za terase",
+        "krov terase",
+        "balkonske ograde",
+        "izolacija balkona",
+        "drvene terase",
+        "aluminijumske konstrukcije",
+        "ulazna grupa"
+      ]
+    },
+    "tow-truck": {
+      "ru": [
+        "эвакуатор",
+        "буксировка авто",
+        "эвакуация мотоцикла",
+        "эвакуация грузовика",
+        "срочный вызов эвакуатора",
+        "эвакуация после ДТП",
+        "погрузка техники",
+        "эвакуация из ямы",
+        "круглосуточный эвакуатор",
+        "эвакуация спецтехники"
+      ],
+      "en": [
+        "tow truck",
+        "car towing",
+        "motorcycle towing",
+        "truck towing",
+        "urgent towing",
+        "accident towing",
+        "equipment loading",
+        "ditch recovery",
+        "24/7 towing",
+        "heavy machinery towing"
+      ],
+      "bs": [
+        "šlep služba",
+        "vuča automobila",
+        "vuča motocikla",
+        "vuča kamiona",
+        "hitna vuča",
+        "vuča poslije udesa",
+        "utovar opreme",
+        "izvlačenje iz jame",
+        "24/7 šlep",
+        "vuča specijalne opreme"
+      ]
+    },
+    "trading": {
+      "ru": [
+        "торговля",
+        "оптовая продажа",
+        "закупка товаров",
+        "дистрибуция",
+        "трейдинг",
+        "электронная коммерция",
+        "сбыт продукции",
+        "торговый агент",
+        "посреднические услуги",
+        "складская продажа"
+      ],
+      "en": [
+        "trading",
+        "wholesale sales",
+        "goods procurement",
+        "distribution",
+        "trading operations",
+        "e-commerce",
+        "product sales",
+        "trading agent",
+        "brokerage services",
+        "warehouse sales"
+      ],
+      "bs": [
+        "trgovina",
+        "veleprodaja",
+        "nabavka robe",
+        "distribucija",
+        "trgovinske operacije",
+        "e-trgovina",
+        "prodaja proizvoda",
+        "trgovinski agent",
+        "posredničke usluge",
+        "skladišna prodaja"
+      ]
+    },
+    "translations": {
+      "ru": [
+        "перевод текстов",
+        "устный перевод",
+        "письменный перевод",
+        "нотариальный перевод",
+        "технический перевод",
+        "юридический перевод",
+        "медицинский перевод",
+        "локализация",
+        "редактура перевода",
+        "срочный перевод"
+      ],
+      "en": [
+        "text translation",
+        "interpretation",
+        "written translation",
+        "notarized translation",
+        "technical translation",
+        "legal translation",
+        "medical translation",
+        "localization",
+        "translation editing",
+        "urgent translation"
+      ],
+      "bs": [
+        "prevođenje tekstova",
+        "usmeno prevođenje",
+        "pisani prevod",
+        "ovjereni prevod",
+        "tehnički prevod",
+        "pravni prevod",
+        "medicinski prevod",
+        "lokalizacija",
+        "uređivanje prevoda",
+        "hitni prevod"
+      ]
+    },
+    "tutors": {
+      "ru": [
+        "репетитор",
+        "индивидуальные занятия",
+        "подготовка к экзаменам",
+        "иностранные языки",
+        "математика",
+        "физика",
+        "русский язык",
+        "английский язык",
+        "помощь студентам",
+        "начальная школа"
+      ],
+      "en": [
+        "tutor",
+        "private lessons",
+        "exam preparation",
+        "foreign languages",
+        "mathematics",
+        "physics",
+        "Russian language",
+        "English language",
+        "student help",
+        "primary school"
+      ],
+      "bs": [
+        "instruktor",
+        "privatni časovi",
+        "priprema za ispite",
+        "strani jezici",
+        "matematika",
+        "fizika",
+        "ruski jezik",
+        "engleski jezik",
+        "pomoć studentima",
+        "osnovna škola"
+      ]
+    },
+    "warehousing": {
+      "ru": [
+        "складские услуги",
+        "хранение товаров",
+        "ответственное хранение",
+        "аренда склада",
+        "складская логистика",
+        "комплектация заказов",
+        "учёт товаров",
+        "паллетное хранение",
+        "временное хранение",
+        "складские операции"
+      ],
+      "en": [
+        "warehousing services",
+        "goods storage",
+        "custodial storage",
+        "warehouse rental",
+        "warehouse logistics",
+        "order picking",
+        "inventory accounting",
+        "pallet storage",
+        "temporary storage",
+        "warehouse operations"
+      ],
+      "bs": [
+        "skladišne usluge",
+        "čuvanje robe",
+        "odgovorno skladištenje",
+        "najam skladišta",
+        "skladišna logistika",
+        "kompletiranje narudžbi",
+        "evidencija robe",
+        "paletno skladištenje",
+        "privremeno skladištenje",
+        "skladišne operacije"
+      ]
+    },
+    "waterproofing": {
+      "ru": [
+        "гидроизоляция",
+        "гидроизоляция подвала",
+        "гидроизоляция кровли",
+        "гидроизоляция ванной",
+        "инъекционная гидроизоляция",
+        "обмазочная гидроизоляция",
+        "гидроизоляция фундамента",
+        "герметизация швов",
+        "кровельные работы",
+        "ремонт кровли"
+      ],
+      "en": [
+        "waterproofing",
+        "basement waterproofing",
+        "roof waterproofing",
+        "bathroom waterproofing",
+        "injection waterproofing",
+        "coating waterproofing",
+        "foundation waterproofing",
+        "joint sealing",
+        "roofing work",
+        "roof repair"
+      ],
+      "bs": [
+        "hidroizolacija",
+        "hidroizolacija podruma",
+        "hidroizolacija krova",
+        "hidroizolacija kupatila",
+        "injekciona hidroizolacija",
+        "premazna hidroizolacija",
+        "hidroizolacija temelja",
+        "zaptivanje spojeva",
+        "krovopokrivački radovi",
+        "popravka krova"
+      ]
+    },
+    "web-development": {
+      "ru": [
+        "создание сайтов",
+        "разработка интернет-магазина",
+        "лендинг",
+        "CRM система",
+        "сайт под ключ",
+        "SEO оптимизация",
+        "адаптивный дизайн",
+        "сайт на WordPress",
+        "сайт визитка",
+        "поддержка сайта"
+      ],
+      "en": [
+        "website creation",
+        "e-commerce development",
+        "landing page",
+        "CRM system",
+        "turnkey website",
+        "SEO optimization",
+        "responsive design",
+        "WordPress site",
+        "business card site",
+        "website maintenance"
+      ],
+      "bs": [
+        "kreiranje sajtova",
+        "razvoj internet prodavnice",
+        "landing stranica",
+        "CRM sistem",
+        "sajt ključ u ruke",
+        "SEO optimizacija",
+        "responzivni dizajn",
+        "WordPress sajt",
+        "vizitka sajt",
+        "održavanje sajta"
+      ]
+    },
+    "ready-business": {
+      "ru": [
+        "стабильный доход",
+        "постоянные клиенты",
+        "готовая клиентская база",
+        "низкая аренда",
+        "выгодное расположение",
+        "высокая рентабельность",
+        "долгосрочный договор аренды",
+        "обучение персонала включено",
+        "всё оборудование в комплекте",
+        "быстрый старт",
+        "налаженные поставки",
+        "хорошая проходимость"
+      ],
+      "en": [
+        "stable income",
+        "regular customers",
+        "ready client base",
+        "low rent",
+        "prime location",
+        "high profitability",
+        "long-term lease agreement",
+        "staff training included",
+        "all equipment included",
+        "quick start",
+        "established supply chain",
+        "good foot traffic"
+      ],
+      "bs": [
+        "stabilan prihod",
+        "stalne mušterije",
+        "gotova baza klijenata",
+        "niska najamnina",
+        "povoljna lokacija",
+        "visoka profitabilnost",
+        "dugoročni ugovor o najmu",
+        "obuka osoblja uključena",
+        "sva oprema uključena",
+        "brz početak",
+        "uspostavljeno snabdijevanje",
+        "dobra prolaznost"
+      ]
+    },
+    "retail-equipment": {
+      "ru": [
+        "новая модель",
+        "энергоэффективный",
+        "компактный размер",
+        "лёгкая установка",
+        "простой монтаж",
+        "удобное управление",
+        "нержавеющая сталь",
+        "регулируемые полки",
+        "защита от кражи",
+        "цифровой дисплей",
+        "сенсорное управление",
+        "беспроводной интерфейс"
+      ],
+      "en": [
+        "new model",
+        "energy efficient",
+        "compact size",
+        "easy installation",
+        "simple setup",
+        "convenient controls",
+        "stainless steel",
+        "adjustable shelves",
+        "anti-theft protection",
+        "digital display",
+        "touch control",
+        "wireless interface"
+      ],
+      "bs": [
+        "nov model",
+        "energetski efikasan",
+        "kompaktna veličina",
+        "laka instalacija",
+        "jednostavno postavljanje",
+        "praktično upravljanje",
+        "nerđajući čelik",
+        "podesive police",
+        "zaštita od krađe",
+        "digitalni ekran",
+        "touch upravljanje",
+        "bežični interfejs"
+      ]
+    },
+    "food-equipment": {
+      "ru": [
+        "нержавеющая сталь",
+        "терморегулятор",
+        "энергосберегающий",
+        "быстрый нагрев",
+        "высокая производительность",
+        "простая очистка",
+        "компактный дизайн",
+        "безопасность использования",
+        "автоматическое отключение",
+        "индикатор температуры",
+        "устойчивое покрытие",
+        "профессиональная серия"
+      ],
+      "en": [
+        "stainless steel",
+        "thermostat control",
+        "energy saving",
+        "quick heating",
+        "high capacity",
+        "easy cleaning",
+        "compact design",
+        "safe operation",
+        "auto shut-off",
+        "temperature indicator",
+        "durable coating",
+        "professional series"
+      ],
+      "bs": [
+        "nerđajući čelik",
+        "termostat kontrola",
+        "ušteda energije",
+        "brzo zagrijavanje",
+        "visok kapacitet",
+        "lako čišćenje",
+        "kompaktan dizajn",
+        "bezbedna upotreba",
+        "automatsko isključivanje",
+        "indikator temperature",
+        "izdržljiva prevlaka",
+        "profesionalna serija"
+      ]
+    },
+    "office-equipment": {
+      "ru": [
+        "беспроводное подключение",
+        "скорость печати",
+        "двусторонняя печать",
+        "энергосберегающий режим",
+        "низкий уровень шума",
+        "компактные размеры",
+        "эргономичный дизайн",
+        "сканер и копир",
+        "цветная печать",
+        "сетевой интерфейс",
+        "большая ёмкость лотка",
+        "простое обслуживание"
+      ],
+      "en": [
+        "wireless connectivity",
+        "print speed",
+        "duplex printing",
+        "energy saving mode",
+        "low noise level",
+        "compact size",
+        "ergonomic design",
+        "scanner and copier",
+        "colour printing",
+        "network interface",
+        "large tray capacity",
+        "easy maintenance"
+      ],
+      "bs": [
+        "bežično povezivanje",
+        "brzina štampe",
+        "dupleks štampa",
+        "režim uštede energije",
+        "nizak nivo buke",
+        "kompaktna veličina",
+        "ergonomski dizajn",
+        "skener i kopir",
+        "štampa u boji",
+        "mrežni interfejs",
+        "veliki kapacitet fioke",
+        "lako održavanje"
+      ]
+    },
+    "industrial-equipment": {
+      "ru": [
+        "высокая мощность",
+        "автоматизация процесса",
+        "долговечная конструкция",
+        "защита от перегрузок",
+        "цифровое управление",
+        "высокая точность",
+        "низкое энергопотребление",
+        "промышленное исполнение",
+        "простая эксплуатация",
+        "быстрая настройка",
+        "аварийная остановка",
+        "гарантия производителя"
+      ],
+      "en": [
+        "high power output",
+        "process automation",
+        "durable construction",
+        "overload protection",
+        "digital control",
+        "high precision",
+        "low power consumption",
+        "industrial grade",
+        "easy operation",
+        "quick setup",
+        "emergency stop",
+        "manufacturer warranty"
+      ],
+      "bs": [
+        "visoka snaga",
+        "automatizacija procesa",
+        "izdržljiva konstrukcija",
+        "zaštita od preopterećenja",
+        "digitalno upravljanje",
+        "visoka preciznost",
+        "niska potrošnja energije",
+        "industrijski kvalitet",
+        "jednostavan rad",
+        "brzo podešavanje",
+        "hitno zaustavljanje",
+        "garancija proizvođača"
+      ]
+    },
+    "logistics-warehouse": {
+      "ru": [
+        "высокая грузоподъёмность",
+        "электрический привод",
+        "компактный манёвр",
+        "литиевая батарея",
+        "телескопические вилы",
+        "система безопасности",
+        "быстрая зарядка",
+        "цифровой дисплей",
+        "эргономичное сиденье",
+        "регулировка высоты",
+        "боковой сдвиг",
+        "автоматическое торможение"
+      ],
+      "en": [
+        "high load capacity",
+        "electric drive",
+        "compact manoeuvrability",
+        "lithium battery",
+        "telescopic forks",
+        "safety system",
+        "quick charging",
+        "digital display",
+        "ergonomic seat",
+        "height adjustment",
+        "side shift",
+        "automatic braking"
+      ],
+      "bs": [
+        "visoka nosivost",
+        "električni pogon",
+        "kompaktna manevarska sposobnost",
+        "litijumska baterija",
+        "teleskopske vilice",
+        "sigurnosni sistem",
+        "brzo punjenje",
+        "digitalni ekran",
+        "ergonomsko sjedište",
+        "podešavanje visine",
+        "bočni pomak",
+        "automatsko kočenje"
+      ]
+    },
+    "beauty-equipment": {
+      "ru": [
+        "профессиональный мотор",
+        "ионный уход",
+        "керамическое покрытие",
+        "регулировка температуры",
+        "бесшумная работа",
+        "эргономичная ручка",
+        "сменные насадки",
+        "ультрафиолетовая лампа",
+        "гидравлический подъём",
+        "мягкая обивка",
+        "антибактериальное покрытие",
+        "цифровой таймер"
+      ],
+      "en": [
+        "professional motor",
+        "ionic care",
+        "ceramic coating",
+        "temperature adjustment",
+        "silent operation",
+        "ergonomic handle",
+        "interchangeable attachments",
+        "UV lamp",
+        "hydraulic lift",
+        "soft upholstery",
+        "antibacterial coating",
+        "digital timer"
+      ],
+      "bs": [
+        "profesionalni motor",
+        "jonska njega",
+        "keramička prevlaka",
+        "podešavanje temperature",
+        "tihi rad",
+        "ergonomska ručka",
+        "izmjenjivi nastavci",
+        "UV lampa",
+        "hidraulično podizanje",
+        "mekana presvlaka",
+        "antibakterijska prevlaka",
+        "digitalni tajmer"
+      ]
+    },
+    "auto-business-equipment": {
+      "ru": [
+        "пневматический привод",
+        "электрогидравлика",
+        "цифровая диагностика",
+        "автоматический режим",
+        "защита от перегрузки",
+        "высокая точность",
+        "прочная сталь",
+        "быстрый подъём",
+        "система блокировки",
+        "мобильная платформа",
+        "компьютерная совместимость",
+        "беспроводной датчик"
+      ],
+      "en": [
+        "pneumatic drive",
+        "electro-hydraulic",
+        "digital diagnostics",
+        "automatic mode",
+        "overload protection",
+        "high precision",
+        "heavy duty steel",
+        "quick lift",
+        "locking system",
+        "mobile platform",
+        "computer compatibility",
+        "wireless sensor"
+      ],
+      "bs": [
+        "pneumatski pogon",
+        "elektro-hidraulika",
+        "digitalna dijagnostika",
+        "automatski režim",
+        "zaštita od preopterećenja",
+        "visoka preciznost",
+        "čelik visoke čvrstoće",
+        "brzo podizanje",
+        "sistem zaključavanja",
+        "mobilna platforma",
+        "kompjuterska kompatibilnost",
+        "bežični senzor"
+      ]
+    },
+    "medical-equipment": {
+      "ru": [
+        "цифровой экран",
+        "высокая точность измерений",
+        "портативный дизайн",
+        "автономная работа",
+        "стерилизуемые материалы",
+        "регулировка параметров",
+        "память пациента",
+        "тревожная сигнализация",
+        "USB интерфейс",
+        "аккумуляторная батарея",
+        "сертифицированное качество",
+        "простой интерфейс"
+      ],
+      "en": [
+        "digital screen",
+        "high measurement accuracy",
+        "portable design",
+        "standalone operation",
+        "sterilisable materials",
+        "parameter adjustment",
+        "patient memory",
+        "alarm system",
+        "USB interface",
+        "rechargeable battery",
+        "certified quality",
+        "simple interface"
+      ],
+      "bs": [
+        "digitalni ekran",
+        "visoka tačnost mjerenja",
+        "prenosivi dizajn",
+        "samostalan rad",
+        "sterilizacijski materijali",
+        "podešavanje parametara",
+        "memorija pacijenta",
+        "alarmni sistem",
+        "USB interfejs",
+        "punjiva baterija",
+        "certificirani kvalitet",
+        "jednostavan interfejs"
+      ]
+    },
+    "business-offices": {
+      "ru": [
+        "центральное расположение",
+        "отдельный вход",
+        "панорамные окна",
+        "кондиционер",
+        "парковка для сотрудников",
+        "охрана 24/7",
+        "скоростной интернет",
+        "готовая отделка",
+        "свой санузел",
+        "кухонная зона",
+        "система пожаротушения",
+        "видеонаблюдение"
+      ],
+      "en": [
+        "central location",
+        "separate entrance",
+        "panoramic windows",
+        "air conditioning",
+        "employee parking",
+        "24/7 security",
+        "high speed internet",
+        "ready finish",
+        "private bathroom",
+        "kitchen area",
+        "fire suppression system",
+        "CCTV surveillance"
+      ],
+      "bs": [
+        "centralna lokacija",
+        "poseban ulaz",
+        "panoramski prozori",
+        "klima uređaj",
+        "parking za zaposlene",
+        "obezbjeđenje 24/7",
+        "brzi internet",
+        "gotova završna obrada",
+        "privatni toalet",
+        "kuhinjski prostor",
+        "sistem za gašenje požara",
+        "video nadzor"
+      ]
+    },
+    "business-flex-space": {
+      "ru": [
+        "гибкая планировка",
+        "высокие потолки",
+        "естественный свет",
+        "открытое пространство",
+        "зонирование",
+        "отдельный вход",
+        "грузовая парковка",
+        "возможность перепланировки",
+        "подходит под любой бизнес",
+        "коммуникации подключены",
+        "доступ 24/7",
+        "хорошая вентиляция"
+      ],
+      "en": [
+        "flexible layout",
+        "high ceilings",
+        "natural light",
+        "open space",
+        "zoning possible",
+        "separate entrance",
+        "truck parking",
+        "reconfiguration possible",
+        "suits any business",
+        "utilities connected",
+        "24/7 access",
+        "good ventilation"
+      ],
+      "bs": [
+        "fleksibilan raspored",
+        "visoki plafoni",
+        "prirodno svjetlo",
+        "otvoren prostor",
+        "moguće zoniranje",
+        "poseban ulaz",
+        "parking za kamione",
+        "moguća preuređenje",
+        "odgovara svakom biznisu",
+        "priključene instalacije",
+        "pristup 24/7",
+        "dobra ventilacija"
+      ]
+    },
+    "business-retail-spaces": {
+      "ru": [
+        "проходное место",
+        "витринные окна",
+        "высокий трафик",
+        "цокольный этаж",
+        "отдельный вход с улицы",
+        "парковка для клиентов",
+        "хорошая видимость",
+        "рядом остановка",
+        "центральная улица",
+        "торговый район",
+        "большая витрина",
+        "возможность вывески"
+      ],
+      "en": [
+        "high traffic location",
+        "display windows",
+        "pedestrian flow",
+        "ground floor",
+        "street level entrance",
+        "customer parking",
+        "good visibility",
+        "near bus stop",
+        "main street",
+        "shopping district",
+        "large storefront",
+        "signage allowed"
+      ],
+      "bs": [
+        "prolazna lokacija",
+        "izlog prozori",
+        "veliki pješački promet",
+        "prizemlje",
+        "ulaz sa ulice",
+        "parking za mušterije",
+        "dobra vidljivost",
+        "blizu autobuske stanice",
+        "glavna ulica",
+        "trgovački kvart",
+        "veliki izlog",
+        "dozvoljena reklama"
+      ]
+    },
+    "business-warehouses": {
+      "ru": [
+        "высокие потолки",
+        "рампа для загрузки",
+        "бетонный пол",
+        "пожарная сигнализация",
+        "отопление",
+        "электричество 380В",
+        "ворота секционные",
+        "охраняемая территория",
+        "удобный подъезд",
+        "система вентиляции",
+        "стеллажи в комплекте",
+        "видеонаблюдение"
+      ],
+      "en": [
+        "high ceilings",
+        "loading ramp",
+        "concrete floor",
+        "fire alarm",
+        "heating",
+        "three phase power",
+        "sectional doors",
+        "secured area",
+        "convenient access",
+        "ventilation system",
+        "shelving included",
+        "CCTV"
+      ],
+      "bs": [
+        "visoki plafoni",
+        "utovarna rampa",
+        "betonski pod",
+        "protivpožarni alarm",
+        "grijanje",
+        "trofazna struja",
+        "sekcijska vrata",
+        "obezbijeđen prostor",
+        "pogodan pristup",
+        "ventilacioni sistem",
+        "regali uključeni",
+        "video nadzor"
+      ]
+    },
+    "business-commercial-land": {
+      "ru": [
+        "ровный участок",
+        "подведены коммуникации",
+        "асфальтированный подъезд",
+        "рядом трасса",
+        "все документы готовы",
+        "зона коммерческой застройки",
+        "электричество на участке",
+        "вода и газ",
+        "разрешение на строительство",
+        "хорошая экология",
+        "охраняемая территория",
+        "возможен выкуп"
+      ],
+      "en": [
+        "flat terrain",
+        "utilities connected",
+        "paved access road",
+        "near highway",
+        "all documents ready",
+        "commercial zoning",
+        "electricity on site",
+        "water and gas",
+        "building permit ready",
+        "good environment",
+        "secured area",
+        "purchase possible"
+      ],
+      "bs": [
+        "ravan teren",
+        "priključene instalacije",
+        "asfaltiran pristupni put",
+        "blizu autoputa",
+        "svi dokumenti spremni",
+        "komercijalna zona",
+        "struja na parceli",
+        "voda i plin",
+        "građevinska dozvola spremna",
+        "dobra ekologija",
+        "obezbijeđen prostor",
+        "moguća kupovina"
+      ]
+    },
+    "business-accounting": {
+      "ru": [
+        "электронная отчётность",
+        "налоговый учёт",
+        "восстановление бухгалтерии",
+        "расчёт зарплаты",
+        "оптимизация налогов",
+        "первичная документация",
+        "удалённое обслуживание",
+        "консультации онлайн",
+        "международная отчётность",
+        "абонентское обслуживание",
+        "кассовые операции",
+        "годовой баланс"
+      ],
+      "en": [
+        "electronic reporting",
+        "tax accounting",
+        "bookkeeping restoration",
+        "payroll calculation",
+        "tax optimisation",
+        "primary documentation",
+        "remote service",
+        "online consultations",
+        "international reporting",
+        "monthly retainer",
+        "cash operations",
+        "annual balance sheet"
+      ],
+      "bs": [
+        "elektronsko izvještavanje",
+        "poresko računovodstvo",
+        "obnova knjigovodstva",
+        "obračun plata",
+        "optimizacija poreza",
+        "primarna dokumentacija",
+        "usluga na daljinu",
+        "online konsultacije",
+        "međunarodno izvještavanje",
+        "pretplatničko održavanje",
+        "blagajničko poslovanje",
+        "godišnji bilans"
+      ]
+    },
+    "business-legal-services": {
+      "ru": [
+        "регистрация компаний",
+        "договорное право",
+        "судебное представительство",
+        "лицензирование",
+        "корпоративное право",
+        "трудовые споры",
+        "арбитраж",
+        "претензионная работа",
+        "юридический аудит",
+        "сопровождение сделок",
+        "регистрация торговых марок",
+        "консультации онлайн"
+      ],
+      "en": [
+        "company registration",
+        "contract law",
+        "court representation",
+        "licensing",
+        "corporate law",
+        "labour disputes",
+        "arbitration",
+        "claims management",
+        "legal audit",
+        "transaction support",
+        "trademark registration",
+        "online consultations"
+      ],
+      "bs": [
+        "registracija kompanija",
+        "ugovorno pravo",
+        "sudsko zastupanje",
+        "licenciranje",
+        "korporativno pravo",
+        "radni sporovi",
+        "arbitraža",
+        "reklamacijski rad",
+        "pravni audit",
+        "podrška pri transakcijama",
+        "registracija zaštitnih znakova",
+        "online konsultacije"
+      ]
+    },
+    "business-taxes": {
+      "ru": [
+        "расчёт налогов",
+        "налоговая декларация",
+        "НДС отчётность",
+        "налоговые льготы",
+        "налоговый аудит",
+        "консультация по налогам",
+        "оптимизация налогообложения",
+        "досудебное урегулирование",
+        "налоги для ИП",
+        "налоги для ООО",
+        "международное налогообложение",
+        "бухгалтерское обслуживание"
+      ],
+      "en": [
+        "tax calculation",
+        "tax return filing",
+        "VAT reporting",
+        "tax benefits",
+        "tax audit",
+        "tax consultation",
+        "tax optimisation",
+        "pre-trial settlement",
+        "taxes for sole traders",
+        "taxes for LLC",
+        "international taxation",
+        "accounting service"
+      ],
+      "bs": [
+        "obračun poreza",
+        "poreska prijava",
+        "Pdv izvještavanje",
+        "poreske olakšice",
+        "poreski audit",
+        "poresko savjetovanje",
+        "optimizacija oporezivanja",
+        "predsudsko poravnanje",
+        "porezi za preduzetnike",
+        "porezi za DOO",
+        "međunarodno oporezivanje",
+        "knjigovodstvena usluga"
+      ]
+    },
+    "business-property-valuation": {
+      "ru": [
+        "оценка рыночной стоимости",
+        "кадастровая стоимость",
+        "комплексный отчёт",
+        "оценка для банка",
+        "судебная экспертиза",
+        "оценка бизнеса",
+        "страховая оценка",
+        "инвестиционный анализ",
+        "оценка залога",
+        "независимая экспертиза",
+        "выезд на объект",
+        "срочная оценка"
+      ],
+      "en": [
+        "market value assessment",
+        "cadastral value",
+        "comprehensive report",
+        "bank valuation",
+        "forensic appraisal",
+        "business valuation",
+        "insurance valuation",
+        "investment analysis",
+        "collateral valuation",
+        "independent appraisal",
+        "site visit included",
+        "urgent valuation"
+      ],
+      "bs": [
+        "procjena tržišne vrijednosti",
+        "katastarska vrijednost",
+        "sveobuhvatan izvještaj",
+        "procjena za banku",
+        "sudsko vještačenje",
+        "procjena biznisa",
+        "osiguravajuća procjena",
+        "investiciona analiza",
+        "procjena kolaterala",
+        "nezavisno vještačenje",
+        "terenski izlazak",
+        "hitna procjena"
+      ]
+    },
+    "business-translations": {
+      "ru": [
+        "нотариальный перевод",
+        "технический перевод",
+        "юридический перевод",
+        "медицинский перевод",
+        "апостиль и легализация",
+        "синхронный перевод",
+        "письменный перевод",
+        "локализация сайтов",
+        "перевод документов",
+        "редактура и корректура",
+        "срочный перевод",
+        "заверенный перевод"
+      ],
+      "en": [
+        "notarised translation",
+        "technical translation",
+        "legal translation",
+        "medical translation",
+        "apostille and legalisation",
+        "simultaneous interpretation",
+        "written translation",
+        "website localisation",
+        "document translation",
+        "proofreading and editing",
+        "urgent translation",
+        "certified translation"
+      ],
+      "bs": [
+        "notarski prijevod",
+        "tehnički prijevod",
+        "pravni prijevod",
+        "medicinski prijevod",
+        "apostil i legalizacija",
+        "simultano prevođenje",
+        "pisani prijevod",
+        "lokalizacija web stranica",
+        "prijevod dokumenata",
+        "lektura i korektura",
+        "hitni prijevod",
+        "ovjereni prijevod"
+      ]
+    },
+    "charity": {
+      "ru": [
+        "гуманитарная помощь",
+        "благотворительность",
+        "пожертвование",
+        "помощь нуждающимся",
+        "вещевая помощь",
+        "продуктовая помощь",
+        "социальная поддержка",
+        "безвозмездно",
+        "дарение",
+        "волонтёрство"
+      ],
+      "en": [
+        "humanitarian aid",
+        "charity",
+        "donation",
+        "helping those in need",
+        "clothing donation",
+        "food aid",
+        "social support",
+        "free of charge",
+        "giving",
+        "volunteering"
+      ],
+      "bs": [
+        "humanitarna pomoć",
+        "dobrotvornost",
+        "donacija",
+        "pomoć potrebitima",
+        "doniranje odjeće",
+        "prehrambena pomoć",
+        "socijalna podrška",
+        "besplatno",
+        "darivanje",
+        "volontiranje"
+      ]
     }
   },
   "cities": {
-    "ru": ["Подгорица", "Никшич", "Будва", "Тиват", "Бар", "Ульцинь", "Херцег-Нови", "Котор", "Цетине", "Биело-Поле", "Плевля", "Мойковац"],
-    "en": ["Podgorica", "Niksic", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg-Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"],
-    "bs": ["Podgorica", "Nikšić", "Budva", "Tivat", "Bar", "Ulcinj", "Herceg Novi", "Kotor", "Cetinje", "Bijelo Polje", "Pljevlja", "Mojkovac"]
+    "ru": [
+      "Подгорица",
+      "Никшич",
+      "Будва",
+      "Тиват",
+      "Бар",
+      "Ульцинь",
+      "Херцег-Нови",
+      "Котор",
+      "Цетине",
+      "Биело-Поле",
+      "Плевля",
+      "Мойковац"
+    ],
+    "en": [
+      "Podgorica",
+      "Niksic",
+      "Budva",
+      "Tivat",
+      "Bar",
+      "Ulcinj",
+      "Herceg-Novi",
+      "Kotor",
+      "Cetinje",
+      "Bijelo Polje",
+      "Pljevlja",
+      "Mojkovac"
+    ],
+    "bs": [
+      "Podgorica",
+      "Nikšić",
+      "Budva",
+      "Tivat",
+      "Bar",
+      "Ulcinj",
+      "Herceg Novi",
+      "Kotor",
+      "Cetinje",
+      "Bijelo Polje",
+      "Pljevlja",
+      "Mojkovac"
+    ]
   },
   "item_ages": {
-    "ru": ["новый", "как новый", "почти новый", "в использовании 1 год", "в использовании 2 года", "в использовании 3 года", "в использовании 5 лет", "новый в упаковке", "с небольшим износом", "после ремонта"],
-    "en": ["new", "like new", "almost new", "used for 1 year", "used for 2 years", "used for 3 years", "used for 5 years", "new in box", "lightly used", "after repair"],
-    "bs": ["nov", "kao nov", "skoro nov", "korišten 1 godinu", "korišten 2 godine", "korišten 3 godine", "korišten 5 godina", "nov u kutiji", "lagano korišten", "poslije popravke"]
+    "ru": [
+      "новый",
+      "как новый",
+      "почти новый",
+      "в использовании 1 год",
+      "в использовании 2 года",
+      "в использовании 3 года",
+      "в использовании 5 лет",
+      "новый в упаковке",
+      "с небольшим износом",
+      "после ремонта"
+    ],
+    "en": [
+      "new",
+      "like new",
+      "almost new",
+      "used for 1 year",
+      "used for 2 years",
+      "used for 3 years",
+      "used for 5 years",
+      "new in box",
+      "lightly used",
+      "after repair"
+    ],
+    "bs": [
+      "nov",
+      "kao nov",
+      "skoro nov",
+      "korišten 1 godinu",
+      "korišten 2 godine",
+      "korišten 3 godine",
+      "korišten 5 godina",
+      "nov u kutiji",
+      "lagano korišten",
+      "poslije popravke"
+    ]
   }
 }

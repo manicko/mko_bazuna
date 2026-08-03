@@ -1,0 +1,7 @@
+{
+  "charity": {
+    "objects": ["donation", "charity", "volunteer", "helping hand", "food donation", "clothing donation", "community", "fundraising", "charity box", "kindness"],
+    "contexts": ["community center", "donation drive", "volunteer event", "charity shop", "helping others", "solidarity", "food bank", "neighborhood support"],
+    "styles": ["photography", "documentary", "editorial", "humanitarian", "lifestyle", "compassionate", "community"]
+  }
+}

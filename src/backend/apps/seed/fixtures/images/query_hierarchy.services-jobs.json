@@ -1,0 +1,292 @@
+{
+  "ac-installation": {
+    "objects": ["air conditioner", "split system", "ventilator", "compressor", "remote control", "toolbox", "wrench set", "ladder", "coolant tank", "wall mount bracket"],
+    "contexts": ["workshop", "building facade", "interior wall", "professional tools", "service van", "technical setup", "modern equipment", "workbench"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "technical"]
+  },
+  "accounting": {
+    "objects": ["calculator", "ledger book", "laptop", "pen", "documents", "stamp", "glasses", "folder", "spreadsheet", "profit chart"],
+    "contexts": ["office desk", "modern office", "conference room", "coworking space", "professional setting", "financial documents", "laptop screen", "reception"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "studio"]
+  },
+  "agriculture": {
+    "objects": ["tractor", "field", "crops", "tiller", "watering system", "greenhouse", "farmer", "fresh vegetables", "harvest", "orchard"],
+    "contexts": ["rural field", "sunrise farm", "open countryside", "green valley", "irrigation system", "farm equipment", "harvest season", "cultivated land", "sunset agriculture", "organic farm"],
+    "styles": ["photography", "nature", "documentary", "professional", "editorial", "lifestyle", "outdoor"]
+  },
+  "apartment-cleaning": {
+    "objects": ["vacuum cleaner", "mop", "bucket", "cleaning spray", "microfiber cloth", "sponge", "broom", "rubber gloves", "spray bottle", "window squeegee"],
+    "contexts": ["living room", "modern apartment", "bright interior", "clean kitchen", "sparkling window", "polished floor", "minimalist home", "tidy bedroom", "fresh interior", "cleaning service"],
+    "styles": ["photography", "lifestyle", "professional", "editorial", "studio", "commercial", "minimalist"]
+  },
+  "appliance-repair": {
+    "objects": ["screwdriver set", "multimeter", "wrench", "circuit board", "spare parts", "toolbox", "soldering iron", "washing machine", "refrigerator", "workbench"],
+    "contexts": ["workshop", "repair bench", "technical setup", "garage workshop", "professional tools", "service center", "electrical parts", "organized workspace"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "technical", "studio"]
+  },
+  "arts": {
+    "objects": ["paintbrush", "canvas", "palette", "paint tubes", "easel", "sculpture", "pencil sketch", "watercolor", "oil painting", "art studio"],
+    "contexts": ["art studio", "natural light", "creative workspace", "easel setup", "gallery setting", "paint splattered", "designer desk", "colorful palette", "workshop", "artist hands"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "creative", "studio"]
+  },
+  "beauty-salons-spa": {
+    "objects": ["massage table", "essential oils", "candle", "towel set", "bathrobe", "spa stone", "incense", "flower petals", "relaxation chair", "steamer"],
+    "contexts": ["spa interior", "relaxation room", "candlelit", "soft lighting", "marble surface", "tranquil setting", "aroma therapy", "luxury spa", "botanical decor", "calming atmosphere"],
+    "styles": ["photography", "beauty", "lifestyle", "professional", "editorial", "luxury", "minimalist"]
+  },
+  "car-repair": {
+    "objects": ["car engine", "wrench", "car lift", "tire", "brake disc", "oil can", "tool chest", "diagnostic scanner", "car hood", "grease gun"],
+    "contexts": ["auto repair shop", "garage", "car lift station", "mechanic tools", "workshop bench", "car parts shelf", "service bay", "oil change station", "tire rack", "under hood"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "technical", "commercial"]
+  },
+  "carpet-cleaning": {
+    "objects": ["carpet", "steam cleaner", "cleaning brush", "spray nozzle", "vacuum hose", "cleaning solution", "microfiber cloth", "extractor machine", "rug beater", "protective gloves"],
+    "contexts": ["living room floor", "clean carpet", "bright interior", "sparkling clean", "fresh home", "professional equipment", "large rug", "after cleaning", "upholstery", "staircase carpet"],
+    "styles": ["photography", "lifestyle", "professional", "editorial", "studio", "documentary", "commercial"]
+  },
+  "catering": {
+    "objects": ["buffet table", "chafing dish", "platter", "wine glass", "napkin", "centerpiece", "catering tray", "silverware", "food warmer", "serving bowl"],
+    "contexts": ["banquet hall", "wedding venue", "garden party", "corporate event", "outdoor catering", "restaurant kitchen", "buffet setup", "elegant table", "catering truck", "event preparation"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "commercial", "documentary", "culinary"]
+  },
+  "cleaning-service": {
+    "objects": ["cleaning cart", "vacuum cleaner", "mop bucket", "spray bottle", "brush set", "duster", "window cleaner", "gloves", "cleaning cloth", "disinfectant"],
+    "contexts": ["residential interior", "office hallway", "clean room", "modern kitchen", "sparkling window", "organized cart", "cleaning service van", "professional equipment"],
+    "styles": ["photography", "lifestyle", "professional", "editorial", "commercial", "documentary"]
+  },
+  "clothing-repair": {
+    "objects": ["sewing machine", "needle", "thread spool", "thimble", "scissors", "zipper", "fabric", "button", "measuring tape", "iron"],
+    "contexts": ["tailor workshop", "sewing table", "mannequin", "fabric shelf", "alteration bench", "bright studio", "organized threads", "professional atelier"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "studio", "craft"]
+  },
+  "commercial-construction": {
+    "objects": ["building crane", "scaffolding", "blueprint", "hard hat", "concrete mixer", "steel beam", "construction worker", "power drill", "safety vest", "excavator"],
+    "contexts": ["construction site", "commercial building", "steel framework", "urban development", "sunset construction", "modern architecture", "site office", "scaffolding structure"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "commercial"]
+  },
+  "courses-training": {
+    "objects": ["whiteboard", "laptop", "notebook", "pen", "projector", "desk chair", "textbook", "certificate", "classroom table", "student desk"],
+    "contexts": ["classroom", "training room", "conference hall", "modern workshop", "study desk", "presentation screen", "learning environment", "group session", "bright classroom", "professional training"],
+    "styles": ["photography", "editorial", "educational", "professional", "documentary", "lifestyle", "corporate"]
+  },
+  "delivery-courier": {
+    "objects": ["delivery van", "bicycle", "package box", "scanner", "uniform", "helmet", "map", "smartphone", "parcel envelope", "delivery bag"],
+    "contexts": ["city street", "urban delivery", "doorstep handover", "busy sidewalk", "packages loaded", "courier on move", "apartment entrance", "logistics hub", "morning delivery", "warehouse sorting"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "documentary", "urban", "commercial"]
+  },
+  "dog-walking": {
+    "objects": ["dog leash", "dog", "puppy", "harness", "treat bag", "poop bag", "water bottle", "dog collar", "ball toy", "dog paws"],
+    "contexts": ["city park", "green grass", "sunset walk", "neighborhood street", "beach promenade", "morning walk", "forest path", "dog friendly area", "outdoor adventure", "happy pet"],
+    "styles": ["photography", "pet", "lifestyle", "professional", "editorial", "outdoor", "candid"]
+  },
+  "electrical": {
+    "objects": ["wire spool", "voltmeter", "screwdriver", "pliers", "circuit breaker", "electrical panel", "cable cutter", "light switch", "socket", "insulation tape"],
+    "contexts": ["workshop", "electrical panel", "new installation", "technical setup", "workbench", "building interior", "professional tools", "organized cables"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "technical", "studio"]
+  },
+  "event-planning": {
+    "objects": ["planner notebook", "calendar", "venue photo", "color swatches", "table decor", "ribbon", "invitation card", "balloon", "table arrangement", "seating chart"],
+    "contexts": ["wedding venue", "conference room", "garden setup", "banquet hall", "decorated table", "event space", "party decoration", "floral arrangement", "elegant dining", "reception area"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "commercial", "documentary", "creative"]
+  },
+  "flooring-installation": {
+    "objects": ["laminate board", "tile cutter", "level tool", "knee pads", "measuring tape", "hammer", "floor saw", "adhesive bucket", "trowel", "underlayment roll"],
+    "contexts": ["new floor installation", "renovated room", "construction site", "workbench", "professional tools", "interior under renovation", "tile layout", "wood floor finish"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "lifestyle"]
+  },
+  "florist": {
+    "objects": ["bouquet", "rose", "tulip", "flower vase", "wrapping paper", "ribbon", "shears", "potted plant", "lavender", "sunflower"],
+    "contexts": ["flower shop", "garden", "wedding decoration", "fresh flowers", "colorful display", "greenhouse", "floral arrangement", "morning market", "boutique interior", "flower delivery"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "commercial", "documentary", "creative"]
+  },
+  "freight": {
+    "objects": ["truck", "cargo container", "pallet", "forklift", "loading ramp", "cargo strap", "shipping label", "semi trailer", "box truck", "warehouse door"],
+    "contexts": ["loading dock", "highway", "warehouse interior", "logistics hub", "container yard", "interstate transport", "parking lot", "industrial area", "cargo sorting", "transport depot"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "commercial", "transport"]
+  },
+  "hair-care-services": {
+    "objects": ["hairbrush", "scissors", "hair dryer", "comb", "hair clips", "styling chair", "mirror", "shampoo bottle", "hair straightener", "curling iron"],
+    "contexts": ["salon interior", "styling station", "mirror reflection", "hair washing area", "bright salon", "modern decor", "professional tools", "salon chair row", "treatment room", "hair product shelf"],
+    "styles": ["photography", "beauty", "lifestyle", "professional", "editorial", "studio", "commercial"]
+  },
+  "hair-styling": {
+    "objects": ["styling comb", "hair spray", "curling tongs", "hair dryer", "hair pins", "elastic band", "diffuser", "flat iron", "velvet cushion", "hair accessories"],
+    "contexts": ["salon chair", "wedding hairstyle", "evening event", "studio lighting", "professional mirror", "styling products", "model session", "hair tutorial", "backstage prep", "fashion show"],
+    "styles": ["photography", "beauty", "lifestyle", "professional", "editorial", "fashion", "studio"]
+  },
+  "home-food-service": {
+    "objects": ["casserole dish", "soup pot", "baking tray", "cake stand", "wooden spoon", "cooking apron", "food container", "fresh ingredients", "delivery bag", "meal box"],
+    "contexts": ["home kitchen", "family dinner table", "fresh ingredients", "cooking preparation", "cozy dining", "homemade pastry", "warm interior", "kitchen counter", "meal packaging", "food delivery"],
+    "styles": ["photography", "culinary", "lifestyle", "professional", "editorial", "documentary", "food"]
+  },
+  "housekeeping": {
+    "objects": ["broom", "dustpan", "mop", "bucket", "spray bottle", "duster", "gloves", "apron", "cleaning brush", "trash bag"],
+    "contexts": ["clean home", "bright living room", "organized bedroom", "tidy kitchen", "sparkling bathroom", "neat shelf", "polished floor", "sunlit interior", "domestic setting", "professional cleaning"],
+    "styles": ["photography", "lifestyle", "professional", "editorial", "documentary", "studio", "domestic"]
+  },
+  "laptop-pc-repair": {
+    "objects": ["laptop", "screwdriver", "circuit board", "thermal paste", "RAM module", "hard drive", "fan", "keyboard", "screen panel", "anti static mat"],
+    "contexts": ["repair workshop", "workbench", "technical setup", "electronic components", "service center", "professional tools", "organized workspace", "circuit close up"],
+    "styles": ["photography", "technical", "documentary", "professional", "editorial", "studio", "industrial"]
+  },
+  "legal-services": {
+    "objects": ["law book", "gavel", "contract", "briefcase", "scales of justice", "stamp", "pen", "glasses", "folder", "badge"],
+    "contexts": ["law office", "courtroom", "library", "conference room", "wood paneled office", "formal desk", "leather chair", "legal documents", "consultation room", "professional setting"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "formal", "studio"]
+  },
+  "manicure": {
+    "objects": ["nail polish", "nail file", "cuticle pusher", "nail clipper", "UV lamp", "gel polish", "nail art brush", "hand cream", "manicure table", "nail drill"],
+    "contexts": ["salon table", "manicure station", "soft lighting", "polished nails", "beauty studio", "hand massage", "relaxation setting", "professional tools", "nail color display", "spa interior"],
+    "styles": ["photography", "beauty", "lifestyle", "professional", "editorial", "studio", "fashion"]
+  },
+  "massage": {
+    "objects": ["massage table", "towel", "essential oil", "stone set", "candle", "relaxation music", "bamboo stick", "massage roller", "aroma diffuser", "soft robe"],
+    "contexts": ["spa room", "dim lighting", "relaxing atmosphere", "calm interior", "candlelit room", "bamboo decor", "zen setting", "therapeutic session", "natural materials", "tranquil space"],
+    "styles": ["photography", "wellness", "lifestyle", "professional", "editorial", "luxury", "minimalist"]
+  },
+  "medicine": {
+    "objects": ["stethoscope", "medical mask", "thermometer", "prescription pad", "pill bottle", "syringe", "gloves", "blood pressure monitor", "medical chart", "doctor coat"],
+    "contexts": ["doctor office", "hospital corridor", "clean examination room", "medical cabinet", "consultation desk", "white interior", "professional setting", "clinical environment", "modern clinic", "waiting area"],
+    "styles": ["photography", "medical", "editorial", "professional", "documentary", "clinical", "studio"]
+  },
+  "no-experience-jobs": {
+    "objects": ["laptop", "notebook", "pen", "coffee cup", "smartphone", "resume", "badge", "headset", "calendar", "desk lamp"],
+    "contexts": ["modern office", "coworking space", "meeting room", "training room", "reception desk", "open plan", "welcome sign", "team workspace", "interview room", "glass building"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "commercial"]
+  },
+  "office-cleaning": {
+    "objects": ["cleaning cart", "vacuum cleaner", "mop", "window squeegee", "trash bin", "spray bottle", "duster", "microfiber cloth", "rubber gloves", "floor polisher"],
+    "contexts": ["office corridor", "open plan office", "reception area", "conference room", "clean desk", "modern workplace", "glass facade", "lobby floor", "meeting room", "office kitchen"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "commercial", "lifestyle"]
+  },
+  "other-services": {
+    "objects": ["toolbox", "smartphone", "calendar", "notebook", "pen", "handshake", "measuring tape", "screwdriver", "laptop", "work gloves"],
+    "contexts": ["workshop", "home setting", "professional desk", "consultation", "service call", "modern interior", "workbench", "client meeting", "flexible workspace", "outdoor job"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "documentary", "commercial", "studio"]
+  },
+  "pc-setup": {
+    "objects": ["desktop computer", "monitor", "keyboard", "mouse", "cable set", "screwdriver", "power supply", "graphics card", "motherboard", "USB hub"],
+    "contexts": ["computer desk", "gaming setup", "home office", "tech workspace", "cable management", "dual monitor", "modern PC", "workstation", "bright interior", "minimalist desk"],
+    "styles": ["photography", "technology", "editorial", "professional", "studio", "lifestyle", "minimalist"]
+  },
+  "pedicure": {
+    "objects": ["foot basin", "pumice stone", "nail file", "foot cream", "toe separator", "nail polish", "towel", "pedicure chair", "foot roller", "cuticle oil"],
+    "contexts": ["salon station", "spa interior", "relaxing foot bath", "soft lighting", "beauty studio", "comfortable chair", "professional tools", "polished toes", "calm atmosphere", "wellness setting"],
+    "styles": ["photography", "beauty", "lifestyle", "professional", "editorial", "studio", "luxury"]
+  },
+  "phone-repair": {
+    "objects": ["smartphone", "screwdriver set", "suction cup", "spudger", "replacement screen", "battery", "magnifying glass", "microscope", "motherboard", "tweezer set"],
+    "contexts": ["repair bench", "workshop", "technical close up", "component tray", "soldering station", "professional tools", "electronic repair", "service counter", "organized parts", "anti static mat"],
+    "styles": ["photography", "technical", "editorial", "professional", "documentary", "studio", "industrial"]
+  },
+  "photoshoots": {
+    "objects": ["camera", "lens", "tripod", "lighting kit", "reflector", "backdrop", "memory card", "camera bag", "flash", "light stand"],
+    "contexts": ["photo studio", "outdoor shoot", "golden hour", "indoor session", "model portrait", "product photography", "natural light", "studio backdrop", "creative lighting", "fashion shoot"],
+    "styles": ["photography", "fashion", "editorial", "professional", "studio", "lifestyle", "commercial"]
+  },
+  "plastering": {
+    "objects": ["trowel", "plaster float", "mixing bucket", "plastering hawk", "spatula", "level", "sandpaper", "joint compound", "corner bead", "mixing drill"],
+    "contexts": ["construction site", "wall finishing", "interior renovation", "new building", "professional tools", "work in progress", "plaster texture", "smooth wall finish", "building interior", "renovation room"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "lifestyle"]
+  },
+  "plumbing": {
+    "objects": ["pipe wrench", "plunger", "plumber snake", "pipe cutter", "soldering torch", "faucet", "shower head", "sink drain", "water heater", "PVC pipe"],
+    "contexts": ["bathroom renovation", "kitchen sink", "workshop", "under sink", "basement pipes", "professional tools", "service van", "repair job", "new installation", "tool organizer"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "technical", "lifestyle"]
+  },
+  "programming": {
+    "objects": ["laptop", "code editor screen", "keyboard", "mouse", "coffee mug", "notebook", "monitor setup", "server rack", "USB drive", "headset"],
+    "contexts": ["modern office", "home office", "coworking space", "dual monitor desk", "tech startup", "minimalist workspace", "code on screen", "night coding", "glass office", "creative tech"],
+    "styles": ["photography", "technology", "editorial", "professional", "lifestyle", "corporate", "minimalist"]
+  },
+  "property-valuation": {
+    "objects": ["clipboard", "measuring tape", "camera", "laptop", "blueprint", "property sign", "calculator", "keys", "valuation report", "laser measurer"],
+    "contexts": ["residential street", "building facade", "apartment interior", "modern kitchen", "garden view", "commercial front", "city view", "new development", "property inspection", "consultation office"],
+    "styles": ["photography", "real estate", "editorial", "professional", "documentary", "architectural", "commercial"]
+  },
+  "psychology": {
+    "objects": ["couch", "notebook", "pen", "tissues box", "clock", "plant", "bookshelf", "calm painting", "lamp", "cozy chair"],
+    "contexts": ["therapy room", "calm interior", "comfortable setting", "warm lighting", "peaceful decor", "soft colors", "professional office", "supportive environment", "quiet space", "bookshelf background"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "minimalist", "studio"]
+  },
+  "residential-construction": {
+    "objects": ["foundation blocks", "brick wall", "roof tiles", "cement mixer", "wooden beam", "level", "safety helmet", "excavator", "crane", "house frame"],
+    "contexts": ["house construction", "building site", "new development", "suburban neighborhood", "foundation work", "roofing work", "sunset building", "modern home", "residential area", "framing structure"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "lifestyle"]
+  },
+  "restaurants": {
+    "objects": ["dining table", "chair set", "menu board", "wine glass", "plate", "chef hat", "kitchen hood", "serving tray", "candle", "tablecloth"],
+    "contexts": ["restaurant interior", "cozy dining", "modern decor", "open kitchen", "outdoor terrace", "romantic setting", "busy dinner service", "bar counter", "warm lighting", "garden dining"],
+    "styles": ["photography", "culinary", "lifestyle", "professional", "editorial", "commercial", "interior"]
+  },
+  "security": {
+    "objects": ["security camera", "monitor screen", "alarm panel", "keypad", "guard uniform", "badge", "flashlight", "fence gate", "motion sensor", "lock system"],
+    "contexts": ["control room", "building entrance", "surveillance center", "commercial facility", "security booth", "monitor wall", "front gate", "modern office", "parking lot", "warehouse perimeter"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "industrial", "studio"]
+  },
+  "shoe-repair": {
+    "objects": ["shoe last", "leather piece", "cobbler hammer", "awl", "thread wax", "sole rubber", "shoe polish", "brush", "heel block", "cutting knife"],
+    "contexts": ["cobbler workshop", "repair bench", "old tools", "craftsmanship", "leather work", "traditional shop", "organized shelf", "shoe collection", "workbench detail", "repair station"],
+    "styles": ["photography", "craft", "documentary", "professional", "editorial", "studio", "lifestyle"]
+  },
+  "skincare": {
+    "objects": ["face cream jar", "serum bottle", "cleansing brush", "face mask", "cotton pad", "spatula", "mirror", "toner bottle", "sunscreen", "eye cream"],
+    "contexts": ["bathroom vanity", "dressing table", "studio lighting", "flat lay", "white background", "natural light", "marble surface", "spa setting", "minimalist", "luxury skincare"],
+    "styles": ["photography", "beauty", "studio", "professional", "editorial", "lifestyle", "luxury"]
+  },
+  "sport-fitness": {
+    "objects": ["dumbbell", "yoga mat", "treadmill", "kettlebell", "fitness band", "barbell", "jump rope", "water bottle", "towel", "gym bag"],
+    "contexts": ["gym interior", "home workout", "fitness studio", "outdoor training", "modern equipment", "sunset run", "personal training", "group class", "sport hall", "weight room"],
+    "styles": ["photography", "sports", "fitness", "professional", "editorial", "lifestyle", "action"]
+  },
+  "tax-planning": {
+    "objects": ["calculator", "tax form", "folder", "pen", "laptop", "stamp", "glass of water", "documents stack", "calendar", "ledger"],
+    "contexts": ["office desk", "home office", "financial documents", "modern study", "professional setting", "calculator and papers", "organized desk", "consultation room", "coworking space", "tax papers"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "lifestyle", "studio"]
+  },
+  "taxi": {
+    "objects": ["car", "taxi sign", "steering wheel", "meter", "back seat", "smartphone holder", "door handle", "seatbelt", "headrest", "dashboard"],
+    "contexts": ["city street", "taxi rank", "airport pickup", "night driving", "urban traffic", "historic old town", "street lighting", "passenger door", "hailing taxi", "modern vehicle"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "documentary", "urban", "commercial"]
+  },
+  "terraces-balconies": {
+    "objects": ["wooden deck", "glass railing", "outdoor furniture", "awning", "plant pot", "terrace tile", "roof section", "aluminum frame", "balcony floor", "sun shade"],
+    "contexts": ["modern balcony", "rooftop terrace", "sea view", "mountain panorama", "garden terrace", "summer house", "sunset view", "new construction", "outdoor living", "city view balcony"],
+    "styles": ["photography", "architectural", "lifestyle", "professional", "editorial", "documentary", "outdoor"]
+  },
+  "tow-truck": {
+    "objects": ["tow truck", "winch cable", "tow hook", "wheel lift", "safety chain", "warning light", "flatbed", "tool box", "gloves", "reflector triangle"],
+    "contexts": ["highway shoulder", "accident scene", "city street", "garage depot", "emergency service", "vehicle recovery", "roadside assistance", "night call", "parking lot", "truck station"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "commercial", "action"]
+  },
+  "trading": {
+    "objects": ["laptop", "chart screen", "smartphone", "pen", "notebook", "calculator", "business card", "handshake", "coin", "briefcase"],
+    "contexts": ["office desk", "trading floor", "meeting room", "warehouse visit", "market stall", "business district", "consultation", "stock market", "modern workspace", "buyer meeting"],
+    "styles": ["photography", "corporate", "editorial", "professional", "documentary", "commercial", "lifestyle"]
+  },
+  "translations": {
+    "objects": ["dictionary", "laptop", "pen", "notebook", "glasses", "documents stack", "coffee cup", "headset", "book shelf", "text pages"],
+    "contexts": ["desk workspace", "home office", "library", "quiet study", "professional translator", "bilingual documents", "modern interior", "coworking space", "study lamp", "language books"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "studio", "corporate"]
+  },
+  "tutors": {
+    "objects": ["textbook", "whiteboard", "pen", "notebook", "laptop", "pencil case", "desk", "chair", "clock", "diploma"],
+    "contexts": ["classroom", "home study", "library", "private lesson", "bright room", "learning desk", "quiet space", "educational setting", "study corner", "student workspace"],
+    "styles": ["photography", "educational", "lifestyle", "professional", "editorial", "documentary", "corporate"]
+  },
+  "warehousing": {
+    "objects": ["warehouse rack", "pallet", "forklift", "cardboard box", "shrink wrap", "barcode scanner", "safety vest", "loading dock", "inventory shelf", "warehouse door"],
+    "contexts": ["warehouse interior", "high shelving", "logistics center", "inventory row", "shipping area", "industrial zone", "order picking", "storage facility", "stacked pallets", "distribution hub"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "commercial", "logistics"]
+  },
+  "waterproofing": {
+    "objects": ["sealant tube", "waterproof membrane", "roller brush", "rubber sheet", "putty knife", "caulking gun", "protective gloves", "spray bottle", "tarpaulin", "drain pipe"],
+    "contexts": ["basement wall", "bathroom renovation", "roof surface", "building foundation", "construction site", "outdoor concrete", "water treatment", "professional tools", "damp proofing", "exterior wall"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "technical"]
+  },
+  "web-development": {
+    "objects": ["laptop", "code on screen", "smartphone mockup", "wireframe", "sketch pad", "mouse", "coffee cup", "server cabinet", "graphics tablet", "responsive display"],
+    "contexts": ["modern office", "home office", "coworking space", "dual monitor desk", "tech startup", "creative studio", "code editor", "project planning", "minimalist desk", "bright interior"],
+    "styles": ["photography", "technology", "editorial", "professional", "lifestyle", "corporate", "minimalist"]
+  }
+}

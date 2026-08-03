@@ -1,0 +1,450 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Item condition (e.g. excellent, good)",
+    "brand": "Product brand name",
+    "feature": "Product feature or selling point",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "rooms": "Number of rooms",
+    "area": "Area in square meters",
+    "item_age": "Age description of the item",
+    "year": "Manufacturing year",
+    "mileage": "Vehicle mileage in km",
+    "category": "Category name (supplied as localized via get_name(locale))"
+  },
+  "templates": [
+    {
+      "id": "real-estate_apartments_01",
+      "category_slug": "apartments",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся {rooms}-комнатная квартира, {city}",
+          "description": "Продаю {rooms}-комнатную квартиру в {city}. Площадь: {area} м². Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "{rooms}-room apartment for sale, {city}",
+          "description": "{rooms}-room apartment for sale in {city}. Area: {area} m². Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Na prodaju {rooms}-soban stan, {city}",
+          "description": "Prodajem {rooms}-soban stan u {city}. Površina: {area} m². Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_apartments_02",
+      "category_slug": "apartments",
+      "patterns": {
+        "ru": {
+          "title": "Сдам {rooms}-комнатную квартиру, {city}",
+          "description": "Сдам {rooms}-комнатную квартиру в {city}. Состояние: {condition}. Площадь: {area} м². Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Renting {rooms}-room apartment, {city}",
+          "description": "Renting a {rooms}-room apartment in {city}. Condition: {condition}. Area: {area} m². Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Izdajem {rooms}-soban stan, {city}",
+          "description": "Izdajem {rooms}-soban stan u {city}. Stanje: {condition}. Površina: {area} m². Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_apartments_03",
+      "category_slug": "apartments",
+      "patterns": {
+        "ru": {
+          "title": "Посутчная аренда квартиры, {city}, {rooms} комн.",
+          "description": "Сдам посуточно {rooms}-комнатную квартиру в {city}. Евроремонт, {feature}. Площадь: {area} м². Цена: {price} EUR за сутки."
+        },
+        "en": {
+          "title": "Short-term apartment rental, {city}, {rooms} rooms",
+          "description": "Short-term rental of a {rooms}-room apartment in {city}. Renovated, {feature}. Area: {area} m². Price: {price} EUR per night."
+        },
+        "bs": {
+          "title": "Kratkoročni najam stana, {city}, {rooms} sobe",
+          "description": "Izdajem {rooms}-soban stan na kratkoročni najam u {city}. Renoviran, {feature}. Površina: {area} m². Cijena: {price} EUR po noći."
+        }
+      }
+    },
+    {
+      "id": "real-estate_houses_01",
+      "category_slug": "houses",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся дом в {city}, {area} м²",
+          "description": "Продаю дом в {city}. Площадь: {area} м², {rooms} комнаты. Состояние: {condition}. Участок: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "House for sale in {city}, {area} m²",
+          "description": "House for sale in {city}. Area: {area} m², {rooms} rooms. Condition: {condition}. Plot: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kuća na prodaju u {city}, {area} m²",
+          "description": "Prodajem kuću u {city}. Površina: {area} m², {rooms} sobe. Stanje: {condition}. Zemljište: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_houses_02",
+      "category_slug": "houses",
+      "patterns": {
+        "ru": {
+          "title": "Сдам дом в {city}, {rooms} комн.",
+          "description": "Сдам дом в {city}. {rooms} комнаты, площадь {area} м². Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "House for rent in {city}, {rooms} rooms",
+          "description": "Renting a house in {city}. {rooms} rooms, area {area} m². Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Kuća za najam u {city}, {rooms} sobe",
+          "description": "Izdajem kuću u {city}. {rooms} sobe, površina {area} m². Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_houses_03",
+      "category_slug": "houses",
+      "patterns": {
+        "ru": {
+          "title": "Дом у моря в {city}, аренда посуточно",
+          "description": "Сдам дом у моря в {city}. {rooms} комнаты, {area} м². Состояние: {condition}. {feature}. Цена: {price} EUR в сутки."
+        },
+        "en": {
+          "title": "Seaside house in {city}, short-term rental",
+          "description": "Seaside house for short-term rent in {city}. {rooms} rooms, {area} m². Condition: {condition}. {feature}. Price: {price} EUR per night."
+        },
+        "bs": {
+          "title": "Kuća uz more u {city}, kratkoročni najam",
+          "description": "Izdajem kuću uz more u {city}. {rooms} sobe, {area} m². Stanje: {condition}. {feature}. Cijena: {price} EUR po noći."
+        }
+      }
+    },
+    {
+      "id": "real-estate_rooms_01",
+      "category_slug": "rooms",
+      "patterns": {
+        "ru": {
+          "title": "Сдам комнату в {city}",
+          "description": "Сдам комнату в {city}. Состояние: {condition}. Площадь: {area} м². Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Room for rent in {city}",
+          "description": "Room for rent in {city}. Condition: {condition}. Area: {area} m². Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Soba za najam u {city}",
+          "description": "Izdajem sobu u {city}. Stanje: {condition}. Površina: {area} m². Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_rooms_02",
+      "category_slug": "rooms",
+      "patterns": {
+        "ru": {
+          "title": "Ищу соседа, комната в {city}",
+          "description": "Ищу соседа по квартире. Сдаётся комната в {city}. Состояние: {condition}. {feature}. Аренда: {price} EUR + коммунальные."
+        },
+        "en": {
+          "title": "Looking for roommate, room in {city}",
+          "description": "Looking for a roommate. Room available in {city}. Condition: {condition}. {feature}. Rent: {price} EUR + utilities."
+        },
+        "bs": {
+          "title": "Tražim cimera, soba u {city}",
+          "description": "Tražim cimera. Soba na raspolaganju u {city}. Stanje: {condition}. {feature}. Najam: {price} EUR + režije."
+        }
+      }
+    },
+    {
+      "id": "real-estate_garages_01",
+      "category_slug": "garages",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся гараж в {city}",
+          "description": "Продаю гараж в {city}. Площадь: {area} м². Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Garage for sale in {city}",
+          "description": "Garage for sale in {city}. Area: {area} m². Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Garaža na prodaju u {city}",
+          "description": "Prodajem garažu u {city}. Površina: {area} m². Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_garages_02",
+      "category_slug": "garages",
+      "patterns": {
+        "ru": {
+          "title": "Сдам гараж в {city}",
+          "description": "Сдам гараж в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Garage for rent in {city}",
+          "description": "Renting a garage in {city}. Area: {area} m². Condition: {condition}. {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Garaža za najam u {city}",
+          "description": "Izdajem garažu u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_land-plots_01",
+      "category_slug": "land-plots",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся участок в {city}, {area} соток",
+          "description": "Продаю земельный участок в {city}. Площадь: {area} соток. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Land plot for sale in {city}, {area} ares",
+          "description": "Land plot for sale in {city}. Area: {area} ares. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Zemljište na prodaju u {city}, {area} ari",
+          "description": "Prodajem zemljište u {city}. Površina: {area} ari. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_land-plots_02",
+      "category_slug": "land-plots",
+      "patterns": {
+        "ru": {
+          "title": "Участок под застройку в {city}",
+          "description": "Продаётся участок под застройку в {city}. {area} соток. {condition}. Коммуникации: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Building plot in {city}",
+          "description": "Building plot for sale in {city}. {area} ares. {condition}. Utilities: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Građevinsko zemljište u {city}",
+          "description": "Građevinsko zemljište na prodaju u {city}. {area} ari. {condition}. Infrastruktura: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_other-real-estate_01",
+      "category_slug": "other-real-estate",
+      "patterns": {
+        "ru": {
+          "title": "Недвижимость в {city}, {category}",
+          "description": "Продаётся {category} в {city}. Состояние: {condition}. Площадь: {area} м². {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Property in {city}, {category}",
+          "description": "Selling {category} in {city}. Condition: {condition}. Area: {area} m². {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Nekretnina u {city}, {category}",
+          "description": "Prodajem {category} u {city}. Stanje: {condition}. Površina: {area} m². {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_other-real-estate_02",
+      "category_slug": "other-real-estate",
+      "patterns": {
+        "ru": {
+          "title": "Сдам {category} в {city}",
+          "description": "Сдам {category} в {city}. Состояние: {condition}. Площадь: {area} м². {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Renting {category} in {city}",
+          "description": "Renting {category} in {city}. Condition: {condition}. Area: {area} m². {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Izdajem {category} u {city}",
+          "description": "Izdajem {category} u {city}. Stanje: {condition}. Površina: {area} m². {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_offices_01",
+      "category_slug": "offices",
+      "patterns": {
+        "ru": {
+          "title": "Сдам офис в {city}, {area} м²",
+          "description": "Сдам офисное помещение в {city}. Площадь: {area} м². Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Office for rent in {city}, {area} m²",
+          "description": "Office space for rent in {city}. Area: {area} m². Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Kancelarija za najam u {city}, {area} m²",
+          "description": "Izdajem kancelarijski prostor u {city}. Površina: {area} m². Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_offices_02",
+      "category_slug": "offices",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся офис в {city}",
+          "description": "Продаю офисное помещение в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Office for sale in {city}",
+          "description": "Office space for sale in {city}. Area: {area} m². Condition: {condition}. {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kancelarija na prodaju u {city}",
+          "description": "Prodajem kancelarijski prostor u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_flex-space_01",
+      "category_slug": "flex-space",
+      "patterns": {
+        "ru": {
+          "title": "Сдам свободного назначения, {city}, {area} м²",
+          "description": "Сдам помещение свободного назначения в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Flex space for rent, {city}, {area} m²",
+          "description": "Flex space for rent in {city}. Area: {area} m². Condition: {condition}. {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Prostor za najam, {city}, {area} m²",
+          "description": "Izdajem prostor slobodne namjene u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_flex-space_02",
+      "category_slug": "flex-space",
+      "patterns": {
+        "ru": {
+          "title": "Помещение свободного назначения, {city}",
+          "description": "Продаётся помещение свободного назначения в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Flex space for sale, {city}",
+          "description": "Flex space for sale in {city}. Area: {area} m². Condition: {condition}. {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prostor slobodne namjene na prodaju, {city}",
+          "description": "Prodajem prostor slobodne namjene u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_retail-spaces_01",
+      "category_slug": "retail-spaces",
+      "patterns": {
+        "ru": {
+          "title": "Сдам торговое помещение, {city}, {area} м²",
+          "description": "Сдам торговое помещение в {city}. Площадь: {area} м². Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Retail space for rent, {city}, {area} m²",
+          "description": "Retail space for rent in {city}. Area: {area} m². Condition: {condition}. Features: {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Prodajni prostor za najam, {city}, {area} m²",
+          "description": "Izdajem prodajni prostor u {city}. Površina: {area} m². Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_retail-spaces_02",
+      "category_slug": "retail-spaces",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся магазин в {city}",
+          "description": "Продаю торговое помещение в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Retail shop for sale, {city}",
+          "description": "Retail space for sale in {city}. Area: {area} m². Condition: {condition}. {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodavnica na prodaju u {city}",
+          "description": "Prodajem prodajni prostor u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_warehouses_01",
+      "category_slug": "warehouses",
+      "patterns": {
+        "ru": {
+          "title": "Сдам склад в {city}, {area} м²",
+          "description": "Сдам складское помещение в {city}. Площадь: {area} м². Состояние: {condition}. {feature}. Аренда: {price} EUR в месяц."
+        },
+        "en": {
+          "title": "Warehouse for rent in {city}, {area} m²",
+          "description": "Warehouse for rent in {city}. Area: {area} m². Condition: {condition}. {feature}. Rent: {price} EUR per month."
+        },
+        "bs": {
+          "title": "Skladište za najam u {city}, {area} m²",
+          "description": "Izdajem skladišni prostor u {city}. Površina: {area} m². Stanje: {condition}. {feature}. Najam: {price} EUR mjesečno."
+        }
+      }
+    },
+    {
+      "id": "real-estate_warehouses_02",
+      "category_slug": "warehouses",
+      "patterns": {
+        "ru": {
+          "title": "Продаётся склад в {city}",
+          "description": "Продаю склад в {city}. Площадь: {area} м². Высота потолков, {feature}. Состояние: {condition}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Warehouse for sale in {city}",
+          "description": "Warehouse for sale in {city}. Area: {area} m². Ceiling height, {feature}. Condition: {condition}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Skladište na prodaju u {city}",
+          "description": "Prodajem skladište u {city}. Površina: {area} m². Visina plafona, {feature}. Stanje: {condition}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_commercial-land_01",
+      "category_slug": "commercial-land",
+      "patterns": {
+        "ru": {
+          "title": "Участок коммерческого назначения, {city}, {area} соток",
+          "description": "Продаётся участок коммерческого назначения в {city}. Площадь: {area} соток. Состояние: {condition}. {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Commercial land in {city}, {area} ares",
+          "description": "Commercial land plot for sale in {city}. Area: {area} ares. Condition: {condition}. {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Komercijalno zemljište u {city}, {area} ari",
+          "description": "Komercijalno zemljište na prodaju u {city}. Površina: {area} ari. Stanje: {condition}. {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "real-estate_commercial-land_02",
+      "category_slug": "commercial-land",
+      "patterns": {
+        "ru": {
+          "title": "Земля под коммерческую застройку, {city}",
+          "description": "Участок под коммерческую застройку в {city}. {area} соток. {condition}. Коммуникации: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Land for commercial development, {city}",
+          "description": "Plot for commercial development in {city}. {area} ares. {condition}. Utilities: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Zemljište za komercijalni razvoj, {city}",
+          "description": "Zemljište za komercijalni razvoj u {city}. {area} ari. {condition}. Infrastruktura: {feature}. Cijena: {price} EUR."
+        }
+      }
+    }
+  ]
+}

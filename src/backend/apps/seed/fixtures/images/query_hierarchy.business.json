@@ -1,0 +1,97 @@
+{
+  "ready-business": {
+    "objects": ["storefront", "coffee shop", "restaurant interior", "retail shop", "bakery", "cafe", "convenience store", "boutique", "bar", "grocery store"],
+    "contexts": ["store interior", "commercial street", "shopping district", "downtown", "high foot traffic", "open for business", "storefront facade", "neighbourhood shop", "business signage", "busy commercial area"],
+    "styles": ["photography", "commercial", "editorial", "professional", "documentary", "lifestyle", "architectural"]
+  },
+  "retail-equipment": {
+    "objects": ["shelving unit", "cash register", "display case", "barcode scanner", "price tag", "shopping cart", "mannequin", "rack", "pos terminal", "security tag"],
+    "contexts": ["retail store", "showroom", "commercial interior", "well lit shop", "merchandise display", "product shelf", "store layout", "checkout counter", "sales floor", "retail environment"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "commercial", "industrial"]
+  },
+  "food-equipment": {
+    "objects": ["commercial oven", "refrigerator", "stainless steel counter", "mixer", "fryer", "ice machine", "grill", "dishwasher", "range hood", "blast chiller"],
+    "contexts": ["commercial kitchen", "restaurant kitchen", "cafe kitchen", "stainless steel worktop", "kitchen hood system", "food prep area", "clean kitchen", "professional cooking", "baking station", "catering setup"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "commercial", "industrial"]
+  },
+  "office-equipment": {
+    "objects": ["office desk", "office chair", "filing cabinet", "printer", "paper shredder", "conference table", "bookcase", "whiteboard", "monitor arm", "desk lamp"],
+    "contexts": ["modern office", "coworking space", "open plan office", "conference room", "reception area", "home office", "corporate interior", "minimalist workspace", "bright office", "professional setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "corporate", "minimalist"]
+  },
+  "industrial-equipment": {
+    "objects": ["conveyor belt", "forklift", "industrial compressor", "lathe machine", "welding machine", "industrial boiler", "hydraulic press", "assembly line", "electric motor", "industrial pump"],
+    "contexts": ["factory floor", "industrial workshop", "manufacturing plant", "production line", "warehouse facility", "heavy machinery", "industrial setting", "steel structure", "workstation", "loading bay"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "architectural", "technical"]
+  },
+  "logistics-warehouse": {
+    "objects": ["pallet rack", "forklift", "warehouse shelf", "cardboard box", "stretch wrap", "pallet", "dock leveler", "hand pallet truck", "conveyor system", "storage bin"],
+    "contexts": ["warehouse interior", "logistics centre", "fulfilment centre", "high ceiling storage", "packing station", "loading dock", "distribution centre", "stockroom", "industrial shelving", "supply chain facility"],
+    "styles": ["photography", "industrial", "documentary", "professional", "editorial", "commercial", "architectural"]
+  },
+  "beauty-equipment": {
+    "objects": ["salon chair", "hair dryer", "beauty bed", "manicure table", "makeup mirror", "steamer", "hair clipper", "facial machine", "nail lamp", "beauty trolley"],
+    "contexts": ["beauty salon", "hair salon interior", "spa treatment room", "modern salon", "clean white interior", "professional beauty studio", "cosmetology clinic", "wellness centre", "nail studio", "luxury spa"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "auto-business-equipment": {
+    "objects": ["car lift", "tire changer", "diagnostic tool", "wheel balancer", "air compressor", "tool chest", "engine hoist", "paint spray booth", "impact wrench", "oil drain pan"],
+    "contexts": ["auto workshop", "car repair garage", "service bay", "mechanical workshop", "tire service", "car detailing studio", "diagnostic station", "professional garage", "lift bay", "automotive centre"],
+    "styles": ["photography", "industrial", "product", "professional", "editorial", "technical", "commercial"]
+  },
+  "medical-equipment": {
+    "objects": ["examination table", "patient monitor", "ultrasound machine", "stethoscope", "surgical light", "defibrillator", "centrifuge", "infusion pump", "autoclave", "diagnostic scanner"],
+    "contexts": ["medical clinic", "hospital room", "doctor office", "sterile environment", "treatment room", "surgery preparation", "diagnostic centre", "modern healthcare", "clean clinical space", "laboratory setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "medical", "commercial"]
+  },
+  "business-offices": {
+    "objects": ["office building", "coworking space", "meeting room", "executive office", "open plan workspace", "reception lobby", "glass facade", "conference hall", "private office", "shared workspace"],
+    "contexts": ["business district", "downtown area", "commercial centre", "modern building", "corporate hub", "central location", "glass tower", "city centre", "business park", "urban commercial zone"],
+    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "corporate", "minimalist"]
+  },
+  "business-flex-space": {
+    "objects": ["open workspace", "event space", "showroom", "creative studio", "exhibition hall", "meeting area", "multi purpose room", "loft space", "pop up shop", "art gallery space"],
+    "contexts": ["flexible layout", "modern interior", "commercial district", "converted warehouse", "industrial chic", "open ceiling", "high ceilings", "bright natural light", "adaptable floor plan", "mixed use building"],
+    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "business-retail-spaces": {
+    "objects": ["shop front", "store interior", "retail unit", "ground floor space", "high street shop", "kiosk", "showroom", "corner shop", "arcade unit", "department space"],
+    "contexts": ["shopping street", "commercial corridor", "retail zone", "pedestrian area", "store window", "entrance facade", "busy intersection", "shopping centre", "street level access", "window display"],
+    "styles": ["photography", "commercial", "architectural", "professional", "editorial", "real estate", "urban"]
+  },
+  "business-warehouses": {
+    "objects": ["warehouse building", "storage facility", "logistics hub", "industrial unit", "cold storage", "distribution depot", "fulfilment centre", "cross dock", "storage shed", "container yard"],
+    "contexts": ["industrial zone", "logistics park", "warehouse district", "truck access", "loading dock", "high clearance", "security gate", "industrial area", "transport corridor", "cargo handling"],
+    "styles": ["photography", "industrial", "architectural", "professional", "editorial", "commercial", "documentary"]
+  },
+  "business-commercial-land": {
+    "objects": ["building plot", "development site", "greenfield", "brownfield", "land parcel", "construction lot", "zoned land", "commercial lot", "undeveloped site", "industrial land"],
+    "contexts": ["commercial zone", "development area", "road frontage", "urban fringe", "industrial park", "highway access", "surveyed land", "building permit ready", "flat terrain", "utilities available"],
+    "styles": ["photography", "landscape", "aerial", "professional", "editorial", "architectural", "documentary"]
+  },
+  "business-accounting": {
+    "objects": ["calculator", "ledger book", "laptop", "documents folder", "accounting report", "pen", "stamp", "spreadsheet", "balance sheet", "receipt"],
+    "contexts": ["modern office", "accounting firm", "desk workspace", "professional setting", "financial documents", "calculator and papers", "organised desk", "corporate environment", "business meeting", "home office"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "minimalist", "studio"]
+  },
+  "business-legal-services": {
+    "objects": ["law book", "contract", "briefcase", "gavel", "scales of justice", "legal document", "stamp", "office desk", "leather chair", "certificate"],
+    "contexts": ["law office", "legal library", "conference room", "formal meeting", "wood panelled office", "professional consultation", "corporate law firm", "modern legal practice", "client meeting", "court building"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "formal", "studio"]
+  },
+  "business-taxes": {
+    "objects": ["tax form", "calculator", "laptop", "pencil", "calendar", "folder", "bank statements", "receipt stack", "stamp", "official document"],
+    "contexts": ["office desk", "accounting workspace", "tax season", "professional consultation", "financial planning", "calculator and papers", "filing documents", "home office", "corporate setting", "paperwork organisation"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "minimalist", "studio"]
+  },
+  "business-property-valuation": {
+    "objects": ["building facade", "measuring tape", "clipboard", "valuation report", "camera", "property deed", "blueprint", "laptop", "notepad", "house model"],
+    "contexts": ["property inspection", "real estate appraisal", "commercial building", "office visit", "on site assessment", "urban location", "architectural survey", "professional evaluation", "residential area", "city street"],
+    "styles": ["photography", "editorial", "real estate", "professional", "documentary", "architectural", "commercial"]
+  },
+  "business-translations": {
+    "objects": ["dictionary", "laptop", "notebook", "pen", "globe", "language book", "headphones", "microphone", "translation document", "certificate"],
+    "contexts": ["office desk", "translation bureau", "laptop workspace", "language study", "international business", "bilingual document", "professional translator", "home office", "modern workspace", "cross cultural communication"],
+    "styles": ["photography", "editorial", "corporate", "professional", "documentary", "minimalist", "lifestyle"]
+  }
+}

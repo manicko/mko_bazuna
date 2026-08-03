@@ -1,0 +1,52 @@
+{
+  "dogs": {
+    "objects": ["dog", "puppy", "labrador", "golden retriever", "German shepherd", "poodle", "beagle", "bulldog", "husky", "chihuahua", "doberman", "border collie"],
+    "contexts": ["park", "beach", "grass field", "sunset walk", "city street", "forest trail", "backyard", "dog owner playing", "mountain hike", "cozy home"],
+    "styles": ["pet photography", "lifestyle", "outdoor", "professional", "editorial", "candid", "studio"]
+  },
+  "cats": {
+    "objects": ["cat", "kitten", "Persian cat", "Maine Coon", "Siamese cat", "British shorthair", "ragdoll", "Bengal cat", "Scottish fold", "tabby cat", "sphynx", "abyssinian"],
+    "contexts": ["sunny windowsill", "cozy sofa", "cat owner cuddling", "garden", "bedroom", "warm blanket", "bookshelf", "cat tree", "morning light", "relaxed home"],
+    "styles": ["pet photography", "lifestyle", "studio", "professional", "editorial", "candid", "indoor"]
+  },
+  "birds": {
+    "objects": ["bird", "parrot", "budgie", "cockatiel", "lovebird", "canary", "parakeet", "finch", "macaw", "African grey", "cockatoo", "conure"],
+    "contexts": ["bird cage", "aviary", "sunny window", "perch", "garden", "pet store", "bird owner hand", "natural habitat", "wooden stand", "close up"],
+    "styles": ["pet photography", "lifestyle", "studio", "professional", "editorial", "close up", "nature"]
+  },
+  "fish-aquarium": {
+    "objects": ["fish", "aquarium", "tropical fish", "goldfish", "betta fish", "angelfish", "guppy", "neon tetra", "koi", "discus fish", "aquarium tank", "cichlid"],
+    "contexts": ["aquarium interior", "planted tank", "blue light", "coral reef", "aquascape", "pet store", "home decor", "bubbles", "LED aquarium", "ornamental fish tank"],
+    "styles": ["aquarium photography", "studio", "professional", "editorial", "macro", "nature", "dark background"]
+  },
+  "other-animals": {
+    "objects": ["hamster", "guinea pig", "rabbit", "chinchilla", "ferret", "turtle", "lizard", "snake", "hedgehog", "degus", "gerbil", "mouse"],
+    "contexts": ["cage", "terrarium", "wooden table", "home interior", "studio lighting", "pet owner hands", "white background", "garden grass", "cozy bedding", "play area"],
+    "styles": ["pet photography", "studio", "lifestyle", "professional", "editorial", "macro", "candid"]
+  },
+  "pet-food": {
+    "objects": ["pet food bag", "dog food", "cat food", "kibble", "wet food", "treats", "food bowl", "food storage", "grain free food", "premium pet food", "natural pet food", "dried food"],
+    "contexts": ["pet store", "studio lighting", "white background", "kitchen counter", "product display", "shelf", "home pantry", "food bowl setting", "minimalist", "flat lay"],
+    "styles": ["product photography", "studio", "commercial", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "pet-toys": {
+    "objects": ["dog toy", "cat toy", "plush toy", "chew toy", "rubber ball", "rope toy", "feather wand", "laser pointer", "squeaky toy", "tunnel", "puzzle toy", "frisbee"],
+    "contexts": ["studio lighting", "white background", "playful setting", "pet store shelf", "grass outdoor", "home floor", "action shot", "product display", "bright background", "minimalist"],
+    "styles": ["product photography", "studio", "commercial", "professional", "editorial", "lifestyle", "action"]
+  },
+  "pet-accessories": {
+    "objects": ["pet bed", "collar", "leash", "harness", "pet bowl", "carrier", "cat house", "scratching post", "grooming brush", "water fountain", "pet mat", "name tag"],
+    "contexts": ["studio lighting", "white background", "home interior", "pet store", "product display", "cozy corner", "living room", "shelf display", "minimalist", "lifestyle setting"],
+    "styles": ["product photography", "studio", "commercial", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "pet-dogs-cats": {
+    "objects": ["dog collar", "cat harness", "leash set", "pet shampoo", "grooming kit", "pet bed", "feeding bowl", "training pad", "nail clipper", "pet comb", "toothbrush", "pet towel"],
+    "contexts": ["studio lighting", "white background", "pet store", "product display", "home shelf", "lifestyle setting", "minimalist", "wooden surface", "organized layout", "bright studio"],
+    "styles": ["product photography", "studio", "commercial", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "pet-birds": {
+    "objects": ["bird cage", "bird feeder", "bird perch", "bird bath", "cage cover", "seed mix", "cuttlebone", "bird toy", "water dispenser", "nesting box", "bird swing", "millet spray"],
+    "contexts": ["studio lighting", "white background", "pet store", "aviary setting", "home interior", "product display", "garden", "shelf", "minimalist", "flat lay"],
+    "styles": ["product photography", "studio", "commercial", "professional", "editorial", "lifestyle", "minimalist"]
+  }
+}

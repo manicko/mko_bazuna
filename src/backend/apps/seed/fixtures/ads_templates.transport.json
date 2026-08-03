@@ -1,0 +1,898 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Item condition (e.g. excellent, good)",
+    "brand": "Product brand name",
+    "feature": "Product feature or selling point",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "year": "Manufacturing year",
+    "mileage": "Vehicle mileage in km",
+    "item_age": "Age description of the item",
+    "category": "Category name (supplied as localized via get_name(locale))"
+  },
+  "templates": [
+    {
+      "id": "transport_cars_01",
+      "category_slug": "cars",
+      "patterns": {
+        "ru": {
+          "title": "Продаю {brand} {year}, {condition}",
+          "description": "Продаю {brand} {year} года. Состояние: {condition}. Пробег: {mileage} км. Комплектация: {feature}. Цена: {price} EUR. Торг уместен."
+        },
+        "en": {
+          "title": "Selling {brand} {year}, {condition}",
+          "description": "Selling {brand} {year}. Condition: {condition}. Mileage: {mileage} km. Features: {feature}. Price: {price} EUR. Negotiable."
+        },
+        "bs": {
+          "title": "Prodajem {brand} {year}, {condition}",
+          "description": "Prodajem {brand} {year}. Stanje: {condition}. Kilometraža: {mileage} km. Karakteristike: {feature}. Cijena: {price} EUR. Moguć dogovor."
+        }
+      }
+    },
+    {
+      "id": "transport_cars_02",
+      "category_slug": "cars",
+      "patterns": {
+        "ru": {
+          "title": "Куплю {brand} {year}-{year}",
+          "description": "Ищу {brand} в {condition} состоянии, год от {year}. Пробег до {mileage} км. Бюджет до {price} EUR. Особенности: {feature}. Рассмотрю варианты."
+        },
+        "en": {
+          "title": "Buying {brand} {year}-{year}",
+          "description": "Looking for {brand} in {condition} condition, year {year}+. Mileage up to {mileage} km. Budget up to {price} EUR. Features: {feature}. Will consider offers."
+        },
+        "bs": {
+          "title": "Kupujem {brand} {year}-{year}",
+          "description": "Tražim {brand} u {condition} stanju, godina {year}+. Kilometraža do {mileage} km. Budžet do {price} EUR. Karakteristike: {feature}. Razmotrit ću ponude."
+        }
+      }
+    },
+    {
+      "id": "transport_cars_03",
+      "category_slug": "cars",
+      "patterns": {
+        "ru": {
+          "title": "Срочно продаю {brand} {year}, {city}",
+          "description": "Срочно продаю {brand} {year} года в {city}. Пробег: {mileage} км. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. Спешите!"
+        },
+        "en": {
+          "title": "Urgent sale: {brand} {year}, {city}",
+          "description": "Urgently selling {brand} {year} in {city}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} EUR. Hurry!"
+        },
+        "bs": {
+          "title": "Hitna prodaja: {brand} {year}, {city}",
+          "description": "Hitno prodajem {brand} {year} u {city}. Kilometraža: {mileage} km. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. Požurite!"
+        }
+      }
+    },
+    {
+      "id": "transport_motorcycles-sub_01",
+      "category_slug": "motorcycles-sub",
+      "patterns": {
+        "ru": {
+          "title": "Продам мотоцикл {brand} {year}",
+          "description": "Продаю мотоцикл {brand} {year} года. Состояние: {condition}. Пробег: {mileage} км. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling motorcycle {brand} {year}",
+          "description": "Selling a {brand} motorcycle {year}. Condition: {condition}. Mileage: {mileage} km. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem motocikl {brand} {year}",
+          "description": "Prodajem motocikl {brand} {year}. Stanje: {condition}. Kilometraža: {mileage} km. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_motorcycles-sub_02",
+      "category_slug": "motorcycles-sub",
+      "patterns": {
+        "ru": {
+          "title": "Куплю мотоцикл {brand}, {condition}",
+          "description": "Ищу мотоцикл {brand}. Состояние: {condition}. Особенности: {feature}. Цена до {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying {brand} motorcycle, {condition}",
+          "description": "Looking for a {brand} motorcycle. Condition: {condition}. Features: {feature}. Budget up to {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem motocikl {brand}, {condition}",
+          "description": "Tražim motocikl {brand}. Stanje: {condition}. Karakteristike: {feature}. Budžet do {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_scooters_01",
+      "category_slug": "scooters",
+      "patterns": {
+        "ru": {
+          "title": "Продаю скутер {brand} {year}",
+          "description": "Продаю скутер {brand} {year} года. Состояние: {condition}. Пробег: {mileage} км. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling scooter {brand} {year}",
+          "description": "Selling {brand} scooter {year}. Condition: {condition}. Mileage: {mileage} km. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem skuter {brand} {year}",
+          "description": "Prodajem skuter {brand} {year}. Stanje: {condition}. Kilometraža: {mileage} km. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_scooters_02",
+      "category_slug": "scooters",
+      "patterns": {
+        "ru": {
+          "title": "Куплю скутер, {condition}",
+          "description": "Куплю скутер в {condition} состоянии. Бюджет: {price} EUR. Особенности: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying scooter, {condition}",
+          "description": "Looking to buy a scooter in {condition} condition. Budget: {price} EUR. Features: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem skuter, {condition}",
+          "description": "Želim kupiti skuter u {condition} stanju. Budžet: {price} EUR. Karakteristike: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_bicycles_01",
+      "category_slug": "bicycles",
+      "patterns": {
+        "ru": {
+          "title": "Продаю велосипед {brand}, {condition}",
+          "description": "Продаю велосипед {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling bicycle {brand}, {condition}",
+          "description": "Selling a {brand} bicycle. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem bicikl {brand}, {condition}",
+          "description": "Prodajem bicikl {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_bicycles_02",
+      "category_slug": "bicycles",
+      "patterns": {
+        "ru": {
+          "title": "Куплю велосипед, {condition}",
+          "description": "Куплю велосипед в {condition} состоянии. Бюджет до {price} EUR. Особенности: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying bicycle, {condition}",
+          "description": "Looking for a bicycle in {condition} condition. Budget up to {price} EUR. Features: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem bicikl, {condition}",
+          "description": "Tražim bicikl u {condition} stanju. Budžet do {price} EUR. Karakteristike: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_scooters-scooters_01",
+      "category_slug": "scooters-scooters",
+      "patterns": {
+        "ru": {
+          "title": "Продам мопед {brand} {year}",
+          "description": "Продаю мопед {brand} {year} года. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling moped {brand} {year}",
+          "description": "Selling {brand} moped {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem moped {brand} {year}",
+          "description": "Prodajem moped {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_scooters-scooters_02",
+      "category_slug": "scooters-scooters",
+      "patterns": {
+        "ru": {
+          "title": "Куплю мопед, {condition}",
+          "description": "Куплю мопед в {condition} состоянии. Особенности: {feature}. Бюджет: {price} EUR."
+        },
+        "en": {
+          "title": "Buying moped, {condition}",
+          "description": "Looking for a moped in {condition} condition. Features: {feature}. Budget: {price} EUR."
+        },
+        "bs": {
+          "title": "Kupujem moped, {condition}",
+          "description": "Tražim moped u {condition} stanju. Karakteristike: {feature}. Budžet: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_trucks-sub_01",
+      "category_slug": "trucks-sub",
+      "patterns": {
+        "ru": {
+          "title": "Продам грузовик {brand} {year}",
+          "description": "Продаю грузовик {brand} {year} года. Пробег: {mileage} км. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling truck {brand} {year}",
+          "description": "Selling {brand} truck {year}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem kamion {brand} {year}",
+          "description": "Prodajem kamion {brand} {year}. Kilometraža: {mileage} km. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_trucks-sub_02",
+      "category_slug": "trucks-sub",
+      "patterns": {
+        "ru": {
+          "title": "Куплю грузовик {brand}, {condition}",
+          "description": "Куплю грузовик {brand} в {condition} состоянии. Пробег до {mileage} км. Бюджет: {price} EUR. Особенности: {feature}."
+        },
+        "en": {
+          "title": "Buying truck {brand}, {condition}",
+          "description": "Buying a {brand} truck in {condition} condition. Mileage up to {mileage} km. Budget: {price} EUR. Features: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem kamion {brand}, {condition}",
+          "description": "Kupujem kamion {brand} u {condition} stanju. Kilometraža do {mileage} km. Budžet: {price} EUR. Karakteristike: {feature}."
+        }
+      }
+    },
+    {
+      "id": "transport_agricultural-machinery_01",
+      "category_slug": "agricultural-machinery",
+      "patterns": {
+        "ru": {
+          "title": "Продам сельхозтехнику {brand} {year}",
+          "description": "Продаю сельхозтехнику {brand} {year} года. Состояние: {condition}. Наработка: {mileage} моточасов. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling farm machinery {brand} {year}",
+          "description": "Selling {brand} agricultural machinery {year}. Condition: {condition}. Hours: {mileage}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem poljoprivrednu mašinu {brand} {year}",
+          "description": "Prodajem poljoprivrednu mašinu {brand} {year}. Stanje: {condition}. Sati rada: {mileage}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_agricultural-machinery_02",
+      "category_slug": "agricultural-machinery",
+      "patterns": {
+        "ru": {
+          "title": "Куплю трактор {brand}",
+          "description": "Ищу трактор {brand} в {condition} состоянии. Особенности: {feature}. Бюджет: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying tractor {brand}",
+          "description": "Looking for a {brand} tractor in {condition} condition. Features: {feature}. Budget: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem traktor {brand}",
+          "description": "Tražim traktor {brand} u {condition} stanju. Karakteristike: {feature}. Budžet: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_commercial-vehicles_01",
+      "category_slug": "commercial-vehicles",
+      "patterns": {
+        "ru": {
+          "title": "Продам коммерческий автомобиль {brand} {year}",
+          "description": "Продаю коммерческий {brand} {year} года. Пробег: {mileage} км. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling commercial vehicle {brand} {year}",
+          "description": "Selling {brand} commercial vehicle {year}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem komercijalno vozilo {brand} {year}",
+          "description": "Prodajem komercijalno vozilo {brand} {year}. Kilometraža: {mileage} km. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_commercial-vehicles_02",
+      "category_slug": "commercial-vehicles",
+      "patterns": {
+        "ru": {
+          "title": "Куплю фургон {brand}",
+          "description": "Куплю фургон {brand}. Состояние: {condition}. Пробег до {mileage} км. Бюджет: {price} EUR. Особенности: {feature}."
+        },
+        "en": {
+          "title": "Buying van {brand}",
+          "description": "Buying a {brand} van. Condition: {condition}. Mileage up to {mileage} km. Budget: {price} EUR. Features: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem kombi {brand}",
+          "description": "Kupujem kombi {brand}. Stanje: {condition}. Kilometraža do {mileage} km. Budžet: {price} EUR. Karakteristike: {feature}."
+        }
+      }
+    },
+    {
+      "id": "transport_campers_01",
+      "category_slug": "campers",
+      "patterns": {
+        "ru": {
+          "title": "Продам дом на колёсах {brand} {year}",
+          "description": "Продаю дом на колёсах {brand} {year} года. Пробег: {mileage} км. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling campervan {brand} {year}",
+          "description": "Selling {brand} campervan {year}. Mileage: {mileage} km. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem kamp prikolicu {brand} {year}",
+          "description": "Prodajem kamp vozilo {brand} {year}. Kilometraža: {mileage} km. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_campers_02",
+      "category_slug": "campers",
+      "patterns": {
+        "ru": {
+          "title": "Куплю кемпер {brand}",
+          "description": "Ищу кемпер {brand}. Состояние: {condition}. Бюджет до {price} EUR. Особенности: {feature}."
+        },
+        "en": {
+          "title": "Buying camper {brand}",
+          "description": "Looking for a {brand} camper. Condition: {condition}. Budget up to {price} EUR. Features: {feature}."
+        },
+        "bs": {
+          "title": "Kupujem kamp vozilo {brand}",
+          "description": "Tražim kamp vozilo {brand}. Stanje: {condition}. Budžet do {price} EUR. Karakteristike: {feature}."
+        }
+      }
+    },
+    {
+      "id": "transport_boats-yachts_01",
+      "category_slug": "boats-yachts",
+      "patterns": {
+        "ru": {
+          "title": "Продам яхту {brand} {year}",
+          "description": "Продаю яхту {brand} {year} года. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling yacht {brand} {year}",
+          "description": "Selling {brand} yacht {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem jahtu {brand} {year}",
+          "description": "Prodajem jahtu {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_boats-yachts_02",
+      "category_slug": "boats-yachts",
+      "patterns": {
+        "ru": {
+          "title": "Сдам яхту в аренду {brand} {year}",
+          "description": "Сдам яхту {brand} {year} года в аренду. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR в день. {city}."
+        },
+        "en": {
+          "title": "Yacht rental {brand} {year}",
+          "description": "Renting {brand} yacht {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR per day. {city}."
+        },
+        "bs": {
+          "title": "Iznajmljujem jahtu {brand} {year}",
+          "description": "Iznajmljujem jahtu {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR po danu. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_motorboats_01",
+      "category_slug": "motorboats",
+      "patterns": {
+        "ru": {
+          "title": "Продам моторную лодку {brand} {year}",
+          "description": "Продаю моторную лодку {brand} {year} года. Состояние: {condition}. Мотор: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling motorboat {brand} {year}",
+          "description": "Selling {brand} motorboat {year}. Condition: {condition}. Engine: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem motorni čamac {brand} {year}",
+          "description": "Prodajem motorni čamac {brand} {year}. Stanje: {condition}. Motor: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_motorboats_02",
+      "category_slug": "motorboats",
+      "patterns": {
+        "ru": {
+          "title": "Сдам моторную лодку напрокат",
+          "description": "Сдам моторную лодку {brand}. Состояние: {condition}. Особенности: {feature}. Аренда: {price} EUR в день. {city}."
+        },
+        "en": {
+          "title": "Motorboat rental",
+          "description": "Renting a {brand} motorboat. Condition: {condition}. Features: {feature}. Rent: {price} EUR per day. {city}."
+        },
+        "bs": {
+          "title": "Iznajmljujem motorni čamac",
+          "description": "Iznajmljujem motorni čamac {brand}. Stanje: {condition}. Karakteristike: {feature}. Najam: {price} EUR po danu. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_sailing-boats_01",
+      "category_slug": "sailing-boats",
+      "patterns": {
+        "ru": {
+          "title": "Продам парусную лодку {brand} {year}",
+          "description": "Продаю парусную лодку {brand} {year} года. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling sailboat {brand} {year}",
+          "description": "Selling {brand} sailboat {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem jedrilicu {brand} {year}",
+          "description": "Prodajem jedrilicu {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_sailing-boats_02",
+      "category_slug": "sailing-boats",
+      "patterns": {
+        "ru": {
+          "title": "Сдам парусник в аренду, {city}",
+          "description": "Сдам парусную лодку {brand} в аренду. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR в день. {city}."
+        },
+        "en": {
+          "title": "Sailboat rental, {city}",
+          "description": "Renting a {brand} sailboat. Condition: {condition}. Features: {feature}. Price: {price} EUR per day. {city}."
+        },
+        "bs": {
+          "title": "Iznajmljujem jedrilicu, {city}",
+          "description": "Iznajmljujem jedrilicu {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR po danu. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_personal-watercraft_01",
+      "category_slug": "personal-watercraft",
+      "patterns": {
+        "ru": {
+          "title": "Продам гидроцикл {brand} {year}",
+          "description": "Продаю гидроцикл {brand} {year} года. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling jet ski {brand} {year}",
+          "description": "Selling {brand} jet ski {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem vodeni skuter {brand} {year}",
+          "description": "Prodajem vodeni skuter {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_personal-watercraft_02",
+      "category_slug": "personal-watercraft",
+      "patterns": {
+        "ru": {
+          "title": "Куплю гидроцикл {brand}",
+          "description": "Куплю гидроцикл {brand} в {condition} состоянии. Бюджет: {price} EUR. Особенности: {feature}. {city}."
+        },
+        "en": {
+          "title": "Buying jet ski {brand}",
+          "description": "Buying a {brand} jet ski in {condition} condition. Budget: {price} EUR. Features: {feature}. {city}."
+        },
+        "bs": {
+          "title": "Kupujem vodeni skuter {brand}",
+          "description": "Kupujem vodeni skuter {brand} u {condition} stanju. Budžet: {price} EUR. Karakteristike: {feature}. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_parts_01",
+      "category_slug": "parts",
+      "patterns": {
+        "ru": {
+          "title": "Продам запчасть {brand}, {condition}",
+          "description": "Продаю запчасть {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling {brand} part, {condition}",
+          "description": "Selling a {brand} part. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem dio {brand}, {condition}",
+          "description": "Prodajem dio {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_parts_02",
+      "category_slug": "parts",
+      "patterns": {
+        "ru": {
+          "title": "Куплю запчасть {brand}",
+          "description": "Нужна запчасть {brand}. Состояние: {condition}. Особенности: {feature}. Цена до {price} EUR. {item_age}."
+        },
+        "en": {
+          "title": "Buying {brand} part",
+          "description": "Need a {brand} part. Condition: {condition}. Features: {feature}. Budget up to {price} EUR. {item_age}."
+        },
+        "bs": {
+          "title": "Kupujem dio {brand}",
+          "description": "Potreban mi je dio {brand}. Stanje: {condition}. Karakteristike: {feature}. Budžet do {price} EUR. {item_age}."
+        }
+      }
+    },
+    {
+      "id": "transport_tires-wheels_01",
+      "category_slug": "tires-wheels",
+      "patterns": {
+        "ru": {
+          "title": "Продам шины {brand}, {condition}",
+          "description": "Продаю шины {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling tires {brand}, {condition}",
+          "description": "Selling {brand} tires. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem gume {brand}, {condition}",
+          "description": "Prodajem gume {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_tires-wheels_02",
+      "category_slug": "tires-wheels",
+      "patterns": {
+        "ru": {
+          "title": "Куплю колёса {brand}",
+          "description": "Нужны колёса {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying wheels {brand}",
+          "description": "Need {brand} wheels. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem felge {brand}",
+          "description": "Potrebne su mi felge {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-accessories_01",
+      "category_slug": "auto-accessories",
+      "patterns": {
+        "ru": {
+          "title": "Продам автоаксессуар {brand}, {condition}",
+          "description": "Продаю автоаксессуар {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling car accessory {brand}, {condition}",
+          "description": "Selling {brand} car accessory. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem auto dodatak {brand}, {condition}",
+          "description": "Prodajem auto dodatak {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-accessories_02",
+      "category_slug": "auto-accessories",
+      "patterns": {
+        "ru": {
+          "title": "Куплю аксессуары для авто",
+          "description": "Ищу аксессуары для авто {brand}. Особенности: {feature}. Бюджет: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying car accessories",
+          "description": "Looking for car accessories for {brand}. Features: {feature}. Budget: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem auto dodatke",
+          "description": "Tražim dodatke za auto {brand}. Karakteristike: {feature}. Budžet: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-tools_01",
+      "category_slug": "auto-tools",
+      "patterns": {
+        "ru": {
+          "title": "Продам автоинструмент {brand}",
+          "description": "Продаю автоинструмент {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling auto tool {brand}",
+          "description": "Selling {brand} auto tool. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem auto alat {brand}",
+          "description": "Prodajem auto alat {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-tools_02",
+      "category_slug": "auto-tools",
+      "patterns": {
+        "ru": {
+          "title": "Куплю инструмент для авто",
+          "description": "Куплю инструмент для авто {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Buying auto tools",
+          "description": "Buying auto tools for {brand}. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kupujem auto alat",
+          "description": "Kupujem auto alat za {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-equipment_01",
+      "category_slug": "auto-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Продам автозапчасти {brand}",
+          "description": "Продаю автозапчасти {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling auto equipment {brand}",
+          "description": "Selling {brand} auto equipment. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem auto opremu {brand}",
+          "description": "Prodajem auto opremu {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-equipment_02",
+      "category_slug": "auto-equipment",
+      "patterns": {
+        "ru": {
+          "title": "Куплю оборудование для авто",
+          "description": "Нужно оборудование для авто {brand}. Состояние: {condition}. Особенности: {feature}. Бюджет: {price} EUR."
+        },
+        "en": {
+          "title": "Buying auto equipment",
+          "description": "Need {brand} auto equipment. Condition: {condition}. Features: {feature}. Budget: {price} EUR."
+        },
+        "bs": {
+          "title": "Kupujem auto opremu",
+          "description": "Potrebna mi je auto oprema {brand}. Stanje: {condition}. Karakteristike: {feature}. Budžet: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_oils-chemicals_01",
+      "category_slug": "oils-chemicals",
+      "patterns": {
+        "ru": {
+          "title": "Продам масло {brand}, {condition}",
+          "description": "Продаю масло {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling oil {brand}, {condition}",
+          "description": "Selling {brand} oil. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem ulje {brand}, {condition}",
+          "description": "Prodajem ulje {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_oils-chemicals_02",
+      "category_slug": "oils-chemicals",
+      "patterns": {
+        "ru": {
+          "title": "Куплю моторное масло",
+          "description": "Куплю моторное масло {brand}. Особенности: {feature}. Цена до {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying motor oil",
+          "description": "Looking for {brand} motor oil. Features: {feature}. Budget up to {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem motorno ulje",
+          "description": "Tražim motorno ulje {brand}. Karakteristike: {feature}. Budžet do {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_anti-theft_01",
+      "category_slug": "anti-theft",
+      "patterns": {
+        "ru": {
+          "title": "Продам автосигнализацию {brand}",
+          "description": "Продаю автосигнализацию {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Selling car alarm {brand}",
+          "description": "Selling {brand} car alarm. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Prodajem auto alarm {brand}",
+          "description": "Prodajem auto alarm {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_anti-theft_02",
+      "category_slug": "anti-theft",
+      "patterns": {
+        "ru": {
+          "title": "Куплю систему защиты авто",
+          "description": "Нужна система защиты для авто. Особенности: {feature}. Бюджет: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying car security system",
+          "description": "Need a car security system. Features: {feature}. Budget: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem sistem zaštite auta",
+          "description": "Potreban mi je sistem zaštite za auto. Karakteristike: {feature}. Budžet: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_gps-navigators_01",
+      "category_slug": "gps-navigators",
+      "patterns": {
+        "ru": {
+          "title": "Продам GPS-навигатор {brand}",
+          "description": "Продаю GPS-навигатор {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling GPS navigator {brand}",
+          "description": "Selling {brand} GPS navigator. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem GPS navigaciju {brand}",
+          "description": "Prodajem GPS navigaciju {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_gps-navigators_02",
+      "category_slug": "gps-navigators",
+      "patterns": {
+        "ru": {
+          "title": "Куплю GPS-навигатор",
+          "description": "Ищу GPS-навигатор для авто. Особенности: {feature}. Цена до {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying GPS navigator",
+          "description": "Looking for a GPS navigator for car. Features: {feature}. Budget up to {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem GPS navigaciju",
+          "description": "Tražim GPS navigaciju za auto. Karakteristike: {feature}. Budžet do {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-audio-video_01",
+      "category_slug": "auto-audio-video",
+      "patterns": {
+        "ru": {
+          "title": "Продам автозвук {brand}",
+          "description": "Продаю автозвук {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling car audio {brand}",
+          "description": "Selling {brand} car audio system. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem auto audio {brand}",
+          "description": "Prodajem auto audio sistem {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_auto-audio-video_02",
+      "category_slug": "auto-audio-video",
+      "patterns": {
+        "ru": {
+          "title": "Куплю автомагнитолу {brand}",
+          "description": "Куплю автомагнитолу {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Buying car stereo {brand}",
+          "description": "Buying {brand} car stereo. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kupujem auto stereo {brand}",
+          "description": "Kupujem auto stereo {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_roof-boxes-hitches_01",
+      "category_slug": "roof-boxes-hitches",
+      "patterns": {
+        "ru": {
+          "title": "Продам багажник на крышу {brand}",
+          "description": "Продаю багажник на крышу {brand}. Состояние: {condition}. Возраст: {item_age}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling roof box {brand}",
+          "description": "Selling {brand} roof box. Condition: {condition}. Age: {item_age}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem krovni nosač {brand}",
+          "description": "Prodajem krovni nosač {brand}. Stanje: {condition}. Starost: {item_age}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_roof-boxes-hitches_02",
+      "category_slug": "roof-boxes-hitches",
+      "patterns": {
+        "ru": {
+          "title": "Куплю фаркоп {brand}",
+          "description": "Нужен фаркоп {brand}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR."
+        },
+        "en": {
+          "title": "Buying tow hitch {brand}",
+          "description": "Need a {brand} tow hitch. Condition: {condition}. Features: {feature}. Price: {price} EUR."
+        },
+        "bs": {
+          "title": "Kupujem kuku za vuču {brand}",
+          "description": "Potrebna mi je kuka za vuču {brand}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR."
+        }
+      }
+    },
+    {
+      "id": "transport_trailers_01",
+      "category_slug": "trailers",
+      "patterns": {
+        "ru": {
+          "title": "Продам прицеп {brand}, {year}",
+          "description": "Продаю прицеп {brand} {year} года. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Selling trailer {brand}, {year}",
+          "description": "Selling {brand} trailer {year}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Prodajem prikolicu {brand}, {year}",
+          "description": "Prodajem prikolicu {brand} {year}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    },
+    {
+      "id": "transport_trailers_02",
+      "category_slug": "trailers",
+      "patterns": {
+        "ru": {
+          "title": "Куплю прицеп, {condition}",
+          "description": "Куплю прицеп в {condition} состоянии. Особенности: {feature}. Цена: {price} EUR. {city}."
+        },
+        "en": {
+          "title": "Buying trailer, {condition}",
+          "description": "Buying a trailer in {condition} condition. Features: {feature}. Price: {price} EUR. {city}."
+        },
+        "bs": {
+          "title": "Kupujem prikolicu, {condition}",
+          "description": "Kupujem prikolicu u {condition} stanju. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
+        }
+      }
+    }
+  ]
+}

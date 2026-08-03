@@ -1,0 +1,4056 @@
+{
+  "real-estate": [
+    {
+      "slug": "apartments",
+      "name": "Квартиры",
+      "name_i18n": {
+        "ru": "Квартиры",
+        "bs": "Stanovi",
+        "en": "Apartments"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent",
+        "rent-short"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "houses",
+      "name": "Дома, дачи, коттеджи",
+      "name_i18n": {
+        "ru": "Дома, дачи, коттеджи",
+        "bs": "Kuće, vikendice",
+        "en": "Houses, Cottages"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent",
+        "rent-short"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "rooms",
+      "name": "Комнаты",
+      "name_i18n": {
+        "ru": "Комнаты",
+        "bs": "Sobe",
+        "en": "Rooms"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent",
+        "rent-short"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "garages",
+      "name": "Гаражи и машиноместа",
+      "name_i18n": {
+        "ru": "Гаражи и машиноместа",
+        "bs": "Garaže",
+        "en": "Garages"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "land-plots",
+      "name": "Земельные участки",
+      "name_i18n": {
+        "ru": "Земельные участки",
+        "bs": "Zemljišta",
+        "en": "Land Plots"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "other-real-estate",
+      "name": "Прочая недвижимость",
+      "name_i18n": {
+        "ru": "Прочая недвижимость",
+        "bs": "Ostale nekretnine",
+        "en": "Other Real Estate"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "offices",
+      "name": "Офисы",
+      "name_i18n": {
+        "ru": "Офисы",
+        "bs": "Kancelarije",
+        "en": "Offices"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "flex-space",
+      "name": "Свободного назначения",
+      "name_i18n": {
+        "ru": "Свободного назначения",
+        "bs": "Slobodne namjene",
+        "en": "Flex Space"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "retail-spaces",
+      "name": "Торговые площади",
+      "name_i18n": {
+        "ru": "Торговые площади",
+        "bs": "Poslovni prostori",
+        "en": "Retail Spaces"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "warehouses",
+      "name": "Склады",
+      "name_i18n": {
+        "ru": "Склады",
+        "bs": "Skladišta",
+        "en": "Warehouses"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    },
+    {
+      "slug": "commercial-land",
+      "name": "Земельные участки (коммерческие)",
+      "name_i18n": {
+        "ru": "Земельные участки (коммерческие)",
+        "bs": "Komercijalna zemljišta",
+        "en": "Commercial Land"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "luxury",
+        "smart-home",
+        "eco",
+        "exchange"
+      ]
+    }
+  ],
+  "transport": [
+    {
+      "slug": "cars",
+      "name": "Автомобили",
+      "name_i18n": {
+        "ru": "Автомобили",
+        "bs": "Automobili",
+        "en": "Cars"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "motorcycles-sub",
+      "name": "Мотоциклы",
+      "name_i18n": {
+        "ru": "Мотоциклы",
+        "bs": "Motocikli",
+        "en": "Motorcycles"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "scooters",
+      "name": "Мопеды и скутеры",
+      "name_i18n": {
+        "ru": "Мопеды и скутеры",
+        "bs": "Mopedi i skuteri",
+        "en": "Scooters"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "bicycles",
+      "name": "Велосипеды",
+      "name_i18n": {
+        "ru": "Велосипеды",
+        "bs": "Bicikli",
+        "en": "Bicycles"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "scooters-scooters",
+      "name": "Самокаты",
+      "name_i18n": {
+        "ru": "Самокаты",
+        "bs": "Trotineti",
+        "en": "Scooters"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "trucks-sub",
+      "name": "Грузовики",
+      "name_i18n": {
+        "ru": "Грузовики",
+        "bs": "Kamioni",
+        "en": "Trucks"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "agricultural-machinery",
+      "name": "Сельхозтехника",
+      "name_i18n": {
+        "ru": "Сельхозтехника",
+        "bs": "Poljoprivredna mehanizacija",
+        "en": "Agricultural Machinery"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "commercial-vehicles",
+      "name": "Коммерческий транспорт",
+      "name_i18n": {
+        "ru": "Коммерческий транспорт",
+        "bs": "Komercijalna vozila",
+        "en": "Commercial Vehicles"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "campers",
+      "name": "Автодома",
+      "name_i18n": {
+        "ru": "Автодома",
+        "bs": "Kamperi",
+        "en": "Campers"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "boats-yachts",
+      "name": "Катера и яхты",
+      "name_i18n": {
+        "ru": "Катера и яхты",
+        "bs": "Brodovi i jahte",
+        "en": "Boats and Yachts"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "motorboats",
+      "name": "Моторные лодки",
+      "name_i18n": {
+        "ru": "Моторные лодки",
+        "bs": "Motorni čamci",
+        "en": "Motorboats"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "sailing-boats",
+      "name": "Вёсельные лодки",
+      "name_i18n": {
+        "ru": "Вёсельные лодки",
+        "bs": "Veslački čamci",
+        "en": "Sailing Boats"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "personal-watercraft",
+      "name": "Гидроциклы",
+      "name_i18n": {
+        "ru": "Гидроциклы",
+        "bs": "Vodeni skuteri",
+        "en": "Personal Watercraft"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "parts",
+      "name": "Запчасти",
+      "name_i18n": {
+        "ru": "Запчасти",
+        "bs": "Rezervni dijelovi",
+        "en": "Parts"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "tires-wheels",
+      "name": "Шины, диски и колёса",
+      "name_i18n": {
+        "ru": "Шины, диски и колёса",
+        "bs": "Gume i felge",
+        "en": "Tires and Wheels"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "auto-accessories",
+      "name": "Аксессуары",
+      "name_i18n": {
+        "ru": "Аксессуары",
+        "bs": "Dodatna oprema",
+        "en": "Accessories"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "auto-tools",
+      "name": "Инструменты",
+      "name_i18n": {
+        "ru": "Инструменты",
+        "bs": "Alat",
+        "en": "Tools"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "auto-equipment",
+      "name": "Экипировка",
+      "name_i18n": {
+        "ru": "Экипировка",
+        "bs": "Oprema",
+        "en": "Equipment"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "oils-chemicals",
+      "name": "Масла и автохимия",
+      "name_i18n": {
+        "ru": "Масла и автохимия",
+        "bs": "Ulja i autohemija",
+        "en": "Oils and Chemicals"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "anti-theft",
+      "name": "Противоугонные устройства",
+      "name_i18n": {
+        "ru": "Противоугонные устройства",
+        "bs": "Protivprovalni uređaji",
+        "en": "Anti-theft Devices"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "gps-navigators",
+      "name": "GPS-навигаторы",
+      "name_i18n": {
+        "ru": "GPS-навигаторы",
+        "bs": "GPS navigatori",
+        "en": "GPS Navigators"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "auto-audio-video",
+      "name": "Аудио- и видеотехника",
+      "name_i18n": {
+        "ru": "Аудио- и видеотехника",
+        "bs": "Audio i video",
+        "en": "Audio and Video"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "roof-boxes-hitches",
+      "name": "Багажники и фаркопы",
+      "name_i18n": {
+        "ru": "Багажники и фаркопы",
+        "bs": "Krovni nosači",
+        "en": "Roof Boxes and Hitches"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "trailers",
+      "name": "Прицепы",
+      "name_i18n": {
+        "ru": "Прицепы",
+        "bs": "Prikolice",
+        "en": "Trailers"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "packaging",
+        "branded",
+        "import",
+        "local"
+      ]
+    }
+  ],
+  "goods": [
+    {
+      "slug": "women-clothing",
+      "name": "Женская одежда",
+      "name_i18n": {
+        "ru": "Женская одежда",
+        "bs": "Ženska odjeća",
+        "en": "Women's Clothing"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "women-shoes",
+      "name": "Женская обувь",
+      "name_i18n": {
+        "ru": "Женская обувь",
+        "bs": "Ženska obuća",
+        "en": "Women's Shoes"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "men-clothing",
+      "name": "Мужская одежда",
+      "name_i18n": {
+        "ru": "Мужская одежда",
+        "bs": "Muška odjeća",
+        "en": "Men's Clothing"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "men-shoes",
+      "name": "Мужская обувь",
+      "name_i18n": {
+        "ru": "Мужская обувь",
+        "bs": "Muška obuća",
+        "en": "Men's Shoes"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "bags-luggage",
+      "name": "Сумки, рюкзаки и чемоданы",
+      "name_i18n": {
+        "ru": "Сумки, рюкзаки и чемоданы",
+        "bs": "Torbe i ruksaci",
+        "en": "Bags and Luggage"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "accessories",
+      "name": "Аксессуары",
+      "name_i18n": {
+        "ru": "Аксессуары",
+        "bs": "Dodaci",
+        "en": "Accessories"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "girls",
+      "name": "Для девочек",
+      "name_i18n": {
+        "ru": "Для девочек",
+        "bs": "Za djevojčice",
+        "en": "For Girls"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "boys",
+      "name": "Для мальчиков",
+      "name_i18n": {
+        "ru": "Для мальчиков",
+        "bs": "Za dječake",
+        "en": "For Boys"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "toys",
+      "name": "Игрушки",
+      "name_i18n": {
+        "ru": "Игрушки",
+        "bs": "Igračke",
+        "en": "Toys"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "strollers",
+      "name": "Детские коляски",
+      "name_i18n": {
+        "ru": "Детские коляски",
+        "bs": "Dječija kolica",
+        "en": "Strollers"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "car-seats",
+      "name": "Автомобильные кресла",
+      "name_i18n": {
+        "ru": "Автомобильные кресла",
+        "bs": "Auto sjedalice",
+        "en": "Car Seats"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "kids-furniture",
+      "name": "Детская мебель",
+      "name_i18n": {
+        "ru": "Детская мебель",
+        "bs": "Dječiji namještaj",
+        "en": "Kids' Furniture"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "feeding-products",
+      "name": "Товары для кормления",
+      "name_i18n": {
+        "ru": "Товары для кормления",
+        "bs": "Proizvodi za hranjenje",
+        "en": "Feeding Products"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "bath-products",
+      "name": "Товары для купания",
+      "name_i18n": {
+        "ru": "Товары для купания",
+        "bs": "Proizvodi za kupanje",
+        "en": "Bath Products"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "school-supplies",
+      "name": "Товары для школы",
+      "name_i18n": {
+        "ru": "Товары для школы",
+        "bs": "Školski pribor",
+        "en": "School Supplies"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "bed-linen",
+      "name": "Постельные принадлежности",
+      "name_i18n": {
+        "ru": "Постельные принадлежности",
+        "bs": "Posteljina",
+        "en": "Bed Linen"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "kids-scooters-bikes",
+      "name": "Самокаты и беговелы",
+      "name_i18n": {
+        "ru": "Самокаты и беговелы",
+        "bs": "Trotineti i bicikli",
+        "en": "Kids' Scooters and Bikes"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "kids-hygiene",
+      "name": "Детская гигиена",
+      "name_i18n": {
+        "ru": "Детская гигиена",
+        "bs": "Dječija higijena",
+        "en": "Kids' Hygiene"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "makeup-manicure",
+      "name": "Макияж и маникюр",
+      "name_i18n": {
+        "ru": "Макияж и маникюр",
+        "bs": "Šminka i manikir",
+        "en": "Makeup and Manicure"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "perfumes",
+      "name": "Парфюмерия",
+      "name_i18n": {
+        "ru": "Парфюмерия",
+        "bs": "Parfemi",
+        "en": "Perfumes"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "care-hygiene",
+      "name": "Уход и гигиена",
+      "name_i18n": {
+        "ru": "Уход и гигиена",
+        "bs": "Njega i higijena",
+        "en": "Care and Hygiene"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "hair-care",
+      "name": "Средства для волос",
+      "name_i18n": {
+        "ru": "Средства для волос",
+        "bs": "Proizvodi za kosu",
+        "en": "Hair Care"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "beauty-appliances",
+      "name": "Приборы и аксессуары",
+      "name_i18n": {
+        "ru": "Приборы и аксессуары",
+        "bs": "Aparati i dodaci",
+        "en": "Appliances and Accessories"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "medical-products",
+      "name": "Медицинские изделия",
+      "name_i18n": {
+        "ru": "Медицинские изделия",
+        "bs": "Medicinski proizvodi",
+        "en": "Medical Products"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "jewelry",
+      "name": "Ювелирные изделия",
+      "name_i18n": {
+        "ru": "Ювелирные изделия",
+        "bs": "Nakit",
+        "en": "Jewelry"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "watches",
+      "name": "Часы",
+      "name_i18n": {
+        "ru": "Часы",
+        "bs": "Satovi",
+        "en": "Watches"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "costume-jewelry",
+      "name": "Бижутерия",
+      "name_i18n": {
+        "ru": "Бижутерия",
+        "bs": "Bižuterija",
+        "en": "Costume Jewelry"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "furniture-interior",
+      "name": "Мебель и интерьер",
+      "name_i18n": {
+        "ru": "Мебель и интерьер",
+        "bs": "Namještaj",
+        "en": "Furniture and Interior"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "repair-construction",
+      "name": "Ремонт и строительство",
+      "name_i18n": {
+        "ru": "Ремонт и строительство",
+        "bs": "Popravka i gradnja",
+        "en": "Repair and Construction"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "appliances",
+      "name": "Бытовая техника",
+      "name_i18n": {
+        "ru": "Бытовая техника",
+        "bs": "Kućni aparati",
+        "en": "Appliances"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "food-products",
+      "name": "Продукты питания",
+      "name_i18n": {
+        "ru": "Продукты питания",
+        "bs": "Prehrambeni proizvodi",
+        "en": "Food Products"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "local",
+        "eco",
+        "import"
+      ]
+    },
+    {
+      "slug": "plants",
+      "name": "Растения",
+      "name_i18n": {
+        "ru": "Растения",
+        "bs": "Biljke",
+        "en": "Plants"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "kitchen-dining",
+      "name": "Посуда и товары для кухни",
+      "name_i18n": {
+        "ru": "Посуда и товары для кухни",
+        "bs": "Posuđe",
+        "en": "Kitchen and Dining"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "phones",
+      "name": "Телефоны",
+      "name_i18n": {
+        "ru": "Телефоны",
+        "bs": "Telefoni",
+        "en": "Phones"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "audio-video",
+      "name": "Аудио и видео",
+      "name_i18n": {
+        "ru": "Аудио и видео",
+        "bs": "Audio i video",
+        "en": "Audio and Video"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "computers",
+      "name": "Компьютеры",
+      "name_i18n": {
+        "ru": "Компьютеры",
+        "bs": "Računari",
+        "en": "Computers"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "laptops",
+      "name": "Ноутбуки",
+      "name_i18n": {
+        "ru": "Ноутбуки",
+        "bs": "Laptopovi",
+        "en": "Laptops"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "tablets",
+      "name": "Планшеты",
+      "name_i18n": {
+        "ru": "Планшеты",
+        "bs": "Tableti",
+        "en": "Tablets"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "cameras",
+      "name": "Фототехника",
+      "name_i18n": {
+        "ru": "Фототехника",
+        "bs": "Foto oprema",
+        "en": "Cameras"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "games-consoles-software",
+      "name": "Игры, приставки, программы",
+      "name_i18n": {
+        "ru": "Игры, приставки, программы",
+        "bs": "Igre, konzole",
+        "en": "Games, Consoles, Software"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "other-electronics",
+      "name": "Другое",
+      "name_i18n": {
+        "ru": "Другое",
+        "bs": "Ostalo",
+        "en": "Other"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "hobby-bicycles",
+      "name": "Велосипеды",
+      "name_i18n": {
+        "ru": "Велосипеды",
+        "bs": "Bicikli",
+        "en": "Bicycles"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "hobby-scooters",
+      "name": "Самокаты",
+      "name_i18n": {
+        "ru": "Самокаты",
+        "bs": "Trotineti",
+        "en": "Scooters"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "books-magazines",
+      "name": "Книги и журналы",
+      "name_i18n": {
+        "ru": "Книги и журналы",
+        "bs": "Knjige i časopisi",
+        "en": "Books and Magazines"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "musical-instruments",
+      "name": "Музыкальные инструменты",
+      "name_i18n": {
+        "ru": "Музыкальные инструменты",
+        "bs": "Muzički instrumenti",
+        "en": "Musical Instruments"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "sports-outdoors",
+      "name": "Спорт и отдых",
+      "name_i18n": {
+        "ru": "Спорт и отдых",
+        "bs": "Sport i rekreacija",
+        "en": "Sports and Outdoors"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "tickets-travel",
+      "name": "Билеты и путешествия",
+      "name_i18n": {
+        "ru": "Билеты и путешествия",
+        "bs": "Ulaznice i putovanja",
+        "en": "Tickets and Travel"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    },
+    {
+      "slug": "hunting-fishing",
+      "name": "Охота и рыбалка",
+      "name_i18n": {
+        "ru": "Охота и рыбалка",
+        "bs": "Lov i ribolov",
+        "en": "Hunting and Fishing"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "handmade",
+        "branded",
+        "custom",
+        "warranty",
+        "packaging",
+        "import",
+        "local",
+        "eco"
+      ]
+    }
+  ],
+  "animals": [
+    {
+      "slug": "dogs",
+      "name": "Собаки",
+      "name_i18n": {
+        "ru": "Собаки",
+        "bs": "Psi",
+        "en": "Dogs"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "cats",
+      "name": "Кошки",
+      "name_i18n": {
+        "ru": "Кошки",
+        "bs": "Mačke",
+        "en": "Cats"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "birds",
+      "name": "Птицы",
+      "name_i18n": {
+        "ru": "Птицы",
+        "bs": "Ptice",
+        "en": "Birds"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "fish-aquarium",
+      "name": "Рыбы и аквариумные животные",
+      "name_i18n": {
+        "ru": "Рыбы и аквариумные животные",
+        "bs": "Ribe i akvarijumi",
+        "en": "Fish and Aquarium"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "other-animals",
+      "name": "Другие животные",
+      "name_i18n": {
+        "ru": "Другие животные",
+        "bs": "Ostale životinje",
+        "en": "Other Animals"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "delivery",
+        "pickup",
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "pet-food",
+      "name": "Корм и сухой корм",
+      "name_i18n": {
+        "ru": "Корм и сухой корм",
+        "bs": "Hrana za životinje",
+        "en": "Pet Food"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "pet-toys",
+      "name": "Игрушки для животных",
+      "name_i18n": {
+        "ru": "Игрушки для животных",
+        "bs": "Igračke za životinje",
+        "en": "Pet Toys"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "pet-accessories",
+      "name": "Аксессуары для животных",
+      "name_i18n": {
+        "ru": "Аксессуары для животных",
+        "bs": "Dodaci za životinje",
+        "en": "Pet Accessories"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "pet-dogs-cats",
+      "name": "Для собак и кошек",
+      "name_i18n": {
+        "ru": "Для собак и кошек",
+        "bs": "Za pse i mačke",
+        "en": "For Dogs and Cats"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "branded",
+        "import",
+        "local"
+      ]
+    },
+    {
+      "slug": "pet-birds",
+      "name": "Для птиц",
+      "name_i18n": {
+        "ru": "Для птиц",
+        "bs": "Za ptice",
+        "en": "For Birds"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "give-away",
+        "lost",
+        "found"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty",
+        "branded",
+        "import",
+        "local"
+      ]
+    }
+  ],
+  "services-jobs": [
+    {
+      "slug": "phone-repair",
+      "name": "Ремонт телефонов",
+      "name_i18n": {
+        "ru": "Ремонт телефонов",
+        "bs": "Popravka telefona",
+        "en": "Phone Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "laptop-pc-repair",
+      "name": "Ремонт ноутбуков и ПК",
+      "name_i18n": {
+        "ru": "Ремонт ноутбуков и ПК",
+        "bs": "Popravka laptopova",
+        "en": "Laptop and PC Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "appliance-repair",
+      "name": "Ремонт бытовой техники",
+      "name_i18n": {
+        "ru": "Ремонт бытовой техники",
+        "bs": "Popravka kućnih aparata",
+        "en": "Appliance Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "clothing-repair",
+      "name": "Пошив и ремонт одежды",
+      "name_i18n": {
+        "ru": "Пошив и ремонт одежды",
+        "bs": "Krojenje i popravka",
+        "en": "Clothing Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "shoe-repair",
+      "name": "Ремонт обуви",
+      "name_i18n": {
+        "ru": "Ремонт обуви",
+        "bs": "Popravka obuće",
+        "en": "Shoe Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "car-repair",
+      "name": "Ремонт авто",
+      "name_i18n": {
+        "ru": "Ремонт авто",
+        "bs": "Popravka automobila",
+        "en": "Car Repair"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "flooring-installation",
+      "name": "Монтаж напольных покрытий",
+      "name_i18n": {
+        "ru": "Монтаж напольных покрытий",
+        "bs": "Montaža podova",
+        "en": "Flooring Installation"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "plastering",
+      "name": "Штукатурка и шпаклёвка",
+      "name_i18n": {
+        "ru": "Штукатурка и шпаклёвка",
+        "bs": "Gipsanje",
+        "en": "Plastering"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "plumbing",
+      "name": "Сантехника",
+      "name_i18n": {
+        "ru": "Сантехника",
+        "bs": "Vodovod",
+        "en": "Plumbing"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "waterproofing",
+      "name": "Гидроизоляция",
+      "name_i18n": {
+        "ru": "Гидроизоляция",
+        "bs": "Hidroizolacija",
+        "en": "Waterproofing"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "electrical",
+      "name": "Электрика",
+      "name_i18n": {
+        "ru": "Электрика",
+        "bs": "Elektrika",
+        "en": "Electrical"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "ac-installation",
+      "name": "Монтаж и обслуживание кондиционеров",
+      "name_i18n": {
+        "ru": "Монтаж и обслуживание кондиционеров",
+        "bs": "Montaža klima",
+        "en": "AC Installation"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "terraces-balconies",
+      "name": "Терассы и балконы",
+      "name_i18n": {
+        "ru": "Терассы и балконы",
+        "bs": "Terase i balkoni",
+        "en": "Terraces and Balconies"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "commercial-construction",
+      "name": "Строительство коммерческих помещений",
+      "name_i18n": {
+        "ru": "Строительство коммерческих помещений",
+        "bs": "Komercijalna gradnja",
+        "en": "Commercial Construction"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "residential-construction",
+      "name": "Строительство жилых помещений",
+      "name_i18n": {
+        "ru": "Строительство жилых помещений",
+        "bs": "Stambena gradnja",
+        "en": "Residential Construction"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "pc-setup",
+      "name": "Настройка ПК и ноутбуков",
+      "name_i18n": {
+        "ru": "Настройка ПК и ноутбуков",
+        "bs": "Podešavanje računara",
+        "en": "PC Setup"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "programming",
+      "name": "Программирование",
+      "name_i18n": {
+        "ru": "Программирование",
+        "bs": "Programiranje",
+        "en": "Programming"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "web-development",
+      "name": "Создание сайтов и приложений",
+      "name_i18n": {
+        "ru": "Создание сайтов и приложений",
+        "bs": "Izgradnja web stranica",
+        "en": "Web Development"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "hair-styling",
+      "name": "Стрижка и укладка волос",
+      "name_i18n": {
+        "ru": "Стрижка и укладка волос",
+        "bs": "Šišanje",
+        "en": "Hair Styling"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "manicure",
+      "name": "Маникюр",
+      "name_i18n": {
+        "ru": "Маникюр",
+        "bs": "Manikir",
+        "en": "Manicure"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "pedicure",
+      "name": "Педикюр",
+      "name_i18n": {
+        "ru": "Педикюр",
+        "bs": "Pedikir",
+        "en": "Pedicure"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "skincare",
+      "name": "Уход за кожей",
+      "name_i18n": {
+        "ru": "Уход за кожей",
+        "bs": "Njega kože",
+        "en": "Skincare"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "hair-care-services",
+      "name": "Уход за волосами",
+      "name_i18n": {
+        "ru": "Уход за волосами",
+        "bs": "Njega kose",
+        "en": "Hair Care"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "massage",
+      "name": "Массаж",
+      "name_i18n": {
+        "ru": "Массаж",
+        "bs": "Masaža",
+        "en": "Massage"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "sport-fitness",
+      "name": "Спорт и фитнес",
+      "name_i18n": {
+        "ru": "Спорт и фитнес",
+        "bs": "Sport i fitnes",
+        "en": "Sport and Fitness"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "beauty-salons-spa",
+      "name": "Салоны красоты и SPA",
+      "name_i18n": {
+        "ru": "Салоны красоты и SPA",
+        "bs": "Saloni ljepote",
+        "en": "Beauty Salons and SPA"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "psychology",
+      "name": "Психология",
+      "name_i18n": {
+        "ru": "Психология",
+        "bs": "Psihologija",
+        "en": "Psychology"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "medicine",
+      "name": "Медицина",
+      "name_i18n": {
+        "ru": "Медицина",
+        "bs": "Medicina",
+        "en": "Medicine"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "tow-truck",
+      "name": "Эвакуатор",
+      "name_i18n": {
+        "ru": "Эвакуатор",
+        "bs": "Šlep služba",
+        "en": "Tow Truck"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "taxi",
+      "name": "Такси",
+      "name_i18n": {
+        "ru": "Такси",
+        "bs": "Taksi",
+        "en": "Taxi"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "delivery-courier",
+      "name": "Перевозки, курьерская доставка",
+      "name_i18n": {
+        "ru": "Перевозки, курьерская доставка",
+        "bs": "Kurirska dostava",
+        "en": "Delivery and Courier"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "freight",
+      "name": "Грузоперевозки",
+      "name_i18n": {
+        "ru": "Грузоперевозки",
+        "bs": "Transport tereta",
+        "en": "Freight"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "apartment-cleaning",
+      "name": "Уборка квартир",
+      "name_i18n": {
+        "ru": "Уборка квартир",
+        "bs": "Čišćenje stanova",
+        "en": "Apartment Cleaning"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "carpet-cleaning",
+      "name": "Химчистка ковров и мебели",
+      "name_i18n": {
+        "ru": "Химчистка ковров и мебели",
+        "bs": "Hemijsko čišćenje",
+        "en": "Carpet Cleaning"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "office-cleaning",
+      "name": "Уборка офисов",
+      "name_i18n": {
+        "ru": "Уборка офисов",
+        "bs": "Čišćenje ureda",
+        "en": "Office Cleaning"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "cleaning-service",
+      "name": "Клининг",
+      "name_i18n": {
+        "ru": "Клининг",
+        "bs": "Usluge čišćenja",
+        "en": "Cleaning Service"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "arts",
+      "name": "Искусство",
+      "name_i18n": {
+        "ru": "Искусство",
+        "bs": "Umjetnost",
+        "en": "Arts"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "event-planning",
+      "name": "Организация мероприятий",
+      "name_i18n": {
+        "ru": "Организация мероприятий",
+        "bs": "Planiranje događaja",
+        "en": "Event Planning"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "photoshoots",
+      "name": "Фотосессии",
+      "name_i18n": {
+        "ru": "Фотосессии",
+        "bs": "Fotografisanje",
+        "en": "Photoshoots"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "florist",
+      "name": "Услуги флориста",
+      "name_i18n": {
+        "ru": "Услуги флориста",
+        "bs": "Cvjećarske usluge",
+        "en": "Florist"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "tutors",
+      "name": "Репетиторы",
+      "name_i18n": {
+        "ru": "Репетиторы",
+        "bs": "Instruktori",
+        "en": "Tutors"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "courses-training",
+      "name": "Курсы и тренинги",
+      "name_i18n": {
+        "ru": "Курсы и тренинги",
+        "bs": "Kursevi",
+        "en": "Courses and Training"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "accounting",
+      "name": "Бухгалтерия",
+      "name_i18n": {
+        "ru": "Бухгалтерия",
+        "bs": "Računovodstvo",
+        "en": "Accounting"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "legal-services",
+      "name": "Юридические услуги",
+      "name_i18n": {
+        "ru": "Юридические услуги",
+        "bs": "Pravne usluge",
+        "en": "Legal Services"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "tax-planning",
+      "name": "Налоговое планирование",
+      "name_i18n": {
+        "ru": "Налоговое планирование",
+        "bs": "Poresko planiranje",
+        "en": "Tax Planning"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "property-valuation",
+      "name": "Оценка недвижимости",
+      "name_i18n": {
+        "ru": "Оценка недвижимости",
+        "bs": "Procjena nekretnina",
+        "en": "Property Valuation"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "translations",
+      "name": "Переводы",
+      "name_i18n": {
+        "ru": "Переводы",
+        "bs": "Prevod",
+        "en": "Translations"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "security",
+      "name": "Охрана",
+      "name_i18n": {
+        "ru": "Охрана",
+        "bs": "Sigurnost",
+        "en": "Security"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "dog-walking",
+      "name": "Выгул собак",
+      "name_i18n": {
+        "ru": "Выгул собак",
+        "bs": "Šetanje pasa",
+        "en": "Dog Walking"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "housekeeping",
+      "name": "Домашний персонал",
+      "name_i18n": {
+        "ru": "Домашний персонал",
+        "bs": "Kućno osoblje",
+        "en": "Housekeeping"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "home-food-service",
+      "name": "Пищевое обслуживание",
+      "name_i18n": {
+        "ru": "Пищевое обслуживание",
+        "bs": "Usluga hrane",
+        "en": "Food Service"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "no-experience-jobs",
+      "name": "Без опыта, подработка, студенты",
+      "name_i18n": {
+        "ru": "Без опыта, подработка, студенты",
+        "bs": "Bez iskustva",
+        "en": "No Experience Jobs"
+      },
+      "listing_purpose_override": [
+        "job-seek"
+      ],
+      "listing_feature_override": [
+        "negotiable"
+      ]
+    },
+    {
+      "slug": "restaurants",
+      "name": "Рестораны",
+      "name_i18n": {
+        "ru": "Рестораны",
+        "bs": "Restorani",
+        "en": "Restaurants"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "catering",
+      "name": "Общественное питание",
+      "name_i18n": {
+        "ru": "Общественное питание",
+        "bs": "Catering",
+        "en": "Catering"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "agriculture",
+      "name": "Сельское хозяйство",
+      "name_i18n": {
+        "ru": "Сельское хозяйство",
+        "bs": "Poljoprivreda",
+        "en": "Agriculture"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "trading",
+      "name": "Торговля",
+      "name_i18n": {
+        "ru": "Торговля",
+        "bs": "Trgovina",
+        "en": "Trading"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "warehousing",
+      "name": "Склады",
+      "name_i18n": {
+        "ru": "Склады",
+        "bs": "Skladištenje",
+        "en": "Warehousing"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    },
+    {
+      "slug": "other-services",
+      "name": "Прочие услуги",
+      "name_i18n": {
+        "ru": "Прочие услуги",
+        "bs": "Ostale usluge",
+        "en": "Other Services"
+      },
+      "listing_purpose_override": [
+        "job-seek",
+        "job-offer",
+        "seek-service",
+        "offer-service"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent"
+      ]
+    }
+  ],
+  "business": [
+    {
+      "slug": "ready-business",
+      "name": "Готовый бизнес",
+      "name_i18n": {
+        "ru": "Готовый бизнес",
+        "bs": "Gotov biznis",
+        "en": "Ready Business"
+      },
+      "listing_purpose_override": [
+        "sell"
+      ],
+      "listing_feature_override": [
+        "negotiable",
+        "urgent",
+        "credit",
+        "installment",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "retail-equipment",
+      "name": "Торговое оборудование",
+      "name_i18n": {
+        "ru": "Торговое оборудование",
+        "bs": "Prodajna oprema",
+        "en": "Retail Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "food-equipment",
+      "name": "Пищевое оборудование",
+      "name_i18n": {
+        "ru": "Пищевое оборудование",
+        "bs": "Prehrambena oprema",
+        "en": "Food Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "office-equipment",
+      "name": "Офисное оборудование",
+      "name_i18n": {
+        "ru": "Офисное оборудование",
+        "bs": "Kancelarijska oprema",
+        "en": "Office Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "industrial-equipment",
+      "name": "Промышленное оборудование",
+      "name_i18n": {
+        "ru": "Промышленное оборудование",
+        "bs": "Industrijska oprema",
+        "en": "Industrial Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "logistics-warehouse",
+      "name": "Логистика и склад",
+      "name_i18n": {
+        "ru": "Логистика и склад",
+        "bs": "Logistika",
+        "en": "Logistics and Warehouse"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "beauty-equipment",
+      "name": "Для салона красоты",
+      "name_i18n": {
+        "ru": "Для салона красоты",
+        "bs": "Oprema za salone",
+        "en": "Beauty Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "auto-business-equipment",
+      "name": "Для автобизнеса",
+      "name_i18n": {
+        "ru": "Для автобизнеса",
+        "bs": "Auto oprema",
+        "en": "Auto Business Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "medical-equipment",
+      "name": "Медицинское оборудование",
+      "name_i18n": {
+        "ru": "Медицинское оборудование",
+        "bs": "Medicinska oprema",
+        "en": "Medical Equipment"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "exchange",
+        "urgent",
+        "warranty"
+      ]
+    },
+    {
+      "slug": "business-offices",
+      "name": "Офисы",
+      "name_i18n": {
+        "ru": "Офисы",
+        "bs": "Kancelarije",
+        "en": "Offices"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-flex-space",
+      "name": "Свободного назначения",
+      "name_i18n": {
+        "ru": "Свободного назначения",
+        "bs": "Slobodne namjene",
+        "en": "Flex Space"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-retail-spaces",
+      "name": "Торговые площади",
+      "name_i18n": {
+        "ru": "Торговые площади",
+        "bs": "Poslovni prostori",
+        "en": "Retail Spaces"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-warehouses",
+      "name": "Склады",
+      "name_i18n": {
+        "ru": "Склады",
+        "bs": "Skladišta",
+        "en": "Warehouses"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-commercial-land",
+      "name": "Земельные участки (коммерческие)",
+      "name_i18n": {
+        "ru": "Земельные участки (коммерческие)",
+        "bs": "Komercijalna zemljišta",
+        "en": "Commercial Land"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-accounting",
+      "name": "Бухгалтерия",
+      "name_i18n": {
+        "ru": "Бухгалтерия",
+        "bs": "Računovodstvo",
+        "en": "Accounting"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-legal-services",
+      "name": "Юридические услуги",
+      "name_i18n": {
+        "ru": "Юридические услуги",
+        "bs": "Pravne usluge",
+        "en": "Legal Services"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-taxes",
+      "name": "Налоги",
+      "name_i18n": {
+        "ru": "Налоги",
+        "bs": "Porezi",
+        "en": "Taxes"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-property-valuation",
+      "name": "Оценка недвижимости",
+      "name_i18n": {
+        "ru": "Оценка недвижимости",
+        "bs": "Procjena nekretnina",
+        "en": "Property Valuation"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    },
+    {
+      "slug": "business-translations",
+      "name": "Переводы",
+      "name_i18n": {
+        "ru": "Переводы",
+        "bs": "Prevod",
+        "en": "Translations"
+      },
+      "listing_purpose_override": [
+        "sell",
+        "rent"
+      ],
+      "listing_feature_override": [
+        "new",
+        "used",
+        "delivery",
+        "pickup",
+        "negotiable",
+        "credit",
+        "installment",
+        "urgent",
+        "warranty",
+        "luxury"
+      ]
+    }
+  ],
+  "charity": [
+    {
+      "slug": "charity",
+      "name": "Благотворительность",
+      "name_i18n": {
+        "ru": "Благотворительность",
+        "bs": "Humanitarnost",
+        "en": "Charity"
+      },
+      "listing_purpose_override": [
+        "give-away"
+      ],
+      "listing_feature_override": []
+    }
+  ]
+}

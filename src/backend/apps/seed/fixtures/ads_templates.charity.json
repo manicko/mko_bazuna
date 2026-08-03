@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Item condition (e.g. excellent, good)",
+    "brand": "Product brand name",
+    "feature": "Product feature or selling point",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "category": "Category name (supplied as localized via get_name(locale))"
+  },
+  "templates": [
+    {
+      "id": "charity_charity_01",
+      "category_slug": "charity",
+      "patterns": {
+        "ru": {
+          "title": "Отдам вещи бесплатно — {feature}",
+          "description": "Отдам {feature} бесплатно. Состояние: {condition}. Самовывоз из {city}. Помогите тем, кто нуждается!"
+        },
+        "en": {
+          "title": "Free stuff — {feature}",
+          "description": "Giving away {feature} for free. Condition: {condition}. Pickup in {city}. Help those in need!"
+        },
+        "bs": {
+          "title": "Poklanjam stvari besplatno — {feature}",
+          "description": "Poklanjam {feature} besplatno. Stanje: {condition}. Lično preuzimanje u {city}. Pomozite onima kojima je potrebno!"
+        }
+      }
+    },
+    {
+      "id": "charity_charity_02",
+      "category_slug": "charity",
+      "patterns": {
+        "ru": {
+          "title": "Приму в дар {category}",
+          "description": "Ищу {category} в дар. Что нужно: {feature}. Город: {city}. Буду благодарен за любую помощь."
+        },
+        "en": {
+          "title": "Looking for {category} donations",
+          "description": "Looking for {category} donations. Needed: {feature}. City: {city}. Grateful for any help."
+        },
+        "bs": {
+          "title": "Tražim donacije {category}",
+          "description": "Tražim donacije {category}. Potrebno: {feature}. Grad: {city}. Zahvalan na svakoj pomoći."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "brands": {
+    "animals": {
+      "ru": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"],
+      "en": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"],
+      "bs": ["Royal Canin", "Purina", "Acana", "Hill's", "Pedigree", "Whiskas", "Trixie", "Ferplast", "Savic", "Tetra"]
+    }
+  },
+  "features": {
+    "dogs": {
+      "ru": ["лабрадор", "овчарка", "золотистый ретривер", "хаски", "чихуахуа", "дружелюбный", "активный", "спокойный", "сторожевой", "для семьи", "маленький", "большой"],
+      "en": ["labrador", "shepherd", "golden retriever", "husky", "chihuahua", "friendly", "active", "calm", "guard dog", "family dog", "small breed", "large breed"],
+      "bs": ["labrador", "pastir", "zlatni retriver", "haski", "čivava", "prijateljski", "aktivan", "smiren", "čuvar", "porodičan", "mala rasa", "velika rasa"]
+    },
+    "cats": {
+      "ru": ["персидская", "мейн-кун", "сиамская", "британская", "сфинкс", "абиссинская", "ласковая", "игривая", "для дома", "гипоаллергенная", "короткошёрстная", "длинношёрстная"],
+      "en": ["Persian", "Maine Coon", "Siamese", "British shorthair", "sphynx", "Abyssinian", "affectionate", "playful", "indoor", "hypoallergenic", "short hair", "long hair"],
+      "bs": ["persijska", "mejn kun", "sijamska", "britanska kratkodlaka", "sfinga", "abisinska", "privržena", "razigrana", "kućna", "hipoalergena", "kratka dlaka", "duga dlaka"]
+    },
+    "birds": {
+      "ru": ["волнистый попугай", "канарейка", "корелла", "неразлучник", "жако", "какаду", "ара", "говорящий", "ручной", "певчий", "маленький", "яркий"],
+      "en": ["budgie", "canary", "cockatiel", "lovebird", "African grey", "cockatoo", "macaw", "talking", "tame", "singing", "small", "colourful"],
+      "bs": ["tigrica", "kanarinac", "kakadu", "nemogućka", "afrički sivi", "kakadu", "ara", "koji priča", "pitom", "pjevač", "mali", "šaren"]
+    },
+    "fish-aquarium": {
+      "ru": ["гуппи", "неон", "скалярия", "петушок", "золотая рыбка", "цихлида", "дискус", "меченосец", "аквариум 50л", "аквариум 100л", "пресноводные", "морские"],
+      "en": ["guppy", "neon tetra", "angelfish", "betta", "goldfish", "cichlid", "discus", "swordtail", "50L aquarium", "100L aquarium", "freshwater", "saltwater"],
+      "bs": ["gupi", "neon tetra", "skalar", "beta", "zlatna ribica", "ciklida", "diskusa", "mačorepac", "50L akvarijum", "100L akvarijum", "slatkovodne", "morske"]
+    },
+    "other-animals": {
+      "ru": ["хомяк", "морская свинка", "кролик", "шиншилла", "хорёк", "черепаха", "ящерица", "декоративный", "ласковый", "ручной", "короткошёрстный", "пушистый"],
+      "en": ["hamster", "guinea pig", "rabbit", "chinchilla", "ferret", "turtle", "lizard", "decorative", "gentle", "tame", "short hair", "fluffy"],
+      "bs": ["hrčak", "zamorče", "zec", "činčila", "tvor", "kornjača", "gušter", "dekorativni", "nežan", "pitom", "kratka dlaka", "puhast"]
+    },
+    "pet-food": {
+      "ru": ["сухой корм", "влажный корм", "корм для щенков", "корм для котят", "беззерновой", "натуральный", "лечебный", "холистик", "консервы", "лакомства", "для стерилизованных", "класс премиум"],
+      "en": ["dry food", "wet food", "puppy food", "kitten food", "grain free", "natural", "veterinary diet", "holistic", "canned food", "treats", "for neutered", "premium class"],
+      "bs": ["suva hrana", "mokra hrana", "hrana za štence", "hrana za mačiće", "bez žitarica", "prirodna", "veterinarska dijeta", "holistička", "konzervirana", "poslastice", "za kastrirane", "premium klasa"]
+    },
+    "pet-toys": {
+      "ru": ["мяч", "пищалка", "канат", "плюшевая", "интерактивная", "лазер", "перо", "трекинговый", "головоломка", "летающая тарелка", "для жевания", "для собак"],
+      "en": ["ball", "squeaky", "rope", "plush", "interactive", "laser", "feather", "fetch toy", "puzzle toy", "frisbee", "chew toy", "for dogs"],
+      "bs": ["lopta", "pištaljka", "konopac", "plišana", "interaktivna", "laser", "pero", "dohvati igračku", "zagonetka", "frizbi", "za žvakanje", "za pse"]
+    },
+    "pet-accessories": {
+      "ru": ["лежак", "домик", "миска", "ошейник", "поводок", "шлейка", "переноска", "когтеточка", "щётка", "поилка", "автокормушка", "коврик"],
+      "en": ["pet bed", "pet house", "bowl", "collar", "leash", "harness", "carrier", "scratching post", "brush", "water fountain", "auto feeder", "mat"],
+      "bs": ["krevet", "kućica", "zdjela", "ogrlica", "povodac", "prsluk", "nosač", "grebalica", "četka", "pojilica", "automatska hranilica", "podloga"]
+    },
+    "pet-dogs-cats": {
+      "ru": ["шампунь", "груминг", "капли от блох", "витамины", "когтерез", "игрушка для кошек", "игрушка для собак", "намордник", "подгузники", "совместные товары", "комбинированный", "универсальный"],
+      "en": ["shampoo", "grooming kit", "flea drops", "vitamins", "nail clipper", "cat toy", "dog toy", "muzzle", "pet diapers", "dual purpose", "combo pack", "universal"],
+      "bs": ["šampon", "grooming set", "kapi protiv buva", "vitamini", "rezač noktiju", "igračka za mačke", "igračka za pse", "brnjica", "pedive za ljubimce", "kombinovano", "kombinacija", "univerzalno"]
+    },
+    "pet-birds": {
+      "ru": ["клетка", "кормушка", "поилка", "жёрдочка", "кальций", "игрушка", "зерносмесь", "гнездо", "качели", "купалка", "наполнитель", "спрей"],
+      "en": ["cage", "feeder", "water dispenser", "perch", "calcium", "toy", "seed mix", "nesting box", "swing", "bird bath", "litter", "spray"],
+      "bs": ["kavez", "hranilica", "pojilica", "sjedalica", "kalcijum", "igračka", "mješavina sjemena", "gnijezdo", "ljuljaška", "kupka", "podloga", "sprej"]
+    }
+  }
+}

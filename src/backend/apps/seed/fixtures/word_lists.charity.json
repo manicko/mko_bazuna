@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "brands": {
+    "charity": {
+      "ru": ["благотворительный фонд", "волонтёрская организация", "общественная организация", "фонд помощи", "волонтёрское объединение"],
+      "en": ["charity foundation", "volunteer organization", "public organization", "aid foundation", "volunteer association"],
+      "bs": ["humanitarna fondacija", "volonterska organizacija", "javna organizacija", "fondacija za pomoć", "volontersko udruženje"]
+    }
+  },
+  "features": {
+    "charity": {
+      "ru": ["гуманитарная помощь", "благотворительность", "пожертвование", "помощь нуждающимся", "вещевая помощь", "продуктовая помощь", "социальная поддержка", "безвозмездно", "дарение", "волонтёрство"],
+      "en": ["humanitarian aid", "charity", "donation", "helping those in need", "clothing donation", "food aid", "social support", "free of charge", "giving", "volunteering"],
+      "bs": ["humanitarna pomoć", "dobrotvornost", "donacija", "pomoć potrebitima", "doniranje odjeće", "prehrambena pomoć", "socijalna podrška", "besplatno", "darivanje", "volontiranje"]
+    }
+  }
+}

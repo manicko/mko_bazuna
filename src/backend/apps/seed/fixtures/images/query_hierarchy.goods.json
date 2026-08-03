@@ -1,0 +1,242 @@
+{
+  "accessories": {
+    "objects": ["watch strap", "sunglasses", "scarf", "belt", "wallet", "keychain", "hair clip", "bracelet", "brooch", "gloves", "tie", "hat"],
+    "contexts": ["white background", "studio lighting", "flat lay", "wooden surface", "fashion shoot", "natural light", "minimalist", "velvet display", "urban street style"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "lifestyle", "commercial"]
+  },
+  "appliances": {
+    "objects": ["refrigerator", "washing machine", "dishwasher", "oven", "microwave", "vacuum cleaner", "air conditioner", "kettle", "toaster", "coffee machine", "blender", "iron"],
+    "contexts": ["modern kitchen", "laundry room", "white background", "studio lighting", "showroom", "minimalist interior", "smart home", "clean design", "open plan kitchen"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "audio-video": {
+    "objects": ["headphones", "speaker", "soundbar", "earbuds", "turntable", "home theater", "microphone", "amplifier", "subwoofer", "projector", "receiver", "cable set"],
+    "contexts": ["studio lighting", "wooden desk", "minimalist setup", "home office", "dark background", "neon glow", "flat lay", "workspace", "lifestyle setting", "music studio"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "bags-luggage": {
+    "objects": ["suitcase", "backpack", "handbag", "duffel bag", "tote bag", "travel bag", "weekender", "crossbody bag", "clutch", "luggage set", "organizer pouch", "shoulder bag"],
+    "contexts": ["white background", "airport lounge", "travel flat lay", "studio lighting", "hotel room", "street fashion", "outdoor travel", "minimalist", "packing arrangement"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "travel", "lifestyle"]
+  },
+  "bath-products": {
+    "objects": ["shower gel", "bath bomb", "body lotion", "shampoo", "soap bar", "bath salt", "sponge", "loofah", "body oil", "bathrobe", "towel set", "bath mat"],
+    "contexts": ["bathroom shelf", "spa setting", "white background", "flat lay", "marble surface", "natural light", "bamboo tray", "relaxation corner", "studio lighting"],
+    "styles": ["photography", "product", "studio", "beauty", "editorial", "lifestyle", "minimalist"]
+  },
+  "beauty-appliances": {
+    "objects": ["hair dryer", "hair straightener", "curling iron", "epilator", "electric shaver", "facial steamer", "massage gun", "hair clipper", "nail dryer", "led face mask", "trimmer", "scalp massager"],
+    "contexts": ["white background", "bathroom vanity", "studio lighting", "beauty salon", "flat lay", "closet shelf", "marble counter", "minimalist setup", "pink backdrop"],
+    "styles": ["photography", "product", "studio", "beauty", "professional", "editorial", "commercial"]
+  },
+  "bed-linen": {
+    "objects": ["bed sheet set", "duvet cover", "pillowcase", "blanket", "quilt", "mattress topper", "throw blanket", "bedspread", "fitted sheet", "pillow set", "bamboo sheet", "flannel sheet"],
+    "contexts": ["bright bedroom", "hotel style bed", "natural light", "minimalist decor", "soft focus", "white linen", "cozy interior", "scandinavian style", "rumpled bed"],
+    "styles": ["photography", "interior design", "lifestyle", "professional", "editorial", "minimalist", "studio"]
+  },
+  "books-magazines": {
+    "objects": ["hardcover book", "paperback", "magazine", "comic book", "textbook", "cookbook", "art book", "novel", "encyclopedia", "children book", "calendar", "journal"],
+    "contexts": ["bookshelf", "wooden desk", "coffee table", "library", "flat lay", "reading nook", "natural light", "stacked arrangement", "vintage setting"],
+    "styles": ["photography", "editorial", "lifestyle", "professional", "documentary", "minimalist", "studio"]
+  },
+  "boys": {
+    "objects": ["t shirt", "jeans", "jacket", "sneakers", "pajama set", "sweater", "shorts", "hoodie", "shirt", "tracksuit", "socks set", "hat"],
+    "contexts": ["white background", "playroom", "outdoor playground", "hanger display", "flat lay", "kids bedroom", "studio lighting", "spring park", "colorful setting"],
+    "styles": ["photography", "fashion", "lifestyle", "professional", "editorial", "studio", "family"]
+  },
+  "cameras": {
+    "objects": ["DSLR camera", "mirrorless camera", "lens", "tripod", "action camera", "drone", "gimbal", "light meter", "camera bag", "flash", "memory card", "battery grip"],
+    "contexts": ["studio", "travel backpack", "white background", "outdoor shooting", "wooden table", "equipment layout", "photographer hands", "nature backdrop", "minimalist arrangement"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "car-seats": {
+    "objects": ["baby car seat", "booster seat", "infant carrier", "car seat base", "travel system", "convertible seat", "group 1 seat", "group 2 seat", "isofix base", "sun shade", "seat protector", "belt adjuster"],
+    "contexts": ["car interior", "studio lighting", "white background", "family car", "installation demo", "parked car", "showroom", "rear seat", "lifestyle setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "family"]
+  },
+  "care-hygiene": {
+    "objects": ["baby lotion", "diaper cream", "baby oil", "baby powder", "wet wipes", "baby wash", "sunscreen", "lip balm", "hand sanitizer", "toothpaste", "baby shampoo", "body spray"],
+    "contexts": ["white background", "bathroom shelf", "flat lay", "nursery", "studio lighting", "pastel backdrop", "marble surface", "minimalist", "natural light"],
+    "styles": ["photography", "product", "studio", "beauty", "professional", "editorial", "lifestyle"]
+  },
+  "computers": {
+    "objects": ["desktop computer", "monitor", "keyboard", "mouse", "workstation", "gaming PC", "all in one", "computer case", "graphics card", "RAM module", "SSD drive", "cooling fan"],
+    "contexts": ["office desk", "gaming setup", "home office", "wooden desk", "minimalist", "dual monitor", "RGB lighting", "studio lighting", "workspace", "modern interior"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technology", "lifestyle"]
+  },
+  "costume-jewelry": {
+    "objects": ["necklace", "earrings", "ring", "bracelet", "anklet", "hair clip", "brooch", "cufflinks", "choker", "body chain", "tiara", "nose ring"],
+    "contexts": ["white background", "velvet display", "studio lighting", "fashion shoot", "jewelry box", "mannequin", "natural light", "flat lay", "marble surface", "luxury setting"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "lifestyle", "commercial"]
+  },
+  "feeding-products": {
+    "objects": ["baby bottle", "nipple", "bottle warmer", "sterilizer", "sippy cup", "baby bowl", "baby spoon", "high chair tray", "breast pump", "milk storage bag", "burp cloth", "pacifier"],
+    "contexts": ["nursery", "white background", "kitchen counter", "studio lighting", "flat lay", "pastel backdrop", "parent hands", "play mat", "natural light"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "family"]
+  },
+  "food-products": {
+    "objects": ["honey jar", "olive oil", "jam", "cheese", "dried herbs", "spice mix", "pasta", "chocolate", "snack pack", "coffee beans", "tea set", "biscuit tin"],
+    "contexts": ["wooden table", "farmhouse kitchen", "natural light", "rustic setting", "ceramic bowl", "flat lay", "garden background", "wicker basket", "marble counter"],
+    "styles": ["photography", "food", "editorial", "lifestyle", "professional", "commercial", "studio"]
+  },
+  "furniture-interior": {
+    "objects": ["sofa", "armchair", "coffee table", "dining table", "chair", "bookshelf", "wardrobe", "bed frame", "dresser", "sideboard", "lamp", "rug"],
+    "contexts": ["modern living room", "minimalist interior", "cozy bedroom", "dining area", "open plan", "showroom", "natural light", "scandinavian design", "industrial loft", "bright space"],
+    "styles": ["photography", "interior design", "architectural", "professional", "editorial", "lifestyle", "minimalist"]
+  },
+  "games-consoles-software": {
+    "objects": ["game console", "controller", "video game", "gaming headset", "console stand", "charging dock", "VR headset", "gaming chair", "steering wheel", "memory card", "game disc", "subscription card"],
+    "contexts": ["gaming setup", "RGB lighting", "living room TV", "wooden desk", "dark ambient", "flat lay", "neon lights", "gamer room", "studio lighting"],
+    "styles": ["photography", "product", "studio", "editorial", "lifestyle", "technology", "commercial"]
+  },
+  "girls": {
+    "objects": ["dress", "skirt", "blouse", "leggings", "cardigan", "tights", "hair bow", "sneakers", "sandals", "swimsuit", "pajama set", "winter coat"],
+    "contexts": ["white background", "pink bedroom", "flat lay", "hanger display", "playroom", "spring garden", "kids closet", "studio lighting", "pastel colors"],
+    "styles": ["photography", "fashion", "lifestyle", "professional", "editorial", "studio", "family"]
+  },
+  "hair-care": {
+    "objects": ["shampoo", "conditioner", "hair mask", "hair oil", "hair spray", "hair gel", "hair serum", "dry shampoo", "hair dye", "leave-in conditioner", "heat protectant", "hair brush"],
+    "contexts": ["bathroom shelf", "white background", "studio lighting", "flat lay", "salon setting", "marble counter", "natural light", "minimalist", "beauty mirror"],
+    "styles": ["photography", "product", "studio", "beauty", "professional", "editorial", "lifestyle"]
+  },
+  "hobby-bicycles": {
+    "objects": ["mountain bike", "road bike", "city bike", "electric bike", "children bike", "bike helmet", "bike lock", "water bottle", "bike pump", "bike light", "cycling gloves", "saddle bag"],
+    "contexts": ["forest trail", "city street", "mountain path", "garage", "park", "sunset ride", "studio lighting", "cycling track", "seaside promenade", "white background"],
+    "styles": ["photography", "product", "studio", "sports", "editorial", "lifestyle", "outdoor"]
+  },
+  "hobby-scooters": {
+    "objects": ["kick scooter", "electric scooter", "scooter helmet", "scooter gloves", "scooter bag", "foldable scooter", "offroad scooter", "scooter bell", "scooter lock", "charging cable", "replacement tire", "handlebar grips"],
+    "contexts": ["city street", "park path", "white background", "urban setting", "studio lighting", "bike lane", "sunset", "sidewalk", "parking lot", "evening ride"],
+    "styles": ["photography", "product", "studio", "sports", "editorial", "lifestyle", "urban"]
+  },
+  "hunting-fishing": {
+    "objects": ["fishing rod", "reel", "fishing lure", "tackle box", "hunting knife", "rifle scope", "camouflage jacket", "fishing net", "survival kit", "headlamp", "thermos", "gps device"],
+    "contexts": ["lake shore", "mountain stream", "forest clearing", "workshop bench", "white background", "sunrise river", "woodland setting", "outdoor gear spread", "hunting blind"],
+    "styles": ["photography", "product", "studio", "outdoor", "editorial", "lifestyle", "documentary"]
+  },
+  "jewelry": {
+    "objects": ["gold ring", "silver necklace", "diamond earrings", "gold bracelet", "pearl necklace", "engagement ring", "wedding band", "gold chain", "pendant", "cufflinks", "signet ring", "charm bracelet"],
+    "contexts": ["velvet display", "white background", "studio lighting", "jewelry box", "luxury setting", "natural light", "mannequin", "flat lay", "marble surface", "dark background"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "luxury", "commercial"]
+  },
+  "kids-furniture": {
+    "objects": ["crib", "changing table", "kids bed", "bunk bed", "play table", "kids chair", "bookshelf", "toy chest", "nightstand", "wardrobe", "desk", "rocking horse"],
+    "contexts": ["nursery", "kids bedroom", "bright room", "soft lighting", "pastel colors", "playful design", "wooden floor", "minimalist nursery", "sunny window", "cozy corner"],
+    "styles": ["photography", "interior design", "lifestyle", "professional", "editorial", "family", "minimalist"]
+  },
+  "kids-hygiene": {
+    "objects": ["baby shampoo", "baby soap", "baby washcloth", "hooded towel", "baby toothbrush", "baby toothpaste", "nail scissors", "hair brush set", "bath thermometer", "baby powder", "baby lotion", "ear thermometer"],
+    "contexts": ["nursery", "white background", "bathroom shelf", "flat lay", "pastel backdrop", "studio lighting", "baby bath", "soft towel", "natural light"],
+    "styles": ["photography", "product", "studio", "baby", "professional", "editorial", "lifestyle"]
+  },
+  "kids-scooters-bikes": {
+    "objects": ["balance bike", "kids bicycle", "training wheels", "kick scooter", "tricycle", "bike helmet", "knee pads", "elbow pads", "bike bell", "stabilizer set", "bike basket", "water bottle holder"],
+    "contexts": ["park path", "playground", "driveway", "garden", "white background", "kids playing", "sunny day", "studio lighting", "sidewalk", "spring park"],
+    "styles": ["photography", "product", "studio", "kids", "editorial", "lifestyle", "outdoor"]
+  },
+  "kitchen-dining": {
+    "objects": ["cookware set", "frying pan", "saucepan", "knife set", "cutting board", "mixing bowl", "measuring cup", "baking dish", "colander", "peeler", "kitchen scale", "spice jar set"],
+    "contexts": ["modern kitchen", "white background", "wooden table", "flat lay", "studio lighting", "minimalist", "marble counter", "hanging rack", "open shelving", "natural light"],
+    "styles": ["photography", "product", "studio", "editorial", "lifestyle", "commercial", "minimalist"]
+  },
+  "laptops": {
+    "objects": ["laptop", "notebook", "ultrabook", "gaming laptop", "macbook", "chromebook", "laptop stand", "laptop bag", "cooling pad", "usb hub", "external drive", "laptop charger"],
+    "contexts": ["office desk", "coffee shop", "home office", "wooden desk", "minimalist setup", "coworking space", "studio lighting", "natural light", "white background", "lifestyle setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "makeup-manicure": {
+    "objects": ["lipstick", "eyeshadow palette", "foundation", "concealer", "blush", "mascara", "eyeliner", "nail polish", "makeup brush set", "beauty sponge", "setting spray", "makeup bag"],
+    "contexts": ["white background", "vanity table", "studio lighting", "flat lay", "marble surface", "beauty mirror", "natural light", "pink backdrop", "luxury setting", "fashion shoot"],
+    "styles": ["photography", "product", "studio", "beauty", "editorial", "fashion", "lifestyle"]
+  },
+  "medical-products": {
+    "objects": ["blood pressure monitor", "thermometer", "pulse oximeter", "glucose meter", "inhaler", "hearing aid", "massage pillow", "knee brace", "back support", "elastic bandage", "first aid kit", "wheelchair"],
+    "contexts": ["white background", "studio lighting", "medical office", "pharmacy shelf", "clean surface", "healthcare setting", "flat lay", "minimalist", "clinical setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "medical", "commercial"]
+  },
+  "men-clothing": {
+    "objects": ["suit", "shirt", "jacket", "jeans", "chinos", "sweater", "t shirt", "hoodie", "coat", "blazer", "vest", "shorts"],
+    "contexts": ["white background", "hanger display", "studio lighting", "urban street", "mannequin", "fashion flat lay", "minimalist wardrobe", "natural light", "business setting"],
+    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "men-shoes": {
+    "objects": ["dress shoes", "sneakers", "loafers", "boots", "moccasins", "oxfords", "derby shoes", "sandals", "slippers", "chukka boots", "winter boots", "running shoes"],
+    "contexts": ["white background", "studio lighting", "urban street", "shoe rack", "leather detail", "outdoor pavement", "mannequin feet", "natural light", "flat lay", "fashion shoot"],
+    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "musical-instruments": {
+    "objects": ["acoustic guitar", "electric guitar", "piano keyboard", "violin", "drum set", "flute", "saxophone", "trumpet", "ukulele", "amplifier", "guitar pedal", "microphone stand"],
+    "contexts": ["music studio", "stage lighting", "white background", "wooden floor", "concert setting", "home studio", "vintage room", "instrument case", "wall mounted"],
+    "styles": ["photography", "product", "studio", "editorial", "lifestyle", "professional", "music"]
+  },
+  "other-electronics": {
+    "objects": ["power bank", "charging cable", "phone case", "screen protector", "smart plug", "wifi router", "extension cord", "cable organizer", "phone stand", "smart watch band", "usb hub", "car charger"],
+    "contexts": ["white background", "workspace", "desk organizer", "studio lighting", "flat lay", "minimalist", "home office", "dark background", "travel kit"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "perfumes": {
+    "objects": ["perfume bottle", "cologne", "eau de toilette", "rollerball", "perfume oil", "gift set", "body mist", "solid perfume", "perfume sample", "atomizer", "perfume tray", "scented candle"],
+    "contexts": ["white background", "vanity table", "studio lighting", "flat lay", "marble surface", "natural light", "luxury setting", "gift arrangement", "minimalist", "dark background"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "lifestyle", "luxury"]
+  },
+  "phones": {
+    "objects": ["smartphone", "iPhone", "android phone", "phone case", "screen protector", "charging cable", "power bank", "phone stand", "wireless charger", "car mount", "selfie stick", "pop socket"],
+    "contexts": ["white background", "workspace", "wooden desk", "hands holding", "coffee shop", "studio lighting", "flat lay", "lifestyle setting", "minimalist", "dark backdrop"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "plants": {
+    "objects": ["potted plant", "succulent", "cactus", "fern", "monstera", "ficus", "palm", "orchid", "rose bush", "lavender", "bonsai tree", "bamboo"],
+    "contexts": ["bright windowsill", "living room corner", "terracotta pot", "greenhouse", "white wall", "minimalist interior", "natural light", "garden setting", "ceramic pot", "sunny balcony"],
+    "styles": ["photography", "lifestyle", "editorial", "professional", "minimalist", "interior design", "nature"]
+  },
+  "repair-construction": {
+    "objects": ["drill", "hammer", "screwdriver set", "wrench", "measuring tape", "level", "pliers", "saw", "utility knife", "tool box", "safety helmet", "work gloves"],
+    "contexts": ["workshop bench", "construction site", "white background", "tool layout", "garage wall", "pegboard display", "studio lighting", "renovation setting", "power tools on shelf"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "industrial", "lifestyle"]
+  },
+  "school-supplies": {
+    "objects": ["notebook", "pen set", "pencil case", "backpack", "calculator", "ruler set", "compass", "markers", "colored pencils", "eraser", "glue stick", "scissors"],
+    "contexts": ["desk setup", "white background", "flat lay", "classroom", "study desk", "colorful arrangement", "natural light", "minimalist", "organized layout", "back to school"],
+    "styles": ["photography", "product", "studio", "editorial", "lifestyle", "educational", "commercial"]
+  },
+  "sports-outdoors": {
+    "objects": ["running shoes", "yoga mat", "dumbbells", "resistance band", "hiking boots", "tent", "sleeping bag", "backpack", "climbing rope", "kettlebell", "fitness tracker", "water bottle"],
+    "contexts": ["gym", "mountain trail", "beach workout", "forest camp", "white background", "home gym", "sunset workout", "outdoor adventure", "park", "studio lighting"],
+    "styles": ["photography", "sports", "product", "outdoor", "editorial", "lifestyle", "action"]
+  },
+  "strollers": {
+    "objects": ["baby stroller", "umbrella stroller", "twin stroller", "jogging stroller", "travel stroller", "stroller organizer", "rain cover", "footmuff", "sun canopy", "stroller seat liner", "buggy board", "stroller hook"],
+    "contexts": ["park path", "city sidewalk", "white background", "studio lighting", "family walk", "sunny day", "outdoor cafe", "lifestyle setting", "spring park"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "family"]
+  },
+  "tablets": {
+    "objects": ["tablet", "iPad", "android tablet", "stylus pen", "tablet case", "tablet stand", "keyboard folio", "screen protector", "drawing tablet", "kids tablet", "usb hub", "bluetooth keyboard"],
+    "contexts": ["white background", "wooden desk", "home office", "coffee shop", "hands holding", "studio lighting", "flat lay", "couch surfing", "minimalist", "lifestyle setting"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "technology"]
+  },
+  "tickets-travel": {
+    "objects": ["plane ticket", "boarding pass", "passport", "travel guide", "map", "luggage tag", "travel insurance", "voucher", "ticket stub", "hotel reservation", "currency", "souvenir magnet"],
+    "contexts": ["flat lay", "passport in hand", "airport lounge", "coffee shop table", "travel desk", "world map background", "boarding gate", "vacation packing", "beach towel"],
+    "styles": ["photography", "editorial", "travel", "lifestyle", "professional", "documentary", "commercial"]
+  },
+  "toys": {
+    "objects": ["building blocks", "action figure", "doll", "puzzle", "stuffed animal", "board game", "car toy", "play dough", "train set", "kite", "yo yo", "slime"],
+    "contexts": ["playroom floor", "white background", "kids table", "colorful setting", "studio lighting", "flat lay", "toy box", "natural light", "bedroom corner", "play mat"],
+    "styles": ["photography", "product", "studio", "kids", "editorial", "lifestyle", "family"]
+  },
+  "watches": {
+    "objects": ["wristwatch", "chronograph", "diver watch", "dress watch", "smartwatch", "pocket watch", "watch band", "watch box", "watch winder", "stopwatch", "alarm clock", "wall clock"],
+    "contexts": ["wrist shot", "white background", "watch box", "studio lighting", "leather strap", "suit sleeve", "natural light", "macro detail", "luxury setting", "minimalist"],
+    "styles": ["photography", "product", "studio", "fashion", "editorial", "lifestyle", "luxury"]
+  },
+  "women-clothing": {
+    "objects": ["dress", "blouse", "skirt", "jacket", "jeans", "trousers", "cardigan", "blazer", "jumpsuit", "top", "trench coat", "leggings"],
+    "contexts": ["white background", "hanger display", "studio lighting", "fashion shoot", "mannequin", "closet rack", "natural light", "urban street", "flat lay", "minimalist"],
+    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "women-shoes": {
+    "objects": ["heels", "flats", "sandals", "boots", "sneakers", "wedges", "pumps", "ballet flats", "ankle boots", "espadrilles", "winter boots", "wedding shoes"],
+    "contexts": ["white background", "studio lighting", "fashion shoot", "shoe closet", "marble floor", "natural light", "flat lay", "mannequin feet", "urban street", "luxury setting"],
+    "styles": ["photography", "fashion", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  }
+}

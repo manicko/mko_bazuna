@@ -1,0 +1,122 @@
+{
+  "cars": {
+    "objects": ["sedan", "SUV", "hatchback", "convertible", "coupe", "wagon", "pickup truck", "minivan", "electric vehicle", "sports car", "limousine", "crossover", "muscle car", "compact car", "luxury sedan"],
+    "contexts": ["showroom", "studio lighting", "street parking", "highway", "city street", "dealership", "garage", "sunset", "mountain road", "urban backdrop"],
+    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "motorcycles-sub": {
+    "objects": ["motorcycle", "cruiser", "sport bike", "dirt bike", "chopper", "touring bike", "naked bike", "enduro", "adventure bike", "cafe racer", "dual sport", "electric motorcycle"],
+    "contexts": ["open road", "garage", "studio lighting", "curvy mountain road", "city street", "track day", "parking lot", "sunset ride", "urban backdrop", "off road trail"],
+    "styles": ["photography", "automotive", "studio", "professional", "editorial", "lifestyle", "action"]
+  },
+  "scooters": {
+    "objects": ["scooter", "Vespa", "electric scooter", "moped", "kick scooter", "motor scooter", "maxi scooter", "three wheel scooter", "commuter scooter", "retro scooter"],
+    "contexts": ["city street", "urban sidewalk", "parking lot", "studio lighting", "cobblestone street", "beach promenade", "garage", "sunny day", "old town", "modern building"],
+    "styles": ["photography", "automotive", "studio", "lifestyle", "editorial", "travel", "urban"]
+  },
+  "bicycles": {
+    "objects": ["mountain bike", "road bike", "city bike", "electric bicycle", "hybrid bike", "BMX", "cruiser bike", "folding bike", "gravel bike", "kids bike", "cargo bike", "fat bike", "fixie", "touring bike", "cyclocross"],
+    "contexts": ["mountain trail", "city park", "bike lane", "forest path", "coastal road", "garage", "studio lighting", "sunset ride", "urban street", "gravel road"],
+    "styles": ["photography", "sports", "lifestyle", "professional", "editorial", "action", "travel"]
+  },
+  "scooters-scooters": {
+    "objects": ["moped", "electric moped", "gas moped", "vintage moped", "scooter moped", "two stroke moped", "classic moped", "restored moped", "commuter moped", "retro moped"],
+    "contexts": ["city street", "garage", "studio lighting", "urban alley", "parking spot", "old town", "workshop", "sunset", "courtyard", "sidewalk"],
+    "styles": ["photography", "automotive", "studio", "lifestyle", "editorial", "retro", "urban"]
+  },
+  "trucks-sub": {
+    "objects": ["truck", "box truck", "flatbed truck", "dump truck", "semi truck", "delivery truck", "cargo truck", "tow truck", "refrigerated truck", "tipper truck", "tanker truck", "pickup truck"],
+    "contexts": ["highway", "construction site", "warehouse dock", "industrial area", "city street", "truck stop", "loading bay", "logistics center", "open road", "dealership lot"],
+    "styles": ["photography", "automotive", "industrial", "professional", "editorial", "commercial", "documentary"]
+  },
+  "agricultural-machinery": {
+    "objects": ["tractor", "combine harvester", "plow", "cultivator", "baler", "sprayer", "seeder", "forage harvester", "telehandler", "farm trailer", "tiller", "irrigation system", "hay rake", "manure spreader", "front loader"],
+    "contexts": ["farm field", "sunset harvest", "barn", "rural landscape", "cultivated land", "wheat field", "green pasture", "workshop", "open countryside", "autumn harvest"],
+    "styles": ["photography", "agricultural", "editorial", "professional", "documentary", "lifestyle", "landscape"]
+  },
+  "commercial-vehicles": {
+    "objects": ["van", "cargo van", "passenger van", "minibus", "delivery van", "panel van", "refrigerated van", "box van", "pickup", "utility vehicle", "ambulance", "police van", "shuttle bus", "work van", "eurocargo"],
+    "contexts": ["city delivery", "warehouse", "commercial street", "loading area", "fleet parking", "business district", "highway", "urban street", "worksite", "logistics hub"],
+    "styles": ["photography", "automotive", "commercial", "professional", "editorial", "industrial", "documentary"]
+  },
+  "campers": {
+    "objects": ["campervan", "motorhome", "RV", "travel trailer", "fifth wheel", "pop up camper", "truck camper", "conversion van", "camper shell", "teardrop trailer", "class A motorhome", "class B van", "class C motorhome", "off road camper", "vintage camper"],
+    "contexts": ["mountain campsite", "lakeside", "forest clearing", "ocean view", "campground", "sunset road", "national park", "open highway", "pine forest", "desert landscape"],
+    "styles": ["photography", "travel", "lifestyle", "editorial", "professional", "adventure", "documentary"]
+  },
+  "boats-yachts": {
+    "objects": ["yacht", "sailboat", "motor yacht", "superyacht", "catamaran", "luxury yacht", "cruising yacht", "gulets", "ketch", "sloop", "schooner", "cabin cruiser", "fishing yacht", "sport yacht", "expedition yacht"],
+    "contexts": ["marina", "open sea", "sunset on water", "harbor", "coastline", "bay", "mooring", "dock", "anchored", "blue water", "luxury port", "Adriatic sea"],
+    "styles": ["photography", "maritime", "lifestyle", "professional", "editorial", "aerial", "travel"]
+  },
+  "motorboats": {
+    "objects": ["speedboat", "motorboat", "RIB", "fishing boat", "bowrider", "center console", "cuddy cabin", "deck boat", "offshore boat", "runabout", "ski boat", "pontoon boat", "aluminum boat", "bass boat", "bay boat"],
+    "contexts": ["marina", "open sea", "coastal waters", "lake", "river", "speed on water", "docking", "sunset cruise", "fishing trip", "water sports"],
+    "styles": ["photography", "maritime", "action", "lifestyle", "professional", "editorial", "travel"]
+  },
+  "sailing-boats": {
+    "objects": ["sailboat", "yacht", "sloop", "catamaran", "ketch", "schooner", "dinghy", "daysailer", "trimaran", "cutter", "yawl", "offshore racer", "cruising sailboat", "classic sailboat", "wooden sailboat"],
+    "contexts": ["marina", "open ocean", "calm sea", "sunset sailing", "harbor", "coastal breeze", "race start", "anchored bay", "blue water", "island view"],
+    "styles": ["photography", "maritime", "lifestyle", "professional", "editorial", "aerial", "documentary"]
+  },
+  "personal-watercraft": {
+    "objects": ["jet ski", "personal watercraft", "wave runner", "sea doo", "stand up jet ski", "luxury watercraft", "sport watercraft", "touring watercraft", "electric watercraft", "kid friendly watercraft"],
+    "contexts": ["ocean waves", "lake splash", "coastal ride", "water sports", "summer day", "beach", "speed on water", "sunset ride", "marina departure", "azure water"],
+    "styles": ["photography", "action", "lifestyle", "sports", "editorial", "travel", "commercial"]
+  },
+  "parts": {
+    "objects": ["engine", "brake disc", "spark plug", "shock absorber", "exhaust pipe", "headlight", "transmission", "radiator", "battery", "steering wheel", "alternator", "starter motor", "clutch kit", "fuel pump", "timing belt"],
+    "contexts": ["workshop", "garage", "workbench", "white background", "tool layout", "mechanical", "repair shop", "close up", "organized shelf", "auto parts store"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "macro"]
+  },
+  "tires-wheels": {
+    "objects": ["car tire", "alloy wheel", "steel rim", "winter tire", "summer tire", "all season tire", "rim", "hubcap", "tire set", "spare tire", "off road tire", "performance tire", "truck tire", "motorcycle tire", "valve stem"],
+    "contexts": ["garage", "tire shop", "white background", "studio lighting", "warehouse", "showroom", "workshop floor", "tire rack", "wheel alignment", "display stand"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "commercial"]
+  },
+  "auto-accessories": {
+    "objects": ["seat cover", "floor mat", "steering wheel cover", "phone holder", "sun shade", "car charger", "dashboard cover", "window visor", "bumper protector", "side mirror", "license plate frame", "gear shifter knob", "car cover", "cup holder", "trunk organizer"],
+    "contexts": ["car interior", "dashboard", "studio lighting", "white background", "showroom", "garage", "flat lay", "drivers seat", "retail display", "product shelf"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "auto-tools": {
+    "objects": ["wrench set", "screwdriver set", "socket set", "jack stand", "oil filter wrench", "multimeter", "car jack", "diagnostic scanner", "ratchet set", "tire inflator", "jump starter", "tool box", "breaker bar", "torque wrench", "pliers set"],
+    "contexts": ["workshop", "garage bench", "tool chest", "white background", "mechanical work", "tool layout", "repair shop", "studio lighting", "organized tools", "professional garage"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "industrial"]
+  },
+  "auto-equipment": {
+    "objects": ["car lift", "tire changer", "wheel balancer", "compressor", "paint gun", "welder", "engine crane", "parts washer", "diagnostic equipment", "smoke machine", "hydraulic press", "brake lathe", "battery charger", "work light", "extraction system"],
+    "contexts": ["auto workshop", "professional garage", "service center", "studio lighting", "mechanical bay", "repair facility", "white background", "industrial setting", "tool layout", "equipment showroom"],
+    "styles": ["photography", "product", "industrial", "professional", "editorial", "technical", "commercial"]
+  },
+  "oils-chemicals": {
+    "objects": ["motor oil", "coolant", "brake fluid", "transmission fluid", "windshield washer", "engine cleaner", "oil additive", "fuel additive", "grease", "antifreeze", "power steering fluid", "rust remover", "degreaser", "paint", "lubricant spray"],
+    "contexts": ["garage shelf", "workshop bench", "white background", "studio lighting", "auto parts store", "product display", "flat lay", "packaging shot", "retail shelf", "professional workshop"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "commercial", "technical"]
+  },
+  "anti-theft": {
+    "objects": ["car alarm", "steering wheel lock", "GPS tracker", "immobilizer", "locking lug nuts", "disklok", "pedal lock", "hood lock", "kill switch", "siren", "motion sensor", "camera system", "window etching", "VIN etching", "tilt sensor"],
+    "contexts": ["car interior", "dashboard install", "workshop bench", "white background", "studio lighting", "security showroom", "garage install", "professional fitment", "product packaging", "flat lay"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technical", "commercial"]
+  },
+  "gps-navigators": {
+    "objects": ["GPS navigator", "car GPS", "portable GPS", "GPS tracker", "navigation system", "dashboard GPS", "marine GPS", "handheld GPS", "GPS antenna", "navigation screen", "touchscreen GPS", "GPS mount", "power cord", "SD card GPS", "GPS module"],
+    "contexts": ["car dashboard", "windshield mount", "studio lighting", "white background", "navigation screen", "road trip", "route display", "map view", "professional install", "sunny drive"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technology", "commercial"]
+  },
+  "auto-audio-video": {
+    "objects": ["car stereo", "speaker", "subwoofer", "amplifier", "head unit", "touch screen radio", "bluetooth receiver", "car monitor", "sound system", "tweeter", "woofer", "crossover", "equalizer", "dash cam", "rear view camera"],
+    "contexts": ["car interior", "dashboard install", "studio lighting", "white background", "audio showroom", "workshop install", "custom setup", "flat lay", "professional fitment", "retail display"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "technology", "lifestyle"]
+  },
+  "roof-boxes-hitches": {
+    "objects": ["roof box", "roof rack", "tow bar", "trailer hitch", "bike rack", "ski rack", "roof basket", "cargo carrier", "hitch receiver", "roof bars", "cross bars", "thule box", "folding hitch", "hitch ball", "roof pod"],
+    "contexts": ["car roof", "garage install", "studio lighting", "white background", "outdoor setup", "road trip ready", "showroom display", "professional install", "product packaging", "mounting hardware"],
+    "styles": ["photography", "product", "studio", "professional", "editorial", "lifestyle", "commercial"]
+  },
+  "trailers": {
+    "objects": ["utility trailer", "boat trailer", "horse trailer", "cargo trailer", "flatbed trailer", "enclosed trailer", "dump trailer", "car trailer", "motorcycle trailer", "livestock trailer", "tilt trailer", "equipment trailer", "landscape trailer", "water trailer", "tandem axle trailer"],
+    "contexts": ["parking lot", "garage", "open field", "highway", "dealership lot", "workshop", "tow vehicle", "storage yard", "outdoor storage", "campground"],
+    "styles": ["photography", "automotive", "industrial", "professional", "editorial", "documentary", "commercial"]
+  }
+}

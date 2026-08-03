@@ -1,0 +1,411 @@
+{
+  "version": 2,
+  "placeholder_schema": {
+    "condition": "Animal health condition, age description",
+    "brand": "Product brand name for pet supplies",
+    "feature": "Breed, temperament, species, type of food/toy",
+    "city": "Montenegro city name",
+    "price": "Numeric price value",
+    "item_age": "Age description of the product (for pet supplies only)",
+    "category": "Category name (supplied as localized via get_name(locale))",
+    "listing_purpose": "sell, give-away, lost, found"
+  },
+  "templates": [
+    {
+      "id": "animals_dogs_01",
+      "category_slug": "dogs",
+      "patterns": {
+        "ru": {
+          "title": "Продаются щенки, {city}",
+          "description": "Продаются щенки. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Puppies for sale, {city}",
+          "description": "Puppies for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Štenci na prodaju, {city}",
+          "description": "Štenci na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_dogs_02",
+      "category_slug": "dogs",
+      "patterns": {
+        "ru": {
+          "title": "Отдам собаку в добрые руки, {city}",
+          "description": "Отдам собаку в добрые руки. Характер: {feature}. Состояние: {condition}. Город: {city}. Бесплатно."
+        },
+        "en": {
+          "title": "Dog needs a good home, {city}",
+          "description": "Giving away a dog to a good home. Temperament: {feature}. Condition: {condition}. City: {city}. Free."
+        },
+        "bs": {
+          "title": "Pas traži dom, {city}",
+          "description": "Poklanjam psa dobrom domu. Temperament: {feature}. Stanje: {condition}. Grad: {city}. Besplatno."
+        }
+      }
+    },
+    {
+      "id": "animals_dogs_03",
+      "category_slug": "dogs",
+      "patterns": {
+        "ru": {
+          "title": "Потерялась собака, {city}",
+          "description": "Потерялась собака в {city}. Порода: {feature}. Приметы: {condition}. Просьба сообщить за вознаграждение {price} BAM."
+        },
+        "en": {
+          "title": "Lost dog, {city}",
+          "description": "Lost dog in {city}. Breed: {feature}. Markings: {condition}. Reward offered: {price} BAM."
+        },
+        "bs": {
+          "title": "Izgubljen pas, {city}",
+          "description": "Izgubljen pas u {city}. Rasa: {feature}. Osobine: {condition}. Nagrada: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_cats_01",
+      "category_slug": "cats",
+      "patterns": {
+        "ru": {
+          "title": "Продаются котята, {city}",
+          "description": "Продаются котята. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Kittens for sale, {city}",
+          "description": "Kittens for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Mačići na prodaju, {city}",
+          "description": "Mačići na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_cats_02",
+      "category_slug": "cats",
+      "patterns": {
+        "ru": {
+          "title": "Ищу дом для кошки, {city}",
+          "description": "Ищу дом для кошки. Особенности: {feature}. Состояние: {condition}. Город: {city}. Отдам бесплатно."
+        },
+        "en": {
+          "title": "Cat needs a home, {city}",
+          "description": "Looking for a home for a cat. Details: {feature}. Condition: {condition}. City: {city}. Free adoption."
+        },
+        "bs": {
+          "title": "Mačka traži dom, {city}",
+          "description": "Tražim dom za mačku. Detalji: {feature}. Stanje: {condition}. Grad: {city}. Poklanjam besplatno."
+        }
+      }
+    },
+    {
+      "id": "animals_cats_03",
+      "category_slug": "cats",
+      "patterns": {
+        "ru": {
+          "title": "Найдена кошка, {city}",
+          "description": "Найдена кошка в {city}. Окрас: {feature}. Особые приметы: {condition}. Ищу хозяина."
+        },
+        "en": {
+          "title": "Found cat, {city}",
+          "description": "Found a cat in {city}. Colour: {feature}. Distinctive features: {condition}. Looking for owner."
+        },
+        "bs": {
+          "title": "Pronađena mačka, {city}",
+          "description": "Pronađena mačka u {city}. Boja: {feature}. Prepoznatljive osobine: {condition}. Tražim vlasnika."
+        }
+      }
+    },
+    {
+      "id": "animals_birds_01",
+      "category_slug": "birds",
+      "patterns": {
+        "ru": {
+          "title": "Продаются птицы, {city}",
+          "description": "Продаются птицы. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Birds for sale, {city}",
+          "description": "Birds for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Ptice na prodaju, {city}",
+          "description": "Ptice na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_birds_02",
+      "category_slug": "birds",
+      "patterns": {
+        "ru": {
+          "title": "Отдам птицу, {city}",
+          "description": "Отдам птицу в хорошие руки. Вид: {feature}. Характер: {condition}. Город: {city}. Бесплатно."
+        },
+        "en": {
+          "title": "Giving away a bird, {city}",
+          "description": "Giving away a bird to a good home. Species: {feature}. Temperament: {condition}. City: {city}. Free."
+        },
+        "bs": {
+          "title": "Poklanjam pticu, {city}",
+          "description": "Poklanjam pticu dobrom domu. Vrsta: {feature}. Temperament: {condition}. Grad: {city}. Besplatno."
+        }
+      }
+    },
+    {
+      "id": "animals_fish-aquarium_01",
+      "category_slug": "fish-aquarium",
+      "patterns": {
+        "ru": {
+          "title": "Продаются аквариумные рыбки, {city}",
+          "description": "Продаются аквариумные рыбки. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Aquarium fish for sale, {city}",
+          "description": "Aquarium fish for sale. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Akvarijumske ribe na prodaju, {city}",
+          "description": "Akvarijumske ribe na prodaju. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_fish-aquarium_02",
+      "category_slug": "fish-aquarium",
+      "patterns": {
+        "ru": {
+          "title": "Отдам рыбок с аквариумом, {city}",
+          "description": "Отдам аквариумных рыбок вместе с оборудованием. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Fish with aquarium for sale, {city}",
+          "description": "Selling aquarium fish with equipment. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Ribe s akvarijumom na prodaju, {city}",
+          "description": "Prodajem akvarijumske ribe s opremom. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_other-animals_01",
+      "category_slug": "other-animals",
+      "patterns": {
+        "ru": {
+          "title": "Продаются домашние питомцы, {city}",
+          "description": "Продаются домашние животные. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+        },
+        "en": {
+          "title": "Pets for sale, {city}",
+          "description": "Pets for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+        },
+        "bs": {
+          "title": "Ljubimci na prodaju, {city}",
+          "description": "Ljubimci na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+        }
+      }
+    },
+    {
+      "id": "animals_other-animals_02",
+      "category_slug": "other-animals",
+      "patterns": {
+        "ru": {
+          "title": "Отдам животное в добрые руки, {city}",
+          "description": "Отдам питомца в добрые руки. Вид: {feature}. Описание: {condition}. Город: {city}. Бесплатно."
+        },
+        "en": {
+          "title": "Pet needs a home, {city}",
+          "description": "Giving away a pet to a loving home. Species: {feature}. Description: {condition}. City: {city}. Free."
+        },
+        "bs": {
+          "title": "Ljubimac traži dom, {city}",
+          "description": "Poklanjam ljubimca dobrom domu. Vrsta: {feature}. Opis: {condition}. Grad: {city}. Besplatno."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-food_01",
+      "category_slug": "pet-food",
+      "patterns": {
+        "ru": {
+          "title": "Продаю корм для животных {brand}",
+          "description": "Продаю корм {brand} для животных. Тип: {feature}. Состояние: {condition}. Срок годности: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Selling pet food {brand}",
+          "description": "Selling {brand} pet food. Type: {feature}. Condition: {condition}. Expiry: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Prodajem hranu za ljubimce {brand}",
+          "description": "Prodajem hranu {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Rok trajanja: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-food_02",
+      "category_slug": "pet-food",
+      "patterns": {
+        "ru": {
+          "title": "{brand} корм, {item_age}",
+          "description": "Продаётся корм {brand}. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} pet food, {item_age}",
+          "description": "{brand} pet food for sale. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} hrana za ljubimce, {item_age}",
+          "description": "{brand} hrana za ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-toys_01",
+      "category_slug": "pet-toys",
+      "patterns": {
+        "ru": {
+          "title": "Продаю игрушки для животных {brand}",
+          "description": "Продаю игрушки {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Selling pet toys {brand}",
+          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Prodajem igračke za ljubimce {brand}",
+          "description": "Prodajem igračke {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-toys_02",
+      "category_slug": "pet-toys",
+      "patterns": {
+        "ru": {
+          "title": "{brand} игрушки для питомцев, {city}",
+          "description": "Продаю игрушки {brand} для животных. Вид: {feature}. Состояние: {condition}. Материал: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} pet toys, {city}",
+          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Material: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} igračke za ljubimce, {city}",
+          "description": "Prodajem igračke {brand} za životinje. Vrsta: {feature}. Stanje: {condition}. Materijal: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-accessories_01",
+      "category_slug": "pet-accessories",
+      "patterns": {
+        "ru": {
+          "title": "Продаю аксессуары для животных {brand}",
+          "description": "Продаю аксессуары {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Selling pet accessories {brand}",
+          "description": "Selling {brand} pet accessories. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Prodajam pribor za ljubimce {brand}",
+          "description": "Prodajam pribor {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-accessories_02",
+      "category_slug": "pet-accessories",
+      "patterns": {
+        "ru": {
+          "title": "{brand} аксессуары, {item_age}",
+          "description": "Продаются аксессуары {brand} для домашних животных. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} pet accessories, {item_age}",
+          "description": "{brand} pet accessories for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} pribor za ljubimce, {item_age}",
+          "description": "{brand} pribor za kućne ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-dogs-cats_01",
+      "category_slug": "pet-dogs-cats",
+      "patterns": {
+        "ru": {
+          "title": "Товары для собак и кошек {brand}",
+          "description": "Продаю товары {brand} для собак и кошек. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Dog and cat supplies {brand}",
+          "description": "Selling {brand} supplies for dogs and cats. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Pribor za pse i mačke {brand}",
+          "description": "Prodajem pribor {brand} za pse i mačke. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-dogs-cats_02",
+      "category_slug": "pet-dogs-cats",
+      "patterns": {
+        "ru": {
+          "title": "{brand} для собак и кошек, {city}",
+          "description": "Продаются товары {brand} для собак и кошек. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} for dogs and cats, {city}",
+          "description": "{brand} supplies for dogs and cats for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} za pse i mačke, {city}",
+          "description": "{brand} pribor za pse i mačke na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-birds_01",
+      "category_slug": "pet-birds",
+      "patterns": {
+        "ru": {
+          "title": "Продаю товары для птиц {brand}",
+          "description": "Продаю товары {brand} для птиц. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "Selling bird supplies {brand}",
+          "description": "Selling {brand} bird supplies. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "Prodajem pribor za ptice {brand}",
+          "description": "Prodajem pribor {brand} za ptice. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+        }
+      }
+    },
+    {
+      "id": "animals_pet-birds_02",
+      "category_slug": "pet-birds",
+      "patterns": {
+        "ru": {
+          "title": "{brand} клетки и корма, {city}",
+          "description": "Продаю товары {brand} для птиц. Клетки, корма, аксессуары. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} BAM. {city}."
+        },
+        "en": {
+          "title": "{brand} bird cages and food, {city}",
+          "description": "Selling {brand} bird supplies: cages, food, accessories. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} BAM. {city}."
+        },
+        "bs": {
+          "title": "{brand} kavezi i hrana za ptice, {city}",
+          "description": "Prodajem pribor {brand} za ptice: kaveze, hranu, pribor. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} BAM. {city}."
+        }
+      }
+    }
+  ]
+}
