@@ -10,6 +10,7 @@ related:
   - db-schema
   - db-enums
   - technical-specification
+  - spec-index
 ---
 
 ## Purpose
@@ -143,4 +144,27 @@ models.UniqueConstraint(fields=["saved_search", "ad"], name="uq_saved_search_ad"
 ```python
 # OneToOneField on user_id has implicit unique index (Django default)
 # No explicit additional indexes
+```
+
+## Indexes — category_listing_purposes
+```python
+models.Index(name='IX_cat_listing_purpose_composite', fields=['category', 'listing_purpose'])
+models.Index(name='IX_cat_listing_purpose_reverse', fields=['listing_purpose'])  # reverse lookup on deactivation
+```
+
+## Indexes — category_listing_features
+```python
+models.Index(name='IX_cat_listing_feature_composite', fields=['category', 'feature'])
+models.Index(name='IX_cat_listing_feature_reverse', fields=['feature'])  # reverse lookup on deactivation
+```
+
+## Indexes — ad_features
+```python
+# Unique constraint on (ad, feature) covers lookups by ad
+# No additional indexes needed — M2M lookups go through Ad.features
+```
+
+## Indexes — ad_images
+```python
+models.Index(name='IX_adimages_sha256', fields=['sha256'])  # photo deduplication lookup
 ```

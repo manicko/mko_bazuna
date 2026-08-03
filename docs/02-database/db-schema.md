@@ -11,6 +11,7 @@ related:
   - technical-specification
   - architecture-structure
   - packages-list
+  - spec-index
 ---
 
 ## Purpose
@@ -30,8 +31,17 @@ details live in sibling files: [db-indexes.md](db-indexes.md) and [db-enums.md](
 ### Top-level relationships
 ```
 users ── ads ──┬── categories
+               │      └── category_paths
+               │      └── category_listing_purposes ── lookup_items
+               │      └── category_listing_features ── lookup_items
                ├── cities
-               └── ad_images
+               ├── ad_images
+               └── ad_features ── lookup_items
+
+lookups ── lookup_groups ── lookup_items
+                └── category_listing_purposes
+                └── category_listing_features
+                └── ad_features
 ```
 (`category_attributes`/`ad_attribute_values` and `tags`/`ad_tags` are out of phase 1 scope.)
 
@@ -92,6 +102,7 @@ description_bs (TEXT, nullable)                   # Bosnian translation for UI d
 original_language (VARCHAR(5), nullable)            # Source language code (e.g. 'ru', 'bs', 'en')
 price (INT, nullable)                             # whole BAM units; multi-currency deferred (currency column removed — YAGNI)
 category_id (FK → categories.id)
+listing_purpose_id (FK → lookup_items.id, nullable)  # resolved via CategoryLookupResolver; group=listing_purpose
 city_id (FK → cities.id)
 category_name (VARCHAR, editable=False)             # zone D1 (hybrid C): denormalized RUSSIAN category name; trigger-synced; in search_vector (weight 'C')
 status (StrEnum — see AdStatus)                    # see db-enums.md
@@ -115,6 +126,8 @@ are repurposed as `title_ru` and `description_ru`. New ads receive `title_ru`/`d
 populated with translated content; legacy ads fall back to `title`/`description`. The
 `get_title(locale)` and `get_description(locale)` methods implement the fallback chain:
 locale-specific column > Russian > original column.
+
+**`ad_features`** (through table for `Ad.features` M2M) — see below.
 
 **Transitions:**
 - DRAFT → ON_MODERATION
@@ -148,6 +161,41 @@ Implemented via **django-mptt>=0.18.0**. No denormalized `path`/`level` columns.
 > Zone D2: i18n names stored in `name_i18n` JSONB (`ru`/`bs`/`en`); UI uses `get_name(locale)` with
 > Russian fallback.
 
+### category_paths
+Multi-parent navigation support. Each category can have zero or more alternative parent routes while keeping a single canonical MPTT parent. Alternative paths are navigation-only — they do not affect lookup inheritance or canonical category assignment.
+```
+id (PK)
+category_id (FK → categories.id)         # the leaf/child being navigated to
+parent_id (FK → categories.id)           # the alternative parent in the navigation path
+sort_order (INT, default 0)              # ordering within alternative parent's children
+is_automatic (BOOL, default False)       # True if created by system rule (e.g. price=0 → charity)
+Unique: (category, parent)
+db_table: category_paths
+```
+
+### category_listing_purposes
+Binds listing purposes (LookupItem, group=listing_purpose) to categories. Used by `CategoryLookupResolver` for inherited purpose resolution.
+```
+id (PK)
+category_id (FK → categories.id)
+listing_purpose_id (FK → lookup_items.id, limit_choices_to: group=listing_purpose)
+is_default (BOOL, default False)         # auto-selected when seller doesn't choose explicitly
+Unique: (category, listing_purpose)
+db_table: category_listing_purposes
+```
+Composite index: `(category_id, listing_purpose_id)`. Index: `listing_purpose_id`.
+
+### category_listing_features
+Binds listing features (LookupItem, group=listing_feature) to categories. Used by `CategoryLookupResolver` for inherited feature resolution.
+```
+id (PK)
+category_id (FK → categories.id)
+feature_id (FK → lookup_items.id, limit_choices_to: group=listing_feature)
+Unique: (category, feature)
+db_table: category_listing_features
+```
+Composite index: `(category_id, feature_id)`. Index: `feature_id`.
+
 ### cities
 ```
 id (PK)
@@ -161,6 +209,31 @@ City match is EXACT against the closed list; unrecognized city → "general / no
 
 > Zone D11: `currency` column removed; `price` is INT whole BAM units.
 
+### lookup_groups
+Reference data groups (e.g. `listing_purpose`, `listing_feature`). Managed through Django admin. System groups are protected from deletion.
+```
+id (PK)
+code (VARCHAR, unique)                   # machine-readable, immutable after creation
+name_i18n (JSONB, nullable)              # {"ru": str, "bs": str, "en": str}
+is_system (BOOL, default False)          # protected from admin deletion
+sort_order (INT, default 0)
+db_table: lookup_groups
+```
+
+### lookup_items
+Individual values within a lookup group (e.g. `sell`, `new`, `urgent`). The `slug` is globally unique and serves as the identifier. Active items are used in resolution; inactive items are preserved for data integrity but hidden from UI.
+```
+id (PK)
+group_id (FK → lookup_groups.id, CASCADE)
+slug (SlugField, unique)                 # globally unique identifier
+name_i18n (JSONB, nullable)              # {"ru": str, "bs": str, "en": str}
+sort_order (INT, default 0)              # per-group ordering
+is_active (BOOL, default True)
+icon (VARCHAR(50), blank)                # emoji or SVG icon name
+color (VARCHAR(7), blank)                # hex color (#RRGGBB)
+db_table: lookup_items
+```
+
 ### ad_images
 ```
 id (PK)
@@ -168,6 +241,7 @@ ad_id (FK → ads.id)
 image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: local MEDIA_ROOT via FileSystemStorage.
                                      #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
+sha256 (CHAR(64), db_index=True)     # SHA-256 hex digest for per-user deduplication; auto-computed on save
 position (INT)
 thumbnail_small (VARCHAR, nullable)    # 240x180 thumbnail storage key
 thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
@@ -179,6 +253,17 @@ Only compressed Telegram photos (`message.photo`) accepted; `message.document` r
 > (unguessable, non-sequential). JPEG validated strictly (magic bytes / PIL) on save; non-JPEG
 > rejected with 415. nginx `/media/` sets `X-Content-Type-Options: nosniff`, whitelists
 > `image/jpeg`, default `application/octet-stream`, `Content-Disposition: inline`.
+
+### ad_features
+Through table for the `Ad.features` M2M relationship. An ad can have 0..N listing features.
+```
+id (PK)
+ad_id (FK → ads.id, CASCADE)
+feature_id (FK → lookup_items.id, CASCADE, limit_choices_to: group=listing_feature)
+sort_order (INT, default 0)              # display order of this feature on the ad page
+Unique: (ad, feature)
+db_table: ad_features
+```
 
 ### analytics_events
 ```

@@ -7,6 +7,7 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── categories
 │   │   ├── core
 │   │   ├── locations
+│   │   ├── lookups
 │   │   ├── media
 │   │   ├── moderation
 │   │   ├── search

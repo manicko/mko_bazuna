@@ -17,6 +17,7 @@ related:
   - packages-list
   - user-stories-index
   - design-system
+  - owner-decisions-index
 ---
 
 # Mko Bazuna — Technical Specification (Agent Summary)
@@ -165,6 +166,7 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
 | **Seed Data Module** | Development-only demo data generation with configurable CLI parameters | `apps.seed` app, `SeedService`, `UserGenerator`, `AdGenerator`, `ImageGenerator`, `AnalyticsGenerator`, `Seed` advisory lock (ID 110) |
 | **Seed Content Fixtures** | Realistic bundled photos and multi-language ad templates for seed data | `ImageGenerator` manifest loading, `AdGenerator` template interpolation, `photo_manifest.json`, `ads_templates.json`, `word_lists.json` |
+| **Category & Lookup Architecture** | Universal reference data system with multi-parent category navigation, config-driven catalog builder, and inheritance-based lookup resolution | `apps.lookups` app (LookupGroup, LookupItem), `CategoryPath` multi-parent model, `CategoryLookupResolver` service, `categories.yaml` + `builder.py`, `FileHashService` for photo dedup |
 
 ## Commands
 

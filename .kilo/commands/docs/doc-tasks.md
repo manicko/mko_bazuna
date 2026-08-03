@@ -40,9 +40,6 @@ Identify:
 
 ## Step 2. Analyze Development Tasks
 
-Review contents of:
-`.ai/tasks/done/*`
-
 For each file:
 
 * identify the feature goal

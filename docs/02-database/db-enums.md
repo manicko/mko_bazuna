@@ -9,6 +9,7 @@ related:
   - db-schema
   - db-indexes
   - technical-specification
+  - spec-index
 ---
 
 ## Purpose
@@ -147,3 +148,11 @@ Source of an autocomplete suggestion.
 | `POPULAR_SEARCH` | from popular search queries |
 | `CATEGORY` | from category name matching |
 | `CITY` | from city name matching |
+
+## LookupGroupCode
+Machine-readable codes for built-in lookup groups. Used in model field `limit_choices_to`, builder, and resolver — never plain strings.
+
+| Value | Meaning |
+|-------|---------|
+| `LISTING_PURPOSE` | `listing_purpose` — what the seller wants to do (sell, buy, rent, etc.) |
+| `LISTING_FEATURE` | `listing_feature` — characteristics of the listing (new, used, urgent, etc.) |
