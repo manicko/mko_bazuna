@@ -25,6 +25,7 @@ permission:
      "*.md": allow
      "*.mdx": allow
      "*.yaml": allow
+     "*.json": allow
      "*.yml": allow
      "*.ai\\*": allow
      "*.kilo\\*": allow
