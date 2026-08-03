@@ -22,7 +22,11 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
-def load_catalog(config_path: str | Path) -> dict[str, str]:
+def load_catalog(
+    config_path: str | Path,
+    apps: Any = None,
+    rewrite_yaml: bool = True,
+) -> dict[str, str]:
     """Load catalog from YAML config. Creates/updates all records.
 
     Order of operations:
@@ -33,6 +37,11 @@ def load_catalog(config_path: str | Path) -> dict[str, str]:
 
     Args:
         config_path: Path to categories.yaml file.
+        apps: Django migration apps registry (``apps.get_model()``) when
+            called from a migration; ``None`` for standalone/live usage
+            with direct model imports.
+        rewrite_yaml: When ``True`` (default), auto-rewrite the YAML config
+            after renames. Set to ``False`` in migration context.
 
     Returns:
         slug_rename_map: {old_slug: new_slug} for any renames that occurred.
@@ -58,42 +67,54 @@ def load_catalog(config_path: str | Path) -> dict[str, str]:
 
     with transaction.atomic():
         # Phase 1: Load lookups
-        group_map = _load_lookups(data.get("lookups", {}))
+        group_map = _load_lookups(data.get("lookups", {}), apps=apps)
 
         # Phase 2: Load category tree
         category_map = _load_categories(
             data.get("categories", []),
             group_map,
             slug_rename_map,
+            apps=apps,
         )
 
         # Phase 3: Load bindings
-        _load_bindings(data.get("categories", []), category_map, group_map)
+        _load_bindings(
+            data.get("categories", []),
+            category_map,
+            group_map,
+            apps=apps,
+        )
 
         # Phase 4: Load category paths
         _load_category_paths(
             data.get("category_paths", []),
             category_map,
             slug_rename_map,
+            apps=apps,
         )
 
     # Auto-rewrite YAML if renames occurred
-    if slug_rename_map:
+    if slug_rename_map and rewrite_yaml:
         _rewrite_yaml(config_path, slug_rename_map)
 
     return slug_rename_map
 
 
-def _load_lookups(data: dict) -> dict[str, Any]:
+def _load_lookups(data: dict[str, Any], apps: Any = None) -> dict[str, Any]:
     """Create/update LookupGroup and LookupItem records.
 
     Args:
         data: Dict mapping group_code -> list of item dicts.
+        apps: Django migration apps registry or ``None`` for live imports.
 
     Returns:
         group_map: {group_code: group_instance}
     """
-    from apps.lookups.models import LookupGroup, LookupItem
+    if apps is not None:
+        LookupGroup = apps.get_model("lookups", "LookupGroup")  # noqa: N806
+        LookupItem = apps.get_model("lookups", "LookupItem")  # noqa: N806
+    else:
+        from apps.lookups.models import LookupGroup, LookupItem  # type: ignore[no-redef]
 
     group_map: dict[str, Any] = {}
 
@@ -125,9 +146,10 @@ def _load_lookups(data: dict) -> dict[str, Any]:
 
 
 def _load_categories(
-    categories_data: list,
+    categories_data: list[dict[str, Any]],
     group_map: dict[str, Any],
     slug_rename_map: dict[str, str],
+    apps: Any = None,
 ) -> dict[str, Any]:
     """Create/update Category tree level by level.
 
@@ -138,16 +160,20 @@ def _load_categories(
         categories_data: List of top-level category dicts.
         group_map: {group_code: group_instance}
         slug_rename_map: {old_slug: new_slug} — populated during renames.
+        apps: Django migration apps registry or ``None`` for live imports.
 
     Returns:
         category_map: {slug: category_instance} for all categories.
     """
-    from apps.categories.models import Category
+    if apps is not None:
+        Category = apps.get_model("categories", "Category")  # noqa: N806
+    else:
+        from apps.categories.models import Category  # type: ignore[no-redef]
 
     category_map: dict[str, Any] = {}
 
     def _process_level(
-        items: list,
+        items: list[dict[str, Any]],
         parent: Any | None,
         level: int,
     ) -> None:
@@ -201,9 +227,10 @@ def _load_categories(
 
 
 def _load_bindings(
-    categories_data: list,
+    categories_data: list[dict[str, Any]],
     category_map: dict[str, Any],
     group_map: dict[str, Any],
+    apps: Any = None,
 ) -> None:
     """Create/update CategoryListingPurpose and CategoryListingFeature.
 
@@ -211,14 +238,20 @@ def _load_bindings(
         categories_data: List of top-level category dicts.
         category_map: {slug: category_instance}
         group_map: {group_code: group_instance}
+        apps: Django migration apps registry or ``None`` for live imports.
     """
-    from apps.categories.models import CategoryListingFeature, CategoryListingPurpose
-    from apps.lookups.models import LookupItem
+    if apps is not None:
+        CategoryListingPurpose = apps.get_model("categories", "CategoryListingPurpose")  # noqa: N806
+        CategoryListingFeature = apps.get_model("categories", "CategoryListingFeature")  # noqa: N806
+        LookupItem = apps.get_model("lookups", "LookupItem")  # noqa: N806
+    else:
+        from apps.categories.models import CategoryListingFeature, CategoryListingPurpose  # type: ignore[no-redef]
+        from apps.lookups.models import LookupItem  # type: ignore[no-redef]
 
     count_purposes = 0
     count_features = 0
 
-    def _process_bindings(items: list) -> None:
+    def _process_bindings(items: list[dict[str, Any]]) -> None:
         nonlocal count_purposes, count_features
 
         for item in items:
@@ -275,9 +308,10 @@ def _load_bindings(
 
 
 def _load_category_paths(
-    paths_data: list,
+    paths_data: list[dict[str, Any]],
     category_map: dict[str, Any],
     slug_rename_map: dict[str, str],
+    apps: Any = None,
 ) -> None:
     """Create/update CategoryPath records.
 
@@ -287,8 +321,12 @@ def _load_category_paths(
         paths_data: List of {category: slug, parent: slug} dicts.
         category_map: {slug: category_instance}
         slug_rename_map: {old_slug: new_slug}
+        apps: Django migration apps registry or ``None`` for live imports.
     """
-    from apps.categories.models import CategoryPath
+    if apps is not None:
+        CategoryPath = apps.get_model("categories", "CategoryPath")  # noqa: N806
+    else:
+        from apps.categories.models import CategoryPath  # type: ignore[no-redef]
 
     def _resolve_slug(slug: str) -> str:
         """Resolve a slug through the rename map."""
@@ -346,7 +384,7 @@ def _rewrite_yaml(config_path: Path, slug_rename_map: dict[str, str]) -> None:
 
     old_to_new = slug_rename_map
 
-    def _rewrite_node(node: dict) -> dict | None:
+    def _rewrite_node(node: dict[str, Any]) -> dict[str, Any] | None:
         """Recursively rewrite a category/dict node, removing new_slug."""
         slug = node.get("slug")
         new_slug = node.get("new_slug")

@@ -32,6 +32,10 @@ help:
 	@echo "  makemigrations Create migrations"
 	@echo "  create-admin   Create admin user manually"
 	@echo ""
+	@echo "Consolidation:"
+	@echo "  consolidate        Consolidate migrations (threshold: \$$(CONSOLIDATE_THRESHOLD))"
+	@echo "  consolidate-force  Consolidate all migrations unconditionally"
+	@echo ""
 	@echo "Utilities:"
 	@echo "  shell          Bash in web container"
 	@echo "  db-shell       psql in database"
@@ -76,6 +80,20 @@ create-admin:
 		--username "${ADMIN_USERNAME:-admin}" \
 		--password "${ADMIN_PASSWORD}" \
 		--telegram-id "${ADMIN_TELEGRAM_ID:--1}"
+
+# ====================== Consolidation ======================
+
+CONSOLIDATE_THRESHOLD ?= 8
+
+consolidate:
+	uv run python scripts/consolidate_migrations.py --threshold $(CONSOLIDATE_THRESHOLD)
+	$(MAKE) makemigrations
+	$(MAKE) migrate
+
+consolidate-force:
+	uv run python scripts/consolidate_migrations.py --force
+	$(MAKE) makemigrations
+	$(MAKE) migrate
 
 # ====================== Utilities ======================
 

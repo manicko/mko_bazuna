@@ -9,7 +9,7 @@ def load_catalog_forward(apps, schema_editor):
     """Call builder.load_catalog() to populate all catalog data."""
     from apps.categories.catalog.builder import load_catalog
 
-    load_catalog(CONFIG_PATH)
+    load_catalog(CONFIG_PATH, apps=apps, rewrite_yaml=False)
 
 
 def reverse_catalog(apps, schema_editor):

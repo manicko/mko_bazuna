@@ -20,6 +20,7 @@ $$ LANGUAGE plpgsql;
 
 # SQL for the trigger on ads table
 SEARCH_VECTOR_TRIGGER_SQL = """
+DROP TRIGGER IF EXISTS ads_search_vector_update ON ads;
 CREATE TRIGGER ads_search_vector_update
   BEFORE INSERT OR UPDATE ON ads
   FOR EACH ROW EXECUTE FUNCTION ads_search_vector_fn();
@@ -38,6 +39,7 @@ $$ LANGUAGE plpgsql;
 
 # SQL for the trigger on categories table
 CATEGORY_PROPAGATE_TRIGGER_SQL = """
+DROP TRIGGER IF EXISTS on_category_name_update ON categories;
 CREATE TRIGGER on_category_name_update
   AFTER UPDATE OF name ON categories
   FOR EACH ROW EXECUTE FUNCTION categories_name_propagate();

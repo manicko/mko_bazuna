@@ -1,116 +1,135 @@
-﻿# Seed migration for categories
+﻿"""Seed migration for categories — creates initial category tree using ORM.
+
+Replaces previous raw-SQL approach with Django ORM + MPTT for proper
+tree structure management.
+"""
+
+import json
 
 from django.db import migrations
 
 
 def create_categories(apps, schema_editor):
-    """Create seed categories with proper MPTT tree structure."""
-    # MPTT tree structure (all in same tree, tree_id=1):
-    # lft=1,2 -> Товары (root, level=0, rght=12)
-    #   lft=2,3 -> Электроника (child, level=1)
-    #   lft=4,5 -> Одежда
-    #   lft=6,7 -> Дом и сад
-    #   lft=8,9 -> Авто товары
-    #   lft=10,11 -> Спорт
-    # lft=13,22 -> Услуги (root, level=0)
-    #   lft=14,15 -> Ремонт
-    #   lft=16,17 -> Перевозки
-    #   lft=18,19 -> Образование
-    #   lft=20,21 -> Здоровье
-    # lft=23,30 -> Недвижимость (root, level=0)
-    #   lft=24,25 -> Квартиры
-    #   lft=26,27 -> Дома
-    #   lft=28,29 -> Коммерция
+    """Create seed categories with proper MPTT tree structure using Django ORM.
 
-    with schema_editor.connection.cursor() as cursor:
-        # SQLite needs foreign keys disabled for raw inserts; PostgreSQL ignores it.
-        if schema_editor.connection.vendor == "sqlite":
-            cursor.execute("PRAGMA foreign_keys = OFF")
+    Creates 14 categories: 3 roots + 5 + 4 + 3 children.
+    MPTT computes lft/rght automatically on save().
+    """
+    Category = apps.get_model("categories", "Category")
 
-        # Root: Товары (id=1) - lft=1, rght=12 means it spans 5 children
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 12, 1, 0, True)",
-            ["Товары", '{"ru": "Товары", "bs": "Proizvodi"}', "tovary"],
-        )
-        # Children of Товары
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 2, 3, 1, 1, True)",
-            ["Электроника", '{"ru": "Электроника", "bs": "Elektronika"}', "elektronika"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 4, 5, 1, 1, True)",
-            ["Одежда", '{"ru": "Одежда", "bs": "Odeća"}', "odezhda"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 6, 7, 1, 1, True)",
-            ["Дом и сад", '{"ru": "Дом и сад", "bs": "Kuća i bašta"}', "dom"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 8, 9, 1, 1, True)",
-            ["Авто товары", '{"ru": "Авто товары", "bs": "Proizvodi za automobile"}', "avto"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 1, 10, 11, 1, 1, True)",
-            ["Спорт", '{"ru": "Спорт", "bs": "Sport"}', "sport"],
-        )
+    # Root: Товары (products)
+    tovary = Category.objects.create(
+        name="Товары",
+        name_i18n=json.dumps({"ru": "Товары", "bs": "Proizvodi"}),
+        slug="tovary",
+        is_active=True,
+    )
 
-        # Root: Услуги (id=7) - lft=13, rght=22
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 13, 22, 1, 0, True)",
-            ["Услуги", '{"ru": "Услуги", "bs": "Usluge"}', "uslugi"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 7, 14, 15, 1, 1, True)",
-            ["Ремонт", '{"ru": "Ремонт", "bs": "Popravka"}', "remont"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 7, 16, 17, 1, 1, True)",
-            ["Перевозки", '{"ru": "Перевозки", "bs": "Prevoz"}', "perevozki"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 7, 18, 19, 1, 1, True)",
-            ["Образование", '{"ru": "Образование", "bs": "Obrazovanje"}', "obrazovanie"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 7, 20, 21, 1, 1, True)",
-            ["Здоровье", '{"ru": "Здоровье", "bs": "Zdravlje"}', "zdorovie"],
-        )
+    # Children of Товары
+    Category.objects.create(
+        name="Электроника",
+        name_i18n=json.dumps({"ru": "Электроника", "bs": "Elektronika"}),
+        slug="elektronika",
+        parent=tovary,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Одежда",
+        name_i18n=json.dumps({"ru": "Одежда", "bs": "Odeća"}),
+        slug="odezhda",
+        parent=tovary,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Дом и сад",
+        name_i18n=json.dumps({"ru": "Дом и сад", "bs": "Kuća i bašta"}),
+        slug="dom",
+        parent=tovary,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Авто товары",
+        name_i18n=json.dumps({"ru": "Авто товары", "bs": "Proizvodi za automobile"}),
+        slug="avto",
+        parent=tovary,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Спорт",
+        name_i18n=json.dumps({"ru": "Спорт", "bs": "Sport"}),
+        slug="sport",
+        parent=tovary,
+        is_active=True,
+    )
 
-        # Root: Недвижимость (id=11) - lft=23, rght=30
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 23, 30, 1, 0, True)",
-            ["Недвижимость", '{"ru": "Недвижимость", "bs": "Nekretnine"}', "nedvizhimost"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 11, 24, 25, 1, 1, True)",
-            ["Квартиры", '{"ru": "Квартиры", "bs": "Stanovi"}', "kvartiry"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 11, 26, 27, 1, 1, True)",
-            ["Дома", '{"ru": "Дома", "bs": "Kuće"}', "doma"],
-        )
-        cursor.execute(
-            "INSERT INTO categories (name, name_i18n, slug, parent_id, lft, rght, tree_id, level, is_active) "
-            "VALUES (%s, %s, %s, 11, 28, 29, 1, 1, True)",
-            ["Коммерция", '{"ru": "Коммерция", "bs": "Poslovni prostor"}', "kommercija"],
-        )
+    # Root: Услуги (services)
+    uslugi = Category.objects.create(
+        name="Услуги",
+        name_i18n=json.dumps({"ru": "Услуги", "bs": "Usluge"}),
+        slug="uslugi",
+        is_active=True,
+    )
 
-        if schema_editor.connection.vendor == "sqlite":
-            cursor.execute("PRAGMA foreign_keys = ON")
+    # Children of Услуги
+    Category.objects.create(
+        name="Ремонт",
+        name_i18n=json.dumps({"ru": "Ремонт", "bs": "Popravka"}),
+        slug="remont",
+        parent=uslugi,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Перевозки",
+        name_i18n=json.dumps({"ru": "Перевозки", "bs": "Prevoz"}),
+        slug="perevozki",
+        parent=uslugi,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Образование",
+        name_i18n=json.dumps({"ru": "Образование", "bs": "Obrazovanje"}),
+        slug="obrazovanie",
+        parent=uslugi,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Здоровье",
+        name_i18n=json.dumps({"ru": "Здоровье", "bs": "Zdravlje"}),
+        slug="zdorovie",
+        parent=uslugi,
+        is_active=True,
+    )
+
+    # Root: Недвижимость (real estate)
+    nedvizhimost = Category.objects.create(
+        name="Недвижимость",
+        name_i18n=json.dumps({"ru": "Недвижимость", "bs": "Nekretnine"}),
+        slug="nedvizhimost",
+        is_active=True,
+    )
+
+    # Children of Недвижимость
+    Category.objects.create(
+        name="Квартиры",
+        name_i18n=json.dumps({"ru": "Квартиры", "bs": "Stanovi"}),
+        slug="kvartiry",
+        parent=nedvizhimost,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Дома",
+        name_i18n=json.dumps({"ru": "Дома", "bs": "Kuće"}),
+        slug="doma",
+        parent=nedvizhimost,
+        is_active=True,
+    )
+    Category.objects.create(
+        name="Коммерция",
+        name_i18n=json.dumps({"ru": "Коммерция", "bs": "Poslovni prostor"}),
+        slug="kommercija",
+        parent=nedvizhimost,
+        is_active=True,
+    )
 
 
 class Migration(migrations.Migration):

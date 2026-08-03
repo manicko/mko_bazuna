@@ -15,6 +15,9 @@ if ($envContent) {
     }
 }
 
+# Default threshold for consolidation
+$CONSOLIDATE_THRESHOLD = 8
+
 # Show help
 function Show-Help {
     Write-Host "Mko Bazuna - Development Commands" -ForegroundColor Cyan
@@ -29,6 +32,8 @@ function Show-Help {
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
     Write-Host "  shell          Open bash shell in web container"
     Write-Host "  migrate        Run database migrations (one-shot, advisory-locked)"
+    Write-Host "  consolidate        Consolidate migrations (threshold: `$CONSOLIDATE_THRESHOLD)"
+    Write-Host "  consolidate-force  Consolidate all migrations unconditionally"
     Write-Host "  makemigrations Create Django migrations from model changes"
     Write-Host "  logs           Follow logs from all services"
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
@@ -158,6 +163,20 @@ function Invoke-Clean {
     }
 }
 
+# Consolidate migrations (threshold-based)
+function Invoke-Consolidate {
+    uv run python scripts/consolidate_migrations.py --threshold $CONSOLIDATE_THRESHOLD
+    Invoke-Makemigrations
+    Invoke-Migrate
+}
+
+# Consolidate all migrations unconditionally
+function Invoke-ConsolidateForce {
+    uv run python scripts/consolidate_migrations.py --force
+    Invoke-Makemigrations
+    Invoke-Migrate
+}
+
 # Main entry point
 param(
     [Parameter(Position=0)]
@@ -174,6 +193,8 @@ switch ($Target.ToLower()) {
     "shell" { Invoke-Shell }
     "migrate" { Invoke-Migrate }
     "makemigrations" { Invoke-Makemigrations }
+    "consolidate" { Invoke-Consolidate }
+    "consolidate-force" { Invoke-ConsolidateForce }
     "logs" { Invoke-Logs }
     "backup" { Invoke-Backup }
     "restore" { Invoke-Restore }
