@@ -10,6 +10,7 @@ related:
   - restore
   - architecture-structure
   - technical-specification
+  - migration-workflow
 ---
 
 ## Purpose
@@ -278,16 +279,19 @@ make restore BACKUP_FILE=./backups/dump_20250719_143022.dump
 
 ### Migration Management
 
+The full development migration workflow — including the consolidation script,
+threshold-based reset, advisory-lock behavior, and migration authoring rules — is
+documented in [the migration workflow guide](migration-workflow.md).
+Summary:
+
 ```bash
-# Apply migrations
-docker compose run --rm migrate
-
-# Create new migrations
-docker compose run --rm web uv run python src/backend/manage.py makemigrations
-
-# Check for missing migrations
-docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
+make migrate         # apply migrations (one-shot, advisory-locked)
+make makemigrations  # create new migration files from model changes
+make consolidate     # reset apps that exceed 8 files back to one initial migration
 ```
+
+For production deployment, run migrations as a one-shot service after the database
+is healthy (the `migrate` service depends on `db: condition: service_healthy`).
 
 ### Admin User Setup
 

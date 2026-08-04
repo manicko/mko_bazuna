@@ -1,4 +1,12 @@
-# Migration for search_vector triggers and category_name propagation
+"""Add search vector trigger and category_name propagation.
+
+Creates the trigger function ads_search_vector_fn() that auto-populates:
+  - category_name (denormalized Russian category name from FK)
+  - search_vector (Russian FTS vector from title + description + category_name)
+
+Also creates categories_name_propagate() trigger that re-populates
+search_vector when a category name is renamed.
+"""
 
 from django.db import migrations
 
@@ -30,7 +38,7 @@ CREATE TRIGGER ads_search_vector_update
 CATEGORY_PROPAGATE_FN_SQL = """
 CREATE OR REPLACE FUNCTION categories_name_propagate() RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE ads SET category_id = ads.category_id  -- trigger #2 recomputes category_name+search_vector
+  UPDATE ads SET category_id = ads.category_id
   WHERE category_id = NEW.id;
   RETURN NEW;
 END;
@@ -45,15 +53,17 @@ CREATE TRIGGER on_category_name_update
   FOR EACH ROW EXECUTE FUNCTION categories_name_propagate();
 """
 
-# Backfill SQL to populate category_name and search_vector for existing rows
-BACKFILL_SQL = """
-UPDATE ads SET category_id = category_id;
-"""
-
 
 class Migration(migrations.Migration):
+    """Create search vector trigger and category_name propagation triggers.
+
+    Dependencies:
+    - ads/0002: FK fields and indexes exist
+    - categories/0001: Category table exists
+    """
+
     dependencies = [
-        ("ads", "0001_initial"),
+        ("ads", "0002_initial"),
         ("categories", "0001_initial"),
     ]
 
@@ -72,10 +82,6 @@ class Migration(migrations.Migration):
         ),
         migrations.RunSQL(
             CATEGORY_PROPAGATE_TRIGGER_SQL,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.RunSQL(
-            BACKFILL_SQL,
             reverse_sql=migrations.RunSQL.noop,
         ),
     ]

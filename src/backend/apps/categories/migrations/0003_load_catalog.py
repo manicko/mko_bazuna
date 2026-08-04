@@ -1,5 +1,4 @@
 """Data migration to load catalog from YAML config via builder."""
-
 from django.db import migrations
 
 CONFIG_PATH = "apps/categories/catalog/categories.yaml"
@@ -20,13 +19,13 @@ class Migration(migrations.Migration):
     """Load catalog data from YAML config via builder.
 
     Depends on:
-    - lookups/0001_initial (LookupGroup + LookupItem tables)
-    - categories/0004_through_tables (CategoryListingPurpose + CategoryListingFeature)
+    - categories/0002: seed categories exist (for reference in catalog data)
+    - lookups/0001: LookupGroup + LookupItem tables
     """
 
     dependencies = [
+        ("categories", "0002_seed_categories"),
         ("lookups", "0001_initial"),
-        ("categories", "0004_through_tables"),
     ]
 
     operations = [

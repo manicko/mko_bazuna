@@ -1,5 +1,4 @@
-# Seed migration for Montenegro cities
-
+"""Seed migration for Montenegro cities."""
 from django.db import migrations
 
 
@@ -8,7 +7,6 @@ def create_cities(apps, schema_editor):
     City = apps.get_model("locations", "City")
 
     cities = [
-        # Montenegro — all 23 official municipalities
         ("podgorica", "Подгорица", "ME", "Montenegro", {"ru": "Подгорица", "bs": "Podgorica"}),
         ("niksic", "Никшич", "ME", "Montenegro", {"ru": "Никшич", "bs": "Nikšić"}),
         ("kotor", "Котор", "ME", "Montenegro", {"ru": "Котор", "bs": "Kotor"}),

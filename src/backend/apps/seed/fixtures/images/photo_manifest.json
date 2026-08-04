@@ -188,6 +188,21 @@
           "filename": "pet-birds_03.jpg",
           "width": 1080,
           "height": 720
+        },
+        {
+          "filename": "pet-birds_04.jpg",
+          "width": 1080,
+          "height": 666
+        },
+        {
+          "filename": "pet-birds_05.jpg",
+          "width": 1080,
+          "height": 717
+        },
+        {
+          "filename": "pet-birds_06.jpg",
+          "width": 1080,
+          "height": 720
         }
       ]
     },
@@ -2031,6 +2046,11 @@
           "filename": "manicure_03.jpg",
           "width": 720,
           "height": 1080
+        },
+        {
+          "filename": "manicure_04.jpg",
+          "width": 1080,
+          "height": 810
         }
       ]
     },
@@ -2257,6 +2277,63 @@
         },
         {
           "filename": "dog-walking_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "arts": {
+      "photos": [
+        {
+          "filename": "arts_01.jpg",
+          "width": 1080,
+          "height": 607
+        },
+        {
+          "filename": "arts_02.jpg",
+          "width": 750,
+          "height": 1080
+        },
+        {
+          "filename": "arts_03.jpg",
+          "width": 720,
+          "height": 1080
+        }
+      ]
+    },
+    "bath-products": {
+      "photos": [
+        {
+          "filename": "bath-products_01.jpg",
+          "width": 768,
+          "height": 1080
+        },
+        {
+          "filename": "bath-products_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "bath-products_03.jpg",
+          "width": 776,
+          "height": 1080
+        }
+      ]
+    },
+    "accessories": {
+      "photos": [
+        {
+          "filename": "accessories_01.jpg",
+          "width": 864,
+          "height": 1080
+        },
+        {
+          "filename": "accessories_02.jpg",
+          "width": 1080,
+          "height": 720
+        },
+        {
+          "filename": "accessories_03.jpg",
           "width": 720,
           "height": 1080
         }
