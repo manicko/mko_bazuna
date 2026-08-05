@@ -73,8 +73,9 @@ class LookupCacheService:
     def invalidate_all() -> None:
         """Invalidate all lookup caches."""
         cache.delete(ALL_GROUPS_CACHE_KEY)
-        # Delete all active items caches via pattern
-        cache.delete_pattern(f"{ACTIVE_ITEMS_PREFIX}:*")
+        # delete_pattern is only available on Redis cache backend
+        if hasattr(cache, "delete_pattern"):
+            cache.delete_pattern(f"{ACTIVE_ITEMS_PREFIX}:*")
         logger.debug("Invalidated all lookup caches")
 
     @staticmethod

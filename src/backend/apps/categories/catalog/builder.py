@@ -200,19 +200,15 @@ def _load_categories(
                 resolved_parent = parent
 
             category, created = Category.objects.update_or_create(
-                slug=slug,  # Match by original slug
+                slug=slug,
                 defaults={
-                    "slug": update_slug,  # Write new slug if renamed
+                    "slug": update_slug,
                     "name": item.get("name", item["name"]),
                     "name_i18n": item.get("name_i18n"),
                     "is_active": item.get("is_active", True),
+                    "parent": resolved_parent,
                 },
             )
-
-            # Insert into MPTT tree if newly created (has no parent yet)
-            if created and resolved_parent is not None:
-                category.parent = resolved_parent
-                category.save()
 
             category_map[update_slug] = category
 

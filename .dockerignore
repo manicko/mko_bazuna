@@ -35,6 +35,7 @@ src/backend/mko_bazuna
 
 # uv cache
 .uv/
+.cache/
 
 # Git and CI
 .git/

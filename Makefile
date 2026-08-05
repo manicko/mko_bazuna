@@ -1,7 +1,7 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down build restart test lint typecheck shell migrate makemigrations logs \
-        backup restore prune-backups db-shell clean create-admin
+        backup restore prune-backups db-shell clean create-admin load-catalog
 
 # ====================== Settings ======================
 
@@ -31,6 +31,7 @@ help:
 	@echo "  migrate        Apply migrations"
 	@echo "  makemigrations Create migrations"
 	@echo "  create-admin   Create admin user manually"
+	@echo "  load-catalog   Load categories.yaml into DB (one-shot)"
 	@echo ""
 	@echo "Consolidation:"
 	@echo "  consolidate        Consolidate migrations (threshold: \$$(CONSOLIDATE_THRESHOLD))"
@@ -80,6 +81,9 @@ create-admin:
 		--username "${ADMIN_USERNAME:-admin}" \
 		--password "${ADMIN_PASSWORD}" \
 		--telegram-id "${ADMIN_TELEGRAM_ID:--1}"
+
+load-catalog:
+	docker compose $(COMPOSE_FILES) run --rm load_catalog
 
 # ====================== Consolidation ======================
 

@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 
 from apps.categories.catalog import builder
 
-CONFIG_PATH = "apps/categories/catalog/categories.yaml"
+CONFIG_PATH = "src/backend/apps/categories/catalog/categories.yaml"
 
 
 class Command(BaseCommand):

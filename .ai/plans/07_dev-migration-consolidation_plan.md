@@ -4,6 +4,11 @@
 **Date:** 2026-08-03
 **Source:** `.ai/problems/06_dev-migration-consolidation_spec.md`
 **Status:** Implementation-ready
+**Architectural decision:** Catalog data loading (formerly migration `0003_load_catalog`) is moved OUT of migrations into a post-migration Docker one-shot service. Migrations become schema-only. This follows the same pattern as `TSK-002` (backfill_translations extraction). Rationale: migrations must be deterministic and immutable; `load_catalog` reads an external YAML file whose content can change, violating immutability.
+
+**Affected migrations:**
+- `categories/0002_seed_categories` — DELETED (stub SEED_CATEGORIES with transliterated slugs not used anywhere in the app)
+- `categories/0003_load_catalog` — DELETED from migrations (catalog loading moves to `TSK-009` Docker service calling `manage.py load_catalog`)
 
 ---
 
@@ -473,7 +478,9 @@ Phase 6 — Verification
 **Depends on:** TSK-001, TSK-002, TSK-003, TSK-004, TSK-005, TSK-006, TSK-007
 **Blocked by:** TSK-008-RSR (research gate must report "Go" or "Go with changes")
 
-**Risk:** HIGH — deletes 36 migration files, modifies DB schema start, changes startup behavior
+**Risk:** HIGH — deletes migration files, modifies DB schema start, changes startup behavior
+
+**Architectural decision:** Catalog data loading is NOT included in the consolidated migration. The `0003_load_catalog` data migration is replaced by `TSK-009`, which creates a post-migration Docker one-shot service that calls `manage.py load_catalog`. This keeps migrations schema-only and deterministic.
 
 **Affected modules:**
 - ALL `migrations/*.py` files across 10 apps (except `__init__.py`)
@@ -500,23 +507,102 @@ Phase 6 — Verification
 
 1. **Delete all migration files** — delete every `[0-9]*.py` file across all app `migrations/` directories (excluding `__init__.py`)
 2. **Delete `__pycache__`** in each `migrations/` directory
-3. **Run `makemigrations`** — verify it produces exactly one `0001_initial.py` per app
+3. **Run `makemigrations`** — verify it produces exactly one `0001_initial.py` per app (schema only, NO data migrations — `0002_seed_categories` and `0003_load_catalog` are intentionally NOT recreated)
 4. **Review generated migrations:**
    - Verify all schema operations are present
-   - If fragile RunPython remains (e.g., seed data), evaluate whether to keep or move
-5. **Update migration 0005_load_catalog** after regeneration to use refactored call:
-   - `load_catalog(CONFIG_PATH, apps=apps, rewrite_yaml=False)` instead of live import
-6. **Apply migrations** on a fresh dev database
-7. Verify `migrate` exits with code 0
-8. Verify `makemigrations --check --dry-run` confirms no pending changes
-9. Commit the new state
+   - Confirm NO `RunPython` data migrations survive in the regenerated `0001_initial` files
+   - Data loading (catalog, translations) is handled by management commands in post-migration services (TSK-002, TSK-009)
+5. **Apply migrations** on a fresh dev database
+6. Verify `migrate` exits with code 0
+7. Verify `makemigrations --check --dry-run` confirms no pending changes
+8. Commit the new state
 
 **Acceptance criteria:**
 - All old migration files deleted
-- Exactly one `0001_initial.py` per app
+- Exactly one `0001_initial.py` per app (schema only)
+- No `RunPython` data migrations in any regenerated `0001_initial.py`
 - `makemigrations --check --dry-run` passes (no pending changes)
 - `docker compose run --rm migrate` exits with code 0 on fresh DB
 - The migrated DB schema matches current models
+- `categories` app has NO data-loading migration; catalog loading is handled by `TSK-009`
+
+</details>
+
+---
+
+### Phase 5.5 — Post-Migration Data Loading (depends on TSK-008)
+
+---
+
+#### TSK-009: Create `load_catalog` Docker one-shot service
+
+<details>
+<summary>Task details</summary>
+
+**Priority:** high
+
+**Depends on:** TSK-005 (management command exists), TSK-008 (schema-only migrations)
+
+**Risk:** moderate — changes docker-compose service graph; `web`/`bot` startup depends on this service
+
+**Purpose:** Replace the `0003_load_catalog` data migration (which read `categories.yaml` during migration and thus violated migration immutability) with a post-migration one-shot Docker service that calls `manage.py load_catalog --no-rewrite`.
+
+**Affected modules:**
+- `docker-compose.yml` — add `load_catalog` service
+- `docker-compose.dev.override.yml` — no schema changes needed (uses base image)
+- `docker/entrypoint-catalog.sh` — NEW entrypoint script
+- `Makefile` — add `load-catalog` target
+- `Makefile.ps1` — add `Invoke-LoadCatalog` function + dispatch entry
+
+**Semantic insertion points:**
+
+1. **`docker/entrypoint-catalog.sh`** (NEW):
+   - Same env setup as `entrypoint-create-admin.sh`
+   - Run: `uv run python src/backend/manage.py load_catalog --no-rewrite`
+
+2. **`docker-compose.yml`** — add new service block after `migrate`:
+   ```yaml
+   load_catalog:
+     build: ...  # same as migrate
+     entrypoint: /app/entrypoint-catalog.sh
+     depends_on:
+       migrate:
+         condition: service_completed_successfully
+     # One-shot: loads categories.yaml into DB, then exits
+   ```
+
+3. **`docker-compose.yml`** — redirect `web`, `bot`, `create_admin` `depends_on` from `migrate` to `load_catalog` (keep `migrate` as transitive dependency through `load_catalog`).
+
+4. **`Makefile`** — add:
+   ```makefile
+   load-catalog:
+     docker compose $(ENV_FILE) run --rm load_catalog
+   ```
+
+5. **`Makefile.ps1`** — add `Invoke-LoadCatalog` function; add dispatch entry `"load-catalog" { Invoke-LoadCatalog }`.
+
+**Changes:**
+
+1. **Create `docker/entrypoint-catalog.sh`**:
+   - `set -e`
+   - `exec uv run python src/backend/manage.py load_catalog --no-rewrite`
+
+2. **Add `load_catalog` service** to `docker-compose.yml`:
+   - Same `build`, `environment`, `env_file`, `volumes` as `migrate`
+   - `entrypoint: /app/entrypoint-catalog.sh`
+   - `depends_on: migrate` (completed successfully)
+
+3. **Update service dependencies** for `web`, `bot`, `create_admin`:
+   - Change `depends_on` from `migrate` → `load_catalog` (with `condition: service_completed_successfully`)
+
+4. **Add `load-catalog` Makefile/Makefile.ps1 targets**
+
+**Acceptance criteria:**
+- `docker compose run --rm load_catalog` loads all 171 categories from `categories.yaml`
+- `web` and `bot` services do not start until `load_catalog` completes
+- `make load-catalog` runs the service locally
+- `manage.py load_catalog` works identically to the previous migration-based approach
+- `--no-rewrite` suppresses YAML file modification (safe for container environments)
 
 </details>
 
@@ -533,27 +619,31 @@ Phase 6 — Verification
 
 **Priority:** high
 
-**Depends on:** TSK-008
+**Depends on:** TSK-008, TSK-009
 
 **Type:** verification
 
 **Verification steps:**
 
 1. **Build**: `docker compose build`
-2. **Migration test**: `docker compose run --rm migrate` — must exit 0
-3. **makemigrations check**: `docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run` — must show no pending changes
-4. **Existing migration tests**: `uv run pytest src/backend/apps/core/tests/test_migrations.py -v`
-5. **Full test suite**: `docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test`
-6. **Lint/typecheck**: `make lint && make typecheck`
+2. **Migration test**: `docker compose run --rm migrate` — must exit 0 (schema only, no data loading)
+3. **Catalog load test**: `docker compose run --rm load_catalog` — must exit 0 and load all 171 categories from `categories.yaml`
+4. **makemigrations check**: `docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run` — must show no pending changes
+5. **Existing migration tests**: `uv run pytest src/backend/apps/core/tests/test_migrations.py -v`
+6. **Catalog builder test**: `uv run pytest src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration -v`
+7. **Full test suite**: `docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test`
+8. **Lint/typecheck**: `make lint && make typecheck`
 
 **Pass criteria:**
 - `migrate` exits with code 0
+- `load_catalog` service exits with code 0 and loads 171 leaf categories
 - `makemigrations --check --dry-run` shows no pending changes
 - `test_migrations.py` passes
+- `TestSeedCategoryIntegration` passes (catalog builder still works standalone)
 - Full test suite passes
 - Lint and typecheck pass without regressions
 
-**Failure action:** Return TSK-008 to rework with diagnostics
+**Failure action:** Return TSK-008 or TSK-009 to rework with diagnostics
 
 </details>
 
@@ -581,10 +671,14 @@ Phase 5:           |           |           |
   TSK-008-RSR      |           |           |
   TSK-008 ───────── all above ─────────────
   (blocked by TSK-008-RSR)
-                   |
+                    |
+Phase 5.5:          |
+  TSK-009          |
+  (after TSK-005, TSK-008)
+                    |
 Phase 6:
   VFY-001
-  (after TSK-008)
+  (after TSK-008, TSK-009)
 ```
 
 ---
@@ -596,17 +690,24 @@ Phase 6:
 | TSK-001 | Moderate | Changes public API of `load_catalog()` | Backward-compatible defaults |
 | TSK-003 | Moderate | Rewrites a data migration from raw SQL to ORM | Preserves same seed data; MPTT handles tree |
 | TSK-007 | Low | Refines SQL guard clauses | Read-only audit of existing patterns |
-| TSK-008 | **HIGH** | Deletes 36 migration files, modifies startup behavior | Gated by TSK-008-RSR; fresh DB only; tests must pass |
+| TSK-008 | **HIGH** | Deletes migration files, schema-only regeneration | Gated by TSK-008-RSR; fresh DB only; tests must pass |
+| TSK-009 | Medium | Changes docker-compose service graph — `web`/`bot` depend on new one-shot | Verify service ordering; categories must be present before app starts |
 
 ---
 
-## Rollback Plan (TSK-008)
+## Rollback Plan (TSK-008, TSK-009)
 
 If TSK-008 produces broken migrations:
 1. `git checkout -- src/backend/apps/*/migrations/` to restore deleted migration files
 2. Recreate dev database: `docker compose down -v && docker compose up`
 3. Diagnose from `makemigrations` output and `migrate` error logs
 4. Fix issues and re-run TSK-008
+
+If TSK-009 service ordering breaks:
+1. Revert `docker-compose.yml` `depends_on` changes
+2. `git checkout -- docker-compose.yml docker-compose.dev.override.yml Makefile Makefile.ps1`
+3. Revert to `0003_load_catalog` data migration (restore from git) as a temporary fix
+4. Re-implement TSK-009 with corrected dependency graph
 
 No production data is at risk (dev mode only per PO decision Q2-B).
 
@@ -618,3 +719,4 @@ No production data is at risk (dev mode only per PO decision Q2-B).
 - **TSK-002 detail**: After extraction, the migration `0006_backfill_translations.py` will be a no-op schema-only migration. It will be deleted in TSK-008 during the full reset.
 - **TSK-003** and **TSK-002** both remove `RunPython` from existing migrations. These changes are overwritten by TSK-008 when all migration files are replaced with regenerated ones. This is intentional — the fixes ensure the *current* migration pipeline works before the reset.
 - **TSK-007** changes are also overwritten by TSK-008, but serve as a safety net in case the consolidated migration must be applied to an existing DB.
+- **TSK-009 (catalog loading)**: The `0003_load_catalog` data migration is intentionally NOT recreated after TSK-008. Instead, catalog loading moves to a post-migration Docker one-shot service (`load_catalog`) that calls `manage.py load_catalog --no-rewrite`. This follows the same pattern as `backfill_translations` (TSK-002) — data operations that depend on external files are kept out of migrations to preserve immutability.

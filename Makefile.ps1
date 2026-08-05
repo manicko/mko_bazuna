@@ -35,6 +35,8 @@ function Show-Help {
     Write-Host "  consolidate        Consolidate migrations (threshold: `$CONSOLIDATE_THRESHOLD)"
     Write-Host "  consolidate-force  Consolidate all migrations unconditionally"
     Write-Host "  makemigrations Create Django migrations from model changes"
+    Write-Host "  create-admin   Create admin user manually"
+    Write-Host "  load-catalog   Load categories.yaml into DB (one-shot)"
     Write-Host "  logs           Follow logs from all services"
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
     Write-Host "  restore        Restore database from backup file"
@@ -80,6 +82,19 @@ function Invoke-Migrate {
 # Create migrations from model changes
 function Invoke-Makemigrations {
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py makemigrations
+}
+
+# Load categories.yaml into DB (one-shot)
+function Invoke-LoadCatalog {
+    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
+}
+
+# Create admin user manually
+function Invoke-CreateAdmin {
+    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
+        --username ($env:ADMIN_USERNAME || "admin") `
+        --password $env:ADMIN_PASSWORD `
+        --telegram-id ($env:ADMIN_TELEGRAM_ID || "-1")
 }
 
 # Follow logs from all services
@@ -193,6 +208,8 @@ switch ($Target.ToLower()) {
     "shell" { Invoke-Shell }
     "migrate" { Invoke-Migrate }
     "makemigrations" { Invoke-Makemigrations }
+    "create-admin" { Invoke-CreateAdmin }
+    "load-catalog" { Invoke-LoadCatalog }
     "consolidate" { Invoke-Consolidate }
     "consolidate-force" { Invoke-ConsolidateForce }
     "logs" { Invoke-Logs }

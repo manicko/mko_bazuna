@@ -108,8 +108,10 @@ class CategoryLookupResolver:
             CategoryLookupResolver.invalidate_category(cat_id)
 
         # Also invalidate ad-level cache since ads may reference this item
-        cache.delete_pattern(f"{RESOLVED_PURPOSES_PREFIX}:*")
-        cache.delete_pattern(f"{RESOLVED_FEATURES_PREFIX}:*")
+        # delete_pattern is only available on Redis cache backend
+        if hasattr(cache, "delete_pattern"):
+            cache.delete_pattern(f"{RESOLVED_PURPOSES_PREFIX}:*")
+            cache.delete_pattern(f"{RESOLVED_FEATURES_PREFIX}:*")
 
     @staticmethod
     def _get_through_model(model_name: str):

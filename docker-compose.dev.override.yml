@@ -33,6 +33,13 @@ services:
       - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./.env.docker:/app/src/.env:ro
 
+  load_catalog:
+    entrypoint: /app/entrypoint-catalog.sh
+    volumes:
+      - .:/app
+      - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
+      - ./.env.docker:/app/src/.env:ro
+
   nginx:
     profiles:
       - use-nginx  # Optional in dev; omit to run without nginx
