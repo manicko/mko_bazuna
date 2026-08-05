@@ -43,8 +43,36 @@ class Ad(models.Model):
         max_length=200,
         help_text="Ad title in Russian (translated from seller input)",
     )
+    title_en = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Ad title in English",
+    )
+    title_bs = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Ad title in Bosnian",
+    )
     description = models.TextField(
         help_text="Ad description in Russian (translated from seller input)",
+    )
+    description_en = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Ad description in English",
+    )
+    description_bs = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Ad description in Bosnian",
+    )
+    original_language = models.CharField(
+        max_length=5,
+        blank=True,
+        null=True,
+        help_text="Original language code of the ad (e.g. 'ru', 'en', 'bs')",
     )
     price = models.PositiveIntegerField(
         blank=True,

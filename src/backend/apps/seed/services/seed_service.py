@@ -207,7 +207,7 @@ class SeedService:
         Returns:
             List of Category instances saved to DB.
         """
-        CONFIG_PATH = "apps/categories/catalog/categories.yaml"
+        CONFIG_PATH = "src/backend/apps/categories/catalog/categories.yaml"
         from apps.categories.catalog.builder import load_catalog
 
         load_catalog(CONFIG_PATH)

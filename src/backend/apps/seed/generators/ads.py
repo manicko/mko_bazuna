@@ -11,7 +11,7 @@ from typing import Any
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus
+from apps.core.enums import AdSource, AdStatus, LanguageLocale
 from apps.locations.models import City
 from apps.seed.generators.base import BaseGenerator
 from apps.users.models import User
@@ -441,7 +441,7 @@ class AdGenerator(BaseGenerator):
                 description_en=description_en,
                 title_bs=title_bs,
                 description_bs=description_bs,
-                original_language="ru",
+                original_language=LanguageLocale.RUSSIAN.value,
                 price=price,
                 category=category,
                 city=city,
