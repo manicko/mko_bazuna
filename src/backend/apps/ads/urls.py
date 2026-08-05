@@ -28,5 +28,5 @@ urlpatterns = [
     path("<int:ad_id>/archive/", ad_archive, name="archive"),
     path("<int:ad_id>/delete/", ad_delete, name="delete"),
     path("<int:ad_id>/reactivate/", ad_reactivate, name="reactivate"),
-    path("media/<str:image_key>", media_gate, name="media_gate"),
+    path("media/<path:image_key>", media_gate, name="media_gate"),
 ]

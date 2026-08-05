@@ -177,7 +177,7 @@ class TestMediaAccessControl:
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key)
         client = Client()
-        url = f"/ads/media/{key}"
+        url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -190,7 +190,7 @@ class TestMediaAccessControl:
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key, status=AdStatus.DRAFT)
         client = Client()
-        url = f"/ads/media/{key}"
+        url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
@@ -204,7 +204,7 @@ class TestMediaAccessControl:
             seller, category, city, image_key=key, status=AdStatus.ON_MODERATION
         )
         client = Client()
-        url = f"/ads/media/{key}"
+        url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
@@ -216,7 +216,7 @@ class TestMediaAccessControl:
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key, status=AdStatus.DELETED)
         client = Client()
-        url = f"/ads/media/{key}"
+        url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
@@ -234,7 +234,7 @@ class TestMediaAccessControl:
         client = Client()
         # Log in as staff
         client.force_login(staff_user)
-        url = f"/ads/media/{key}"
+        url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -243,10 +243,26 @@ class TestMediaAccessControl:
     def test_non_existent_key_returns_404(self, isolated_media_root):
         """Non-existent image key returns 404."""
         client = Client()
-        url = "/ads/media/nonexistent-uuid.jpg"
+        url = "/media/nonexistent-uuid.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
+
+    def test_seed_storage_key_with_path_returns_redirect(self, seller, category, city, isolated_media_root):
+        """Storage keys with slashes (e.g. 'seed/kvartiry_01.jpg') resolve via media_gate.
+
+        Seed images use subdirectory-prefixed storage keys like ``seed/<filename>.jpg``.
+        The ``<path:image_key>`` URL converter must match the full path (including
+        the ``/``) so the view can look up the AdImage by its ``image`` field.
+        """
+        key = "seed/kvartiry_01.jpg"
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
 
 
 class TestExifStripping:
@@ -336,7 +352,7 @@ class TestPathTraversalRejection:
     def test_path_traversal_up_dir(self, isolated_media_root):
         """Path traversal with '../' returns 404."""
         client = Client()
-        url = "/ads/media/../../../etc/passwd"
+        url = "/media/../../../etc/passwd"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         # The key won't match any AdImage in DB -> 404
@@ -345,7 +361,7 @@ class TestPathTraversalRejection:
     def test_path_traversal_encoded(self, isolated_media_root):
         """URL-encoded path traversal returns 404."""
         client = Client()
-        url = "/ads/media/%2e%2e%2f%2e%2e%2fetc%2fpasswd"
+        url = "/media/%2e%2e%2f%2e%2e%2fetc%2fpasswd"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
@@ -353,7 +369,7 @@ class TestPathTraversalRejection:
     def test_path_traversal_with_slash_prefix(self, isolated_media_root):
         """Absolute path-like key returns 404."""
         client = Client()
-        url = "/ads/media//etc/passwd"
+        url = "/media//etc/passwd"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
@@ -361,7 +377,7 @@ class TestPathTraversalRejection:
     def test_path_traversal_with_null_byte(self, isolated_media_root):
         """Null byte injection in image key returns 404."""
         client = Client()
-        url = "/ads/media/../../../etc/passwd%00.jpg"
+        url = "/media/../../../etc/passwd%00.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
@@ -369,7 +385,7 @@ class TestPathTraversalRejection:
     def test_random_key_does_not_resolve(self, isolated_media_root):
         """Random non-existent key returns 404 (not a path traversal)."""
         client = Client()
-        url = "/ads/media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+        url = "/media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
@@ -419,7 +435,7 @@ class TestMediaGateThumbnailResolution:
             seller, category, city, "img-small.jpg", "thumbnail_small"
         )
         client = Client()
-        url = f"/ads/media/{thumb_key}"
+        url = f"/media/{thumb_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -431,7 +447,7 @@ class TestMediaGateThumbnailResolution:
             seller, category, city, "img-medium.jpg", "thumbnail_medium"
         )
         client = Client()
-        url = f"/ads/media/{thumb_key}"
+        url = f"/media/{thumb_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -443,7 +459,7 @@ class TestMediaGateThumbnailResolution:
             seller, category, city, "img-large.jpg", "thumbnail_large"
         )
         client = Client()
-        url = f"/ads/media/{thumb_key}"
+        url = f"/media/{thumb_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -460,7 +476,7 @@ class TestMediaGateThumbnailResolution:
             status=AdStatus.DRAFT,
         )
         client = Client()
-        url = f"/ads/media/{thumb_key}"
+        url = f"/media/{thumb_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
@@ -477,7 +493,7 @@ class TestMediaGateThumbnailResolution:
         )
         client = Client()
         client.force_login(staff_user)
-        url = f"/ads/media/{thumb_key}"
+        url = f"/media/{thumb_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
@@ -506,7 +522,7 @@ class TestMediaGateThumbnailResolution:
         AdImage.objects.create(ad=ad, image="other.jpg", thumbnail_small=conflicting_key)
 
         client = Client()
-        url = f"/ads/media/{conflicting_key}"
+        url = f"/media/{conflicting_key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         # Should resolve to the one with image=conflict.jpg (primary lookup)
@@ -515,7 +531,7 @@ class TestMediaGateThumbnailResolution:
     def test_non_existent_thumbnail_key_returns_404(self, isolated_media_root):
         """Non-existent thumbnail key returns 404."""
         client = Client()
-        url = "/ads/media/nonexistent-small.jpg"
+        url = "/media/nonexistent-small.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
