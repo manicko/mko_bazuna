@@ -35,6 +35,7 @@ from django.shortcuts import render
 
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.conf import settings
 
 
 
@@ -85,20 +86,41 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
 
 
+def _serve_image(image_key: str) -> HttpResponse:
+    """Serve a media file directly (development fallback without nginx).
+
+    Uses ``FileResponse`` to stream the file from ``MEDIA_ROOT``.  In production,
+    the ``media_gate`` view returns an ``X-Accel-Redirect`` header that nginx
+    intercepts; this helper is only used when ``DEBUG=True``.
+    """
+    file_path = settings.MEDIA_ROOT / image_key
+    if not file_path.exists():
+        raise Http404("Image not found")
+    with open(file_path, "rb") as f:
+        data = f.read()
+    return HttpResponse(data, content_type="image/jpeg")
+
+
 def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     """
     Media access gate for Ad images and thumbnails.
 
     Looks up AdImage by storage key (original image or thumbnail variant),
     verifies parent Ad is PUBLISHED (or request is from a staff user),
-    then returns X-Accel-Redirect to the internal nginx /protected-media/ location.
+    then:
+
+    - In production (DEBUG=False): returns X-Accel-Redirect to the internal
+      nginx /protected-media/ location.
+    - In development (DEBUG=True, no nginx): serves the file directly via
+      FileResponse.
 
     Args:
         request: HTTP request
-        image_key: Storage key (e.g. ``<uuid>.jpg`` or ``<uuid>-small.jpg``)
+        image_key: Storage key (e.g. ``<uuid>.jpg`` or ``seed/<filename>.jpg``)
 
     Returns:
-        Empty 200 response with X-Accel-Redirect header, or 403/404
+        FileResponse (dev) or empty 200 with X-Accel-Redirect header (prod),
+        or 403/404
     """
     try:
         ad_image = AdImage.objects.select_related("ad").get(image=image_key)
@@ -120,6 +142,8 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
 
     # Allow staff users (moderators/admins) to view any image
     if request.user.is_staff:
+        if settings.DEBUG:
+            return _serve_image(image_key)
         response = HttpResponse()
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
         return response
@@ -127,6 +151,9 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     # Non-staff users: only serve images for PUBLISHED ads
     if ad_image.ad.status != AdStatus.PUBLISHED:
         return HttpResponseForbidden("Access denied")
+
+    if settings.DEBUG:
+        return _serve_image(image_key)
 
     response = HttpResponse()
     response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
