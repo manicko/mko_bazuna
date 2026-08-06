@@ -19,28 +19,12 @@ Max allowed parallel subagents = 2
 
 <process>
 
-## 1. Gather Base Layer Context (once)
-
-Read `.ai/context/commands.md` for verification commands.
-Read `AGENTS.md` for project guidelines.
-List documentation structure from `docs/` folder.
 
 
-Set variables:
-- `{BASE_CONTEXT}` = summary of the above files
-- `{REPORT_TEMPLATE_PATH}` = `.ai/audit/templates/audit-findings.md`
-- `{TASK_FILES}` = list of files in `.kilo/commands/audit/phases/`
-- {auditor} - model from `.ai/models/lookup_table.md`
-- {VALIDATOR} -  model from `.ai/models/lookup_table.md`
+## 0 Select Phases
 
-*DO NOT*
-- Read executor role or executor tasks and templates, just provide links
-- Read production code, full documentation content
-
-
-## 1.5 Select Phases
-
-From `{TASK_FILES}`, filter out `99-audit-validate.md`. Parse each remaining filename (`NN-audit-name.md`) to extract phase number and name.
+list of files in `.kilo/commands/audit/phases/`
+filter out `99-audit-validate.md`.
 
 Present the list to the user as a numbered table:
 
@@ -54,13 +38,27 @@ Present the list to the user as a numbered table:
 - comma-separated numbers (e.g. `1,3,4`) — run selected phases only
 
 Store the result as `{SELECTED_PHASES}`.
+From `{SELECTED_PHASES}` parse each remaining filename (`NN-audit-name.md`) to extract phase number and name.
+
+
+## 1. Gather Base Layer Context (once)
+
+
+Read `.ai/context/commands.md` for verification commands.
+Read `AGENTS.md` for project guidelines.
+List documentation structure from `docs/` folder.
+
+Set variables:
+- `{BASE_CONTEXT}` = summary of the above files
+- `{REPORT_TEMPLATE_PATH}` = `.ai/audit/templates/audit-findings.md`
+
+*DO NOT* Read executor role or executor tasks and templates, just provide links
+*DO NOT* Read production code, full documentation content
+
 
 ## 2. Execute Phase Loop
 
-For each phase file in `{SELECTED_PHASES}` (sorted by phase number) follow steps 2.1-2.6:
-
-IMPORTANT:
-- do not read task files or findings templates just pass file paths to agent to read them
+For each phase file in `{SELECTED_PHASES}` 
 
 <phase_loop>
 
@@ -74,13 +72,12 @@ Max allowed parallel subagents = 2
 ```
 Task(
   prompt="Read and execute phase task: {TASK_PATH}n"
-       + "Report template: {REPORT_TEMPLATE_PATH}\n"
        + "Write findings to: {OUTPUT_PATH}\n"
+       + "Report template: {REPORT_TEMPLATE_PATH}\n"
        + "Base context: {BASE_CONTEXT}\n"
        + "problems_only = TRUE\n",
   agent="auditor",
   mode = "subagent",
-  model = "{auditor}",
   description="Execute audit phase {PHASE_NUMBER} - {PHASE_NAME}"
 )
 ```
@@ -100,7 +97,6 @@ Task(
        + "problems_only = TRUE\n",
   agent = "validator",
   mode = "subagent",
-  model = "{VALIDATOR}",
   description="Validate phase {PHASE_NUMBER} - {PHASE_NAME}",
 )
 ```

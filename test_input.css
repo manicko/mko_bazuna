@@ -1,0 +1,5 @@
+/* Tailwind input stylesheet */
+@source "src/backend/templates/**/*.html";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

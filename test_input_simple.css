@@ -1,0 +1,5 @@
+/* Test with simple HTML source */
+@source "test_simple.html";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

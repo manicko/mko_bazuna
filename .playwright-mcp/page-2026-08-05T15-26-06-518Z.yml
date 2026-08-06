@@ -1,0 +1,22 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - heading [level=1] [ref=f1e4]:
+        - link "Mko Bazuna" [ref=f1e5] [cursor=pointer]:
+          - /url: /
+      - button "EN" [ref=f1e7]
+  - main [ref=f1e10]:
+    - article [ref=f1e11]:
+      - img "Photo 1 for Looking for a flooring specialist, Herceg-Novi" [ref=f1e13]
+      - generic [ref=f1e14]:
+        - heading "Looking for a flooring specialist, Herceg-Novi" [level=1] [ref=f1e15]
+        - paragraph [ref=f1e16]: 2767 BAM
+        - paragraph [ref=f1e18]: "Looking for a flooring installation specialist in Herceg-Novi. Conditions: perfect. Floor type: floor repair. Budget: 3689 BAM."
+        - generic [ref=f1e19]:
+          - generic [ref=f1e20]: "Location: Беране"
+          - generic [ref=f1e21]: "Category: Монтаж напольных покрытий"
+          - time [ref=f1e23]: "Published: Aug 02, 2026"
+      - link "Contact Seller" [ref=f1e25] [cursor=pointer]:
+        - /url: https://t.me/?start=contact_2
+    - link "← Back to listings" [ref=f1e27] [cursor=pointer]:
+      - /url: javascript:history.back()

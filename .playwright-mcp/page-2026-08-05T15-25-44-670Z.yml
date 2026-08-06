@@ -1,0 +1,168 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - heading [level=1] [ref=e4]:
+        - link "Mko Bazuna" [ref=e5] [cursor=pointer]:
+          - /url: /
+      - button "EN" [ref=e7]
+  - main [ref=e10]:
+    - generic [ref=e12]:
+      - searchbox "Search ads..." [ref=e13]
+      - button "Search" [ref=e14]
+    - generic [ref=e16]:
+      - article [ref=e17]:
+        - 'link "Looking for a flooring specialist, Herceg-Novi Looking for a flooring specialist, Herceg-Novi 2767 BAM Looking for a flooring installation specialist in Herceg-Novi. Conditions: perfect. Floor type: floor repair. Budget: 3689 BAM. Беране Монтаж напольных покрытий Aug 02" [ref=e18] [cursor=pointer]':
+          - /url: /2/
+          - img "Looking for a flooring specialist, Herceg-Novi" [ref=e19]
+          - generic [ref=e20]:
+            - heading "Looking for a flooring specialist, Herceg-Novi" [level=2] [ref=e21]
+            - paragraph [ref=e22]: 2767 BAM
+            - paragraph [ref=e23]: "Looking for a flooring installation specialist in Herceg-Novi. Conditions: perfect. Floor type: floor repair. Budget: 3689 BAM."
+            - generic [ref=e24]:
+              - generic [ref=e25]: Беране
+              - generic [ref=e26]: Монтаж напольных покрытий
+              - time [ref=e27]: Aug 02
+      - article [ref=e28]:
+        - 'link "Beauty salon equipment, Ulcinj Beauty salon equipment, Ulcinj 3136 BAM Selling premium brand Beauty Equipment. Condition: very good. Year: 2015. Usage: new. Features: interchangeable attachments. Price: 4052 EUR. Ulcinj. Плевля Для салона красоты Jul 30" [ref=e29] [cursor=pointer]':
+          - /url: /7/
+          - img "Beauty salon equipment, Ulcinj" [ref=e30]
+          - generic [ref=e31]:
+            - heading "Beauty salon equipment, Ulcinj" [level=2] [ref=e32]
+            - paragraph [ref=e33]: 3136 BAM
+            - paragraph [ref=e34]: "Selling premium brand Beauty Equipment. Condition: very good. Year: 2015. Usage: new. Features: interchangeable attachments. Price: 4052 EUR. Ulcinj."
+            - generic [ref=e35]:
+              - generic [ref=e36]: Плевля
+              - generic [ref=e37]: Для салона красоты
+              - time [ref=e38]: Jul 30
+      - article [ref=e39]:
+        - 'link "Buying tractor Fiat Buying tractor Fiat 54581 BAM Looking for a Fiat tractor in very good condition. Features: front loader. Budget: 62589 EUR. Herceg-Novi. Беране Сельхозтехника Jul 30" [ref=e40] [cursor=pointer]':
+          - /url: /5/
+          - img "Buying tractor Fiat" [ref=e41]
+          - generic [ref=e42]:
+            - heading "Buying tractor Fiat" [level=2] [ref=e43]
+            - paragraph [ref=e44]: 54581 BAM
+            - paragraph [ref=e45]: "Looking for a Fiat tractor in very good condition. Features: front loader. Budget: 62589 EUR. Herceg-Novi."
+            - generic [ref=e46]:
+              - generic [ref=e47]: Беране
+              - generic [ref=e48]: Сельхозтехника
+              - time [ref=e49]: Jul 30
+      - article [ref=e50]:
+        - 'link "Short-term apartment rental, Budva, 2 rooms Short-term apartment rental, Budva, 2 rooms 470696 BAM Short-term rental of a 2-room apartment in Budva. Renovated, developed infrastructure. Area: 105 m². Price: 31028 EUR per night. Цетине Квартиры Jul 29" [ref=e51] [cursor=pointer]':
+          - /url: /12/
+          - img "Short-term apartment rental, Budva, 2 rooms" [ref=e52]
+          - generic [ref=e53]:
+            - heading "Short-term apartment rental, Budva, 2 rooms" [level=2] [ref=e54]
+            - paragraph [ref=e55]: 470696 BAM
+            - paragraph [ref=e56]: "Short-term rental of a 2-room apartment in Budva. Renovated, developed infrastructure. Area: 105 m². Price: 31028 EUR per night."
+            - generic [ref=e57]:
+              - generic [ref=e58]: Цетине
+              - generic [ref=e59]: Квартиры
+              - time [ref=e60]: Jul 29
+      - article [ref=e61]:
+        - 'link "Commercial construction in Niksic, from 571 BAM Commercial construction in Niksic, from 571 BAM 681 BAM Offering commercial construction services in Niksic. Experience: like new. Services: project documentation. Price from 571 BAM. Биело-Поле Строительство коммерческих помещений Jul 28" [ref=e62] [cursor=pointer]':
+          - /url: /17/
+          - img "Commercial construction in Niksic, from 571 BAM" [ref=e63]
+          - generic [ref=e64]:
+            - heading "Commercial construction in Niksic, from 571 BAM" [level=2] [ref=e65]
+            - paragraph [ref=e66]: 681 BAM
+            - paragraph [ref=e67]: "Offering commercial construction services in Niksic. Experience: like new. Services: project documentation. Price from 571 BAM."
+            - generic [ref=e68]:
+              - generic [ref=e69]: Биело-Поле
+              - generic [ref=e70]: Строительство коммерческих помещений
+              - time [ref=e71]: Jul 28
+      - article [ref=e72]:
+        - 'link "Selling Plants, satisfactory Selling Plants, satisfactory 2972 BAM Selling Plants. Condition: satisfactory. Species: air purifying. Height/size: air purifying. Price: 4955 BAM. Даниловград Растения Jul 27" [ref=e73] [cursor=pointer]':
+          - /url: /3/
+          - img "Selling Plants, satisfactory" [ref=e74]
+          - generic [ref=e75]:
+            - heading "Selling Plants, satisfactory" [level=2] [ref=e76]
+            - paragraph [ref=e77]: 2972 BAM
+            - paragraph [ref=e78]: "Selling Plants. Condition: satisfactory. Species: air purifying. Height/size: air purifying. Price: 4955 BAM."
+            - generic [ref=e79]:
+              - generic [ref=e80]: Даниловград
+              - generic [ref=e81]: Растения
+              - time [ref=e82]: Jul 27
+      - article [ref=e83]:
+        - 'link "Selling Volkswagen 2020, acceptable Selling Volkswagen 2020, acceptable 36522 BAM Selling Volkswagen 2020. Condition: acceptable. Mileage: 34242 km. Features: Bluetooth. Price: 72381 EUR. Negotiable. Даниловград Автомобили Jul 25" [ref=e84] [cursor=pointer]':
+          - /url: /8/
+          - img "Selling Volkswagen 2020, acceptable" [ref=e85]
+          - generic [ref=e86]:
+            - heading "Selling Volkswagen 2020, acceptable" [level=2] [ref=e87]
+            - paragraph [ref=e88]: 36522 BAM
+            - paragraph [ref=e89]: "Selling Volkswagen 2020. Condition: acceptable. Mileage: 34242 km. Features: Bluetooth. Price: 72381 EUR. Negotiable."
+            - generic [ref=e90]:
+              - generic [ref=e91]: Даниловград
+              - generic [ref=e92]: Автомобили
+              - time [ref=e93]: Jul 25
+      - article [ref=e94]:
+        - 'link "Car repair in Bijelo Polje, from 3306 BAM Car repair in Bijelo Polje, from 3306 BAM 4498 BAM Offering auto repair services in Bijelo Polje. Experience: good. Services: brake replacement. Price from 3306 BAM. Биело-Поле Ремонт авто Jul 22" [ref=e95] [cursor=pointer]':
+          - /url: /27/
+          - img "Car repair in Bijelo Polje, from 3306 BAM" [ref=e96]
+          - generic [ref=e97]:
+            - heading "Car repair in Bijelo Polje, from 3306 BAM" [level=2] [ref=e98]
+            - paragraph [ref=e99]: 4498 BAM
+            - paragraph [ref=e100]: "Offering auto repair services in Bijelo Polje. Experience: good. Services: brake replacement. Price from 3306 BAM."
+            - generic [ref=e101]:
+              - generic [ref=e102]: Биело-Поле
+              - generic [ref=e103]: Ремонт авто
+              - time [ref=e104]: Jul 22
+      - article [ref=e105]:
+        - 'link "Looking for Hobby and Leisure, acceptable Looking for Hobby and Leisure, acceptable 2172 BAM Looking for Hobby and Leisure in acceptable condition. Budget: 955 BAM. Features: . DM me offers. Плевля Хобби и отдых Jul 16" [ref=e106] [cursor=pointer]':
+          - /url: /20/
+          - img "Looking for Hobby and Leisure, acceptable" [ref=e107]
+          - generic [ref=e108]:
+            - heading "Looking for Hobby and Leisure, acceptable" [level=2] [ref=e109]
+            - paragraph [ref=e110]: 2172 BAM
+            - paragraph [ref=e111]: "Looking for Hobby and Leisure in acceptable condition. Budget: 955 BAM. Features: . DM me offers."
+            - generic [ref=e112]:
+              - generic [ref=e113]: Плевля
+              - generic [ref=e114]: Хобби и отдых
+              - time [ref=e115]: Jul 16
+      - article [ref=e116]:
+        - 'link "Urgently buying Business Urgently buying Business 1730 BAM Urgently need Business. Condition: average. Specs: . Will consider offers up to BAM. Cetinje. Тиват Бизнес Jun 30" [ref=e117] [cursor=pointer]':
+          - /url: /22/
+          - img "Urgently buying Business" [ref=e118]
+          - generic [ref=e119]:
+            - heading "Urgently buying Business" [level=2] [ref=e120]
+            - paragraph [ref=e121]: 1730 BAM
+            - paragraph [ref=e122]: "Urgently need Business. Condition: average. Specs: . Will consider offers up to BAM. Cetinje."
+            - generic [ref=e123]:
+              - generic [ref=e124]: Тиват
+              - generic [ref=e125]: Бизнес
+              - time [ref=e126]: Jun 30
+      - article [ref=e127]:
+        - 'link "Urgent sale: Zara, 2015 Urgent sale: Zara, 2015 202 BAM Urgent sale of Zara from 2015. Condition: good. Package: no scratches. Age: new. Price negotiable on site. Price: 918 BAM. Даниловград Телефоны Jun 20" [ref=e128] [cursor=pointer]':
+          - /url: /30/
+          - 'img "Urgent sale: Zara, 2015" [ref=e129]'
+          - generic [ref=e130]:
+            - 'heading "Urgent sale: Zara, 2015" [level=2] [ref=e131]'
+            - paragraph [ref=e132]: 202 BAM
+            - paragraph [ref=e133]: "Urgent sale of Zara from 2015. Condition: good. Package: no scratches. Age: new. Price negotiable on site. Price: 918 BAM."
+            - generic [ref=e134]:
+              - generic [ref=e135]: Даниловград
+              - generic [ref=e136]: Телефоны
+              - time [ref=e137]: Jun 20
+      - article [ref=e138]:
+        - 'link "Selling H&M scooter, used for 2 years Selling H&M scooter, used for 2 years 3377 BAM Selling H&M scooter. Condition: satisfactory. Age: used for 2 years. Electric/kick: max speed 25 km/h. Price: 1093 BAM. Мойковац Самокаты Jun 09" [ref=e139] [cursor=pointer]':
+          - /url: /13/
+          - img "Selling H&M scooter, used for 2 years" [ref=e140]
+          - generic [ref=e141]:
+            - heading "Selling H&M scooter, used for 2 years" [level=2] [ref=e142]
+            - paragraph [ref=e143]: 3377 BAM
+            - paragraph [ref=e144]: "Selling H&M scooter. Condition: satisfactory. Age: used for 2 years. Electric/kick: max speed 25 km/h. Price: 1093 BAM."
+            - generic [ref=e145]:
+              - generic [ref=e146]: Мойковац
+              - generic [ref=e147]: Самокаты
+              - time [ref=e148]: Jun 09
+      - article [ref=e149]:
+        - 'link "Lenovo bottles/teats, set Lenovo bottles/teats, set 4798 BAM Lenovo bottle or teat set. Condition: fair. Quantity: anti-colic system. Age: anti-colic system. Price: 4099 BAM. Podgorica. Биело-Поле Товары для кормления Jun 08" [ref=e150] [cursor=pointer]':
+          - /url: /6/
+          - img "Lenovo bottles/teats, set" [ref=e151]
+          - generic [ref=e152]:
+            - heading "Lenovo bottles/teats, set" [level=2] [ref=e153]
+            - paragraph [ref=e154]: 4798 BAM
+            - paragraph [ref=e155]: "Lenovo bottle or teat set. Condition: fair. Quantity: anti-colic system. Age: anti-colic system. Price: 4099 BAM. Podgorica."
+            - generic [ref=e156]:
+              - generic [ref=e157]: Биело-Поле
+              - generic [ref=e158]: Товары для кормления
+              - time [ref=e159]: Jun 08

@@ -1,0 +1,49 @@
+id: TASK_063_Regenerate_output_css
+
+title: Regenerate output.css via Docker Tailwind CLI
+
+priority: high
+
+depends_on:
+  - TASK_061_Migrate_input_css_v4_native_syntax
+  - TASK_062_Delete_tailwind_config_js
+
+source_reference: .ai/plans/08_design-system-css-pipeline_plan.md
+source_section: TSK-003 — Regenerate output.css via Docker
+
+description: >
+  Run the Tailwind v4 standalone CLI via Docker to regenerate the committed
+  output.css artifact. The Docker image already has tailwindcss at
+  /usr/local/bin/tailwindcss and the Dockerfile (line 66) and dev compose
+  (lines 8-9) already invoke the correct command without --config.
+
+goals:
+  - Produce a class-complete output.css (291 selectors vs stale 82)
+  - Use Docker as the canonical regeneration path (PO decision Q2-B)
+  - Commit the regenerated artifact (it is tracked, not gitignored)
+
+files:
+  - path: src/theme/static/theme/css/output.css
+
+changes:
+
+  - action: run_command
+
+    description: >
+      Execute the Docker Tailwind CLI build command to regenerate output.css.
+
+    code_hint: |
+      docker compose exec web tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify
+
+acceptance_criteria:
+  - output.css is regenerated (exit code 0)
+  - Selector count increases from 82 to approximately 291
+  - File header shows tailwindcss v4.3.3
+  - No v3 @tailwind directives in output
+  - Regenerated file is committed to the repository
+
+risk_level: moderate
+risk_mitigation: >
+  The build command is identical to Dockerfile line 66 and README.md line 40.
+  Docker is the only working path (local .venv stub is non-functional).
+  VFY-001 verifies class coverage before any template edits proceed.

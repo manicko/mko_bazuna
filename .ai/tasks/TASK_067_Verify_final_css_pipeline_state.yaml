@@ -1,0 +1,47 @@
+id: TASK_067_Verify_final_css_pipeline_state
+
+title: Verify final CSS pipeline state (end-to-end)
+
+priority: high
+
+type: verification
+
+depends_on:
+  - TASK_065_Final_regeneration_output_css
+
+verifies:
+  - TASK_064_Replace_prose_wrapper_detail_html
+  - TASK_065_Final_regeneration_output_css
+
+source_reference: .ai/plans/08_design-system-css-pipeline_plan.md
+source_section: VFY-002 — Verify final CSS pipeline state
+
+description: >
+  End-to-end validation of the entire fix: config migrated, CSS regenerated,
+  template edited, and final build produces a class-complete stylesheet.
+  Confirms no regressions and that the prose wrapper is removed from
+  ads/detail.html.
+
+verification_steps:
+  - check: "input.css uses @import and @source (not @tailwind directives)"
+  - check: "tailwind.config.js does not exist at project root"
+  - check: "ads/detail.html does not contain 'prose' class"
+  - check: "ads/detail.html description wrapper div has class='mb-6'"
+  - check: "17 acceptance classes present in final output.css"
+  - check: "output.css selector count ~291 (no regression from TSK-003)"
+  - build: "docker compose build succeeds with new files"
+
+files:
+  - path: src/theme/static/theme/css/input.css
+  - path: src/theme/static/theme/css/output.css
+  - path: src/backend/templates/ads/detail.html
+  - path: tailwind.config.js
+
+acceptance_criteria:
+  - Config state: v4-native syntax in input.css, no tailwind.config.js
+  - Template state: prose removed, mb-6 wrapper, inner <p> preserved
+  - CSS coverage: all 17 classes non-zero
+  - No regression: selector count unchanged, Docker build succeeds
+
+pass_criteria: All config, template, and CSS checks pass; Docker build succeeds
+failure_action: Return the specific failed task (TASK_064 or TASK_065) to rework

@@ -1,0 +1,47 @@
+id: TASK_061_Migrate_input_css_v4_native_syntax
+
+title: Migrate input.css to Tailwind v4-native syntax
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/plans/08_design-system-css-pipeline_plan.md
+source_section: TSK-001 — Migrate input.css to Tailwind v4-native syntax
+
+description: >
+  Replace v3 @tailwind directives in input.css with v4-native
+  @import "tailwindcss" and @source at-rule. The standalone CLI v4.3.3
+  ignores @tailwind directives and the content key in tailwind.config.js;
+  only @source drives class extraction.
+
+goals:
+  - Enable v4 content-based class extraction
+  - Replace v3 directives with v4-native syntax
+  - Cover all 16 template files via @source glob
+
+files:
+  - path: src/theme/static/theme/css/input.css
+
+changes:
+
+  - action: replace_content
+
+    description: >
+      Replace the three v3 @tailwind directives with v4-native syntax.
+
+    code_hint: |
+      /* Tailwind input stylesheet */
+      @import "tailwindcss";
+      @source "src/backend/templates/**/*.html";
+
+acceptance_criteria:
+  - input.css contains @import "tailwindcss"
+  - input.css contains @source "src/backend/templates/**/*.html"
+  - input.css does NOT contain @tailwind base / components / utilities
+  - File is syntactically valid CSS
+
+risk_level: moderate
+risk_mitigation: >
+  Exact v4 syntax verified by spec research session.
+  VFY-001 class-coverage check confirms all utilities are extracted.
