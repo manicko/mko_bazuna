@@ -20,9 +20,17 @@ description: >
   'theme/css/tailwindcss'. The v3 @tailwind directives were not standard CSS
   @import rules so this was not an issue before.
 
-  Fix: create a custom storage subclass that sets ignore_patterns to exclude
-  input.css from manifest post-processing. input.css is a build-time-only
-  input for the Tailwind CLI and should not be collected or post-processed.
+  IMPORTANT: ignore_patterns on the storage class is a NO-OP in Django 5.2.
+  It is an AppConfig-level mechanism (StaticFilesConfig) consumed by the
+  collectstatic command during file discovery, not during post_process.
+  The correct fix is to override post_process and filter input.css out
+  before the parent class processes CSS @import/url() references.
+
+  Also: a stale duplicate theme package at src/backend/theme/ (created in
+  commit 15c63de, never updated) shadowed the real src/theme/ package due to
+  PYTHONPATH ordering (/app/src/backend:/app/src). The stale directory lacked
+  storage.py, causing ModuleNotFoundError. This has been fixed by deleting the
+  stale directory and reordering PYTHONPATH to /app/src:/app/src/backend.
 
 goals:
   - Fix Docker build (collectstatic post_process phase)
@@ -37,9 +45,9 @@ files:
       - type: class
         name: ThemeStaticFilesStorage
 
-    semantic_anchors:
-      class_inherits:
-        parent: CompressedManifestStaticFilesStorage
+      semantic_anchors:
+        class_inherits:
+          parent: CompressedManifestStaticFilesStorage
 
   - path: src/backend/config/settings/base.py
 
@@ -47,11 +55,27 @@ files:
       - type: setting
         name: STORAGES
 
-    semantic_anchors:
-      dict_key_replace:
-        key: "staticfiles"
-        backend_value: "whitenoise.storage.CompressedManifestStaticFilesStorage"
-        new_backend_value: "theme.storage.ThemeStaticFilesStorage"
+      semantic_anchors:
+        dict_key_replace:
+          key: "staticfiles"
+          backend_value: "whitenoise.storage.CompressedManifestStaticFilesStorage"
+          new_backend_value: "theme.storage.ThemeStaticFilesStorage"
+
+  - path: src/backend/config/settings/base.py
+
+    targets:
+      - type: setting
+        name: STATICFILES_DIRS
+
+      semantic_anchors:
+        remove_from_list:
+          item: "BASE_DIR / \"theme\" / \"static\""
+
+      description: >
+        Remove redundant src/theme/static from STATICFILES_DIRS. The theme app
+        is in INSTALLED_APPS, so AppDirectoriesFinder already discovers its
+        static directory. Keeping it in STATICFILES_DIRS caused duplicate file
+        collection warnings during collectstatic.
 
   - path: src/backend/config/settings/prod.py
 
@@ -70,24 +94,30 @@ changes:
 
     description: >
       Create a custom storage class extending CompressedManifestStaticFilesStorage
-      with ignore_patterns to skip input.css during collectstatic post-processing.
+      that overrides post_process to filter out input.css before the parent's
+      CSS @import/url() rewriting runs. This prevents MissingFileError for
+      the @import "tailwindcss" directive in input.css.
 
     file_path: src/theme/storage.py
 
     code_hint: |
+      import fnmatch
       from whitenoise.storage import CompressedManifestStaticFilesStorage
 
 
       class ThemeStaticFilesStorage(CompressedManifestStaticFilesStorage):
-          """Static files storage that excludes Tailwind input.css from manifest post-processing.
-
-          input.css contains @import "tailwindcss" (v4 syntax) which collectstatic's
-          manifest post-processor would try to resolve as a relative CSS file
-          reference, causing a MissingFileError. The file is a build-time-only
-          input for the Tailwind CLI and should not be post-processed.
-          """
-
           ignore_patterns = ["theme/css/input.css"]
+
+          def post_process(self, paths, content_hashed=False, **kwargs):
+              skip_patterns = ["theme/css/input.css"]
+              filtered = {
+                  name: value
+                  for name, value in paths.items()
+                  if not any(fnmatch.fnmatch(name, p) for p in skip_patterns)
+              }
+              yield from super().post_process(
+                  filtered, content_hashed=content_hashed, **kwargs
+              )
 
   - action: edit_python
 
@@ -101,6 +131,18 @@ changes:
       "staticfiles": {
           "BACKEND": "theme.storage.ThemeStaticFilesStorage",
       },
+
+  - action: edit_python
+
+    description: >
+      Remove BASE_DIR / "theme" / "static" from STATICFILES_DIRS in base.py
+      to eliminate duplicate file collection warnings. The AppDirectoriesFinder
+      already discovers the theme app's static directory via INSTALLED_APPS.
+
+    file_path: src/backend/config/settings/base.py
+
+    code_hint: |
+      STATICFILES_DIRS = [BASE_DIR.parent / "static"]
 
   - action: edit_python
 
@@ -123,7 +165,15 @@ acceptance_criteria:
 risk_level: low
 
 risk_mitigation: >
-  ignore_patterns is a standard Django ManifestStaticFilesStorage mechanism.
-  It skips input.css during post_process only — the file is still collected
-  to STATIC_ROOT but without hash or @import resolution. No template
-  references input.css; only output.css is linked via {% static %}.
+  The post_process override filters input.css from the paths dict before the
+  parent class applies CSS @import/url() rewriting. The file is still collected
+  to STATIC_ROOT (it appears in the post_process output as a non-hashed copy),
+  but no @import resolution is attempted. No template references input.css;
+  only output.css is linked via {% static %}.
+
+  Note: Django's ignore_patterns is an AppConfig-level mechanism (StaticFilesConfig),
+  not a storage-class attribute. It is consumed by the collectstatic command during
+  file discovery via finders, NOT during post_process. The original TASK-068 plan
+  incorrectly assumed ignore_patterns would work on the storage class. A live
+  reproduction confirmed it is a no-op — the post_process override is the
+  correct approach.
