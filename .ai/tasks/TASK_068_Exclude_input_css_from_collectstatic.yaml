@@ -1,0 +1,129 @@
+id: TASK_068_Exclude_input_css_from_collectstatic
+
+title: Exclude input.css from collectstatic post-processing (Docker build fix)
+
+priority: high
+
+type: implementation
+
+depends_on:
+  - TASK_061_Migrate_input_css_v4_native_syntax
+
+source_reference: .ai/plans/08_design-system-css-pipeline_plan.md
+source_section: VFY-002 — Docker build fails (collectstatic @import resolution)
+
+description: >
+  The v4-native @import "tailwindcss" directive in input.css is a real CSS
+  @import rule. Django's collectstatic with CompressedManifestStaticFilesStorage
+  (whitenoise) post-processes CSS files and attempts to resolve @import rules
+  as relative file references, producing a MissingFileError for
+  'theme/css/tailwindcss'. The v3 @tailwind directives were not standard CSS
+  @import rules so this was not an issue before.
+
+  Fix: create a custom storage subclass that sets ignore_patterns to exclude
+  input.css from manifest post-processing. input.css is a build-time-only
+  input for the Tailwind CLI and should not be collected or post-processed.
+
+goals:
+  - Fix Docker build (collectstatic post_process phase)
+  - input.css preserved for Tailwind CLI regeneration
+  - output.css remains fully functional and class-complete
+  - No changes to Dockerfile or template references
+
+files:
+  - path: src/theme/storage.py
+
+    targets:
+      - type: class
+        name: ThemeStaticFilesStorage
+
+    semantic_anchors:
+      class_inherits:
+        parent: CompressedManifestStaticFilesStorage
+
+  - path: src/backend/config/settings/base.py
+
+    targets:
+      - type: setting
+        name: STORAGES
+
+    semantic_anchors:
+      dict_key_replace:
+        key: "staticfiles"
+        backend_value: "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        new_backend_value: "theme.storage.ThemeStaticFilesStorage"
+
+  - path: src/backend/config/settings/prod.py
+
+    targets:
+      - type: module_attribute
+        name: STATICFILES_STORAGE
+
+    semantic_anchors:
+      replace_value:
+        old: "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        new: "theme.storage.ThemeStaticFilesStorage"
+
+changes:
+
+  - action: create_file
+
+    description: >
+      Create a custom storage class extending CompressedManifestStaticFilesStorage
+      with ignore_patterns to skip input.css during collectstatic post-processing.
+
+    file_path: src/theme/storage.py
+
+    code_hint: |
+      from whitenoise.storage import CompressedManifestStaticFilesStorage
+
+
+      class ThemeStaticFilesStorage(CompressedManifestStaticFilesStorage):
+          """Static files storage that excludes Tailwind input.css from manifest post-processing.
+
+          input.css contains @import "tailwindcss" (v4 syntax) which collectstatic's
+          manifest post-processor would try to resolve as a relative CSS file
+          reference, causing a MissingFileError. The file is a build-time-only
+          input for the Tailwind CLI and should not be post-processed.
+          """
+
+          ignore_patterns = ["theme/css/input.css"]
+
+  - action: edit_python
+
+    description: >
+      Update STORAGES["staticfiles"]["BACKEND"] in base.py to use the custom
+      ThemeStaticFilesStorage class.
+
+    file_path: src/backend/config/settings/base.py
+
+    code_hint: |
+      "staticfiles": {
+          "BACKEND": "theme.storage.ThemeStaticFilesStorage",
+      },
+
+  - action: edit_python
+
+    description: >
+      Update legacy STATICFILES_STORAGE in prod.py to use the custom class
+      for consistency.
+
+    file_path: src/backend/config/settings/prod.py
+
+    code_hint: |
+      STATICFILES_STORAGE = "theme.storage.ThemeStaticFilesStorage"
+
+acceptance_criteria:
+  - src/theme/storage.py defines ThemeStaticFilesStorage with ignore_patterns
+  - STORAGES["staticfiles"]["BACKEND"] points to theme.storage.ThemeStaticFilesStorage
+  - prod.py STATICFILES_STORAGE points to theme.storage.ThemeStaticFilesStorage
+  - Docker build collectstatic phase succeeds (input.css not post-processed)
+  - output.css still contains all 17 acceptance classes (no regression)
+
+risk_level: low
+
+risk_mitigation: >
+  ignore_patterns is a standard Django ManifestStaticFilesStorage mechanism.
+  It skips input.css during post_process only — the file is still collected
+  to STATIC_ROOT but without hash or @import resolution. No template
+  references input.css; only output.css is linked via {% static %}.
