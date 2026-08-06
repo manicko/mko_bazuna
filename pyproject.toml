@@ -41,7 +41,8 @@ platforms = ["Linux", "Windows"]
 include-package-data = true
 
 # Project is NOT installed in the image; import roots are provided via
-# ENV PYTHONPATH=/app/src/backend:/app/src (see docker/Dockerfile).
+# ENV PYTHONPATH=/app/src:/app/src/backend (see docker/Dockerfile).
+# src listed first in both Docker and pytest so the real theme package resolves correctly.
 # If installation is ever enabled, discover the real split layout:
 
 [tool.setuptools.packages.find]
@@ -151,7 +152,7 @@ ignore_missing_imports = true
 minversion = "8.4"
 asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]
-pythonpath = ["src/backend", "src"]
+pythonpath = ["src", "src/backend"]
 addopts = ["--import-mode=importlib","-ra", "-q"]
 console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning

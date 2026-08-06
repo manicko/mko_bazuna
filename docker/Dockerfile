@@ -47,8 +47,9 @@ RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwi
 COPY . .
 
 # Make the real source layout importable without repackaging the project.
-# src/backend -> apps, config ; src -> telegram_bot
-ENV PYTHONPATH=/app/src/backend:/app/src
+# src -> theme (real), telegram_bot ; src/backend -> apps, config
+# src listed first so the real theme package is not shadowed by any stale duplicate
+ENV PYTHONPATH=/app/src:/app/src/backend
 
 # Build Tailwind CSS and collect static files
 # Use standalone tailwindcss CLI with explicit input/output paths
@@ -115,7 +116,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV UV_LINK_MODE=copy
 ENV UV_COMPILE_BYTECODE=1
 # Make the real source layout importable at runtime (web/bot/migrate/scheduler)
-ENV PYTHONPATH=/app/src/backend:/app/src
+ENV PYTHONPATH=/app/src:/app/src/backend
 
 # Runtime volume for media (writable)
 VOLUME ["/app/media"]
