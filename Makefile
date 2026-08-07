@@ -1,7 +1,7 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down build restart test lint typecheck shell migrate makemigrations logs \
-        backup restore prune-backups db-shell clean create-admin load-catalog
+        backup restore prune-backups db-shell clean create-admin load-catalog seed
 
 # ====================== Settings ======================
 
@@ -32,6 +32,7 @@ help:
 	@echo "  makemigrations Create migrations"
 	@echo "  create-admin   Create admin user manually"
 	@echo "  load-catalog   Load categories.yaml into DB (one-shot)"
+	@echo "  seed           Re-run seed manually (dev: also auto-runs on `make up`)"
 	@echo ""
 	@echo "Consolidation:"
 	@echo "  consolidate        Consolidate migrations (threshold: \$$(CONSOLIDATE_THRESHOLD))"
@@ -84,6 +85,10 @@ create-admin:
 
 load-catalog:
 	docker compose $(COMPOSE_FILES) run --rm load_catalog
+
+# Run seed manually (dev: seed auto-runs on `make up`; this is for re-seeding)
+seed:
+	docker compose $(COMPOSE_FILES) run --rm seed
 
 # ====================== Consolidation ======================
 

@@ -40,6 +40,20 @@ services:
       - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
       - ./.env.docker:/app/src/.env:ro
 
+  # Dev: seed runs automatically after load_catalog completes.
+  # profiles: !reset [] replaces the ["seed"] profile gate from base compose,
+  # making the one-shot seed container start with a plain `docker compose up`.
+  # In production, docker-compose.prod.yml retains profiles: ["seed"] so seed
+  # only runs on explicit --profile seed demand.
+  seed:
+    profiles: !reset []
+    entrypoint: /app/entrypoint-seed.sh
+    volumes:
+      - .:/app
+      - ./docker/entrypoint-seed.sh:/app/entrypoint-seed.sh
+      - ./.env.docker:/app/src/.env:ro
+      - media_volume:/app/media
+
   nginx:
     profiles:
       - use-nginx  # Optional in dev; omit to run without nginx

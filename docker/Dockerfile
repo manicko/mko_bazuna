@@ -34,9 +34,16 @@ WORKDIR /app
 COPY pyproject.toml uv.lock* ./
 
 # Install dependencies to venv
+# --no-dev excludes dev tools (pytest, ruff, etc.) but includes all [project] deps
+# faker is a [project] dependency (needed by the seed service at runtime)
+# Remove pytailwindcss's console-script wrapper to ensure the standalone binary
+# at /usr/local/bin/tailwindcss (downloaded below) takes precedence on PATH.
+# Without this, the wrapper shadows the standalone binary and triggers a 106MB
+# runtime download on every fresh image, blocking server startup.
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev --no-default-groups
+    uv sync --frozen --no-install-project --no-dev --no-default-groups && \
+    rm -f /opt/venv/bin/tailwindcss
 
 # Install Tailwind CSS CLI (standalone binary)
 RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
