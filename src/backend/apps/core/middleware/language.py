@@ -87,7 +87,11 @@ class LanguagePreMiddleware(MiddlewareMixin):
         request._lang_cookie_value = lang
 
         # Persist preference in session for authenticated users.
-        if hasattr(request, "session") and request.user.is_authenticated:
+        if (
+            hasattr(request, "session")
+            and hasattr(request, "user")
+            and request.user.is_authenticated
+        ):
             request.session["django_language"] = lang
 
     def _set_language_code(self, request: Any, lang: str) -> None:

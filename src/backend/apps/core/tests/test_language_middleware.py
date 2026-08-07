@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest
 from django.test import SimpleTestCase
 
@@ -157,3 +158,39 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
         self.middleware.process_response(request, response)
         assert request.LANGUAGE_CODE == "en"
         response.set_cookie.assert_not_called()
+
+    # --- Session persistence for authenticated users ---
+
+    def test_lang_param_with_session_but_no_user_does_not_crash(self) -> None:
+        """?lang must not crash when session is set but user is not.
+
+        Reproduces the production bug: SessionMiddleware runs before
+        AuthenticationMiddleware in the middleware chain. The defensive
+        ``hasattr(request, "user")`` guard prevents ``AttributeError``.
+        """
+        request = _make_request(get={"lang": "bs"})
+        request.session = MagicMock()
+        # Deliberately do NOT set request.user, simulating middleware
+        # ordering where AuthenticationMiddleware has not run yet.
+        self.middleware.process_request(request)
+        assert request.LANGUAGE_CODE == "bs"
+
+    def test_anonymous_user_does_not_persist_session(self) -> None:
+        """?lang with an anonymous user does not write to the session."""
+        request = _make_request(get={"lang": "en"})
+        request.session = MagicMock()
+        request.user = AnonymousUser()
+        self.middleware.process_request(request)
+        assert request.LANGUAGE_CODE == "en"
+        request.session.__setitem__.assert_not_called()
+
+    def test_authenticated_user_persists_session(self) -> None:
+        """?lang with an authenticated user writes language to session."""
+        request = _make_request(get={"lang": "en"})
+        request.session = MagicMock()
+        request.user = MagicMock(is_authenticated=True)
+        self.middleware.process_request(request)
+        assert request.LANGUAGE_CODE == "en"
+        request.session.__setitem__.assert_called_once_with(
+            "django_language", "en"
+        )
