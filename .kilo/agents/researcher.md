@@ -2,7 +2,7 @@
 description: Researches how to implement a phase before planning. 
 mode: all
 color: "#F59E0B"
-steps: 100
+steps: 200
 
 permission:
    agent_manager: deny

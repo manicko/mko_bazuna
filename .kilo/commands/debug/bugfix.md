@@ -10,10 +10,11 @@ alwaysApply: false
 ## Step 1 — Study the Bug
 
 Summarize the debug info and problem description provided at the end of this prompt.
+Do not argue on the workflow, just follow.
 
 ## Step 2 — Preparation (Researcher)
 
-Launch one or more Researcher agents to:
+Use <task> tool to launch one or more <researcher> agents to:
 1. Investigate the project architecture relevant to the bug
 2. Research modern best practices for solving this class of problem within the current architecture
 
@@ -28,20 +29,19 @@ If multiple viable approaches exist, launch a Researcher agent to choose the pre
 Prefer a solid, future-proof solution over a quick and dirty patch.
 
 ## Step 4 — Risk & Complexity Assessment (Researcher)
-
-Launch a Researcher agent to assess risks of the fix and potential architectural impact.
+Use <task> tool to launch <researcher> agent to assess risks of the fix and potential architectural impact.
 
 ### If high risk or complex only
 
-- **4.1** Launch Researcher to deepen analysis of risks and modern practices under the current architecture
-- **4.2** Launch Planner agent to produce a fix plan (including tests and docs) and save it to  
+- **4.1** Use <task> tool to launch <researcher> to deepen analysis of risks and modern practices under the current architecture
+- **4.2** Use <task> tool to launch <planner>  agent to produce a fix plan (including tests and docs) and save it to  
   `.ai/plans/{Number}_{problem_name}_fix_plan.md`
-- **4.3** Launch Validator agent to review the plan for modern practices, maintainability, and long-term quality (goal: solid foundation, not a quick patch)
+- **4.3** Use <task> tool to launch <validator>  agent to review the plan for modern practices, maintainability, and long-term quality (goal: solid foundation, not a quick patch)
 - **4.4** Repeat 4.2 if the plan needs refinement
 
 ## Step 5 — Implementation (Implementor)
 
-Launch Implementor agent to:
+Use <task> tool to launch <implementor> agent to:
 
 1. Implement the approved fix (or the selected route if no formal plan was required)
 2. Run quality checks for changed code:
