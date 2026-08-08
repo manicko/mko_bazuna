@@ -207,10 +207,15 @@ class SeedService:
         Returns:
             List of Category instances saved to DB.
         """
-        CONFIG_PATH = "src/backend/apps/categories/catalog/categories.yaml"
+        CATALOG_PATH = (
+            Path(__file__).resolve().parents[2]
+            / "categories"
+            / "catalog"
+            / "categories.yaml"
+        )
         from apps.categories.catalog.builder import load_catalog
 
-        load_catalog(CONFIG_PATH)
+        load_catalog(CATALOG_PATH)
         return list(Category.objects.all())
 
     def _load_city_fixtures(self) -> list[City]:

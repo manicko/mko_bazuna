@@ -885,7 +885,12 @@ class TestSeedCategoryIntegration(TestCase):
         """Load categories via catalog builder and create prerequisite data."""
         from apps.categories.catalog.builder import load_catalog
 
-        CATALOG_PATH = "src/backend/apps/categories/catalog/categories.yaml"
+        CATALOG_PATH = (
+            Path(__file__).resolve().parents[2]
+            / "categories"
+            / "catalog"
+            / "categories.yaml"
+        )
         load_catalog(CATALOG_PATH)
 
         City.objects.create(

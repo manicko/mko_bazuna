@@ -1,10 +1,12 @@
 """Management command to load catalog from YAML config."""
 
+from pathlib import Path
+
 from django.core.management.base import BaseCommand
 
 from apps.categories.catalog import builder
 
-CONFIG_PATH = "src/backend/apps/categories/catalog/categories.yaml"
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "catalog" / "categories.yaml"
 
 
 class Command(BaseCommand):

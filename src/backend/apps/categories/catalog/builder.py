@@ -17,9 +17,15 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 logger = logging.getLogger(__name__)
+
+# Round-trip YAML instance: preserves comments, flow style, key order,
+# and original quoting when rewriting categories.yaml.
+_yaml: YAML = YAML(typ="rt")
+_yaml.preserve_quotes = True
 
 
 def load_catalog(
@@ -48,7 +54,7 @@ def load_catalog(
 
     Raises:
         FileNotFoundError: If config_path does not exist.
-        yaml.YAMLError: If YAML is malformed.
+        YAMLError: If YAML is malformed.
     """
     from django.db import transaction
 
@@ -57,7 +63,7 @@ def load_catalog(
         raise FileNotFoundError(f"Catalog config not found: {config_path}")
 
     with open(config_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = _yaml.load(f)
 
     if not data:
         logger.warning("Empty catalog config at %s", config_path)
@@ -373,8 +379,8 @@ def _rewrite_yaml(config_path: Path, slug_rename_map: dict[str, str]) -> None:
 
     try:
         with open(config_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-    except (OSError, yaml.YAMLError) as e:
+            data = _yaml.load(f) or {}
+    except (OSError, YAMLError) as e:
         logger.warning("Cannot read YAML for rewrite: %s", e)
         return
 
@@ -430,7 +436,7 @@ def _rewrite_yaml(config_path: Path, slug_rename_map: dict[str, str]) -> None:
             dir=str(config_path.parent),
         )
         with os.fdopen(fd, "w", encoding="utf-8") as tmp:
-            yaml.dump(data, tmp, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            _yaml.dump(data, tmp)
         shutil.copymode(str(config_path), tmp_path)
         os.replace(tmp_path, str(config_path))
         logger.info("Rewrote YAML config at %s (%d renames)", config_path, len(old_to_new))

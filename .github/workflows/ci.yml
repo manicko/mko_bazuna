@@ -19,13 +19,13 @@ jobs:
           context: .
           push: false
           tags: mko-bazuna:ci
-          cache-from:
-            - type: registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
-          cache-to:
-            - type: registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
+          cache-to: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
 
   test:
     runs-on: ubuntu-latest
+    env:
+      UV_DEFAULT_GROUPS: dev
     services:
       db:
         image: postgres:18-alpine
@@ -101,6 +101,8 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      UV_DEFAULT_GROUPS: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -119,6 +121,8 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    env:
+      UV_DEFAULT_GROUPS: dev
     steps:
       - uses: actions/checkout@v4
 

@@ -109,6 +109,11 @@ COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
 
 # Copy source code (Django apps, config, telegram_bot)
 COPY --from=builder --chown=app:app /app/src /app/src
+# Copy project config + lockfile so entrypoint-test.sh can run
+# `uv sync --frozen --no-install-project --group dev` in the test container.
+# UV_NO_INSTALL_PROJECT=1 and UV_FROZEN=1 (set above) ensure production `uv run`
+# calls are a no-op sync (deps already in venv, no network, no project install).
+COPY --from=builder --chown=app:app /app/pyproject.toml /app/uv.lock /app/
 # Copy collected static files
 COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
 
@@ -122,6 +127,12 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # uv configuration (consistent with builder stage)
 ENV UV_LINK_MODE=copy
 ENV UV_COMPILE_BYTECODE=1
+# Prevent uv run from attempting to build/install the project package in the
+# runtime stage (no build tools here). Without these, copying pyproject.toml
+# into the image would cause uv run to fail on production services
+# (load_catalog, seed, create_admin, scheduler) that use `uv run`.
+ENV UV_NO_INSTALL_PROJECT=1
+ENV UV_FROZEN=1
 # Make the real source layout importable at runtime (web/bot/migrate/scheduler)
 ENV PYTHONPATH=/app/src:/app/src/backend
 

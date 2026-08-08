@@ -4,6 +4,13 @@
 
 set -e
 
+# Enable dev dependencies (pytest, pytest-django, etc.) for testing.
+# default-groups = [] in pyproject.toml keeps dev tools out of the production
+# image. UV_DEFAULT_GROUPS=dev overrides this for the test environment only.
+# UV_NO_INSTALL_PROJECT=1 is set in the Dockerfile runtime stage.
+export UV_DEFAULT_GROUPS=dev
+uv sync --frozen --no-install-project
+
 # Wait for database to be ready
 echo "Waiting for PostgreSQL..."
 for i in $(seq 1 30); do
