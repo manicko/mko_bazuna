@@ -22,9 +22,15 @@ Two long-lived processes share one Django project + one DB:
 
 ## Quick start
 ```bash
-cp .env.example .env        # set BOT_TOKEN, DB, SECRET_KEY
-docker compose up --build   # db + web + bot + nginx
+# Configure .env.docker with your values (BOT_TOKEN, DJANGO_SECRET_KEY, POSTGRES_PASSWORD)
+make build                  # build Docker images (one-time)
+make up                     # start dev environment on :8000; runs db → migrate → load_catalog → create_admin → seed → web, bot
 ```
+
+> **Project isolation:** `make` sets `COMPOSE_PROJECT_NAME` automatically (`mko-bazuna-dev` for dev,
+> `mko-bazuna-test` for test) so `make up` and `make test` never collide. See
+> [Docker deployment & operations](docs/ops/docker-deployment.md#compose-project-isolation) for the
+> exact invocation forms and manual (non-`make`) setup.
 
 ### Tailwind CSS Development
 
@@ -32,12 +38,14 @@ Tailwind CSS is built during Docker image creation and regenerated on container 
 
 ```bash
 # Development with hot-reload
-docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up --build
+make up
 ```
 
 To rebuild CSS manually after editing templates:
 ```bash
-docker compose exec web tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify
+make shell
+# then inside the container:
+uv run tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify
 ```
 
 ### Local HTTPS Development
@@ -62,7 +70,8 @@ cp localhost+2-key.pem privkey.pem
 
 Then run with nginx profile for HTTPS:
 ```bash
-docker compose --profile use-nginx up --build
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
 
 Access at `https://localhost`. Certificates are valid for ~2 years; re-run mkcert to renew.
@@ -72,7 +81,8 @@ Web is served behind nginx (ports 80/443); the web container is not exposed dire
 ### PgBouncer (optional connection pooling)
 PgBouncer service is available for connection pooling via profile:
 ```bash
-docker compose --profile pgbouncer up --build
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml --profile pgbouncer up -d
 ```
 Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in production when:
 - High database connection count from multiple app instances
@@ -92,7 +102,9 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 | `docs/03-packages/packages-list.md` | Dependency set & versions |
 | `docs/03-packages/dependency-collisions.md` | Package version-coupling & collision risks |
 | `docs/04-user-stories/index.md` | User stories by role (seller/buyer/admin) |
-| `docs/ops/docker-deployment.md` | Docker deployment & operations guide |
+  | `docs/ops/docker-deployment.md` | Docker deployment & operations guide (Makefile, project isolation, test env, recovery) |
+  | `docs/ops/migration-workflow.md` | Development migration workflow, consolidation, advisory locks |
+  | `docs/ops/seed-workflow.md` | Seed data generation, fixtures, and photo pipeline |
 | `docs/ops/restore.md` | Database restore runbook |
 | `docs/ops/local-https-mkcert.md` | Local HTTPS setup with mkcert |
 | `docs/99-agent/architecture.md` · `rules.md` · `references.md` | Agent guidelines & references |
@@ -101,15 +113,18 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 ### Docs structure
 ```
 docs/
-├── 00-overview/        doc-maintenance-rules.md
-├── 01-spec/            spec-index.md · technical-specification.md · architecture-structure.md
-├── 02-database/        db-schema.md · db-indexes.md · db-enums.md
-├── 03-packages/        packages-list.md · dependency-collisions.md
-├── 04-user-stories/    index.md · seller-stories.md · buyer-stories.md · admin-stories.md
-├── 05-owner-decisions/ index.md
-├── ops/                 docker-deployment.md · restore.md · local-https-mkcert.md
-├── 99-agent/           architecture.md · rules.md · references.md
-└── 98-reference/       ast-editor.md
+├── 00-overview/            doc-maintenance-rules.md
+├── 01-spec/                spec-index.md · technical-specification.md · architecture-structure.md · design-system.md · filter-ui.md · search-patterns.md · ui-patterns.md
+├── 02-database/            db-schema.md · db-indexes.md · db-enums.md
+├── 03-packages/            packages-list.md · dependency-collisions.md
+├── 04-user-stories/        index.md · seller-stories.md · buyer-stories.md · admin-stories.md
+├── 05-owner-decisions/     index.md
+├── 06-design-system/       index.md · tokens.md · tokens-research.md · layout.md · instruction.md · components.md · accessibility.md
+├── 07-design-researches/   migration_patterns.md · Design_1/ · Design_2/
+├── 97-plans/               01-phase-plan-highlevel.md · phase-01-detailed.md · phase-01-detailed-deployment.md · phase-01-detailed-testing.md · phase-02-detailed-plan-1.md · phase-02-detailed-plan-2.md · phase-02-detailed-plan-3.md
+├── 98-reference/           ast-editor.md
+├── 99-agent/               architecture.md · rules.md · references.md · trust-signals-plan.md
+└── ops/                    docker-deployment.md · migration-workflow.md · seed-workflow.md · restore.md · local-https-mkcert.md · postgres-18-docker-volume-migration.md · research/
 ```
 
 ## Commands

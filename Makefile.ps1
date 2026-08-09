@@ -1,5 +1,14 @@
 # Makefile.ps1 — PowerShell equivalent for Mko Bazuna Docker workflow
 # Windows/WSL2 primary development path - provides parity to Makefile targets
+#
+# NOTE: `param()` MUST be the first executable statement in the script (before any
+# function or variable assignment) so this file runs under Windows PowerShell 5.1,
+# not only PowerShell 7+.
+
+param(
+    [Parameter(Position=0)]
+    [string]$Target = "help"
+)
 
 # Isolated Compose project names: dev and test run in separate projects so their
 # `db` containers, networks, and named volumes never collide.
@@ -13,8 +22,11 @@ if ($envContent) {
         if ($line -match "^([^#=]+)=(.*)$") {
             $name = $matches[1].Trim()
             $value = $matches[2].Trim()
-            if (-not $env:$name) {
-                $env:$name = $value
+            # Use env: drive cmdlets (PS 5.1-compatible) instead of $env:$name, which
+            # is a PowerShell 7+ only syntax and fails to parse under Windows PowerShell.
+            $current = Get-Item -Path "env:$name" -ErrorAction SilentlyContinue
+            if (-not $current -or -not $current.Value) {
+                Set-Item -Path "env:$name" -Value $value
             }
         }
     }
@@ -32,6 +44,7 @@ function Show-Help {
     Write-Host "Targets:"
     Write-Host "  up             Start development environment (web on :8000, hot-reload)"
     Write-Host "  down           Stop and remove containers"
+    Write-Host "  build          Rebuild Docker images without cache"
     Write-Host "  test           Run pytest in test container (auto-starts test DB on :5433)"
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
@@ -56,13 +69,19 @@ function Show-Help {
 # Start development environment
 function Invoke-Up {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+}
+
+# Rebuild images without cache (equiv. to: make build)
+function Invoke-Build {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
 }
 
 # Stop and remove containers
 function Invoke-Down {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down
 }
 
 # Start only the long-running test PostgreSQL (port 5433)
@@ -120,7 +139,7 @@ function Invoke-Shell {
 # Run migrations (one-shot service)
 function Invoke-Migrate {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose run --rm migrate
+    docker compose --env-file .env.docker run --rm migrate
 }
 
 # Create migrations from model changes
@@ -138,10 +157,13 @@ function Invoke-LoadCatalog {
 # Create admin user manually
 function Invoke-CreateAdmin {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
-        --username ($env:ADMIN_USERNAME || "admin") `
+    # PS 5.1-compatible defaults (the `||` operator is PowerShell 7+ only).
+    $adminUser = if ($env:ADMIN_USERNAME) { $env:ADMIN_USERNAME } else { "admin" }
+    $adminTg = if ($env:ADMIN_TELEGRAM_ID) { $env:ADMIN_TELEGRAM_ID } else { "-1" }
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
+        --username $adminUser `
         --password $env:ADMIN_PASSWORD `
-        --telegram-id ($env:ADMIN_TELEGRAM_ID || "-1")
+        --telegram-id $adminTg
 }
 
 # Follow logs from all services
@@ -223,7 +245,7 @@ function Invoke-PruneBackups {
 # Clean - stop containers and remove volumes
 function Invoke-Clean {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
     if (Test-Path "./backups") {
         Remove-Item "./backups/*.dump" -Force -ErrorAction SilentlyContinue
     }
@@ -246,15 +268,11 @@ function Invoke-ConsolidateForce {
 }
 
 # Main entry point
-param(
-    [Parameter(Position=0)]
-    [string]$Target = "help"
-)
-
 switch ($Target.ToLower()) {
     "help" { Show-Help }
     "up" { Invoke-Up }
     "down" { Invoke-Down }
+    "build" { Invoke-Build }
     "test-db" { Invoke-TestDb }
     "test-down" { Invoke-TestDown }
     "test-logs" { Invoke-TestLogs }

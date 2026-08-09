@@ -11,76 +11,186 @@ related:
   - architecture-structure
   - technical-specification
   - migration-workflow
+  - seed-workflow
 ---
 
 ## Purpose
 
-Documentation for deploying and operating the Mko Bazuna platform using Docker. Covers local development setup, production deployment, environment configuration, and routine operational procedures.
+Documentation for deploying and operating the Mko Bazuna platform using Docker. Covers the
+Makefile-driven Compose project isolation model, local development setup, production deployment,
+environment configuration, the service startup dependency chain, routine operational procedures,
+and troubleshooting.
 
 ## Main Concepts
 
-- **Two-process architecture:** Web (gunicorn WSGI) and bot (aiogram) share one Django project and PostgreSQL database
-- **Migrations run exactly once** before both services start
+- **Two-process architecture:** Web (gunicorn WSGI) and bot (aiogram) share one Django project
+  and PostgreSQL database
+- **Migrations run exactly once** before both services start (via an advisory-locked one-shot
+  service)
+- **Compose project isolation:** Dev and test environments use separate Compose project names
+  (`mko-bazuna-dev` and `mko-bazuna-test`) so they never collide on service names, networks, or
+  named volumes
+- **Seed auto-runs in dev:** The dev override clears the `seed` profile gate so the seed one-shot
+  container starts automatically on `make up`
 - **Media storage:** Local `MEDIA_ROOT` volume served via nginx
 - **TLS termination:** Handled by nginx; HTTPS mandatory for login deep-links and secure cookies
+
+## Compose Project Isolation
+
+The Makefile is the primary interface for all Docker operations. It uses **GNU Make target-specific
+variable exports** to assign `COMPOSE_PROJECT_NAME` per target group, eliminating project-name
+mismatch between `make up`, `make down`, and `make test`:
+
+```makefile
+up down build restart lint typecheck shell makemigrations create-admin \
+    load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
+    export COMPOSE_PROJECT_NAME = mko-bazuna-dev
+
+test test-db test-down test-logs test-recreate: \
+    export COMPOSE_PROJECT_NAME = mko-bazuna-test
+```
+
+This means every dev target operates on the `mko-bazuna-dev` project and every test target operates
+on `mko-bazuna-test`. You can run `make up` (dev, port 8000) and `make test` simultaneously
+without service-name, network, or named-volume collisions. Each project gets its own `postgres_data`
+and `uv_cache` volumes, prefixed by the project name.
+
+### Exact invocation forms
+
+| Environment | Compose project name | Full invocation | Env file |
+|-------------|---------------------|-----------------|----------|
+| Dev | `mko-bazuna-dev` | `docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml <cmd>` | `.env.docker` |
+| Test | `mko-bazuna-test` | `docker compose -f docker-compose.yml -f docker-compose.test.yml <cmd>` | *(none — test vars are inline in the override)* |
+
+> **Note:** The test recipes do **not** pass `--env-file .env.docker`. Test credentials and settings
+> are defined inline in `docker-compose.test.yml` (user: `postgres`, db: `mko_bazuna`, password:
+> `postgres`).
+
+> **Warning:** A plain `docker compose up` (without `make` or `--env-file`) silently falls back to
+> the directory-name default project `mko_bazuna`. This causes a project-name mismatch with
+> Makefile-managed containers and leads to stale, orphaned containers. Always use `make` or
+> replicate the exact invocation form above with the correct `COMPOSE_PROJECT_NAME`.
+
+### Environment files
+
+| File | Purpose | Tracked in git |
+|------|---------|----------------|
+| `.env.docker` | App secrets/creds; passed via `--env-file` and bind-mounted into containers as `src/.env` (also used via `env_file:` in compose) | Yes (template with placeholder values) |
+| `.env` | Auto-loaded by Compose for `${VAR}` interpolation in YAML only; sets no `COMPOSE_PROJECT_NAME` | No (gitignored) |
+
+Never set `DATABASE_URL` in `.env.docker` — Compose constructs it from the `POSTGRES_*` variables so
+the inter-container hostname (`db`) is correct.
+
+### Windows / non-`make` operation
+
+`make` is not available in a default Windows 11 PowerShell shell, so `make up`,
+`make down`, `make build`, and `make test` will not run as-is. Use one of:
+
+- **PowerShell parity script:** `.\Makefile.ps1 <target>` — provides project-name
+  isolation equivalent to the Makefile (`up`, `down`, `build`, `test`, `test-db`,
+  `clean`, …). Run `.\Makefile.ps1 help` for the full target list.
+- **Manual invocation:** Pass `--project-name` explicitly to `docker compose`. This
+  is shell-agnostic and is exactly equivalent to the `make` targets.
+
+  ```powershell
+  # IMPORTANT: On Windows, write each command on a SINGLE line.
+  # The `\` line-continuation is a bash feature; PowerShell treats a trailing `\`
+  # as a literal backslash, which makes `docker compose` reject the path/fragment.
+  # These examples are single-line PowerShell-ready commands.
+
+  # Start dev (equiv. to: make up)
+  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+
+  # Stop dev (equiv. to: make down)
+  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down
+
+  # Rebuild images without cache (equiv. to: make build)
+  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+
+  # Full environment reset (equiv. to: make clean)
+  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+  docker compose -p mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down --rmi all -v
+  # Start test DB on host:5433 (equiv. to: make test-db)
+  docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
+
+  # Run tests, one-shot (equiv. to: make test)
+  docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test
+  ```
+
+  Omitting `--project-name` falls back to the directory-name default `mko_bazuna`, which
+  collides with any `make`/`Makefile.ps1`-managed stack and reuses the wrong volume (see
+  [Recovery from stale project names](#recovery-from-stale-project-names)).
+
+## Startup Dependency Chain
+
+On `make up`, the Compose `depends_on` directives run one-shot services in a strict order before
+starting the long-lived web and bot processes. The full chain is:
+
+```
+db (healthy, pg_isready)
+  → migrate (one-shot, advisory-locked, exits 0)
+    → load_catalog (one-shot, loads categories.yaml)
+      → create_admin (one-shot, skipped if ADMIN_PASSWORD is empty)
+        → seed (one-shot, auto-runs in dev)
+  → web (gunicorn, long-lived)
+  → bot (aiogram, long-lived)
+```
+
+- **`db`** — PostgreSQL 18 with a `pg_isready` healthcheck. `web` and `bot` both block on
+  downstream one-shot services completing successfully.
+- **`migrate`** — runs `manage.py migrate --noinput` inside a PostgreSQL advisory lock (ID 100) so
+  concurrent runs are serialized. Exits 0 on success (including a fresh DB with no pending
+  migrations). See [the migration workflow](migration-workflow.md) for details.
+- **`load_catalog`** — loads the category tree from `apps/categories/catalog/categories.yaml`.
+  Depends on `migrate` completing successfully.
+- **`create_admin`** — creates a Django superuser if `ADMIN_PASSWORD` is set; skipped silently
+  otherwise. Depends on `load_catalog`.
+- **`seed`** — populates the database with demo data. In dev this runs **automatically** because
+  `docker-compose.dev.override.yml` sets `profiles: !reset []` on the `seed` service, clearing the
+  base `["seed"]` profile gate from `docker-compose.yml`. In production the profile gate is
+  retained, so seed only runs on explicit `--profile seed` demand. See
+  [the seed data workflow](seed-workflow.md) for details.
 
 ## Local Development Setup
 
 ### Prerequisites
 
 - Docker + Docker Compose
-- Python 3.14+ with `uv` package manager
+- Python 3.14+ with `uv` package manager (for host-side commands like `make consolidate`)
 - A Telegram bot token from @BotFather
 
 ### Quick Start
 
 ```bash
-# Copy the Docker environment template and configure
-cp .env.docker .env.local
+# Configure environment: edit .env.docker with your real values
+#   - BOT_TOKEN: your Telegram bot token from @BotFather
+#   - DJANGO_SECRET_KEY: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+#   - POSTGRES_PASSWORD: database password
 
-# Edit .env.local and set your values:
-# - BOT_TOKEN: Your Telegram bot token
-# - DJANGO_SECRET_KEY: Generate with `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`
-# - POSTGRES_PASSWORD: Database password
+# Start dev environment (project: mko-bazuna-dev)
+make up
 
-# Start development environment
-docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --env-file .env.local up -d
-
-# Apply migrations
-docker compose --env-file .env.local run --rm migrate
-```
-
-```bash
-# 1. Останавливаем все контейнеры проекта
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --rmi all
-
-# 2. Удаляем все dangling (висячие) образы, контейнеры, сети и volumes проекта
-docker system prune -f --volumes
-
-# 3. (Опционально, но рекомендуется) Удаляем ВСЕ неиспользуемые образы
-docker image prune -a -f
-
-# 4. Полная очистка кэша сборки (очень важно при проблемах с uv / layers)
-docker builder prune -a -f
-```
-
-```bash
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
-
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d --force-recreate
+# The dependency chain runs automatically:
+# db → migrate → load_catalog → create_admin → seed → web, bot
+# Web is served at http://localhost:8000 (hot-reload enabled)
 ```
 
 ### Database Configuration
 
-Docker Compose automatically constructs `DATABASE_URL` from the `POSTGRES_*` variables using the `db` service hostname:
+Docker Compose automatically constructs `DATABASE_URL` from the `POSTGRES_*` variables using the
+`db` service hostname:
 
 ```
 postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 ```
 
-**Important:** Do NOT set `DATABASE_URL` in `.env.local` or `.env.docker` when running Docker containers. The compose files build it from the individual database variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), ensuring the correct hostname (`db`) is used for inter-container communication.
+**Important:** Do NOT set `DATABASE_URL` in `.env.docker` — the compose files build it from the
+individual database variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), ensuring the
+correct hostname (`db`) is used for inter-container communication.
 
-For local Django development outside Docker (using `uv run` directly), use `.env.local` with `DATABASE_URL` pointing to `localhost`:
+For local Django development outside Docker (using `uv run` directly), use `.env` (auto-loaded by
+Compose) with `DATABASE_URL` pointing to `localhost`:
+
 ```bash
 # Start Django locally (not in Docker)
 uv run python src/backend/manage.py runserver
@@ -92,37 +202,74 @@ uv run python src/backend/manage.py runserver
 |---------|------|-------------|
 | `web` | 8000 | Django development server (hot-reload enabled) |
 | `bot` | — | Telegram bot (logs to stdout) |
-| `db` | 5432 | PostgreSQL 18 |
+| `db` | — | PostgreSQL 18 (internal, no host port) |
 | `nginx` | 80/443 | Optional; use `profiles: ["use-nginx"]` to enable |
+
+### Full environment reset
+
+If you encounter stale containers or build issues:
+
+```bash
+# 1. Stop and remove all dev containers and volumes
+# Windows: .\Makefile.ps1 down  — or single-line:
+#   docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v
+
+make down    # or: docker compose --env-file .env.docker \
+             #      -f docker-compose.yml -f docker-compose.dev.override.yml down -v
+
+# 2. Remove dangling images, containers, networks, and volumes
+docker system prune -f --volumes
+
+# 3. (Optional) Remove all unused images
+docker image prune -a -f
+
+# 4. Clear build cache (important for uv layer issues)
+docker builder prune -a -f
+
+# 5. Rebuild and start fresh
+make build
+make up
+# Windows: .\Makefile.ps1 build ; .\Makefile.ps1 up
+```
 
 ### Production-like Development
 
-For full production parity with nginx TLS termination, see [Local HTTPS with mkcert](local-https-mkcert.md) for certificate setup.
+For full production parity with nginx TLS termination, see
+[Local HTTPS with mkcert](local-https-mkcert.md) for certificate setup.
 
 ```bash
 # Run without nginx (direct web access on port 8000)
-docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+make up
 
 # Or run with nginx for production-like HTTPS (requires mkcert setup)
-docker compose -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
 
-**Note:** Running with `--profile use-nginx` requires TLS certificates. Follow the mkcert setup guide for local HTTPS development.
+Windows (PowerShell 5.1+) — single line, no `\` continuation:
+
+```powershell
+# Windows equivalents:
+.\Makefile.ps1 up
+
+# Or with nginx for production-like HTTPS (requires mkcert setup):
+docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
+```
+
+**Note:** Running with `--profile use-nginx` requires TLS certificates. Follow the mkcert setup
+guide for local HTTPS development.
 
 ## Production Deployment
 
 ### Docker Compose Production
 
 ```bash
-# Copy the Docker environment template and configure
-cp .env.docker .env.local
-
-# Edit .env.local with production values
+# Configure .env.docker with production values
 # Then start services:
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Apply migrations (run once)
-docker compose --env-file .env.local run --rm migrate
+docker compose --env-file .env.docker -f docker-compose.yml run --rm migrate
 ```
 
 ### Production Services
@@ -143,7 +290,7 @@ Mount TLS certificates at `/etc/nginx/certs/` in the nginx container:
 
 ```bash
 # Using Let's Encrypt certificates
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 The production override file (`docker-compose.prod.yml`) includes:
@@ -169,43 +316,85 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `SEED_USERS` | No | Number of demo users to generate (default: 10) |
 | `SEED_ADS` | No | Number of demo ads to generate (default: 30) |
 
-**Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker containers. Do not set `DATABASE_URL` in `.env.docker` when running Docker - the compose files build it from the individual database variables.
+**Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
+containers. Do not set `DATABASE_URL` in `.env.docker` — the compose files build it from the
+individual database variables.
 
 *Required for automatic admin creation via `create_admin` service. Can be created manually if not set.
 
 ## Makefile Commands
 
-The project includes a Makefile for common operations:
+The project includes a Makefile (`Makefile` for Linux/macOS, `Makefile.ps1` for Windows) that
+manages Compose project names automatically. Use `make <target>` — do not call `docker compose`
+directly unless you have set `COMPOSE_PROJECT_NAME` explicitly (see
+[Compose Project Isolation](#compose-project-isolation)).
+
+### Dev targets (project: `mko-bazuna-dev`)
 
 | Target | Description |
 |--------|-------------|
-| `make up` | Start dev environment with hot-reload (`mko-bazuna-dev` project) |
+| `make up` | Start dev environment with hot-reload (port 8000) |
 | `make down` | Stop and remove dev containers |
 | `make build` | Rebuild Docker images without cache |
 | `make restart` | Restart the web service |
-| `make test` | Run tests (auto-starts test DB on :5433); uses `--reuse-db` |
-| `make test-db` | Start the long-running test PostgreSQL (port 5433) |
+| `make clean` | Stop containers and remove volumes (`down -v --remove-orphans`) |
+| `make logs` | Follow dev container logs |
+| `make backup` | Create database backup (7-day rotation) |
+| `make restore BACKUP_FILE=...` | Restore database from backup |
+| `make prune-backups` | Delete backups older than 7 days |
+
+### Django / catalog targets (project: `mko-bazuna-dev`)
+
+| Target | Description |
+|--------|-------------|
+| `make migrate` | Apply migrations (one-shot, advisory-locked) |
+| `make makemigrations` | Create new migration files from model changes |
+| `make create-admin` | Create admin user manually |
+| `make load-catalog` | Load categories.yaml into DB (one-shot) |
+| `make seed` | Re-run seed manually (dev: also auto-runs on `make up`) |
+| `make shell` | Open shell in web container |
+| `make db-shell` | Open psql in database |
+| `make lint` | Run ruff linter |
+| `make typecheck` | Run basedpyright type checker |
+
+### Consolidation targets (host-side, project: `mko-bazuna-dev`)
+
+| Target | Description |
+|--------|-------------|
+| `make consolidate` | Reset apps exceeding 8 migration files back to initial |
+| `make consolidate-force` | Reset all migrations unconditionally |
+
+> See [the migration workflow](migration-workflow.md) for full details on consolidation logic and
+> rules.
+
+### Test targets (project: `mko-bazuna-test`)
+
+| Target | Description |
+|--------|-------------|
+| `make test` | Run tests (auto-starts test DB on :5433; uses `--reuse-db`) |
+| `make test-db` | Start long-running test PostgreSQL (port 5433, persistent) |
 | `make test-down` | Stop test environment (preserves DB for `--reuse-db`) |
 | `make test-logs` | Follow test environment logs |
 | `make test-recreate` | Drop and rebuild test DB schema (`--no-reuse-db --create-db`) |
-| `make lint` | Run ruff linter |
-| `make typecheck` | Run basedpyright type checker |
-| `make migrate` | Apply database migrations |
-| `make create-admin` | Create admin user manually |
-| `make makemigrations` | Create new migrations |
-| `make shell` | Open shell in web container |
-| `make db-shell` | Open psql in database |
-| `make logs` | Follow container logs |
-| `make backup` | Create database backup |
-| `make restore BACKUP_FILE=...` | Restore from backup |
 
 ## Test Environment
 
-The test environment is fully isolated from the running dev environment via separate
-Docker Compose **project names** (`mko-bazuna-dev` and `mko-bazuna-test`). You can run
-`make up` (dev, port 8000) and `make test` at the same time without service-name,
-network, or named-volume collisions. Each project gets its own `postgres_data` and
-`uv_cache` volumes.
+The test environment is fully isolated from the running dev environment via a separate Compose
+project name (`mko-bazuna-test`). You can run `make up` (dev, port 8000) and `make test`
+simultaneously without service-name, network, or named-volume collisions.
+
+### Architecture comparison
+
+| Aspect | Dev (`mko-bazuna-dev`) | Test (`mko-bazuna-test`) |
+|--------|------------------------|--------------------------|
+| Compose files | `docker-compose.yml` + `docker-compose.dev.override.yml` | `docker-compose.yml` + `docker-compose.test.yml` |
+| Env file | `--env-file .env.docker` | *(none — test vars are inline in the override)* |
+| DB host port | *(not published)* | **5433** → container 5432 |
+| DB credentials | `POSTGRES_*` from `.env.docker` | `postgres` / `postgres` / `mko_bazuna` |
+| Persistent volume | `mko-bazuna-dev_postgres_data` | `mko-bazuna-test_postgres_data` |
+| Source binding | `.:/app` (hot-reload) | `.:/app` (no image rebuild needed) |
+| `DEBUG` | `True` | `False` |
+| Settings module | `config.settings.dev` | `config.settings.test` |
 
 ### Quick start
 
@@ -226,52 +415,88 @@ make test-down
 |--------|-------------|
 | `make test-db` | Start only the test PostgreSQL on port `5433` (`restart: unless-stopped`, persistent volume). Idempotent. |
 | `make test` | Start the test DB if not running, then run the one-shot `test` container (migrate + pytest). |
-| `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives across sessions. |
+| `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives between sessions. |
 | `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). |
 | `make test-logs` | Follow logs from the test project (db + test run output). |
 
+### `--reuse-db` strategy
+
+The `mko-bazuna-test_postgres_data` volume persists across `make test` / `make test-down` cycles.
+The `entrypoint-test.sh` script runs:
+
+```bash
+pytest --reuse-db --create-db --tb=short
+```
+
+- `--reuse-db` caches the `test_mko_bazuna` schema between runs (skips the ~1.5 s migration replay).
+- `--create-db` makes Django rebuild the schema whenever migrations diverge.
+- The test DB has its own named volume (`mko-bazuna-test_postgres_data`) because the test override
+  does **not** override the base `volumes:` key — Compose prefixes it with the project name,
+  yielding the persistent volume above.
+- `--reuse-db` is intentionally **Docker-only**; it is not added to `pyproject.toml` `addopts`, so
+  host-side and CI runs (which build a fresh DB each time) are unaffected.
+
+To bypass the cache when the schema is stale:
+
+```bash
+make test-recreate   # runs: pytest --no-reuse-db --create-db --tb=short
+```
+
 ### Fast iteration
 
-- The `test` service **bind-mounts the source tree** (`.:/app`) and the entrypoint
-  scripts into the container, so changing Python/Django code and re-running `make test`
-  does **not** require rebuilding the Docker image. Only `make build` (the full
-  Tailwind CSS + collectstatic builder stage) rebuilds the image.
-- `init: true` is set on the `test` service for proper signal handling (Ctrl+C
-  propagation) and zombie reaping.
-- On Windows, `.\Makefile.ps1 test-db` / `test` / `test-down` / `test-logs` /
-  `test-recreate` provide parity.
-
-### `--reuse-db` workflow
-
-- By default `entrypoint-test.sh` runs `pytest --reuse-db --create-db --tb=short`.
-  `--reuse-db` caches the `test_mko_bazuna` schema between runs (skip the ~1.5 s
-  migration replay), and `--create-db` makes Django rebuild the schema whenever the
-  migrations diverge. This is the standard pytest-django fast-iteration pattern.
-- Use `--create-db` (always on by default) to refresh after a migration change.
-- Use `make test-recreate` when the cached schema is stale or you need a guaranteed
-  clean slate — it runs `pytest --no-reuse-db --create-db --tb=short`.
-- `--reuse-db` is intentionally **Docker-only**; it is not added to `pyproject.toml`
-  `addopts`, so host-side and CI runs (which build a fresh DB each time) are
-  unaffected.
+- The `test` service **bind-mounts the source tree** (`.:/app`) and the entrypoint scripts into
+  the container, so changing Python/Django code and re-running `make test` does **not** require
+  rebuilding the Docker image. Only `make build` (the full Tailwind CSS + collectstatic builder
+  stage) rebuilds the image.
+- `init: true` is set on the `test` service for proper signal handling (Ctrl+C propagation) and
+  zombie reaping.
 
 ### Debugging the test database
 
-The test PostgreSQL is published on host port **5433** (vs. the dev database, which has
-no host port). Connect directly for inspection:
+The test PostgreSQL is published on host port **5433** (vs. the dev database, which has no host
+port). Connect directly for inspection:
 
 ```bash
 psql -h 127.0.0.1 -p 5433 -U postgres -d mko_bazuna
 # password: postgres
 ```
 
-The test database name is `mko_bazuna`; pytest-django creates the actual `test_mko_bazuna`
-database inside the same container, which is what `--reuse-db` caches.
+The test database name is `mko_bazuna`; pytest-django creates the actual `test_mko_bazuna` database
+inside the same container, which is what `--reuse-db` caches.
 
-### Note for switching from the default project name
+### Recovery from stale project names
 
-If you previously ran the test suite with the default project name (`mko_bazuna`), run
-`docker compose -f docker-compose.yml -f docker-compose.test.yml down -v` once to remove
-the old containers and volumes before using `make test-db`.
+If you previously ran `docker compose up` without `make` (or before the `COMPOSE_PROJECT_NAME`
+exports existed), containers may be stranded under the default project name `mko_bazuna` (dev) or a
+stray `mko_pg_test` container may hold port 5433 (test). `make down` or `make test-db` will then
+report "No stopped containers" or a port-conflict error.
+
+**Recovery steps:**
+
+1. **Remove stale dev project** (project `mko_bazuna`):
+
+```bash
+docker compose -p mko_bazuna -f docker-compose.yml -f docker-compose.dev.override.yml down --remove-orphans
+```
+
+Add `-v` to also wipe its volumes if dev data is regenerable via seed:
+
+```bash
+docker compose -p mko_bazuna -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+```
+
+2. **Clear port 5433** (stray `mko_pg_test` container):
+
+```bash
+docker rm -f mko_pg_test
+```
+
+3. **Recreate under the correct project names:**
+
+```bash
+make up         # recreates dev under mko-bazuna-dev
+make test-db    # recreates test DB under mko-bazuna-test
+```
 
 ## Scheduled Jobs
 
@@ -292,8 +517,14 @@ The platform runs several periodic cleanup tasks:
 ### Running Sweeps
 
 ```bash
-# Run manually
-docker compose run --rm web python src/backend/manage.py archive_sweep
+# Run manually (uses the dev project name automatically)
+make shell
+# then: python src/backend/manage.py archive_sweep
+
+# Or via docker compose directly
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py archive_sweep
 
 # Or via systemd (bare metal)
 # /etc/systemd/system/mko-bazuna-scheduler.service
@@ -342,11 +573,13 @@ location /protected-media/ {
 ### Backup
 
 ```bash
-# Using Makefile
+# Using Makefile (project name set automatically)
 make backup
 
 # Manual
-docker compose exec -T db pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -F c > backups/dump_$(date +%Y%m%d_%H%M%S).dump
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  exec -T db pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -F c > backups/dump_$(date +%Y%m%d_%H%M%S).dump
 ```
 
 ### Restore
@@ -371,14 +604,12 @@ make consolidate     # reset apps that exceed 8 files back to one initial migrat
 For production deployment, run migrations as a one-shot service after the database
 is healthy (the `migrate` service depends on `db: condition: service_healthy`).
 
-### Admin User Setup
+## Admin User Setup
 
 The `create_admin` service creates a pre-configured admin user for Django admin site access.
-This is a one-time setup that runs automatically during deployment when `ADMIN_PASSWORD` is set.
+This is a one-time setup that runs automatically during `make up` when `ADMIN_PASSWORD` is set.
 
-#### Pre-configured Admin User
-
-The admin user is created with the following attributes:
+### Pre-configured Admin User
 
 | Attribute | Default Value | Description |
 |-----------|---------------|-------------|
@@ -393,7 +624,7 @@ The admin user is created with the following attributes:
 login form displays "Telegram ID" as the username field. Enter the `ADMIN_TELEGRAM_ID` value
 (default: `-1`) as the username, along with the password.
 
-#### Automatic Creation
+### Automatic Creation
 
 The `create_admin` service runs after migrations complete and creates an admin user if
 `ADMIN_PASSWORD` is set in the environment:
@@ -401,56 +632,66 @@ The `create_admin` service runs after migrations complete and creates an admin u
 ```bash
 # Set ADMIN_PASSWORD in .env.docker or environment
 # Then run:
-docker compose --env-file .env.docker up -d
+make up
 
 # Check logs for confirmation
-docker compose logs create_admin
+make logs | grep create_admin
 ```
 
 If `ADMIN_PASSWORD` is empty or not set, the service skips creation with a message:
+
 ```
 ADMIN_PASSWORD not set, skipping admin user creation
 ```
 
-#### Manual Creation
+### Manual Creation
 
 If `ADMIN_PASSWORD` was not set during initial deployment, or you need to create/change the
 password later, use the management command:
 
 ```bash
 # Create admin user
-docker compose --env-file .env.docker run --rm web uv run python src/backend/manage.py create_admin_user \
+make create-admin
+
+# Or manually via docker compose
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
     --password your_secure_password \
     --telegram-id -1
 
 # With custom values
-docker compose --env-file .env.docker run --rm web uv run python src/backend/manage.py create_admin_user \
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py create_admin_user \
     --username myadmin \
     --password new_password \
     --telegram-id -1 \
     --email admin@example.com
 ```
 
-#### Dry-Run Mode
+### Dry-Run Mode
 
 Verify what would be created without making changes:
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
     --password test123 \
     --telegram-id -1 \
     --dry-run
 ```
 
-#### Password Change
+### Password Change
 
 To change the admin password, use Django's built-in password change command:
 
 ```bash
 # Open Django shell in web container
-docker compose run --rm web uv run python src/backend/manage.py shell
+make shell
 
 # In the shell:
 from django.contrib.auth import get_user_model
@@ -466,78 +707,55 @@ skip if a user with the same `telegram_id` already exists:
 
 ```bash
 # This will skip if telegram_id=-1 already exists
-docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
-    --username admin \
-    --password new_password \
-    --telegram-id -1
+make create-admin
 ```
 
-#### Changing the Telegram ID Placeholder
+### Changing the Telegram ID Placeholder
 
 If you need to use a different telegram_id for admin login:
 
 ```bash
-# Create with custom telegram_id
-docker compose run --rm web uv run python src/backend/manage.py create_admin_user \
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
     --password your_password \
     --telegram-id -999
 ```
 
-Then set `ADMIN_TELEGRAM_ID=-999` in your `.env` file and restart the services.
+Then set `ADMIN_TELEGRAM_ID=-999` in your `.env.docker` file and restart the services.
 
 ## Seed Data
 
-The project includes a development-only seed command that populates the database with realistic demo data. This is useful for visual evaluation, pagination testing, and search/filter verification.
+The project includes a development-only seed command that populates the database with realistic
+demo data. This is useful for visual evaluation, pagination testing, and search/filter verification.
+Seed also **auto-runs** on `make up` in development (see [Startup Dependency Chain](#startup-dependency-chain)).
 
-### Management Command
+For the full seed data generation process — including fixture generation, photo downloads, and LLM
+content generation — see [the seed data workflow](seed-workflow.md).
 
-```bash
-# Run seed with defaults (10 users, 30 ads)
-uv run python src/backend/manage.py seed
-
-# Custom seed parameters
-uv run python src/backend/manage.py seed --users 50 --ads 200 --force
-
-# Custom status distribution
-uv run python src/backend/manage.py seed --status-distribution '{"published":0.7,"archived":0.1,"draft":0.1,"on_moderation":0.05,"rejected":0.05}'
-
-# Skip analytics generation
-uv run python src/backend/manage.py seed --analytics False
-```
-
-**Warning:** The seed command is **destructive** — it deletes all existing seed data before regenerating. Use `--force` to skip the confirmation prompt.
-
-#### CLI Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `--users` | int | 10 | Number of demo users |
-| `--ads` | int | 30 | Number of demo ads |
-| `--force` | bool | False | Skip confirmation prompt |
-| `--status-distribution` | str | (from config) | JSON status weights, e.g. `'{"published":0.6,"archived":0.2}'` |
-| `--analytics` | bool | True | Generate view events and daily metrics |
-
-### Docker Compose
-
-The seed service is a one-shot container gated by `profiles: ["seed"]`. It runs after migrations complete and populates the database with demo data:
+### Running Seed
 
 ```bash
-# Run seed with defaults
-docker compose --env-file .env.local --profile seed run --rm seed
+# Re-run seed manually (dev: also auto-runs on `make up`)
+make seed
 
 # Custom seed parameters via environment variables
-SEED_USERS=50 SEED_ADS=200 docker compose --env-file .env.local --profile seed run --rm seed
+SEED_USERS=50 SEED_ADS=200 make seed
+
+# Production (explicit profile, seed does NOT auto-run):
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile seed run --rm seed
 ```
 
-#### Seed Service Details
-
-- **Entrypoint:** `docker/entrypoint-seed.sh` — calls `manage.py seed --force` with `SEED_USERS` and `SEED_ADS` env var overrides
-- **Depends on:** `migrate` (condition: `service_completed_successfully`)
-- **Volumes:** mounts `media_volume` for photo generation
-- **Advisory lock:** uses session-scoped lock ID 110 to prevent concurrent seed operations
+**Warning:** The seed command is **destructive** — it deletes all existing seed data before
+regenerating. Use `--force` to skip the confirmation prompt.
 
 ### What Gets Generated
+
+See [the seed data workflow](seed-workflow.md) for the full list of generated entities, fixture
+generation process, and configuration options.
 
 | Entity | Count | Details |
 |--------|-------|---------|
@@ -549,9 +767,13 @@ SEED_USERS=50 SEED_ADS=200 docker compose --env-file .env.local --profile seed r
 | **Analytics events** | auto | `AD_VIEWED` events spread over 90 days |
 | **DailyAdMetrics** | auto | Per-ad-per-day view count rollups |
 
-### Deterministic Output
+### Seed Service Details
 
-The seed command produces deterministic output: running with the same parameters produces identical data. This is achieved via `Faker.seed_instance(42)` (configurable in `seed.default.json`).
+- **Entrypoint:** `docker/entrypoint-seed.sh` — calls `manage.py seed --force` with `SEED_USERS`
+  and `SEED_ADS` env var overrides
+- **Depends on:** `load_catalog` (condition: `service_completed_successfully`)
+- **Volumes:** mounts `media_volume` for photo generation
+- **Advisory lock:** uses session-scoped lock ID 110 to prevent concurrent seed operations
 
 ## Monitoring & Logging
 
@@ -564,21 +786,23 @@ The seed command produces deterministic output: running with the same parameters
 ### Log Access
 
 ```bash
-# Follow all logs
-docker compose logs -f
+# Follow all dev logs (project name set automatically)
+make logs
 
 # Specific service
-docker compose logs -f bot
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml logs -f bot
 
 # Filter by pattern
-docker compose logs | grep "ERROR"
+make logs | grep "ERROR"
 ```
 
 ### Viewing Metrics
 
 ```bash
 # Show analytics metrics via admin CLI
-docker compose run --rm web uv run python src/backend/manage.py show_metrics
+make shell
+# then: python src/backend/manage.py show_metrics
 ```
 
 ## Troubleshooting
@@ -587,55 +811,76 @@ docker compose run --rm web uv run python src/backend/manage.py show_metrics
 
 ```bash
 # Check database health
-docker compose ps db
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  ps db
 
 # Connect directly
-docker compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB
+make db-shell
 
 # Verify migrations
-docker compose run --rm migrate
+make migrate
 ```
 
 ### Bot Not Responding
 
 ```bash
 # Check bot logs
-docker compose logs bot
+make logs | grep bot
 
 # Verify bot token
-docker compose exec bot env | grep BOT_TOKEN
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  exec bot env | grep BOT_TOKEN
 
 # Check for Django setup errors
-docker compose exec bot python -c "import django; django.setup(); print('OK')"
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  exec bot python -c "import django; django.setup(); print('OK')"
 ```
 
 ### Media Files Not Loading
 
 ```bash
 # Check media volume
-docker compose exec web ls -la /app/media
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  exec web ls -la /app/media
 
 # Verify file ownership
-docker compose exec web ls -la /app/media/root
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  exec web ls -la /app/media/root
 
 # Check nginx logs
-docker compose logs nginx
+make logs | grep nginx
 ```
 
 ### Migration Conflicts
 
 ```bash
 # Check for unapplied migrations
-docker compose run --rm web uv run python src/backend/manage.py showmigrations
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py showmigrations
 
 # Check for missing migrations
-docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
 ```
+
+### Stale project name containers
+
+See [Recovery from stale project names](#recovery-from-stale-project-names) in the Test
+Environment section.
 
 ## Related Documentation
 
 - [Local HTTPS with mkcert](local-https-mkcert.md) - Development HTTPS setup for production parity
 - [Database Restore Runbook](restore.md)
+- [Migration Workflow](migration-workflow.md) - Dev migration workflow, consolidation, and rules
+- [Seed Data Workflow](seed-workflow.md) - Seed data generation, fixtures, and photo pipeline
 - [Architecture Structure](../01-spec/architecture-structure.md)
 - [Technical Specification](../01-spec/technical-specification.md)
 - [DB Schema](../02-database/db-schema.md)
