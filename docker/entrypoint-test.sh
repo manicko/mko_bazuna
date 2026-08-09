@@ -6,10 +6,12 @@ set -e
 
 # Enable dev dependencies (pytest, pytest-django, etc.) for testing.
 # default-groups = [] in pyproject.toml keeps dev tools out of the production
-# image. UV_DEFAULT_GROUPS=dev overrides this for the test environment only.
-# UV_NO_INSTALL_PROJECT=1 is set in the Dockerfile runtime stage.
-export UV_DEFAULT_GROUPS=dev
-uv sync --frozen --no-install-project
+# image. The --group dev flag overrides this for the test environment only.
+# UV_NO_INSTALL_PROJECT=1 is set in the Dockerfile runtime stage, but it prevents
+# uv sync from installing any packages. Unset it here; --no-install-project CLI
+# flag still prevents the project package itself from being installed.
+unset UV_NO_INSTALL_PROJECT
+uv sync --frozen --no-install-project --group dev
 
 # Wait for database to be ready
 echo "Waiting for PostgreSQL..."
@@ -30,6 +32,9 @@ fi
 echo "Running migrations..."
 uv run python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
 
-# Run pytest with short traceback format
+# Run pytest with short traceback format.
+# --reuse-db caches the test_mko_bazuna schema between runs for fast iteration;
+# --create-db makes Django recreate the schema when it diverges from migrations.
+# PYTEST_OPTS lets callers (e.g. `make test-recreate`) override the flags.
 echo "Running tests..."
-uv run pytest --tb=short
+uv run pytest ${PYTEST_OPTS:---reuse-db --create-db --tb=short}

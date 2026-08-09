@@ -364,17 +364,25 @@ class Ad(models.Model):
             self.save(update_fields=update_fields)
 
     def get_title(self, locale: str = "ru") -> str:
-        """Return localized title with fallback chain: locale → ru → first available."""
-        # Priority: locale column > Russian > original
-        for field in [f"title_{locale}", "title_ru", "title"]:
+        """Return localized title for *locale* with a fallback to the Russian base.
+
+        The Russian base lives in the ``title`` column (``title_ru`` is not a
+        real column), so the fallback chain is ``title_<locale>`` → ``title``.
+        """
+        for field in [f"title_{locale}", "title"]:
             val = getattr(self, field, None)
             if val:
                 return val
         return ""
 
     def get_description(self, locale: str = "ru") -> str:
-        """Return localized description with fallback chain: locale → ru → first available."""
-        for field in [f"description_{locale}", "description_ru", "description"]:
+        """Return localized description for *locale* with a fallback to the Russian base.
+
+        The Russian base lives in the ``description`` column
+        (``description_ru`` is not a real column), so the fallback chain is
+        ``description_<locale>`` → ``description``.
+        """
+        for field in [f"description_{locale}", "description"]:
             val = getattr(self, field, None)
             if val:
                 return val

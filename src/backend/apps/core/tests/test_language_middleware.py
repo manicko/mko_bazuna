@@ -13,8 +13,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.test import SimpleTestCase
+from django.utils import translation
 
 from apps.core.middleware.language import (
     LANGUAGE_COOKIE_MAX_AGE,
@@ -43,6 +44,9 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
     def setUp(self) -> None:
         """Instantiate middleware once per test."""
         self.middleware = LanguagePreMiddleware(get_response=lambda r: None)
+        # ``process_request`` now calls ``translation.activate()``; clear the
+        # thread-local afterwards so tests do not leak active languages.
+        self.addCleanup(translation.deactivate)
 
     # --- Priority: ?lang parameter ---
 
@@ -138,26 +142,33 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
     # --- Cookie persistence (via process_response) ---
 
     def test_cookie_set_when_lang_param_used(self) -> None:
-        """?lang=bs sets lang_pref cookie via process_response."""
+        """?lang=bs sets lang_pref cookie and emits language headers."""
         request = _make_request(get={"lang": "bs"})
-        response = MagicMock()
+        response = HttpResponse()
         self.middleware.process_request(request)
         self.middleware.process_response(request, response)
-        response.set_cookie.assert_called_once_with(
-            LANGUAGE_COOKIE_NAME,
-            "bs",
-            max_age=LANGUAGE_COOKIE_MAX_AGE,
+        # Cookie persistence (CR3: 1-year lang_pref)
+        self.assertIn("lang_pref", response.cookies)
+        self.assertEqual(response.cookies["lang_pref"].value, "bs")
+        self.assertEqual(
+            int(response.cookies["lang_pref"]["max-age"]), LANGUAGE_COOKIE_MAX_AGE
         )
+        # Header contract (formerly provided by LocaleMiddleware)
+        self.assertIn("Accept-Language", response.headers.get("Vary", ""))
+        self.assertEqual(response.headers.get("Content-Language"), "bs")
         assert request.LANGUAGE_CODE == "bs"
 
     def test_cookie_not_set_when_no_lang_param(self) -> None:
-        """lang_pref cookie is not set when ?lang is absent."""
+        """lang_pref cookie is not (re)set when ?lang is absent."""
         request = _make_request(cookies={LANGUAGE_COOKIE_NAME: "en"})
-        response = MagicMock()
+        response = HttpResponse()
         self.middleware.process_request(request)
         self.middleware.process_response(request, response)
         assert request.LANGUAGE_CODE == "en"
-        response.set_cookie.assert_not_called()
+        self.assertNotIn("lang_pref", response.cookies)
+        # Headers are still emitted for cookie-driven language
+        self.assertIn("Accept-Language", response.headers.get("Vary", ""))
+        self.assertEqual(response.headers.get("Content-Language"), "en")
 
     # --- Session persistence for authenticated users ---
 
@@ -194,3 +205,41 @@ class LanguagePreMiddlewareTests(SimpleTestCase):
         request.session.__setitem__.assert_called_once_with(
             "django_language", "en"
         )
+
+    # --- Thread-local / request-attr consistency (regression guard) ---
+
+    def test_thread_local_matches_request_language_code(self) -> None:
+        """``translation.get_language()`` must agree with ``request.LANGUAGE_CODE``.
+
+        Removing ``LocaleMiddleware`` means this middleware owns the thread-local
+        active language (read by ``{% get_current_language %}`` and the ``i18n``
+        context processor). If activation and the request attribute ever diverge,
+        the switcher highlight desyncs from the rendered ad text.
+        """
+        cases = [
+            ({"lang": "en"}, None, None, "en"),  # ?lang= wins
+            (None, {"lang_pref": "bs"}, None, "bs"),  # cookie
+            (None, None, "en-US,en;q=0.9", "en"),  # Accept-Language
+            (None, None, "fr-FR,fr;q=0.9", "ru"),  # unsupported -> default
+            ({}, None, None, "ru"),  # nothing -> default
+        ]
+        for get, cookies, accept_language, expected in cases:
+            request = _make_request(
+                get=get or {},
+                cookies=cookies or {},
+                accept_language=accept_language,
+            )
+            self.middleware.process_request(request)
+            self.assertEqual(
+                translation.get_language(),
+                request.LANGUAGE_CODE,
+                msg=f"thread-local != request.LANGUAGE_CODE for {get=}, {cookies=}",
+            )
+            self.assertEqual(translation.get_language(), expected)
+
+    def test_invalid_lang_still_syncs_to_russian(self) -> None:
+        """An invalid ?lang falls back to ``ru`` in both thread-local and request."""
+        request = _make_request(get={"lang": "fr"})
+        self.middleware.process_request(request)
+        self.assertEqual(translation.get_language(), "ru")
+        self.assertEqual(request.LANGUAGE_CODE, "ru")

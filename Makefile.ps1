@@ -1,6 +1,11 @@
 # Makefile.ps1 — PowerShell equivalent for Mko Bazuna Docker workflow
 # Windows/WSL2 primary development path - provides parity to Makefile targets
 
+# Isolated Compose project names: dev and test run in separate projects so their
+# `db` containers, networks, and named volumes never collide.
+$DevProject = "mko-bazuna-dev"
+$TestProject = "mko-bazuna-test"
+
 # Load environment variables from .env file
 $envContent = Get-Content -Path ".env" -ErrorAction SilentlyContinue
 if ($envContent) {
@@ -27,7 +32,11 @@ function Show-Help {
     Write-Host "Targets:"
     Write-Host "  up             Start development environment (web on :8000, hot-reload)"
     Write-Host "  down           Stop and remove containers"
-    Write-Host "  test           Run pytest in test container (ephemeral PostgreSQL)"
+    Write-Host "  test           Run pytest in test container (auto-starts test DB on :5433)"
+    Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
+    Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
+    Write-Host "  test-logs      Follow test environment logs"
+    Write-Host "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
     Write-Host "  lint           Run ruff linter inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
     Write-Host "  shell          Open bash shell in web container"
@@ -46,51 +55,89 @@ function Show-Help {
 
 # Start development environment
 function Invoke-Up {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml up -d
 }
 
 # Stop and remove containers
 function Invoke-Down {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down
 }
 
-# Run tests in test container (ephemeral PostgreSQL)
+# Start only the long-running test PostgreSQL (port 5433)
+function Invoke-TestDb {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+}
+
+# Stop and remove the test environment (preserves the DB volume for --reuse-db)
+function Invoke-TestDown {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml down
+}
+
+# Follow test environment logs
+function Invoke-TestLogs {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml logs -f
+}
+
+# Drop and rebuild the test DB schema (ignores the --reuse-db cache).
+# The entrypoint-test.sh pipeline (uv sync + wait + migrate + pytest) still runs;
+# only pytest's caching flags are overridden via PYTEST_OPTS.
+function Invoke-TestRecreate {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short" test
+}
+
+# Run tests in test container (auto-starts the test DB if not running)
 function Invoke-Test {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    # Ensure the long-running test DB is up (idempotent) so --reuse-db can persist.
+    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
     docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test
 }
 
 # Run linter inside web container
 function Invoke-Lint {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check src/
 }
 
 # Run type checker inside web container
 function Invoke-Typecheck {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run basedpyright src/
 }
 
 # Open shell in web container
 function Invoke-Shell {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web /bin/bash
 }
 
 # Run migrations (one-shot service)
 function Invoke-Migrate {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose run --rm migrate
 }
 
 # Create migrations from model changes
 function Invoke-Makemigrations {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py makemigrations
 }
 
 # Load categories.yaml into DB (one-shot)
 function Invoke-LoadCatalog {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
 }
 
 # Create admin user manually
 function Invoke-CreateAdmin {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
         --username ($env:ADMIN_USERNAME || "admin") `
         --password $env:ADMIN_PASSWORD `
@@ -99,11 +146,13 @@ function Invoke-CreateAdmin {
 
 # Follow logs from all services
 function Invoke-Logs {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml logs -f
 }
 
 # Create database backup with 7-day rotation
 function Invoke-Backup {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     $backupsDir = "./backups"
     if (-not (Test-Path $backupsDir)) {
         New-Item -ItemType Directory -Path $backupsDir | Out-Null
@@ -151,6 +200,7 @@ function Invoke-Restore {
         exit 1
     }
 
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose exec -T db pg_restore -U $pgUser -d $pgDb --clean --if-exists $BackupFile
 }
 
@@ -172,6 +222,7 @@ function Invoke-PruneBackups {
 
 # Clean - stop containers and remove volumes
 function Invoke-Clean {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
     if (Test-Path "./backups") {
         Remove-Item "./backups/*.dump" -Force -ErrorAction SilentlyContinue
@@ -180,6 +231,7 @@ function Invoke-Clean {
 
 # Consolidate migrations (threshold-based)
 function Invoke-Consolidate {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     uv run python scripts/consolidate_migrations.py --threshold $CONSOLIDATE_THRESHOLD
     Invoke-Makemigrations
     Invoke-Migrate
@@ -187,6 +239,7 @@ function Invoke-Consolidate {
 
 # Consolidate all migrations unconditionally
 function Invoke-ConsolidateForce {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
     uv run python scripts/consolidate_migrations.py --force
     Invoke-Makemigrations
     Invoke-Migrate
@@ -202,6 +255,10 @@ switch ($Target.ToLower()) {
     "help" { Show-Help }
     "up" { Invoke-Up }
     "down" { Invoke-Down }
+    "test-db" { Invoke-TestDb }
+    "test-down" { Invoke-TestDown }
+    "test-logs" { Invoke-TestLogs }
+    "test-recreate" { Invoke-TestRecreate }
     "test" { Invoke-Test }
     "lint" { Invoke-Lint }
     "typecheck" { Invoke-Typecheck }

@@ -179,11 +179,15 @@ The project includes a Makefile for common operations:
 
 | Target | Description |
 |--------|-------------|
-| `make up` | Start dev environment with hot-reload |
-| `make down` | Stop and remove containers |
+| `make up` | Start dev environment with hot-reload (`mko-bazuna-dev` project) |
+| `make down` | Stop and remove dev containers |
 | `make build` | Rebuild Docker images without cache |
 | `make restart` | Restart the web service |
-| `make test` | Run tests |
+| `make test` | Run tests (auto-starts test DB on :5433); uses `--reuse-db` |
+| `make test-db` | Start the long-running test PostgreSQL (port 5433) |
+| `make test-down` | Stop test environment (preserves DB for `--reuse-db`) |
+| `make test-logs` | Follow test environment logs |
+| `make test-recreate` | Drop and rebuild test DB schema (`--no-reuse-db --create-db`) |
 | `make lint` | Run ruff linter |
 | `make typecheck` | Run basedpyright type checker |
 | `make migrate` | Apply database migrations |
@@ -194,6 +198,80 @@ The project includes a Makefile for common operations:
 | `make logs` | Follow container logs |
 | `make backup` | Create database backup |
 | `make restore BACKUP_FILE=...` | Restore from backup |
+
+## Test Environment
+
+The test environment is fully isolated from the running dev environment via separate
+Docker Compose **project names** (`mko-bazuna-dev` and `mko-bazuna-test`). You can run
+`make up` (dev, port 8000) and `make test` at the same time without service-name,
+network, or named-volume collisions. Each project gets its own `postgres_data` and
+`uv_cache` volumes.
+
+### Quick start
+
+```bash
+# 1. Start the long-running test PostgreSQL (persistent, port 5433)
+make test-db
+
+# 2. Run tests (starts test DB if not running; reuses the cached schema)
+make test
+
+# 3. (When done) stop the test environment, keeping the DB for the next session
+make test-down
+```
+
+### Lifecycle commands
+
+| Target | Description |
+|--------|-------------|
+| `make test-db` | Start only the test PostgreSQL on port `5433` (`restart: unless-stopped`, persistent volume). Idempotent. |
+| `make test` | Start the test DB if not running, then run the one-shot `test` container (migrate + pytest). |
+| `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives across sessions. |
+| `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). |
+| `make test-logs` | Follow logs from the test project (db + test run output). |
+
+### Fast iteration
+
+- The `test` service **bind-mounts the source tree** (`.:/app`) and the entrypoint
+  scripts into the container, so changing Python/Django code and re-running `make test`
+  does **not** require rebuilding the Docker image. Only `make build` (the full
+  Tailwind CSS + collectstatic builder stage) rebuilds the image.
+- `init: true` is set on the `test` service for proper signal handling (Ctrl+C
+  propagation) and zombie reaping.
+- On Windows, `.\Makefile.ps1 test-db` / `test` / `test-down` / `test-logs` /
+  `test-recreate` provide parity.
+
+### `--reuse-db` workflow
+
+- By default `entrypoint-test.sh` runs `pytest --reuse-db --create-db --tb=short`.
+  `--reuse-db` caches the `test_mko_bazuna` schema between runs (skip the ~1.5 s
+  migration replay), and `--create-db` makes Django rebuild the schema whenever the
+  migrations diverge. This is the standard pytest-django fast-iteration pattern.
+- Use `--create-db` (always on by default) to refresh after a migration change.
+- Use `make test-recreate` when the cached schema is stale or you need a guaranteed
+  clean slate — it runs `pytest --no-reuse-db --create-db --tb=short`.
+- `--reuse-db` is intentionally **Docker-only**; it is not added to `pyproject.toml`
+  `addopts`, so host-side and CI runs (which build a fresh DB each time) are
+  unaffected.
+
+### Debugging the test database
+
+The test PostgreSQL is published on host port **5433** (vs. the dev database, which has
+no host port). Connect directly for inspection:
+
+```bash
+psql -h 127.0.0.1 -p 5433 -U postgres -d mko_bazuna
+# password: postgres
+```
+
+The test database name is `mko_bazuna`; pytest-django creates the actual `test_mko_bazuna`
+database inside the same container, which is what `--reuse-db` caches.
+
+### Note for switching from the default project name
+
+If you previously ran the test suite with the default project name (`mko_bazuna`), run
+`docker compose -f docker-compose.yml -f docker-compose.test.yml down -v` once to remove
+the old containers and volumes before using `make test-db`.
 
 ## Scheduled Jobs
 

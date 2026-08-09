@@ -3,10 +3,14 @@
 # Uses postgres:18-alpine with no persistent volume - DB destroyed after run
 
 services:
-  # Override db service for test: ephemeral database (no persistent volume)
+  # Override db service for test: long-running, persistent PostgreSQL.
+  # `volumes` is NOT overridden here, so the base `postgres_data` volume applies
+  # (prefixed by the project name -> mko-bazuna-test_postgres_data). This keeps the
+  # container alive between `make test` runs so `pytest --reuse-db` can cache the
+  # schema. Port 5433 on the host allows debugging with psql / GUI tools.
   db:
     image: postgres:18-alpine
-    restart: "no"
+    restart: unless-stopped
     environment:
       POSTGRES_DB: mko_bazuna
       POSTGRES_USER: postgres
@@ -15,8 +19,8 @@ services:
       DJANGO_SECRET_KEY: test-secret-key-for-testing-only
       DJANGO_SETTINGS_MODULE: config.settings.test
       BOT_TOKEN: test-bot-token-for-testing
-
-    # No persistent volume for ephemeral test database
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d mko_bazuna"]
       interval: 5s
@@ -35,12 +39,16 @@ services:
       BOT_TOKEN: test-bot-token-for-testing
     env_file: []
 
-  # Test service: one-shot run migrate + pytest
+  # Test service: one-shot run of migrate + pytest.
+  # Source code is bind-mounted (.:/app) so test iteration needs no image rebuild.
+  # `init: true` makes the container PID 1 properly forward signals (Ctrl+C)
+  # and reap zombies (CR5).
   test:
     build:
       context: .
       dockerfile: docker/Dockerfile
     command: /app/entrypoint-test.sh
+    init: true
     depends_on:
       db:
         condition: service_healthy
@@ -52,5 +60,18 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
       - DJANGO_SECRET_KEY=test-secret-key-for-testing-only
       - BOT_TOKEN=test-bot-token-for-testing
+      # Override Dockerfile's UV_NO_INSTALL_PROJECT=1 so uv sync installs dev deps
+      - UV_NO_INSTALL_PROJECT=0
+      # .env is not bind-mounted; entrypoint.sh skips its existence check (CR3 safety)
+      - SKIP_ENV_CHECK=1
+    # Bind-mount source + entrypoint scripts for hot-reload; cache uv downloads.
+    volumes:
+      - .:/app
+      - ./docker/entrypoint.sh:/app/entrypoint.sh
+      - ./docker/entrypoint-test.sh:/app/entrypoint-test.sh
+      - uv_cache:/root/.cache/uv
     # One-shot service: exits with pytest exit code
     profiles: ["test"]
+
+volumes:
+  uv_cache:

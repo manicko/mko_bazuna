@@ -1,9 +1,21 @@
 """
 Language preference middleware for Mko Bazuna.
 
-Detects and sets the user language preference before Django's LocaleMiddleware
-runs. Priority order: ?lang=X query parameter > lang_pref cookie >
-Accept-Language header > default to ru.
+The single authority for the active language. Resolves the user language per
+priority ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``ru``,
+activates the Django translation for the request thread, and keeps
+``request.LANGUAGE_CODE`` in sync with the thread-local active language.
+
+Django's ``LocaleMiddleware`` is intentionally NOT used (see
+``config/settings/base.py``): it is dormant in this project (no
+``i18n_patterns``, no ``set_language`` view, no compiled ``.mo`` files) and its
+``process_request`` would re-derive the language from the default ``django_language``
+cookie (which is never set here) plus ``Accept-Language``, clobbering the value
+resolved above and ignoring both ``?lang=`` and the ``lang_pref`` cookie.
+
+This middleware also replaces ``LocaleMiddleware``'s response contract:
+``Vary: Accept-Language`` and ``Content-Language`` headers, keeping the
+behaviour forward-compatible with any future reverse proxy / page cache.
 """
 
 from __future__ import annotations
@@ -11,6 +23,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.utils import translation
+from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
 
 from apps.core.enums import LanguageLocale
@@ -22,7 +36,11 @@ LANGUAGE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
 
 
 class LanguagePreMiddleware(MiddlewareMixin):
-    """Detect and set user language preference before LocaleMiddleware.
+    """Detect, activate and persist the user's language preference.
+
+    This middleware is the single authority for the active language: Django's
+    ``LocaleMiddleware`` is intentionally removed from the stack (it is dormant
+    here and would clobber the resolved language — see the module docstring).
 
     Reads the language preference from the following sources in priority
     order:
@@ -56,10 +74,13 @@ class LanguagePreMiddleware(MiddlewareMixin):
         self._set_language_code(request, LanguageLocale.RUSSIAN.value)
 
     def process_response(self, request: Any, response: Any) -> Any:
-        """Persist the lang_pref cookie on the response if set by ?lang=.
+        """Persist the ``lang_pref`` cookie and emit language response headers.
 
-        The cookie value is stored on the request during process_request
-        and applied here where we have access to the response object.
+        The cookie value is stored on the request during ``process_request``
+        and applied here where we have access to the response object. The
+        ``Vary``/``Content-Language`` headers replicate the contract that
+        Django's ``LocaleMiddleware.process_response`` provided, so the
+        behaviour is preserved for any future reverse proxy / page cache.
         """
         cookie_value = getattr(request, "_lang_cookie_value", None)
         if cookie_value is not None:
@@ -68,6 +89,8 @@ class LanguagePreMiddleware(MiddlewareMixin):
                 cookie_value,
                 max_age=LANGUAGE_COOKIE_MAX_AGE,
             )
+        patch_vary_headers(response, ("Accept-Language",))
+        response.headers.setdefault("Content-Language", translation.get_language())
         return response
 
     def _apply_lang_param(self, request: Any, lang: str) -> None:
@@ -95,8 +118,15 @@ class LanguagePreMiddleware(MiddlewareMixin):
             request.session["django_language"] = lang
 
     def _set_language_code(self, request: Any, lang: str) -> None:
-        """Set ``request.LANGUAGE_CODE`` to the given language code."""
-        request.LANGUAGE_CODE = lang
+        """Activate the language for the current thread and sync the request.
+
+        ``translation.activate(lang)`` sets the thread-local active language
+        (read by ``{% get_current_language %}`` and Django's ``i18n`` context
+        processor), and ``request.LANGUAGE_CODE`` is set to the resulting
+        ``translation.get_language()`` so the two are always in agreement.
+        """
+        translation.activate(lang)
+        request.LANGUAGE_CODE = translation.get_language()
 
     def _parse_accept_language(self, request: Any) -> str | None:
         """Extract the primary language tag from the Accept-Language header.
