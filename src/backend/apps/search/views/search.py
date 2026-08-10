@@ -11,7 +11,9 @@ import re
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
+from apps.locations.models import City
+from apps.users.views.consent import is_consent_given
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -45,6 +47,46 @@ def search(request: HttpRequest) -> HttpResponse:
 
     query = (request.GET.get("q") or "").strip()
     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+
+    # Category filter (by slug) — applies in addition to FTS
+    current_category = request.GET.get("category")
+    suggested_category = None
+    if current_category:
+        try:
+            category = Category.objects.get(slug=current_category, is_active=True)
+            descendant_ids = category.get_descendants(include_self=True).values_list(
+                "id", flat=True
+            )
+            ads = ads.filter(category_id__in=descendant_ids)
+        except Category.DoesNotExist:
+            suggested_category = current_category
+
+    # City filter (by slug)
+    current_city = request.GET.get("city")
+    suggested_city = None
+    if current_city:
+        try:
+            city = City.objects.get(slug=current_city)
+            ads = ads.filter(city_id=city.id)
+        except City.DoesNotExist:
+            suggested_city = current_city
+
+    # Price range filter
+    min_price = request.GET.get("min_price")
+    max_price = request.GET.get("max_price")
+    if min_price:
+        try:
+            ads = ads.filter(price__gte=int(min_price))
+        except ValueError:
+            pass
+    if max_price:
+        try:
+            ads = ads.filter(price__lte=int(max_price))
+        except ValueError:
+            pass
+
+    # Sort (parsed for context + pagination URL preservation; FTS branch keeps -rank)
+    current_sort = request.GET.get("sort", AdSort.DATE_NEW)
 
     if query:
         # Detect language from request preference and translate to Russian if needed
@@ -95,6 +137,14 @@ def search(request: HttpRequest) -> HttpResponse:
         "page_obj": page_obj,
         "query": query,
         "has_results": has_results,
+        "current_category": current_category,
+        "current_city": current_city,
+        "current_sort": current_sort,
+        "min_price": min_price,
+        "max_price": max_price,
+        "suggested_category": suggested_category,
+        "suggested_city": suggested_city,
+        "consent_shown": is_consent_given(request),
     }
 
     # HTMX partial rendering support
