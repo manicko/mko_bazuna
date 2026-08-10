@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import shutil
 import time
 from pathlib import Path
@@ -19,6 +20,7 @@ from apps.core.enums import AdSource, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.locations.models import City
 from apps.media.services.hash_service import FileHashService
+from apps.search.models import PopularSearch
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.images import ImageGenerator
@@ -120,6 +122,10 @@ class SeedService:
             if ad_images:
                 hashed_count = self._backfill_image_hashes(ad_images)
                 logger.info("[seed] AdImage SHA-256: %d hashes backfilled", hashed_count)
+
+            # Step 5c: Seed popular searches for autocomplete
+            popular_count = self._seed_popular_searches()
+            self._log_progress("PopularSearch", popular_count, 0.0)
 
             # Step 6: Generate analytics (optional)
             events: list[AnalyticsEvent] = []
@@ -276,3 +282,41 @@ class SeedService:
             AdImage.objects.filter(pk=pk).update(sha256=file_hash)
 
         return len(hashed)
+
+    def _seed_popular_searches(self, limit: int = 15) -> int:
+        """Create PopularSearch records from config and ad titles.
+
+        Reads curated queries from the seed config (``popular_searches``) and
+        derives additional keyword queries from seed ad titles. Uses
+        ``update_or_create`` keyed on ``query`` for idempotency on re-seed
+        (``SeedService._clean`` does not remove PopularSearch rows).
+        """
+        count = 0
+        config_searches = self.config.get("popular_searches", [])
+        for item in config_searches:
+            PopularSearch.objects.update_or_create(
+                query=item["query"],
+                defaults={"hit_count": item["hit_count"]},
+            )
+            count += 1
+
+        rng = random.Random(self.config.get("faker_seed", 42) + 200)
+        # Exclude config queries so they are not upserted twice.
+        existing: set[str] = {item["query"] for item in config_searches}
+        title_words: set[str] = set()
+        for ad in Ad.objects.filter(source=AdSource.SEED):
+            if not ad.title:
+                continue
+            for word in ad.title.lower().split():
+                word = word.strip(".,!?")
+                if len(word) >= 4 and word.isalpha() and word not in existing:
+                    title_words.add(word)
+
+        for word in sorted(title_words)[:limit]:
+            PopularSearch.objects.update_or_create(
+                query=word,
+                defaults={"hit_count": max(rng.randint(5, 30), 10)},
+            )
+            count += 1
+
+        return count

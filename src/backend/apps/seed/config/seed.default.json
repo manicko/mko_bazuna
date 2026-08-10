@@ -19,6 +19,13 @@
       "max": 15
     }
   },
+  "popular_searches": [
+    {"query": "iPhone", "hit_count": 150},
+    {"query": "car", "hit_count": 120},
+    {"query": "apartment", "hit_count": 90},
+    {"query": "sofa", "hit_count": 80},
+    {"query": "bike", "hit_count": 60}
+  ],
   "photo_manifest_version": 1,
   "template_version": 2
 }
