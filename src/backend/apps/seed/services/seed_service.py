@@ -128,6 +128,7 @@ class SeedService:
                 t_start = time.time()
                 analytics_gen = AnalyticsGenerator(self.config, db_ads)
                 events = analytics_gen.generate_events()
+                events.extend(analytics_gen.generate_contact_events())
                 if events:
                     AnalyticsEvent.objects.bulk_create(events, batch_size=5000)
                 t_elapsed = time.time() - t_start

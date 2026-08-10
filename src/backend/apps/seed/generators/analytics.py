@@ -95,6 +95,73 @@ class AnalyticsGenerator(BaseGenerator):
 
         return events
 
+    def generate_contact_events(self) -> list[AnalyticsEvent]:
+        """Generate CONTACT_INITIATED and CONTACT_RESPONSE events for published ads.
+
+        CONTACT_INITIATED: triggered for ~15% of ad views, ad_id set, user_id=None
+        (anonymous buyers). Event timestamp distributed across the ad's active
+        period with the same recency bias as AD_VIEWED events.
+
+        CONTACT_RESPONSE: triggered for ~60% of CONTACT_INITIATED events that
+        share the same seller, ad_id=None, user_id=seller.
+
+        Returns:
+            List of AnalyticsEvent instances ready for bulk_create.
+        """
+        events: list[AnalyticsEvent] = []
+        now = datetime.now(UTC)
+
+        for ad in self.ads:
+            if ad.status != AdStatus.PUBLISHED:
+                continue
+            if ad.published_at is None:
+                continue
+
+            ad_start = ad.published_at
+            ad_end = ad.archived_at if ad.archived_at else now
+
+            # Determine view count for this ad to derive contact initiations
+            for day_offset in range(self.days_back):
+                day_date = now - timedelta(days=day_offset)
+                if day_date < ad_start or (ad_end and day_date > ad_end):
+                    continue
+
+                recency_weight = max(0.1, 1.0 - (day_offset / self.days_back) * 0.9)
+                max_for_day = max(0, int(self.max_views * recency_weight))
+                if max_for_day < self.min_views:
+                    max_for_day = self.min_views
+
+                views_today = self.faker.random_int(self.min_views, max_for_day)
+                # ~15% of views trigger a contact initiation
+                contact_initiated_count = int(views_today * 0.15)
+
+                for _ in range(contact_initiated_count):
+                    random_hour = self.faker.random_int(0, 23)
+                    random_minute = self.faker.random_int(0, 59)
+                    event_time = day_date.replace(
+                        hour=random_hour, minute=random_minute, second=0, microsecond=0,
+                    )
+                    events.append(AnalyticsEvent(
+                        event_type=AnalyticsEventType.CONTACT_INITIATED,
+                        timestamp=event_time,
+                        user=None,
+                        ad=ad,
+                    ))
+
+                    # ~60% of initiations get a response from the seller
+                    if self.faker.random_int(0, 99) < 60:
+                        response_time = event_time + timedelta(
+                            minutes=self.faker.random_int(5, 120),
+                        )
+                        events.append(AnalyticsEvent(
+                            event_type=AnalyticsEventType.CONTACT_RESPONSE,
+                            timestamp=response_time,
+                            user=ad.user,
+                            ad=None,
+                        ))
+
+        return events
+
     def generate_daily_metrics(self) -> list[DailyAdMetrics]:
         """Generate DailyAdMetrics rollup records.
 
