@@ -18,6 +18,7 @@ from apps.categories.models import Category
 from apps.core.enums import AdSource, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.locations.models import City
+from apps.media.services.hash_service import FileHashService
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.images import ImageGenerator
@@ -114,6 +115,11 @@ class SeedService:
                 AdImage.objects.bulk_create(ad_images, batch_size=5000)
             t_elapsed = time.time() - t_start
             self._log_progress("AdImage", len(ad_images), t_elapsed)
+
+            # Step 5b: Backfill SHA-256 for images (bulk_create bypasses save())
+            if ad_images:
+                hashed_count = self._backfill_image_hashes(ad_images)
+                logger.info("[seed] AdImage SHA-256: %d hashes backfilled", hashed_count)
 
             # Step 6: Generate analytics (optional)
             events: list[AnalyticsEvent] = []
@@ -245,3 +251,27 @@ class SeedService:
         """Log progress for a generation step."""
         logger.info("[seed] %s: %d rows in %.2fs", name, count, elapsed)
         logger.info("  %s: %d rows in %.2fs", name, count, elapsed)
+
+    def _backfill_image_hashes(self, ad_images: list[AdImage]) -> int:
+        """Compute SHA-256 for seed AdImage records bypassed by bulk_create.
+
+        ``bulk_create`` skips ``AdImage.save()``, which normally computes the
+        hash for deduplication. This backfills each image file's SHA-256 from
+        disk and persists it with one ``update()`` per record.
+        """
+        media_root = settings.MEDIA_ROOT
+        hashed: list[tuple[int, str]] = []
+        for img in ad_images:
+            if isinstance(media_root, str):
+                file_path = os.path.join(media_root, img.image)
+            else:
+                file_path = str(media_root / img.image)
+            if os.path.exists(file_path):
+                file_hash = FileHashService.calculate_sha256(file_path)
+                if file_hash:
+                    hashed.append((img.pk, file_hash))
+
+        for pk, file_hash in hashed:
+            AdImage.objects.filter(pk=pk).update(sha256=file_hash)
+
+        return len(hashed)
