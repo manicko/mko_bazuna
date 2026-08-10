@@ -25,6 +25,7 @@ from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
+from apps.trust.services.trust_calculator import TrustCalculator
 from apps.users.models import User
 from django.conf import settings
 
@@ -150,6 +151,14 @@ class SeedService:
                     )
                 t_elapsed = time.time() - t_start
                 self._log_progress("DailyAdMetrics", len(metrics), t_elapsed)
+
+            # Step 7: Generate trust scores (reads contact events from Step 6)
+            t_start = time.time()
+            trust_calc = TrustCalculator()
+            for user in db_users:
+                trust_calc.calculate_and_save(user)
+            t_elapsed = time.time() - t_start
+            self._log_progress("SellerTrustScore", len(db_users), t_elapsed)
 
             total_elapsed = time.time() - total_start
             logger.info(
