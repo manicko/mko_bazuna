@@ -298,9 +298,13 @@ class TestDashboardStatsIntegration(TestCase):
         self.assertIn("Ad Alpha", html)
         # ad_b has 1 view, 1 contact
         self.assertIn("Ad Beta", html)
-        # View and contact count badges appear in the response
+        # View and contact count badges appear in the response.
+        # Each ad has exactly 1 contact, so the template renders the
+        # singular form "1 contact" (pluralize produces no "s" for count=1).
         self.assertIn("views", html)
-        self.assertIn("contacts", html)
+        self.assertIn("contact", html)
+        # Verify the count text alongside the label
+        self.assertIn("1 contact", html)
 
     def test_html_contains_ad_titles(self) -> None:
         """Dashboard HTML lists ad titles."""
