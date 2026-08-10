@@ -27,17 +27,25 @@
     <main class="container mx-auto px-4 py-6">
         <!-- Search form -->
         <form method="get" action="{% url 'search:search' %}" class="mb-6">
-            <div class="flex gap-2">
+            <div class="relative flex gap-2">
                 <input 
-                    type="search" 
+                    type="search" id="search-input"
                     name="q" 
                     value="{{ query|default:'' }}" 
                     placeholder="{% trans "Search ads..." %}" 
                     class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="{% url 'search:autocomplete' %}"
+                    hx-trigger="input delay:300ms"
+                    hx-target="#autocomplete-dropdown"
+                    hx-swap="none"
+                    autocomplete="off"
                 >
                 <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                     {% trans "Search" %}
                 </button>
+                <div id="autocomplete-dropdown"
+                     class="absolute left-0 right-0 hidden mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                     style="z-index: 50; top: 100%;"></div>
             </div>
         </form>
 
@@ -48,5 +56,61 @@
     </main>
 
     {% include "components/consent_banner.html" %}
+    <script>
+        (function () {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            const input = document.getElementById('search-input');
+            if (!dropdown || !input) return;
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function hide() {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+            }
+
+            function render(json) {
+                const items = (json && json.suggestions) ? json.suggestions : [];
+                if (!items.length) { hide(); return; }
+                let html = '<ul role="listbox" class="py-1">';
+                items.forEach(function (s) {
+                    const label = escapeHtml(s.text || '');
+                    const src = s.source ? ' <span class="text-xs text-gray-400">[' + escapeHtml(s.source) + ']</span>' : '';
+                    html += '<li role="option" data-q="' + encodeURIComponent(s.text || '') + '"' +
+                            ' class="px-3 py-2 hover:bg-gray-100 cursor-pointer">' + label + src + '</li>';
+                });
+                html += '</ul>';
+                dropdown.innerHTML = html;
+                dropdown.classList.remove('hidden');
+            }
+
+            document.body.addEventListener('htmx:afterRequest', function (e) {
+                const detail = e.detail || {};
+                if (detail.target !== dropdown) return;
+                const xhr = detail.xhr;
+                if (!xhr) return;
+                if (xhr.status === 429) { hide(); return; }
+                let json;
+                try { json = JSON.parse(xhr.responseText); } catch (_) { hide(); return; }
+                render(json);
+            });
+
+            input.addEventListener('keydown', function (e) {
+                const items = dropdown.querySelectorAll('li[data-q]');
+                if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
+                const first = items[0];
+                if ((e.key === 'ArrowDown' || e.key === 'Enter') && items.length) {
+                    e.preventDefault();
+                    window.location.href = "{% url 'search:search' %}?q=" + first.getAttribute('data-q');
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
