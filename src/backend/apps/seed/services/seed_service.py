@@ -139,17 +139,16 @@ class SeedService:
                 self._log_progress("DailyAdMetrics", len(metrics), t_elapsed)
 
             total_elapsed = time.time() - total_start
-            logger.info("Seed complete in %.2fs", total_elapsed)
-            # Print summary
-            print(f"\n{'=' * 50}")
-            print(f"Seed complete in {total_elapsed:.2f}s")
-            print(f"  Users: {users}")
-            print(f"  Ads: {ads}")
-            print(f"  Images: {len(ad_images)}")
-            if analytics:
-                print(f"  Analytics events: {len(events) if analytics else 0}")
-                print(f"  Daily metrics: {len(metrics) if analytics else 0}")
-            print(f"{'=' * 50}")
+            logger.info(
+                "Seed complete in %.2fs — users=%d ads=%d images=%d "
+                "events=%d metrics=%d",
+                total_elapsed,
+                users,
+                ads,
+                len(ad_images),
+                len(events) if analytics else 0,
+                len(metrics) if analytics else 0,
+            )
 
     def _clean(self) -> None:
         """Delete all seed data in FK-safe order and cleans the seed media directory.
@@ -245,4 +244,4 @@ class SeedService:
     def _log_progress(self, name: str, count: int, elapsed: float) -> None:
         """Log progress for a generation step."""
         logger.info("[seed] %s: %d rows in %.2fs", name, count, elapsed)
-        print(f"  {name}: {count} rows in {elapsed:.2f}s")
+        logger.info("  %s: %d rows in %.2fs", name, count, elapsed)
