@@ -125,8 +125,8 @@ class TestPriorityCalculator(TestCase):
         result = self.calculator.calculate_priority(ad)
 
         self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → avg = int(20 / 2) = 10
-        self.assertEqual(result["base_score"], 10)
+        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
+        self.assertEqual(result["base_score"], 20)
 
     def test_banned_word_detection_in_description(self) -> None:
         """Banned word found in description adds 20 points and flags 'banned_word'."""
@@ -142,8 +142,8 @@ class TestPriorityCalculator(TestCase):
         result = self.calculator.calculate_priority(ad)
 
         self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → avg = 10
-        self.assertEqual(result["base_score"], 10)
+        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
+        self.assertEqual(result["base_score"], 20)
 
     def test_banned_word_case_insensitive(self) -> None:
         """Banned word matching is case-insensitive."""
@@ -159,8 +159,8 @@ class TestPriorityCalculator(TestCase):
         result = self.calculator.calculate_priority(ad)
 
         self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → avg = 10
-        self.assertEqual(result["base_score"], 10)
+        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
+        self.assertEqual(result["base_score"], 20)
 
     def test_banned_word_multiple_words_increase_score(self) -> None:
         """Multiple banned words add 20 points each, capped at 100."""
@@ -175,9 +175,9 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        # Content: 100 (5 × 20, capped), User: 0 → avg = int(100 / 2) = 50
-        self.assertEqual(result["base_score"], 50)
-        self.assertEqual(result["priority_level"], AdPriorityLevel.MEDIUM.value)
+        # Content: 100 (5 × 20, capped), User: 0 → max(100, 0) = 100
+        self.assertEqual(result["base_score"], 100)
+        self.assertEqual(result["priority_level"], AdPriorityLevel.HIGH.value)
 
     def test_banned_word_no_match_returns_zero(self) -> None:
         """No matching banned words yields no banned_word flag and 0 content score."""
@@ -235,8 +235,8 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        # Content: 0, User: 15 → avg = int(15 / 2) = 7
-        self.assertEqual(result["base_score"], 7)
+        # Content: 0, User: 15 → max(0, 15) = 15
+        self.assertEqual(result["base_score"], 15)
 
     def test_established_user_repeat_offender(self) -> None:
         """>3 rejections in 7 days adds 25 points and flags 'repeat_offender'."""
@@ -263,22 +263,28 @@ class TestPriorityCalculator(TestCase):
         result = self.calculator.calculate_priority(ad)
 
         self.assertIn("repeat_offender", result["flags"])
-        # Content: 0, User: 25 → avg = int(25 / 2) = 12
-        self.assertEqual(result["base_score"], 12)
+        # Content: 0, User: 25 → max(0, 25) = 25
+        self.assertEqual(result["base_score"], 25)
 
     def test_established_user_rejections_outside_window(self) -> None:
         """Rejections older than 7 days do NOT trigger repeat_offender."""
         old = timezone.now() - timedelta(days=10)
+        old_rejected_ids: list[int] = []
         for i in range(4):
-            _make_ad(
+            ad = _make_ad(
                 self.user,
                 self.category,
                 self.city,
                 title=f"Old Rejected {i}",
                 description=f"Old description {i}",
                 status=AdStatus.REJECTED,
-                created_at=old,
             )
+            old_rejected_ids.append(ad.id)
+
+        # auto_now_add=True silently ignores created_at passed to the constructor.
+        # Backdate via QuerySet.update(), which bypasses save() and therefore
+        # does not trigger auto_now / auto_now_add.
+        Ad.objects.filter(id__in=old_rejected_ids).update(created_at=old)
 
         ad = _make_ad(
             self.user,
@@ -291,12 +297,14 @@ class TestPriorityCalculator(TestCase):
         result = self.calculator.calculate_priority(ad)
 
         self.assertNotIn("repeat_offender", result["flags"])
-        # Content: 0, User: 0 → avg = 0
+        # Content: 0, User: 0 (rejections > 7 days old) → max(0, 0) = 0
         self.assertEqual(result["base_score"], 0)
 
     def test_established_user_below_ad_threshold(self) -> None:
         """User with ≤50 ads gets no bonus from ad count."""
-        for i in range(50):
+        # 49 published + 1 new ad being evaluated = 50 total.
+        # Threshold is strict "> 50", so 50 ads -> no bonus.
+        for i in range(49):
             _make_ad(
                 self.user,
                 self.category,
@@ -316,7 +324,7 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        # Content: 0, User: 0 (≤50 ads, no recent rejections) → avg = 0
+        # Content: 0, User: 0 (≤50 ads, no recent rejections) → max(0, 0) = 0
         self.assertEqual(result["base_score"], 0)
 
     def test_established_user_combined_bonus(self) -> None:
@@ -352,8 +360,8 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        # Content: 0, User: 40 (15 + 25) → avg = int(40 / 2) = 20
-        self.assertEqual(result["base_score"], 20)
+        # Content: 0, User: 40 (15 + 25) → max(0, 40) = 40
+        self.assertEqual(result["base_score"], 40)
         self.assertIn("repeat_offender", result["flags"])
 
     # ── test_priority_level_mapping ─────────────────────────────────────
@@ -397,7 +405,7 @@ class TestPriorityCalculator(TestCase):
                 status=AdStatus.PUBLISHED,
             )
 
-        # 3 banned words → content = 60; user = 40 → avg = int(100/2) = 50 → MEDIUM
+        # 3 banned words → content = 60; user = 40 → max(60, 40) = 60 → MEDIUM
         _banned_words_setup("spam", "scam", "cheap")
         ad = _make_ad(
             self.user,
@@ -409,7 +417,7 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        self.assertEqual(result["base_score"], 50)
+        self.assertEqual(result["base_score"], 60)
         self.assertEqual(result["priority_level"], AdPriorityLevel.MEDIUM.value)
 
     def test_priority_level_boundaries(self) -> None:
@@ -498,8 +506,8 @@ class TestPriorityCalculator(TestCase):
 
         result = self.calculator.calculate_priority(ad)
 
-        # Content: 40, User: 0, total: 20, flags: 2
-        # 20 < 80 AND 2 < 3 → escalation_required = False
+        # Content: 40, User: 0, total: 40, flags: 2
+        # 40 < 80 AND 2 < 3 → escalation_required = False
         self.assertFalse(result["escalation_required"])
         self.assertEqual(len(result["flags"]), 2)
 

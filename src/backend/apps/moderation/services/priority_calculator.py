@@ -37,7 +37,12 @@ class PriorityCalculator:
         scores.append(user_score["score"])
         flags.extend(user_score["flags"])
 
-        total = int(sum(scores) / len(scores)) if scores else 0
+        # Take the worst-case (highest) score across content and user-history
+        # signals. Averaging would dilute a strong content signal (e.g. 5 banned
+        # words → 100) to 50 when the user has no history, incorrectly lowering
+        # priority for toxic new-user ads. max() ensures the highest-risk signal
+        # dominates, consistent with the escalation_required logic below.
+        total = max(scores) if scores else 0
 
         return {
             "base_score": total,

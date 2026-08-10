@@ -1,5 +1,6 @@
 {# Seller dashboard template for Mko Bazuna. Lists seller's ads grouped by status with edit/archive/reactivate actions. Requires authentication. #}
 {% load static %}
+{% load dict_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -70,7 +71,7 @@
             {% if ads %}
                 <section class="mb-8">
                     <h3 class="text-lg font-medium mb-3 text-gray-700">
-                        {{ status_labels[status] }} 
+                        {{ status_labels|get_item:status }} 
                         <span class="text-sm font-normal text-gray-500">({{ ads|length }})</span>
                     </h3>
 
@@ -96,7 +97,7 @@
                                 {% endif %}
 
                                 {% if seller_stats %}
-                                    {% with ad_stat=per_ad_stats_dict[ad.id] %}
+                                    {% with ad_stat=per_ad_stats_dict|get_item:ad.id %}
                                         {% if ad_stat %}
                                         <div class="flex gap-3 text-xs text-gray-500 mb-2">
                                             <span>{{ ad_stat.views }} view{{ ad_stat.views|pluralize }}</span>
