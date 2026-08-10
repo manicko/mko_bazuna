@@ -6,6 +6,7 @@ AnalyticsEvent for product metrics.
 
 from apps.core.enums import AnalyticsEventType
 from django.db import models
+from django.utils import timezone
 
 
 class AnalyticsEvent(models.Model):
@@ -21,7 +22,7 @@ class AnalyticsEvent(models.Model):
         help_text="Type of analytics event",
     )
     timestamp = models.DateTimeField(
-        auto_now_add=True,
+        default=timezone.now,
         help_text="Event timestamp",
     )
     user = models.ForeignKey(
