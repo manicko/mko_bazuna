@@ -1,3 +1,18 @@
+---
+id: docker-test-environment-research-report
+domain: ops
+tags:
+  - research
+  - docker
+  - test-environment
+  - infrastructure
+related:
+  - docker-deployment
+  - doc-maintenance-rules
+---
+
+> **Update Notice (2026-08-10):** This research report described the pre-implementation state of the Docker test environment. Both **Approach A** (project-name isolation via `COMPOSE_PROJECT_NAME`) and **Approach B** (`tmpfs` + `--reuse-db --create-db`) have been fully implemented in commit `b67f3dc` ("doc:docker"). All five audit findings (B1âB5) are resolved in commit `6d9225d` ("fix(test-infra): resolve CATALOGPATH and CI dev tooling"). All 10 confirmed requirements (CR1âCR10) from the implementation phase are satisfied. The current, maintained workflow is documented in [Docker Deployment â Test Environment](../docker-deployment.md#test-environment). This report is preserved for historical context.
+
 # Docker Test Environment Architecture Research Report
 
 **Status:** Research Complete  

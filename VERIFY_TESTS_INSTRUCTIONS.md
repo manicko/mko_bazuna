@@ -30,7 +30,18 @@ The `-v` flag also removes anonymous volumes (including the ephemeral test DB vo
 
 ## Step 2 — Rebuild the Docker Image
 
-The Dockerfile builds the venv from `uv.lock` (production deps only via `--no-dev`). The test entrypoint (`entrypoint-test.sh`) re-syncs with `UV_DEFAULT_GROUPS=dev` to add pytest/ruff. Always rebuild after changes to `pyproject.toml`, `uv.lock`, or source code:
+The Dockerfile builds the venv from `uv.lock` (production deps only, no dev group). The test
+entrypoint (`entrypoint-test.sh`) re-syncs dev dependencies at runtime via:
+
+```bash
+unset UV_NO_INSTALL_PROJECT
+uv sync --frozen --no-install-project --group dev
+```
+
+This replaces the older `UV_DEFAULT_GROUPS=dev` environment-variable pattern. The `unset` clears
+the Dockerfile's `UV_NO_INSTALL_PROJECT=1` so `uv sync` can proceed, while the `--no-install-project`
+CLI flag keeps the project package itself out (matching the non-test stages). Always rebuild after
+changes to `pyproject.toml`, `uv.lock`, or the `Dockerfile`:
 
 ```pwsh
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build db
@@ -84,26 +95,29 @@ This runs `entrypoint-catalog.sh` which calls `load_catalog.py`. If the `CATALOG
 
 ## Step 6 — Run the Test Suite
 
-Run a one-shot test container using the **test** compose file (ephemeral PostgreSQL, test settings). This is the most reliable way — it doesn't need `.env.docker` and uses isolated test DB:
+Run the test suite using the **test** compose file (ephemeral PostgreSQL, test settings, project
+name `mko-bazuna-test` for isolation from dev). The Makefile handles the project-name isolation
+and DB startup automatically:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.test.yml --profile test up --build test
+make test
 ```
 
-This will:
-1. Build the image (if `--build` is passed)
-2. Start the ephemeral `db` service (postgres:18-alpine, no persistent volume)
-3. Run migrations via `entrypoint-test.sh` (uses `migrate_locked.py`)
-4. Run `pytest --tb=short`
+This starts the long-running test DB (if not already running) and then runs a one-shot `test`
+container that executes `entrypoint-test.sh`. You can also invoke the equivalent command
+manually (single-line PowerShell):
+
+```pwsh
+docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
+docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test
+```
+
+The one-shot `test` container will:
+1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
+2. Wait for PostgreSQL to be ready
+3. Run migrations via `migrate_locked.py` (advisory-locked, idempotent)
+4. Run `pytest --tb=short` (the entrypoint passes `--reuse-db --create-db` by default)
 5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
-
-**Alternative** (if you just want to run tests against the already-running dev DB):
-
-```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test
-```
-
-> Note: The `test` service is defined in `docker-compose.test.yml`. Using the `--profile test` flag with `up` is the primary method because it brings up the ephemeral DB dependency automatically.
 
 ---
 
@@ -121,7 +135,7 @@ Type check all changed Python files:
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test uv run basedpyright src/backend/apps/seed/tests/test_seed.py src/backend/apps/categories/management/commands/load_catalog.py src/backend/apps/seed/services/seed_service.py src/backend/apps/core/utils/migrate_locked.py
 ```
 
-> The `test` service has `UV_DEFAULT_GROUPS=dev` set in its entrypoint, so ruff/basedpyright/pytest are available. The `--no-deps` flag skips waiting for the DB healthcheck. If you get `--no-deps` issues, drop it and let the DB start first.
+> The `test` service syncs dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`), so ruff/basedpyright/pytest are available. The `--no-deps` flag skips waiting for the DB healthcheck. If you get `--no-deps` issues, drop it and let the DB start first.
 
 ---
 
@@ -137,12 +151,12 @@ docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.te
 
 Expected: prints the full path and `True`.
 
-### B1 — `UV_DEFAULT_GROUPS=dev` enables test deps
+### B1 — Dev dependencies are installed via entrypoint-test.sh
 
-In the test container, verify pytest is available:
+The test entrypoint syncs dev dependencies with `unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`. In the test container, verify pytest is available:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "import pytest; print(pytest.__version__)"
+docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "import pytest; print(pytest.__version__)"
 ```
 
 Expected: prints a version number (e.g. `8.3.4`).
@@ -186,5 +200,5 @@ docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.te
 | `ERROR: .env file not found` | Test service doesn't set `SKIP_ENV_CHECK` but compose vars are provided | Add `SKIP_ENV_CHECK=1` env var to test service, or ensure `.env.docker` is mounted |
 | `uv: command not found` | Image wasn't rebuilt after Dockerfile changes | Run `docker compose build` |
 | `uv sync --frozen` fails with lockfile out of date | `uv.lock` doesn't match `pyproject.toml` | Run `uv lock --upgrade` locally then commit |
-| pytest not found | `UV_DEFAULT_GROUPS=dev` not set | Check `entrypoint-test.sh` has `export UV_DEFAULT_GROUPS=dev` |
+| `pytest not found` | `entrypoint-test.sh` does not sync dev deps | Verify `entrypoint-test.sh` runs `unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev` |
 | `categories.yaml not found` | Wrong `parents[n]` index | Verify with Step 8 path check |
