@@ -230,11 +230,11 @@ def listings(
 
 
     # Start with only published ads
-
-    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related(
-
-        "category", "city", "user"
-
+    # Prefetch trust scores to avoid N+1 in render_trust_badge template tag.
+    ads = (
+        Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .select_related("category", "city", "user")
+        .prefetch_related("user__trust_score")
     )
 
 

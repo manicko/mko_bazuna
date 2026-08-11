@@ -52,11 +52,15 @@ def render_trust_badge(context: template.Context, user: User) -> str:
     if not user or user.is_anonymous:
         return ""
 
-    try:
-        trust_score = SellerTrustScore.objects.get(user=user)
-    except SellerTrustScore.DoesNotExist:
-        logger.debug("No SellerTrustScore for user %s", user.id)
-        return ""
+    # Use prefetched trust_score (via prefetch_related("user__trust_score"))
+    # to avoid an N+1 query per ad in the listings loop.
+    trust_score = getattr(user, "trust_score", None)
+    if trust_score is None:
+        try:
+            trust_score = SellerTrustScore.objects.get(user=user)
+        except SellerTrustScore.DoesNotExist:
+            logger.debug("No SellerTrustScore for user %s", user.id)
+            return ""
 
     template_path = BADGE_TEMPLATES.get(trust_score.trust_level)
     if template_path is None:
