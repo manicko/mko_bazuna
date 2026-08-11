@@ -40,12 +40,10 @@
                     hx-swap="none"
                     autocomplete="off"
                 >
+                <ul id="autocomplete-dropdown" class="autocomplete-dropdown"></ul>
                 <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                     {% trans "Search" %}
                 </button>
-                <div id="autocomplete-dropdown"
-                     class="absolute left-0 right-0 hidden mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                     style="z-index: 50; top: 100%;"></div>
             </div>
         </form>
 
@@ -70,22 +68,26 @@
                     .replace(/"/g, '&quot;');
             }
 
+            function parseJson(str) {
+                try { return JSON.parse(str); } catch (_) { return null; }
+            }
+
             function hide() {
                 dropdown.classList.add('hidden');
                 dropdown.innerHTML = '';
             }
 
             function render(json) {
-                const items = (json && json.suggestions) ? json.suggestions : [];
-                if (!items.length) { hide(); return; }
-                let html = '<ul role="listbox" class="py-1">';
-                items.forEach(function (s) {
-                    const label = escapeHtml(s.text || '');
-                    const src = s.source ? ' <span class="text-xs text-gray-400">[' + escapeHtml(s.source) + ']</span>' : '';
-                    html += '<li role="option" data-q="' + encodeURIComponent(s.text || '') + '"' +
-                            ' class="px-3 py-2 hover:bg-gray-100 cursor-pointer">' + label + src + '</li>';
-                });
-                html += '</ul>';
+                const suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
+                if (!suggestions.length) { hide(); return; }
+                const html = suggestions.map(function (s) {
+                    const text = escapeHtml(s.text || '');
+                    const encoded = encodeURIComponent(s.text || '');
+                    const src = s.source ? ' (' + escapeHtml(s.source) + ')' : '';
+                    return '<li><a href="{% url 'search:search' %}?q=' + encoded +
+                           '" class="block w-full px-3 py-2 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">' +
+                           text + src + '</a></li>';
+                }).join('');
                 dropdown.innerHTML = html;
                 dropdown.classList.remove('hidden');
             }
@@ -96,20 +98,36 @@
                 const xhr = detail.xhr;
                 if (!xhr) return;
                 if (xhr.status === 429) { hide(); return; }
-                let json;
-                try { json = JSON.parse(xhr.responseText); } catch (_) { hide(); return; }
-                render(json);
+                const parsed = parseJson(xhr.responseText);
+                if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
+                render(parsed);
             });
 
             input.addEventListener('keydown', function (e) {
-                const items = dropdown.querySelectorAll('li[data-q]');
+                const items = dropdown.querySelectorAll('li a');
                 if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
-                const first = items[0];
-                if ((e.key === 'ArrowDown' || e.key === 'Enter') && items.length) {
+                if (!items.length) return;
+                if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    window.location.href = "{% url 'search:search' %}?q=" + first.getAttribute('data-q');
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
+                    next.focus();
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
+                    prev.focus();
+                }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.location.href = items[0].href;
                 }
             });
+
+            hide();
         })();
     </script>
 </body>
