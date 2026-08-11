@@ -278,10 +278,7 @@ class SeedService:
         media_root = settings.MEDIA_ROOT
         hashed: list[tuple[int, str]] = []
         for img in ad_images:
-            if isinstance(media_root, str):
-                file_path = os.path.join(media_root, img.image)
-            else:
-                file_path = str(media_root / img.image)
+            file_path = str(Path(media_root) / str(img.image))
             if os.path.exists(file_path):
                 file_hash = FileHashService.calculate_sha256(file_path)
                 if file_hash:
