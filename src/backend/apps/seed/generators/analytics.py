@@ -36,6 +36,23 @@ class AnalyticsGenerator(BaseGenerator):
         self.min_views = views_config.get("min", 0)
         self.max_views = views_config.get("max", 15)
 
+    @staticmethod
+    def _coerce_datetime(value: datetime | str | None) -> datetime | None:
+        """Normalize a timestamp to a timezone-aware datetime.
+
+        Ad timestamps may arrive as ISO-format strings (from fixtures or
+        seed configs) or as timezone-aware datetimes (read from the DB).
+        Comparing a ``datetime`` against a ``str`` raises ``TypeError``; this
+        helper guarantees a consistent ``datetime | None`` for safe comparisons.
+        """
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value
+
     def generate_events(self) -> list[AnalyticsEvent]:
         """Generate AnalyticsEvent records with AD_VIEWED type.
 
@@ -51,11 +68,11 @@ class AnalyticsGenerator(BaseGenerator):
                 continue
 
             # Determine the ad's active period (when it was published)
-            if ad.published_at is None:
+            ad_start = self._coerce_datetime(ad.published_at)
+            if ad_start is None:
                 continue
 
-            ad_start = ad.published_at
-            ad_end = ad.archived_at if ad.archived_at else now
+            ad_end = self._coerce_datetime(ad.archived_at) or now
 
             for day_offset in range(self.days_back):
                 day_date = now - timedelta(days=day_offset)
@@ -114,11 +131,11 @@ class AnalyticsGenerator(BaseGenerator):
         for ad in self.ads:
             if ad.status != AdStatus.PUBLISHED:
                 continue
-            if ad.published_at is None:
+            ad_start = self._coerce_datetime(ad.published_at)
+            if ad_start is None:
                 continue
 
-            ad_start = ad.published_at
-            ad_end = ad.archived_at if ad.archived_at else now
+            ad_end = self._coerce_datetime(ad.archived_at) or now
 
             # Determine view count for this ad to derive contact initiations
             for day_offset in range(self.days_back):
@@ -178,11 +195,11 @@ class AnalyticsGenerator(BaseGenerator):
             if ad.status != AdStatus.PUBLISHED:
                 continue
 
-            if ad.published_at is None:
+            ad_start = self._coerce_datetime(ad.published_at)
+            if ad_start is None:
                 continue
 
-            ad_start = ad.published_at
-            ad_end = ad.archived_at if ad.archived_at else now
+            ad_end = self._coerce_datetime(ad.archived_at) or now
 
             for day_offset in range(self.days_back):
                 day_date = (now - timedelta(days=day_offset)).date()
