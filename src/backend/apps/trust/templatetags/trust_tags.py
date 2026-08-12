@@ -52,6 +52,11 @@ def render_trust_badge(context: template.Context, user: User) -> str:
     if not user or user.is_anonymous:
         return ""
 
+    # Unsaved user instances (e.g. ``User()`` in tests) have no PK, so they
+    # cannot have a trust score and cannot be queried via a related filter.
+    if user.pk is None:
+        return ""
+
     # Use prefetched trust_score (via prefetch_related("user__trust_score"))
     # to avoid an N+1 query per ad in the listings loop.
     trust_score = getattr(user, "trust_score", None)

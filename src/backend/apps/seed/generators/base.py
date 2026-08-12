@@ -32,6 +32,13 @@ class BaseGenerator:
         self.config = config
         self.faker = Faker("ru_RU")
         self.faker.seed_instance(config.get("faker_seed", 42))
+        # Each generator instance gets its own ``random.Random`` seeded from
+        # ``faker_seed``. This makes output fully deterministic and isolated:
+        # two generators constructed with the same seed produce identical
+        # sequences regardless of execution order or interleaving with other
+        # generators. We intentionally do NOT seed the global ``random`` module,
+        # as that would cause cross-generator interference.
+        self._rng = random.Random(config.get("faker_seed", 42))
 
     def _random_choice(
         self,
@@ -49,8 +56,8 @@ class BaseGenerator:
             A single item from options.
         """
         if weights:
-            return random.choices(options, weights=weights, k=1)[0]
-        return random.choice(options)
+            return self._rng.choices(options, weights=weights, k=1)[0]
+        return self._rng.choice(options)
 
     def _random_date(
         self,
@@ -69,7 +76,7 @@ class BaseGenerator:
         delta = end - start
         if delta.total_seconds() <= 0:
             return start
-        random_seconds = random.randint(0, int(delta.total_seconds()))
+        random_seconds = self._rng.randint(0, int(delta.total_seconds()))
         return start + timedelta(seconds=random_seconds)
 
     def _chunked(

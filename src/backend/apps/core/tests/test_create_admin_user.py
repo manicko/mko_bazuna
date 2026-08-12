@@ -168,8 +168,13 @@ class TestCreateAdminUser:
             )
 
     def test_requires_username_and_password(self):
-        """Test that required arguments are enforced."""
-        with pytest.raises(SystemExit):
+        """Test that required arguments are enforced.
+
+        ``call_command`` wraps argparse errors as ``CommandError`` (not
+        ``SystemExit``, which only occurs when the command is invoked directly
+        from the CLI via ``manage.py``).
+        """
+        with pytest.raises(CommandError, match="--username"):
             call_command("create_admin_user")
 
     def test_sets_password_correctly(self):

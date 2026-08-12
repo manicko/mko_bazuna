@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import random
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -328,14 +327,14 @@ class AdGenerator(BaseGenerator):
         item_ages: list[str] = self.word_lists.get("item_ages", {}).get(locale, [])  # type: ignore[union-attr]
 
         replacements: dict[str, str] = {
-            "{condition}": random.choice(conditions) if conditions else "",
-            "{brand}": random.choice(brands) if brands else "",
-            "{feature}": random.choice(features) if features else "",
-            "{city}": random.choice(cities) if cities else "",
+            "{condition}": self._rng.choice(conditions) if conditions else "",
+            "{brand}": self._rng.choice(brands) if brands else "",
+            "{feature}": self._rng.choice(features) if features else "",
+            "{city}": self._rng.choice(cities) if cities else "",
             "{price}": str(self._generate_price(category) or ""),
             "{rooms}": str(self.faker.random_int(1, 4)),
             "{area}": str(self.faker.random_int(30, 150)),
-            "{item_age}": random.choice(item_ages) if item_ages else "",
+            "{item_age}": self._rng.choice(item_ages) if item_ages else "",
             "{year}": str(self.faker.random_int(2015, 2024)),
             "{mileage}": str(self.faker.random_int(5000, 150000)),
             "{category}": category.get_name(locale),
@@ -378,7 +377,7 @@ class AdGenerator(BaseGenerator):
         ads: list[Ad] = []
 
         for _ in range(ad_count):
-            category = random.choice(self.categories)
+            category = self._rng.choice(self.categories)
 
             # Select template by category slug with fallback
             category_templates: list[dict[str, Any]]
@@ -389,7 +388,7 @@ class AdGenerator(BaseGenerator):
             else:
                 category_templates = []
             template: dict[str, Any] = (
-                random.choice(category_templates) if category_templates
+                self._rng.choice(category_templates) if category_templates
                 else {"patterns": {
                     "ru": {"title": "Товар", "description": "Описание."},
                     "en": {"title": "Item", "description": "Description."},
@@ -402,8 +401,8 @@ class AdGenerator(BaseGenerator):
             title_en, description_en = self._fill_template(template, "en", category)
             title_bs, description_bs = self._fill_template(template, "bs", category)
 
-            user = random.choice(self.users)
-            city = random.choice(self.cities)
+            user = self._rng.choice(self.users)
+            city = self._rng.choice(self.cities)
             status = self._weighted_status(statuses, weights)
 
             # Generate price based on category
@@ -490,7 +489,7 @@ class AdGenerator(BaseGenerator):
         weights: list[float],
     ) -> AdStatus:
         """Select a status using weighted random selection."""
-        return random.choices(statuses, weights=weights, k=1)[0]
+        return self._rng.choices(statuses, weights=weights, k=1)[0]
 
     def _generate_price(self, category: Category) -> int | None:
         """Generate a price appropriate for the category."""

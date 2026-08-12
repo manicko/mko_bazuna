@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -20,7 +21,7 @@ from apps.locations.models import City
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.base import BaseGenerator
-from apps.seed.generators.images import ImageGenerator
+from apps.seed.generators.images import FIXTURES_IMAGES_DIR, ImageGenerator
 from apps.seed.generators.users import UserGenerator
 from apps.users.models import User
 
@@ -267,9 +268,44 @@ class TestImageGenerator(TestCase):
             source=AdSource.SEED,
         )
 
+    def setUp(self) -> None:
+        """Initialize tracking for dummy JPEG files created during tests."""
+        self._created_files: list[Path] = []
+
+    def tearDown(self) -> None:
+        """Remove dummy JPEG files and temp media created during tests."""
+        for path in self._created_files:
+            path.unlink(missing_ok=True)
+        shutil.rmtree("/tmp/test_seed_media", ignore_errors=True)
+
     @override_settings(MEDIA_ROOT="/tmp/test_seed_media")
     def test_generates_ad_images(self) -> None:
         """ImageGenerator creates AdImage instances for ads."""
+        # Create dummy JPEG fixture files for all manifest-referenced photos.
+        # The actual image files were removed from git; only the JSON manifest
+        # remains. ImageGenerator._preprocess_images silently skips missing
+        # files, so we materialise minimal valid JPEGs in the fixtures dir.
+        from PIL import Image
+
+        manifest_path = FIXTURES_IMAGES_DIR / "photo_manifest.json"
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+
+        dummy = Image.new("RGB", (100, 100), color="red")
+        for cat_entry in manifest.get("categories", {}).values():
+            for photo in cat_entry.get("photos", []):
+                filename = photo["filename"]
+                fixture_path = FIXTURES_IMAGES_DIR / filename
+                if not fixture_path.exists():
+                    dummy.save(fixture_path, format="JPEG")
+                    self._created_files.append(fixture_path)
+        for photo in manifest.get("default", {}).get("photos", []):
+            filename = photo["filename"]
+            fixture_path = FIXTURES_IMAGES_DIR / filename
+            if not fixture_path.exists():
+                dummy.save(fixture_path, format="JPEG")
+                self._created_files.append(fixture_path)
+
         gen = ImageGenerator(
             {"faker_seed": 42, "image_count": {"min": 1, "max": 2}},
             [self.ad],
@@ -623,6 +659,27 @@ class TestImageGeneratorManifest(TestCase):
 class TestAdGeneratorMultiLang(TestCase):
     """Tests for AdGenerator multi-language template support."""
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        """Create test users and cities required by AdGenerator.generate()."""
+        for i in range(3):
+            User.objects.create(
+                username=f"multilang-user{i}",
+                telegram_id=3000 + i,
+                chat_id=3000 + i,
+                password="!",
+            )
+        cls.users = list(User.objects.all())
+
+        for i in range(2):
+            City.objects.create(
+                name=f"TestCity{i}",
+                slug=f"test-city-{i}",
+                region="Test",
+                country_code="ME",
+            )
+        cls.cities = list(City.objects.all())
+
     def test_word_lists_loaded(self) -> None:
         """Word lists contain expected keys with entries."""
         from apps.seed.generators.ads import AdGenerator
@@ -717,9 +774,9 @@ class TestAdGeneratorMultiLang(TestCase):
                 "faker_seed": 42,
                 "status_distribution": {"published": 1.0},
             },
-            [],
+            self.users,
             [cat],
-            [],
+            self.cities,
         )
         ads = gen.generate(3)
         assert len(ads) == 3
@@ -741,9 +798,9 @@ class TestAdGeneratorMultiLang(TestCase):
         cat = Category(name="Тест", slug="test-slug")
         gen = AdGenerator(
             {"faker_seed": 42, "status_distribution": {"draft": 1.0}},
-            [],
+            self.users,
             [cat],
-            [],
+            self.cities,
         )
         ads = gen.generate(5)
         for ad in ads:
@@ -757,8 +814,8 @@ class TestAdGeneratorMultiLang(TestCase):
         cat = Category(name="Тест", slug="test-slug")
         config = {"faker_seed": 42, "status_distribution": {"draft": 1.0}}
 
-        gen1 = AdGenerator(config, [], [cat], [])
-        gen2 = AdGenerator(config, [], [cat], [])
+        gen1 = AdGenerator(config, self.users, [cat], self.cities)
+        gen2 = AdGenerator(config, self.users, [cat], self.cities)
         ads1 = gen1.generate(3)
         ads2 = gen2.generate(3)
 
@@ -779,9 +836,9 @@ class TestAdGeneratorMultiLang(TestCase):
         cat = Category(name="Неизвестно", slug="unknown-slug-123")
         gen = AdGenerator(
             {"faker_seed": 42, "status_distribution": {"draft": 1.0}},
-            [],
+            self.users,
             [cat],
-            [],
+            self.cities,
         )
         ads = gen.generate(1)
         ad = ads[0]
@@ -990,8 +1047,12 @@ class TestSeedCategoryIntegration(TestCase):
                 Category.objects.filter(slug=ad.category.slug).exists(),
                 f"Ad references unknown category slug: {ad.category.slug}",
             )
-            # Price should be generated for all ads
-            self.assertIsNotNone(ad.price)
+            # Price may be None for free/negotiable ads (~20% of non-special
+            # categories) per AdGenerator._generate_price() — only validate
+            # the field when a price is actually set
+            if ad.price is not None:
+                self.assertIsInstance(ad.price, int)
+                self.assertGreater(ad.price, 0)
             # Multi-language fields should be populated
             self.assertIsNotNone(ad.title)
             self.assertIsNotNone(ad.title_en)

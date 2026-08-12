@@ -225,3 +225,6 @@ scripts/seed-images-config.json
 src/backend/apps/seed/fixtures/images/*.jpg
 src/backend/apps/seed/fixtures/images/*.jpeg
 src/backend/apps/seed/fixtures/images/*.png
+
+# Seed-generated media (downloaded/generated images)
+media/seed/
