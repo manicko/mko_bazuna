@@ -130,12 +130,24 @@ class ImageGenerator(BaseGenerator):
         max_images = image_count_config.get("max", 3)
 
         ad_images: list[AdImage] = []
+        warned_missing: set[str] = set()
         for ad in self.ads:
-            # Get photos for this ad's category
-            category_keys = category_key_map.get(ad.category.slug)
+            # Get photos for this ad's category, trying parent categories
+            # as fallback (e.g. ads in 'cars' use 'transport' photos if 'cars'
+            # has no manifest entry). This prevents random cross-category
+            # assignment when a category lacks curated photos.
+            category_keys = self._find_category_keys(ad, category_key_map)
+
             if not category_keys:
-                # Fallback to default pool
-                category_keys = category_key_map.get("__default__", image_keys)
+                cat_slug = ad.category.slug
+                if cat_slug not in warned_missing:
+                    warned_missing.add(cat_slug)
+                    logger.warning(
+                        "No photos for category '%s' (or any parent); "
+                        "skipping images for this ad",
+                        cat_slug,
+                    )
+                continue
 
             num_images = self.faker.random_int(min_images, max_images)
             # Ensure we don't ask for more unique images than available
@@ -160,6 +172,41 @@ class ImageGenerator(BaseGenerator):
                 ad_images.append(ad_img)
 
         return ad_images
+
+    def _find_category_keys(
+        self,
+        ad: Ad,
+        category_key_map: dict[str, list[str]],
+    ) -> list[str]:
+        """Find photo storage keys for an ad's category, with parent fallback.
+
+        Walks up the category tree (via MPTT ``parent``) until a category with
+        manifest photos is found. Falls back to the default pool as a last
+        resort.
+
+        Args:
+            ad: The ad being processed.
+            category_key_map: Mapping of category slug → photo storage keys.
+
+        Returns:
+            List of storage keys for the best-matching category, or the
+            default pool if no category or parent has photos.
+        """
+        # 1. Direct category match
+        keys = category_key_map.get(ad.category.slug)
+        if keys:
+            return keys
+
+        # 2. Walk up the MPTT tree
+        node = ad.category.parent
+        while node is not None:
+            keys = category_key_map.get(node.slug)
+            if keys:
+                return keys
+            node = node.parent
+
+        # 3. Default pool (neutral, generic photos)
+        return category_key_map.get("__default__", [])
 
     def _ensure_seed_dir(self) -> str:
         """Create MEDIA_ROOT/seed/ directory and return its path."""

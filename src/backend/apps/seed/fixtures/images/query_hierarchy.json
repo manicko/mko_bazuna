@@ -6141,5 +6141,753 @@
       "compassionate",
       "community"
     ]
+  },
+  "animals": {
+    "objects": [
+      "animal",
+      "pet",
+      "wildlife",
+      "farm animal",
+      "exotic pet"
+    ],
+    "contexts": [
+      "cute",
+      "close-up",
+      "natural habitat",
+      "playing",
+      "cuddly"
+    ],
+    "styles": [
+      "photography",
+      "wildlife",
+      "macro",
+      "lifestyle"
+    ]
+  },
+  "auto-parts": {
+    "objects": [
+      "auto part",
+      "car part",
+      "engine component",
+      "brake",
+      "tire",
+      "exhaust"
+    ],
+    "contexts": [
+      "mechanic",
+      "garage",
+      "professional",
+      "detailed",
+      "shiny"
+    ],
+    "styles": [
+      "product photography",
+      "industrial",
+      "professional"
+    ]
+  },
+  "beauty-health": {
+    "objects": [
+      "beauty product",
+      "skincare",
+      "makeup",
+      "spa",
+      "cosmetic",
+      "wellness"
+    ],
+    "contexts": [
+      "luxury",
+      "elegant",
+      "natural",
+      "close-up",
+      "pampering"
+    ],
+    "styles": [
+      "lifestyle",
+      "beauty",
+      "editorial"
+    ]
+  },
+  "beauty-health-services": {
+    "objects": [
+      "beauty service",
+      "spa",
+      "salon",
+      "massage",
+      "facial",
+      "manicure"
+    ],
+    "contexts": [
+      "relaxing",
+      "luxury",
+      "professional",
+      "serene",
+      "clean"
+    ],
+    "styles": [
+      "lifestyle",
+      "wellness",
+      "interior"
+    ]
+  },
+  "business": {
+    "objects": [
+      "business",
+      "office",
+      "workspace",
+      "team",
+      "meeting",
+      "executive"
+    ],
+    "contexts": [
+      "professional",
+      "modern",
+      "bright",
+      "collaborative",
+      "corporate"
+    ],
+    "styles": [
+      "business",
+      "office",
+      "professional"
+    ]
+  },
+  "business-commercial-real-estate": {
+    "objects": [
+      "commercial property",
+      "office building",
+      "business center",
+      "retail space",
+      "commercial kitchen",
+      "warehouse"
+    ],
+    "contexts": [
+      "corporate",
+      "professional",
+      "modern",
+      "urban",
+      "spacious"
+    ],
+    "styles": [
+      "architectural",
+      "business",
+      "real estate"
+    ]
+  },
+  "business-equipment": {
+    "objects": [
+      "business equipment",
+      "office desk",
+      "conference table",
+      "reception",
+      "waiting area",
+      "commercial"
+    ],
+    "contexts": [
+      "professional",
+      "modern",
+      "corporate",
+      "organized",
+      "contemporary"
+    ],
+    "styles": [
+      "business",
+      "office",
+      "interior"
+    ]
+  },
+  "business-services": {
+    "objects": [
+      "business service",
+      "consultation",
+      "meeting",
+      "office",
+      "professional",
+      "contractor"
+    ],
+    "contexts": [
+      "professional",
+      "modern",
+      "business",
+      "corporate",
+      "clean"
+    ],
+    "styles": [
+      "business",
+      "office",
+      "professional"
+    ]
+  },
+  "cleaning": {
+    "objects": [
+      "cleaning",
+      "mop",
+      "vacuum",
+      "cleaner",
+      "sponge",
+      "bucket"
+    ],
+    "contexts": [
+      "tidy",
+      "spotless",
+      "fresh",
+      "organized",
+      "bright"
+    ],
+    "styles": [
+      "lifestyle",
+      "interior",
+      "cleaning"
+    ]
+  },
+  "clothing-shoes-accessories": {
+    "objects": [
+      "fashion item",
+      "outfit",
+      "shoes",
+      "handbag",
+      "scarf",
+      "accessory"
+    ],
+    "contexts": [
+      "stylish",
+      "elegant",
+      "fashion",
+      "trendy",
+      "coordinated"
+    ],
+    "styles": [
+      "fashion",
+      "editorial",
+      "lifestyle"
+    ]
+  },
+  "commercial-real-estate": {
+    "objects": [
+      "commercial space",
+      "retail store",
+      "office suite",
+      "showroom",
+      "warehouse",
+      "commercial kitchen"
+    ],
+    "contexts": [
+      "modern",
+      "corporate",
+      "professional",
+      "spacious",
+      "urban"
+    ],
+    "styles": [
+      "architectural",
+      "business",
+      "real estate"
+    ]
+  },
+  "construction-renovation": {
+    "objects": [
+      "construction",
+      "building site",
+      "renovation",
+      "blueprint",
+      "tools",
+      "workers"
+    ],
+    "contexts": [
+      "industrial",
+      "construction",
+      "active",
+      "urban",
+      "hard-hat"
+    ],
+    "styles": [
+      "construction",
+      "industrial",
+      "documentary"
+    ]
+  },
+  "electronics": {
+    "objects": [
+      "electronic device",
+      "smartphone",
+      "laptop",
+      "tablet",
+      "speaker",
+      "gadget"
+    ],
+    "contexts": [
+      "modern",
+      "sleek",
+      "tech",
+      "glowing",
+      "close-up"
+    ],
+    "styles": [
+      "product",
+      "lifestyle",
+      "tech"
+    ]
+  },
+  "events-entertainment": {
+    "objects": [
+      "event",
+      "party",
+      "concert",
+      "festival",
+      "wedding",
+      "celebration"
+    ],
+    "contexts": [
+      "festive",
+      "crowded",
+      "joyful",
+      "lively",
+      "colorful"
+    ],
+    "styles": [
+      "event",
+      "lifestyle",
+      "documentary"
+    ]
+  },
+  "finance-legal": {
+    "objects": [
+      "finance service",
+      "bank",
+      "office",
+      "documents",
+      "contract",
+      "consultation"
+    ],
+    "contexts": [
+      "professional",
+      "formal",
+      "trustworthy",
+      "corporate",
+      "serious"
+    ],
+    "styles": [
+      "business",
+      "office",
+      "professional"
+    ]
+  },
+  "food-service-jobs": {
+    "objects": [
+      "food service",
+      "kitchen",
+      "restaurant",
+      "chef",
+      "meal",
+      "waiter"
+    ],
+    "contexts": [
+      "culinary",
+      "cozy",
+      "warm",
+      "inviting",
+      "fresh"
+    ],
+    "styles": [
+      "food",
+      "restaurant",
+      "lifestyle"
+    ]
+  },
+  "goods": {
+    "objects": [
+      "product",
+      "merchandise",
+      "item",
+      "gift",
+      "package",
+      "sale"
+    ],
+    "contexts": [
+      "clean",
+      "minimalist",
+      "product",
+      "lifestyle",
+      "organized"
+    ],
+    "styles": [
+      "product",
+      "lifestyle",
+      "minimalist"
+    ]
+  },
+  "hobby-leisure": {
+    "objects": [
+      "hobby",
+      "craft",
+      "collection",
+      "game",
+      "hobby",
+      "leisure activity"
+    ],
+    "contexts": [
+      "relaxing",
+      "creative",
+      "fun",
+      "colorful",
+      "detailed"
+    ],
+    "styles": [
+      "lifestyle",
+      "hobby",
+      "close-up"
+    ]
+  },
+  "home-garden": {
+    "objects": [
+      "garden",
+      "garden",
+      "landscape",
+      "plants",
+      "patio",
+      "backyard"
+    ],
+    "contexts": [
+      "natural",
+      "lush",
+      "peaceful",
+      "beautiful",
+      "outdoor"
+    ],
+    "styles": [
+      "nature",
+      "lifestyle",
+      "garden"
+    ]
+  },
+  "home-services": {
+    "objects": [
+      "home service",
+      "technician",
+      "plumber",
+      "electrician",
+      "repair",
+      "maintenance"
+    ],
+    "contexts": [
+      "professional",
+      "work",
+      "tools",
+      "skill",
+      "helpful"
+    ],
+    "styles": [
+      "business",
+      "lifestyle",
+      "interior"
+    ]
+  },
+  "it-computers": {
+    "objects": [
+      "computer",
+      "desktop",
+      "laptop",
+      "server",
+      "workspace",
+      "tech setup"
+    ],
+    "contexts": [
+      "modern",
+      "tech",
+      "clean",
+      "professional",
+      "digital"
+    ],
+    "styles": [
+      "tech",
+      "office",
+      "product"
+    ]
+  },
+  "kids-clothing-shoes": {
+    "objects": [
+      "kids clothing",
+      "child",
+      "toddler",
+      "kid outfit",
+      "baby",
+      "children"
+    ],
+    "contexts": [
+      "playful",
+      "colorful",
+      "joyful",
+      "bright",
+      "fun"
+    ],
+    "styles": [
+      "lifestyle",
+      "children",
+      "fashion"
+    ]
+  },
+  "kids-products-toys": {
+    "objects": [
+      "toy",
+      "children toy",
+      "game",
+      "puzzle",
+      "doll",
+      "building blocks"
+    ],
+    "contexts": [
+      "playful",
+      "colorful",
+      "fun",
+      "creative",
+      "joyful"
+    ],
+    "styles": [
+      "lifestyle",
+      "children",
+      "close-up"
+    ]
+  },
+  "motorcycles": {
+    "objects": [
+      "motorcycle",
+      "motorcycle",
+      "bike",
+      "rider",
+      "helmet",
+      "motorcycle gear"
+    ],
+    "contexts": [
+      "adventure",
+      "rebellious",
+      "speed",
+      "open road",
+      "powerful"
+    ],
+    "styles": [
+      "automotive",
+      "lifestyle",
+      "action"
+    ]
+  },
+  "pet-supplies": {
+    "objects": [
+      "pet supply",
+      "dog toy",
+      "cat bed",
+      "fish tank",
+      "bird cage",
+      "pet food"
+    ],
+    "contexts": [
+      "cute",
+      "warm",
+      "homey",
+      "colorful",
+      "friendly"
+    ],
+    "styles": [
+      "lifestyle",
+      "close-up",
+      "pet"
+    ]
+  },
+  "real-estate": {
+    "objects": [
+      "property",
+      "house",
+      "apartment",
+      "building",
+      "land",
+      "estate"
+    ],
+    "contexts": [
+      "architectural",
+      "property",
+      "real estate",
+      "exterior",
+      "aerial"
+    ],
+    "styles": [
+      "real estate",
+      "architectural",
+      "lifestyle"
+    ]
+  },
+  "repair-service": {
+    "objects": [
+      "repair service",
+      "repair shop",
+      "technician",
+      "tools",
+      "fix",
+      "service"
+    ],
+    "contexts": [
+      "professional",
+      "workshop",
+      "industrial",
+      "skill",
+      "organized"
+    ],
+    "styles": [
+      "business",
+      "industrial",
+      "lifestyle"
+    ]
+  },
+  "services-jobs": {
+    "objects": [
+      "service job",
+      "worker",
+      "service provider",
+      "professional",
+      "task",
+      "help"
+    ],
+    "contexts": [
+      "professional",
+      "reliable",
+      "trustworthy",
+      "skilled",
+      "focused"
+    ],
+    "styles": [
+      "business",
+      "office",
+      "lifestyle"
+    ]
+  },
+  "transport": {
+    "objects": [
+      "transport",
+      "vehicle",
+      "car",
+      "truck",
+      "bus",
+      "transport"
+    ],
+    "contexts": [
+      "road",
+      "travel",
+      "urban",
+      "fleet",
+      "journey"
+    ],
+    "styles": [
+      "transport",
+      "lifestyle",
+      "documentary"
+    ]
+  },
+  "transport-logistics": {
+    "objects": [
+      "logistics",
+      "delivery",
+      "truck",
+      "warehouse",
+      "shipping",
+      "package"
+    ],
+    "contexts": [
+      "logistics",
+      "industrial",
+      "cargo",
+      "facility",
+      "distribution"
+    ],
+    "styles": [
+      "business",
+      "industrial",
+      "logistics"
+    ]
+  },
+  "trucks": {
+    "objects": [
+      "truck",
+      "truck",
+      "lorry",
+      "delivery truck",
+      "semi",
+      "cargo"
+    ],
+    "contexts": [
+      "heavy",
+      "industrial",
+      "powerful",
+      "commercial",
+      "road"
+    ],
+    "styles": [
+      "transport",
+      "industrial",
+      "documentary"
+    ]
+  },
+  "tutoring-education": {
+    "objects": [
+      "education",
+      "student",
+      "teacher",
+      "classroom",
+      "books",
+      "learning"
+    ],
+    "contexts": [
+      "educational",
+      "knowledge",
+      "students",
+      "learning",
+      "academic"
+    ],
+    "styles": [
+      "education",
+      "lifestyle",
+      "office"
+    ]
+  },
+  "watches-jewelry": {
+    "objects": [
+      "jewelry",
+      "watch",
+      "ring",
+      "necklace",
+      "bracelet",
+      "earrings"
+    ],
+    "contexts": [
+      "luxury",
+      "elegant",
+      "fine",
+      "sparkling",
+      "precious"
+    ],
+    "styles": [
+      "lifestyle",
+      "close-up",
+      "luxury"
+    ]
+  },
+  "water-transport": {
+    "objects": [
+      "water vehicle",
+      "boat",
+      "yacht",
+      "ship",
+      "sailboat",
+      "jet ski"
+    ],
+    "contexts": [
+      "maritime",
+      "ocean",
+      "luxury",
+      "adventure",
+      "sailing"
+    ],
+    "styles": [
+      "transport",
+      "lifestyle",
+      "nautical"
+    ]
   }
 }

@@ -437,15 +437,21 @@ def process_category(
 
 
 def validate_manifest() -> bool:
-    """Cross-check ``photo_manifest.json`` against JPEG files on disk.
+    """Cross-check ``photo_manifest.json`` against JPEG files and query hierarchy.
 
-    Reports any manifest-referenced files that are missing from the fixtures
-    directory. Exit code is 0 (truthy return) when all files are present,
-    non-zero otherwise.
+    Two checks:
+    1. Every manifest-referenced JPEG exists on disk in ``FIXTURES_IMAGES_DIR``.
+    2. Every category in ``query_hierarchy.json`` has a manifest entry with
+       at least ``photos_per_category`` photos (reports under-downloaded
+       categories).
 
     Returns:
-        True if all manifest-referenced files exist, False if any are missing.
+        True if all checks pass, False if any files are missing or categories
+        are under-represented.
     """
+    ok = True
+
+    # ── Check 1: manifest-referenced files exist on disk ──
     if not MANIFEST_PATH.exists():
         logger.error("Manifest not found at %s", MANIFEST_PATH)
         return False
@@ -471,11 +477,38 @@ def validate_manifest() -> bool:
         if not file_path.exists():
             missing.append(f"default/{filename}")
 
-    logger.info("Validated manifest: %d photos, %d missing", total, len(missing))
+    logger.info("Checked manifest: %d photos, %d missing files", total, len(missing))
     for ref in missing:
         logger.warning("Missing fixture file: %s", ref)
+    if missing:
+        ok = False
 
-    return len(missing) == 0
+    # ── Check 2: manifest coverage vs query hierarchy ──
+    if not QUERY_HIERARCHY_PATH.exists():
+        logger.error("Query hierarchy not found at %s", QUERY_HIERARCHY_PATH)
+        return False
+
+    with open(QUERY_HIERARCHY_PATH, encoding="utf-8") as f:
+        hierarchy = json.load(f)
+
+    manifest_count = len(manifest.get("categories", {}))
+    hierarchy_count = len(hierarchy)
+    uncovered = sorted(set(hierarchy.keys()) - set(manifest.get("categories", {}).keys()))
+
+    logger.info(
+        "Coverage: %d categories in manifest, %d in query hierarchy, %d uncovered",
+        manifest_count,
+        hierarchy_count,
+        len(uncovered),
+    )
+    for slug in uncovered[:50]:
+        logger.warning("No photos downloaded for category: %s", slug)
+    if len(uncovered) > 50:
+        logger.warning("... and %d more uncovered categories", len(uncovered) - 50)
+    if uncovered:
+        ok = False
+
+    return ok
 
 
 # ─── Entry point ───────────────────────────────────────────────────────────

@@ -128,15 +128,16 @@ The script:
 ### Manifest Validation (`--validate`)
 
 Before building a Docker image, verify that every entry in `photo_manifest.json`
-has a corresponding JPEG file on disk:
+has a corresponding JPEG file on disk AND that all categories from
+`query_hierarchy.json` are represented in the manifest:
 
 ```bash
 python scripts/download_seed_photos.py --validate
 ```
 
-This exits with code 0 if all files are present, or non-zero if any fixture
-JPEGs referenced by the manifest are missing. Use this in CI or as a pre-build
-check before `docker compose build`.
+This exits with code 0 if all checks pass, or non-zero if any fixture JPEGs are
+missing or any categories from `query_hierarchy.json` lack manifest entries.
+Use this in CI or as a pre-build check before `docker compose build`.
 
 ### End-to-End Pipeline (3 Stages)
 

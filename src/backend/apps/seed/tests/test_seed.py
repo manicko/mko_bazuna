@@ -253,7 +253,7 @@ class TestImageGenerator(TestCase):
             chat_id=9999,
             password="!",
         )
-        cat = Category.objects.create(name="Тест", slug="test")
+        cat = Category.objects.create(name="Тест", slug="apartments")
         city = City.objects.create(
             name="Тест", slug="test-city", region="Test", country_code="ME"
         )
