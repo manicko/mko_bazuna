@@ -93,11 +93,103 @@ class PhotoSource:
         self.config = config
         self._request_count = 0
         self._limit = 9999
+        self._exhausted = False
         self.downloaded_ids: set[str] = set()
 
     @property
     def exhausted(self) -> bool:
-        return self._request_count >= self._limit
+        return self._exhausted or self._request_count >= self._limit
+
+    def _mark_exhausted(self) -> None:
+        """Permanently mark this source as exhausted (rate-limit or auth error)."""
+        self._exhausted = True
+
+    def _safe_get(self, url: str, headers: dict[str, str], params: dict[str, Any]) -> requests.Response:
+        """Send a GET request with bounded retry on transient failures.
+
+        Retries on ``ConnectionError``, ``Timeout``, and ``5xx`` server errors.
+        Does **not** retry ``4xx`` responses — those raise ``HTTPError`` for the
+        caller to classify (rate-limit, auth error, etc.).
+        """
+        timeout = self.config.get("request_timeout_sec", 30)
+        max_retries = self.config.get("http_max_retries", 2)
+        base_delay = self.config.get("retry_base_delay_sec", 1.0)
+        last_resp: requests.Response | None = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                last_resp = requests.get(url, headers=headers, params=params, timeout=timeout)
+                self._request_count += 1
+                if last_resp.status_code < 500:
+                    last_resp.raise_for_status()
+                    return last_resp
+                logger.warning(
+                    "%s: server error %d, attempt %d/%d",
+                    self.NAME,
+                    last_resp.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                )
+            except (requests.ConnectionError, requests.Timeout) as e:
+                self._request_count += 1
+                logger.warning(
+                    "%s: network error, attempt %d/%d: %s",
+                    self.NAME,
+                    attempt + 1,
+                    max_retries + 1,
+                    e,
+                )
+
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt), 30) + random.uniform(0, 0.5)
+                time.sleep(delay)
+
+        if last_resp is not None:
+            last_resp.raise_for_status()
+        raise requests.ConnectionError(f"{self.NAME}: all retries exhausted with no response")
+
+    def _handle_http_error(self, error: requests.HTTPError, service_name: str) -> None:
+        """Classify and log an ``HTTPError`` from the photo API.
+
+        Distinguishes rate-limit (``429`` → WARNING) from auth/permission
+        (``403`` → ERROR) from other HTTP errors. Marks the source as
+        exhausted so subsequent calls skip it.
+        """
+        self._mark_exhausted()
+        resp = error.response
+        if resp is None:
+            logger.error(
+                "%s: request failed with no response: %s", service_name, error
+            )
+            return
+        status = resp.status_code
+        if status == 429:
+            logger.warning(
+                "%s: rate limit reached (HTTP 429). Marking source exhausted.",
+                service_name,
+            )
+        elif status == 403:
+            logger.error(
+                "%s: permission denied (HTTP 403). Check API key/permissions. "
+                "Marking source exhausted.",
+                service_name,
+            )
+        else:
+            logger.error(
+                "%s: HTTP error %d: %s. Marking source exhausted.",
+                service_name,
+                status,
+                resp.text[:200],
+            )
+
+    def _handle_request_exception(self, error: requests.RequestException, service_name: str) -> None:
+        """Handle a non-HTTP request exception (e.g., exhausted retries on network error)."""
+        self._mark_exhausted()
+        logger.error(
+            "%s: connection error after retries: %s. Marking source exhausted.",
+            service_name,
+            error,
+        )
 
     def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
         """Search for photos and return list of photo metadata dicts."""
@@ -130,9 +222,15 @@ class UnsplashClient(PhotoSource):
         headers = {"Authorization": f"Client-ID {self.api_key}"}
         params = {"query": query, "per_page": min(per_page, 30), "page": page}
 
-        resp = requests.get(url, headers=headers, params=params, timeout=self.config.get("request_timeout_sec", 30))
-        self._request_count += 1
-        resp.raise_for_status()
+        try:
+            resp = self._safe_get(url, headers, params)
+        except requests.HTTPError as e:
+            self._handle_http_error(e, "Unsplash")
+            return []
+        except requests.RequestException as e:
+            self._handle_request_exception(e, "Unsplash")
+            return []
+
         data = resp.json()
         return data.get("results", [])
 
@@ -163,9 +261,15 @@ class PexelsClient(PhotoSource):
         headers = {"Authorization": self.api_key}
         params = {"query": query, "per_page": min(per_page, 80), "page": page}
 
-        resp = requests.get(url, headers=headers, params=params, timeout=self.config.get("request_timeout_sec", 30))
-        self._request_count += 1
-        resp.raise_for_status()
+        try:
+            resp = self._safe_get(url, headers, params)
+        except requests.HTTPError as e:
+            self._handle_http_error(e, "Pexels")
+            return []
+        except requests.RequestException as e:
+            self._handle_request_exception(e, "Pexels")
+            return []
+
         data = resp.json()
         return data.get("photos", [])
 
@@ -617,7 +721,16 @@ def main() -> None:
                     continue
 
                 source.downloaded_ids = downloaded_ids
-                n = process_category(cat_slug, hierarchy, source, manifest, config)
+                try:
+                    n = process_category(cat_slug, hierarchy, source, manifest, config)
+                except Exception as e:
+                    logger.error(
+                        "Error processing category %s with %s: %s",
+                        cat_slug,
+                        source.NAME,
+                        e,
+                    )
+                    n = 0
                 if n > 0:
                     total_downloaded += n
 

@@ -9,5 +9,7 @@
   "max_dimension_px": 1080,
   "request_timeout_sec": 30,
   "unsplash_safe_limit": 45,
-  "pexels_safe_limit": 150
+  "pexels_safe_limit": 150,
+  "http_max_retries": 2,
+  "retry_base_delay_sec": 1.0
 }
