@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -13,10 +12,9 @@ from django.conf import settings
 from apps.ads.models import Ad, AdImage
 from apps.media.services.thumbnails import ThumbnailService
 from apps.seed.generators.base import BaseGenerator
+from apps.seed.paths import FIXTURES_IMAGES_DIR
 
 logger = logging.getLogger(__name__)
-
-FIXTURES_IMAGES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "images"
 
 ManifestEntry = dict[str, Any]
 

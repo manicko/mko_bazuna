@@ -59,6 +59,8 @@ function Show-Help {
     Write-Host "  makemigrations Create Django migrations from model changes"
     Write-Host "  create-admin   Create admin user manually"
     Write-Host "  load-catalog   Load categories.yaml into DB (one-shot)"
+    Write-Host "  seed-photos-validate  Cross-check photo_manifest.json against fixture files"
+    Write-Host "  seed-photos-download  Download seed photos from Unsplash/Pexels to fixtures"
     Write-Host "  logs           Follow logs from all services"
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
     Write-Host "  restore        Restore database from backup file"
@@ -267,6 +269,16 @@ function Invoke-ConsolidateForce {
     Invoke-Migrate
 }
 
+# Validate seed photo manifest against files on disk
+function Invoke-SeedPhotosValidate {
+    uv run python scripts/download_seed_photos.py --validate
+}
+
+# Download seed photos from Unsplash/Pexels to fixtures/images/
+function Invoke-SeedPhotosDownload {
+    uv run python scripts/download_seed_photos.py @args
+}
+
 # Main entry point
 switch ($Target.ToLower()) {
     "help" { Show-Help }
@@ -285,6 +297,8 @@ switch ($Target.ToLower()) {
     "makemigrations" { Invoke-Makemigrations }
     "create-admin" { Invoke-CreateAdmin }
     "load-catalog" { Invoke-LoadCatalog }
+    "seed-photos-validate" { Invoke-SeedPhotosValidate }
+    "seed-photos-download" { Invoke-SeedPhotosDownload }
     "consolidate" { Invoke-Consolidate }
     "consolidate-force" { Invoke-ConsolidateForce }
     "logs" { Invoke-Logs }

@@ -21,8 +21,9 @@ from apps.locations.models import City
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.base import BaseGenerator
-from apps.seed.generators.images import FIXTURES_IMAGES_DIR, ImageGenerator
+from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
+from apps.seed.paths import FIXTURES_IMAGES_DIR
 from apps.users.models import User
 
 

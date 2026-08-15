@@ -115,6 +115,7 @@ Configuration file: `scripts/seed-images-config.json`
 python scripts/download_seed_photos.py          # single pass
 python scripts/download_seed_photos.py --all     # loop until limits exhausted
 python scripts/download_seed_photos.py --category avtomobili  # single category
+python scripts/download_seed_photos.py --validate  # check manifest vs files
 ```
 
 The script:
@@ -123,6 +124,53 @@ The script:
 3. Downloads photos from Pexels (or Unsplash as fallback)
 4. Saves JPEGs as `{category_slug}_{NN:02d}.jpg` in `apps/seed/fixtures/images/`
 5. Auto-populates `photo_manifest.json` with entries for all downloaded photos
+
+### Manifest Validation (`--validate`)
+
+Before building a Docker image, verify that every entry in `photo_manifest.json`
+has a corresponding JPEG file on disk:
+
+```bash
+python scripts/download_seed_photos.py --validate
+```
+
+This exits with code 0 if all files are present, or non-zero if any fixture
+JPEGs referenced by the manifest are missing. Use this in CI or as a pre-build
+check before `docker compose build`.
+
+### End-to-End Pipeline (3 Stages)
+
+Seed photos flow through three stages — understanding this helps avoid common
+pitfalls:
+
+1. **Download** (`scripts/download_seed_photos.py`): A **standalone** script
+   (no Django) that fetches JPEGs from Unsplash/Pexels and saves them to
+   `apps/seed/fixtures/images/`. Produces `photo_manifest.json`,
+   `downloaded_ids.json`, and `query_hierarchy.json` in the same directory.
+   These fixture files are **not** committed (gitignored) and are populated
+   locally or in CI.
+
+2. **Seed** (`manage.py seed` → `ImageGenerator`): A Django-loaded generator
+   that **copies** each fixture JPEG from `fixtures/images/` into
+   `MEDIA_ROOT/seed/` (e.g. `media/seed/`). It reads `photo_manifest.json` to
+   map category slugs to filenames, generates thumbnails, and creates
+   `AdImage` ORM rows with `image = "seed/<filename>.jpg"`. **No network access
+   at this stage** — all photos must be bundled as fixtures first.
+
+3. **Read/Serve** (`SeedService._backfill_image_hashes`, `media_gate`):
+   Reads JPEGs from `MEDIA_ROOT/seed/` via the path
+   `Path(MEDIA_ROOT) / str(img.image)`, computes SHA-256 hashes, and serves
+   them at `/media/seed/<filename>.jpg`.
+
+**Key points:**
+- The download script writes to **fixtures** (source); seeding copies to
+  **media/seed** (runtime). Do not try to make the download script write to
+  `MEDIA_ROOT` — it is standalone and cannot resolve Django settings.
+- `_clean()` wipes `MEDIA_ROOT/seed/` on every re-seed, but leaves
+  `fixtures/images/` intact — re-seeding does not re-download.
+- Docker's `COPY . .` bakes fixture JPEGs into the image (`.dockerignore`
+  excludes `media/` but NOT `fixtures/images/*.jpg`), giving the seed command
+  its "all resources bundled" guarantee.
 
 ### Rate Limits
 

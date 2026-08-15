@@ -6,6 +6,7 @@ Usage:
     uv run python scripts/download_seed_photos.py          # single pass
     uv run python scripts/download_seed_photos.py --all     # loop until limits exhausted
     uv run python scripts/download_seed_photos.py --category avtomobili  # single category
+    uv run python scripts/download_seed_photos.py --validate  # check manifest vs files on disk
 
 Workflow per category:
     1. Load query_hierarchy.json → get objects/contexts/styles for this category
@@ -31,16 +32,24 @@ from typing import Any
 import requests
 from PIL import Image
 
+# Allow importing from apps.seed.paths (Django-free module) without a full
+# Django setup — this script runs standalone outside the Django process.
+_SRC_BACKEND = Path(__file__).resolve().parent.parent / "src" / "backend"
+if str(_SRC_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_SRC_BACKEND))
+
+from apps.seed.paths import (  # noqa: E402
+    DOWNLOADED_IDS_PATH,
+    FIXTURES_IMAGES_DIR,
+    MANIFEST_PATH,
+    QUERY_HIERARCHY_PATH,
+)
+
 logger = logging.getLogger(__name__)
 
 # ─── Paths ─────────────────────────────────────────────────────────────────
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_DIR = Path(__file__).resolve().parent
-FIXTURES_IMAGES_DIR = PROJECT_ROOT / "src" / "backend" / "apps" / "seed" / "fixtures" / "images"
-QUERY_HIERARCHY_PATH = FIXTURES_IMAGES_DIR / "query_hierarchy.json"
-DOWNLOADED_IDS_PATH = FIXTURES_IMAGES_DIR / "downloaded_ids.json"
-MANIFEST_PATH = FIXTURES_IMAGES_DIR / "photo_manifest.json"
 CONFIG_PATH = SCRIPT_DIR / "seed-images-config.json"
 CONFIG_EXAMPLE_PATH = SCRIPT_DIR / "seed-images-config.example.json"
 
@@ -424,11 +433,60 @@ def process_category(
     return downloaded
 
 
+# ─── Validation ──────────────────────────────────────────────────────────────
+
+
+def validate_manifest() -> bool:
+    """Cross-check ``photo_manifest.json`` against JPEG files on disk.
+
+    Reports any manifest-referenced files that are missing from the fixtures
+    directory. Exit code is 0 (truthy return) when all files are present,
+    non-zero otherwise.
+
+    Returns:
+        True if all manifest-referenced files exist, False if any are missing.
+    """
+    if not MANIFEST_PATH.exists():
+        logger.error("Manifest not found at %s", MANIFEST_PATH)
+        return False
+
+    with open(MANIFEST_PATH, encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    missing: list[str] = []
+    total = 0
+
+    for category_slug, entry in manifest.get("categories", {}).items():
+        for photo in entry.get("photos", []):
+            total += 1
+            filename = photo.get("filename", "")
+            file_path = FIXTURES_IMAGES_DIR / filename
+            if not file_path.exists():
+                missing.append(f"{category_slug}/{filename}")
+
+    for photo in manifest.get("default", {}).get("photos", []):
+        total += 1
+        filename = photo.get("filename", "")
+        file_path = FIXTURES_IMAGES_DIR / filename
+        if not file_path.exists():
+            missing.append(f"default/{filename}")
+
+    logger.info("Validated manifest: %d photos, %d missing", total, len(missing))
+    for ref in missing:
+        logger.warning("Missing fixture file: %s", ref)
+
+    return len(missing) == 0
+
+
 # ─── Entry point ───────────────────────────────────────────────────────────
 
 
 def main() -> None:
-    """Run the seed photo download workflow."""
+    """Run the seed photo download workflow.
+
+    Pass ``--validate`` to cross-check ``photo_manifest.json`` against JPEGs
+    on disk without contacting any API.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -446,12 +504,19 @@ def main() -> None:
     args = sys.argv[1:]
     single_category: str | None = None
     loop_all = False
+    validate_only = False
 
     for arg in args:
         if arg.startswith("--category="):
             single_category = arg.split("=", 1)[1]
         elif arg == "--all":
             loop_all = True
+        elif arg == "--validate":
+            validate_only = True
+
+    if validate_only:
+        ok = validate_manifest()
+        sys.exit(0 if ok else 1)
 
     # Load query hierarchy
     if not QUERY_HIERARCHY_PATH.exists():
@@ -547,7 +612,7 @@ def main() -> None:
         time.sleep(5)
 
     logger.info("Done. Downloaded %d photos total.", total_downloaded)
-    print(f"\nDownloaded {total_downloaded} photos. Manifest: {MANIFEST_PATH}")
+    logger.info("Manifest: %s", MANIFEST_PATH)
 
 
 if __name__ == "__main__":
