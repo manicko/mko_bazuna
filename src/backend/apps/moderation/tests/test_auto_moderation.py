@@ -8,14 +8,16 @@ import pytest
 from django.core.cache import cache
 
 from apps.ads.models import Ad, AdImage
+from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
-from apps.moderation.models import ModerationCriteria
+from apps.moderation.models import ModeratorActionLog, ModerationCriteria
 from apps.moderation.services.auto_moderation import (
     _contains_banned_words,
     _validate_description_length,
     _validate_image_count,
+    _validate_max_ads_per_user,
     _validate_title_length,
     check,
 )
@@ -262,3 +264,18 @@ class TestCheckFunction:
         # Ensure no specific reason is exposed
         assert "too short" not in error.lower()
         assert "title" not in error.lower() or "ad content" in error.lower()
+
+        # check() must be read-only: no status transition or audit/analytics side-effects
+        assert ad.status != AdStatus.ON_MODERATION_FAILED
+        assert ModeratorActionLog.objects.count() == 0
+        assert AnalyticsEvent.objects.count() == 0
+
+    def test_failed_ad_not_counted_in_active_limit(self):
+        """ON_MODERATION_FAILED ads do not count toward the active-ads limit (AD-003)."""
+        # 1 PUBLISHED (active) + 1 ON_MODERATION_FAILED (should be excluded).
+        # With max_ads=2 and the failed ad excluded, only 1 active remains -> under limit.
+        self._create_ad(title="Published Ad", status=AdStatus.PUBLISHED)
+        self._create_ad(title="Failed Ad", status=AdStatus.ON_MODERATION_FAILED)
+
+        # If ON_MODERATION_FAILED were counted, active count=2 and 2<2 would be False.
+        assert _validate_max_ads_per_user(self.user.id, max_ads=2) is True

@@ -194,7 +194,7 @@ def _contains_banned_words(title: str, description: str, banned_words: tuple) ->
 def _validate_max_ads_per_user(user_id: int, max_ads: int) -> bool:
     """Validate user has not exceeded max active ads limit."""
     # Count only published and on-moderation ads (not drafts, rejected, archived, deleted)
-    active_statuses = [AdStatus.PUBLISHED, AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]
+    active_statuses = [AdStatus.PUBLISHED, AdStatus.ON_MODERATION]
     count = Ad.objects.filter(
         user_id=user_id,
         status__in=active_statuses,
@@ -263,15 +263,14 @@ def _pass_moderation(ad: Ad) -> None:
 
 def check(ad: Ad) -> tuple[bool, str | None]:
     """
-    Check ad compliance against ModerationCriteria without publishing.
+    Check ad compliance against ModerationCriteria without modifying state.
 
     Validates ad against cached criteria rules.
-    On fail: sets moderation_failed_at + ON_MODERATION_FAILED + logs ModeratorActionLog,
-             returns (False, generic_seller_safe_error) - no specific reason exposed.
+    On fail: returns (False, generic seller-safe error) without modifying ad state.
     On pass: returns (True, None).
 
-    This function is for pre-submission validation where seller-safe errors are required.
-    For full auto-moderation with status transitions, use auto_moderate().
+    This function is for pre-submission validation where seller-safe errors are
+    required. For full auto-moderation with status transitions, use auto_moderate().
 
     Args:
         ad: The Ad instance to validate.
@@ -297,37 +296,30 @@ def check(ad: Ad) -> tuple[bool, str | None]:
 
     # Validate title length
     if not _validate_title_length(ad.title, title_min, title_max):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate description length
     if not _validate_description_length(ad.description, desc_min, desc_max):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate price required
     if price_required and ad.price is None:
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate image count
     if not _validate_image_count(ad, min_imgs, max_imgs):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate banned words
     if _contains_banned_words(ad.title, ad.description, banned_words):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate max ads per user
     if not _validate_max_ads_per_user(ad.user_id, max_ads):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate duplicate title
     if _is_duplicate_title(ad.title, ad.user_id, ad.id, dup_threshold):
-        _fail_moderation(ad)
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # All checks passed
