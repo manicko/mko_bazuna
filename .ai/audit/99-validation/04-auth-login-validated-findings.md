@@ -342,18 +342,24 @@ Effort: small | Priority: recommended
 
 ### AUT-005: Cookie security flags not explicit in settings
 
-> Validation Note:
-> - Action: validated
-> - Detail: Code inspection of all four settings files (base.py, dev.py, prod.py, test.py) confirms
-  only SESSION_COOKIE_SECURE = True (base.py:65) and CSRF_COOKIE_SECURE = True (base.py:66) are
-  explicitly set. grep for SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE across the entire
-  config/settings/ directory returns ZERO matches. Django 5.2 defaults are
-  SESSION_COOKIE_HTTPONLY = True and SESSION_COOKIE_SAMESITE = Lax (correct but implicit).
-  The spec at db-schema.md:86 requires SECURE + HTTPONLY + SAMESITE=Lax, and only SECURE is explicit.
-> - Recommendation confirmed: Add explicit SESSION_COOKIE_HTTPONLY = True and
-  SESSION_COOKIE_SAMESITE = Lax to base.py:65-66. Dev.py and prod.py inherit from base.py via
-  from .base import * so the fix applies broadly. (Note: dev.py/test.py override SECURE=False for
-  testing convenience but do not touch HTTPONLY or SAMESITE.)
+ > Validation Note:
+ > - Action: validated (corrected)
+ > - Detail: Code inspection of all four settings files (base.py, dev.py, prod.py, test.py) confirms
+ >   SESSION_COOKIE_SECURE = True (base.py:65), SESSION_COOKIE_HTTPONLY = True (base.py:66), and
+ >   SESSION_COOKIE_SAMESITE = "Lax" (base.py:67) are all present and explicit. However,
+ >   CSRF_COOKIE_HTTPONLY and CSRF_COOKIE_SAMESITE were NOT present in base.py — only
+ >   CSRF_COOKIE_SECURE = True (base.py:68) was set. Django 5.2 defaults are
+ >   SESSION_COOKIE_HTTPONLY = True and SESSION_COOKIE_SAMESITE = Lax (already explicit here).
+ >   The spec at db-schema.md:86 requires SECURE + HTTPONLY + SAMESITE=Lax for session cookies, all three now explicit.
+ > - Correction: The original validation note incorrectly stated SESION_COOKIE_HTTPONLY and
+ >   SESSION_COOKIE_SAMESITE were absent — they ARE present at base.py:66-67. The actual gap was
+ >   CSRF_COOKIE_HTTPONLY and CSRF_COOKIE_SAMESITE (CSRF cookie flags beyond SECURE), which
+ >   have now been added at base.py:69-70.
+ > - Recommendation confirmed: Add explicit CSRF_COOKIE_HTTPONLY = True and
+ >   CSRF_COOKIE_SAMESITE = "Lax" to base.py. Dev.py and prod.py inherit from base.py via
+ >   from .base import * so the fix applies broadly.
+ > - Post-validation status: CSRF_COOKIE_HTTPONLY = True (base.py:69) and
+ >   CSRF_COOKIE_SAMESITE = "Lax" (base.py:70) — both added and verified.
 
 | Field | Value |
 |-------|-------|
@@ -366,23 +372,29 @@ Effort: small | Priority: recommended
 **Description:**
 
 The spec (docs/02-database/db-schema.md:86) requires session cookies with SECURE + HTTPONLY +
-SAMESITE=Lax. The base settings (src/backend/config/settings/base.py:65-66) explicitly set
-SESSION_COOKIE_SECURE = True and CSRF_COOKIE_SECURE = True, but do NOT explicitly set
-SESSION_COOKIE_HTTPONLY or SESSION_COOKIE_SAMESITE. Django 5.2 defaults are
-SESSION_COOKIE_HTTPONLY = True and SESSION_COOKIE_SAMESITE = Lax, but relying on implicit defaults
-makes the security posture unclear and fragile: a future Django upgrade or settings refactor could
-silently change these.
+SAMESITE=Lax. The base settings (src/backend/config/settings/base.py) explicitly set
+SESSION_COOKIE_SECURE = True (line 65), SESSION_COOKIE_HTTPONLY = True (line 66), and
+SESSION_COOKIE_SAMESITE = "Lax" (line 67). However, CSRF_COOKIE_SECURE = True (line 68) was the
+only explicit CSRF cookie flag — CSRF_COOKIE_HTTPONLY and CSRF_COOKIE_SAMESITE were absent.
+While Django 5.2 defaults CSRF_COOKIE_HTTPONLY = True, the absence of explicit CSRF_COOKIE_HTTPONLY
+and CSRF_COOKIE_SAMESITE makes the security posture for CSRF cookies implicit and fragile: a future
+Django upgrade or settings refactor could silently change these values.
 
 **Evidence:**
 
-- src/backend/config/settings/base.py:65-66 — only SESSION_COOKIE_SECURE and CSRF_COOKIE_SECURE are set
-- No SESSION_COOKIE_HTTPONLY or SESSION_COOKIE_SAMESITE in any settings file (base, dev, prod, test) — confirmed via grep
-- Django 5.2 defaults: SESSION_COOKIE_HTTPONLY = True, SESSION_COOKIE_SAMESITE = Lax (correct but implicit)
+- src/backend/config/settings/base.py:65-67 — SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY,
+  SESSION_COOKIE_SAMESITE are all present and explicit
+- src/backend/config/settings/base.py:68 — CSRF_COOKIE_SECURE = True is present
+- src/backend/config/settings/base.py:69-70 — CSRF_COOKIE_HTTPONLY = True and
+  CSRF_COOKIE_SAMESITE = "Lax" (ADDED — gap fix)
+- Django 5.2 defaults: SESSION_COOKIE_HTTPONLY = True, SESSION_COOKIE_SAMESITE = Lax,
+  CSRF_COOKIE_HTTPONLY = True (correct but now also explicit for CSRF)
 
 **Recommendation:**
 
-Add explicit SESSION_COOKIE_HTTPONLY = True and SESSION_COOKIE_SAMESITE = Lax to
-src/backend/config/settings/base.py.
+Added explicit CSRF_COOKIE_HTTPONLY = True and CSRF_COOKIE_SAMESITE = "Lax" to
+src/backend/config/settings/base.py (now at lines 69-70), alongside the existing
+CSRF_COOKIE_SECURE = True.
 
 Effort: trivial | Priority: recommended
 
@@ -692,9 +704,9 @@ Effort: trivial | Priority: low
 |----|---------|-------------|
 | AUT-001 | Bot token claim crash | ENT-001: replaced `.update(returning=True).first()` with raw SQL `UPDATE ... RETURNING` via `connection.cursor()` |
 | AUT-002 | Sync ORM in async fixtures | Fixed `login_token_factory` fixture: `_create` now uses `await sync_to_async(LoginToken.objects.create)()`; all 4 call sites `await` the factory. `user` fixture investigated and confirmed safe (sync fixtures run outside the running event loop in pytest-asyncio strict mode). Removed 4 dead unused sync fixtures from `test_login_claim.py`. |
-| AUT-003 | No constant-time token comparison | Added `hmac.compare_digest` in `login_status` view for constant-time token hash verification |
+| AUT-003 | No constant-time token comparison | Added `hmac.compare_digest` in `login_status` view and `handle_login_orm` (bot-side) for constant-time token hash verification — both in consent.py and login.py |
 | AUT-004 | No rate limiting on login_issue | Added `login_rate_limit` service (10 req/60s per IP via Django cache); `@never_cache` + 429 on exceed |
-| AUT-005 | Cookie security flags not explicit | Added `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`, `CSRF_COOKIE_HTTPONLY`, `CSRF_COOKIE_SAMESITE`, `SECURE_SSL_REDIRECT` |
+| AUT-005 | Cookie security flags not explicit | SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE were already present (base.py:66-67); added CSRF_COOKIE_HTTPONLY = True and CSRF_COOKIE_SAMESITE = "Lax" (base.py:69-70) — gap fix verified |
 | AUT-006 | Web login claim not in transaction.atomic() | Wrapped read-then-write claim block in `transaction.atomic()` with optimistic locking filter |
 | AUT-007 | Raw token in GET, no polling JS | Added `raw_token` to template context, client-side polling JS (3s interval), `@never_cache` decorator |
 | AUT-008 | Redundant session.cycle_key() | Removed — `auth_login()` already cycles the key for anonymous→authenticated transitions |
@@ -731,3 +743,5 @@ Effort: trivial | Priority: low
 | AUT-006 | Recommendation refined | Non-actionable two-option split (wrap in transaction OR update spec) resolved to single solution: wrap in transaction.atomic() to match spec db-schema.md:83. Spec takes precedence over code change. |
 | AUT-002 | Recommendation refined | Non-actionable two-option split (wrap in sync_to_async OR restructure as async fixtures) resolved to single solution: wrap all ORM calls in sync_to_async, matching test_login_claim.py:83 pattern. `login_token_factory` was fixed (conftest.py:89: `await sync_to_async(LoginToken.objects.create)(...)`). The `user` fixture (conftest.py:59-73) was investigated and confirmed SAFE — sync fixtures in pytest-asyncio strict mode run outside the running event loop (`asyncio.get_running_loop()` raises `RuntimeError`), so `SynchronousOnlyOperation` is never raised. 4 dead sync fixtures in `test_login_claim.py` (`future_token`, `expired_token`, `claimed_token`, `consumed_token`) removed. |
 | AUT-008 | Recommendation refined | Non-actionable two-option split (remove cycle_key OR add explanatory comment) resolved to single solution: remove the redundant cycle_key() call. auth_login() already cycles the session key for anonymous-to-authenticated transitions. |
+| AUT-005 | Validation note corrected | Original validation note incorrectly stated SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE were absent — they ARE present at base.py:66-67. Actual gap was CSRF_COOKIE_HTTPONLY and CSRF_COOKIE_SAMESITE (absent from base.py). Fix applied: added both at base.py:69-70. |
+| AUT-003 | Fix location expanded | Fix Applied column stated hmac.compare_digest was added only in login_status view — corrected to include both consent.py (login_status) and login.py (handle_login_orm), matching the finding's Affected Modules. |
