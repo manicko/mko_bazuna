@@ -17,7 +17,7 @@ from django.conf import settings
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
+from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
 from apps.locations.models import City
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
@@ -446,6 +446,9 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
     if not message.text:
         return
 
+    if not message.from_user:
+        return
+
     text = message.text.strip().lower()
 
     if text == "confirm":
@@ -470,7 +473,10 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             desc_bs=desc_translations.get("bs", original_desc),
             title_en=title_translations.get("en", original_title),
             desc_en=desc_translations.get("en", original_desc),
-            original_language="bs",
+            original_language=LanguageLocale.from_code(
+                message.from_user.language_code,
+                fallback=LanguageLocale.BOSNIAN,
+            ).value,
             category_id=data.get("category_id"),
             city_id=data.get("city_id"),
             price=data.get("price"),

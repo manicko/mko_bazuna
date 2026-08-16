@@ -168,6 +168,28 @@ class LanguageLocale(StrEnum):
         """Return a list of all locale string values."""
         return [m.value for m in cls]
 
+    @classmethod
+    def from_code(
+        cls,
+        language_code: str | None,
+        *,
+        fallback: LanguageLocale | None = None,
+    ) -> LanguageLocale:
+        """Resolve a Telegram/IETF language_code to a LanguageLocale.
+
+        Normalizes tags like 'en-US' to 'en', maps to the enum, and returns
+        fallback when the code is None or unsupported.
+        """
+        if fallback is None:
+            fallback = cls.BOSNIAN
+        if not language_code:
+            return fallback
+        base = language_code.split("-")[0].lower()
+        for member in cls:
+            if member.value == base:
+                return member
+        return fallback
+
     @property
     def fts_config(self) -> str:
         """PostgreSQL text search config for this language."""
