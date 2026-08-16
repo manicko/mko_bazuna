@@ -41,6 +41,8 @@ class Ad(models.Model):
     )
     title = models.CharField(
         max_length=200,
+        null=True,
+        blank=True,
         help_text="Ad title in Russian (translated from seller input)",
     )
     title_en = models.CharField(
@@ -56,6 +58,8 @@ class Ad(models.Model):
         help_text="Ad title in Bosnian",
     )
     description = models.TextField(
+        null=True,
+        blank=True,
         help_text="Ad description in Russian (translated from seller input)",
     )
     description_en = models.TextField(
@@ -85,13 +89,17 @@ class Ad(models.Model):
         "categories.Category",
         on_delete=models.PROTECT,
         related_name="ads",
-        help_text="Ad category",
+        null=True,
+        blank=True,
+        help_text="Ad category. NULL during draft phase.",
     )
     city = models.ForeignKey(
         "locations.City",
         on_delete=models.PROTECT,
         related_name="ads",
-        help_text="Ad city location",
+        null=True,
+        blank=True,
+        help_text="Ad city location. NULL during draft phase.",
     )
 
     # Listing purpose and features (lookup integration)
@@ -116,7 +124,9 @@ class Ad(models.Model):
     category_name = models.CharField(
         max_length=200,
         editable=False,
-        help_text="Denormalized Russian category name; trigger-synced",
+        null=True,
+        blank=True,
+        help_text="Denormalized Russian category name; trigger-synced. NULL during draft phase.",
     )
 
     # Lifecycle
@@ -534,3 +544,6 @@ class AdFeature(models.Model):
 
     def __str__(self) -> str:
         return f"Ad {self.ad_id} -> {self.feature.slug}"
+
+
+

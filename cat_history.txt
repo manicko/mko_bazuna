@@ -1,0 +1,8 @@
+6d9225d fix(test-infra): resolve CATALOGPATH and CI dev tooling
+47eb13c fix(migration) squash migrations
+1839d59 plan
+61e266d feat(migrations): refactor catalog builder, extract backfill command, idempotent SQL, consolidation script
+a77b05f feat(catalog): implement category + universal lookup architecture
+b655a41 plan tasks
+e12ee92 plan tests
+15c63de tasks done

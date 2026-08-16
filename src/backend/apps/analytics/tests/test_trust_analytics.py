@@ -411,14 +411,22 @@ class TestGetSellerDailyMetrics(TestCase):
         self.assertEqual(dates, sorted(dates, reverse=True))
 
     def test_days_parameter_filters_by_cutoff(self) -> None:
-        """The days parameter limits the lookback window."""
+        """The days parameter limits the lookback window.
+
+        The service uses an inclusive cutoff (``date >= today - days``), the same
+        convention as the moderation analytics services and the production
+        dashboard views. So ``days=1`` includes today *and* yesterday.
+        """
         metrics_1_day = get_seller_daily_metrics(self.user.id, days=1)
-        self.assertEqual(len(metrics_1_day), 1)
+        # cutoff = today - 1 day -> includes today and yesterday (2 records)
+        self.assertEqual(len(metrics_1_day), 2)
+        # Ordered by ``-date``, the most recent day (today) is first.
         assert self.metrics_day3 is not None
         self.assertEqual(metrics_1_day[0].date, self.metrics_day3.date)
 
         metrics_2_days = get_seller_daily_metrics(self.user.id, days=2)
-        self.assertEqual(len(metrics_2_days), 2)
+        # cutoff = today - 2 days -> includes today, yesterday and day-before (3)
+        self.assertEqual(len(metrics_2_days), 3)
 
     def test_empty_when_no_metrics(self) -> None:
         """A seller with no metrics returns an empty list."""
@@ -429,7 +437,9 @@ class TestGetSellerDailyMetrics(TestCase):
     def test_returns_all_metric_fields(self) -> None:
         """Returned metrics contain all expected fields."""
         metrics = get_seller_daily_metrics(self.user.id, days=1)
-        self.assertEqual(len(metrics), 1)
+        # Inclusive cutoff (date >= today - 1) -> today and yesterday (2 rows).
+        self.assertEqual(len(metrics), 2)
+        # Ordered by ``-date``, the most recent day (today) is first.
         m = metrics[0]
         assert self.ad.id is not None
         self.assertEqual(m.ad_id, self.ad.id)

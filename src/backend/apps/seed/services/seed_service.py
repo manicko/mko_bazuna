@@ -294,21 +294,24 @@ class SeedService:
 
         Reads curated queries from the seed config (``popular_searches``) and
         derives additional keyword queries from seed ad titles. Uses
-        ``update_or_create`` keyed on ``query`` for idempotency on re-seed
+        ``update_or_create`` keyed on ``query_normalized`` (matching the
+        ``increment_popular_search`` runtime service) for idempotency on re-seed
         (``SeedService._clean`` does not remove PopularSearch rows).
         """
         count = 0
         config_searches = self.config.get("popular_searches", [])
         for item in config_searches:
+            normalized = item["query"].strip().lower()
             PopularSearch.objects.update_or_create(
-                query=item["query"],
-                defaults={"hit_count": item["hit_count"]},
+                query_normalized=normalized,
+                defaults={"query": item["query"], "hit_count": item["hit_count"]},
             )
             count += 1
 
         rng = random.Random(self.config.get("faker_seed", 42) + 200)
         # Exclude config queries so they are not upserted twice.
-        existing: set[str] = {item["query"] for item in config_searches}
+        existing: set[str] = {item["query"].strip().lower() for item in config_searches}
+
         title_words: set[str] = set()
         for ad in Ad.objects.filter(source=AdSource.SEED):
             if not ad.title:
@@ -320,8 +323,8 @@ class SeedService:
 
         for word in sorted(title_words)[:limit]:
             PopularSearch.objects.update_or_create(
-                query=word,
-                defaults={"hit_count": max(rng.randint(5, 30), 10)},
+                query_normalized=word.lower(),
+                defaults={"query": word, "hit_count": max(rng.randint(5, 30), 10)},
             )
             count += 1
 

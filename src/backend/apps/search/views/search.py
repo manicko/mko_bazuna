@@ -181,19 +181,15 @@ def _fuzzy_category_match(query: str) -> Category | None:
     Returns:
         Matching Category or None
     """
-    # Try exact match first
-    try:
-        return Category.objects.get(name__iexact=query, is_active=True)
-    except Category.DoesNotExist:
-        pass
+    # Try exact match first (use first() to handle duplicate category names)
+    return Category.objects.filter(name__iexact=query, is_active=True).first() or (
+        # Try slug match (slug is unique so first() is safe)
+        Category.objects.filter(slug__iexact=query, is_active=True).first()
+    ) or _fuzzy_match_by_name(query)
 
-    # Try slug match
-    try:
-        return Category.objects.get(slug__iexact=query, is_active=True)
-    except Category.DoesNotExist:
-        pass
 
-    # Fuzzy match on name
+def _fuzzy_match_by_name(query: str) -> Category | None:
+    """Find the closest category name match using difflib fuzzy matching."""
     from difflib import get_close_matches
 
     all_names = list(
@@ -201,9 +197,5 @@ def _fuzzy_category_match(query: str) -> Category | None:
     )
     matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
     if matches:
-        try:
-            return Category.objects.get(name__iexact=matches[0], is_active=True)
-        except Category.DoesNotExist:
-            pass
-
+        return Category.objects.filter(name__iexact=matches[0], is_active=True).first()
     return None

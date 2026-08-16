@@ -1,0 +1,398 @@
+commit 438db2dd613d3aa8950332fab5dbf63063ac4ec3
+Author: manicko <manicko@yandex.ru>
+Date:   Mon Aug 10 16:52:02 2026 +0200
+
+    feat(search): add filter context to search view for list template (Â§4.2)
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 3c44b72..8e7bfd8 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -11,7 +11,9 @@ import re
+ from apps.ads.models import Ad
+ from apps.analytics.models import AnalyticsEvent
+ from apps.categories.models import Category
+-from apps.core.enums import AdStatus, AnalyticsEventType
++from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
++from apps.locations.models import City
++from apps.users.views.consent import is_consent_given
+ from django.contrib.postgres.search import SearchQuery, SearchRank
+ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import render
+@@ -46,6 +48,46 @@ def search(request: HttpRequest) -> HttpResponse:
+     query = (request.GET.get("q") or "").strip()
+     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+ 
++    # Category filter (by slug) â€” applies in addition to FTS
++    current_category = request.GET.get("category")
++    suggested_category = None
++    if current_category:
++        try:
++            category = Category.objects.get(slug=current_category, is_active=True)
++            descendant_ids = category.get_descendants(include_self=True).values_list(
++                "id", flat=True
++            )
++            ads = ads.filter(category_id__in=descendant_ids)
++        except Category.DoesNotExist:
++            suggested_category = current_category
++
++    # City filter (by slug)
++    current_city = request.GET.get("city")
++    suggested_city = None
++    if current_city:
++        try:
++            city = City.objects.get(slug=current_city)
++            ads = ads.filter(city_id=city.id)
++        except City.DoesNotExist:
++            suggested_city = current_city
++
++    # Price range filter
++    min_price = request.GET.get("min_price")
++    max_price = request.GET.get("max_price")
++    if min_price:
++        try:
++            ads = ads.filter(price__gte=int(min_price))
++        except ValueError:
++            pass
++    if max_price:
++        try:
++            ads = ads.filter(price__lte=int(max_price))
++        except ValueError:
++            pass
++
++    # Sort (parsed for context + pagination URL preservation; FTS branch keeps -rank)
++    current_sort = request.GET.get("sort", AdSort.DATE_NEW)
++
+     if query:
+         # Detect language from request preference and translate to Russian if needed
+         query_language = request.LANGUAGE_CODE
+@@ -95,6 +137,14 @@ def search(request: HttpRequest) -> HttpResponse:
+         "page_obj": page_obj,
+         "query": query,
+         "has_results": has_results,
++        "current_category": current_category,
++        "current_city": current_city,
++        "current_sort": current_sort,
++        "min_price": min_price,
++        "max_price": max_price,
++        "suggested_category": suggested_category,
++        "suggested_city": suggested_city,
++        "consent_shown": is_consent_given(request),
+     }
+ 
+     # HTMX partial rendering support
+
+commit 88121b775f8828dca9b3e58a7d7294c0dca961a2
+Author: manicko <manicko@yandex.ru>
+Date:   Wed Jul 29 12:03:27 2026 +0200
+
+    feat(search): implement search autocomplete with popular searches, history, and entity suggestions
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 25648c0..3c44b72 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -17,7 +17,9 @@ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import render
+ from django.core.paginator import Paginator
+ from apps.core.utils.sanitize import sanitize_query_for_log
++from apps.search.services.popular_search import increment_popular_search
+ from apps.search.services.query_translator import translate_query
++from apps.search.services.search_history import record_search_history
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -74,6 +76,11 @@ def search(request: HttpRequest) -> HttpResponse:
+             user_id=request.user.id if request.user.is_authenticated else None,
+         )
+ 
++        # Record popular search and user history for autocomplete
++        increment_popular_search(query)
++        if request.user.is_authenticated:
++            record_search_history(request.user.id, query)
++
+     # Paginate results
+     paginator = Paginator(ads, PER_PAGE)
+     page_number = request.GET.get("page", 1)
+
+commit fb6c0b87b7ed289dbf537e602dd644544a05b7c6
+Author: manicko <manicko@yandex.ru>
+Date:   Mon Jul 27 17:27:30 2026 +0200
+
+    feat(search): update search view for language-aware search
+    
+    Task: TASK_017_update_search_view_language_aware.yaml
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index ed4dc8b..25648c0 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -12,12 +12,12 @@ from apps.ads.models import Ad
+ from apps.analytics.models import AnalyticsEvent
+ from apps.categories.models import Category
+ from apps.core.enums import AdStatus, AnalyticsEventType
+-from apps.search.services.query_translator import translate_query_bs_to_ru
+ from django.contrib.postgres.search import SearchQuery, SearchRank
+ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import render
+ from django.core.paginator import Paginator
+ from apps.core.utils.sanitize import sanitize_query_for_log
++from apps.search.services.query_translator import translate_query
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -27,7 +27,7 @@ def search(request: HttpRequest) -> HttpResponse:
+     Search view using PostgreSQL FTS on search_vector.
+ 
+     Features:
+-        - Bosnian query translated to Russian before search
++        - Query translated to Russian for FTS search based on request language
+         - One-word queries apply fuzzy category detection
+         - GIN index used for search_vector (Task 5)
+         - Records SEARCH_PERFORMED analytics event
+@@ -45,8 +45,12 @@ def search(request: HttpRequest) -> HttpResponse:
+     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+ 
+     if query:
+-        # Translate Bosnian query to Russian
+-        translated_query = translate_query_bs_to_ru(query)
++        # Detect language from request preference and translate to Russian if needed
++        query_language = request.LANGUAGE_CODE
++        if query_language != "ru":
++            translated_query = translate_query(query, query_language, "ru")
++        else:
++            translated_query = query
+ 
+         # One-word queries: apply fuzzy category detection
+         if _is_single_word(query):
+
+commit a65c04995959347f6b4ebeed6c680459a768a117
+Author: manicko <manicko@yandex.ru>
+Date:   Tue Jul 21 15:30:49 2026 +0200
+
+    fix(search): docs cleanup, query sanitization, narrow except, analytics ordering, circuit breaker
+    
+    Tasks: TASK_050, TASK_051, TASK_052, TASK_053, TASK_054
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 4e31d2a..ed4dc8b 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -17,6 +17,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank
+ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import render
+ from django.core.paginator import Paginator
++from apps.core.utils.sanitize import sanitize_query_for_log
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -44,12 +45,6 @@ def search(request: HttpRequest) -> HttpResponse:
+     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+ 
+     if query:
+-        # Record search event (analytics)
+-        AnalyticsEvent.objects.create(
+-            event_type=AnalyticsEventType.SEARCH_PERFORMED,
+-            user_id=request.user.id if request.user.is_authenticated else None,
+-        )
+-
+         # Translate Bosnian query to Russian
+         translated_query = translate_query_bs_to_ru(query)
+ 
+@@ -69,6 +64,12 @@ def search(request: HttpRequest) -> HttpResponse:
+             rank=SearchRank("search_vector", search_query)
+         ).filter(search_vector=search_query).order_by("-rank")
+ 
++        # Record search event (analytics) after successful execution
++        AnalyticsEvent.objects.create(
++            event_type=AnalyticsEventType.SEARCH_PERFORMED,
++            user_id=request.user.id if request.user.is_authenticated else None,
++        )
++
+     # Paginate results
+     paginator = Paginator(ads, PER_PAGE)
+     page_number = request.GET.get("page", 1)
+@@ -77,7 +78,7 @@ def search(request: HttpRequest) -> HttpResponse:
+     total_count = int(paginator.count)
+     has_results = total_count > 0
+     if query and not has_results:
+-        logger.info(f"Empty search results for query '{query}'")
++        logger.info("Empty search results for query '%s'", sanitize_query_for_log(query))
+ 
+     context = {
+         "page_obj": page_obj,
+
+commit 5df6f2e43a01d779c5c733217acea671d852b98f
+Author: manicko <manicko@yandex.ru>
+Date:   Tue Jul 21 15:27:18 2026 +0200
+
+    feat(search): add pagination and real HTMX partial to search/listings
+    
+    Task: TASK_049_search_pagination_htmx
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index dd1437f..4e31d2a 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -16,6 +16,7 @@ from apps.search.services.query_translator import translate_query_bs_to_ru
+ from django.contrib.postgres.search import SearchQuery, SearchRank
+ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import render
++from django.core.paginator import Paginator
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -29,13 +30,16 @@ def search(request: HttpRequest) -> HttpResponse:
+         - One-word queries apply fuzzy category detection
+         - GIN index used for search_vector (Task 5)
+         - Records SEARCH_PERFORMED analytics event
++        - Paginated results (24 per page) with HTMX partial support
+ 
+     Args:
+         request: HTTP request with 'q' query parameter
+ 
+     Returns:
+-        Rendered search results page
++        Rendered search results page (full or HTMX partial)
+     """
++    PER_PAGE = 24
++
+     query = (request.GET.get("q") or "").strip()
+     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+ 
+@@ -65,19 +69,25 @@ def search(request: HttpRequest) -> HttpResponse:
+             rank=SearchRank("search_vector", search_query)
+         ).filter(search_vector=search_query).order_by("-rank")
+ 
+-    has_results = ads.exists() if query else False
++    # Paginate results
++    paginator = Paginator(ads, PER_PAGE)
++    page_number = request.GET.get("page", 1)
++    page_obj = paginator.get_page(page_number)
++
++    total_count = int(paginator.count)
++    has_results = total_count > 0
+     if query and not has_results:
+         logger.info(f"Empty search results for query '{query}'")
+ 
+     context = {
+-        "ads": ads,
++        "page_obj": page_obj,
+         "query": query,
+         "has_results": has_results,
+     }
+ 
+     # HTMX partial rendering support
+     if request.headers.get("HX-Request"):
+-        return render(request, "ads/list.html", context)
++        return render(request, "ads/partials/ad_list.html", context)
+ 
+     return render(request, "ads/list.html", context)
+ 
+
+commit 8fa63fa8ef18bc62faba2abc9462b09e9ace1792
+Author: manicko <manicko@yandex.ru>
+Date:   Tue Jul 21 15:21:39 2026 +0200
+
+    fix(search): expand category filter to descendants in search view
+    
+    Task: TASK_048_category_descendants
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 2542d49..dd1437f 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -53,7 +53,11 @@ def search(request: HttpRequest) -> HttpResponse:
+         if _is_single_word(query):
+             category_filter = _fuzzy_category_match(translated_query)
+             if category_filter:
+-                ads = ads.filter(category=category_filter)
++                # Expand to category subtree (consistent with listings.py)
++                descendant_ids = category_filter.get_descendants(include_self=True).values_list(
++                    "id", flat=True
++                )
++                ads = ads.filter(category_id__in=descendant_ids)
+ 
+         # FTS search on search_vector
+         search_query = SearchQuery(translated_query, search_type="websearch", config="russian")
+
+commit b655a41067e205de188815901a111e3af3e8ab31
+Author: manicko <manicko@yandex.ru>
+Date:   Mon Jul 20 22:57:28 2026 +0200
+
+    plan tasks
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 901d352..2542d49 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -8,16 +8,14 @@ One-word queries trigger fuzzy category detection.
+ import logging
+ import re
+ 
+-from django.contrib.postgres.search import SearchQuery, SearchRank
+-from django.http import HttpRequest, HttpResponse
+-from django.shortcuts import render
+-
+ from apps.ads.models import Ad
++from apps.analytics.models import AnalyticsEvent
+ from apps.categories.models import Category
+-from apps.core.enums import AdStatus
++from apps.core.enums import AdStatus, AnalyticsEventType
+ from apps.search.services.query_translator import translate_query_bs_to_ru
+-from apps.analytics.models import AnalyticsEvent
+-from apps.core.enums import AnalyticsEventType
++from django.contrib.postgres.search import SearchQuery, SearchRank
++from django.http import HttpRequest, HttpResponse
++from django.shortcuts import render
+ 
+ logger = logging.getLogger(__name__)
+ 
+
+commit 68f7e2529a98a05b41b8b7276218422b2123252d
+Author: manicko <manicko@yandex.ru>
+Date:   Mon Jul 20 13:48:31 2026 +0200
+
+    feat(analytics): implement event tracking with Plausible snippet and metrics views
+
+diff --git a/src/backend/apps/search/views/search.py b/src/backend/apps/search/views/search.py
+index 5dd0d12..901d352 100644
+--- a/src/backend/apps/search/views/search.py
++++ b/src/backend/apps/search/views/search.py
+@@ -16,6 +16,8 @@ from apps.ads.models import Ad
+ from apps.categories.models import Category
+ from apps.core.enums import AdStatus
+ from apps.search.services.query_translator import translate_query_bs_to_ru
++from apps.analytics.models import AnalyticsEvent
++from apps.core.enums import AnalyticsEventType
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -28,6 +30,7 @@ def search(request: HttpRequest) -> HttpResponse:
+         - Bosnian query translated to Russian before search
+         - One-word queries apply fuzzy category detection
+         - GIN index used for search_vector (Task 5)
++        - Records SEARCH_PERFORMED analytics event
+ 
+     Args:
+         request: HTTP request with 'q' query parameter
+@@ -39,6 +42,12 @@ def search(request: HttpRequest) -> HttpResponse:
+     ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+ 
+     if query:
++        # Record search event (analytics)
++        AnalyticsEvent.objects.create(
++            event_type=AnalyticsEventType.SEARCH_PERFORMED,
++            user_id=request.user.id if request.user.is_authenticated else None,
++        )
++
+         # Translate Bosnian query to Russian
+         translated_query = translate_query_bs_to_ru(query)
+ 
+@@ -123,4 +132,4 @@ def _fuzzy_category_match(query: str) -> Category | None:
+         except Category.DoesNotExist:
+             pass
+ 
+-    return None
+\ No newline at end of file
++    return None

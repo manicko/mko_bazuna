@@ -264,6 +264,27 @@ class TestMediaAccessControl:
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
 
+    def test_shared_seed_key_across_multiple_ads_returns_200(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A storage key shared by several ads serves without HTTP 500.
+
+        Seed data reuses ``seed/<filename>`` across multiple ads. ``media_gate``
+        must look the key up via ``filter`` (not ``get``); otherwise the shared
+        key raises ``MultipleObjectsReturned`` and the listings-page images fail
+        to render. Regression guard for the image-display bug.
+        """
+        key = "seed/birds_04.jpg"
+        # Same image referenced by two distinct PUBLISHED ads (seed reuse)
+        _create_ad_with_image(seller, category, city, image_key=key)
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+
 
 class TestExifStripping:
     """EXIF stripping (MED-002) — metadata is removed on store."""
@@ -535,3 +556,4 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
+

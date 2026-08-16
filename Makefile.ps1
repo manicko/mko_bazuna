@@ -60,6 +60,7 @@ function Show-Help {
     Write-Host "  create-admin   Create admin user manually"
     Write-Host "  load-catalog   Load categories.yaml into DB (one-shot)"
     Write-Host "  seed-photos-validate  Cross-check photo_manifest.json against fixture files"
+    Write-Host "  seed-photos-cleanup   Clean stale manifest entries for missing fixture files"
     Write-Host "  seed-photos-download  Download seed photos from Unsplash/Pexels to fixtures"
     Write-Host "  logs           Follow logs from all services"
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
@@ -274,6 +275,11 @@ function Invoke-SeedPhotosValidate {
     uv run python scripts/download_seed_photos.py --validate
 }
 
+# Clean stale manifest entries for missing fixture files
+function Invoke-SeedPhotosCleanup {
+    uv run python scripts/download_seed_photos.py --validate --fix=cleanup
+}
+
 # Download seed photos from Unsplash/Pexels to fixtures/images/
 function Invoke-SeedPhotosDownload {
     uv run python scripts/download_seed_photos.py @args
@@ -298,6 +304,7 @@ switch ($Target.ToLower()) {
     "create-admin" { Invoke-CreateAdmin }
     "load-catalog" { Invoke-LoadCatalog }
     "seed-photos-validate" { Invoke-SeedPhotosValidate }
+    "seed-photos-cleanup" { Invoke-SeedPhotosCleanup }
     "seed-photos-download" { Invoke-SeedPhotosDownload }
     "consolidate" { Invoke-Consolidate }
     "consolidate-force" { Invoke-ConsolidateForce }

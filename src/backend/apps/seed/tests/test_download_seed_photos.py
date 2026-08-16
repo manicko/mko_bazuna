@@ -347,6 +347,135 @@ class TestProcessCategoryResilience:
         assert client.exhausted
 
 
+# ─── process_category: existing file registration ───────────────────────
+
+
+class TestProcessCategoryExistingFiles:
+    """Tests for the fix that registers existing files in the manifest.
+
+    When both Unsplash and Pexels are enabled, ``process_category`` is called
+    once per source for each category.  Without manifest registration, a file
+    that already exists on disk (from a previous run or a prior source) would
+    be re-checked by the next source, causing redundant API requests — the
+    "double file existence check".  The fix ensures existing files are
+    registered so the main loop's ``count_category_photos`` guard can skip
+    already-satisfied categories.
+    """
+
+    def _make_source(self) -> MagicMock:
+        """Create a mock PhotoSource that returns a fake photo via pick_photo."""
+        source = MagicMock()
+        source.NAME = "fake"
+        source.exhausted = False
+        source.downloaded_ids = set()
+        source.photo_id.return_value = "fake_1"
+        return source
+
+    def test_existing_file_registered_in_manifest(self, seed_fs, config, sleep_mock):
+        """An existing file absent from manifest is registered with dimensions."""
+        (seed_fs / "cats_01.jpg").write_bytes(b"fake-jpeg")
+
+        source = self._make_source()
+        hierarchy = {"objects": ["cat"], "contexts": ["sitting"], "styles": ["photo"]}
+        manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
+
+        with patch.object(download, "pick_photo", return_value={"id": "x"}):
+            n = process_category("cats", hierarchy, source, manifest, config)
+
+        assert n == 1
+        photos = manifest["categories"]["cats"]["photos"]
+        assert len(photos) == 1
+        assert photos[0]["filename"] == "cats_01.jpg"
+        # Dimensions fall back to (0, 0) since the "JPEG" is fake
+        assert photos[0]["width"] == 0
+        assert photos[0]["height"] == 0
+
+    def test_existing_file_not_duplicated_when_in_manifest(self, seed_fs, config, sleep_mock):
+        """If a file is already in the manifest, it is not duplicated.
+
+        Manifest starts with ``cats_01.jpg`` (start_seq=2), so the loop
+        generates ``cats_02.jpg`` next.  We mock ``download_and_compress`` so
+        no real download happens, and verify the original entry is untouched.
+        """
+        source = self._make_source()
+        hierarchy = {"objects": ["cat"], "contexts": ["sitting"], "styles": ["photo"]}
+        manifest = {
+            "version": 1,
+            "categories": {
+                "cats": {"photos": [{"filename": "cats_01.jpg", "width": 100, "height": 100}]}
+            },
+            "default": {"photos": []},
+        }
+
+        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
+             patch.object(download, "download_and_compress") as mock_dl:
+            n = process_category("cats", hierarchy, source, manifest, config)
+
+        assert n == 3
+        assert mock_dl.call_count == 3
+        photos = manifest["categories"]["cats"]["photos"]
+        # cats_01.jpg was pre-existing, cats_02/03/04 were "downloaded"
+        filenames = [p["filename"] for p in photos]
+        assert filenames.count("cats_01.jpg") == 1  # no duplicate
+        assert len(filenames) == 4
+
+    def test_all_existing_files_no_download_called(self, seed_fs, config, sleep_mock):
+        """When all target files already exist, download_and_compress is never called."""
+        for i in (1, 2, 3):
+            (seed_fs / f"cats_{i:02d}.jpg").write_bytes(b"fake-jpeg")
+
+        source = self._make_source()
+        hierarchy = {"objects": ["cat"], "contexts": ["sitting"], "styles": ["photo"]}
+        manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
+
+        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
+             patch.object(download, "download_and_compress") as mock_dl:
+            n = process_category("cats", hierarchy, source, manifest, config)
+
+        assert n == 3
+        assert mock_dl.call_count == 0
+        assert count_category_photos("cats", manifest) == 3
+
+    def test_mixed_existing_and_new_files(self, seed_fs, config, sleep_mock):
+        """Existing files are registered; new files are downloaded via the source."""
+        # cats_01.jpg exists on disk, cats_02 and cats_03 do not
+        (seed_fs / "cats_01.jpg").write_bytes(b"fake-jpeg")
+
+        source = self._make_source()
+        hierarchy = {"objects": ["cat"], "contexts": ["sitting"], "styles": ["photo"]}
+        manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
+
+        def fake_download(_source, _photo, output_path, _config):
+            output_path.write_bytes(b"fake-downloaded")
+            return True
+
+        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
+             patch.object(download, "download_and_compress", side_effect=fake_download):
+            n = process_category("cats", hierarchy, source, manifest, config)
+
+        assert n == 3
+        photos = manifest["categories"]["cats"]["photos"]
+        assert len(photos) == 3
+        filenames = [p["filename"] for p in photos]
+        assert filenames == ["cats_01.jpg", "cats_02.jpg", "cats_03.jpg"]
+
+    def test_category_satisfied_skips_second_source(self, seed_fs, config, sleep_mock):
+        """After filling a category, count_category_photos >= limit guards the next source."""
+        for i in (1, 2, 3):
+            (seed_fs / f"dogs_{i:02d}.jpg").write_bytes(b"fake-jpeg")
+
+        source = self._make_source()
+        hierarchy = {"objects": ["dog"], "contexts": ["outdoor"], "styles": ["photo"]}
+        manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
+
+        with patch.object(download, "pick_photo", return_value={"id": "x"}):
+            n = process_category("dogs", hierarchy, source, manifest, config)
+
+        assert n == 3
+        # This is the guard the main loop uses to skip the next photo source
+        assert count_category_photos("dogs", manifest) >= config["photos_per_category"]
+
+
 # ─── FixMode / cleanup ────────────────────────────────────────────────────
 
 

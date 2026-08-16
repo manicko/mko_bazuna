@@ -1,0 +1,298 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Найти: транспорт - Mko Bazuna</title>
+    <link rel="stylesheet" href="/static/theme/css/output.css">
+    
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/">Mko Bazuna</a>
+            </h1>
+            
+
+
+
+<div class="relative inline-block" id="lang-switcher">
+    
+    <button
+        type="button"
+        class="flex items-center gap-1 px-3 py-1 text-sm rounded hover:bg-gray-100 transition-colors"
+        aria-haspopup="true"
+        aria-expanded="false"
+        data-lang-switcher-toggle
+    >
+        <span class="font-medium">RU</span>
+        <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+    </button>
+
+    
+    <div
+        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
+        data-lang-switcher-menu
+    >
+        
+        
+        
+
+        
+            <a
+                href="?lang=ru"
+                class="block px-4 py-2 text-sm transition-colors bg-gray-100 text-gray-900 font-medium cursor-default"
+                data-lang="ru"
+                data-lang-switcher-link
+                aria-current="true"
+            >
+                Русский
+            </a>
+        
+            <a
+                href="?lang=bs"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="bs"
+                data-lang-switcher-link
+                
+            >
+                bosanski
+            </a>
+        
+            <a
+                href="?lang=en"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="en"
+                data-lang-switcher-link
+                
+            >
+                English
+            </a>
+        
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const COOKIE_NAME = 'lang_pref';
+    const COOKIE_PATH = '/';
+    const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
+    const container = document.getElementById('lang-switcher');
+    if (!container) return;
+
+    const toggleBtn = container.querySelector('[data-lang-switcher-toggle]');
+    const menu = container.querySelector('[data-lang-switcher-menu]');
+    const links = container.querySelectorAll('[data-lang-switcher-link]');
+
+    /**
+     * Set a cookie with the given name, value, and options.
+     */
+    function setCookie(name, value, maxAge, path) {
+        var parts = [
+            encodeURIComponent(name) + '=' + encodeURIComponent(value),
+            'max-age=' + maxAge,
+            'path=' + path,
+            'SameSite=Lax'
+        ];
+        document.cookie = parts.join('; ');
+    }
+
+    /**
+     * Toggle dropdown visibility.
+     */
+    function toggleDropdown() {
+        var isHidden = menu.classList.contains('hidden');
+        if (isHidden) {
+            menu.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            menu.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    /**
+     * Close dropdown and reset ARIA state.
+     */
+    function closeDropdown() {
+        menu.classList.add('hidden');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    // Toggle on button click
+    toggleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleDropdown();
+    });
+
+    // On language link click: set cookie, then allow default navigation
+    links.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            var lang = link.getAttribute('data-lang');
+            if (lang) {
+                setCookie(COOKIE_NAME, lang, COOKIE_MAX_AGE, COOKIE_PATH);
+            }
+            // Allow default browser navigation (href carries ?lang=X)
+            closeDropdown();
+        });
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    // Close dropdown on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeDropdown();
+            toggleBtn.focus();
+        }
+    });
+})();
+</script>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Search form -->
+        <form method="get" action="/search/" class="mb-6">
+            <div class="relative flex gap-2">
+                <input 
+                    type="search" id="search-input"
+                    name="q" 
+                    value="транспорт" 
+                    placeholder="Search ads..." 
+                    class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="/api/search/autocomplete"
+                    hx-trigger="input delay:300ms"
+                    hx-target="#autocomplete-dropdown"
+                    hx-swap="none"
+                    autocomplete="off"
+                >
+                <ul id="autocomplete-dropdown" class="autocomplete-dropdown"></ul>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Найти
+                </button>
+            </div>
+        </form>
+
+        <!-- Dynamic content (ad grid, suggestions, pagination) -->
+        <div id="ad-list">
+            
+
+
+
+
+<!-- Did-you-mean suggestions -->
+
+
+
+
+<!-- Ads grid -->
+
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No results found for "транспорт"</p>
+        <p class="text-gray-500 mt-2">Try a different search term or browse all categories</p>
+    </div>
+
+
+<!-- Empty state when no query and no ads -->
+
+        </div>
+    </main>
+
+    
+
+
+
+    <script>
+        (function () {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            const input = document.getElementById('search-input');
+            if (!dropdown || !input) return;
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function parseJson(str) {
+                try { return JSON.parse(str); } catch (_) { return null; }
+            }
+
+            function hide() {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+            }
+
+            function render(json) {
+                const suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
+                if (!suggestions.length) { hide(); return; }
+                const html = suggestions.map(function (s) {
+                    const text = escapeHtml(s.text || '');
+                    const encoded = encodeURIComponent(s.text || '');
+                    const src = s.source ? ' (' + escapeHtml(s.source) + ')' : '';
+                    return '<li><a href="/search/?q=' + encoded +
+                           '" class="block w-full px-3 py-2 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">' +
+                           text + src + '</a></li>';
+                }).join('');
+                dropdown.innerHTML = html;
+                dropdown.classList.remove('hidden');
+            }
+
+            document.body.addEventListener('htmx:afterRequest', function (e) {
+                const detail = e.detail || {};
+                if (detail.target !== dropdown) return;
+                const xhr = detail.xhr;
+                if (!xhr) return;
+                if (xhr.status === 429) { hide(); return; }
+                const parsed = parseJson(xhr.responseText);
+                if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
+                render(parsed);
+            });
+
+            input.addEventListener('keydown', function (e) {
+                const items = dropdown.querySelectorAll('li a');
+                if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
+                if (!items.length) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
+                    next.focus();
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
+                    prev.focus();
+                }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.location.href = items[0].href;
+                }
+            });
+
+            hide();
+        })();
+    </script>
+</body>
+</html>

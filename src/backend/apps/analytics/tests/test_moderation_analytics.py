@@ -95,7 +95,17 @@ def _make_ad(
         "source": AdSource.TELEGRAM,
     }
     defaults.update(overrides)
-    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
+    ad = Ad.objects.create(**defaults)  # type: ignore[arg-type]
+    # Ad.created_at is ``auto_now_add=True``: Django silently overwrites any
+    # value supplied to ``.create()`` with the current instant, which would
+    # zero out the time-to-moderate deltas these tests rely on. Backdate via
+    # ``QuerySet.update()``, which bypasses ``save()``/``pre_save`` hooks so the
+    # intended past creation timestamp is actually persisted (same pattern used
+    # in apps.moderation.tests.test_priority).
+    if "created_at" in overrides:
+        Ad.objects.filter(id=ad.id).update(created_at=overrides["created_at"])
+        ad.refresh_from_db()
+    return ad
 
 
 def _make_moderation_event(
@@ -120,14 +130,22 @@ def _make_action_log(
     *,
     created_at: timezone.datetime | None = None,
 ) -> ModeratorActionLog:
-    """Create a ModeratorActionLog entry for rejection reason tests."""
-    return ModeratorActionLog.objects.create(
+    """Create a ModeratorActionLog entry for rejection reason tests.
+
+    ``created_at`` is backdated via ``QuerySet.update()`` when supplied, because
+    the field is ``auto_now_add=True`` and a value passed to ``.create()`` would
+    otherwise be silently overwritten with the current instant.
+    """
+    log = ModeratorActionLog.objects.create(
         ad=ad,
         user=user,
         action_type=action_type,
         reason=reason,
-        created_at=created_at or timezone.now(),
     )
+    if created_at is not None:
+        ModeratorActionLog.objects.filter(id=log.id).update(created_at=created_at)
+        log.refresh_from_db()
+    return log
 
 
 # ---------------------------------------------------------------------------

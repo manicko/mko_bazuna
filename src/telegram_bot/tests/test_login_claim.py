@@ -11,8 +11,9 @@ import pytest
 from apps.users.models import LoginToken
 from django.utils import timezone
 from telegram_bot.handlers.login import handle_login_orm
+from asgiref.sync import sync_to_async
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration, pytest.mark.asyncio]
 
 
 @pytest.fixture
@@ -79,7 +80,7 @@ class TestClaimLoginToken:
     async def test_fresh_unclaimed_token(self, token_hash: str, telegram_id: int) -> None:
         """Fresh unclaimed+unexpired token is claimed successfully."""
         # Arrange: create token
-        LoginToken.objects.create(
+        await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             telegram_id=None,
             consumed_at=None,
@@ -105,7 +106,7 @@ class TestClaimLoginToken:
     async def test_reclaim_blocked(self, token_hash: str, telegram_id: int) -> None:
         """Re-claim of the same token returns None (replay blocked)."""
         # Arrange: create token
-        LoginToken.objects.create(
+        await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             telegram_id=None,
             consumed_at=None,
@@ -137,7 +138,7 @@ class TestClaimLoginToken:
     async def test_expired_token_rejected(self, token_hash: str, telegram_id: int) -> None:
         """Expired token returns None."""
         # Arrange: create expired token
-        LoginToken.objects.create(
+        await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             telegram_id=None,
             consumed_at=None,
@@ -159,7 +160,7 @@ class TestClaimLoginToken:
     async def test_claimed_token_rejected(self, token_hash: str, telegram_id: int) -> None:
         """Token already claimed by bot (telegram_id set) returns None."""
         # Arrange: create token claimed by another user
-        LoginToken.objects.create(
+        await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             telegram_id=900000200,
             consumed_at=None,
@@ -182,7 +183,7 @@ class TestClaimLoginToken:
         """Token already consumed by web (consumed_at set) returns None."""
         # Arrange: create consumed token
         now = timezone.now()
-        LoginToken.objects.create(
+        await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             telegram_id=900000300,
             consumed_at=now,
@@ -200,3 +201,4 @@ class TestClaimLoginToken:
 
         # Assert
         assert login_token is None, "Consumed token should not be claimable"
+

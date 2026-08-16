@@ -106,10 +106,18 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     """
     Media access gate for Ad images and thumbnails.
 
-    Looks up AdImage by storage key (original image or thumbnail variant),
-    verifies parent Ad is PUBLISHED (or request is from a staff user),
-    then:
+    Looks up the AdImage row(s) referencing ``image_key`` (matching the
+    ``image`` field first, then the ``thumbnail_*`` fallback) and authorizes
+    the request: staff users may view anything; non-staff users only when at
+    least one referencing ad is PUBLISHED.
 
+    A storage key is **not** guaranteed to be unique. Seed data deliberately
+    reuses ``seed/<filename>`` (and its thumbnail variants) across multiple ads,
+    so the lookup uses ``filter`` rather than ``get`` to avoid
+    ``MultipleObjectsReturned`` (which previously produced HTTP 500 responses
+    and broken images on the listings page).
+
+    Serving:
     - In production (DEBUG=False): returns X-Accel-Redirect to the internal
       nginx /protected-media/ location.
     - In development (DEBUG=True, no nginx): serves the file directly via
@@ -123,25 +131,29 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
         FileResponse (dev) or empty 200 with X-Accel-Redirect header (prod),
         or 403/404
     """
-    try:
-        ad_image = AdImage.objects.select_related("ad").get(image=image_key)
-    except AdImage.DoesNotExist:
-        # Fallback: check if this is a thumbnail key stored in one of the
-        # thumbnail_* fields.
-        thumbnail_q = (
-            Q(thumbnail_small=image_key)
-            | Q(thumbnail_medium=image_key)  # type: ignore[operator]
-            | Q(thumbnail_large=image_key)  # type: ignore[operator]
-        )
-        ad_image = (
-            AdImage.objects.select_related("ad")
-            .filter(thumbnail_q)
-            .first()
-        )
-        if ad_image is None:
-            raise Http404("Image not found") from None
+    # Reject malformed storage keys early. A NUL byte (or other control
+    # characters) can never occur in a valid key (``<uuid>.jpg`` or
+    # ``seed/<filename>.jpg``) and would otherwise be sent verbatim to
+    # PostgreSQL, raising DataError (HTTP 500) on path-traversal attempts
+    # instead of a clean 404.
+    if any(ord(ch) < 0x20 for ch in image_key):
+        raise Http404("Image not found")
 
-    # Allow staff users (moderators/admins) to view any image
+    # Match any AdImage that references this key in its ``image`` field or in
+    # one of the ``thumbnail_*`` fields. ``get`` must not be used: seed data
+    # shares the same key across several ads, which would raise
+    # MultipleObjectsReturned -> HTTP 500 for viewers.
+    key_q = (
+        Q(image=image_key)
+        | Q(thumbnail_small=image_key)  # type: ignore[operator]
+        | Q(thumbnail_medium=image_key)  # type: ignore[operator]
+        | Q(thumbnail_large=image_key)  # type: ignore[operator]
+    )
+
+    if not AdImage.objects.filter(key_q).exists():
+        raise Http404("Image not found")
+
+    # Staff users (moderators/admins) can view any image regardless of status
     if request.user.is_staff:
         if settings.DEBUG:
             return _serve_image(image_key)
@@ -149,8 +161,10 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
         return response
 
-    # Non-staff users: only serve images for PUBLISHED ads
-    if ad_image.ad.status != AdStatus.PUBLISHED:
+    # Non-staff users: only serve images referenced by a PUBLISHED ad. A shared
+    # seed key can be attached to several ads, so check existence across all of
+    # them rather than the status of a single (arbitrary) row.
+    if not AdImage.objects.filter(key_q, ad__status=AdStatus.PUBLISHED).exists():
         return HttpResponseForbidden("Access denied")
 
     if settings.DEBUG:

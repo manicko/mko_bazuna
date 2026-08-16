@@ -1,0 +1,7 @@
+electronics: status=200 no_results=False ad_cards=0 msg=[]
+auto: status=200 no_results=False ad_cards=0 msg=[]
+instructor: status=200 no_results=False ad_cards=0 msg=[]
+transport: status=200 no_results=True ad_cards=0 msg=[]
+bicycle: HTTP 500 | get() returned more than one Category -- it returned 2!
+food_ru: status=200 no_results=True ad_cards=0 msg=[]
+phones: status=200 no_results=True ad_cards=0 msg=[]

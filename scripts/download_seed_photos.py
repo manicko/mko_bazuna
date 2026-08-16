@@ -585,7 +585,28 @@ def process_category(
         output_path = FIXTURES_IMAGES_DIR / filename
 
         if output_path.exists():
-            logger.warning("File %s already exists, skipping", filename)
+            # Register the existing file in the manifest so subsequent
+            # photo sources don't re-check the same sequence numbers.
+            cat_photos = (
+                manifest.get("categories", {})
+                .get(category_slug, {})
+                .get("photos", [])
+            )
+            if not any(p.get("filename") == filename for p in cat_photos):
+                logger.info(
+                    "File %s already exists on disk, registering in manifest",
+                    filename,
+                )
+                try:
+                    with Image.open(output_path) as img:
+                        width, height = img.size
+                except Exception:
+                    width, height = 0, 0
+                update_manifest_for_category(
+                    manifest, category_slug, filename, width, height
+                )
+            else:
+                logger.debug("File %s already in manifest", filename)
             downloaded += 1
             continue
 
@@ -968,6 +989,7 @@ def main() -> None:
 
     while True:
         pass_number += 1
+        downloaded_this_pass = 0
         # Re-prioritize on each --all pass: categories with fewer photos
         # come first so under-represented categories are filled up.
         if loop_all and not single_category:
@@ -980,6 +1002,18 @@ def main() -> None:
             hierarchy = hierarchy_data.get(cat_slug, {})
             if not hierarchy:
                 logger.warning("No hierarchy entry for %s, skipping", cat_slug)
+                continue
+
+            # Skip this category if it already has enough photos in the
+            # manifest — prevents the same files from being re-checked
+            # across multiple photo sources (e.g. both Unsplash and Pexels).
+            if count_category_photos(cat_slug, manifest) >= photos_per_category:
+                logger.info(
+                    "Category %s already has %d/%d photos, skipping",
+                    cat_slug,
+                    count_category_photos(cat_slug, manifest),
+                    photos_per_category,
+                )
                 continue
 
             for source in photo_sources:
@@ -999,11 +1033,16 @@ def main() -> None:
                     n = 0
                 if n > 0:
                     total_downloaded += n
+                    downloaded_this_pass += n
 
-            if total_downloaded > 0 and total_downloaded % 10 == 0:
-                # Save progress periodically
-                save_downloaded_ids(downloaded_ids)
-                save_manifest(manifest)
+                # Stop trying sources once the category is satisfied.
+                if count_category_photos(cat_slug, manifest) >= photos_per_category:
+                    break
+
+                if total_downloaded > 0 and total_downloaded % 10 == 0:
+                    # Save progress periodically
+                    save_downloaded_ids(downloaded_ids)
+                    save_manifest(manifest)
 
         # Save after each pass
         save_downloaded_ids(downloaded_ids)
@@ -1013,10 +1052,14 @@ def main() -> None:
         if not loop_all:
             break
 
-        # Check if we exhausted all sources or have enough per category
+        # Check if we exhausted all sources or made no progress this pass.
         all_exhausted = all(s.exhausted for s in photo_sources)
         if all_exhausted:
             logger.info("All API rate limits reached. Stopping.")
+            break
+
+        if downloaded_this_pass == 0:
+            logger.info("No new photos downloaded in this pass. Stopping.")
             break
 
         # Brief pause between passes

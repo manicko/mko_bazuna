@@ -2,7 +2,7 @@
 description: Senior architecture and code audit agent for Python CLI tools focused on maintainability, scalability, correctness, security, and production-grade engineering without overengineering
 mode: all
 color: "#EF4444"
-steps: 150
+steps: 350
 
 permission:
    agent_manager: deny

@@ -17,6 +17,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: docker/Dockerfile
           push: false
           tags: mko-bazuna:ci
           cache-from: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
@@ -25,7 +26,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      UV_DEFAULT_GROUPS: dev
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
     services:
       db:
         image: postgres:18-alpine
@@ -50,7 +51,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --no-install-project
+        run: uv sync --frozen --no-install-project --group dev
         working-directory: src/backend
 
       - name: Wait for database
@@ -101,8 +102,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    env:
-      UV_DEFAULT_GROUPS: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -112,7 +111,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --no-install-project
+        run: uv sync --frozen --no-install-project --group dev
         working-directory: src/backend
 
       - name: Run ruff
@@ -121,8 +120,6 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    env:
-      UV_DEFAULT_GROUPS: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -132,7 +129,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --no-install-project
+        run: uv sync --frozen --no-install-project --group dev
         working-directory: src/backend
 
       - name: Run basedpyright

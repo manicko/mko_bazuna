@@ -1,0 +1,1336 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ads - Mko Bazuna</title>
+    <link rel="stylesheet" href="/static/theme/css/output.css">
+    
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-gray-800">
+                <a href="/">Mko Bazuna</a>
+            </h1>
+            
+
+
+
+<div class="relative inline-block" id="lang-switcher">
+    
+    <button
+        type="button"
+        class="flex items-center gap-1 px-3 py-1 text-sm rounded hover:bg-gray-100 transition-colors"
+        aria-haspopup="true"
+        aria-expanded="false"
+        data-lang-switcher-toggle
+    >
+        <span class="font-medium">RU</span>
+        <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+    </button>
+
+    
+    <div
+        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
+        data-lang-switcher-menu
+    >
+        
+        
+        
+
+        
+            <a
+                href="?lang=ru"
+                class="block px-4 py-2 text-sm transition-colors bg-gray-100 text-gray-900 font-medium cursor-default"
+                data-lang="ru"
+                data-lang-switcher-link
+                aria-current="true"
+            >
+                Русский
+            </a>
+        
+            <a
+                href="?lang=bs"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="bs"
+                data-lang-switcher-link
+                
+            >
+                bosanski
+            </a>
+        
+            <a
+                href="?lang=en"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="en"
+                data-lang-switcher-link
+                
+            >
+                English
+            </a>
+        
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const COOKIE_NAME = 'lang_pref';
+    const COOKIE_PATH = '/';
+    const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
+    const container = document.getElementById('lang-switcher');
+    if (!container) return;
+
+    const toggleBtn = container.querySelector('[data-lang-switcher-toggle]');
+    const menu = container.querySelector('[data-lang-switcher-menu]');
+    const links = container.querySelectorAll('[data-lang-switcher-link]');
+
+    /**
+     * Set a cookie with the given name, value, and options.
+     */
+    function setCookie(name, value, maxAge, path) {
+        var parts = [
+            encodeURIComponent(name) + '=' + encodeURIComponent(value),
+            'max-age=' + maxAge,
+            'path=' + path,
+            'SameSite=Lax'
+        ];
+        document.cookie = parts.join('; ');
+    }
+
+    /**
+     * Toggle dropdown visibility.
+     */
+    function toggleDropdown() {
+        var isHidden = menu.classList.contains('hidden');
+        if (isHidden) {
+            menu.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            menu.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    /**
+     * Close dropdown and reset ARIA state.
+     */
+    function closeDropdown() {
+        menu.classList.add('hidden');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    // Toggle on button click
+    toggleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleDropdown();
+    });
+
+    // On language link click: set cookie, then allow default navigation
+    links.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            var lang = link.getAttribute('data-lang');
+            if (lang) {
+                setCookie(COOKIE_NAME, lang, COOKIE_MAX_AGE, COOKIE_PATH);
+            }
+            // Allow default browser navigation (href carries ?lang=X)
+            closeDropdown();
+        });
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    // Close dropdown on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeDropdown();
+            toggleBtn.focus();
+        }
+    });
+})();
+</script>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Search form -->
+        <form method="get" action="/search/" class="mb-6">
+            <div class="relative flex gap-2">
+                <input 
+                    type="search" id="search-input"
+                    name="q" 
+                    value="" 
+                    placeholder="Search ads..." 
+                    class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="/api/search/autocomplete"
+                    hx-trigger="input delay:300ms"
+                    hx-target="#autocomplete-dropdown"
+                    hx-swap="none"
+                    autocomplete="off"
+                >
+                <ul id="autocomplete-dropdown" class="autocomplete-dropdown"></ul>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Найти
+                </button>
+            </div>
+        </form>
+
+        <!-- Dynamic content (ad grid, suggestions, pagination) -->
+        <div id="ad-list">
+            
+
+
+
+
+<!-- Did-you-mean suggestions -->
+
+
+
+
+<!-- Ads grid -->
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/35/" class="block">
+                    
+                        <img 
+                            src="/media/seed/pet-birds_08-small.jpg" 
+                            alt="Посуда/кухня Dell, новый набор"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Посуда/кухня Dell, новый набор
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">2203 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Новый набор посуды Dell. Состояние: отличное. Материал: нержавеющая сталь. Количество предметов: нержавеющая сталь. Цена: 594 BAM. Ульцинь.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Будва</span>
+                            <span>Посуда и товары для кухни</span>
+                            <time datetime="2026-08-09">
+                                Авг 09
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/34/" class="block">
+                    
+                        <img 
+                            src="/media/seed/school-supplies_01-small.jpg" 
+                            alt="Предлагаю услуги: Электроника"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Предлагаю услуги: Электроника
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">2197 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Предлагаю Электроника. Опыт работы: среднее. В Будва и окрестностях. Подробности: . Цена: 1585 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Цетине</span>
+                            <span>Электроника</span>
+                            <time datetime="2026-08-09">
+                                Авг 09
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/31/" class="block">
+                    
+                        <img 
+                            src="/media/seed/boys_04-small.jpg" 
+                            alt="Ресторан / доставка еды, Тиват"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Ресторан / доставка еды, Тиват
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">4149 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Предлагаю услуги ресторана и доставку блюд в Тиват. Опыт: отличное. Меню: меню на заказ. Цена от 922 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Подгорица</span>
+                            <span>Рестораны</span>
+                            <time datetime="2026-08-08">
+                                Авг 08
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/53/" class="block">
+                    
+                        <img 
+                            src="/media/seed/delivery-courier_05-small.jpg" 
+                            alt="Продаётся склад в Херцег-Нови"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Продаётся склад в Херцег-Нови
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">473302 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаю склад в Херцег-Нови. Площадь: 145 м². Высота потолков, грузовой лифт. Состояние: отличное. Цена: 491325 EUR.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Подгорица</span>
+                            <span>Склады</span>
+                            <time datetime="2026-08-07">
+                                Авг 07
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/46/" class="block">
+                    
+                        <img 
+                            src="/media/seed/school-supplies_03-small.jpg" 
+                            alt="Хочу заказать домашнюю еду, Тиват"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Хочу заказать домашнюю еду, Тиват
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу, кто готовит домашнюю еду на заказ в Тиват. Тип кухни: как новый. Пожелания: диетическое питание. Бюджет: 2182 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Никшич</span>
+                            <span>Пищевое обслуживание</span>
+                            <time datetime="2026-08-04">
+                                Авг 04
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/60/" class="block">
+                    
+                        <img 
+                            src="/media/seed/boys_06-small.jpg" 
+                            alt="Ищу одежду для мальчика, Биело-Поле"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Ищу одежду для мальчика, Биело-Поле
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">55 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу одежду для мальчика в Биело-Поле. Размер: хлопок 100%. Бренд: Braun. Состояние: нормальное. Бюджет:  BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Котор</span>
+                            <span>Для мальчиков</span>
+                            <time datetime="2026-08-02">
+                                Авг 02
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/41/" class="block">
+                    
+                        <img 
+                            src="/media/seed/school-supplies_02-small.jpg" 
+                            alt="Продаю Товары для школы, приемлемое"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Продаю Товары для школы, приемлемое
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">3708 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаю Товары для школы. Состояние: приемлемое. Набор/количество: треугольная форма. Бренд: Dell. Цена:  BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Никшич</span>
+                            <span>Товары для школы</span>
+                            <time datetime="2026-07-28">
+                                Июл 28
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/54/" class="block">
+                    
+                        <img 
+                            src="/media/seed/birds_05-small.jpg" 
+                            alt="Репетитор в Плевля, от 1460 BAM/час"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Репетитор в Плевля, от 1460 BAM/час
+                            </h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">2510 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Предлагаю услуги репетитора в Плевля. Опыт: превосходное. Предметы: индивидуальные занятия. Цена: 1460 BAM/час.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Биело-Поле</span>
+                            <span>Репетиторы</span>
+                            <time datetime="2026-07-27">
+                                Июл 27
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/43/" class="block">
+                    
+                        <img 
+                            src="/media/seed/delivery-courier_04-small.jpg" 
+                            alt="Помощь с налоговой отчётностью"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Помощь с налоговой отчётностью
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">3377 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Помогу с Налоги в Плевля. Опыт: приемлемое. Преимущества: расчёт налогов. Стоимость: 1959 EUR.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Херцег-Нови</span>
+                            <span>Налоги</span>
+                            <time datetime="2026-07-24">
+                                Июл 24
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/36/" class="block">
+                    
+                        <img 
+                            src="/media/seed/delivery-courier_04-small.jpg" 
+                            alt="Нужна сборка / настройка ПК, Херцег-Нови"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Нужна сборка / настройка ПК, Херцег-Нови
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">4798 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу специалиста по сборке и настройке ПК в Херцег-Нови. Конфигурация: неплохое. Цель: настройка BIOS. Бюджет:  BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Плевля</span>
+                            <span>Настройка ПК и ноутбуков</span>
+                            <time datetime="2026-07-23">
+                                Июл 23
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/58/" class="block">
+                    
+                        <img 
+                            src="/media/seed/pet-toys_03-small.jpg" 
+                            alt="Сломался ноутбук / ПК, нужен мастер, Котор"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Сломался ноутбук / ПК, нужен мастер, Котор
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">4761 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу мастера по ремонту ноутбуков или ПК в Котор. Проблема: среднее. Модель: замена клавиатуры. Бюджет: 3355 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Беране</span>
+                            <span>Ремонт ноутбуков и ПК</span>
+                            <time datetime="2026-07-12">
+                                Июл 12
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/32/" class="block">
+                    
+                        <img 
+                            src="/media/seed/delivery-courier_05-small.jpg" 
+                            alt="Продаю Hyundai 2023, среднее"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Продаю Hyundai 2023, среднее
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">30221 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаю Hyundai 2023 года. Состояние: среднее. Пробег: 114974 км. Комплектация: круиз-контроль. Цена: 5478 EUR. Торг уместен.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Даниловград</span>
+                            <span>Автомобили</span>
+                            <time datetime="2026-07-12">
+                                Июл 12
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/52/" class="block">
+                    
+                        <img 
+                            src="/media/seed/catering_05-small.jpg" 
+                            alt="Куплю трактор Nissan"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Куплю трактор Nissan
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">49795 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу трактор Nissan в как новый состоянии. Особенности: мощный двигатель. Бюджет: 75519 EUR. Подгорица.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Подгорица</span>
+                            <span>Сельхозтехника</span>
+                            <time datetime="2026-07-11">
+                                Июл 11
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/42/" class="block">
+                    
+                        <img 
+                            src="/media/seed/birds_06-small.jpg" 
+                            alt="Снасти/экипировка IKEA, Плевля"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Снасти/экипировка IKEA, Плевля
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">590 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаются рыболовные снасти или охотничья экипировка IKEA в Плевля. Состояние: нормальное. Комплект: телескопическое удилище. Цена:  BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Бар</span>
+                            <span>Охота и рыбалка</span>
+                            <time datetime="2026-07-10">
+                                Июл 10
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/55/" class="block">
+                    
+                        <img 
+                            src="/media/seed/campers_04-small.jpg" 
+                            alt="Сломался ноутбук / ПК, нужен мастер, Цетине"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Сломался ноутбук / ПК, нужен мастер, Цетине
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу мастера по ремонту ноутбуков или ПК в Цетине. Проблема: удовлетворительное. Модель: замена аккумулятора. Бюджет: 1836 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Биело-Поле</span>
+                            <span>Ремонт ноутбуков и ПК</span>
+                            <time datetime="2026-07-02">
+                                Июл 02
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/37/" class="block">
+                    
+                        <img 
+                            src="/media/seed/campers_06-small.jpg" 
+                            alt="Ищу фитнес тренера / инструктора, Подгорица"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Ищу фитнес тренера / инструктора, Подгорица
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">3136 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Ищу фитнес тренера в Подгорица. Цель: приемлемое. Пожелания: растяжка. Бюджет: 4790 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Улцинь</span>
+                            <span>Спорт и фитнес</span>
+                            <time datetime="2026-06-26">
+                                Июн 26
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/33/" class="block">
+                    
+                        <img 
+                            src="/media/seed/boys_04-small.jpg" 
+                            alt="Оборудование для склада, Никшич"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Оборудование для склада, Никшич
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">2972 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаю Логистика и склад для склада. Бренд: популярный производитель. Состояние: приемлемое. Особенности: быстрая зарядка. Цена: 2767 EUR. Никшич.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Даниловград</span>
+                            <span>Логистика и склад</span>
+                            <time datetime="2026-06-26">
+                                Июн 26
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/59/" class="block">
+                    
+                        <img 
+                            src="/media/seed/pet-birds_09-small.jpg" 
+                            alt="Предлагаю услуги: Хобби и отдых"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Предлагаю услуги: Хобби и отдых
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">1641 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Предлагаю Хобби и отдых. Опыт работы: приемлемое. В Будва и окрестностях. Подробности: . Цена: 2649 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Биело-Поле</span>
+                            <span>Хобби и отдых</span>
+                            <time datetime="2026-06-22">
+                                Июн 22
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/44/" class="block">
+                    
+                        <img 
+                            src="/media/seed/boys_04-small.jpg" 
+                            alt="Срочно куплю Одежда, обувь, аксессуары"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Срочно куплю Одежда, обувь, аксессуары
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">627 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Срочно нужен Одежда, обувь, аксессуары. Состояние: как новый. Характеристики: . Готов рассмотреть предложения до 453 BAM. Мойковац.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Беране</span>
+                            <span>Одежда, обувь, аксессуары</span>
+                            <time datetime="2026-06-21">
+                                Июн 21
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                <a href="/48/" class="block">
+                    
+                        <img 
+                            src="/media/seed/boys_04-small.jpg" 
+                            alt="Продаются щенки, Бар"
+                            class="w-full h-48 object-cover rounded-t-lg"
+                            loading="lazy"
+                            width="240" height="180"
+                        >
+                    
+                    
+                    <div class="p-4">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2">Продаются щенки, Бар
+                            
+
+<span
+    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    aria-label="Verified seller"
+    role="status"
+>
+    <svg
+        class="w-3 h-3 mr-1"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+    >
+        <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+        />
+    </svg>
+    <span>Verified</span>
+</span></h2>
+                        
+                        
+                            <p class="text-blue-600 font-bold text-xl mb-2">4622 BAM</p>
+                        
+                        
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">Продаются щенки. Порода: чихуахуа. Возраст: приемлемое. Город: Бар. Цена: 4791 BAM.</p>
+                        
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Даниловград</span>
+                            <span>Собаки</span>
+                            <time datetime="2026-06-16">
+                                Июн 16
+                            </time>
+                        </div>
+                    </div>
+                </a>
+            </article>
+        
+    </div>
+
+    <!-- Pagination -->
+    
+
+
+<!-- Empty state when no query and no ads -->
+
+        </div>
+    </main>
+
+    
+
+
+
+    <script>
+        (function () {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            const input = document.getElementById('search-input');
+            if (!dropdown || !input) return;
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function parseJson(str) {
+                try { return JSON.parse(str); } catch (_) { return null; }
+            }
+
+            function hide() {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+            }
+
+            function render(json) {
+                const suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
+                if (!suggestions.length) { hide(); return; }
+                const html = suggestions.map(function (s) {
+                    const text = escapeHtml(s.text || '');
+                    const encoded = encodeURIComponent(s.text || '');
+                    const src = s.source ? ' (' + escapeHtml(s.source) + ')' : '';
+                    return '<li><a href="/search/?q=' + encoded +
+                           '" class="block w-full px-3 py-2 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">' +
+                           text + src + '</a></li>';
+                }).join('');
+                dropdown.innerHTML = html;
+                dropdown.classList.remove('hidden');
+            }
+
+            document.body.addEventListener('htmx:afterRequest', function (e) {
+                const detail = e.detail || {};
+                if (detail.target !== dropdown) return;
+                const xhr = detail.xhr;
+                if (!xhr) return;
+                if (xhr.status === 429) { hide(); return; }
+                const parsed = parseJson(xhr.responseText);
+                if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
+                render(parsed);
+            });
+
+            input.addEventListener('keydown', function (e) {
+                const items = dropdown.querySelectorAll('li a');
+                if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
+                if (!items.length) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
+                    next.focus();
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const active = document.activeElement;
+                    const idx = Array.from(items).indexOf(active);
+                    const prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
+                    prev.focus();
+                }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.location.href = items[0].href;
+                }
+            });
+
+            hide();
+        })();
+    </script>
+</body>
+</html>
