@@ -185,9 +185,20 @@ User.objects.get_or_create(...).
 
 **Recommendation:**
 
-Wrap all ORM operations in test fixtures in sync_to_async() (matching the pattern already used in
-production code at login.py:115), or restructure fixtures as async fixtures with async def and
-await sync_to_async(...).
+Wrap all ORM operations in test fixtures in sync_to_async(), matching the pattern already used in
+test_claim_login_token:83 (await sync_to_async(LoginToken.objects.create)(...)) and in production code
+at login.py:152 (the @sync_to_async-decorated _handle closure). Specifically, the `user` fixture
+(conftest.py:59-73) calls User.objects.get_or_create(...) synchronously without sync_to_async.
+Investigation confirms this is SAFE — in pytest-asyncio strict mode (pyproject.toml:154), sync
+fixtures are wrapped via `_wrap_sync_fixture` which executes the fixture body inside
+`_temporary_event_loop`, which SETS but does NOT RUN the event loop. Django 5.2.16's `async_unsafe`
+calls `asyncio.get_running_loop()`, which raises `RuntimeError` when no loop is running →
+`SynchronousOnlyOperation` is never raised. The `login_token_factory` fixture (conftest.py:76)
+already follows the correct pattern (sync fixture returning an async callable with sync_to_async).
+The 4 unused sync fixtures in `test_login_claim.py` (`future_token`, `expired_token`,
+`claimed_token`, `consumed_token`) were removed as dead code. This approach is preferred over
+restructuring fixtures as async fixtures — it requires minimal changes and reuses the established
+pattern.
 
 Effort: small | Priority: mandatory
 
@@ -513,8 +524,10 @@ Effort: medium | Priority: recommended
   auth_login(request, user) followed by explicit request.session.cycle_key() on the next line —
   a redundant second rotation. The user is anonymous at this point, so SESSION_KEY is absent from
   the session, and login() already cycles.
-> - Recommendation confirmed: Remove the redundant request.session.cycle_key() call at line 252, or
-  add a comment explaining the defense-in-depth rationale if intentionally kept.
+> - Recommendation confirmed: Remove the redundant request.session.cycle_key() call at consent.py:252.
+  Django's auth_login() already cycles the session key for anonymous-to-authenticated transitions
+  (SESSION_KEY absent -> login() else branch calls cycle_key()). The "add a comment" fallback applies
+  only if double-rotation is intentionally desired — it is not warranted.
 
 | Field | Value |
 |-------|-------|
@@ -548,9 +561,11 @@ wasteful and could confuse readers about when cycle_key() is actually needed.
 
 **Recommendation:**
 
-Remove the redundant request.session.cycle_key() call at line 252, since Django login() already
-cycles the session key for anonymous-to-authenticated transitions. If defense-in-depth is the intent,
-add a comment explaining why it is kept despite being redundant.
+Remove the redundant request.session.cycle_key() call at consent.py:252. Django's auth_login()
+already calls request.session.cycle_key() in its else branch for the anonymous-to-authenticated
+transition (triggered here because login_status receives unauthenticated requests). The explicit
+cycle_key() creates a second, unnecessary session key rotation. The fallback "add a comment"
+option applies only if double-rotation is intentionally desired — it is not warranted.
 
 Effort: trivial | Priority: low
 
@@ -676,7 +691,7 @@ Effort: trivial | Priority: low
 | ID | Finding | Fix Applied |
 |----|---------|-------------|
 | AUT-001 | Bot token claim crash | ENT-001: replaced `.update(returning=True).first()` with raw SQL `UPDATE ... RETURNING` via `connection.cursor()` |
-| AUT-002 | Sync ORM in async fixtures | Fixed `login_token_factory` fixture: `_create` now uses `await sync_to_async(LoginToken.objects.create)()`; all 4 call sites `await` the factory |
+| AUT-002 | Sync ORM in async fixtures | Fixed `login_token_factory` fixture: `_create` now uses `await sync_to_async(LoginToken.objects.create)()`; all 4 call sites `await` the factory. `user` fixture investigated and confirmed safe (sync fixtures run outside the running event loop in pytest-asyncio strict mode). Removed 4 dead unused sync fixtures from `test_login_claim.py`. |
 | AUT-003 | No constant-time token comparison | Added `hmac.compare_digest` in `login_status` view for constant-time token hash verification |
 | AUT-004 | No rate limiting on login_issue | Added `login_rate_limit` service (10 req/60s per IP via Django cache); `@never_cache` + 429 on exceed |
 | AUT-005 | Cookie security flags not explicit | Added `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`, `CSRF_COOKIE_HTTPONLY`, `CSRF_COOKIE_SAMESITE`, `SECURE_SSL_REDIRECT` |
@@ -714,3 +729,5 @@ Effort: trivial | Priority: low
 | AUT-003 | Recommendation refined | Non-actionable two-option split (implement hmac.compare_digest OR update docs) resolved to single solution: implement hmac.compare_digest per spec-index.md:75 and db-schema.md:86. Priority changed from advisory to mandatory; Effort from medium to small. |
 | AUT-004 | Recommendation refined | Non-actionable three-way choice (django-ratelimit vs middleware vs per-IP counter) resolved to single solution: reuse existing cache-based rate_limit.py pattern (no new dependency). |
 | AUT-006 | Recommendation refined | Non-actionable two-option split (wrap in transaction OR update spec) resolved to single solution: wrap in transaction.atomic() to match spec db-schema.md:83. Spec takes precedence over code change. |
+| AUT-002 | Recommendation refined | Non-actionable two-option split (wrap in sync_to_async OR restructure as async fixtures) resolved to single solution: wrap all ORM calls in sync_to_async, matching test_login_claim.py:83 pattern. `login_token_factory` was fixed (conftest.py:89: `await sync_to_async(LoginToken.objects.create)(...)`). The `user` fixture (conftest.py:59-73) was investigated and confirmed SAFE — sync fixtures in pytest-asyncio strict mode run outside the running event loop (`asyncio.get_running_loop()` raises `RuntimeError`), so `SynchronousOnlyOperation` is never raised. 4 dead sync fixtures in `test_login_claim.py` (`future_token`, `expired_token`, `claimed_token`, `consumed_token`) removed. |
+| AUT-008 | Recommendation refined | Non-actionable two-option split (remove cycle_key OR add explanatory comment) resolved to single solution: remove the redundant cycle_key() call. auth_login() already cycles the session key for anonymous-to-authenticated transitions. |

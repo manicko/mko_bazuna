@@ -29,51 +29,6 @@ def token_hash() -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-@pytest.fixture
-def future_token(token_hash: str) -> LoginToken:
-    """Create an unclaimed, unexpired LoginToken."""
-    return LoginToken.objects.create(
-        token_hash=token_hash,
-        telegram_id=None,
-        consumed_at=None,
-        expires_at=timezone.now() + timezone.timedelta(minutes=5),
-    )
-
-
-@pytest.fixture
-def expired_token(token_hash: str) -> LoginToken:
-    """Create an unclaimed, expired LoginToken."""
-    return LoginToken.objects.create(
-        token_hash=token_hash,
-        telegram_id=None,
-        consumed_at=None,
-        expires_at=timezone.now() - timezone.timedelta(minutes=1),
-    )
-
-
-@pytest.fixture
-def claimed_token(token_hash: str) -> LoginToken:
-    """Create a LoginToken already claimed by the bot (telegram_id set)."""
-    return LoginToken.objects.create(
-        token_hash=token_hash,
-        telegram_id=900000200,
-        consumed_at=None,
-        expires_at=timezone.now() + timezone.timedelta(minutes=5),
-    )
-
-
-@pytest.fixture
-def consumed_token(token_hash: str) -> LoginToken:
-    """Create a LoginToken already consumed by the web (consumed_at set)."""
-    now = timezone.now()
-    return LoginToken.objects.create(
-        token_hash=token_hash,
-        telegram_id=900000300,
-        consumed_at=now,
-        expires_at=now + timezone.timedelta(minutes=5),
-    )
-
-
 class TestClaimLoginToken:
     """Tests for login-token atomic claim via handle_login_orm."""
 
