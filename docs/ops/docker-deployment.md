@@ -394,7 +394,7 @@ simultaneously without service-name, network, or named-volume collisions.
 | DB credentials | `POSTGRES_*` from `.env.docker` | `postgres` / `postgres` / `mko_bazuna` |
 | Persistent volume | `mko-bazuna-dev_postgres_data` | `mko-bazuna-test_postgres_data` |
 | Source binding | `.:/app` (hot-reload) | `.:/app` (no image rebuild needed) |
-| `DEBUG` | `True` | `False` |
+| `DEBUG` | `True` | `True` |
 | Settings module | `config.settings.dev` | `config.settings.test` |
 
 ### Quick start

@@ -5,9 +5,9 @@ set -e
 
 # Fail fast if .env file is missing
 check_env_file() {
-    if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "/app/.env" ]; then
+    if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "/app/src/.env" ]; then
         if [ "$DJANGO_SETTINGS_MODULE" != "config.settings.test" ]; then
-            echo "ERROR: /app/.env file not found. Copy .env.example to .env and configure values." >&2
+            echo "ERROR: /app/src/.env file not found. Copy .env.docker.example to .env.docker and configure values." >&2
             exit 1
         fi
     fi
