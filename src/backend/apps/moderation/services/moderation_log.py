@@ -8,6 +8,8 @@ Reason field is TEXT and NEVER shown to seller (US-A11).
 import logging
 from typing import TYPE_CHECKING
 
+from django.db import transaction
+
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.models import ModeratorActionLog
 
@@ -165,49 +167,56 @@ def log_soft_delete(ad_id: int, user_id: int | None, moderator_id: int, reason: 
     return log
 
 
-def set_moderation_failed(ad: Ad, reason: str = "Auto-moderation failed") -> None:
-    """
-    Set ad status to ON_MODERATION_FAILED and log the action.
+def set_moderation_failed(ad: "Ad", reason: str = "Auto-moderation failed") -> None:  # noqa: UP037
+    """Set ad status to ON_MODERATION_FAILED and log the action.
+
+    Wrapped in ``transaction.atomic()`` to ensure the status transition and
+    audit log entry are committed or rolled back together (DB-002).
 
     Args:
         ad: The Ad instance that failed moderation.
         reason: The reason for failure (default: auto-moderation).
     """
-    ad.transition_to(AdStatus.ON_MODERATION_FAILED)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad.transition_to(AdStatus.ON_MODERATION_FAILED)
+        log_auto_fail(ad_id=ad.id, user_id=ad.user_id)
 
-    log_auto_fail(ad_id=ad.id, user_id=ad.user_id)
 
+def set_rejected(ad: "Ad", moderator_id: int, reason: str) -> None:  # noqa: UP037
+    """Set ad status to REJECTED, populate moderated_by, and log the action.
 
-def set_rejected(ad: Ad, moderator_id: int, reason: str) -> None:
-    """
-    Set ad status to REJECTED, populate moderated_by, and log the action.
+    Wrapped in ``transaction.atomic()`` to ensure the status transition and
+    audit log entry are committed or rolled back together (DB-002).
 
     Args:
         ad: The Ad instance to reject.
         moderator_id: The moderator user ID performing the rejection.
         reason: The rejection reason (INTERNAL ONLY - never shown to seller).
     """
-    ad.transition_to(AdStatus.REJECTED, moderator_id=moderator_id)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad.transition_to(AdStatus.REJECTED, moderator_id=moderator_id)
+        log_manual_reject(
+            ad_id=ad.id,
+            user_id=ad.user_id,
+            moderator_id=moderator_id,
+            reason=reason,
+        )
 
-    log_manual_reject(
-        ad_id=ad.id,
-        user_id=ad.user_id,
-        moderator_id=moderator_id,
-        reason=reason,
-    )
 
+def set_published(ad: "Ad", moderator_id: int | None = None) -> None:  # noqa: UP037
+    """Set ad status to PUBLISHED with optional moderator and log the action.
 
-def set_published(ad: Ad, moderator_id: int | None = None) -> None:
-    """
-    Set ad status to PUBLISHED with optional moderator and log the action.
+    Wrapped in ``transaction.atomic()`` to ensure the status transition and
+    audit log entry are committed or rolled back together (DB-002).
 
     Args:
         ad: The Ad instance to publish.
         moderator_id: The moderator user ID (None for auto-publish).
     """
-    ad.transition_to(AdStatus.PUBLISHED, moderator_id=moderator_id)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad.transition_to(AdStatus.PUBLISHED, moderator_id=moderator_id)
 
-    if moderator_id:
-        log_manual_publish(ad_id=ad.id, moderator_id=moderator_id)
-    else:
-        log_auto_publish(ad_id=ad.id, user_id=ad.user_id)
+        if moderator_id:
+            log_manual_publish(ad_id=ad.id, moderator_id=moderator_id)
+        else:
+            log_auto_publish(ad_id=ad.id, user_id=ad.user_id)

@@ -42,8 +42,8 @@ class Command(BaseCommand):
         """Execute the consent hard-delete command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.CONSENT_HARD_DELETE):
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(AdvisoryLockId.CONSENT_HARD_DELETE):
                 # Query using the IX_users_erasure_sweep index
                 # consent_revoked_at is not null and older than 30 days
                 cutoff_date = timezone.now() - timedelta(days=30)

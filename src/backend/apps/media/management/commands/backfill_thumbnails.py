@@ -53,69 +53,76 @@ class Command(BaseCommand):
         dry_run: bool = options["dry_run"]
         batch_size: int = options["batch_size"]
 
-        with advisory_lock(LOCK_ID):
-            # Find AdImage records that have an original image but are
-            # missing at least one thumbnail variant.
-            has_image = Q(image__isnull=False) & ~Q(image="")
-            missing_thumbnail = (
-                Q(thumbnail_small__isnull=True)
-                | Q(thumbnail_medium__isnull=True)  # type: ignore[operator]
-                | Q(thumbnail_large__isnull=True)  # type: ignore[operator]
-            )
-            queryset = AdImage.objects.filter(has_image, missing_thumbnail).order_by("id")
-
-            total = queryset.count()
-
-            if dry_run:
-                logger.info(
-                    "DRY RUN: %d AdImage records need thumbnail backfill",
-                    total,
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(LOCK_ID):
+                # Find AdImage records that have an original image but are
+                # missing at least one thumbnail variant.
+                has_image = Q(image__isnull=False) & ~Q(image="")
+                missing_thumbnail = (
+                    Q(thumbnail_small__isnull=True)
+                    | Q(thumbnail_medium__isnull=True)  # type: ignore[operator]
+                    | Q(thumbnail_large__isnull=True)  # type: ignore[operator]
                 )
-                return
+                queryset = AdImage.objects.filter(
+                    has_image, missing_thumbnail
+                ).order_by("id")
 
-            if total == 0:
-                logger.info("No AdImage records need thumbnail backfill")
-                return
+                total = queryset.count()
 
-            logger.info("Starting thumbnail backfill for %d records", total)
+                if dry_run:
+                    logger.info(
+                        "DRY RUN: %d AdImage records need thumbnail backfill",
+                        total,
+                    )
+                    return
 
-            service = ThumbnailService(storage_dir=settings.MEDIA_ROOT)
-            processed = 0
-            errors = 0
-
-            # Process in batches to avoid long-running transactions
-            ids = list(queryset.values_list("id", flat=True))
-            for i in range(0, len(ids), batch_size):
-                batch_ids = ids[i : i + batch_size]
-                batch = list(
-                    AdImage.objects.filter(id__in=batch_ids).iterator()
-                )
-
-                for ad_image in batch:
-                    try:
-                        self._process_one(service, ad_image)
-                        processed += 1
-                    except Exception as exc:
-                        errors += 1
-                        logger.exception(
-                            "Failed to generate thumbnails for AdImage %d: %s",
-                            ad_image.id,
-                            exc,
-                        )
+                if total == 0:
+                    logger.info(
+                        "No AdImage records need thumbnail backfill"
+                    )
+                    return
 
                 logger.info(
-                    "Progress: %d/%d processed, %d errors",
-                    min(i + batch_size, total),
-                    total,
+                    "Starting thumbnail backfill for %d records", total
+                )
+
+                service = ThumbnailService(storage_dir=settings.MEDIA_ROOT)
+                processed = 0
+                errors = 0
+
+                # Process in batches to avoid long-running transactions
+                ids = list(queryset.values_list("id", flat=True))
+                for i in range(0, len(ids), batch_size):
+                    batch_ids = ids[i : i + batch_size]
+                    batch = list(
+                        AdImage.objects.filter(id__in=batch_ids).iterator()
+                    )
+
+                    for ad_image in batch:
+                        try:
+                            self._process_one(service, ad_image)
+                            processed += 1
+                        except Exception as exc:
+                            errors += 1
+                            logger.exception(
+                                "Failed to generate thumbnails for AdImage %d: %s",
+                                ad_image.id,
+                                exc,
+                            )
+
+                    logger.info(
+                        "Progress: %d/%d processed, %d errors",
+                        min(i + batch_size, total),
+                        total,
+                        errors,
+                    )
+
+                logger.info(
+                    "Backfill complete: %d processed, %d errors out of %d total",
+                    processed,
                     errors,
+                    total,
                 )
-
-            logger.info(
-                "Backfill complete: %d processed, %d errors out of %d total",
-                processed,
-                errors,
-                total,
-            )
 
     def _process_one(
         self, service: ThumbnailService, ad_image: AdImage

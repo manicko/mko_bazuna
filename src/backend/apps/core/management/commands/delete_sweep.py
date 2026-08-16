@@ -40,8 +40,8 @@ class Command(BaseCommand):
         """Execute the delete sweep command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
                 # Query using the IX_ads_delete_sweep partial index
                 # Status is ARCHIVED, published_at older than 4 months
                 cutoff_date = timezone.now() - timedelta(days=120)

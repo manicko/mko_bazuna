@@ -14,6 +14,7 @@ See also section G in docs/01-spec/technical-specification.md.
 """
 
 import hashlib
+import hmac
 import logging
 import secrets
 from datetime import timedelta
@@ -21,12 +22,15 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 
 from apps.users.models import LoginToken, User
 from apps.users.services import can_login, decline_consent, give_consent, withdraw_consent
+from apps.users.services.login_rate_limit import login_rate_limit_check
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +149,7 @@ def is_consent_given(request: HttpRequest) -> bool:
     return user.consent_given_at is not None or not user.ads_auto_publish
 
 
+@never_cache
 def login_issue(request: HttpRequest) -> HttpResponse:
     """
     Issue a login token and render the Telegram deep-link.
@@ -162,6 +167,10 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered login page with deep-link to Telegram bot
     """
+    if not login_rate_limit_check(request):
+        logger.warning("Rate limit exceeded for login_issue")
+        return HttpResponse(status=429)
+
     raw_token = secrets.token_urlsafe(24)  # 32 URL-safe chars, matches bot regex `{32}`
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
@@ -181,10 +190,12 @@ def login_issue(request: HttpRequest) -> HttpResponse:
         {
             "deep_link": deep_link,
             "bot_username": bot_username,
+            "raw_token": raw_token,
         },
     )
 
 
+@never_cache
 def login_status(request: HttpRequest) -> HttpResponse:
     """
     Poll login token status — atomically mark consumed if claimed.
@@ -208,30 +219,37 @@ def login_status(request: HttpRequest) -> HttpResponse:
 
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    try:
-        token = LoginToken.objects.get(token_hash=token_hash)
-    except LoginToken.DoesNotExist:
-        return HttpResponse(status=410)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        try:
+            token = LoginToken.objects.get(token_hash=token_hash)
+        except LoginToken.DoesNotExist:
+            return HttpResponse(status=410)
 
-    # Token expired or already consumed — gone
-    if token.expires_at <= timezone.now() or token.consumed_at is not None:
-        return HttpResponse(status=410)
+        # Constant-time comparison (spec: spec-index.md:75, db-schema.md:86)
+        if not hmac.compare_digest(token.token_hash, token_hash):
+            return HttpResponse(status=410)
 
-    # Bot has not claimed the token yet — keep polling
-    if token.telegram_id is None:
-        return HttpResponse(status=204)
+        # Token expired or already consumed — gone
+        if token.expires_at <= timezone.now() or token.consumed_at is not None:
+            return HttpResponse(status=410)
 
-    # Bot has claimed the token — atomically mark consumed
-    updated = LoginToken.objects.filter(
-        token_hash=token_hash,
-        telegram_id=token.telegram_id,
-        consumed_at__isnull=True,
-        expires_at__gt=timezone.now(),
-    ).update(consumed_at=timezone.now())
+        # Bot has not claimed the token yet — keep polling
+        if token.telegram_id is None:
+            return HttpResponse(status=204)
 
-    if updated == 0:
-        # Race condition — another request already consumed it
-        return HttpResponse(status=410)
+        # Bot has claimed the token — atomically mark consumed (single UPDATE)
+        # Optimistic concurrency: filter conditions ensure only an unclaimed,
+        # unexpired token with matching telegram_id is touched.
+        updated = LoginToken.objects.filter(
+            token_hash=token_hash,
+            telegram_id=token.telegram_id,
+            consumed_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        ).update(consumed_at=timezone.now())
+
+        if updated == 0:
+            # Race condition — another request already consumed it
+            return HttpResponse(status=410)
 
     logger.info(f"Login token {token_hash[:8]} consumed by telegram_id={token.telegram_id}")
 
@@ -248,8 +266,9 @@ def login_status(request: HttpRequest) -> HttpResponse:
         return HttpResponse(status=410)
 
     # Establish web session
+    # auth_login() already calls cycle_key() for anonymous->authenticated transitions,
+    # so an explicit cycle_key() here would be redundant.
     auth_login(request, user)
-    request.session.cycle_key()
 
     logger.info(f"Web session established for user {user.id} (telegram_id={token.telegram_id})")
 

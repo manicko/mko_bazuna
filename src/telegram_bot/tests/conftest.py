@@ -6,12 +6,13 @@ enabling handler tests against the real PostgreSQL ORM (two-process contract).
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.utils import timezone
 
@@ -73,7 +74,7 @@ def user() -> Any:
 
 
 @pytest.fixture
-def login_token_factory() -> Callable[..., tuple[str, Any]]:
+def login_token_factory() -> Callable[..., Awaitable[tuple[str, Any]]]:
     """Factory fixture for creating LoginToken instances.
 
     Returns a callable that accepts an optional ``raw_token`` string
@@ -81,9 +82,11 @@ def login_token_factory() -> Callable[..., tuple[str, Any]]:
     """
     from apps.users.models import LoginToken
 
-    def _create(raw_token: str = "abc123_def456_ghi789_jkl012_mno345") -> tuple[str, Any]:
+    async def _create(
+        raw_token: str = "abc123_def456_ghi789_jkl012_mno345",
+    ) -> tuple[str, Any]:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        token = LoginToken.objects.create(
+        token = await sync_to_async(LoginToken.objects.create)(
             token_hash=token_hash,
             expires_at=timezone.now() + timezone.timedelta(hours=1),
         )

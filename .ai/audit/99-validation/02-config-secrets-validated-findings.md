@@ -80,14 +80,14 @@ service boot with a clear error. Never default secret-bearing vars. Effort: triv
 > **Validation Note:**
 > - **Action:** validated
 > - **Detail:** git ls-files .env.docker returns .env.docker (tracked). git check-ignore .env.docker exits non-zero (NOT ignored). .gitignore:145-147 lists .env, .env.dev, .env.local but omits .env.docker. .dockerignore:5 uses .env* glob which DOES exclude .env.docker from the image build context, confirming the leak vector is VCS only (not the container image). Current .env.docker content contains only placeholders (no active leak). The ops docs at docker-deployment.md:78 acknowledge .env.docker is tracked ("Yes (template with placeholder values)") yet docker-deployment.md:165 instructs "edit .env.docker with your real values" and :267 instructs "Configure .env.docker with production values". The env-var reference table at docker-deployment.md:305-308 lists BOT_TOKEN, DJANGO_SECRET_KEY, POSTGRES_PASSWORD as required. This creates a documented flow that writes real secrets into a tracked file. All evidence verified.
-> - **Recommendation confirmed:** Decouple the tracked template from runtime secrets — keep .env.docker as a tracked template, inject real secrets via a gitignored runtime file or orchestration environment, and add .env.docker-handling guidance to .gitignore/.dockerignore.
+> - **Recommendation confirmed:** Select the **gitignored runtime file** model (orchestration-environment alternative rejected -- it would rewrite every `env_file:` / bind-mount site and the entrypoint path checks; see CFG-004). Keep `.env.docker` as the tracked template (placeholder values only) and route real secrets through a gitignored `.env.docker.local` runtime file: `cp .env.docker .env.docker.local`, fill `DJANGO_SECRET_KEY` / `BOT_TOKEN` / `POSTGRES_PASSWORD`, add `.env.docker.local` to `.gitignore`, and redirect every `env_file:`, the `./.env.docker.local:/app/src/.env:ro` bind-mount, and `Makefile:9` to the runtime file so `entrypoint.sh:9` and `base.py:36` continue reading operator-populated secrets (the scheduler's `/app/.env` check is tracked separately as CFG-004).
 
 | Field | Value |
 |-------|-------|
 | **ID** | CFG-003 |
 | **Severity** | HIGH |
 | **Type** | SPEC-DEVIATION |
-| **Affected Modules** | .env.docker, .gitignore:145-149, docker-compose.yml (all services env_file: .env.docker + ./.env.docker:/app/src/.env:ro), docs/ops/docker-deployment.md:165,267 |
+| **Affected Modules** | .env.docker (template, stays tracked), .env.docker.local (new runtime file), .gitignore:145-148, docker-compose.yml + docker-compose.dev.override.yml + docker-compose.prod.yml (every service `env_file: - .env.docker` + `./.env.docker:/app/src/.env:ro`), Makefile:9, docs/ops/docker-deployment.md:78,165,267 |
 | **Classification** | mandatory |
 
 **Description:** .env.docker is BOTH the only runtime secret source (loaded by every service via
@@ -101,10 +101,15 @@ filling real DJANGO_SECRET_KEY/BOT_TOKEN/POSTGRES_PASSWORD commits production se
 deployment flow writes real secrets into this tracked file. .dockerignore correctly excludes
 .env* from images (line 5), so the leak vector is VCS, not the image.
 
-**Recommendation:** Decouple the tracked template from the runtime secret file: keep .env.docker
-as a tracked template only, and inject real secrets via a gitignored runtime file (e.g. copy to a
-gitignored .env) or via the orchestration environment. Add .env.docker-secrets-handling
-guidance to .gitignore/.dockerignore. Effort: small.
+**Recommendation:** Select the **gitignored runtime file** model (the orchestration-environment alternative is rejected -- it would require rewriting every `env_file:` / bind-mount site and the entrypoint path checks; see CFG-004). Keep `.env.docker` as the **tracked template** (placeholder values only, no real secrets) and route real secrets through a gitignored `.env.docker.local` runtime file. Bootstrap it once from the template (`cp .env.docker .env.docker.local`) so it carries every default; the YAML `${VAR:-default}` syntax remains as a secondary safety net -- a two-file `env_file: [.env.docker.local, .env.docker]` fallback is intentionally avoided, because a missing `env_file` hard-errors in Compose and the `/app/src/.env` bind-mount must stay consistent with the `env_file:` source (`base.py:36` `read_env` loads `/app/src/.env`). Concrete steps:
+
+1. Leave `.env.docker` tracked as the template -- it already holds only placeholders (e.g. `POSTGRES_PASSWORD=your-password`, empty `BOT_TOKEN=`); no content or rename changes required.
+2. Create the gitignored runtime file: `cp .env.docker .env.docker.local`, then fill real `DJANGO_SECRET_KEY` / `BOT_TOKEN` / `POSTGRES_PASSWORD` in `.env.docker.local`.
+3. Ignore the runtime file: add `.env.docker.local` to `.gitignore` next to `.env`, `.env.dev`, `.env.local` (.gitignore:145-148). No `.dockerignore` change -- `.env*` (line 5) already excludes every `.env*` file from image builds.
+4. Redirect the consumption layer to `.env.docker.local` (the only mechanical change): `docker-compose.yml` (every service's `env_file: - .env.docker` -> `.env.docker.local`, and `./.env.docker:/app/src/.env:ro` -> `./.env.docker.local:/app/src/.env:ro`), `docker-compose.dev.override.yml` (web/bot/load_catalog/seed), `docker-compose.prod.yml` (scheduler), and `Makefile:9` (`ENV_FILE := --env-file .env.docker.local`). The bind-mount target `/app/src/.env` is unchanged, so `entrypoint.sh:9`'s fail-fast check and `base.py:36`'s `read_env` of `/app/src/.env` continue reading the operator-populated secrets. (`entrypoint-scheduler.sh:8` checks `/app/.env`, a separate path mismatch tracked as CFG-004.)
+5. Update docs `docs/ops/docker-deployment.md`: the :78 table -- `.env.docker` stays "Yes (template, placeholders only)", add `.env.docker.local` "No (runtime secrets, gitignored)"; :165 / :267 -- instruct `cp .env.docker .env.docker.local` then fill secrets into `.env.docker.local` (never into the tracked template); update the `--env-file .env.docker` invocation examples throughout (e.g. :102, :105, :108) to `--env-file .env.docker.local`.
+
+Real secrets are injected via the gitignored `.env.docker.local` runtime file (not the orchestration environment) with consistent `env_file:` + bind-mount references so the single source of truth at `/app/src/.env` is preserved. Effort: medium (mechanical reference swap across 3 compose files + Makefile + docs; no schema/SQL change).
 
 ---
 
@@ -248,7 +253,7 @@ confusion about which entrypoint actually runs. Effort: trivial.
 |---------|-------------|-------|
 | CFG-001 | Medium | Changing BOT_TOKEN to fail-fast in production will cause the ot container to exit non-zero if the token is missing. Operators relying on the current silent skip (e.g. web-only deployments) must set BOT_TOKEN or use DEBUG=True. Backward-compatible only if gated on DEBUG. |
 | CFG-002 | High | Switching :- to :? makes Compose fail-fast on any missing secret at config/parse time. Any deployment relying on placeholder defaults (e.g. quick local bootstrap with .env.docker placeholders) will break. Requires coordinated rollout with secret provisioning. |
-| CFG-003 | High | gitignoring .env.docker changes the secret injection mechanism. Deployment scripts, Makefile targets, and CI/CD must source secrets from the new gitignored runtime file or orchestration env. Highest operational coordination burden. Should be sequenced AFTER or TOGETHER with CFG-002. |
+| CFG-003 | High | Redirecting secret injection from tracked .env.docker to gitignored .env.docker.local changes the consumption layer. All compose env_file/bind-mount sites (docker-compose.yml, docker-compose.dev.override.yml, docker-compose.prod.yml), Makefile targets (--env-file), and docs must source secrets from .env.docker.local. Highest operational coordination burden. Should be sequenced AFTER or TOGETHER with CFG-002. |
 | CFG-004 | Low | Path fix in a shell script; no schema or behavioral change. estart: unless-stopped means the current crash-loop stops. Safe to deploy independently. |
 | CFG-005 | Trivial | New test cases only; no production impact. |
 | CFG-006 | Trivial | Documentation update only; no code or config change. |
@@ -256,7 +261,7 @@ confusion about which entrypoint actually runs. Effort: trivial.
 
 **Recommended rollout sequencing:**
 1. Phase 1 (low-risk, independent): CFG-004 (path fix), CFG-006 (docs), CFG-007 (stub deletion), CFG-005 (tests).
-2. Phase 2 (coordinated secrets hardening): CFG-002 (compose :? fail-fast) + CFG-003 (gitignore .env.docker, inject via runtime file or orchestrator env). Apply together to avoid a window where secrets are required but not provisioned.
+2. Phase 2 (coordinated secrets hardening): CFG-002 (compose :? fail-fast) + CFG-003 (redirect to gitignored .env.docker.local runtime file; update env_file/bind-mount/Makefile refs). Apply together to avoid a window where secrets are required but not provisioned.
 3. Phase 3 (runtime guard): CFG-001 (settings-level BOT_TOKEN guard + bot non-zero exit + comment fix). Apply after Phase 2 so the fail-fast behavior is consistent across layers.
 
 ## Validation Summary

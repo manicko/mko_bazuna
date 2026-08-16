@@ -9,6 +9,8 @@ import logging
 from difflib import SequenceMatcher
 from typing import Final
 
+from django.db import transaction
+
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
@@ -216,39 +218,47 @@ def _is_duplicate_title(title: str, user_id: int, ad_id: int, threshold: int) ->
 
 
 def _fail_moderation(ad: Ad) -> None:
-    """Set ad to ON_MODERATION_FAILED with timestamp and log action."""
+    """Set ad to ON_MODERATION_FAILED with timestamp and log action.
+
+    All writes are wrapped in a single transaction to ensure atomicity.
+    """
     from apps.moderation.services.moderation_log import set_moderation_failed
 
-    set_moderation_failed(ad)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        set_moderation_failed(ad)
 
-    AnalyticsEvent.objects.create(
-        event_type=AnalyticsEventType.MODERATION_REJECTED,
-        user_id=ad.user_id,
-        ad_id=ad.id,
-    )
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.MODERATION_REJECTED,
+            user_id=ad.user_id,
+            ad_id=ad.id,
+        )
 
 
 def _pass_moderation(ad: Ad) -> None:
-    """Set ad to PUBLISHED with timestamp, log action, and create analytics event."""
+    """Set ad to PUBLISHED with timestamp, log action, and create analytics event.
+
+    All writes are wrapped in a single transaction to ensure atomicity.
+    """
     from apps.moderation.services.moderation_log import set_published
 
-    set_published(ad)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        set_published(ad)
 
-    AnalyticsEvent.objects.create(
-        event_type=AnalyticsEventType.AD_PUBLISHED,
-        user_id=ad.user_id,
-        ad_id=ad.id,
-    )
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.AD_PUBLISHED,
+            user_id=ad.user_id,
+            ad_id=ad.id,
+        )
 
-    AnalyticsEvent.objects.create(
-        event_type=AnalyticsEventType.MODERATION_APPROVED,
-        user_id=ad.user_id,
-        ad_id=ad.id,
-    )
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.MODERATION_APPROVED,
+            user_id=ad.user_id,
+            ad_id=ad.id,
+        )
 
-    TrustCalculator().calculate_and_save(ad.user)
+        TrustCalculator().calculate_and_save(ad.user)
 
-    logger.info(f"Auto-moderation passed for ad {ad.id}")
+        logger.info(f"Auto-moderation passed for ad {ad.id}")
 
 
 def check(ad: Ad) -> tuple[bool, str | None]:

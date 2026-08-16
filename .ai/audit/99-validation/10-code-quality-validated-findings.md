@@ -21,7 +21,7 @@ validator: validator
 > - **Action:** validated
 > - **Detail:** Confirmed: copy_service.py lines 48-49 assign latitude=source.latitude and longitude=source.longitude. Ad model (models.py, 549 lines) defines no latitude or longitude columns - grep returns zero matches. Only location field is city (ForeignKey line 96). copy_ad invoked by bot /copy via ad_copy.py:51 (sync_to_async), raises AttributeError at runtime.
 > - **Docstring:** copy_service.py line 4 claims to Preserve coordinates - a promise the model does not fulfill.
-> - **Recommendation:** Correct. Remove the two lines or add proper model fields + migration. Removing is simpler and aligns with overengineering avoidance.
+> - **Recommendation:** Remove the two lines at copy_service.py:48-49 and update the module docstring (line 4) to drop the false coordinates claim. The Ad model (db-schema.md) defines no latitude/longitude columns — only city (FK). No spec or user story defines coordinates; Design_01/03-ad-detail.md Coordinates Toggle is a research note, and ui-ux-patterns-analysis.json explicitly flags CONFLICT: No GPS coordinates. Adding fields + migration would ship a feature absent from phases 1-2, violating YAGNI (cf. currency column removed) and overengineering avoidance. Removing unblocks the bot /copy command immediately.
 > - **Evidence quality:** Strong.
 
 **ID:** QLT-001
@@ -87,7 +87,7 @@ validator: validator
 > **Validation Note:**
 > - **Action:** validated (with evidence correction)
 > - **Detail:** Confirmed: can_contact_seller() (lines 26-62) and get_seller_for_contact() (lines 65-104) have identical condition chains. Finding states 5-condition but both implement 6: status check + 5 seller conditions.
-> - **Recommendation:** Correct. Extract shared helper.
+> - **Recommendation:** Extract the 6-condition zone-R2 check into a private predicate def _check_seller_contactable(ad: Ad, seller: User | None) -> bool in contact.py. can_contact_seller(ad) passes ad.user (caller must select_related(user) to avoid N+1); get_seller_for_contact(ad_id) passes the already-fetched ad.user. Both functions delegate to this single predicate, eliminating the duplicated 6-condition chain. No behavior change.
 > - **Evidence quality:** Strong (6 conditions, not 5).
 > - **Note:** Classified advisory but missing from Advisory Recommendations section in findings file.
 
@@ -103,7 +103,7 @@ validator: validator
 > **Validation Note:**
 > - **Action:** validated
 > - **Detail:** Confirmed: record_trust_event defined at trust_analytics.py:92, re-exported from __init__.py. Grep across src (excluding tests) shows zero production call sites - only in test_trust_analytics.py.
-> - **Recommendation:** Valid. Investigate or remove. Uses event_type=event.value (QLT-007).
+> - **Recommendation:** Wire record_trust_event into TrustCalculator.calculate_and_save() (trust_calculator.py:40-86): call record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED) after persisting SellerTrustScore. TrustCalculator already imports AnalyticsEventType (uses it for CONTACT_INITIATED/CONTACT_RESPONSE) and is the single owner of trust-level computation — this is the well-defined call site matching the established record_contact_initiated/record_contact_response pattern. Fix the QLT-007 .value usage in the same edit (event_type=event). For SELLER_VERIFIED, leave the function exported; no admin verification handler exists yet to wire it.
 > - **Evidence quality:** Strong.
 
 **ID:** QLT-006

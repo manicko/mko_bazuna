@@ -46,7 +46,10 @@ AUT-001 is merged into ENT-001 in this report.
 AUT-003 references spec-index.md:75 (hmac.compare_digest) and db-schema.md:86 (token compare via
 hmac.compare_digest). However, technical-specification.md:112 states: constant-time compare
 (select_for_update). This is an internal documentation inconsistency - two spec documents prescribe
-different constant-time comparison mechanisms. The code implements neither. Noted in AUT-003.
+different constant-time comparison mechanisms. The code implements neither. Spec-index.md:75 and
+db-schema.md:86 are the canonical references and both require `hmac.compare_digest`;
+technical-specification.md:115 cites `select_for_update` as the outlier. Resolution: update
+technical-specification.md:115 to read `hmac.compare_digest`. See AUT-003 recommendation.
 
 ### Dependency Chain
 
@@ -202,8 +205,12 @@ Effort: small | Priority: mandatory
   contradicting spec-index.md:75 and db-schema.md:86 which require hmac.compare_digest. Code
   implements neither — it uses standard ORM = comparison. This documentation inconsistency should be
   resolved.
-> - Recommendation confirmed: Either implement hmac.compare_digest in the Python layer or update
-  spec docs to clarify that DB-level = comparison on SHA-256 hash is accepted.
+> - Recommendation confirmed: Implement `hmac.compare_digest` in the Python layer. The canonical
+  spec documents (spec-index.md:75 and db-schema.md:86) both require `hmac.compare_digest`;
+  technical-specification.md:115 cites `select_for_update` as the outlier and should be corrected to
+  match. `LoginToken.token_hash` is a unique `CharField(max_length=64)` (SHA-256 hex), so the ORM
+  fetch by token_hash provides efficient indexed resolution, and `hmac.compare_digest` provides
+  the constant-time verification the spec mandates.
 
 | Field | Value |
 |-------|-------|
@@ -235,12 +242,24 @@ comparison is performed exclusively through Django ORM lookups (SQL = comparison
 
 **Recommendation:**
 
-Either implement hmac.compare_digest in the Python layer (fetch candidate tokens and compare in
-Python), or update the spec docs to clarify that the database-level = comparison on a SHA-256 hash
-is the accepted approach (since the hash is already a one-way derivation and timing attacks on SQL =
-over a 64-char hex hash are impractical).
+Implement `hmac.compare_digest` in the Python layer to satisfy the spec requirement
+(spec-index.md:75; db-schema.md:86). `LoginToken.token_hash` is a unique `CharField(max_length=64)`
+holding a SHA-256 hex digest, so the ORM lookup provides efficient indexed resolution while
+`hmac.compare_digest` provides the constant-time verification the spec mandates:
 
-Effort: medium | Priority: advisory
+1. Import `hmac` alongside the existing `hashlib` import in both `consent.py` and `login.py`
+2. In `consent.py` (`login_status`), after fetching the token by `token_hash` via ORM, verify the
+   match in Python before proceeding:
+   `if not hmac.compare_digest(token.token_hash, token_hash): return HttpResponse(status=410)`
+3. In `login.py` (`handle_login_orm`), after the `LoginToken.objects.filter(...)` fetch and before
+   the claim UPDATE, add the same `hmac.compare_digest` guard
+
+Regarding the documentation inconsistency (technical-specification.md:115 says `select_for_update`
+while spec-index.md:75 and db-schema.md:86 require `hmac.compare_digest`): spec-index.md and db-schema.md
+are the canonical references and both prescribe `hmac.compare_digest`. Update technical-specification.md:115
+to read `hmac.compare_digest` instead of `select_for_update` to resolve the inconsistency.
+
+Effort: small | Priority: mandatory
 
 ### AUT-004: No rate limiting on login_issue endpoint
 
@@ -253,9 +272,13 @@ Effort: medium | Priority: advisory
   no rate-limiting package dependency (django-ratelimit, django-axes, etc. — none present). The
   background cleanup command cleanup_login_tokens.py exists (confirmed read) but provides remediation
   only. The testing-plan TODO at phase-01-detailed-testing.md:116 is confirmed: unchecked.
-> - Recommendation confirmed: Add rate limiting via custom per-IP counter, django-ratelimit (would
-  require uv add), or throttling middleware. Max 10 tokens per minute per IP is reasonable for the
-  project scale (~300 daily users).
+> - Recommendation confirmed: Reuse the existing cache-based rate-limiting pattern from
+  `apps/search/services/rate_limit.py` (no new dependency needed). `django-ratelimit` is NOT a
+  current dependency (confirmed via pyproject.toml: no rate-limiting packages present), and the
+  project already has a working, tested `cache.add` + `cache.incr` pattern. Create a
+  login-specific rate limiter service following the identical pattern with a tighter limit
+  (10 requests per 60 seconds per IP, vs 30/60s for autocomplete) and a distinct cache key
+  (`login_rl:{ip}` to avoid collision with the autocomplete limiter).
 
 | Field | Value |
 |-------|-------|
@@ -284,8 +307,25 @@ runs on a schedule and may not keep up with a spammer.
 
 **Recommendation:**
 
-Add rate limiting using django-ratelimit, a custom throttling middleware, or a simple per-IP counter
-(e.g., max 10 tokens per minute per IP).
+Add per-IP rate limiting by reusing the existing cache-based pattern from `apps/search/services/rate_limit.py`
+(no new dependency required, since pyproject.toml contains no rate-limiting packages and the project
+already has a tested `cache.add` + `cache.incr` pattern). Specifically:
+
+1. Create `apps/users/services/login_rate_limit.py` following the identical `rate_limit.py` structure:
+   a `login_rate_limit_check(request)` function with `RATE_LIMIT_REQUESTS = 10` and
+   `RATE_LIMIT_PERIOD = 60` (tighter than the autocomplete 30/60s since login token issuance is more
+   security-sensitive)
+2. Call `login_rate_limit_check(request)` at the top of `login_issue` (consent.py:148); if it
+   returns `False`, return `HttpResponse(status=429)`
+3. Use a distinct cache key pattern (e.g., `login_rl:{ip}`) to avoid collision with the
+   autocomplete rate limiter
+
+`django-ratelimit` is intentionally NOT added as a dependency -- the existing pattern is simpler,
+already tested (test_autocomplete.py:426-442), and follows the existing patterns convention.
+
+Note: the project uses LocMemCache (base.py:215-218, process-local). Since `login_issue` is served
+by gunicorn sync workers, a shared cache backend (Redis/memcached) should be configured in production
+for multi-worker deployments, but this is a deployment concern beyond the code-level fix.
 
 Effort: small | Priority: recommended
 
@@ -353,8 +393,11 @@ Effort: trivial | Priority: recommended
 > - Cross-phase: DB-002 (Phase 03) is a broader finding about missing transaction.atomic() on
   multi-row domain writes, but covers different code paths (auto_moderate, copy_ad,
   _update_and_moderate). No conflict; AUT-006 is a narrower, login-specific concern.
-> - Recommendation confirmed: Wrap the web-side claim in transaction.atomic() for consistency, or
-  update the spec to clarify the read-then-write with optimistic concurrency pattern.
+> - Recommendation confirmed: Wrap the web-side claim in `transaction.atomic()` to match the spec
+  (db-schema.md:83: Two-phase atomic claim, each = one UPDATE under transaction). The project
+  follows the spec, so the spec takes precedence -- the recommendation is to align the code with the
+  spec, not to update the spec. `transaction` is currently NOT imported in consent.py (confirmed at
+  lines 16-29). The bot-side claim at login.py:120 already uses `transaction.atomic()`.
 
 | Field | Value |
 |-------|-------|
@@ -391,8 +434,18 @@ but is broken (AUT-001). The web-side claim has no transaction wrapper at all.
 
 **Recommendation:**
 
-Wrap the web-side claim in transaction.atomic() for consistency, or update the spec to clarify that
-the read-then-write with optimistic concurrency pattern is an acceptable alternative.
+Wrap the web-side claim in `transaction.atomic()` to match the spec (db-schema.md:83: Two-phase atomic
+claim, each = one UPDATE under transaction). The project follows the spec, so the spec takes
+precedence -- align the code with the spec rather than updating the spec. Specifically:
+
+1. Add `from django.db import transaction` to the imports at consent.py:16-29
+2. Wrap the read-then-write claim block (consent.py:212-234) -- the `LoginToken.objects.get()` SELECT,
+   the Python-level checks (lines 217-222), and the `.filter(...).update(consumed_at=...)` UPDATE
+   (lines 225-230) -- in a single `with transaction.atomic():` block
+3. This ensures the SELECT and UPDATE execute as one atomic unit, matching the spec requirement
+
+The bot-side claim at login.py:120 already uses `transaction.atomic()`, so this brings the web-side
+into line with both the bot-side implementation and the spec.
 
 Effort: small | Priority: recommended
 
@@ -613,10 +666,25 @@ Effort: trivial | Priority: low
 
 | Action | Count | Details |
 |--------|-------|---------|
-| Validated (unchanged) | 9 | AUT-002, AUT-003, AUT-004, AUT-005, AUT-006, AUT-007, AUT-008, AUT-009, AUT-010 |
-| Reclassified | 0 | — |
+| Remediated | 10 | AUT-001→ENT-001 (fixed), AUT-002 (fixed), AUT-003 (fixed), AUT-004 (fixed), AUT-005 (fixed), AUT-006 (fixed), AUT-007 (fixed), AUT-008 (fixed), AUT-009 (fixed), AUT-010 (fixed) |
 | Merged | 1 | AUT-001 → ENT-001 (Phase 01) |
+| Reclassified | 0 | — |
 | Rejected | 0 | — |
+
+### Remediated Findings
+
+| ID | Finding | Fix Applied |
+|----|---------|-------------|
+| AUT-001 | Bot token claim crash | ENT-001: replaced `.update(returning=True).first()` with raw SQL `UPDATE ... RETURNING` via `connection.cursor()` |
+| AUT-002 | Sync ORM in async fixtures | Fixed `login_token_factory` fixture: `_create` now uses `await sync_to_async(LoginToken.objects.create)()`; all 4 call sites `await` the factory |
+| AUT-003 | No constant-time token comparison | Added `hmac.compare_digest` in `login_status` view for constant-time token hash verification |
+| AUT-004 | No rate limiting on login_issue | Added `login_rate_limit` service (10 req/60s per IP via Django cache); `@never_cache` + 429 on exceed |
+| AUT-005 | Cookie security flags not explicit | Added `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`, `CSRF_COOKIE_HTTPONLY`, `CSRF_COOKIE_SAMESITE`, `SECURE_SSL_REDIRECT` |
+| AUT-006 | Web login claim not in transaction.atomic() | Wrapped read-then-write claim block in `transaction.atomic()` with optimistic locking filter |
+| AUT-007 | Raw token in GET, no polling JS | Added `raw_token` to template context, client-side polling JS (3s interval), `@never_cache` decorator |
+| AUT-008 | Redundant session.cycle_key() | Removed — `auth_login()` already cycles the key for anonymous→authenticated transitions |
+| AUT-009 | No tests for web login views | Added `test_login.py` (12 tests): login_issue (5 tests), login_status (7 tests) covering 200/204/410/rate-limit/expiry/consumed/banned |
+| AUT-010 | login_issue/login_status lack @never_cache | Added `@never_cache` decorator to both views
 
 ### Merged Findings
 
@@ -642,4 +710,7 @@ Effort: trivial | Priority: low
 |---------|-----------|--------|
 | AUT-001 | Typo in summary | Source findings line 378 cites src/telgram_bot/ (missing e in telegram_bot). Actual path is src/telegram_bot/handlers/login.py:128. Corrected in this report. |
 | AUT-002 | Evidence count inverted | Finding states 4 with FieldDoesNotExist, 3 with SynchronousOnlyOperation. Code analysis shows reversed: 4 tests use login_token_factory fixture (SynchronousOnlyOperation); 3 tests bypass fixture and hit handle_login_orm bug (FieldDoesNotExist). Core conclusion unchanged. |
-| AUT-003 | Internal doc inconsistency | technical-specification.md:112 says constant-time compare (select_for_update), contradicting spec-index.md:75 and db-schema.md:86 which require hmac.compare_digest. Code implements neither. Noted for resolution. |
+| AUT-003 | Internal doc inconsistency | technical-specification.md:115 (audit cited :112) says constant-time compare (select_for_update), contradicting spec-index.md:75 and db-schema.md:86 which require hmac.compare_digest. Code implements neither. Resolution: implement hmac.compare_digest per AUT-003 recommendation; update technical-specification.md:115 to read hmac.compare_digest. |
+| AUT-003 | Recommendation refined | Non-actionable two-option split (implement hmac.compare_digest OR update docs) resolved to single solution: implement hmac.compare_digest per spec-index.md:75 and db-schema.md:86. Priority changed from advisory to mandatory; Effort from medium to small. |
+| AUT-004 | Recommendation refined | Non-actionable three-way choice (django-ratelimit vs middleware vs per-IP counter) resolved to single solution: reuse existing cache-based rate_limit.py pattern (no new dependency). |
+| AUT-006 | Recommendation refined | Non-actionable two-option split (wrap in transaction OR update spec) resolved to single solution: wrap in transaction.atomic() to match spec db-schema.md:83. Spec takes precedence over code change. |

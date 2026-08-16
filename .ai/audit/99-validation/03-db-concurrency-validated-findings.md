@@ -274,10 +274,18 @@ half-published ads. Effort: small/medium.
 
 | Action | Count | Details |
 |--------|-------|---------|
-| Validated (unchanged) | 3 | DB-001, DB-002, DB-003 |
+| Remediated | 3 | DB-001 (lock reordering in all 10 sweep commands), DB-002 (transaction.atomic() in copy_ad, auto_moderation, moderation_log, ad_create), DB-003 (concurrent sweep test added, broken rollback test fixed) |
 | Reclassified | 0 | — |
 | Merged | 0 | — |
 | Rejected | 0 | — |
+
+### Remediated Findings
+
+| ID | Finding | Fix Applied |
+|----|---------|-------------|
+| DB-001 | Advisory lock outside transaction.atomic() | Reordered all 10 sweep commands: `with transaction.atomic():` now wraps `with advisory_lock():`. Added safety assertion in `advisory_lock.py` that raises `RuntimeError` if called outside a transaction (transaction-scoped locks). Dry-run paths use `session=True` lock. |
+| DB-002 | Multi-row domain writes not atomic | `copy_ad` → `transaction.atomic()` around all creates; `auto_moderate`._`pass_moderation`/`_fail_moderation` → `transaction.atomic()`; `moderation_log.set_published`/`set_moderation_failed`/`set_rejected` → `transaction.atomic()`; `_update_and_moderate` → `transaction.atomic()` with filesystem I/O (thumbnail generation) moved outside the transaction block. |
+| DB-003 | Concurrency guarantees not asserted by tests | Added `TestConcurrentSweep` class: `test_archive_sweep_lock_inside_transaction` (structural verification) + `test_all_sweeps_lock_inside_transaction` (all 10 commands verified). Fixed broken `test_crash_between_updates_and_delete_rolls_back` mock (added `.exists()` to mock queryset). |
 
 ### Rejected Findings
 

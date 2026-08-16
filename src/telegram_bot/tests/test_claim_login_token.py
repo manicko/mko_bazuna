@@ -8,7 +8,7 @@ UPDATE…RETURNING pattern that protects against TOCTOU races.
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
@@ -24,12 +24,12 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_claim_valid_token(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """A valid unclaimed token is claimed and user is created."""
         from telegram_bot.handlers.login import handle_login_orm
 
-        raw_token, _ = login_token_factory()
+        raw_token, _ = await login_token_factory()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         result_token, result_user, created = await handle_login_orm(
@@ -50,12 +50,12 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_claim_sets_telegram_id_on_token(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """Claiming a token sets telegram_id on the LoginToken row."""
         from telegram_bot.handlers.login import handle_login_orm
 
-        raw_token, token = login_token_factory()
+        raw_token, token = await login_token_factory()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         await handle_login_orm(
@@ -74,7 +74,7 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_reject_expired_token(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """An expired token is rejected (returns None)."""
         from telegram_bot.handlers.login import handle_login_orm
@@ -104,7 +104,7 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_reject_already_claimed_token(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """An already-claimed token is rejected (returns None)."""
         from telegram_bot.handlers.login import handle_login_orm
@@ -135,12 +135,12 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_creates_user_on_first_claim(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """First claim creates a new User record."""
         from telegram_bot.handlers.login import handle_login_orm
 
-        raw_token, _ = login_token_factory()
+        raw_token, _ = await login_token_factory()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         _, result_user, created = await handle_login_orm(
@@ -159,7 +159,7 @@ class TestClaimLoginToken:
     @pytest.mark.asyncio
     async def test_returns_existing_user_on_second_login(
         self,
-        login_token_factory: Callable[..., tuple[str, Any]],
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
     ) -> None:
         """A second login with the same telegram_id returns the existing user."""
         from telegram_bot.handlers.login import handle_login_orm
@@ -176,7 +176,7 @@ class TestClaimLoginToken:
         )
 
         # Create a fresh token for this user
-        raw_token, _ = login_token_factory()
+        raw_token, _ = await login_token_factory()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         _, result_user, created = await handle_login_orm(

@@ -9,15 +9,14 @@ before PgBouncer is attached to the database.
 import logging
 from contextlib import contextmanager
 
-from django.db import connection
+from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
 
 @contextmanager
 def advisory_lock(lock_id: int, *, session: bool = False):
-    """
-    Context manager for PostgreSQL advisory locks.
+    """Context manager for PostgreSQL advisory locks.
 
     Args:
         lock_id: Lock identifier (must be unique per operation). See AdvisoryLockId enum
@@ -30,10 +29,9 @@ def advisory_lock(lock_id: int, *, session: bool = False):
     Important:
         Transaction-scoped locks (session=False) are released at the end of the
         current database transaction. Callers **must** wrap the entire operation
-        (from first queryset op to final update/delete) inside
-        ``transaction.atomic()`` to ensure the lock covers the full count-to-mutate
-        sequence. Without an explicit transaction, Django's autocommit mode releases
-        the lock after each individual statement.
+        inside ``transaction.atomic()`` to ensure the lock covers the full
+        count-to-mutate sequence. This function asserts that a transaction is active
+        to prevent the autocommit-release bug (DB-001).
 
     Lock ID allocation (see AdvisoryLockId enum in apps.core.enums):
         - Phase 4 jobs: 1-5 (archive_sweep, delete_sweep, consent_hard_delete,
@@ -41,6 +39,14 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         - Phase 2 jobs: 6-7 (purge_failed_ads, purge_rejected_ads)
         - migrate service: 100 (session-scoped, runs pre-PgBouncer)
     """
+    if not session:
+        if not transaction.get_connection().in_atomic_block:
+            raise RuntimeError(
+                "advisory_lock (transaction-scoped) must be called inside "
+                "transaction.atomic(). Acquire the lock inside the transaction "
+                "block: `with transaction.atomic(): with advisory_lock(N): ...`"
+            )
+
     with connection.cursor() as cursor:
         if session:
             cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])

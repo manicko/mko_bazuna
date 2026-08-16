@@ -25,6 +25,9 @@
             >
                 Login via Telegram
             </a>
+            <p id="login-status" class="text-xs text-gray-400 mt-4 hidden">
+                Waiting for Telegram confirmation...
+            </p>
             <p class="text-xs text-gray-400 mt-4">
                 Don't have Telegram?
                 <a href="https://telegram.org" class="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">
@@ -33,5 +36,36 @@
             </p>
         </div>
     </main>
+    <script>
+        (function () {
+            "use strict";
+            var pollUrl = "{% url 'consent:login_status' %}?token={{ raw_token }}";
+            var statusEl = document.getElementById("login-status");
+            var deepLinkEl = document.querySelector('a[href^="https://t.me"]');
+
+            statusEl.classList.remove("hidden");
+            deepLinkEl.style.display = "none";
+
+            var interval = setInterval(function () {
+                fetch(pollUrl, { cache: "no-store" })
+                    .then(function (resp) {
+                        if (resp.status === 200) {
+                            clearInterval(interval);
+                            statusEl.textContent = "Login successful! Redirecting...";
+                            window.location.href = "{% url 'ads:dashboard' %}";
+                        } else if (resp.status === 204) {
+                            statusEl.textContent = "Waiting for Telegram confirmation...";
+                        } else if (resp.status === 410) {
+                            clearInterval(interval);
+                            statusEl.textContent = "This login link is invalid, expired, or already used.";
+                        }
+                    })
+                    .catch(function () {
+                        clearInterval(interval);
+                        statusEl.textContent = "Error checking login status.";
+                    });
+            }, 3000);
+        })();
+    </script>
 </body>
 </html>

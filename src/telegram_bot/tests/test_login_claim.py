@@ -13,7 +13,7 @@ from django.utils import timezone
 from telegram_bot.handlers.login import handle_login_orm
 from asgiref.sync import sync_to_async
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration, pytest.mark.asyncio]
 
 
 @pytest.fixture

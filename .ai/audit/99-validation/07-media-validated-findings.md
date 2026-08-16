@@ -138,8 +138,9 @@ The execution order is: save_photo writes original -> AdImage.objects.create() t
 > - **Path note:** Finding references `apps/ads/models.py` and `apps/media/services/` - actual paths are `src/backend/apps/ads/models.py` and `src/backend/apps/media/services/`.
 
 **Recommendation:**
-1. [Mandatory] Detect dedup before writing: compute the SHA-256 during upload, look up an existing AdImage by (user, sha256), and only write the file if no match exists - otherwise reuse the existing key and discard the upload bytes.
-2. [Alternative] When dedup is detected inside AdImage.save(), delete the just-written duplicate file (and any generated thumbnails).
+1. [Mandatory] Detect dedup before writing at the upload step. In `save_photo` (`src/telegram_bot/handlers/ad_create.py:580-608`), after EXIF-stripping the bytes (line 592, `cleaned = strip_photo_exif(data)`) but before the atomic file write (line 594, `os.open` with `O_CREAT|O_EXCL`), compute the SHA-256 of the cleaned in-memory bytes. Add `FileHashService.calculate_sha256_from_bytes(data: bytes) -> str` to `hash_service.py` (the existing `calculate_sha256(file_path)` only reads from disk). Look up an existing `AdImage` by `sha256` + `ad__user_id`, using the same query pattern as `AdImage.save()` at `models.py:486-489`. If a match exists, return the existing `AdImage.image` storage key and discard the upload bytes -- no file is written to disk. If no match, proceed with the existing `os.open` write path. The `user_id` for the lookup is available from FSM state (`ad_create.py:60,478`) and must be passed into `save_photo`.
+2. [Mandatory] Mitigate the TOCTOU race condition (concurrent identical uploads both passing the lookup) at the database level: add a `UniqueConstraint(fields=["sha256", "user"])` to `AdImage` -- this requires a `user` FK mirroring `ad.user` (a schema migration, per project rule 13). Under concurrent uploads, the first write creates the row; subsequent writes raise `IntegrityError`, caught by the caller to look up and reuse the existing `AdImage.image` key. This is preferred over `get_or_create` because it guarantees uniqueness at the storage-engine level.
+3. [Recommended] With dedup-before-write in place, `AdImage.save()`'s dedup check (`models.py:480-491`) becomes defense-in-depth. Retain it as a backstop -- it will not match in the normal flow but protects against bypass paths (admin edits, seed import via `.update()`). See rollout note at line 458.
 
 **Effort:** small | **Priority:** recommended (mandatory fix)
 
@@ -436,7 +437,7 @@ MED-005 (orphan sweep) is a defense-in-depth backstop for all file-leak findings
 
 | Step | Action | Blocked by | Risk |
 |------|--------|-----------|------|
-| 1 | MED-002: Detect dedup before write (compute SHA-256 at upload, look up by (user, sha256) before save_photo) | none | Medium - changes upload flow; must handle race condition with concurrent identical uploads |
+| 1 | MED-002: Detect dedup before write (compute SHA-256 from in-memory bytes at upload, look up by (user, sha256) before save_photo) + add UniqueConstraint(user, sha256) | none | Medium - changes upload flow + 1 schema migration (unique constraint on new user FK); race condition mitigated by DB-level constraint |
 | 2 | MED-001 + MED-004: Implement AdImage.delete_files() with reference counting + pre_delete signal | none | Medium - new signal handler; must not break bulk_create in seed (seed uses bulk_create, not save()) |
 | 3 | MED-003: Enforce count before write + fix misleading message + cleanup excess files | none | Low - guard before save_photo |
 | 4 | MED-008: Refactor AdImage.save() to compute SHA-256 only when image field changes | MED-002 (if dedup-at-upload changes the save flow) | Low - code-only, no schema change |
@@ -446,11 +447,11 @@ MED-005 (orphan sweep) is a defense-in-depth backstop for all file-leak findings
 
 ### Key rollout considerations:
 
-- **Two-process architecture (web + bot):** Per docs/99-agent/architecture.md, both share one DB; migrations run once before both start. Steps 1-4 are code-only changes (no schema changes), so both processes can be restarted independently after deployment.
+- **Two-process architecture (web + bot):** Per docs/99-agent/architecture.md, both share one DB; migrations run once before both start. Steps 1-3 and 5-7 are code-only changes; Step 1 additionally includes a schema migration for the unique constraint (runs before both processes start). Both processes can be restarted independently after deployment.
 - **MED-002 risk:** Changing dedup to write-time lookup requires computing SHA-256 before calling save_photo. This means the bot must compute the hash of the downloaded photo bytes, check the DB, and only write if no existing row is found. Race condition: two identical uploads from the same user in parallel -- use get_or_create or a unique constraint on (user, sha256) to guarantee correctness.
 - **MED-001 signal safety:** Adding an AdImage.pre_delete signal is backward-compatible. The signal handler must be careful with bulk_create (used by seed_service) -- pre_delete fires on .delete() calls, not bulk_create, so seed data is safe.
-- **Backward compatibility:** All changes are backward-compatible with existing data. No schema changes required.
-- **Rollback feasibility:** All changes are code-only (no schema migrations). Rollback = revert PR + restart both web and bot processes.
+- **Backward compatibility:** All changes are backward-compatible with existing data. MED-002 adds one schema migration (unique constraint + user FK); existing AdImage rows get user populated via migration default from ad__user.
+- **Rollback feasibility:** Changes are code + 1 schema migration (MED-002 unique constraint). Rollback = revert PR + run `migrate backward` to drop the constraint + restart both web and bot processes.
 
 ### Warnings
 
@@ -463,7 +464,7 @@ MED-005 (orphan sweep) is a defense-in-depth backstop for all file-leak findings
 ## Required Fixes
 
 1. **MED-001 (CRITICAL):** Implement reference-counted AdImage.delete_files() that deletes image + all thumbnail_* keys only when the last referencing row is removed. Wire into all sweep commands, soft_delete_user_ads, delete_draft, and an AdImage.pre_delete signal. **Required for both disk hygiene (Phase-07 5d) and PII erasure (Phase-07 5f).**
-2. **MED-002 (MEDIUM):** Detect duplicate upload before writing the file -- compute SHA-256 at upload time and look up existing AdImage by (user, sha256) prior to save_photo. Prevents file and thumbnail leaks.
+2. **MED-002 (MEDIUM):** Detect duplicate upload before writing the file -- compute SHA-256 from in-memory bytes at upload time and look up an existing AdImage by (user, sha256) prior to save_photo. Add `FileHashService.calculate_sha256_from_bytes()`. Mitigate the TOCTOU race with a `UniqueConstraint(fields=["sha256", "user"])` on AdImage (requires a user FK, schema migration). Prevents file and thumbnail leaks at the source.
 3. **MED-003 (HIGH):** Enforce len(photos) >= 5 in process_photos before accepting a 6th photo; fix the misleading error message; clean up excess on-disk files when count is rejected.
 
 ---

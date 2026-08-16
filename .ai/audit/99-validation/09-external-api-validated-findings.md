@@ -63,7 +63,7 @@ Validation outcomes:
 
 **Validation assessment:** The problem is real. The POST-only guard is in the decorator (not the view body), so a valid POST with malformed body still reaches the unguarded `json.loads` and crashes.
 
-**Recommendation:** Guard the parse and return 400. Keep as-is.
+**Recommendation:** Wrap `json.loads(request.body)` at `api_bulk.py:36` in `try/except json.JSONDecodeError`. Both malformed JSON (`"not-json"`) and an empty body raise `json.JSONDecodeError`, so a single handler covers both cases — no separate `len(request.body)` check needed. Return `JsonResponse({"error": "Invalid JSON in request body"}, status=400)` (matches `staff_required_api` error style at `decorators.py:48`). Log at WARNING via the existing `logger` (`api_bulk.py:16`), excluding the raw body to avoid logging untrusted input. Add test cases in `test_priority_service.py` for malformed body and empty body — both expect HTTP 400 with `{"error": "Invalid JSON in request body"}`. Keep as-is.
 
 ---
 
@@ -109,7 +109,7 @@ Validation outcomes:
 
 **Validation assessment:** Genuinely dead code. Not documented as reserved/future. Safe to remove or document as reserved.
 
-**Recommendation:** Investigate before deleting (confirm no external callers). Keep as-is.
+**Recommendation:** Delete `translate_to_russian` (`ad_create.py:646-659`) and its transitive-only helper `_do_translate` (`ad_create.py:639-643`). Evidence already confirmed: grep across `src/` and `tests/` shows zero callers; `_do_translate` is referenced only at its definition (line 639) and at `ad_create.py:651` (inside the dead `translate_to_russian`); no spec, README, StrEnum, or config-template references either symbol; neither is exported via `__all__`. The active translator `translate_all_languages` (line 771) uses the separate `_do_translate_to` (`ad_create.py:765`), so removing these has zero behavioral impact. After deletion: run `uv run ruff check src/telegram_bot/handlers/ad_create.py` then `uv run pytest src/backend/apps/telegram_bot/` to confirm no regressions. No migration needed. Keep as-is.
 
 ---
 
@@ -395,3 +395,5 @@ None detected. The findings file notes Finding 13 ("no HTTPS redirect") was fals
 ---
 
 *This validated report is self-contained. All evidence references are to the current git HEAD state as of validation date 2026-08-15. No production code was modified during this validation.*
+
+

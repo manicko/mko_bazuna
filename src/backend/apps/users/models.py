@@ -30,10 +30,12 @@ class User(AbstractUser):
         help_text="Optional public @username; NOT used for t.me link or publishing",
     )
 
-    # Telegram identifier (unique, required for auth - use placeholder for admin accounts)
+    # Telegram identifier (unique, required for active users; nullified on GDPR erasure)
     telegram_id = models.BigIntegerField(
         unique=True,
-        help_text="Telegram user ID; required for authentication",
+        blank=True,
+        null=True,
+        help_text="Telegram user ID; required for authentication (nullified on GDPR withdrawal)",
     )
 
     # Stable Telegram chat ID (set on first bot contact, never nullified on withdraw)

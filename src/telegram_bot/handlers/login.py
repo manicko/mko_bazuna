@@ -4,6 +4,7 @@ Login handler for Telegram bot deep-link authentication.
 Implements atomic token claim via indexed SHA-256 hash lookup.
 """
 
+import datetime
 import hashlib
 import logging
 import re
@@ -17,7 +18,7 @@ from django.utils import timezone
 from apps.users.models import User, LoginToken
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,42 @@ async def handle_login_deep_link(
         await message.answer("Login successful! You can now create ads with /post.")
 
 
+def _claim_login_token(
+    token_hash: str, telegram_id: int, now: datetime.datetime
+) -> LoginToken | None:
+    """Atomically claim a login token by setting its ``telegram_id``.
+
+    Uses PostgreSQL ``UPDATE ... RETURNING`` for a single-statement,
+    zero-TOCTOU claim. The ``WHERE`` clause guarantees only an unclaimed
+    (``telegram_id IS NULL``), not-yet-consumed (``consumed_at IS NULL``),
+    and unexpired (``expires_at > now``) token is touched. Postgres holds a
+    row-level lock for the duration of the ``UPDATE``, so a concurrent claim
+    from another bot worker matches zero rows and returns ``None``.
+
+    Returns the claimed ``LoginToken`` instance (with ``telegram_id`` set and
+    ``consumed_at`` still ``NULL``), or ``None`` when no token matched.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE login_tokens
+               SET telegram_id = %s
+             WHERE token_hash = %s
+               AND telegram_id IS NULL
+               AND consumed_at IS NULL
+               AND expires_at > %s
+            RETURNING id, token_hash, telegram_id, created_at, expires_at, consumed_at
+            """,
+            [telegram_id, token_hash, now],
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        columns = [desc[0] for desc in cursor.description]
+
+    return LoginToken(**dict(zip(columns, row, strict=True)))
+
+
 async def handle_login_orm(
     token_hash: str,
     telegram_id: int,
@@ -116,18 +153,11 @@ async def handle_login_orm(
     def _handle() -> tuple[LoginToken | None, User | None, bool]:
         now = timezone.now()
 
-        # Atomic UPDATE claim with RETURNING — single query, no TOCTOU
+        # Atomic UPDATE ... RETURNING claim — single query, zero TOCTOU.
+        # token_hash is unique-indexed; the UPDATE row lock guarantees only
+        # one concurrent claimer wins. See docs/02-database/db-schema.md:84-85.
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-            login_token = (
-                LoginToken.objects.filter(
-                    token_hash=token_hash,
-                    telegram_id__isnull=True,
-                    consumed_at__isnull=True,
-                    expires_at__gt=now,
-                )
-                .update(telegram_id=telegram_id, returning=True)
-                .first()
-            )
+            login_token = _claim_login_token(token_hash, telegram_id, now)
 
         if login_token is None:
             return None, None, False

@@ -142,23 +142,23 @@ Telegram IDs (e.g., `1098765432`) are stable, guessable, and traceable to real u
 **Type:** BEST-PRACTICE
 **Spec refs (corrected):** `docs/01-spec/technical-specification.md` Decision F (DECLINE, WITHDRAW, DELETE states defined as distinct); `docs/04-user-stories/` (no "re-grant consent" story exists)
 **Evidence (validated):**
-- Consent model uses 3 distinct DateTimeField states: `consent_given_at` (set at DECLINE), `consent_revoked_at` (set at WITHDRAW), `account_deleted_at` (set at DELETE). See `apps/users/models.py:34-37`.
-- All 3 actions are reachable via distinct URL endpoints: `consent_decline` (`/consent/decline/`), `consent_withdraw` (`/consent/withdraw/`), `consent_accept` (`/consent/accept/`). See `apps/users/urls.py:17-25`.
-- `consent_decline()` (`views/consent.py:187-220`) sets `consent_given_at` but does NOT hard-delete or soft-delete ads — buyer can still browse anonymously (spec-compliant).
-- `consent_withdraw()` (`views/consent.py:105-145`) triggers `withdraw_consent()` → hard token deletion + (intended) telegram_id NULLing + (pending) ad soft-delete.
+- Consent model uses distinct DateTimeField states: `consent_given_at` (set at ACCEPT — `models.py:74`), `consent_revoked_at` (set at WITHDRAW — `models.py:79`), `deleted_at` (set at DELETE — `models.py:69`). No `account_deleted_at` field exists. See `apps/users/models.py:68-83`.
+- All 3 actions are reachable via distinct URL endpoints: `consent_accept` (`/consent/accept/`), `consent_decline` (`/consent/decline/`), `consent_withdraw` (`/consent/withdraw/`). See `apps/users/urls.py:8-13`.
+- `consent_decline()` (`views/consent.py:67-93`) sets `is_declined=True` + `ads_auto_publish=False` — does NOT set `consent_revoked_at`, does NOT null PII, does NOT soft-delete ads (spec-compliant: buyer can still browse anonymously).
+- `consent_withdraw()` (`views/consent.py:97-123`) triggers `withdraw_consent()` → deletes ALL LoginTokens by telegram_id (`deletion.py:132`) + nulls `telegram_id`/`username` (`deletion.py:148-154`) + soft-deletes ads (`deletion.py:180`). Crashes on `User.telegram_id` NOT NULL (PII-001).
 - No "re-grant consent" user story found in `docs/04-user-stories/` (finding cited one — stale).
-- Spec Decision F explicitly defines: "DECLINE = reject banner; WITHDRAW = erase PII from existing ad; DELETE = remove account entirely."
+- Spec Decision F (technical-specification.md section F) defines: DECLINE = browse-only (no erasure); WITHDRAW sets `consent_revoked_at` → soft-delete + 30-day PII erasure. Spec section K confirms banner is hidden after accept.
 
 > **Validation Note:**
 > - **Action:** validated
-> - **Detail:** The distinction is correctly implemented in the code (3 states, 3 endpoints, 3 handlers). The finding's core premise — that the UI treats them as the same action — is partially accurate: the web banner presents a single "Reject all" button that maps to `consent_decline`, but there is no in-UI path to `consent_withdraw` (which requires authenticated user action via the account settings page). This is not a spec deviation but a UX discoverability gap. The spec ref `docs/09-security/consent-policy.md` does not exist.
+> - **Detail:** The distinction is correctly implemented in the code (3 states, 3 endpoints, 3 handlers). The finding's core premise — that the UI treats them as the same action — is accurate: the web banner (`components/consent_banner.html`) presents Accept and "Decline (Browse-only)" buttons that map to `consent_accept` and `consent_decline` respectively, but there is no in-UI path to `consent_withdraw` (which requires authenticated user action). This is a UX discoverability gap, not a spec deviation. The dashboard page (`/dashboard/`, template `ads/dashboard.html`) is the authenticated user's home; no separate account-settings page exists in this codebase. The spec ref `docs/09-security/consent-policy.md` does not exist.
 
 **Analysis:**
-The code distinguishes DECLINE/WITHDRAW/DELETE correctly. However, the frontend consent banner (`/web/templates/web/consent_banner.html`) only exposes the DECLINE path. Once a user DECLINEs, there is no visible UI path to later WITHDRAW consent (which is the GDPR Article 21 "object to processing" right for users who previously CONSENTED). The banner conflates initial rejection with withdrawal.
+The code distinguishes DECLINE/WITHDRAW/DELETE correctly. However, the frontend consent banner (`components/consent_banner.html`) only exposes the ACCEPT and DECLINE paths — there is no visible UI path to WITHDRAW consent (the GDPR Article 21 "object to processing" right for users who previously CONSENTED). The `consent_withdraw` view (`views/consent.py:97-123`) exists and is `@login_required`, but no template links to it. The dashboard page (`ads/dashboard.html`) is the authenticated user home and has no "Withdraw" button in its header (only "Logout" at line 25) — creating a discoverability gap for the withdrawal flow.
 
 **Recommendation:**
-1. [Recommended] Add a "Withdraw Data" link/button in the account settings page that POSTs to `/consent/withdraw/`, clearly labeled as "Permanently erase your Telegram ID."
-2. [Recommended] If the banner is shown to consenting users (not just initial visitors), add a "Manage Consent" link that distinguishes "Reject Analytics" (DECLINE) from "Withdraw Data Consent" (WITHDRAW).
+1. [Recommended] Add a "Withdraw Data" POST button on the seller dashboard page (`ads/dashboard.html`, header beside the existing "Logout" link at line 25). The form should POST to `{% url 'consent:withdraw' %}` with a CSRF token. Label it "Permanently erase your Telegram ID" with a confirmation modal (withdrawal is irreversible). There is no separate account-settings page in this codebase; the dashboard is the authenticated user home.
+2. [Recommended] The consent banner (`components/consent_banner.html`) is gated by `{% if not consent_shown %}` where `consent_shown = is_consent_given(request)` (`dashboard.py:85`, `listings.py:80`). `is_consent_given()` returns `True` for anonymous users and for authenticated users who have accepted (`consent_given_at` set) or declined (`not ads_auto_publish`, `consent.py:145`). The banner therefore does NOT render for consenting users — item 2 conditional premise ("if the banner is shown to consenting users") is invalid. The persistent dashboard button (item 1) is the sole correct entry point to the WITHDRAW path, distinct from the banner initial ACCEPT/DECLINE path.
 
 **Effort:** small | **Priority:** medium
 
@@ -216,26 +216,26 @@ While technically true that `/consent/withdraw/` has no rate limiting, this is n
 
 ### PII-006 [HIGH] LoginToken table not covered by consent withdrawal cleanup — stale PII linkage persists
 
-**Type:** SPEC-DEVIATION
+**Type:** STALE — already resolved
 **Spec refs (corrected):** `docs/01-spec/technical-specification.md` Decision F (full PII erasure includes deleting LoginToken rows for withrawn-consent users)
-**Evidence (validated):**
-- `deletion.py:132-146` — `withdraw_consent()` deletes LoginTokens: `LoginToken.objects.filter(token_hash=token.token_hash).delete()` (line 132). This IS implemented.
-- **BUT:** The deletion at line 132 uses `token.token_hash` — only deletes the *current* token being consumed. LoginTokens created during previous sessions (if any exist for the user's telegram_id) are NOT deleted.
-- `apps/users/models.py:55-72` — `LoginToken` has no FK to `User`; it has `telegram_id: BigIntegerField` (NOT NULL, no FK constraint). See `models.py:63`.
-- `LoginToken` rows for the same telegram_id may exist across multiple sessions (one per login claim). `withdraw_consent()` only knows the CURRENT token; previous tokens' rows persist.
+**Evidence (re-checked — stale vs. current code):**
+- `deletion.py:132` — `withdraw_consent()` deletes LoginTokens: `LoginToken.objects.filter(telegram_id=user_telegram_id).delete()`. This deletes ALL LoginTokens matching the user's `telegram_id`, not just the current token. The audit's cited code (`token.token_hash`) is STALE — the current code filters by `telegram_id`.
+- `apps/users/models.py:133-137` — `LoginToken.telegram_id` is `BigIntegerField(blank=True, null=True)` — **nullable**, not NOT NULL. Migration `0001_initial.py:22` confirms `null=True`.
+- `withdraw_consent()` receives a `User` (line 87: `def withdraw_consent(user: User)`), not a `LoginToken` — the audit's claim is STALE.
+- `test_deletion.py:30-51` — `test_withdraw_deletes_user_login_tokens` creates two LoginTokens for the same `telegram_id` and asserts BOTH are deleted. The token-deletion assertion passes; the test fails only due to PII-001 (`User.telegram_id` NOT NULL crash at `user.save()`, line 158).
 
 > **Validation Note:**
-> - **Action:** partially validated
-> - **Detail:** The finding's premise — that LoginToken cleanup is incomplete — is valid. `withdraw_consent()` deletes only the active token (`token.token_hash`), not all LoginTokens belonging to `user.telegram_id`. Since `LoginToken.telegram_id` is NOT NULL and there is no FK cascade (it is a plain BigIntegerField), old token rows with the user's telegram_id persist after withdrawal. This is a real PII persistence gap. The spec does not exist at cited path, but Decision F implies "delete all user data" which includes all LoginTokens for that telegram_id.
+> - **Action:** stale — finding already resolved in current code
+> - **Detail:** The finding's premise — that only the current token is deleted — is STALE. `withdraw_consent()` at `deletion.py:132` already executes `LoginToken.objects.filter(telegram_id=user_telegram_id).delete()`, deleting ALL LoginTokens for the user's `telegram_id`. `LoginToken.telegram_id` is already `BigIntegerField(blank=True, null=True)` (nullable), so no schema change is needed. The test failure (`NotNullViolation` at `deletion.py:158`) is caused by PII-001 (`User.telegram_id` NOT NULL), not by incomplete LoginToken cleanup. Spec Decision F (technical-specification.md section F) requires deleting all LoginToken rows for the withdrawn user — this is already implemented.
 
 **Analysis:**
-`withdraw_consent()` receives a `LoginToken` object. It deletes that specific token row. But if the user previously logged in multiple times (multiple unexpired or expired LoginToken rows with the same telegram_id), those stale rows remain in the table with the user's telegram_id in plaintext — they are never cleaned up. Since LoginToken has no FK to User and telegram_id is a plain NOT NULL BigIntegerField, there is no cascade protection.
+The PII-006 finding is **stale** — based on a prior version where `withdraw_consent()` deleted by `token_hash`. The current code (`deletion.py:132`) already deletes all LoginTokens matching `user.telegram_id` via `LoginToken.objects.filter(telegram_id=user_telegram_id).delete()`. This is the query-based approach from the original recommendation, and it fully satisfies spec Decision F ("delete all user data"). `LoginToken.telegram_id` is nullable (`null=True`), so no FK or schema migration is required. The `NotNullViolation` test failure is caused solely by PII-001 (`User.telegram_id` NOT NULL), not by incomplete LoginToken cleanup. A FK migration would require backfilling existing LoginToken rows with user FK values and add cross-process coupling — unjustified per the "avoid overengineering" principle (`docs/99-agent/rules.md`).
 
 **Recommendation:**
-1. [Mandatory] Change `LoginToken.telegram_id` to a proper FK (`ForeignKey(User, on_delete=...)`) so cascade deletion works — OR add `LoginToken.objects.filter(telegram_id=user.telegram_id).delete()` in `withdraw_consent()`.
-2. [Recommended] Add `on_delete=CASCADE` or `SET_NULL` behavior.
+1. [No action needed — already implemented] `withdraw_consent()` at `deletion.py:132` already deletes ALL LoginTokens for the user via `LoginToken.objects.filter(telegram_id=user_telegram_id).delete()` — this is the query-based approach from the original recommendation, and it fully satisfies spec Decision F. `LoginToken.telegram_id` is already `BigIntegerField(blank=True, null=True)` (`models.py:133-137`; `migrations/0001_initial.py:22`), so no schema change is required.
+2. [No action needed — FK migration unnecessary] A `ForeignKey(User, on_delete=CASCADE)` migration would require backfilling existing LoginToken rows with user FK values (no FK currently exists) and introduces cross-process coupling between web and bot. Per the project's "avoid overengineering" principle, the already-working query-based deletion is the correct solution; the FK migration is unjustified.
 
-**Effort:** small | **Priority:** high
+**Effort:** N/A — already resolved | **Priority:** N/A — stale finding
 
 ---
 
@@ -383,12 +383,11 @@ The login claim flow references `token.returning` (LoginToken.returning) which d
 ```
 PII-007 (migrations) ──► PII-002 (logging fix)  [logging changes to consent.py require clean migration state]
 PII-001 (NOT NULL)    ──┬──► PII-008 (atomic) [must be fixed first; atomic block will rollback LoginToken deletion if NOT NULL still enforced]
-                        ├──► PII-010 (sweep)   [NULL user handling depends on withdrawal completing]
-                        └──► PII-006 (LoginToken) [telegram_id NULLing depends on field being nullable]
+                        └──► PII-010 (sweep)   [NULL user handling depends on withdrawal completing]
 PII-011 (LoginToken.returning) ──► blocks whole login → withdrawal flow (user must login before withdrawing)
 ```
 
-**Key insight:** PII-001 is the **root cause** of 3 downstream failures (PII-008, PII-010, PII-006). Every test in the `TestWithdrawConsent*` suite fails at the same line (`deletion.py:158`, `user.save()` with `telegram_id=None` on a NOT NULL field). The fix is a single schema change (`ALTER COLUMN telegram_id DROP NOT NULL`) that unblocks 4 findings.
+**Key insight:** PII-001 is the **root cause** of 3 test failures (`TestWithdrawConsent*` suite: PII-008, PII-010, and the PII-006 test). PII-006's code is already resolved (`deletion.py:132` already deletes all LoginTokens by `telegram_id`), but its test still fails because `withdraw_consent()` crashes at `user.save()` (line 158) before assertions are reached. The fix is a single schema change (`ALTER COLUMN telegram_id DROP NOT NULL`) that unblocks 3 findings (PII-001, PII-008, PII-010) and allows the PII-006 test to pass.
 
 ---
 
@@ -401,7 +400,7 @@ PII-011 (LoginToken.returning) ──► blocks whole login → withdrawal flow 
 | 1 | PII-011: Add `LoginToken.returning` field + migration | none | Medium — migration on hot table |
 | 2 | PII-001: Make `User.telegram_id` nullable + migration | none | **High** — schema change, must run before both web + bot start |
 | 3 | PII-008: Wrap `withdraw_consent()` in `transaction.atomic()` | PII-001 | Low — code change only |
-| 4 | PII-006: Delete all LoginTokens for telegram_id in `withdraw_consent()` | PII-001 | Low — query extension |
+| 4 | PII-006: ALREADY IMPLEMENTED — deletes all LoginTokens by telegram_id at `deletion.py:132` | none | N/A — no action needed |
 | 5 | PII-010: Add null-guard + try/except to sweep command | PII-001 | Low — defensive code |
 | 6 | PII-002: Apply `mask_telegram_id()` filter to 7 logger calls | none (independent) | Low — logging only |
 | 7 | PII-004: Document retention timeline for anonymized ads | none | Low — doc only |
@@ -436,7 +435,7 @@ Per `docs/99-agent/architecture.md`, both processes share one DB and migrations 
 | PII-003 | validated | Medium (code inspection) | BEST-PRACTICE | medium |
 | PII-004 | validated (partially stale) | Medium (code + spec check) | DOC-UPDATE | medium |
 | PII-005 | **rejected** | High (grep confirms no rate limiting infra anywhere) | — | N/A |
-| PII-006 | validated (partially) | High (code + spec check) | SPEC-DEVIATION | high |
+| PII-006 | **stale — already resolved** | High (code + spec check) | STALE | N/A |
 | PII-007 | validated | High (makemigrations output) | SPEC-DEVIATION | mandatory |
 | PII-008 | validated | High (code + runtime failure) | SPEC-DEVIATION | high |
 | PII-009 | validated (partially) | Medium (code inspection) | DOC-UPDATE | low |
@@ -445,6 +444,7 @@ Per `docs/99-agent/architecture.md`, both processes share one DB and migrations 
 
 ### Rejected Findings
 - **PII-005** — Rejected: references non-existent `ConsentWithdrawView` (actual is function `consent_withdraw`). No rate limiting exists project-wide; adding it to one endpoint is security theater. The single-use token mechanism already provides natural rate-limiting.
+- **PII-006** — Stale: already resolved in current code. `withdraw_consent()` at `deletion.py:132` already deletes ALL LoginTokens by `telegram_id` (query-based approach). `LoginToken.telegram_id` is already nullable. FK migration unnecessary.
 
 ### Stale References Found (documentation only)
 - `docs/09-security/consent-policy.md` — does not exist
@@ -459,8 +459,9 @@ Per `docs/99-agent/architecture.md`, both processes share one DB and migrations 
 ### Final Assessment
 The source findings document has **mixed fidelity**:
 - 5 findings fully validated (PII-001, PII-002, PII-003, PII-008, PII-010) with reproducible evidence.
-- 3 findings partially validated with stale sub-references (PII-004, PII-006, PII-009).
+- 2 findings partially validated with stale sub-references (PII-004, PII-009).
 - 1 finding rejected as not-actionable (PII-005).
+- 1 finding stale — already resolved in current code (PII-006).
 - 1 new finding surfaced during validation (PII-011).
 - 6 stale documentation references identified across the findings document.
 

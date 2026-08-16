@@ -10,7 +10,7 @@ import asyncio
 import logging
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbidden
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId, AnalyticsEventType
 from apps.core.utils.advisory_lock import advisory_lock
@@ -41,11 +41,21 @@ class Command(BaseCommand):
         """Execute alert delivery with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):
-            if dry_run:
+        if dry_run:
+            with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK, session=True):
                 self._dry_run_check()
-            else:
-                self._send_alerts()
+            return
+
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):
+                user_ads, notifications_to_create, analytics_events = (
+                    self._collect_alerts()
+                )
+
+                self._persist_alerts(notifications_to_create, analytics_events)
+
+        # Send messages outside the transaction (network I/O)
+        asyncio.run(self._send_user_digests(settings.BOT_TOKEN, user_ads))
 
     def _dry_run_check(self) -> None:
         """Log counts of users, saved searches, and potential matches."""
@@ -65,14 +75,14 @@ class Command(BaseCommand):
             total_matches,
         )
 
-    def _send_alerts(self) -> None:
-        """Send alert notifications for all active saved searches."""
-        bot_token = settings.BOT_TOKEN
-        if not bot_token:
-            logger.warning("BOT_TOKEN not set - skipping alert delivery")
-            return
+    def _collect_alerts(self) -> tuple[dict[int, list], list, list]:
+        """Collect notification data for all active saved searches.
 
-        # Collect notification data synchronously (inside transaction lock)
+        Must be called inside a transaction with the advisory lock held.
+
+        Returns:
+            A tuple of (user_ads, notifications_to_create, analytics_events).
+        """
         user_ads: dict[int, list] = {}
         notifications_to_create: list[SavedSearchNotification] = []
         analytics_events: list[AnalyticsEvent] = []
@@ -102,18 +112,24 @@ class Command(BaseCommand):
                 )
             )
 
-        # Bulk create notifications and analytics events inside transaction
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-            if notifications_to_create:
-                SavedSearchNotification.objects.bulk_create(
-                    notifications_to_create, ignore_conflicts=True
-                )
+        return user_ads, notifications_to_create, analytics_events
 
-            if analytics_events:
-                AnalyticsEvent.objects.bulk_create(analytics_events)
+    def _persist_alerts(
+        self,
+        notifications_to_create: list[SavedSearchNotification],
+        analytics_events: list[AnalyticsEvent],
+    ) -> None:
+        """Bulk-create notifications and analytics events.
 
-        # Send messages asynchronously
-        asyncio.run(self._send_user_digests(bot_token, user_ads))
+        Must be called inside a transaction with the advisory lock held.
+        """
+        if notifications_to_create:
+            SavedSearchNotification.objects.bulk_create(
+                notifications_to_create, ignore_conflicts=True
+            )
+
+        if analytics_events:
+            AnalyticsEvent.objects.bulk_create(analytics_events)
 
     async def _send_user_digests(
         self, bot_token: str, user_ads: dict[int, list]
@@ -149,7 +165,7 @@ class Command(BaseCommand):
                         text=message,
                         parse_mode="HTML",
                     )
-                except (TelegramBadRequest, TelegramForbidden) as e:
+                except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logger.warning(
                         "Failed to send alert to user %d: %s", user_id, e
                     )

@@ -39,8 +39,8 @@ class Command(BaseCommand):
         """Execute the daily metrics rollup with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with advisory_lock(AdvisoryLockId.ROLLUP_DAILY_METRICS):
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(AdvisoryLockId.ROLLUP_DAILY_METRICS):
                 yesterday = timezone.now().date() - timedelta(days=1)
 
                 logger.info("Rolling up analytics events for %s", yesterday)

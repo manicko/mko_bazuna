@@ -21,6 +21,7 @@ validator: validator
 > - **Action:** validated
 > - **Detail:** Confirmed: full-suite run reports 30 failures + 4 errors, 71.70% coverage. pyproject.toml:171 sets `fail_under = 80` in `[tool.coverage.report]`, only activated when `--cov` is passed (as in CI ci.yml:93). All 8 mandatory findings (TSC-002 through TSC-009) plus 5 advisory findings (TSC-010 through TSC-013) are confirmed as real problems. The finding serves as the umbrella summary.
 > - **Architectural impact:** A perpetually red test suite undermines CI branch protection and developer trust. Root causes span both production bugs (AUT-001 returning=True, PII-001 telegram_id=None, SRH-003 TelegramForbidden) and test infrastructure defects (TSC-002 through TSC-008).
+> - **Recommendation:** After TSC-002 through TSC-010 and prior-phase production bugs (AUT-001 returning=True, PII-001 telegram_id=None, SRH-003/SRH-004/SRH-007/SRH-011) are fixed, verify with `uv run pytest --tb=short --cov --cov-report=term-missing` (working dir `src/backend`, matching CI ci.yml:93). Success criteria: 0 failures, 0 errors, >=80% line coverage with branch coverage (TSC-008). Trace any residual failure to a tracked finding; if none exists, file a new TSC finding with the failing test name, assertion, and stack trace before closing this umbrella.
 > - **Evidence quality:** Strong.
 
 **ID:** TSC-001
@@ -266,7 +267,7 @@ None.
 10. **TSC-012** (LOW, small) — Replace `time.sleep(1)` with mocked timeout; replace `time.sleep(0.01)` with freezegun or mocked `timezone.now()`.
 11. **TSC-009** (MEDIUM, small) — Rename `.env.docker` to `.env.docker.example`, add to `.gitignore`, update Makefile:9.
 12. **TSC-010** (MEDIUM, large) — Increase coverage on `ad_create.py`, `login.py`, `contact.py`. Unblocks TSC-001 login.py coverage (depends on Phase 04 AUT-001 returning=True fix).
-13. **TSC-001** (CRITICAL, large) — Resolve all remaining failures after TSC-002 through TSC-010 are addressed (SRH-003 TelegramForbidden import, SRH-004 hit_count reset, SRH-001/011 FTS i18n, SRH-007 cache leak). Achieve 100% green suite with >=80% coverage (line + branch).
+13. **TSC-001** (CRITICAL, large) — Verify the full suite is green after TSC-002 through TSC-010 and prior-phase production fixes (AUT-001 returning=True, PII-001 telegram_id=None, SRH-003 TelegramForbidden import, SRH-004 hit_count reset, SRH-001/011 FTS i18n, SRH-007 cache leak). Run `uv run pytest --tb=short --cov --cov-report=term-missing` (working dir `src/backend`); success = 0 failures, 0 errors, >=80% line coverage with branch coverage enabled. Trace any residual failure to a tracked finding; if untracked, file a new TSC finding with test name, assertion, and stack trace.
 
 ### Dependency Summary
 

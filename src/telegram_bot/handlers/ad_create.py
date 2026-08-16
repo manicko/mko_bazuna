@@ -686,6 +686,8 @@ async def update_ad_and_moderate(
 
     @sync_to_async
     def _update_and_moderate() -> tuple[bool, list[str]]:
+        from django.db import transaction
+
         try:
             ad = Ad.objects.get(id=ad_id)
         except Ad.DoesNotExist:
@@ -714,24 +716,13 @@ async def update_ad_and_moderate(
         if listing_purpose_id:
             ad.listing_purpose_id = listing_purpose_id
 
-        ad.save()
-
-        # Save features (M2M via through model)
-        if feature_ids is not None:
-            ad.features.set(feature_ids)
-
-        # Create AdImage records and generate thumbnails
+        # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
+        # so a DB rollback does not leave filesystem and DB desynced.
         for photo in photos:
-            ad_image = AdImage.objects.create(
-                ad_id=ad_id,
-                image=photo["storage_key"],
-                telegram_file_id=photo["telegram_file_id"],
-                position=photo["position"],
-            )
-
-            # Generate thumbnails for each photo with graceful fallback
             try:
-                original_path = os.path.join(settings.MEDIA_ROOT, photo["storage_key"])
+                original_path = os.path.join(
+                    settings.MEDIA_ROOT, photo["storage_key"]
+                )
                 with open(original_path, "rb") as f:
                     photo_bytes = f.read()
 
@@ -740,15 +731,45 @@ async def update_ad_and_moderate(
                     photo_bytes, photo["storage_key"]
                 )
 
-                ad_image.thumbnail_small = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
-                ad_image.thumbnail_medium = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
-                ad_image.thumbnail_large = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
-                ad_image.save()
+                photo["thumbnail_small"] = thumbnail_keys.get(
+                    ThumbnailSizeStrEnum.SMALL
+                )
+                photo["thumbnail_medium"] = thumbnail_keys.get(
+                    ThumbnailSizeStrEnum.MEDIUM
+                )
+                photo["thumbnail_large"] = thumbnail_keys.get(
+                    ThumbnailSizeStrEnum.LARGE
+                )
             except Exception:
-                logger.exception("Failed to generate thumbnails for %s", photo["storage_key"])
+                logger.exception(
+                    "Failed to generate thumbnails for %s",
+                    photo["storage_key"],
+                )
+                photo["thumbnail_small"] = None
+                photo["thumbnail_medium"] = None
+                photo["thumbnail_large"] = None
 
-        # Transition DRAFT -> ON_MODERATION (state machine requires this step)
-        ad.transition_to(AdStatus.ON_MODERATION)
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            ad.save()
+
+            # Save features (M2M via through model)
+            if feature_ids is not None:
+                ad.features.set(feature_ids)
+
+            # Create AdImage records with pre-generated thumbnails
+            for photo in photos:
+                AdImage.objects.create(
+                    ad_id=ad_id,
+                    image=photo["storage_key"],
+                    telegram_file_id=photo["telegram_file_id"],
+                    position=photo["position"],
+                    thumbnail_small=photo.get("thumbnail_small"),
+                    thumbnail_medium=photo.get("thumbnail_medium"),
+                    thumbnail_large=photo.get("thumbnail_large"),
+                )
+
+            # Transition DRAFT -> ON_MODERATION (state machine requires this step)
+            ad.transition_to(AdStatus.ON_MODERATION)
 
         # Delegate to shared auto-moderation service
         # Handles: banned_words, duplicate_title, all validations,

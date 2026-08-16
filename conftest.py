@@ -20,16 +20,19 @@ if "BOT_TOKEN" not in os.environ:
 # working DATABASE_URL. Use 127.0.0.1 (not `localhost`) to avoid the Windows IPv6
 # (::1) connection timeout when Postgres is Docker-published on IPv4 only.
 # Override with a real DATABASE_URL env var if your database lives elsewhere.
+# Set a working DATABASE_URL before loading .env so that local host testing
+# (port 5433) works even when .env points at the Docker-internal hostname 'db'.
+# Users can override by setting DATABASE_URL explicitly in their shell.
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgres://postgres:postgres@127.0.0.1:5433/mko_bazuna",
+)
+
 _local_env = Path(__file__).resolve().parent / "src" / "backend" / ".env"
 if _local_env.is_file():
     import environ
 
     environ.Env.read_env(str(_local_env), override=False)
-
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgres://postgres:postgres@127.0.0.1:5432/mko_bazuna",
-)
 
 import django  # noqa: E402
 
