@@ -4,9 +4,16 @@
 Usage:
     # Copy seed-images-config.example.json → seed-images-config.json, fill in API keys
     uv run python scripts/download_seed_photos.py          # single pass
-    uv run python scripts/download_seed_photos.py --all     # loop until limits exhausted
+    uv run python scripts/download_seed_photos.py --all     # loop until limits exhausted (prioritizes under-represented categories)
     uv run python scripts/download_seed_photos.py --category avtomobili  # single category
+    uv run python scripts/download_seed_photos.py --category=beauty-health  # '=' form also accepted
     uv run python scripts/download_seed_photos.py --validate  # check manifest vs files on disk
+    uv run python scripts/download_seed_photos.py --validate --fix=cleanup  # find and clean missing files
+    uv run python scripts/download_seed_photos.py --fix cleanup  # '--fix <mode>' space form also accepted
+
+    For --category and --fix, both --flag=value and --flag value (space-separated)
+    forms are supported. Unknown flags abort with exit code 1. In --all mode,
+    categories with fewer existing photos are downloaded first.
 
 Workflow per category:
     1. Load query_hierarchy.json → get objects/contexts/styles for this category
@@ -23,11 +30,14 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import random
 import sys
+import tempfile
 import time
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import requests
 from PIL import Image
@@ -46,6 +56,27 @@ from apps.seed.paths import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+
+class FixMode(StrEnum):
+    """Recovery modes for reconciling ``photo_manifest.json`` with files on disk."""
+
+    NONE = "none"
+    CLEANUP = "cleanup"
+
+
+class CliArgs(NamedTuple):
+    """Parsed CLI arguments for the seed photo download script.
+
+    ``category`` is ``None`` when ``--category`` was not supplied. All other
+    fields carry their natural defaults unless the corresponding flag is set.
+    """
+
+    category: str | None
+    loop_all: bool
+    validate_only: bool
+    fix_mode: FixMode
+
 
 # ─── Paths ─────────────────────────────────────────────────────────────────
 
@@ -310,9 +341,24 @@ def load_manifest() -> dict[str, Any]:
 
 
 def save_manifest(manifest: dict[str, Any]) -> None:
-    """Persist photo manifest to disk."""
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+    """Persist photo manifest to disk atomically.
+
+    Writes to a temporary file in the same directory, then atomically renames
+    it into place via ``os.replace``. This prevents partial writes on
+    interruption (e.g. Ctrl-C or crash mid-write).
+    """
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=MANIFEST_PATH.parent,
+        prefix=".photo_manifest_",
+        suffix=".tmp",
+        delete=False,
+    ) as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
+        tmp_path = Path(f.name)
+    os.replace(tmp_path, MANIFEST_PATH)
 
 
 def compose_query(hierarchy: dict[str, Any]) -> str:
@@ -469,6 +515,32 @@ def get_next_sequence_number(category_slug: str, manifest: dict[str, Any]) -> in
     return max_num + 1
 
 
+def count_category_photos(category_slug: str, manifest: dict[str, Any]) -> int:
+    """Return the number of photos already in the manifest for a category."""
+    categories = manifest.get("categories", {})
+    return len(categories.get(category_slug, {}).get("photos", []))
+
+
+def prioritize_categories(
+    categories: list[str],
+    manifest: dict[str, Any],
+    photos_per_category: int,
+) -> list[str]:
+    """Order categories by deficit (fewest photos first) with random tie-breaking.
+
+    Shuffles first for randomness, then stable-sorts by deficit descending so
+    under-represented categories are processed first. Categories with more than
+    ``photos_per_category`` photos go last.
+    """
+    shuffled = list(categories)
+    random.shuffle(shuffled)
+    shuffled.sort(
+        key=lambda slug: photos_per_category - count_category_photos(slug, manifest),
+        reverse=True,
+    )
+    return shuffled
+
+
 def process_category(
     category_slug: str,
     hierarchy: dict[str, Any],
@@ -540,6 +612,35 @@ def process_category(
 # ─── Validation ──────────────────────────────────────────────────────────────
 
 
+def find_missing_manifest_entries(
+    manifest: dict[str, Any],
+) -> list[tuple[str, dict[str, Any]]]:
+    """Return manifest entries whose fixture files are missing from disk.
+
+    Iterates both ``categories`` and the ``default`` fallback, checking
+    ``FIXTURES_IMAGES_DIR / filename`` for each photo entry.
+
+    Returns:
+        List of ``(category_slug, photo_entry)`` tuples for missing files,
+        where ``photo_entry`` is the full dict from the manifest (containing
+        ``filename``, ``width``, ``height``).
+    """
+    missing: list[tuple[str, dict[str, Any]]] = []
+
+    for category_slug, entry in manifest.get("categories", {}).items():
+        for photo in entry.get("photos", []):
+            filename = photo.get("filename", "")
+            if not (FIXTURES_IMAGES_DIR / filename).exists():
+                missing.append((category_slug, photo))
+
+    for photo in manifest.get("default", {}).get("photos", []):
+        filename = photo.get("filename", "")
+        if not (FIXTURES_IMAGES_DIR / filename).exists():
+            missing.append(("default", photo))
+
+    return missing
+
+
 def validate_manifest() -> bool:
     """Cross-check ``photo_manifest.json`` against JPEG files and query hierarchy.
 
@@ -563,23 +664,13 @@ def validate_manifest() -> bool:
     with open(MANIFEST_PATH, encoding="utf-8") as f:
         manifest = json.load(f)
 
-    missing: list[str] = []
     total = 0
+    for entry in manifest.get("categories", {}).values():
+        total += len(entry.get("photos", []))
+    total += len(manifest.get("default", {}).get("photos", []))
 
-    for category_slug, entry in manifest.get("categories", {}).items():
-        for photo in entry.get("photos", []):
-            total += 1
-            filename = photo.get("filename", "")
-            file_path = FIXTURES_IMAGES_DIR / filename
-            if not file_path.exists():
-                missing.append(f"{category_slug}/{filename}")
-
-    for photo in manifest.get("default", {}).get("photos", []):
-        total += 1
-        filename = photo.get("filename", "")
-        file_path = FIXTURES_IMAGES_DIR / filename
-        if not file_path.exists():
-            missing.append(f"default/{filename}")
+    missing_entries = find_missing_manifest_entries(manifest)
+    missing = [f"{cat}/{photo.get('filename', '')}" for cat, photo in missing_entries]
 
     logger.info("Checked manifest: %d photos, %d missing files", total, len(missing))
     for ref in missing:
@@ -615,6 +706,146 @@ def validate_manifest() -> bool:
     return ok
 
 
+# ─── Recovery ───────────────────────────────────────────────────────────────
+
+
+def fix_cleanup(manifest: dict[str, Any]) -> int:
+    """Remove manifest entries for fixture files missing from disk.
+
+    Iterates all categories (including ``default``), filtering out photo
+    entries whose files don't exist in ``FIXTURES_IMAGES_DIR``. Categories
+    that lose all photos are kept with an empty ``photos`` list and logged
+    as a WARNING (per decision D7 — a data-quality issue, not a crash).
+
+    The manifest is saved atomically via ``save_manifest()`` (temp file +
+    ``os.replace``) to prevent partial writes on interruption. The function
+    never deletes files from disk and does not modify ``downloaded_ids.json``
+    (per decisions D4 and D2).
+
+    Args:
+        manifest: The manifest dict (mutated in place and persisted to disk).
+
+    Returns:
+        The number of removed stale entries.
+    """
+    removed = 0
+
+    for category_slug, entry in manifest.get("categories", {}).items():
+        photos = entry.get("photos", [])
+        kept = [
+            p for p in photos
+            if (FIXTURES_IMAGES_DIR / p.get("filename", "")).exists()
+        ]
+        removed += len(photos) - len(kept)
+        entry["photos"] = kept
+        if not kept:
+            logger.warning(
+                "Category '%s' now has zero photos after cleanup — "
+                "re-download with --all to restore coverage",
+                category_slug,
+            )
+
+    default_entry = manifest.setdefault("default", {"photos": []})
+    default_photos = default_entry.get("photos", [])
+    default_kept = [
+        p for p in default_photos
+        if (FIXTURES_IMAGES_DIR / p.get("filename", "")).exists()
+    ]
+    removed += len(default_photos) - len(default_kept)
+    default_entry["photos"] = default_kept
+    if not default_kept and default_photos:
+        logger.warning(
+            "Default photos now has zero photos after cleanup — "
+            "re-download with --all to restore coverage",
+        )
+
+    logger.info("Cleanup removed %d stale manifest entries", removed)
+    save_manifest(manifest)
+    return removed
+
+
+# ─── CLI parsing ─────────────────────────────────────────────────────────────
+
+
+def _consume_value(argv: list[str], i: int, flag: str) -> str:
+    """Return the value following a space-separated ``--flag`` token.
+
+    The next token must exist and must not itself start with ``-`` so that
+    ``--category --all`` (or ``--fix --validate``) is rejected instead of
+    silently consuming the following flag as the value. Aborts with exit
+    code 1 when no usable value is present.
+    """
+    if i + 1 >= len(argv) or argv[i + 1].startswith("-"):
+        logger.error("Missing value for %s: expected a non-flag argument", flag)
+        sys.exit(1)
+    return argv[i + 1]
+
+
+def _resolve_fix_mode(mode_str: str) -> FixMode:
+    """Resolve a ``--fix`` mode string into a ``FixMode`` member.
+
+    Aborts with exit code 1 (and logs the valid modes) when the value does not
+    match any ``FixMode``.
+    """
+    try:
+        return FixMode(mode_str)
+    except ValueError:
+        valid = ", ".join(m.value for m in FixMode)
+        logger.error("Unknown --fix mode: %s. Valid modes: %s", mode_str, valid)
+        sys.exit(1)
+
+
+def parse_cli_args(argv: list[str]) -> CliArgs:
+    """Parse CLI arguments with an index-based state machine.
+
+    Supports both ``--flag=value`` and ``--flag value`` (space-separated) forms
+    for ``--category`` and ``--fix``. Unknown arguments abort the run with
+    ``sys.exit(1)``.
+
+    Recognized flags:
+      --category=<slug> / --category <slug>  : single-category download
+      --all                                  : loop until API limits exhausted
+      --validate                             : check manifest vs files on disk
+      --fix=<mode> / --fix <mode>            : recovery mode (e.g. cleanup)
+    """
+    category: str | None = None
+    loop_all = False
+    validate_only = False
+    fix_mode = FixMode.NONE
+
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--all":
+            loop_all = True
+            i += 1
+        elif arg == "--validate":
+            validate_only = True
+            i += 1
+        elif arg.startswith("--category="):
+            category = arg.split("=", 1)[1]
+            i += 1
+        elif arg == "--category":
+            category = _consume_value(argv, i, "--category")
+            i += 2
+        elif arg.startswith("--fix="):
+            fix_mode = _resolve_fix_mode(arg.split("=", 1)[1])
+            i += 1
+        elif arg == "--fix":
+            fix_mode = _resolve_fix_mode(_consume_value(argv, i, "--fix"))
+            i += 2
+        else:
+            logger.error("Unknown argument: %s", arg)
+            sys.exit(1)
+
+    return CliArgs(
+        category=category,
+        loop_all=loop_all,
+        validate_only=validate_only,
+        fix_mode=fix_mode,
+    )
+
+
 # ─── Entry point ───────────────────────────────────────────────────────────
 
 
@@ -623,6 +854,12 @@ def main() -> None:
 
     Pass ``--validate`` to cross-check ``photo_manifest.json`` against JPEGs
     on disk without contacting any API.
+
+    Use ``--validate --fix=cleanup`` (or ``--fix=cleanup`` alone) to remove
+    manifest entries for files that no longer exist on disk. Both the
+    ``--fix=cleanup`` and ``--fix cleanup`` (space-separated) forms are
+    accepted. This is a dev-only recovery mode that requires no API keys or
+    network access.
     """
     logging.basicConfig(
         level=logging.INFO,
@@ -637,21 +874,42 @@ def main() -> None:
     use_unsplash: bool = config.get("unsplash", True)
     use_pexels: bool = config.get("pexels", True)
 
-    # Parse CLI args
-    args = sys.argv[1:]
-    single_category: str | None = None
-    loop_all = False
-    validate_only = False
+    # Parse CLI args (supports both --flag=value and --flag value forms)
+    cli_args = parse_cli_args(sys.argv[1:])
+    single_category: str | None = cli_args.category
+    loop_all = cli_args.loop_all
+    validate_only = cli_args.validate_only
+    fix_mode: FixMode = cli_args.fix_mode
 
-    for arg in args:
-        if arg.startswith("--category="):
-            single_category = arg.split("=", 1)[1]
-        elif arg == "--all":
-            loop_all = True
-        elif arg == "--validate":
-            validate_only = True
+    if validate_only and fix_mode == FixMode.CLEANUP:
+        # Report current state, clean stale entries, then re-validate.
+        logger.info("=== Pre-cleanup validation ===")
+        validate_manifest()
+        if not MANIFEST_PATH.exists():
+            logger.error("Manifest not found at %s", MANIFEST_PATH)
+            sys.exit(1)
+        with open(MANIFEST_PATH, encoding="utf-8") as f:
+            manifest = json.load(f)
+        removed = fix_cleanup(manifest)
+        logger.info("Removed %d stale manifest entries", removed)
+        logger.info("=== Post-cleanup validation ===")
+        ok = validate_manifest()
+        sys.exit(0 if ok else 1)
 
     if validate_only:
+        ok = validate_manifest()
+        sys.exit(0 if ok else 1)
+
+    if fix_mode == FixMode.CLEANUP:
+        # --fix=cleanup without --validate: clean and confirm.
+        if not MANIFEST_PATH.exists():
+            logger.error("Manifest not found at %s", MANIFEST_PATH)
+            sys.exit(1)
+        with open(MANIFEST_PATH, encoding="utf-8") as f:
+            manifest = json.load(f)
+        removed = fix_cleanup(manifest)
+        logger.info("Removed %d stale manifest entries", removed)
+        logger.info("=== Post-cleanup validation ===")
         ok = validate_manifest()
         sys.exit(0 if ok else 1)
 
@@ -669,14 +927,16 @@ def main() -> None:
     manifest = load_manifest()
 
     # Determine which categories to process
+    photos_per_category = config.get("photos_per_category", 3)
     if single_category:
         if single_category not in hierarchy_data:
             logger.error("Category '%s' not found in query hierarchy", single_category)
             sys.exit(1)
         categories_to_process = [single_category]
     else:
-        categories_to_process = list(hierarchy_data.keys())
-        random.shuffle(categories_to_process)
+        categories_to_process = prioritize_categories(
+            list(hierarchy_data.keys()), manifest, photos_per_category
+        )
 
     # Determine photo source order
     photo_sources: list[PhotoSource] = []
@@ -708,6 +968,12 @@ def main() -> None:
 
     while True:
         pass_number += 1
+        # Re-prioritize on each --all pass: categories with fewer photos
+        # come first so under-represented categories are filled up.
+        if loop_all and not single_category:
+            categories_to_process = prioritize_categories(
+                list(hierarchy_data.keys()), manifest, photos_per_category
+            )
         logger.info("=== Pass %d: %d categories to process ===", pass_number, len(categories_to_process))
 
         for cat_slug in categories_to_process:

@@ -9,7 +9,9 @@ specifically that ``PhotoSource.search()`` gracefully handles HTTP errors
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -32,6 +34,13 @@ PhotoSource = download.PhotoSource
 pick_photo = download.pick_photo
 next_available_page = download.next_available_page
 process_category = download.process_category
+find_missing_manifest_entries = download.find_missing_manifest_entries
+fix_cleanup = download.fix_cleanup
+FixMode = download.FixMode
+parse_cli_args = download.parse_cli_args
+CliArgs = download.CliArgs
+count_category_photos = download.count_category_photos
+prioritize_categories = download.prioritize_categories
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────
@@ -336,3 +345,481 @@ class TestProcessCategoryResilience:
             n = process_category("business-taxes", hierarchy, client, manifest, config)
         assert n == 0
         assert client.exhausted
+
+
+# ─── FixMode / cleanup ────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def seed_fs(tmp_path, monkeypatch):
+    """Temp fixture dir with fake JPEGs and module-level paths patched."""
+    fixtures_dir = tmp_path / "fixtures" / "images"
+    fixtures_dir.mkdir(parents=True)
+
+    # Fake JPEG files that exist on disk
+    for name in (
+        "massage_01.jpg",
+        "massage_02.jpg",
+        "phones_01.jpg",
+        "phones_02.jpg",
+        "dogs_01.jpg",
+    ):
+        (fixtures_dir / name).write_bytes(b"fake-jpeg")
+
+    monkeypatch.setattr(download, "FIXTURES_IMAGES_DIR", fixtures_dir)
+    monkeypatch.setattr(download, "MANIFEST_PATH", fixtures_dir / "photo_manifest.json")
+    monkeypatch.setattr(download, "DOWNLOADED_IDS_PATH", fixtures_dir / "downloaded_ids.json")
+    monkeypatch.setattr(download, "QUERY_HIERARCHY_PATH", fixtures_dir / "query_hierarchy.json")
+
+    return fixtures_dir
+
+
+class TestFixCleanup:
+    """Tests for find_missing_manifest_entries, fix_cleanup, and --fix=cleanup."""
+
+    # ── find_missing_manifest_entries ──
+
+    def test_find_missing_returns_correct_entries(self, seed_fs):
+        """Returns (category_slug, photo_entry) tuples for missing files only."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                ]},
+                "phones": {"photos": [
+                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                    {"filename": "phones_99.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": [
+                {"filename": "default_99.jpg", "width": 100, "height": 100},
+            ]},
+        }
+        result = find_missing_manifest_entries(manifest)
+        assert len(result) == 3
+        # Category scope is preserved in the returned tuples
+        slugs = [slug for slug, _ in result]
+        assert slugs == ["massage", "phones", "default"]
+        filenames = [photo["filename"] for _, photo in result]
+        assert filenames == ["massage_99.jpg", "phones_99.jpg", "default_99.jpg"]
+
+    def test_find_missing_returns_empty_when_all_exist(self, seed_fs):
+        """Returns empty list when every manifest file exists on disk."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        assert find_missing_manifest_entries(manifest) == []
+
+    # ── fix_cleanup: removal & preservation ──
+
+    def test_fix_cleanup_removes_only_missing(self, seed_fs):
+        """Only missing entries are removed; existing entries are preserved."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                ]},
+                "phones": {"photos": [
+                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                    {"filename": "phones_99.jpg", "width": 200, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        removed = fix_cleanup(manifest)
+        assert removed == 2
+
+        massage_files = [p["filename"] for p in manifest["categories"]["massage"]["photos"]]
+        assert massage_files == ["massage_01.jpg", "massage_02.jpg"]
+        phone_files = [p["filename"] for p in manifest["categories"]["phones"]["photos"]]
+        assert phone_files == ["phones_01.jpg"]
+
+    def test_fix_cleanup_returns_correct_count(self, seed_fs):
+        """Returned count matches the number of removed entries."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                ]},
+                "phones": {"photos": [
+                    {"filename": "phones_98.jpg", "width": 100, "height": 100},
+                    {"filename": "phones_99.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": [
+                {"filename": "default_97.jpg", "width": 100, "height": 100},
+            ]},
+        }
+        assert fix_cleanup(manifest) == 4
+
+    # ── fix_cleanup: empty-category warning ──
+
+    def test_fix_cleanup_warns_when_category_empty(self, seed_fs, caplog):
+        """Logs a WARNING when a category loses all its photos."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "dogs": {"photos": [
+                    {"filename": "dogs_02.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        with caplog.at_level(logging.WARNING):
+            fix_cleanup(manifest)
+        assert any("zero photos" in r.getMessage() for r in caplog.records)
+
+    def test_fix_cleanup_keeps_empty_category_in_manifest(self, seed_fs):
+        """Category with zero photos after cleanup stays in manifest with empty list."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "dogs": {"photos": [
+                    {"filename": "dogs_02.jpg", "width": 100, "height": 100},
+                ]},
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        fix_cleanup(manifest)
+        assert manifest["categories"]["dogs"]["photos"] == []
+        assert manifest["categories"]["massage"]["photos"] == [
+            {"filename": "massage_01.jpg", "width": 100, "height": 100}
+        ]
+
+    # ── fix_cleanup: atomic write ──
+
+    def test_fix_cleanup_atomic_write_not_corrupted(self, seed_fs):
+        """Manifest saved to disk is valid JSON after cleanup with mixed entries."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        fix_cleanup(manifest)
+        result = json.loads(seed_fs.joinpath("photo_manifest.json").read_text())
+        assert result["version"] == 1
+        files = [p["filename"] for p in result["categories"]["massage"]["photos"]]
+        assert files == ["massage_01.jpg"]
+
+    # ── fix_cleanup: downloaded_ids.json untouched ──
+
+    def test_fix_cleanup_does_not_modify_downloaded_ids(self, seed_fs):
+        """downloaded_ids.json is NOT modified by cleanup."""
+        seed_fs.joinpath("downloaded_ids.json").write_text(
+            json.dumps({"downloaded_ids": ["id1", "id2"]})
+        )
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        fix_cleanup(manifest)
+        ids = json.loads(seed_fs.joinpath("downloaded_ids.json").read_text())
+        assert ids == {"downloaded_ids": ["id1", "id2"]}
+
+    # ── End-to-end: --fix=cleanup ──
+
+    def test_fix_cleanup_end_to_end(self, seed_fs, monkeypatch):
+        """--fix=cleanup loads manifest, cleans, re-validates, exits 0."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                ]},
+                "phones": {"photos": [
+                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                    {"filename": "phones_02.jpg", "width": 200, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        seed_fs.joinpath("photo_manifest.json").write_text(json.dumps(manifest))
+        seed_fs.joinpath("query_hierarchy.json").write_text(
+            json.dumps({"massage": {}, "phones": {}})
+        )
+        seed_fs.joinpath("downloaded_ids.json").write_text(
+            json.dumps({"downloaded_ids": []})
+        )
+
+        monkeypatch.setattr(sys, "argv", ["download_seed_photos.py", "--fix=cleanup"])
+        monkeypatch.setattr(download, "load_config", lambda: {})
+
+        with pytest.raises(SystemExit) as exc:
+            download.main()
+        assert exc.value.code == 0
+
+        result = json.loads(seed_fs.joinpath("photo_manifest.json").read_text())
+        massage_files = [p["filename"] for p in result["categories"]["massage"]["photos"]]
+        assert "massage_99.jpg" not in massage_files
+        assert "massage_01.jpg" in massage_files
+        assert json.loads(seed_fs.joinpath("downloaded_ids.json").read_text()) == {
+            "downloaded_ids": []
+        }
+
+    def test_validate_then_fix_cleanup_end_to_end(self, seed_fs, monkeypatch):
+        """--validate --fix=cleanup reports, cleans, and re-validates."""
+        manifest = {
+            "version": 1,
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                ]},
+                "phones": {"photos": [
+                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                ]},
+            },
+            "default": {"photos": []},
+        }
+        seed_fs.joinpath("photo_manifest.json").write_text(json.dumps(manifest))
+        seed_fs.joinpath("query_hierarchy.json").write_text(
+            json.dumps({"massage": {}, "phones": {}})
+        )
+        seed_fs.joinpath("downloaded_ids.json").write_text(
+            json.dumps({"downloaded_ids": []})
+        )
+
+        monkeypatch.setattr(
+            sys, "argv", ["download_seed_photos.py", "--validate", "--fix=cleanup"]
+        )
+        monkeypatch.setattr(download, "load_config", lambda: {})
+
+        with pytest.raises(SystemExit) as exc:
+            download.main()
+        assert exc.value.code == 0
+
+        result = json.loads(seed_fs.joinpath("photo_manifest.json").read_text())
+        files = [p["filename"] for p in result["categories"]["massage"]["photos"]]
+        assert files == ["massage_01.jpg"]
+
+
+# ─── parse_cli_args ────────────────────────────────────────────────────────
+
+
+class TestParseCliArgs:
+    """Unit tests for parse_cli_args — the manual sys.argv state machine.
+
+    Covers both ``--flag=value`` and ``--flag value`` (space-separated) forms
+    for ``--category`` and ``--fix``, plus error/exit handling.
+    """
+
+    def test_category_equals_form(self):
+        """``--category=beauty-health`` parses into the category field."""
+        result = parse_cli_args(["--category=beauty-health"])
+        assert result.category == "beauty-health"
+        assert result.loop_all is False
+        assert result.validate_only is False
+        assert result.fix_mode is FixMode.NONE
+
+    def test_category_space_form(self):
+        """``--category beauty-health`` (space-separated) parses into category."""
+        result = parse_cli_args(["--category", "beauty-health"])
+        assert result.category == "beauty-health"
+
+    def test_category_hyphenated_slug_equals_form(self):
+        """A hyphenated slug works in the equals form."""
+        result = parse_cli_args(["--category=services-jobs"])
+        assert result.category == "services-jobs"
+
+    def test_category_hyphenated_slug_space_form(self):
+        """A hyphenated slug works in the space-separated form (hyphen is not a bare flag)."""
+        result = parse_cli_args(["--category", "services-jobs"])
+        assert result.category == "services-jobs"
+
+    def test_fix_equals_form(self):
+        """``--fix=cleanup`` resolves to FixMode.CLEANUP."""
+        result = parse_cli_args(["--fix=cleanup"])
+        assert result.fix_mode is FixMode.CLEANUP
+        assert result.category is None
+
+    def test_fix_space_form(self):
+        """``--fix cleanup`` (space-separated) resolves to FixMode.CLEANUP."""
+        result = parse_cli_args(["--fix", "cleanup"])
+        assert result.fix_mode is FixMode.CLEANUP
+
+    def test_all_flag(self):
+        """``--all`` sets loop_all."""
+        result = parse_cli_args(["--all"])
+        assert result.loop_all is True
+
+    def test_validate_flag(self):
+        """``--validate`` sets validate_only."""
+        result = parse_cli_args(["--validate"])
+        assert result.validate_only is True
+
+    def test_defaults_no_args(self):
+        """No arguments yields all defaults."""
+        result = parse_cli_args([])
+        assert result.category is None
+        assert result.loop_all is False
+        assert result.validate_only is False
+        assert result.fix_mode is FixMode.NONE
+
+    def test_combined_flags_space_and_equals(self):
+        """``--validate --fix=cleanup --all --category phones`` parses all together."""
+        result = parse_cli_args(
+            ["--validate", "--fix=cleanup", "--all", "--category", "phones"]
+        )
+        assert result.validate_only is True
+        assert result.fix_mode is FixMode.CLEANUP
+        assert result.loop_all is True
+        assert result.category == "phones"
+
+    def test_invalid_fix_mode_equals_exits(self):
+        """An invalid --fix mode via ``--fix=bogus`` exits 1."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--fix=bogus"])
+        assert exc.value.code == 1
+
+    def test_invalid_fix_mode_space_exits(self):
+        """An invalid --fix mode via ``--fix bogus`` exits 1."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--fix", "bogus"])
+        assert exc.value.code == 1
+
+    def test_fix_without_value_exits(self):
+        """``--fix`` with no following value exits 1."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--fix"])
+        assert exc.value.code == 1
+
+    def test_category_without_value_exits(self):
+        """``--category`` with no following value exits 1."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--category"])
+        assert exc.value.code == 1
+
+    def test_unknown_arg_exits(self):
+        """An unrecognized argument exits 1."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--bogus"])
+        assert exc.value.code == 1
+
+    def test_fix_followed_by_flag_does_not_swallow(self):
+        """``--fix --validate`` must NOT swallow ``--validate`` as the fix value.
+
+        The next token starts with ``-``, so ``--fix`` is rejected as missing
+        its value rather than consuming ``--validate``.
+        """
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--fix", "--validate"])
+        assert exc.value.code == 1
+
+    def test_category_followed_by_flag_does_not_swallow(self):
+        """``--category --all`` must NOT swallow ``--all`` as the category value."""
+        with pytest.raises(SystemExit) as exc:
+            parse_cli_args(["--category", "--all"])
+        assert exc.value.code == 1
+
+
+# ─── prioritize_categories ────────────────────────────────────────────────
+
+
+class TestPrioritizeCategories:
+    """Tests for count_category_photos and prioritize_categories."""
+
+    def test_count_returns_manifest_count(self):
+        """count_category_photos reflects current manifest entries."""
+        manifest = {
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "massage_01.jpg"},
+                    {"filename": "massage_02.jpg"},
+                ]},
+                "phones": {"photos": []},
+            },
+            "default": {"photos": []},
+        }
+        assert count_category_photos("massage", manifest) == 2
+        assert count_category_photos("phones", manifest) == 0
+        assert count_category_photos("nonexistent", manifest) == 0
+
+    def test_count_returns_zero_for_empty_manifest(self):
+        """A manifest with no categories returns 0 for any slug."""
+        assert count_category_photos("massage", {"categories": {}, "default": {"photos": []}}) == 0
+
+    def test_prioritize_zero_photo_first(self):
+        """Categories with 0 photos come before categories with 3 photos."""
+        manifest = {
+            "categories": {
+                "massage": {"photos": [
+                    {"filename": "m_01.jpg"},
+                    {"filename": "m_02.jpg"},
+                    {"filename": "m_03.jpg"},
+                ]},
+                "phones": {"photos": []},
+            },
+            "default": {"photos": []},
+        }
+        result = prioritize_categories(["massage", "phones"], manifest, photos_per_category=3)
+        assert result[0] == "phones"  # 0 photos → highest deficit
+        assert result[1] == "massage"  # 3 photos → lowest deficit
+
+    def test_prioritize_preserves_all_categories(self):
+        """No categories are dropped by prioritization."""
+        manifest = {"categories": {}, "default": {"photos": []}}
+        result = prioritize_categories(["a", "b", "c", "d"], manifest, photos_per_category=3)
+        assert sorted(result) == ["a", "b", "c", "d"]
+
+    def test_prioritize_deterministic_order_among_ties(self):
+        """With a fixed random seed, equal-deficit categories keep their shuffled order."""
+        import random as _random_mod
+
+        manifest = {"categories": {}, "default": {"photos": []}}
+        slugs = ["a", "b", "c", "d", "e"]
+        _random_mod.seed(42)
+        result = prioritize_categories(slugs, manifest, photos_per_category=3)
+        # All have 0 photos → all have same deficit → result is just a shuffle of all
+        assert sorted(result) == sorted(slugs)
+        # Verify it's not just the input order (shuffle happened)
+        assert result != slugs or len(slugs) <= 1  # trivially true for ties
+
+    def test_prioritize_re_sorts_when_manifest_changes(self):
+        """After photos are added, re-prioritizing moves exhausted categories last."""
+        manifest = {"categories": {}, "default": {"photos": []}}
+        slugs = ["a", "b"]
+
+        # Initially both have 0 photos — order is random, just check both present
+        first = prioritize_categories(slugs, manifest, photos_per_category=3)
+        assert sorted(first) == sorted(slugs)
+
+        # Simulate category "a" now has 3 photos
+        manifest = {
+            "categories": {
+                "a": {"photos": [{"f": "a_01.jpg"}, {"f": "a_02.jpg"}, {"f": "a_03.jpg"}]},
+            },
+            "default": {"photos": []},
+        }
+        second = prioritize_categories(slugs, manifest, photos_per_category=3)
+        # "b" (deficit 3) must come before "a" (deficit 0)
+        assert second[0] == "b"
+        assert second[1] == "a"

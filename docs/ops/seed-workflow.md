@@ -116,7 +116,10 @@ python scripts/download_seed_photos.py          # single pass
 python scripts/download_seed_photos.py --all     # loop until limits exhausted
 python scripts/download_seed_photos.py --category avtomobili  # single category
 python scripts/download_seed_photos.py --validate  # check manifest vs files
+python scripts/download_seed_photos.py --validate --fix=cleanup  # find and clean missing files
 ```
+
+Both `--category=<slug>` and `--category <slug>` (and likewise `--fix=<mode>` / `--fix <mode>`) are accepted. Unknown flags abort with exit code 1. In `--all` mode, categories with fewer existing photos are processed first on each pass to prioritize under-represented categories.
 
 The script:
 1. Reads `query_hierarchy.json` from `apps/seed/fixtures/images/`
@@ -138,6 +141,40 @@ python scripts/download_seed_photos.py --validate
 This exits with code 0 if all checks pass, or non-zero if any fixture JPEGs are
 missing or any categories from `query_hierarchy.json` lack manifest entries.
 Use this in CI or as a pre-build check before `docker compose build`.
+
+### Manifest Cleanup (`--fix=cleanup`)
+
+When fixture JPEGs are missing from disk (e.g. after a fresh clone wipes gitignored
+images, or after `git clean -fdx`), the manifest still references them. The download
+script's `--validate` mode reports the missing files but cannot repair them.
+
+Use `--fix=cleanup` to prune stale manifest entries:
+
+```bash
+# Report missing files, clean stale entries, and re-validate
+uv run python scripts/download_seed_photos.py --validate --fix=cleanup
+
+# Clean without an initial validation report
+uv run python scripts/download_seed_photos.py --fix=cleanup
+```
+
+**What it does:**
+- Removes every manifest entry (in both `categories` and `default`) whose JPEG file
+  does not exist in `apps/seed/fixtures/images/`.
+- Saves the manifest atomically (temp file + `os.replace`) to prevent corruption
+  on interruption.
+- Logs a **WARNING** for any category that loses all its photos.
+
+**What it does NOT do:**
+- Does **not** delete any JPEG files from disk (orphans are harmless and safe
+  to remove manually if desired).
+- Does **not** modify `downloaded_ids.json` — photo IDs are kept so that previously
+  accepted photos are not re-fetched.
+- Does **not** require API keys or network access — cleanup is purely local.
+
+After cleanup, all manifest-referenced files will exist on disk. Categories that
+lost all photos remain in the manifest with an empty `photos` list; re-download
+them with `--all` if needed.
 
 ### End-to-End Pipeline (3 Stages)
 
