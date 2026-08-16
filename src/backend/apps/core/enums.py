@@ -33,6 +33,7 @@ class AdvisoryLockId(IntEnum):
     CREATE_ADMIN = 101
     BACKFILL_THUMBNAILS = 102
     QUEUE_PROCESSING = 10
+    PURGE_DELETED_ADS = 11
     SEED = 110
 
 

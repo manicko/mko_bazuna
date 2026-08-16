@@ -3,7 +3,8 @@ Integration tests for scheduler sweep and purge management commands.
 
 Covers TASK_049 (lifecycle sweeps: archive_sweep, delete_sweep,
 consent_hard_delete, sweep_drafts, cleanup_login_tokens), TASK_037
-(purge_failed_ads) and TASK_038 (purge_rejected_ads).
+(purge_failed_ads), TASK_038 (purge_rejected_ads) and AD-002
+(purge_deleted_ads).
 
 These are DB-backed tests using real PostgreSQL per project spec.
 Each command is exercised in both --dry-run (no mutation) and real
@@ -63,12 +64,18 @@ def _make_ad(seller, category, city, **kwargs) -> Ad:
     """Create an Ad with required FK fields, overriding any kwargs.
 
     Timestamp fields (created_at, published_at, moderation_failed_at,
-    rejected_at) use auto_now_add/auto_now in the model, so they cannot be
-    set at creation time. Any such field passed in kwargs is applied via a
-    post-create UPDATE, which bypasses the model's automatic timestamping and
-    lets tests control retention-window boundaries precisely.
+    rejected_at, deleted_at) use auto_now_add/auto_now in the model, so they
+    cannot be set at creation time. Any such field passed in kwargs is applied
+    via a post-create UPDATE, which bypasses the model's automatic timestamping
+    and lets tests control retention-window boundaries precisely.
     """
-    timestamp_fields = {"created_at", "published_at", "moderation_failed_at", "rejected_at"}
+    timestamp_fields = {
+        "created_at",
+        "published_at",
+        "moderation_failed_at",
+        "rejected_at",
+        "deleted_at",
+    }
     timestamps = {k: v for k, v in kwargs.items() if k in timestamp_fields}
     data = {k: v for k, v in kwargs.items() if k not in timestamp_fields}
     defaults = {
@@ -516,6 +523,87 @@ class TestPurgeRejectedAds:
         assert AdvisoryLockId.PURGE_REJECTED_ADS == 7
 
 
+class TestPurgeDeletedAds:
+    """Tests for purge_deleted_ads command (advisory lock 11, 120-day window)."""
+
+    def test_purge_deleted_ads_deletes_old_deleted(self, seller, category, city):
+
+        old = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DELETED,
+            deleted_at=timezone.now() - timedelta(days=200),
+        )
+        call_command("purge_deleted_ads")
+        assert not Ad.objects.filter(pk=old.pk).exists()
+
+    def test_purge_deleted_ads_preserves_recent(self, seller, category, city):
+
+        recent = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DELETED,
+            deleted_at=timezone.now() - timedelta(days=30),
+        )
+        call_command("purge_deleted_ads")
+        assert Ad.objects.filter(pk=recent.pk).exists()
+
+    def test_purge_deleted_ads_skips_non_deleted(self, seller, category, city):
+
+        published = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            deleted_at=timezone.now() - timedelta(days=200),
+        )
+        call_command("purge_deleted_ads")
+        assert Ad.objects.filter(pk=published.pk).exists()
+
+    def test_purge_deleted_ads_advisory_lock(self):
+        assert AdvisoryLockId.PURGE_DELETED_ADS == 11
+
+    def test_purge_deleted_ads_dry_run(self, seller, category, city):
+
+        old = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DELETED,
+            deleted_at=timezone.now() - timedelta(days=200),
+        )
+        call_command("purge_deleted_ads", "--dry-run")
+        assert Ad.objects.filter(pk=old.pk).exists()
+
+    def test_purge_deleted_ads_media_cleanup(self, seller, category, city, monkeypatch):
+
+        old = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DELETED,
+            deleted_at=timezone.now() - timedelta(days=200),
+        )
+        AdImage.objects.create(ad=old, image="test-uuid-deleted.jpg")
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.purge_deleted_ads.delete_photo",
+            _record,
+        )
+
+        call_command("purge_deleted_ads")
+
+        assert "test-uuid-deleted.jpg" in deleted_keys
+        assert not Ad.objects.filter(pk=old.pk).exists()
+
+
 class TestConcurrentSweep:
     """Concurrent-double-sweep tests verifying advisory lock serialization (DB-003)."""
 
@@ -550,6 +638,7 @@ class TestConcurrentSweep:
             cleanup_login_tokens,
             consent_hard_delete,
             delete_sweep,
+            purge_deleted_ads,
             purge_failed_ads,
             purge_rejected_ads,
             sweep_drafts,
@@ -567,6 +656,7 @@ class TestConcurrentSweep:
             cleanup_login_tokens,
             purge_failed_ads,
             purge_rejected_ads,
+            purge_deleted_ads,
             rollup_daily_metrics,
             backfill_thumbnails,
         ]

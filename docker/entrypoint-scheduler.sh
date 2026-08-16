@@ -33,6 +33,7 @@ hourly_commands = [
     'cleanup_login_tokens',
     'purge_failed_ads',
     'purge_rejected_ads',
+    'purge_deleted_ads',
 ]
 # Daily at 08:00 UTC (phase-02 spec: docs/97-plans/phase-02-detailed-plan-1.md:317).
 # add future daily jobs here, e.g. 'rollup_daily_metrics'
