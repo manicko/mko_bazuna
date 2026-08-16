@@ -1,21 +1,28 @@
 """
-Media service unit tests — validation and storage-key generation (TST-007).
+Media service unit tests — validation, storage-key generation, and file deletion (TST-007).
 
 Verifies:
 - ``validate_jpeg_bytes`` rejects invalid/empty/short payloads
 - ``validate_photo`` rejects oversized files, oversized dimensions, non-JPEG
 - ``generate_storage_key`` returns a UUID v4 + ``.jpg`` with no PII
+- ``delete_photo`` swallows OSError subtypes and retries transient failures
 
 No database interaction required — pure unit tests.
 """
 
 import io
+import logging
 import re
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
 
 from telegram_bot.services.media import (
+    DELETE_PHOTO_MAX_ATTEMPTS,
+    delete_photo,
     generate_storage_key,
     validate_jpeg_bytes,
     validate_photo,
@@ -193,3 +200,85 @@ class TestGenerateStorageKey:
         assert len(parts) == 5
         # Version nibble at position 14 (0-indexed) must be '4'
         assert uuid_part[14] == "4"
+
+
+# ---------------------------------------------------------------------------
+# Test — delete_photo
+# ---------------------------------------------------------------------------
+
+
+class TestDeletePhoto:
+    """delete_photo — file deletion with bounded retry on OSError."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_media_root(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Redirect MEDIA_ROOT to a temp dir and capture WARNING+ logs.
+
+        Keeps these tests as pure unit tests: ``delete_photo`` only reads
+        ``settings.MEDIA_ROOT`` (lazily evaluated), so swapping the module-level
+        ``settings`` reference avoids any Django configuration dependency.
+        """
+        caplog.set_level(logging.WARNING)
+        monkeypatch.setattr(
+            "telegram_bot.services.media.settings",
+            SimpleNamespace(MEDIA_ROOT=tmp_path),
+        )
+
+    def test_delete_photo_file_not_found_silent(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A missing file is swallowed with a warning; no exception escapes."""
+        with patch(
+            "telegram_bot.services.media.os.remove",
+            side_effect=FileNotFoundError("no such file"),
+        ) as mock_remove:
+            delete_photo("missing.jpg")  # must not raise
+        assert mock_remove.call_count == 1
+        assert "already deleted" in caplog.text
+
+    def test_delete_photo_file_not_found_does_not_retry(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """FileNotFoundError is terminal — os.remove called once, no retry."""
+        with patch(
+            "telegram_bot.services.media.os.remove",
+            side_effect=FileNotFoundError("no such file"),
+        ) as mock_remove, patch(
+            "telegram_bot.services.media.time.sleep"
+        ) as mock_sleep:
+            delete_photo("missing.jpg")
+        assert mock_remove.call_count == 1
+        assert mock_sleep.call_count == 0
+        assert "Retryable error" not in caplog.text
+
+    def test_delete_photo_handles_os_error(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """PermissionError on every attempt: swallowed, error logged, no raise."""
+        with patch(
+            "telegram_bot.services.media.os.remove",
+            side_effect=PermissionError("denied"),
+        ) as mock_remove, patch("telegram_bot.services.media.time.sleep"):
+            delete_photo("locked.jpg")  # must not raise
+        assert mock_remove.call_count == DELETE_PHOTO_MAX_ATTEMPTS
+        assert "Failed to delete" in caplog.text
+
+    def test_delete_photo_retries_on_temporary_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Transient OSError then success: retries succeed; warning logged."""
+        with patch(
+            "telegram_bot.services.media.os.remove",
+            side_effect=[PermissionError("denied"), None],
+        ) as mock_remove, patch(
+            "telegram_bot.services.media.time.sleep"
+        ) as mock_sleep:
+            delete_photo("flaky.jpg")
+        assert mock_remove.call_count == 2
+        assert mock_sleep.call_count == 1
+        assert "Retryable error" in caplog.text

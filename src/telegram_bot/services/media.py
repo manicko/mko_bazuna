@@ -6,6 +6,7 @@ Validates photos and generates storage keys per spec.
 
 import io
 import logging
+import time
 import uuid
 
 from PIL import Image, ImageOps
@@ -77,6 +78,10 @@ def generate_storage_key() -> str:
     return f"{uuid.uuid4()}.jpg"
 
 
+DELETE_PHOTO_MAX_ATTEMPTS = 3
+DELETE_PHOTO_BASE_DELAY = 0.1
+
+
 def delete_photo(storage_key: str) -> None:
     """
     Delete a photo file from the media storage.
@@ -84,15 +89,38 @@ def delete_photo(storage_key: str) -> None:
     Removes the file at ``os.path.join(settings.MEDIA_ROOT, storage_key)``.
     Succeeds silently if the file does not exist.
 
+    Transient ``OSError`` subtypes (e.g. ``PermissionError``) are retried with
+    exponential backoff. ``FileNotFoundError`` is terminal — it means the file
+    is already gone and retrying would not help. After the final attempt all
+    failures are logged and swallowed so that sweep/cron jobs are never
+    aborted by an orphaned file.
+
     Args:
         storage_key: Relative storage key (e.g. ``"<uuid>.jpg"``).
     """
     path = os.path.join(settings.MEDIA_ROOT, storage_key)
-    try:
-        os.remove(path)
-        logger.info(f"Deleted photo: {storage_key}")
-    except FileNotFoundError:
-        logger.warning(f"Photo not found (already deleted): {storage_key}")
+    for attempt in range(DELETE_PHOTO_MAX_ATTEMPTS):
+        try:
+            os.remove(path)
+            logger.info(f"Deleted photo: {storage_key}")
+            return
+        except FileNotFoundError:
+            logger.warning(f"Photo not found (already deleted): {storage_key}")
+            return
+        except OSError as exc:
+            if attempt < DELETE_PHOTO_MAX_ATTEMPTS - 1:
+                delay = DELETE_PHOTO_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    f"Retryable error deleting photo {storage_key} "
+                    f"(attempt {attempt + 1}/{DELETE_PHOTO_MAX_ATTEMPTS}): {exc}"
+                )
+                time.sleep(delay)
+            else:
+                logger.error(
+                    f"Failed to delete photo {storage_key} after "
+                    f"{DELETE_PHOTO_MAX_ATTEMPTS} attempts: {exc}"
+                )
+                return
 
 
 def strip_photo_exif(photo_bytes: bytes) -> bytes:
