@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """Run the Telegram bot."""
-    # BOT_TOKEN is loaded from validated settings schema;
-    # missing/invalid token raises ImproperlyConfigured at django.setup().
+    # BOT_TOKEN comes from Django settings (loaded via django-environ at base.py).
+    # In production, an empty token raises ImproperlyConfigured at settings import time (prod.py guard).
+    # In development (DEBUG=True), an empty token is permitted; the bot skips startup below.
     token = settings.BOT_TOKEN
 
     # Skip bot startup if token is empty/missing (development mode)
