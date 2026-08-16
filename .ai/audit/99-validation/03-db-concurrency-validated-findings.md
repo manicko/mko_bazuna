@@ -301,13 +301,13 @@ half-published ads. Effort: small/medium.
 
 ## Warnings
 
-- **DB-001 + DB-002 filesystem-vs-transaction interaction:** Several sweep commands
-  (`delete_sweep`, `purge_failed_ads`, `purge_rejected_ads`, `consent_hard_delete`,
-  `sweep_drafts`) call `delete_photo()` (physical file deletion) **inside** the
-  `transaction.atomic()` block. Even after fixing the lock ordering (DB-001), a DB
-  rollback would not undo filesystem deletions. The fix for DB-001 should be accompanied by
-  moving `delete_photo()` calls outside the transaction or behind a compensating action,
-  consistent with DB-002's own recommendation.
+- **DB-001 + DB-002 filesystem-vs-transaction interaction (RESOLVED):** The residual warning
+  about `delete_photo()` calls inside `transaction.atomic()` has been addressed. All five
+  sweep commands (`delete_sweep`, `sweep_drafts`, `consent_hard_delete`, `purge_failed_ads`,
+  `purge_rejected_ads`) now perform physical file deletion **after** the transaction commits,
+  preventing orphaned DB rows on rollback. A behavioral test
+  (`test_file_deletion_after_commit_not_inside_transaction`) verifies that a filesystem
+  failure does not roll back the DB delete.
 - **DB-002 + `AdImage.save()` file reads:** `AdImage.save()` (models.py:461-493) reads files
   from disk (`FileHashService.calculate_sha256`) during `AdImage.objects.create()` inside
   `_update_and_moderate` and `copy_ad`. Wrapping these in `transaction.atomic()` means a

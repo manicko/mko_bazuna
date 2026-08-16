@@ -1,9 +1,0 @@
-food: status=200 no_results=True ad_cards=0 title=['Найти: food - Mko Bazuna']
-velosiped: ERROR HTTP Error 500: Internal Server Error
-kvartira: status=200 no_results=True ad_cards=0 title=['Найти: квартира - Mko Bazuna']
-transport: status=200 no_results=True ad_cards=0 title=['Найти: транспорт - Mko Bazuna']
-telefon: status=200 no_results=True ad_cards=0 title=['Найти: телефон - Mko Bazuna']
-telegramma: status=200 no_results=True ad_cards=0 title=['Найти: телеграмма - Mko Bazuna']
-ac[transport]: status=200 body={"suggestions": [{"text": "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442", "source": "category", "type": "category"}, {"text": "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442 \u0438 \u043f\u0435\u0440\u0435\u0432\u043e\u0437\u043a\u0438", "source": "category", "type": "category"}], 
-ac[velosiped]: status=200 body={"suggestions": [{"text": "\u0412\u0435\u043b\u043e\u0441\u0438\u043f\u0435\u0434\u044b", "source": "category", "type": "category"}], "query": "\u0432\u0435\u043b"}
-ac[food]: status=200 body={"suggestions": [], "query": "food"}

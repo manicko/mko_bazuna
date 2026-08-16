@@ -75,7 +75,8 @@ and `uv_cache` volumes, prefixed by the project name.
 
 | File | Purpose | Tracked in git |
 |------|---------|----------------|
-| `.env.docker` | App secrets/creds; passed via `--env-file` and bind-mounted into containers as `src/.env` (also used via `env_file:` in compose) | Yes (template with placeholder values) |
+| `.env.docker` | App secrets/creds; passed via `--env-file` and bind-mounted into containers as `src/.env` (also used via `env_file:` in compose) | No (runtime secrets, gitignored) |
+| `.env.docker.example` | Template for `.env.docker`; committed to git with placeholder values; copy to `.env.docker` and fill in real values | Yes (template, placeholders only) |
 | `.env` | Auto-loaded by Compose for `${VAR}` interpolation in YAML only; sets no `COMPOSE_PROJECT_NAME` | No (gitignored) |
 
 Never set `DATABASE_URL` in `.env.docker` — Compose constructs it from the `POSTGRES_*` variables so
@@ -162,7 +163,7 @@ db (healthy, pg_isready)
 ### Quick Start
 
 ```bash
-# Configure environment: edit .env.docker with your real values
+# Configure environment: copy .env.docker.example to .env.docker and fill in your real values
 #   - BOT_TOKEN: your Telegram bot token from @BotFather
 #   - DJANGO_SECRET_KEY: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 #   - POSTGRES_PASSWORD: database password
@@ -264,7 +265,7 @@ guide for local HTTPS development.
 ### Docker Compose Production
 
 ```bash
-# Configure .env.docker with production values
+# Copy .env.docker.example to .env.docker and fill in production values
 # Then start services:
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 

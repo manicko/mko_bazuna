@@ -145,8 +145,9 @@ activemq-data/
 .env
 .env.dev
 .env.local
+.env.docker
 
-# .env.example, .env.dev.example,  are committed as templates
+# .env.example, .env.dev.example, .env.docker.example are committed as templates
 .envrc
 .venv
 env/

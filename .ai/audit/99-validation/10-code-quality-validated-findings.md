@@ -218,8 +218,30 @@ validator: validator
 >   1. Claims 24 Any matches in base.py - FALSE. Grep returns 6 matches (import + 5 usage: dict[str,Any], list[Any], -> Any, list[Any], list[list[Any]]). File is 96 lines.
 >   2. Claims 86 total Any matches in src/ - TRUE but misleading. Includes 12 imports, string literals ("Any title"), comments ("Any such field"), docstrings ("Any other exception"). Actual typing.Any type annotation count is approximately 50-55.
 >   3. No ID field in table - structural issue. Heading QLT-013 has no ID field.
->   4. Severity LOW, seed-only, no production impact. Recommendation: replace with concrete types or SeedContext Pydantic model. Valid but lower priority than claimed.
+>   4. Severity LOW, seed-only, no production impact. Recommendation below was previously non-actionable (offered "concrete types" vs "SeedContext Pydantic model" without selecting one).
 > - **Evidence quality:** Weak - core observation (Any usage exists) is correct, but quantitative evidence is significantly inflated.
+> - **Refined recommendation (actionable):**
+>   - **Root cause:** Exactly 5 `Any` annotations exist across base.py (file is 96 lines, not the 24 claimed):
+>     - `config: dict[str, Any]` — `__init__` parameter (line 26), the entry point for the seed config loaded from JSON in `seed_service.py:_load_config()` (lines 48-54).
+>     - `options: list[Any]`, `-> Any` — `_random_choice` (lines 45-47), generic utility.
+>     - `items: list[Any]`, `list[list[Any]]` — `_chunked` (lines 84-86), generic utility.
+>   - **Primary — config boundary:** Pydantic model `SeedContext`. The `config: dict[str, Any]` is the dominant `Any`: it is the constructor boundary (JSON file -> in-memory config) and propagates `Any` into `self.config`, consumed by every subclass via `config.get(...)`. Project policy designates Pydantic v2 as the validation layer for "settings schemas" at system boundaries; `seed/default.json` parsed via `json.load()` is exactly that. This matches the existing Pydantic pattern in `src/telegram_bot/schemas/` (e.g. `message_payloads.py`).
+>   - **Rejected alternative ("concrete types" / TypedDict):** A TypedDict gives static type-checking only and NO runtime validation, so it cannot guard against malformed JSON, missing keys, or wrong types (e.g. `faker_seed` as a string). The boundary remains unvalidated, contrary to project policy for settings/config schemas.
+>   - **Implementation (config):**
+>     1. Create `src/backend/apps/seed/config/seed_context.py` with `class SeedContext(BaseModel)` and fields matching `seed.default.json` + the generator access pattern:
+>        - `faker_seed: int = 42`
+>        - `chunk_size: int = 10000`
+>        - `status_distribution: dict[str, float] = {}`
+>        - nested `ImageCountConfig(min: int, max: int)` -> `image_count: ImageCountConfig`
+>        - nested `AnalyticsConfig(days_back: int, views_per_ad_per_day: ViewsRange)` -> `analytics: AnalyticsConfig`
+>        - `popular_searches: list[PopularSearchEntry]` (`query: str`, `hit_count: int`)
+>        - `photo_manifest_version: int = 1`
+>        - `template_version: int = 2`
+>        - All fields use `Field(default=...)` so the empty-config fallback (`return {}` in `_load_config`) still works.
+>     2. Update `seed_service.py:_load_config()` (line 48) to `return SeedContext(**json.load(f))`; update line 80 (`self.config["status_distribution"] = parsed` -> attribute assignment) and line 302 (`self.config.get("popular_searches", [])` -> `self.config.popular_searches`).
+>     3. Update `BaseGenerator.__init__` (`base.py:26`) to `config: SeedContext`; replace `config.get("faker_seed", 42)` (lines 34, 41) with `config.faker_seed`.
+>     4. Update subclass constructors (`ads.py`, `images.py`, `analytics.py`, `users.py`) signatures + attribute access (`self.config.status_distribution`, `self.config.image_count.min`, `config.analytics.days_back`, etc.).
+>   - **Utility methods (`_random_choice`, `_chunked`):** These 3 remaining `Any` usages are NOT boundary issues and the Pydantic model does not address them. They are generic container utilities where the element type is arbitrary and must round-trip to the caller. The precise fix is a module-level `TypeVar`: `T = TypeVar("T")`, then `options: list[T] -> T` and `items: list[T] -> list[list[T]]`. Neither Pydantic nor TypedDict can express a type that echoes the caller's element type — `TypeVar` is the correct, `any`-free solution. Required complement to the primary approach.
 
 **ID:** QLT-013 (heading, no ID field in table)
 **Severity:** LOW
@@ -397,7 +419,7 @@ None. All 13 findings identify at least some real codebase issues. Findings QLT-
 10. **QLT-009** (MEDIUM) - Extract ad-creation FSM business logic into shared service.
 11. **QLT-010/011** (MEDIUM) - Extract filtering from listings.py view into ListingQuery service.
 12. **QLT-002** (HIGH) - Fix remaining genuine basedpyright errors after steps 2-6 address valid concerns.
-13. **QLT-013** (LOW) - Replace Any in seed generators (seed-only, lowest priority).
+13. **QLT-013** (LOW) - Replace Any in seed generators: introduce `SeedContext` Pydantic model for the config boundary + `TypeVar` generics for `_random_choice`/`_chunked` utilities (seed-only, lowest priority).
 
 ### Dependency Summary
 

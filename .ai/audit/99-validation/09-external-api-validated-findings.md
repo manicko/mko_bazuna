@@ -45,7 +45,7 @@ Validation outcomes:
 
 **Validation assessment:** The problem is real and critical. GET requests must be idempotent; approving an ad is a mutation. CSRF via `<img src>` or crawler triggers is exploitable.
 
-**Recommendation:** Add `@require_POST` (or `if request.method != "POST": return HttpResponseNotAllowed(["POST"])`). Keep as-is.
+**Recommendation:** Apply `@require_POST` as the outermost decorator on `approve_ad` (`review.py:46`), above `@staff_required`. Non-POST requests receive HTTP 405 before the staff identity check runs, consistent with the project's decorator-based pattern (`staff_required`, `staff_required_api` in `decorators.py:34-50`) and the rollout-safety guidance below. No new dependencies required.
 
 ---
 
@@ -86,7 +86,7 @@ Validation outcomes:
 
 **Validation assessment:** The crash is real, critical, and empirically confirmed. Every `/start login_<token>` deep-link crashes. The entire bot-based login flow is broken — no new user can log in via the bot.
 
-**Recommendation:** (Minimal) Remove `returning=True` from `.update()` and add a separate `LoginToken.objects.get(token_hash=token_hash)` after the update. (Correct) Use `select_for_update(skip_locked=True)` for the atomic claim, or use Django 5.1+ `.returning()` method correctly. The minimal fix is lowest-risk but reintroduces a TOCTOU race; the correct fix preserves atomicity. Keep as-is.
+**Recommendation:** Replace the broken `LoginToken.objects.filter(...).update(telegram_id=..., returning=True).first()` with raw SQL `UPDATE ... RETURNING` via `connection.cursor()`, aligned with the ENT-001 decision (File 01). Execute `UPDATE login_tokens SET telegram_id=%s WHERE token_hash=%s AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > %s RETURNING *` inside the existing `transaction.atomic()` block in `handle_login_orm` (`login.py:159`). This restores the intended single-query atomic claim with zero TOCTOU, matching the PostgreSQL-specific raw-cursor pattern in `apps/core/utils/advisory_lock.py`. Note: the current source at `login.py:112-130` (`_claim_login_token`) already implements this approach — verify it satisfies the ENT-001 specification. No new dependency required. Effort: trivial (verification) / medium (if reimplementation needed).
 
 ---
 
@@ -257,7 +257,7 @@ Validation outcomes:
 
 **Validation assessment:** Core finding is valid and **amplified**: production also uses LocMemCache (not overridden in `prod.py`). Cache is used by BOTH rate limiting (`rate_limit.py`) AND moderation criteria caching (`auto_moderation.py` via `cache.py`). The `priority.py` citation is incorrect.
 
-**Recommendation:** Use Redis (or PostgreSQL-based cache) for production. Locmem acceptable for dev-only. Document the limitation in `docs/99-agent/architecture.md`. File citation correction: cite `auto_moderation.py` and `cache.py`, not `priority.py`.
+**Recommendation:** Replace `LocMemCache` with Redis via `django-redis`, aligned with the ENT-003 decision (File 01). Add `django-redis` to `pyproject.toml`; configure `CACHES["default"]` with `django_redis.cache.RedisCache` and `REDIS_URL` in `base.py` (lines 217-221), overriding in `prod.py` if needed; add a `redis` service to `docker-compose.yml` and `docker-compose.prod.yml` wired into `web`, `bot`, and `scheduler`. Select Redis (not PostgreSQL-based cache) because `apps/lookups/services/cache_service.py:76` and `apps/categories/services/lookup_resolution.py:111` use `cache.delete_pattern` (a `django-redis`-specific API). Document the production requirement in `docs/99-agent/architecture.md`. File citation correction: cite `auto_moderation.py` and `cache.py`, not `priority.py`. Effort: medium.
 
 ---
 
@@ -333,7 +333,7 @@ None detected. The findings file notes Finding 13 ("no HTTPS redirect") was fals
 |---------|-------------|--------------|-------|
 | 01 | Low | None | Trivial; backward-compatible (GET was a bug) |
 | 02 | Low | None | Returns 400 instead of 500 |
-| 03 | High (blocking) | None | Minimal fix (remove `returning=True`) reintroduces TOCTOU race; correct fix uses `select_for_update(skip_locked=True)` or Django `.returning()` API |
+| 03 | High (blocking) | None | Raw SQL `UPDATE ... RETURNING` via `connection.cursor()` per ENT-001; verify current `_claim_login_token` (`login.py:112-130`) matches specification |
 | 04 | Low | None | No callers; safe to delete |
 | 05 | Medium | 04 (cleanup) | Circuit breaker; test in isolation |
 | 06 | Medium | 05 | Consolidation; assess at project scale before abstracting |
@@ -349,7 +349,7 @@ None detected. The findings file notes Finding 13 ("no HTTPS redirect") was fals
 
 - **Finding 01:** Adding `@require_POST` above `@staff_required` is safe. `@require_POST` should be outermost so non-POST requests get 405 before the staff check.
 - **Finding 10:** Expanding CSP to all responses requires testing against existing inline scripts/styles in templates. A too-restrictive CSP could break the UI. Recommend staging deployment with reporting-only CSP first.
-- **Finding 03:** The minimal fix (remove `returning=True`, add separate SELECT) reintroduces a TOCTOU race that the original commit (`3bda47d`) attempted to fix. The correct fix should use `select_for_update(skip_locked=True)` or Django 5.1+ `.returning()` method. This is a semantic fix, not just a deletion.
+- **Finding 03:** The correct fix uses raw SQL `UPDATE ... RETURNING` via `connection.cursor()` (ENT-001), not the minimal `remove returning=True + separate SELECT` workaround, to avoid reintroducing the TOCTOU race that commit `3bda47d` attempted to fix. Verify the current `_claim_login_token` implementation (`login.py:112-130`) matches the ENT-001 specification before assuming the issue is resolved.
 
 ---
 

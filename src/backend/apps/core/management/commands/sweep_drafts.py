@@ -69,13 +69,15 @@ class Command(BaseCommand):
                 # Delete atomically - CASCADE will handle ad_images
                 deleted_count, _ = queryset.delete()
 
-                # Remove physical media files after ORM cascade
-                for storage_key in storage_keys:
-                    delete_photo(storage_key)
+        # Delete physical media after the transaction commits. Filesystem
+        # deletions inside transaction.atomic() cannot be rolled back, so a DB
+        # rollback would orphan DB rows pointing to already-deleted files.
+        for storage_key in storage_keys:
+            delete_photo(storage_key)
 
-                logger.info(
-                    "Deleted %d draft ads older than 30 minutes. "
-                    "Removed %d media files.",
-                    deleted_count,
-                    len(storage_keys),
-                )
+        logger.info(
+            "Deleted %d draft ads older than 30 minutes. "
+            "Removed %d media files.",
+            deleted_count,
+            len(storage_keys),
+        )

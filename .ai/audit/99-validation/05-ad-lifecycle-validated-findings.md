@@ -56,7 +56,24 @@ Each finding was validated against the actual implementation in `src/backend/app
 
 **Rollout safety:** Changing `reject_ad` to enforce `ON_MODERATION -> REJECTED` (via `transition_to()`) is a **behavioral change** — admins will no longer be able to reject ads from PUBLISHED/DRAFT/ARCHIVED statuses. This should be intentional (it brings the code in line with the spec). Low technical risk, medium operational risk (behavior change).
 
-**Recommendation:** Route all status changes through `transition_to()` to guarantee the ALLOWED_TRANSITIONS matrix is enforced and lifecycle side-effects are applied consistently. For batch sweep operations, enforce the transition guard at the SQL level via a database CHECK constraint or stored procedure. For `reject_ad`, add a guard enforcing `ad.status == AdStatus.ON_MODERATION` before allowing rejection.
+**Recommendation:** Route all single-row status changes through `transition_to()` to guarantee the `ALLOWED_TRANSITIONS` matrix is enforced and lifecycle side-effects are applied consistently. This covers `approve_ad()`, `reject_ad()`, and `soft_delete_ad()` in `admin_actions.py` plus per-row updates in the bot handler. For `reject_ad`, add a guard enforcing `ad.status == AdStatus.ON_MODERATION` before allowing rejection (the current guard at `admin_actions.py:63` only blocks re-rejection, not invalid source statuses).
+
+For the **batch sweep path** (`archive_sweep.py`), the source-status precondition is already enforced at the queryset level (`status=AdStatus.PUBLISHED`, line 47), so the remaining gap is **lifecycle side-effect consistency** - a status timestamp must accompany its status. Enforce this at the SQL level with a **database CHECK constraint** on the `ads` table (selected over a stored procedure - see *Rejected alternative* below), declared through the Django ORM so it is applied by the migration system rather than hand-managed SQL. Implementation steps:
+
+1. Add `CheckConstraint` entries to `Ad.Meta.constraints` in `src/backend/apps/ads/models.py`, one per status-to-timestamp invariant, using the `Q` API and `AdStatus` enum values (mirroring the existing `models.Index(condition=Q(...))` pattern used for `IX_ads_archive_sweep` etc.):
+
+   - `status = ARCHIVED` implies `archived_at IS NOT NULL` -> name `ck_ads_archived_at_if_archived`
+   - `status = REJECTED` implies `rejected_at IS NOT NULL` -> name `ck_ads_rejected_at_if_rejected`
+   - `status = ON_MODERATION_FAILED` implies `moderation_failed_at IS NOT NULL` -> name `ck_ads_moderation_failed_at_if_failed`
+   - `status = DELETED` implies `deleted_at IS NOT NULL` -> name `ck_ads_deleted_at_if_deleted`
+   - `status = PUBLISHED` implies `published_at IS NOT NULL` -> name `ck_ads_published_at_if_published`
+   - `moderation_failed_at` and `rejected_at` mutually exclusive -> name `ck_ads_failed_and_rejected_mutually_exclusive`
+
+2. Generate and commit the migration via `make makemigrations` (-> `manage.py makemigrations ads`). The constraint is applied by the one-shot advisory-locked `migrate` service described in `docs/ops/migration-workflow.md`, which runs exactly once before both web and bot start - no separate SQL deployment script is required.
+
+3. Verify with `uv run pytest src/backend/apps/core/tests/test_sweep_commands.py src/backend/apps/ads/` and add a regression test asserting that a bulk `Ad.objects.filter(status=AdStatus.PUBLISHED).update(status=AdStatus.ARCHIVED)` (without `archived_at`) raises `django.db.IntegrityError`, proving the constraint guards the sweep path. If any pre-existing dev rows violate the invariants, backfill the timestamps before applying the migration (the dev DB is disposable per `docs/ops/migration-workflow.md`).
+
+**Rejected alternative - stored procedure:** A stored procedure would embed executable transition-matrix logic as procedural `plpgsql` inside PostgreSQL, duplicating the `ALLOWED_TRANSITIONS` dict already defined in Python (`ads/models.py:280`) and violating the project's strict separation of concerns (business logic in Django/Python; the database reserved for declarative integrity). The project uses **zero** stored procedures - a repo-wide search for `CREATE (OR REPLACE) PROCEDURE` returns no matches; the only `CREATE FUNCTION` statements are two trigger functions in `ads/migrations/0002_initial.py` (lines 12 and 34) for FTS `search_vector` sync-safety. A CHECK constraint cannot see the prior row state (`OLD` is unavailable outside a row-level trigger), so it cannot express the full transition matrix; the matrix stays in `transition_to()` (Python) while the constraint enforces the complementary, DB-appropriate invariant - timestamp/side-effect consistency - that the bulk sweep path is the most likely to violate. If full transition-matrix enforcement is ever needed on a bulk path, route through `transition_to()` per-row (or a row-level trigger using `OLD`) rather than a stored procedure.
 
 **Effort:** medium | **Priority:** mandatory
 
@@ -365,7 +382,7 @@ No conflicting evidence found between findings. The findings are internally cons
 
 ## Required Fixes
 
-1. **AD-001 (CRITICAL, mandatory):** Route `approve_ad()`, `reject_ad()`, `soft_delete_ad()` in `admin_actions.py` through `transition_to()`. Fix `reject_ad` guard to enforce `ON_MODERATION -> REJECTED`. Route `archive_sweep.py` status update through `transition_to()` or add a SQL-level CHECK constraint.
+1. **AD-001 (CRITICAL, mandatory):** Route `approve_ad()`, `reject_ad()`, `soft_delete_ad()` in `admin_actions.py` through `transition_to()`. Fix `reject_ad` guard to enforce `ON_MODERATION -> REJECTED`. Add DB `CheckConstraint`(s) on `Ad.Meta` enforcing status-timestamp invariants (see AD-001 Recommendation) and generate the migration; the sweep already enforces source-status via its queryset filter.
 2. **AD-002 (HIGH, mandatory):** Add a `purge_deleted_ads` management command with 4-month retention from `deleted_at`, advisory lock, and a partial index `IX_ads_purge_deleted` on `[status, deleted_at]` filtered `Q(status=AdStatus.DELETED)`. Schedule in cron.
 3. **AD-003 (HIGH, mandatory):** Remove `AdStatus.ON_MODERATION_FAILED` from `active_statuses` in `_validate_max_ads_per_user()` (auto_moderation.py:195). Correct set: `[AdStatus.PUBLISHED, AdStatus.ON_MODERATION]`.
 4. **AD-004 (MEDIUM, mandatory):** Remove all `_fail_moderation(ad)` calls from `check()` in `auto_moderation.py:254-324`. Make `check()` purely read-only validation.

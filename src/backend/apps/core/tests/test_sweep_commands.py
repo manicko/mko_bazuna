@@ -595,3 +595,42 @@ class TestConcurrentSweep:
         assert prod_tx_idx < prod_lock_idx, (
             "send_alerts: transaction.atomic() must wrap advisory_lock()"
         )
+
+    def test_file_deletion_after_commit_not_inside_transaction(
+        self, seller, category, city, monkeypatch
+    ):
+        """delete_photo runs AFTER transaction.atomic() commits, not inside it.
+
+        If delete_photo were called inside the transaction, a filesystem
+        failure would trigger a DB rollback and the Ad rows would be restored.
+        When called after commit, the DB delete persists even if file deletion
+        raises — proving the filesystem side-effect is decoupled from the
+        transaction boundary.
+
+        Addresses the residual DB-001/DB-002 warning: filesystem deletions
+        inside transaction.atomic() cannot be rolled back, so a DB rollback
+        would orphan DB rows pointing to already-deleted files.
+        """
+        old = _make_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.ARCHIVED,
+            published_at=timezone.now() - timedelta(days=200),
+        )
+        AdImage.objects.create(ad=old, image="test-uuid.jpg")
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError("disk full")
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.delete_sweep.delete_photo",
+            _raise,
+        )
+
+        with pytest.raises(RuntimeError, match="disk full"):
+            call_command("delete_sweep")
+
+        # DB rows are gone despite the file-deletion failure -> proves
+        # delete_photo ran after the transaction committed.
+        assert not Ad.objects.filter(pk=old.pk).exists()

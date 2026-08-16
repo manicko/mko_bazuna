@@ -83,13 +83,15 @@ class Command(BaseCommand):
                 # Delete users - CASCADE will handle their ads (and ad_images via ORM)
                 deleted_count, _ = queryset.delete()
 
-                # Remove physical media files after ORM cascade
-                for storage_key in storage_keys:
-                    delete_photo(storage_key)
+        # Delete physical media after the transaction commits. Filesystem
+        # deletions inside transaction.atomic() cannot be rolled back, so a DB
+        # rollback would orphan DB rows pointing to already-deleted files.
+        for storage_key in storage_keys:
+            delete_photo(storage_key)
 
-                logger.info(
-                    "Hard-deleted %d users with consent revoked over 30 days ago. "
-                    "Removed %d media files.",
-                    deleted_count,
-                    len(storage_keys),
-                )
+        logger.info(
+            "Hard-deleted %d users with consent revoked over 30 days ago. "
+            "Removed %d media files.",
+            deleted_count,
+            len(storage_keys),
+        )
