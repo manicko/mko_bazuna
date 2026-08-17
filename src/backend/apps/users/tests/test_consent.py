@@ -173,7 +173,7 @@ class TestConsentWithdrawView:
     def test_withdraw_requires_authentication(self) -> None:
         """Anonymous users are redirected to login."""
         client = Client()
-        response = client.get("/consent/withdraw/")
+        response = client.post("/consent/withdraw/")
         assert response.status_code == 302
 
     def test_withdraw_triggers_user_soft_delete(
@@ -189,7 +189,7 @@ class TestConsentWithdrawView:
 
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/withdraw/")
+        response = client.post("/consent/withdraw/")
 
         assert response.status_code == 302
         assert response.url == "/dashboard/"
@@ -216,7 +216,7 @@ class TestConsentWithdrawView:
 
         client = Client()
         client.force_login(user)
-        client.get("/consent/withdraw/")
+        client.post("/consent/withdraw/")
 
         # Verify ads are soft-deleted
         ad1.refresh_from_db()
@@ -230,10 +230,22 @@ class TestConsentWithdrawView:
         """consent_withdraw sets the consent_given cookie to 'withdrawn'."""
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/withdraw/")
+        response = client.post("/consent/withdraw/")
 
         assert response.cookies.get("consent_given") is not None
         assert response.cookies["consent_given"].value == "withdrawn"
+
+    def test_withdraw_button_renders_on_dashboard(self, user: User) -> None:
+        """Authenticated users see the Withdraw Data button on the dashboard."""
+        client = Client()
+        client.force_login(user)
+        response = client.get("/dashboard/")
+
+        assert response.status_code == 200
+        # The Withdraw Data button is present in the response
+        assert b"Withdraw Data" in response.content
+        # The form posts to the consent withdrawal endpoint
+        assert b'action="/consent/withdraw/"' in response.content
 
 
 # ---------------------------------------------------------------------------

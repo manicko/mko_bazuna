@@ -27,6 +27,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
 
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
@@ -104,6 +105,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_POST
 def consent_withdraw(request: HttpRequest) -> HttpResponse:
     """
     Withdraw consent and trigger immediate soft-delete.
