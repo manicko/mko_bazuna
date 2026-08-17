@@ -155,7 +155,7 @@ minversion = "8.4"
 asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]
 pythonpath = ["src", "src/backend"]
-addopts = ["--import-mode=importlib","-ra", "-q"]
+addopts = ["--import-mode=importlib","-ra", "-q", "--cov", "--cov-report=term-missing"]
 console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning
 markers = [
@@ -165,6 +165,7 @@ markers = [
 
 # Coverage.py configuration (used by pytest-cov)
 [tool.coverage.run]
+branch = true
 source = ["src/backend", "src/telegram_bot"]
 omit = ["*/migrations/*", "*/tests/*", "*/test_*.py", "*/conftest.py", "*/manage.py", "*/wsgi.py", "*/asgi.py"]
 
