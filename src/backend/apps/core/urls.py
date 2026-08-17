@@ -7,4 +7,5 @@ app_name = "core"
 
 urlpatterns = [
     path("health/", views.health_check, name="health"),
+    path("csp-report/", views.csp_report, name="csp_report"),
 ]

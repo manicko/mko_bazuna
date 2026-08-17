@@ -252,7 +252,9 @@ start — and does not crash on missing commands — before the command modules 
 
 The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 
-- **Security headers (all responses):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; object-src 'none'`
+- **Security headers (all responses):** `Strict-Transport-Security` (HSTS, production only), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`
+- **Content-Security-Policy (Report-Only, Phase 1):** `Content-Security-Policy-Report-Only` is applied server-level so every response inherits it. Because nginx `add_header` inheritance drops inherited headers when a `location` block defines its own, it is re-declared in the `/static/` and `/protected-media/` blocks. The policy is content-appropriate (allows `script-src ... 'unsafe-inline'` and `style-src ... 'unsafe-inline'` to accommodate current templates). Report-Only mode means violations are collected but NOT enforced — zero rollout risk. Violation reports are POSTed to the Django endpoint at `/csp-report/` (`apps.core.views.csp_report`), which logs them for monitoring.
+- **Phase 2 (deferred):** Refactor templates to eliminate `'unsafe-inline'`, then switch `Content-Security-Policy-Report-Only` to an enforcing `Content-Security-Policy` with a stricter, content-appropriate policy.
 - **Script execution blocked:** `location ~* /media/.*\.(php|py|cgi|pl|sh)$ { deny all; return 403; }` in `/media/` location
 - **MIME whitelist:** Only `image/jpeg` served for `/media/` uploads; default `application/octet-stream`
 - **Media behavior:** `Content-Disposition: inline` for all media responses
