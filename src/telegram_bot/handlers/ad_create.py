@@ -15,7 +15,8 @@ from aiogram.fsm.state import StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from django.conf import settings
 
-from apps.ads.models import Ad, AdImage
+from apps.ads.models import Ad
+from apps.ads.services.images import AdImageService
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
 from apps.core.services.translation import translate_text
@@ -742,8 +743,8 @@ async def update_ad_and_moderate(
 
             # Create AdImage records with pre-generated thumbnails
             for photo in photos:
-                AdImage.objects.create(
-                    ad_id=ad_id,
+                AdImageService.create_or_skip(
+                    ad=ad,
                     image=photo["storage_key"],
                     telegram_file_id=photo["telegram_file_id"],
                     position=photo["position"],

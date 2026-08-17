@@ -7,10 +7,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
-    initial = True
-
     dependencies = [
-        ('ads', '0002_initial'),
+        ('ads', '0002_add_fks_and_search_triggers'),
         ('search', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('analytics', '0002_initial'),
+        ('analytics', '0002_add_user_fks_and_metrics'),
     ]
 
     operations = [

@@ -459,10 +459,11 @@ class AdImage(models.Model):
         return f"AdImage {self.id} for Ad {self.ad_id}"
 
     def save(self, *args, **kwargs) -> None:
-        """Override save to auto-compute SHA-256 on creation and skip duplicates.
+        """Auto-compute SHA-256 on creation if the underlying file exists.
 
-        If the same user already has an AdImage with the same SHA-256 hash,
-        the duplicate is not created (returns early).
+        Deduplication is intentionally **not** performed here — use
+        ``AdImageService.create_or_skip()`` for bot-uploaded photos so that
+        duplicate uploads by the same seller are detected and logged.
         """
         from apps.media.services.hash_service import FileHashService
 
@@ -474,21 +475,7 @@ class AdImage(models.Model):
                 file_path = str(media_root / self.image)
 
             if os.path.exists(file_path):
-                file_hash = FileHashService.calculate_sha256(file_path)
-                self.sha256 = file_hash
-
-                # Check for existing duplicate by same user
-                if self._state.adding and self.ad_id:
-                    user_id = Ad.objects.filter(id=self.ad_id).values_list(
-                        "user_id", flat=True
-                    ).first()
-                    if user_id:
-                        duplicate = AdImage.objects.filter(
-                            sha256=file_hash,
-                            ad__user_id=user_id,
-                        ).exclude(id=self.id).exists()
-                        if duplicate:
-                            return  # Skip duplicate
+                self.sha256 = FileHashService.calculate_sha256(file_path)
 
         super().save(*args, **kwargs)
 

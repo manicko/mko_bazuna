@@ -361,6 +361,23 @@ docker compose run --rm web uv run python src/backend/manage.py migrate --fake
 
 The `make consolidate` target does this for you automatically.
 
+### Renaming an already-applied migration
+
+When renaming a migration file that has **already been applied** to a
+database (e.g. `0002_initial.py` → `0002_add_fks_and_search_triggers.py`
+and removing the `initial = True` flag), Django's `django_migrations` table
+still records the old filename. After updating all cross-app
+`dependencies` tuples that referenced the old name, reconcile with:
+
+```bash
+docker compose run --rm web uv run python src/backend/manage.py migrate --fake
+```
+
+`--fake` marks the renamed migration as applied **without** re-executing its
+SQL. This is safe because only the filename and metadata changed, not the
+schema. On a fresh dev DB (e.g. `make test-recreate`) no `--fake` is needed —
+Django reads the new filename directly.
+
 ### Migration dependency cycle
 
 If `makemigrations` emits a circular-dependency error, inspect the generated graph:

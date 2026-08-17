@@ -50,8 +50,6 @@ CREATE TRIGGER on_category_name_update
 
 class Migration(migrations.Migration):
 
-    initial = True
-
     dependencies = [
         ('ads', '0001_initial'),
         ('lookups', '0001_initial'),
