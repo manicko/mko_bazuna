@@ -1,5 +1,5 @@
 # Base docker-compose.yml for Mko Bazuna
-# Services: db, migrate, web, bot, nginx, create_admin
+# Services: db, redis, migrate, web, bot, nginx, create_admin
 # Static served by whitenoise in image; media served by nginx from media_volume
 
 services:
@@ -16,6 +16,16 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER must be set} -d ${POSTGRES_DB:?POSTGRES_DB must be set}"]
       interval: 5s
       timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 5
 
   migrate:
@@ -128,6 +138,8 @@ services:
     depends_on:
       load_catalog:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     environment:
       - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
@@ -136,6 +148,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       - POSTGRES_HOST=db
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env.docker
     volumes:
@@ -152,6 +165,8 @@ services:
     depends_on:
       load_catalog:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     environment:
       - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
@@ -160,6 +175,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       - POSTGRES_HOST=db
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env.docker
     volumes:

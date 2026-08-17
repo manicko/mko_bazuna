@@ -48,9 +48,29 @@ wait_for_db() {
     exit 1
 }
 
+# Wait for Redis cache to be ready (only if REDIS_URL is configured)
+# Required in production for shared cache across gunicorn workers and the bot process.
+wait_for_redis() {
+    if [ -z "$REDIS_URL" ]; then
+        echo "No REDIS_URL configured, skipping Redis wait"
+        return 0
+    fi
+    echo "Waiting for Redis..."
+    for i in {1..15}; do
+        if /opt/venv/bin/python -c "import redis; redis.from_url('$REDIS_URL').ping()" 2>/dev/null; then
+            echo "Redis ready"
+            return 0
+        fi
+        sleep 1
+    done
+    echo "ERROR: Redis unavailable after 15s" >&2
+    exit 1
+}
+
 # Execute logic
 check_env_file
 fix_volume_permissions
 wait_for_db
+wait_for_redis
 
 exec "$@"

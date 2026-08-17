@@ -42,3 +42,10 @@ STORAGES = {  # noqa: F405
 PASSWORD_HASHERS = [  # noqa: F405
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+# Test uses in-process cache (no Redis needed for test suite).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}

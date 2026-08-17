@@ -216,8 +216,19 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "")
 # Format: hostname only, e.g., "analytics.example.com" or "plausible.io"
 PLAUSIBLE_HOST = os.getenv("PLAUSIBLE_HOST", "")
 
+# Cache configuration — shared cache via Redis (django-redis).
+# Production and Docker environments use Redis so that cache keys and rate-limit
+# counters are shared across gunicorn workers and the separate bot process.
+# Dev/test settings override CACHES to LocMemCache (no Redis dependency).
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
     }
 }
+
+# Redis connection URL (shared cache backend for web + bot processes).
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")

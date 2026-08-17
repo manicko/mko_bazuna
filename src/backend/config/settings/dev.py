@@ -35,3 +35,10 @@ SECURE_HSTS_PRELOAD = False
 # Proxy settings for nginx TLS termination in dev
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
+
+# Development uses in-process cache (no Redis needed).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
