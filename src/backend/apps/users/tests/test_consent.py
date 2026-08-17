@@ -209,7 +209,9 @@ class TestConsentWithdrawView:
         city: City,
     ) -> None:
         """consent_withdraw soft-deletes all user ads."""
-        ad1 = _create_ad(user, category, city, title="Published Ad", status=AdStatus.PUBLISHED)
+        ad1 = _create_ad(
+            user, category, city, title="Published Ad", status=AdStatus.PUBLISHED
+        )
         ad2 = _create_ad(user, category, city, title="Draft Ad", status=AdStatus.DRAFT)
 
         client = Client()

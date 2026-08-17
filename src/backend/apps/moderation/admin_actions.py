@@ -9,14 +9,15 @@ import logging
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.moderation.services.moderation_log import (
     log_ban_account,
-    log_manual_publish,
-    log_manual_reject,
     log_soft_delete,
+    set_published,
+    set_rejected,
 )
 from apps.users.models import User
-from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ def approve_ad(ad: Ad, moderator_id: int) -> None:
     Approve an ad for publication.
 
     Sets original_published_at on first publish (immutable audit field).
+    Delegates to set_published() which routes through transition_to(PUBLISHED)
+    and logs the action atomically.
 
     Args:
         ad: Ad instance to approve
@@ -34,26 +37,17 @@ def approve_ad(ad: Ad, moderator_id: int) -> None:
     if ad.status != AdStatus.ON_MODERATION:
         return
 
-    ad.status = AdStatus.PUBLISHED
-    ad.published_at = timezone.now()
-    ad.published_by_id = moderator_id
-
-    update_fields = ["status", "published_at", "published_by"]
-
-    # Set original_published_at once (immutable audit field)
-    if ad.original_published_at is None:
-        ad.original_published_at = ad.published_at
-        update_fields.append("original_published_at")
-
-    ad.save(update_fields=update_fields)
-
-    log_manual_publish(ad_id=ad.id, moderator_id=moderator_id)
+    set_published(ad, moderator_id=moderator_id)
     logger.info(f"Ad {ad.id} approved by moderator {moderator_id}")
 
 
 def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     """
     Reject an ad with reason.
+
+    Delegates to set_rejected() which routes through transition_to(REJECTED)
+    and logs the action atomically. The transition matrix enforces valid
+    source statuses: ON_MODERATION and ON_MODERATION_FAILED only.
 
     Args:
         ad: Ad instance to reject
@@ -63,17 +57,7 @@ def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     if ad.status == AdStatus.REJECTED:
         return
 
-    ad.status = AdStatus.REJECTED
-    ad.rejected_at = timezone.now()
-    ad.moderated_by_id = moderator_id
-    ad.save(update_fields=["status", "rejected_at", "moderated_by"])
-
-    log_manual_reject(
-        ad_id=ad.id,
-        user_id=ad.user_id,
-        moderator_id=moderator_id,
-        reason=reason,
-    )
+    set_rejected(ad, moderator_id=moderator_id, reason=reason)
     logger.info(f"Ad {ad.id} rejected by moderator {moderator_id}")
 
 
@@ -96,12 +80,17 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
             moderator_id=moderator_id,
             reason=reason,
         )
-        logger.info(f"User {user.telegram_id} banned by moderator {moderator_id}")
+        logger.info(
+            f"User {mask_telegram_id(user.telegram_id)} banned by moderator {moderator_id}"
+        )
 
 
 def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     """
     Soft delete an ad.
+
+    Routes through transition_to(DELETED) via the state machine driver.
+    The any->DELETED transition is always valid per the transition matrix.
 
     Args:
         ad: Ad instance to delete
@@ -111,16 +100,14 @@ def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     if ad.status == AdStatus.DELETED:
         return
 
-    ad.status = AdStatus.DELETED
-    ad.deleted_at = timezone.now()
-    ad.save(update_fields=["status", "deleted_at"])
-
-    log_soft_delete(
-        ad_id=ad.id,
-        user_id=ad.user_id,
-        moderator_id=moderator_id,
-        reason=reason,
-    )
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad.transition_to(AdStatus.DELETED)
+        log_soft_delete(
+            ad_id=ad.id,
+            user_id=ad.user_id,
+            moderator_id=moderator_id,
+            reason=reason,
+        )
     logger.info(f"Ad {ad.id} deleted by moderator {moderator_id}")
 
 
@@ -155,7 +142,9 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
         Number of ads rejected
     """
     count = 0
-    for ad in queryset.filter(status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]):
+    for ad in queryset.filter(
+        status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]
+    ):
         if ad.status != AdStatus.REJECTED:
             reject_ad(ad, moderator_id, reason)
             count += 1

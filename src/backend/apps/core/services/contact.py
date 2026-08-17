@@ -10,6 +10,7 @@ import logging
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -146,4 +147,6 @@ def record_contact_response(seller_telegram_id: int) -> None:
         )
         logger.info("Contact response event recorded for seller %s", user.id)
     except User.DoesNotExist:
-        logger.warning("Seller not found for telegram_id %s", seller_telegram_id)
+        logger.warning(
+            "Seller not found for telegram_id %s", mask_telegram_id(seller_telegram_id)
+        )

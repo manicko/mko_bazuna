@@ -216,3 +216,25 @@ class TestCreateAdminUser:
 
         assert User.objects.filter(username="rerunadmin").count() == 1
         assert "already exists, skipping" in out2.getvalue()
+
+    def test_command_dry_run_does_not_leak_telegram_id(self, caplog) -> None:
+        """Dry-run mode must not leak raw telegram_id in stdout or caplog."""
+        telegram_id = 999888777
+        out = StringIO()
+        with caplog.at_level("INFO"):
+            call_command(
+                "create_admin_user",
+                username="leaktest",
+                password="testpass123",
+                telegram_id=telegram_id,
+                dry_run=True,
+                stdout=out,
+            )
+
+        stdout_output = out.getvalue()
+        # Raw telegram_id must not appear in stdout
+        assert str(telegram_id) not in stdout_output
+        # Masked value should be present for log correlation
+        assert "tg_" in stdout_output
+        # Raw telegram_id must not appear in any log output
+        assert str(telegram_id) not in caplog.text

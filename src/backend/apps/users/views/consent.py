@@ -28,8 +28,14 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
-from apps.users.services import can_login, decline_consent, give_consent, withdraw_consent
+from apps.users.services import (
+    can_login,
+    decline_consent,
+    give_consent,
+    withdraw_consent,
+)
 from apps.users.services.login_rate_limit import login_rate_limit_check
 
 logger = logging.getLogger(__name__)
@@ -251,18 +257,24 @@ def login_status(request: HttpRequest) -> HttpResponse:
             # Race condition — another request already consumed it
             return HttpResponse(status=410)
 
-    logger.info(f"Login token {token_hash[:8]} consumed by telegram_id={token.telegram_id}")
+    logger.info(
+        f"Login token {token_hash[:8]} consumed by telegram_id={mask_telegram_id(token.telegram_id)}"
+    )
 
     # Look up the user by telegram_id
     try:
         user = User.objects.get(telegram_id=token.telegram_id)
     except User.DoesNotExist:
-        logger.error(f"User not found for telegram_id={token.telegram_id}")
+        logger.error(
+            f"User not found for telegram_id={mask_telegram_id(token.telegram_id)}"
+        )
         return HttpResponse(status=410)
 
     # Check if user is banned
     if not can_login(user):
-        logger.warning(f"Login denied for telegram_id={token.telegram_id}: banned")
+        logger.warning(
+            f"Login denied for telegram_id={mask_telegram_id(token.telegram_id)}: banned"
+        )
         return HttpResponse(status=410)
 
     # Establish web session
@@ -270,6 +282,8 @@ def login_status(request: HttpRequest) -> HttpResponse:
     # so an explicit cycle_key() here would be redundant.
     auth_login(request, user)
 
-    logger.info(f"Web session established for user {user.id} (telegram_id={token.telegram_id})")
+    logger.info(
+        f"Web session established for user {user.id} (telegram_id={mask_telegram_id(token.telegram_id)})"
+    )
 
     return HttpResponse(status=200)

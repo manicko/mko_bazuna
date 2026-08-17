@@ -17,6 +17,7 @@ from django.contrib.auth import get_user_model
 
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
+from apps.core.utils.sanitize import mask_telegram_id
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,9 @@ class Command(BaseCommand):
 
         # Validate password is not empty
         if not password or not password.strip():
-            raise CommandError("Password cannot be empty. Please provide a valid password.")
+            raise CommandError(
+                "Password cannot be empty. Please provide a valid password."
+            )
 
         User = get_user_model()
 
@@ -72,26 +75,32 @@ class Command(BaseCommand):
         with advisory_lock(AdvisoryLockId.CREATE_ADMIN, session=True):
             # Idempotent: skip if user already exists
             if User.objects.filter(telegram_id=telegram_id).exists():
-                self.stdout.write(self.style.WARNING(
-                    f"Admin user with telegram_id={telegram_id} already exists, skipping"
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Admin user with telegram_id={mask_telegram_id(telegram_id)} already exists, skipping"
+                    )
+                )
                 return
 
             if User.objects.filter(username=username).exists():
-                self.stdout.write(self.style.WARNING(
-                    f"User with username='{username}' already exists, skipping"
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"User with username='{username}' already exists, skipping"
+                    )
+                )
                 return
 
             if dry_run:
-                self.stdout.write(self.style.WARNING(
-                    f"DRY RUN: Would create admin user:\n"
-                    f"  username: {username}\n"
-                    f"  telegram_id: {telegram_id}\n"
-                    f"  email: {email}\n"
-                    f"  is_staff: True\n"
-                    f"  is_superuser: True"
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"DRY RUN: Would create admin user:\n"
+                        f"  username: {username}\n"
+                        f"  telegram_id: {mask_telegram_id(telegram_id)}\n"
+                        f"  email: {email}\n"
+                        f"  is_staff: True\n"
+                        f"  is_superuser: True"
+                    )
+                )
                 return
 
             # Create the admin user
@@ -106,11 +115,17 @@ class Command(BaseCommand):
             user.set_password(password)
             user.save()
 
-            logger.info("Admin user created: %s (telegram_id=%s)", username, telegram_id)
-            self.stdout.write(self.style.SUCCESS(
-                f"Admin user created:\n"
-                f"  username: {username}\n"
-                f"  telegram_id: {telegram_id}\n"
-                f"  is_staff: True\n"
-                f"  is_superuser: True"
-            ))
+            logger.info(
+                "Admin user created: %s (telegram_id=%s)",
+                username,
+                mask_telegram_id(telegram_id),
+            )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Admin user created:\n"
+                    f"  username: {username}\n"
+                    f"  telegram_id: {mask_telegram_id(telegram_id)}\n"
+                    f"  is_staff: True\n"
+                    f"  is_superuser: True"
+                )
+            )

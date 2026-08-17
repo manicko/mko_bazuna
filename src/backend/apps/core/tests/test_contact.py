@@ -8,7 +8,7 @@ import pytest
 from telegram_bot.handlers.contact import CONTACT_PATTERN
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from apps.core.services.contact import can_contact_seller
+from apps.core.services.contact import can_contact_seller, record_contact_response
 from apps.users.models import User
 from django.utils import timezone
 
@@ -49,6 +49,30 @@ def city():
     )
 
 
+def _set_status_timestamp(data, now=None):
+    """Auto-populate timestamp fields matching the ad status."""
+    from django.utils import timezone
+    from apps.core.enums import AdStatus
+
+    if now is None:
+        now = timezone.now()
+    status = data.get("status")
+    if status == AdStatus.PUBLISHED:
+        data.setdefault("published_at", now)
+        data.setdefault("original_published_at", now)
+    elif status == AdStatus.ARCHIVED:
+        data.setdefault("archived_at", now)
+        data.setdefault("published_at", now)
+        data.setdefault("original_published_at", now)
+    elif status == AdStatus.REJECTED:
+        data.setdefault("rejected_at", now)
+    elif status == AdStatus.ON_MODERATION_FAILED:
+        data.setdefault("moderation_failed_at", now)
+    elif status == AdStatus.DELETED:
+        data.setdefault("deleted_at", now)
+    return data
+
+
 def _make_ad(seller, category, city, **kwargs) -> Ad:
     """Create an Ad with required FK fields, overriding any kwargs."""
     defaults = {
@@ -61,6 +85,7 @@ def _make_ad(seller, category, city, **kwargs) -> Ad:
         "status": AdStatus.PUBLISHED,
     }
     defaults.update(kwargs)
+    _set_status_timestamp(defaults)
     return Ad.objects.create(**defaults)
 
 
@@ -162,3 +187,17 @@ class TestContactPattern:
         match = CONTACT_PATTERN.match("contact_456")
         assert match is not None
         assert int(match.group(1)) == 456
+
+
+class TestContactResponseNoPii:
+    """Tests that record_contact_response does not leak raw telegram_id in logs (PII-002)."""
+
+    def test_contact_no_seller_no_pii_in_log(self, caplog) -> None:
+        """Calling record_contact_response with non-existent seller must not log raw telegram_id."""
+        with caplog.at_level("WARNING"):
+            record_contact_response(seller_telegram_id=999999)
+
+        # Raw telegram_id must not appear in any log output
+        assert "999999" not in caplog.text
+        # Masked value should be present for log correlation
+        assert "tg_" in caplog.text
