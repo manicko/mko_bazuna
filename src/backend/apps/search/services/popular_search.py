@@ -24,7 +24,7 @@ def increment_popular_search(query: str) -> None:
     Atomically increment the hit count for a normalized search query.
 
     Strips leading/trailing whitespace and lowercases the query for
-    normalization.  Uses ``update_or_create`` for the initial insert and
+    normalization.  Uses ``get_or_create`` for the initial insert and
     an ``F()`` expression for a race-safe increment on subsequent calls.
 
     Args:
@@ -34,7 +34,7 @@ def increment_popular_search(query: str) -> None:
     if not normalized:
         return
 
-    obj, created = PopularSearch.objects.update_or_create(
+    obj, created = PopularSearch.objects.get_or_create(
         query_normalized=normalized,
         defaults={"query": query, "hit_count": 1},
     )
