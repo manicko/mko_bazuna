@@ -68,6 +68,29 @@ def _make_city(slug: str = "svc-test-city") -> City:
     )
 
 
+def _set_status_timestamp(data, now=None):
+    """Auto-populate timestamp fields matching the ad status."""
+    from django.utils import timezone
+
+    if now is None:
+        now = timezone.now()
+    status = data.get("status")
+    if status == AdStatus.PUBLISHED:
+        data.setdefault("published_at", now)
+        data.setdefault("original_published_at", now)
+    elif status == AdStatus.ARCHIVED:
+        data.setdefault("archived_at", now)
+        data.setdefault("published_at", now)
+        data.setdefault("original_published_at", now)
+    elif status == AdStatus.REJECTED:
+        data.setdefault("rejected_at", now)
+    elif status == AdStatus.ON_MODERATION_FAILED:
+        data.setdefault("moderation_failed_at", now)
+    elif status == AdStatus.DELETED:
+        data.setdefault("deleted_at", now)
+    return data
+
+
 def _make_ad(
     user: User,
     category: Category,
@@ -90,6 +113,7 @@ def _make_ad(
         "source": AdSource.TELEGRAM,
     }
     defaults.update(overrides)
+    _set_status_timestamp(defaults)
     return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
 
@@ -526,4 +550,64 @@ class TestBulkModerationActionView(TestCase):
         data = response.json()
         self.assertEqual(data["completed"], 0)
         self.assertEqual(len(data["errors"]), 1)
-        self.assertIn("unknown", data["errors"][0]["error"].lower())
+        self.assertEqual(data["errors"][0]["error"], "Processing failed")
+
+    # ── Finding 01: approve_ad enforces POST-only ─────────────────────────
+
+    def test_approve_ad_get_returns_405(self) -> None:
+        """GET to approve_ad endpoint returns 405 Method Not Allowed."""
+        ad = _make_ad(self.user, self.category, self.city)
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(f"/moderation/approve/{ad.id}/")
+
+        self.assertEqual(response.status_code, 405)
+        # Ad should remain in original status
+        ad.refresh_from_db()
+        self.assertEqual(ad.status, AdStatus.ON_MODERATION)
+
+    # ── Finding 02: bulk API guards against malformed JSON ─────────────────
+
+    def test_malformed_json_body_returns_400(self) -> None:
+        """POST with malformed JSON body returns 400 with error message."""
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.bulk_url,
+            data="not-json",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "Invalid JSON in request body")
+
+    def test_empty_body_returns_400(self) -> None:
+        """POST with empty body returns 400 with error message."""
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.bulk_url,
+            data="",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data["error"], "Invalid JSON in request body")
+
+    # ── Finding 14: bulk API sanitizes error messages ──────────────────────
+
+    def test_error_messages_sanitized(self) -> None:
+        """Error messages returned to client are sanitized, not raw exceptions."""
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.bulk_url,
+            data=json.dumps({"action": "approve", "selected_items": [99999]}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["completed"], 0)
+        self.assertEqual(len(data["errors"]), 1)
+        self.assertEqual(data["errors"][0]["id"], 99999)
+        self.assertEqual(data["errors"][0]["error"], "Processing failed")

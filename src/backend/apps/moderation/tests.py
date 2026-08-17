@@ -319,18 +319,19 @@ class TestApproveAdView:
             seller: User,
             category: Category,
             city: City,
-        ) -> None:
-            """GET to approve_ad redirects (view does not check method)."""
+    ) -> None:
+            """GET to approve_ad returns 405 Method Not Allowed."""
             ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
             client = Client()
             client.force_login(staff_user)
-            client.get(f"/moderation/approve/{ad.id}/")
+            response = client.get(f"/moderation/approve/{ad.id}/")
 
-            # The view does not check method, so GET will still work
-            # But the ad should still be approved
+            # @require_POST ensures GET returns 405 and the ad is not modified
+            assert response.status_code == 405
+
             ad.refresh_from_db()
-            assert ad.status == AdStatus.PUBLISHED
+            assert ad.status == AdStatus.ON_MODERATION
 
     def test_approve_non_moderation_ad_returns_404(
         self,

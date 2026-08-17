@@ -33,7 +33,11 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
             "errors": [{"id": 5, "error": "..."}]
         }
     """
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        logger.warning("Invalid JSON in bulk moderation request body")
+        return JsonResponse({"error": "Invalid JSON in request body"}, status=400)
     action = data.get("action", "")
     ad_ids: list[int] = data.get("selected_items", [])
     reason: str = data.get("reason", "")
@@ -54,8 +58,9 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
 
             results["completed"] += 1  # type: ignore[operator]
         except Exception as e:
+            logger.error("Bulk moderation failed for ad %s: %s", ad_id, e)
             errors = results.get("errors", [])
-            errors.append({"id": ad_id, "error": str(e)})
-            results["errors"] = errors  # type: ignore[assignment]
+            errors.append({"id": ad_id, "error": "Processing failed"})
+            results["errors"] = errors
 
     return JsonResponse(results)

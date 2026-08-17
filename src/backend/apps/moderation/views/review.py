@@ -11,6 +11,7 @@ from apps.core.enums import AdStatus
 from apps.moderation.views.decorators import staff_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
     return render(request, "admin/moderation/review.html", context)
 
 
+@require_POST
 @staff_required
 def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
