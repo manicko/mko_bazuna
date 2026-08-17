@@ -11,6 +11,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from apps.ads.models import Ad
+from apps.analytics.services.trust_analytics import record_trust_event
 from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerTrustScore
 
@@ -73,15 +74,18 @@ class TrustCalculator:
             trust_score.ad_count_active = self._count_active_ads(user)
             trust_score.rejection_rate = self._calculate_rejection_rate(user)
             trust_score.contact_response_rate = response_score
-            trust_score.save(update_fields=[
-                "trust_level",
-                "score",
-                "ad_count_lifetime",
-                "ad_count_active",
-                "rejection_rate",
-                "contact_response_rate",
-            ])
+            trust_score.save(
+                update_fields=[
+                    "trust_level",
+                    "score",
+                    "ad_count_lifetime",
+                    "ad_count_active",
+                    "rejection_rate",
+                    "contact_response_rate",
+                ]
+            )
             logger.info("Updated trust score for user %s", user.id)
+        record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
 
         return trust_score
 
@@ -115,11 +119,7 @@ class TrustCalculator:
         Returns:
             Quality score in range 0-QUALITY_MAX.
         """
-        total = (
-            Ad.objects.filter(user=user)
-            .exclude(status=AdStatus.DRAFT)
-            .count()
-        )
+        total = Ad.objects.filter(user=user).exclude(status=AdStatus.DRAFT).count()
         rejected = Ad.objects.filter(
             user=user,
             status__in=[AdStatus.REJECTED, AdStatus.ON_MODERATION_FAILED],
@@ -165,11 +165,7 @@ class TrustCalculator:
         Returns:
             Rejection rate as a float percentage (0.0-100.0).
         """
-        total = (
-            Ad.objects.filter(user=user)
-            .exclude(status=AdStatus.DRAFT)
-            .count()
-        )
+        total = Ad.objects.filter(user=user).exclude(status=AdStatus.DRAFT).count()
         rejected = Ad.objects.filter(
             user=user,
             status__in=[AdStatus.REJECTED, AdStatus.ON_MODERATION_FAILED],
@@ -187,11 +183,7 @@ class TrustCalculator:
         Returns:
             Total non-draft ad count.
         """
-        return (
-            Ad.objects.filter(user=user)
-            .exclude(status=AdStatus.DRAFT)
-            .count()
-        )
+        return Ad.objects.filter(user=user).exclude(status=AdStatus.DRAFT).count()
 
     def _count_active_ads(self, user: User) -> int:
         """Count currently published ads for active metric.

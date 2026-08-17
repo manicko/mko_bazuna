@@ -80,7 +80,9 @@ def _make_ad(
     return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
 
-def _make_verification(user: User, *, verified_by_admin: bool = False) -> SellerVerification:
+def _make_verification(
+    user: User, *, verified_by_admin: bool = False
+) -> SellerVerification:
     """Create a SellerVerification for the given user."""
     return SellerVerification.objects.create(
         user=user,
@@ -611,3 +613,28 @@ class TestTrustCalculator(TestCase):
         self.assertEqual(score2.score, 35)  # 5 + 30 + 0
         self.assertEqual(score2.ad_count_lifetime, 1)
         self.assertEqual(score2.ad_count_active, 1)
+
+    # ── test_calculate_and_save_records_trust_event ────────────────────────
+
+    def test_calculate_and_save_records_trust_event(self) -> None:
+        """calculate_and_save records a TRUST_LEVEL_UPDATED analytics event."""
+        user = _make_user(telegram_id=990027001)
+        self._score(user)
+
+        events = AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.TRUST_LEVEL_UPDATED,
+            user_id=user.id,
+        )
+        self.assertEqual(events.count(), 1)
+
+    def test_calculate_and_save_records_on_update(self) -> None:
+        """Calling calculate_and_save twice records two TRUST_LEVEL_UPDATED events."""
+        user = _make_user(telegram_id=990028001)
+        self._score(user)
+        self._score(user)
+
+        events = AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.TRUST_LEVEL_UPDATED,
+            user_id=user.id,
+        )
+        self.assertEqual(events.count(), 2)
