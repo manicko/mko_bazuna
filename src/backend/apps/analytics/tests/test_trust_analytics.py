@@ -147,7 +147,9 @@ class TestCalculateSellerTrustScore(TestCase):
         # 6 rejected ads → -60, floor at 0 (base 50 - 60 = -10 → 0)
         for i in range(6):
             _make_ad(
-                user, self.category, self.city,
+                user,
+                self.category,
+                self.city,
                 title=f"Rej Ad {i}",
                 status=AdStatus.REJECTED,
             )
@@ -165,7 +167,9 @@ class TestCalculateSellerTrustScore(TestCase):
         # 2 rejected ads → -20
         for i in range(2):
             _make_ad(
-                user, self.category, self.city,
+                user,
+                self.category,
+                self.city,
                 title=f"Rej {i}",
                 status=AdStatus.REJECTED,
             )
@@ -199,7 +203,9 @@ class TestCalculateSellerTrustScore(TestCase):
         # Many rejected ads
         for i in range(20):
             _make_ad(
-                user, self.category, self.city,
+                user,
+                self.category,
+                self.city,
                 title=f"Rej {i}",
                 status=AdStatus.REJECTED,
             )
@@ -294,7 +300,7 @@ class TestRecordTrustEvent(TestCase):
         self.assertEqual(events.count(), 1)
         event = events.first()
         assert event is not None
-        self.assertEqual(event.event_type, AnalyticsEventType.SELLER_VERIFIED.value)
+        self.assertEqual(event.event_type, AnalyticsEventType.SELLER_VERIFIED)
 
     def test_creates_event_without_ad(self) -> None:
         """Trust events are created without an associated ad."""
@@ -316,11 +322,11 @@ class TestRecordTrustEvent(TestCase):
         assert events[1] is not None
         self.assertEqual(
             events[0].event_type,
-            AnalyticsEventType.SELLER_VERIFIED.value,
+            AnalyticsEventType.SELLER_VERIFIED,
         )
         self.assertEqual(
             events[1].event_type,
-            AnalyticsEventType.TRUST_LEVEL_UPDATED.value,
+            AnalyticsEventType.TRUST_LEVEL_UPDATED,
         )
 
 

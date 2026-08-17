@@ -163,7 +163,7 @@ class TestRollupDailyMetrics(TestCase):
         assert cls.ad1.id is not None
         AnalyticsEvent.objects.create(
             ad=cls.ad1,
-            event_type=AnalyticsEventType.AD_VIEWED.value,
+            event_type=AnalyticsEventType.AD_VIEWED,
             timestamp=today_event_ts,
         )
 

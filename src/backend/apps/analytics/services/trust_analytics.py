@@ -97,13 +97,13 @@ def record_trust_event(user_id: int, event: AnalyticsEventType) -> None:
         event: The type of trust event to record.
     """
     AnalyticsEvent.objects.create(
-        event_type=event.value,
+        event_type=event,
         user_id=user_id,
     )
     logger.info(
         "Trust event recorded: user=%s event=%s",
         user_id,
-        event.value,
+        event,
     )
 
 

@@ -46,9 +46,9 @@ class Command(BaseCommand):
                 logger.info("Rolling up analytics events for %s", yesterday)
 
                 event_types = [
-                    AnalyticsEventType.AD_VIEWED.value,
-                    AnalyticsEventType.CONTACT_INITIATED.value,
-                    AnalyticsEventType.CONTACT_COMPLETED.value,
+                    AnalyticsEventType.AD_VIEWED,
+                    AnalyticsEventType.CONTACT_INITIATED,
+                    AnalyticsEventType.CONTACT_COMPLETED,
                 ]
 
                 aggregated = (
@@ -61,14 +61,14 @@ class Command(BaseCommand):
                     .annotate(
                         views=Count(
                             "id",
-                            filter=Q(event_type=AnalyticsEventType.AD_VIEWED.value),
+                            filter=Q(event_type=AnalyticsEventType.AD_VIEWED),
                         ),
                         contacts=Count(
                             "id",
                             filter=Q(
                                 event_type__in=[
-                                    AnalyticsEventType.CONTACT_INITIATED.value,
-                                    AnalyticsEventType.CONTACT_COMPLETED.value,
+                                    AnalyticsEventType.CONTACT_INITIATED,
+                                    AnalyticsEventType.CONTACT_COMPLETED,
                                 ]
                             ),
                         ),
