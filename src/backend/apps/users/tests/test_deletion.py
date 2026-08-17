@@ -8,7 +8,12 @@ import hashlib
 
 import pytest
 from apps.users.models import LoginToken, User
-from apps.users.services.deletion import decline_consent, give_consent, withdraw_consent
+from apps.users.services.deletion import (
+    decline_consent,
+    give_consent,
+    soft_delete_user_ads,
+    withdraw_consent,
+)
 from django.utils import timezone
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
@@ -153,6 +158,7 @@ class TestWithdrawConsentSoftDeletesAds:
             city=city,
             category_name=category.name,
             status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
         )
         ad2 = Ad.objects.create(
             user=user,
@@ -196,3 +202,140 @@ class TestGiveConsent:
         assert user.consent_revoked_at is None
         assert user.telegram_id is not None
         assert user.username is None  # default for test fixture
+
+
+class TestWithdrawConsentAtomicity:
+    """Tests for transaction.atomic() wrapping in withdraw_consent (PII-008)."""
+
+    def test_withdraw_is_atomic_rollback(self, user: User, monkeypatch):
+        """If soft_delete_user_ads raises, the entire transaction rolls back.
+
+        LoginTokens and user PII must be fully restored when an error occurs
+        inside the transaction boundary.
+        """
+        now = timezone.now()
+        token = LoginToken.objects.create(
+            token_hash="hash_rollback",
+            telegram_id=user.telegram_id,
+            expires_at=now + timezone.timedelta(hours=1),
+        )
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError("simulated DB error in soft_delete_user_ads")
+
+        monkeypatch.setattr(
+            "apps.users.services.deletion.soft_delete_user_ads",
+            _raise,
+        )
+
+        with pytest.raises(RuntimeError, match="simulated DB error"):
+            withdraw_consent(user)
+
+        # LoginTokens restored — transaction rolled back
+        assert LoginToken.objects.filter(pk=token.pk).exists()
+        # User NOT soft-deleted — PII and flags rolled back
+        user.refresh_from_db()
+        assert user.is_deleted is False
+        assert user.telegram_id == 900000001  # not nulled
+        assert user.consent_revoked_at is None
+
+    def test_withdraw_returns_storage_keys(self, user: User, monkeypatch):
+        """withdraw_consent returns list[str] of DRAFT-ad storage keys."""
+        from apps.ads.models import Ad, AdImage
+        from apps.categories.models import Category
+        from apps.core.enums import AdStatus
+        from apps.locations.models import City
+
+        category = Category.objects.create(name="Test Category", slug="test-category")
+        city = City.objects.create(
+            country_code="ME",
+            name="Test City",
+            region="Test Region",
+            slug="test-city",
+        )
+
+        draft_ad = Ad.objects.create(
+            user=user,
+            title="Draft Ad",
+            description="Description",
+            category=category,
+            city=city,
+            category_name=category.name,
+            status=AdStatus.DRAFT,
+        )
+        AdImage.objects.create(ad=draft_ad, image="test-draft-key.jpg")
+
+        deleted_keys: list[str] = []
+
+        def _spy(key: str) -> None:
+            deleted_keys.append(key)
+
+        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+
+        result = withdraw_consent(user)
+
+        assert isinstance(result, list)
+        assert all(isinstance(k, str) for k in result)
+        assert "test-draft-key.jpg" in result
+        # delete_photo called with the same keys after transaction commits
+        assert deleted_keys == result
+
+    def test_withdraw_idempotent(self, user: User):
+        """Calling withdraw_consent twice returns [] on second call, no extra deletions."""
+        now = timezone.now()
+        token = LoginToken.objects.create(
+            token_hash="hash_idempotent",
+            telegram_id=user.telegram_id,
+            expires_at=now + timezone.timedelta(hours=1),
+        )
+
+        withdraw_consent(user)
+        assert user.is_deleted is True
+        # Token deleted by first call (inside transaction)
+        assert not LoginToken.objects.filter(pk=token.pk).exists()
+
+        second = withdraw_consent(user)
+        assert second == []
+        # No extra token deletion on second call (already gone)
+        assert not LoginToken.objects.filter(pk=token.pk).exists()
+
+    def test_soft_delete_user_ads_returns_keys_not_count(self, user: User, monkeypatch):
+        """soft_delete_user_ads is DB-only: returns list[str], never calls delete_photo."""
+        from apps.ads.models import Ad, AdImage
+        from apps.categories.models import Category
+        from apps.core.enums import AdStatus
+        from apps.locations.models import City
+
+        category = Category.objects.create(name="Test Category", slug="test-category")
+        city = City.objects.create(
+            country_code="ME",
+            name="Test City",
+            region="Test Region",
+            slug="test-city",
+        )
+
+        draft_ad = Ad.objects.create(
+            user=user,
+            title="Draft Ad",
+            description="Description",
+            category=category,
+            city=city,
+            category_name=category.name,
+            status=AdStatus.DRAFT,
+        )
+        AdImage.objects.create(ad=draft_ad, image="orphan-key.jpg")
+
+        called: list[str] = []
+
+        def _spy(key: str) -> None:
+            called.append(key)
+
+        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+
+        result = soft_delete_user_ads(user)
+
+        assert isinstance(result, list)
+        assert all(isinstance(k, str) for k in result)
+        assert "orphan-key.jpg" in result
+        # delete_photo must NOT be called by soft_delete_user_ads (DB-only)
+        assert called == []
