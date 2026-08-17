@@ -4,11 +4,18 @@ Tests for contact service render conditions (zone R2).
 Tests the real can_contact_seller predicate using persisted User+Ad fixtures.
 """
 
+from types import SimpleNamespace
+
 import pytest
 from telegram_bot.handlers.contact import CONTACT_PATTERN
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from apps.core.services.contact import can_contact_seller, record_contact_response
+from apps.core.services.contact import (
+    _check_seller_contactable,
+    can_contact_seller,
+    get_seller_for_contact,
+    record_contact_response,
+)
 from apps.users.models import User
 from django.utils import timezone
 
@@ -201,3 +208,110 @@ class TestContactResponseNoPii:
         assert "999999" not in caplog.text
         # Masked value should be present for log correlation
         assert "tg_" in caplog.text
+
+
+class TestCheckSellerContactable:
+    """Direct unit tests for the _check_seller_contactable predicate (zone R2).
+
+    Happy path plus each of the 6 conditions failing -> False.
+    """
+
+    def test_all_conditions_met_returns_true(self, seller, category, city):
+        """All 6 conditions satisfied -> predicate returns True."""
+        ad = _make_ad(seller, category, city)
+        assert _check_seller_contactable(ad, seller) is True
+
+    @pytest.mark.parametrize(
+        "status",
+        [AdStatus.DRAFT, AdStatus.ON_MODERATION, AdStatus.ARCHIVED, AdStatus.REJECTED],
+    )
+    def test_ad_not_published_returns_false(self, seller, category, city, status):
+        """ad.status != PUBLISHED -> predicate returns False."""
+        ad = _make_ad(seller, category, city, status=status)
+        assert _check_seller_contactable(ad, seller) is False
+
+    def test_seller_is_none_returns_false(self):
+        """seller is None -> predicate returns False (defensive)."""
+        ad = SimpleNamespace(status=AdStatus.PUBLISHED)
+        assert _check_seller_contactable(ad, None) is False
+
+    def test_telegram_id_none_returns_false(self):
+        """seller with telegram_id is None -> predicate returns False."""
+        ad = SimpleNamespace(status=AdStatus.PUBLISHED)
+        seller = SimpleNamespace(
+            telegram_id=None,
+            is_deleted=False,
+            is_banned=False,
+            consent_revoked_at=None,
+        )
+        assert _check_seller_contactable(ad, seller) is False
+
+    def test_seller_deleted_returns_false(self, seller, category, city):
+        """seller.is_deleted -> predicate returns False."""
+        seller.is_deleted = True
+        seller.save(update_fields=["is_deleted"])
+        ad = _make_ad(seller, category, city)
+        assert _check_seller_contactable(ad, seller) is False
+
+    def test_seller_banned_returns_false(self, seller, category, city):
+        """seller.is_banned -> predicate returns False."""
+        seller.is_banned = True
+        seller.save(update_fields=["is_banned"])
+        ad = _make_ad(seller, category, city)
+        assert _check_seller_contactable(ad, seller) is False
+
+    def test_consent_revoked_returns_false(self, seller, category, city):
+        """seller.consent_revoked_at set -> predicate returns False."""
+        seller.consent_revoked_at = timezone.now()
+        seller.save(update_fields=["consent_revoked_at"])
+        ad = _make_ad(seller, category, city)
+        assert _check_seller_contactable(ad, seller) is False
+
+
+class TestGetSellerForContactIntegration:
+    """Integration tests for get_seller_for_contact delegating to the predicate.
+
+    Returns (True, seller) on the happy path and (False, None) per violation
+    (plus the ad-not-found case handled before the predicate runs).
+    """
+
+    def test_returns_seller_when_contactable(self, seller, category, city):
+        """Published ad + contactable seller -> (True, seller)."""
+        ad = _make_ad(seller, category, city)
+        assert get_seller_for_contact(ad.id) == (True, seller)
+
+    def test_returns_false_none_when_ad_not_found(self):
+        """Non-existent ad id -> (False, None)."""
+        assert get_seller_for_contact(999999) == (False, None)
+
+    @pytest.mark.parametrize(
+        "status",
+        [AdStatus.DRAFT, AdStatus.ON_MODERATION, AdStatus.ARCHIVED, AdStatus.REJECTED],
+    )
+    def test_returns_false_none_when_not_published(
+        self, seller, category, city, status
+    ):
+        """Non-PUBLISHED ad -> (False, None)."""
+        ad = _make_ad(seller, category, city, status=status)
+        assert get_seller_for_contact(ad.id) == (False, None)
+
+    def test_returns_false_none_when_seller_deleted(self, seller, category, city):
+        """Deleted seller -> (False, None)."""
+        seller.is_deleted = True
+        seller.save(update_fields=["is_deleted"])
+        ad = _make_ad(seller, category, city)
+        assert get_seller_for_contact(ad.id) == (False, None)
+
+    def test_returns_false_none_when_seller_banned(self, seller, category, city):
+        """Banned seller -> (False, None)."""
+        seller.is_banned = True
+        seller.save(update_fields=["is_banned"])
+        ad = _make_ad(seller, category, city)
+        assert get_seller_for_contact(ad.id) == (False, None)
+
+    def test_returns_false_none_when_consent_revoked(self, seller, category, city):
+        """Consent revoked -> (False, None)."""
+        seller.consent_revoked_at = timezone.now()
+        seller.save(update_fields=["consent_revoked_at"])
+        ad = _make_ad(seller, category, city)
+        assert get_seller_for_contact(ad.id) == (False, None)

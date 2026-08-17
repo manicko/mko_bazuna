@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 # - seller.consent_revoked_at IS NULL
 
 
+def _check_seller_contactable(ad: Ad, seller: User | None) -> bool:
+    """Return True only when the ad is published and the seller is contactable.
+
+    Encapsulates the Zone R2 render conditions shared by can_contact_seller
+    and get_seller_for_contact so the condition chain exists in one place.
+    """
+    if ad.status != AdStatus.PUBLISHED:
+        return False
+    if seller is None:
+        return False
+    if seller.telegram_id is None:
+        return False
+    if seller.is_deleted:
+        return False
+    if seller.is_banned:
+        return False
+    if seller.consent_revoked_at is not None:
+        return False
+    return True
+
+
 def can_contact_seller(ad: Ad) -> bool:
     """
     Check if contact button should render for an ad (zone R2 conditions).
@@ -41,26 +62,10 @@ def can_contact_seller(ad: Ad) -> bool:
     Returns:
         True if contact button should render, False otherwise.
     """
-    if ad.status != AdStatus.PUBLISHED:
-        return False
-
+    # Callers must `select_related("user")` on the ad; this predicate
+    # only consumes the already-loaded relation to avoid N+1 queries.
     seller = ad.user
-    if seller is None:
-        return False
-
-    if seller.telegram_id is None:
-        return False
-
-    if seller.is_deleted:
-        return False
-
-    if seller.is_banned:
-        return False
-
-    if seller.consent_revoked_at is not None:
-        return False
-
-    return True
+    return _check_seller_contactable(ad, seller)
 
 
 def get_seller_for_contact(ad_id: int) -> tuple[bool, User | None]:
@@ -83,26 +88,10 @@ def get_seller_for_contact(ad_id: int) -> tuple[bool, User | None]:
     except Ad.DoesNotExist:
         return (False, None)
 
-    if ad.status != AdStatus.PUBLISHED:
-        return (False, None)
-
     seller = ad.user
-    if seller is None:
-        return (False, None)
-
-    if seller.telegram_id is None:
-        return (False, None)
-
-    if seller.is_deleted:
-        return (False, None)
-
-    if seller.is_banned:
-        return (False, None)
-
-    if seller.consent_revoked_at is not None:
-        return (False, None)
-
-    return (True, seller)
+    if _check_seller_contactable(ad, seller):
+        return (True, seller)
+    return (False, None)
 
 
 def record_contact_initiated(buyer_telegram_id: int | None = None) -> None:
