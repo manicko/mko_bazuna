@@ -7,10 +7,13 @@ Usage: /copy <ad_id>
 
 import logging
 
+from asgiref.sync import sync_to_async
+
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
+from apps.ads.services.copy_service import copy_ad
 from telegram_bot.states import AdCreateState
 
 logger = logging.getLogger(__name__)
@@ -32,7 +35,7 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         return
 
     # Parse ad_id from command
-    args = message.text.strip().split(maxsplit=1)
+    args = (message.text or "").strip().split(maxsplit=1)
     if len(args) < 2:
         await message.answer("Usage: /copy <ad_id>")
         return
@@ -42,10 +45,6 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
     except ValueError:
         await message.answer("Invalid ad ID. Usage: /copy <ad_id>")
         return
-
-    # Copy the ad
-    from asgiref.sync import sync_to_async
-    from apps.ads.services.copy_service import copy_ad
 
     try:
         new_ad = await sync_to_async(copy_ad)(ad_id, user_id)
