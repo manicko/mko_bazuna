@@ -24,6 +24,7 @@ from apps.core.enums import (
     AdSource,
     AdStatus,
     BulkModerationAction,
+    PriorityFilter,
 )
 from apps.locations.models import City
 from apps.moderation.models import AdModerationPriority, ModerationCriteria
@@ -241,13 +242,38 @@ class TestPriorityService(TestCase):
         )
         self.service.calculate_and_save(low_ad)
 
-        high_qs = self.service.get_queued_ads(priority_filter="high")
-        low_qs = self.service.get_queued_ads(priority_filter="low")
+        high_qs = self.service.get_queued_ads(priority_filter=PriorityFilter.HIGH)
+        low_qs = self.service.get_queued_ads(priority_filter=PriorityFilter.LOW)
 
         self.assertIn(high_ad, high_qs)
         self.assertNotIn(low_ad, high_qs)
         self.assertIn(low_ad, low_qs)
         self.assertNotIn(high_ad, low_qs)
+
+    def test_get_queued_ads_priority_filter_none_returns_all(self) -> None:
+        """get_queued_ads with priority_filter=None returns ads of every priority level."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        high_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="spam scam cheap fake counterfeit",
+        )
+        self.service.calculate_and_save(high_ad)
+
+        low_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Clean title",
+            description="Clean description",
+        )
+        self.service.calculate_and_save(low_ad)
+
+        qs = self.service.get_queued_ads(priority_filter=None)
+
+        self.assertIn(high_ad, qs)
+        self.assertIn(low_ad, qs)
 
     # ── get_priority_counts ────────────────────────────────────────────
 
@@ -435,6 +461,84 @@ class TestModerationQueueView(TestCase):
         # Filter by low — should show it
         response = self.client.get(f"{self.queue_url}?priority=low")
         self.assertContains(response, "Low priority ad")
+
+    def test_queue_priority_all_default(self) -> None:
+        """Queue page with no priority param shows ads of every priority level."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        high_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="spam scam cheap fake counterfeit",
+        )
+        PriorityService().calculate_and_save(high_ad)
+
+        low_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Low priority ad",
+        )
+        PriorityService().calculate_and_save(low_ad)
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(high_ad.id))
+        self.assertContains(response, str(low_ad.id))
+
+    def test_queue_priority_all_explicit(self) -> None:
+        """Queue page with ?priority=all shows ads of every priority level."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        high_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="spam scam cheap fake counterfeit",
+        )
+        PriorityService().calculate_and_save(high_ad)
+
+        low_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Low priority ad",
+        )
+        PriorityService().calculate_and_save(low_ad)
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(f"{self.queue_url}?priority=all")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(high_ad.id))
+        self.assertContains(response, str(low_ad.id))
+
+    def test_priority_filter_invalid_value_defaults_to_all(self) -> None:
+        """An unrecognized priority value falls back to showing all ads."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        high_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="spam scam cheap fake counterfeit",
+        )
+        PriorityService().calculate_and_save(high_ad)
+
+        low_ad = _make_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Low priority ad",
+        )
+        PriorityService().calculate_and_save(low_ad)
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(f"{self.queue_url}?priority=bogus")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(high_ad.id))
+        self.assertContains(response, str(low_ad.id))
 
     def test_queue_shows_priority_counts(self) -> None:
         """Queue page displays priority counts in the filter links."""

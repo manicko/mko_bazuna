@@ -94,6 +94,21 @@ class AdPriorityLevel(StrEnum):
     LOW = "low"
 
 
+class PriorityFilter(StrEnum):
+    """Priority filter for the moderation queue.
+
+    ``ALL`` is a UI/query sentinel (maps to no DB filter) and is NOT a
+    value stored in the ``AdModerationPriority.priority_level`` column
+    (which uses ``AdPriorityLevel``). HIGH/MEDIUM/LOW mirror
+    ``AdPriorityLevel`` so the DB filter is identical.
+    """
+
+    ALL = "all"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class TrustLevel(StrEnum):
     """Seller trust level for badge display."""
 
@@ -220,6 +235,7 @@ __all__ = [
     "BulkModerationAction",
     "CategoryRejectReason",
     "AdPriorityLevel",
+    "PriorityFilter",
     "ThumbnailSizeStrEnum",
     "SearchSuggestionSource",
     "LanguageLocale",

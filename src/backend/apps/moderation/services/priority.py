@@ -10,7 +10,7 @@ import logging
 from django.db.models import Count, QuerySet
 
 from apps.ads.models import Ad
-from apps.core.enums import AdPriorityLevel, AdStatus
+from apps.core.enums import AdPriorityLevel, AdStatus, PriorityFilter
 from apps.moderation.models import AdModerationPriority
 from apps.moderation.services.priority_calculator import PriorityCalculator
 
@@ -37,24 +37,41 @@ class PriorityService:
         )
 
         if created:
-            logger.info("Created priority record for ad %s (score=%s)", ad.id, data["base_score"])
+            logger.info(
+                "Created priority record for ad %s (score=%s)",
+                ad.id,
+                data["base_score"],
+            )
         else:
-            logger.info("Updated priority record for ad %s (score=%s)", ad.id, data["base_score"])
+            logger.info(
+                "Updated priority record for ad %s (score=%s)",
+                ad.id,
+                data["base_score"],
+            )
 
         return obj
 
-    def get_queued_ads(self, priority_filter: str | None = None) -> QuerySet[Ad]:
+    def get_queued_ads(
+        self, priority_filter: PriorityFilter | None = None
+    ) -> QuerySet[Ad]:
         """Get ads in the moderation queue, optionally filtered by priority level.
 
         Uses select_related and prefetch_related to avoid N+1 queries.
         Orders by base_score descending (highest priority first).
         """
-        qs = Ad.objects.filter(
-            status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
-        ).select_related(
-            "user", "category", "city",
-        ).prefetch_related(
-            "images", "moderation_priority",
+        qs = (
+            Ad.objects.filter(
+                status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
+            )
+            .select_related(
+                "user",
+                "category",
+                "city",
+            )
+            .prefetch_related(
+                "images",
+                "moderation_priority",
+            )
         )
 
         if priority_filter:
@@ -69,11 +86,16 @@ class PriorityService:
 
         Returns a dict with keys 'high', 'medium', 'low' and counts.
         """
-        counts = AdModerationPriority.objects.filter(
-            ad__status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
-        ).values("priority_level").annotate(
-            count=Count("id"),
-        ).order_by("priority_level")
+        counts = (
+            AdModerationPriority.objects.filter(
+                ad__status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
+            )
+            .values("priority_level")
+            .annotate(
+                count=Count("id"),
+            )
+            .order_by("priority_level")
+        )
 
         result: dict[str, int] = {level.value: 0 for level in AdPriorityLevel}
         for item in counts:

@@ -7,6 +7,7 @@ counts per priority level.
 
 import logging
 
+from apps.core.enums import PriorityFilter
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required
 from django.http import HttpRequest, HttpResponse
@@ -22,17 +23,25 @@ def moderation_queue(request: HttpRequest) -> HttpResponse:
     Supports ?priority=high|medium|low|all query parameter.
     Shows count of ads in each priority bucket.
     """
-    priority = request.GET.get("priority", "all")
+    raw_priority = request.GET.get("priority", PriorityFilter.ALL)
+    try:
+        selected = PriorityFilter(raw_priority)
+    except ValueError:
+        selected = PriorityFilter.ALL
     service = PriorityService()
 
     ads = service.get_queued_ads(
-        priority_filter=None if priority == "all" else priority,
+        priority_filter=None if selected is PriorityFilter.ALL else selected,
     )
 
     all_counts = service.get_priority_counts()
 
-    return render(request, "admin/moderation/queue.html", {
-        "ads": ads,
-        "selected_priority": priority,
-        "priority_counts": all_counts,
-    })
+    return render(
+        request,
+        "admin/moderation/queue.html",
+        {
+            "ads": ads,
+            "selected_priority": selected,
+            "priority_counts": all_counts,
+        },
+    )
