@@ -6,7 +6,8 @@ enabling handler tests against the real PostgreSQL ORM (two-process contract).
 """
 
 import hashlib
-from collections.abc import Awaitable, Callable
+import threading
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 import pytest
@@ -14,6 +15,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.db import connections
+from django.db.backends.signals import connection_created
 from django.utils import timezone
 
 # ---------------------------------------------------------------------------
@@ -93,3 +96,78 @@ def login_token_factory() -> Callable[..., Awaitable[tuple[str, Any]]]:
         return raw_token, token
 
     return _create
+
+
+# ---------------------------------------------------------------------------
+# Leaked worker-thread connection cleanup
+#
+# Bot handlers run inside ``@sync_to_async`` (asgiref 3.12, default
+# ``thread_sensitive=True``). With no parent ``AsyncToSync`` wrapper, asgiref
+# parks them on its shared single-worker thread, which lives in a separate
+# thread-local context and therefore gets its OWN PostgreSQL backend (Django
+# ``ConnectionHandler`` is thread-local when ``thread_critical=False``).
+#
+# Django's ``TransactionTestCase``/``TestCase`` teardown only closes the
+# connection that belongs to the thread running the test. The worker-thread
+# backend is never closed: it stays open (possibly ``idle in transaction``)
+# across tests. With ``django_db(transaction=True)`` (bot tests) the next
+# test's ``TRUNCATE ... CASCADE`` demands ``ACCESS EXCLUSIVE`` locks on every
+# table while a leaked worker backend still holds row/table locks from the
+# ``ads <-> categories`` cross-table triggers (see ``pg_trigger.sql``), an
+# intermittent deadlock.
+#
+# Fix: register every connection Django opens (any thread) via the
+# ``connection_created`` signal and close them after each test. Closing a
+# ``BaseDatabaseWrapper`` issues a clean network Close (server-side ROLLBACK),
+# releasing locks and resetting ``self.connection`` to None so the next use
+# reconnects. ``pg_terminate_backend`` is deliberately avoided: it kills the
+# server-side process but leaves Django's wrapper pointing at a dead socket
+# (non-None), so the framework skips reconnect and raises "connection is
+# closed" / "connection is lost".
+# ---------------------------------------------------------------------------
+
+_all_connections: set[Any] = set()
+_all_connections_lock = threading.Lock()
+
+
+def _register_connection(connection: Any, **kwargs: Any) -> None:
+    """Track every DB connection Django opens, on any thread."""
+    with _all_connections_lock:
+        _all_connections.add(connection)
+
+
+connection_created.connect(_register_connection)
+
+
+def _close_all_thread_connections() -> None:
+    """Close every tracked Django connection (main thread + worker threads)."""
+    with _all_connections_lock:
+        conns = list(_all_connections)
+        _all_connections.clear()
+    for _c in conns:
+        try:
+            _c.close()
+        except Exception:
+            pass
+    # Also close the current thread's connection (in case it escaped tracking).
+    connections.close_all()
+
+
+@pytest.fixture(autouse=True)
+def _reap_worker_connections() -> Iterator[None]:
+    """Close sync_to_async worker-thread connections after each bot test.
+
+    Runs after the test body (and after pytest-django's own rollback/TRUNCATE),
+    terminating any worker backend that still holds trigger locks so it cannot
+    collide with the next test's transaction boundary.
+    """
+    yield
+    _close_all_thread_connections()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _reap_stale_backends_session() -> Iterator[None]:
+    """Close any DB connection left open past per-test teardown (e.g. opened during collection/DB setup)."""
+    _close_all_thread_connections()
+    yield
+    _close_all_thread_connections()
