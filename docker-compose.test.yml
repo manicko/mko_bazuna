@@ -5,9 +5,9 @@
 services:
   # Override db service for test: long-running, persistent PostgreSQL.
   # `volumes` is NOT overridden here, so the base `postgres_data` volume applies
-  # (prefixed by the project name -> mko-bazuna-test_postgres_data). This keeps the
-  # container alive between `make test` runs so `pytest --reuse-db` can cache the
-  # schema. Port 5433 on the host allows debugging with psql / GUI tools.
+  # (prefixed by the project name -> mko-bazuna-test_postgres_data). This keeps
+  # the container alive between `make test` runs. Port 5433 on the host allows
+  # debugging with psql / GUI tools.
   db:
     image: postgres:18-alpine
     restart: unless-stopped

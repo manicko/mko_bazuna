@@ -4,7 +4,6 @@ Ad and AdImage models for Mko Bazuna.
 Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 """
 
-
 import os
 
 from apps.core.enums import AdSource, AdStatus
@@ -240,138 +239,171 @@ class Ad(models.Model):
                 fields=["status", "rejected_at"],
                 condition=Q(status=AdStatus.REJECTED),
             ),
+            models.Index(
+                name="IX_ads_purge_deleted",
+                fields=["status", "deleted_at"],
+                condition=Q(status=AdStatus.DELETED),
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(status=AdStatus.PUBLISHED) | Q(published_at__isnull=False),
+                name="ck_ads_published_at_if_published",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status=AdStatus.ARCHIVED) | Q(archived_at__isnull=False),
+                name="ck_ads_archived_at_if_archived",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status=AdStatus.REJECTED) | Q(rejected_at__isnull=False),
+                name="ck_ads_rejected_at_if_rejected",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status=AdStatus.ON_MODERATION_FAILED)
+                | Q(moderation_failed_at__isnull=False),
+                name="ck_ads_moderation_failed_at_if_failed",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status=AdStatus.DELETED) | Q(deleted_at__isnull=False),
+                name="ck_ads_deleted_at_if_deleted",
+            ),
+            models.CheckConstraint(
+                condition=Q(moderation_failed_at__isnull=True)
+                | Q(rejected_at__isnull=True),
+                name="ck_ads_failed_and_rejected_mutually_exclusive",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"Ad {self.id}: {str(self.title)[:50]}"
 
     def transition_to(
-            self,
-            target: AdStatus,
-            moderator_id: int | None = None,
-        ) -> None:
-            """
-            Transition ad to target status with validation and timer side-effects.
+        self,
+        target: AdStatus,
+        moderator_id: int | None = None,
+    ) -> None:
+        """
+        Transition ad to target status with validation and timer side-effects.
 
-            Enforces the allowed transition matrix:
-            - DRAFT -> ON_MODERATION
-            - ON_MODERATION -> PUBLISHED | REJECTED | ON_MODERATION_FAILED
-            - PUBLISHED -> ARCHIVED
-            - ARCHIVED -> PUBLISHED | ON_MODERATION
-            - PUBLISHED -> ON_MODERATION
-            - any -> DELETED
+        Enforces the allowed transition matrix:
+        - DRAFT -> ON_MODERATION
+        - ON_MODERATION -> PUBLISHED | REJECTED | ON_MODERATION_FAILED
+        - PUBLISHED -> ARCHIVED
+        - ARCHIVED -> PUBLISHED | ON_MODERATION
+        - PUBLISHED -> ON_MODERATION
+        - any -> DELETED
 
-            Side-effects:
-            - -> PUBLISHED: published_at = now(); original_published_at set once if None
-            - -> DELETED: deleted_at = now()
-            - -> ARCHIVED: archived_at = now()
-            - -> ON_MODERATION_FAILED: moderation_failed_at = now()
-            - -> REJECTED: rejected_at = now()
-            - -> ON_MODERATION: clears moderation_failed_at, rejected_at, archived_at
+        Side-effects:
+        - -> PUBLISHED: published_at = now(); original_published_at set once if None
+        - -> DELETED: deleted_at = now()
+        - -> ARCHIVED: archived_at = now()
+        - -> ON_MODERATION_FAILED: moderation_failed_at = now()
+        - -> REJECTED: rejected_at = now()
+        - -> ON_MODERATION: clears moderation_failed_at, rejected_at, archived_at
 
-            Args:
-                target: The target AdStatus to transition to.
-                moderator_id: Optional moderator ID for PUBLISHED/REJECTED transitions.
+        Args:
+            target: The target AdStatus to transition to.
+            moderator_id: Optional moderator ID for PUBLISHED/REJECTED transitions.
 
-            Raises:
-                ValueError: If the transition is not allowed.
-            """
-            # Define allowed transitions as a mapping
-            ALLOWED_TRANSITIONS: dict[AdStatus, set[AdStatus]] = {
-                AdStatus.DRAFT: {AdStatus.ON_MODERATION},
-                AdStatus.ON_MODERATION: {
-                    AdStatus.PUBLISHED,
-                    AdStatus.REJECTED,
-                    AdStatus.ON_MODERATION_FAILED,
-                },
-                AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
-                AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
-                AdStatus.REJECTED: set(),  # Terminal
-                AdStatus.ON_MODERATION_FAILED: set(),  # Terminal
-                AdStatus.DELETED: set(),  # Terminal
-            }
+        Raises:
+            ValueError: If the transition is not allowed.
+        """
+        # Define allowed transitions as a mapping
+        ALLOWED_TRANSITIONS: dict[AdStatus, set[AdStatus]] = {
+            AdStatus.DRAFT: {AdStatus.ON_MODERATION},
+            AdStatus.ON_MODERATION: {
+                AdStatus.PUBLISHED,
+                AdStatus.REJECTED,
+                AdStatus.ON_MODERATION_FAILED,
+            },
+            AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
+            AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
+            AdStatus.REJECTED: set(),  # Terminal
+            AdStatus.ON_MODERATION_FAILED: set(),  # Terminal
+            AdStatus.DELETED: set(),  # Terminal
+        }
 
-            current = AdStatus(self.status)
+        current = AdStatus(self.status)
 
-            # DELETED is a terminal state - no transitions allowed from it
-            if current == AdStatus.DELETED:
-                raise ValueError(
-                    f"Cannot transition from DELETED to {target.value}. DELETED is terminal."
-                )
+        # DELETED is a terminal state - no transitions allowed from it
+        if current == AdStatus.DELETED:
+            raise ValueError(
+                f"Cannot transition from DELETED to {target.value}. DELETED is terminal."
+            )
 
-            # any -> DELETED is always allowed
-            if target == AdStatus.DELETED:
-                if current != AdStatus.DELETED:
-                    self.status = AdStatus.DELETED
-                    self.deleted_at = timezone.now()
-                    self.save(update_fields=["status", "deleted_at"])
-                return
+        # any -> DELETED is always allowed
+        if target == AdStatus.DELETED:
+            if current != AdStatus.DELETED:
+                self.status = AdStatus.DELETED
+                self.deleted_at = timezone.now()
+                self.save(update_fields=["status", "deleted_at"])
+            return
 
-            # Validate transition against allowed matrix
-            allowed_targets = ALLOWED_TRANSITIONS.get(current, set())
-            if target not in allowed_targets:
-                raise ValueError(
-                    f"Invalid transition: {current.value} -> {target.value}. "
-                    f"Allowed targets from {current.value}: {', '.join(t.value for t in allowed_targets) or 'none'}"
-                )
+        # Validate transition against allowed matrix
+        allowed_targets = ALLOWED_TRANSITIONS.get(current, set())
+        if target not in allowed_targets:
+            raise ValueError(
+                f"Invalid transition: {current.value} -> {target.value}. "
+                f"Allowed targets from {current.value}: {', '.join(t.value for t in allowed_targets) or 'none'}"
+            )
 
-            # Apply transition with side-effects
-            now_val = timezone.now()
-            update_fields = ["status"]
+        # Apply transition with side-effects
+        now_val = timezone.now()
+        update_fields = ["status"]
 
-            if target == AdStatus.PUBLISHED:
-                # Reset published_at on every PUBLISHED transition
-                self.published_at = now_val
-                update_fields.append("published_at")
+        if target == AdStatus.PUBLISHED:
+            # Reset published_at on every PUBLISHED transition
+            self.published_at = now_val
+            update_fields.append("published_at")
 
-                # Set original_published_at once (immutable)
-                if self.original_published_at is None:
-                    self.original_published_at = now_val
-                    update_fields.append("original_published_at")
+            # Set original_published_at once (immutable)
+            if self.original_published_at is None:
+                self.original_published_at = now_val
+                update_fields.append("original_published_at")
 
-                # Set published_by if moderator provided
-                if moderator_id is not None:
-                    self.published_by_id = moderator_id
-                    update_fields.append("published_by")
+            # Set published_by if moderator provided
+            if moderator_id is not None:
+                self.published_by_id = moderator_id
+                update_fields.append("published_by")
 
-            elif target == AdStatus.ARCHIVED:
-                self.archived_at = now_val
+        elif target == AdStatus.ARCHIVED:
+            self.archived_at = now_val
+            update_fields.append("archived_at")
+
+        elif target == AdStatus.ON_MODERATION_FAILED:
+            self.moderation_failed_at = now_val
+            update_fields.append("moderation_failed_at")
+            # Clear rejected_at if it was set (mutually exclusive)
+            if self.rejected_at is not None:
+                self.rejected_at = None
+                update_fields.append("rejected_at")
+
+        elif target == AdStatus.REJECTED:
+            self.rejected_at = now_val
+            update_fields.append("rejected_at")
+            # Set moderated_by if moderator provided
+            if moderator_id is not None:
+                self.moderated_by_id = moderator_id
+                update_fields.append("moderated_by")
+            # Clear moderation_failed_at if it was set (mutually exclusive)
+            if self.moderation_failed_at is not None:
+                self.moderation_failed_at = None
+                update_fields.append("moderation_failed_at")
+
+        elif target == AdStatus.ON_MODERATION:
+            # Clear moderation and archive timestamps when re-submitting for moderation
+            if self.moderation_failed_at is not None:
+                self.moderation_failed_at = None
+                update_fields.append("moderation_failed_at")
+            if self.rejected_at is not None:
+                self.rejected_at = None
+                update_fields.append("rejected_at")
+            if self.archived_at is not None:
+                self.archived_at = None
                 update_fields.append("archived_at")
 
-            elif target == AdStatus.ON_MODERATION_FAILED:
-                self.moderation_failed_at = now_val
-                update_fields.append("moderation_failed_at")
-                # Clear rejected_at if it was set (mutually exclusive)
-                if self.rejected_at is not None:
-                    self.rejected_at = None
-                    update_fields.append("rejected_at")
-
-            elif target == AdStatus.REJECTED:
-                self.rejected_at = now_val
-                update_fields.append("rejected_at")
-                # Set moderated_by if moderator provided
-                if moderator_id is not None:
-                    self.moderated_by_id = moderator_id
-                    update_fields.append("moderated_by")
-                # Clear moderation_failed_at if it was set (mutually exclusive)
-                if self.moderation_failed_at is not None:
-                    self.moderation_failed_at = None
-                    update_fields.append("moderation_failed_at")
-
-            elif target == AdStatus.ON_MODERATION:
-                # Clear moderation and archive timestamps when re-submitting for moderation
-                if self.moderation_failed_at is not None:
-                    self.moderation_failed_at = None
-                    update_fields.append("moderation_failed_at")
-                if self.rejected_at is not None:
-                    self.rejected_at = None
-                    update_fields.append("rejected_at")
-                if self.archived_at is not None:
-                    self.archived_at = None
-                    update_fields.append("archived_at")
-
-            self.status = target
-            self.save(update_fields=update_fields)
+        self.status = target
+        self.save(update_fields=update_fields)
 
     def get_title(self, locale: str = "ru") -> str:
         """Return localized title for *locale* with a fallback to the Russian base.
@@ -531,6 +563,3 @@ class AdFeature(models.Model):
 
     def __str__(self) -> str:
         return f"Ad {self.ad_id} -> {self.feature.slug}"
-
-
-

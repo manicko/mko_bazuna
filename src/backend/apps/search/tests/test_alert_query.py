@@ -95,7 +95,7 @@ def _create_published_ad(seller, category, city, **kwargs) -> Ad:
     defaults = {
         "user": seller,
         "title": "Красный велосипед",
-        "description": "Продается детский велосипед в хорошем состоянии",
+        "description": "Продается товар по объявлению",
         "category": category,
         "city": city,
         "status": AdStatus.PUBLISHED,

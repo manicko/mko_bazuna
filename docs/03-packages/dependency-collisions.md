@@ -57,7 +57,7 @@ the couplings above:
 
 | Risk | Level | Mitigation |
 |------|-------|------------|
-| deep-translator Google-scrape fragility | HIGH | Hard timeout ~500ms + mandatory fallback to original query. |
+| deep-translator Google-scrape fragility | HIGH | Hard timeout ~500ms + circuit breaker (3 failures → 60s cooldown) + LRU cache, governing both search-side query translation and bot-side ad-creation translation. Mandatory fallback to original text/query on failure. |
 | aiogram FSM "PostgreSQL storage" misconception | HIGH | Use `Ad.DRAFT` in shared Django ORM; no DB-backed FSM. |
 | django-mptt abandonment | MEDIUM | Plan replacement (recursive CTE / django-tree-queries) before Django 6.0; keep `<6.0`. |
 | django-tailwind without daisyUI | MEDIUM | Plain Tailwind suffices for MVP. |

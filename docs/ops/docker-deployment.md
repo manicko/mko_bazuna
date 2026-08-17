@@ -34,6 +34,7 @@ and troubleshooting.
   container starts automatically on `make up`
 - **Media storage:** Local `MEDIA_ROOT` volume served via nginx
 - **TLS termination:** Handled by nginx; HTTPS mandatory for login deep-links and secure cookies
+- **Redis cache service (production):** `redis:7-alpine` provides a shared cache backend across web gunicorn workers (3) and the bot process. `LocMemCache` is per-process only and cannot share rate-limit counters or cache invalidations. Dev/test settings override `CACHES` to `LocMemCache`, so no Redis is needed for local development or testing.
 
 ## Compose Project Isolation
 

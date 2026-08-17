@@ -253,6 +253,11 @@ class TestAutocompleteEndpoint:
 class TestPopularSearchService:
     """Tests for the popular_search service."""
 
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self) -> None:
+        """Clear Django cache between tests to prevent bleeding popular-search state."""
+        cache.clear()
+
     def test_increment_popular_search_creates_new_entry(self) -> None:
         """First call creates a new PopularSearch entry with hit_count=1."""
         increment_popular_search("тест")

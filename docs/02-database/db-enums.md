@@ -73,6 +73,21 @@ Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-s
 | `CRITERIA_CHANGE` | moderation criteria edited at runtime |
 | `OTHER` | other moderator action |
 
+## BulkModerationAction
+Bulk moderation action types accepted by the moderation JSON API
+(`bulk_moderation_action` view). This is an API-level vocabulary — it is **not**
+stored as a database column (individual outcomes are persisted as ad status
+transitions and `ModeratorActionLog` entries, see [db-schema.md](db-schema.md)).
+
+| Value | Meaning |
+|-------|---------|
+| `APPROVE` | publish the selected ads |
+| `REJECT` | reject the selected ads (requires a reason) |
+| `FLAG` | recalculate moderation priority for the selected ads |
+
+The API validates the action up front and returns `400` for any value outside
+this set.
+
 ## CategoryRejectReason
 UI/admin vocabulary enum for moderator reject dropdown. Used as guidance for
 reason text in `ModeratorActionLog` (never shown to seller, US-A11).

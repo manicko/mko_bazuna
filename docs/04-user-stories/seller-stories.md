@@ -48,8 +48,7 @@ Seller deletes an ad → `DELETED` (soft), hidden from the site.
 and can reactivate them (text re-checked). See decision J.
 
 ### US-S8 — Delete account
-Seller confirms deletion on the site; ads are soft-deleted; `telegram_id`/`username` are nulled
-exactly **30 days** after `consent_revoked_at` (decision F / zone R1). Independent of the
+Seller withdraws consent via a 'Withdraw Data' button on the dashboard (POST, CSRF-protected, confirmation dialog); ads are soft-deleted; `telegram_id`/`username` are nulled exactly **30 days** after `consent_revoked_at` (decision F / zone R1). Independent of the
 `ads_auto_publish` flag (US-S9). Re-registration only allowed after the 30-day null (zone R9).
 
 ### US-S9 — Publishing ban

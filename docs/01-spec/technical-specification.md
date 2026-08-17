@@ -81,9 +81,13 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Users are maximally anonymous; nothing beyond Telegram login is stored.
 - **Privacy policy / Terms required from launch** (visible to buyers without login).
 - **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
-- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent task, zone R1; index `IX_users_erasure_sweep`):
-  - NULL `telegram_id` + `username`; DELETE user's ad rows (+ `ad_images`)
-  - SET NULL `analytics_events.user_id` (aggregates kept) and `ModeratorActionLog.user_id` (reason/admin/timestamp kept for audit)
+- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, `ERASURE_RETENTION_DAYS=30`; index `IX_users_erasure_sweep`):
+  - NULL `telegram_id` + `username`; SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`
+  - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` after transaction commits (TX-then-FS pattern)
+  - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
+  - **PII logging:** All `telegram_id` values in logger calls and `stdout.write` output are masked via `mask_telegram_id()` (SHA-256 hash, non-reversible, `tg_` prefix) from `apps/core/utils/sanitize.py`. Raw telegram_id must never appear in logs.
+  - **Withdrawal UI:** Authenticated sellers can withdraw consent via a "Withdraw Data" POST button on the seller dashboard (`/dashboard/`), beside the Logout link. Requires CSRF token + confirmation dialog. Triggers `consent_withdraw` view → `withdraw_consent()`.
+  - **Deleted-user banner guard:** No web-side middleware redirects soft-deleted users; the consent banner `{% include %}` is guarded by `{% if not request.user.is_authenticated or not request.user.is_deleted %}` in all 5 template sites (dashboard, detail, list, seller_dashboard, moderation_dashboard) to suppress rendering. `AnonymousUser` lacks `is_deleted`, so `is_authenticated` is checked first.
 - Failed-check logs auto-purged after 7 days (separate sweep, zone D12).
 
 ### K. Consent banner & privacy behavior (zone R3, see O2)
@@ -99,7 +103,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Language switcher UI:** Dropdown component in header allows users to switch languages; selection sets `lang_pref` cookie for persistence and navigates via `?lang=X` parameter.
 - **Content stored in Russian** as base language. Multi-language columns (`title_en`, `title_bs`, `description_en`, `description_bs`) store translated content for UI display. `original_language` tracks source language for audit.
 - **Search (phase 1) is over Russian content.** Queries in Bosnian or English translate to Russian at search time via `apps/search/services/query_translator.py`. Multi-language search vector includes all language variants using appropriate FTS configurations (`russian`, `simple`, `english`).
-- **Stored-content-invariant (zone D5):** seller may input in any supported language, but the bot MUST translate title+description to Russian on ad creation (using `deep-translator` + parallel `asyncio.gather`) so `to_tsvector('russian', …)` is correct. UI displays localized content via `Ad.get_title(locale)` and `Ad.get_description(locale)` template filters.
+- **Stored-content-invariant (zone D5):** seller may input in any supported language, but the bot MUST translate title+description to Russian on ad creation. The bot delegates to the shared `apps.core.services.translation.translate_text` function (invoked in parallel via `asyncio.gather` + `asyncio.to_thread`), inheriting the same 500ms timeout, circuit breaker (3 failures → 60s cooldown), and LRU cache as the search-side translator, so `to_tsvector('russian', …)` is correct. UI displays localized content via `Ad.get_title(locale)` and `Ad.get_description(locale)` template filters.
 - **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation) and search queries (on lookup) to **Google Translate** for language normalization. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
 - **Result sorting:** buyer chooses — by date (newest first) or by price.
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.

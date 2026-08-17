@@ -67,22 +67,31 @@ All content is stored in Russian; Russian, Bosnian, and English queries translat
 
 1. User enters query in search input (Russian, Bosnian, or English)
 2. `deep-translator` library translates to Russian via Google Translate
-3. Translation passes through request cache to prevent duplicate calls
+3. Translation passes through an LRU cache to prevent duplicate calls within the same process
 4. PostgreSQL FTS executes on Russian-translated query
 5. Results optionally tagged "translated from Russian"
 
 ### Implementation
 
-Documented in `apps/search/services/query_translator.py`
+All translation logic now lives in the shared module `apps/core/services/translation.py`,
+used by both the search-side query translator (`apps/search/services/query_translator`) and
+the bot's ad-creation translator (`translate_all_languages` in `telegram_bot/handlers/ad_create.py`).
+The legacy `apps/search/services/query_translator.py` is now a backward-compatibility re-export shim
+that re-exports names from the shared module.
+
+The consolidated resilience policy is enforced by the shared service:
+- **500ms timeout** via `ThreadPoolExecutor` future result (timeout exceptions trigger fallback)
+- **Circuit breaker:** 3 consecutive failures → circuit opens for 60s cooldown (half-open on next call)
+- **LRU cache:** `lru_cache(maxsize=128)` for query translation, `lru_cache(maxsize=256)` for generic translation
 
 ```python
-# apps/search/services/query_translator.py
+# apps/core/services/translation.py  (shared — used by search + bot)
 def translate_query(text: str, source_locale: str, target_locale: str) -> str:
     """Translate text from source_locale to target_locale using deep-translator."""
     if not text or not text.strip():
         return text
     
-    # ... implements timeout, caching, and circuit-breaker for gracefull degradation
+    # ... implements 500ms timeout, LRU cache, and circuit-breaker for graceful degradation
     
     return translated_text
 

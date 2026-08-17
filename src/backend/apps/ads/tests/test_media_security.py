@@ -23,7 +23,11 @@ from PIL.ExifTags import Base as ExifBase
 from django.test import Client, override_settings
 from django.utils import timezone
 
-from telegram_bot.services.media import delete_photo, generate_storage_key, strip_photo_exif
+from telegram_bot.services.media import (
+    delete_photo,
+    generate_storage_key,
+    strip_photo_exif,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -152,6 +156,8 @@ def _create_ad_with_image(
         category_name=category.name,
         status=actual_status,
         published_at=timezone.now() if actual_status == AdStatus.PUBLISHED else None,
+        archived_at=timezone.now() if actual_status == AdStatus.ARCHIVED else None,
+        deleted_at=timezone.now() if actual_status == AdStatus.DELETED else None,
     )
 
     ad_image = AdImage.objects.create(
@@ -175,7 +181,9 @@ def _create_ad_with_image(
 class TestMediaAccessControl:
     """Media access gate (MED-001) — unpublished/withdrawn ad photos blocked."""
 
-    def test_published_ad_returns_redirect(self, seller, category, city, isolated_media_root):
+    def test_published_ad_returns_redirect(
+        self, seller, category, city, isolated_media_root
+    ):
         """PUBLISHED ad images get X-Accel-Redirect header."""
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key)
@@ -186,19 +194,25 @@ class TestMediaAccessControl:
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
 
-    def test_draft_ad_returns_forbidden(self, seller, category, city, isolated_media_root):
+    def test_draft_ad_returns_forbidden(
+        self, seller, category, city, isolated_media_root
+    ):
         """DRAFT ad images return 403 Forbidden."""
         from apps.core.enums import AdStatus
 
         key = generate_storage_key()
-        _create_ad_with_image(seller, category, city, image_key=key, status=AdStatus.DRAFT)
+        _create_ad_with_image(
+            seller, category, city, image_key=key, status=AdStatus.DRAFT
+        )
         client = Client()
         url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
 
-    def test_on_moderation_ad_returns_forbidden(self, seller, category, city, isolated_media_root):
+    def test_on_moderation_ad_returns_forbidden(
+        self, seller, category, city, isolated_media_root
+    ):
         """ON_MODERATION ad images return 403 Forbidden."""
         from apps.core.enums import AdStatus
 
@@ -212,19 +226,25 @@ class TestMediaAccessControl:
             response = client.get(url)
         assert response.status_code == 403
 
-    def test_deleted_ad_returns_forbidden(self, seller, category, city, isolated_media_root):
+    def test_deleted_ad_returns_forbidden(
+        self, seller, category, city, isolated_media_root
+    ):
         """DELETED ad images return 403 Forbidden."""
         from apps.core.enums import AdStatus
 
         key = generate_storage_key()
-        _create_ad_with_image(seller, category, city, image_key=key, status=AdStatus.DELETED)
+        _create_ad_with_image(
+            seller, category, city, image_key=key, status=AdStatus.DELETED
+        )
         client = Client()
         url = f"/media/{key}"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
 
-    def test_staff_can_view_any_status(self, seller, staff_user, category, city, isolated_media_root):
+    def test_staff_can_view_any_status(
+        self, seller, staff_user, category, city, isolated_media_root
+    ):
         """Staff users can view images for any ad status."""
         from apps.core.enums import AdStatus
 
@@ -251,7 +271,9 @@ class TestMediaAccessControl:
             response = client.get(url)
         assert response.status_code == 404
 
-    def test_seed_storage_key_with_path_returns_redirect(self, seller, category, city, isolated_media_root):
+    def test_seed_storage_key_with_path_returns_redirect(
+        self, seller, category, city, isolated_media_root
+    ):
         """Storage keys with slashes (e.g. 'seed/kvartiry_01.jpg') resolve via media_gate.
 
         Seed images use subdirectory-prefixed storage keys like ``seed/<filename>.jpg``.
@@ -446,14 +468,18 @@ class TestMediaGateThumbnailResolution:
             city=city,
             category_name=category.name,
             status=actual_status,
-            published_at=timezone.now() if actual_status == AdStatus.PUBLISHED else None,
+            published_at=timezone.now()
+            if actual_status == AdStatus.PUBLISHED
+            else None,
         )
 
         kwargs = {thumbnail_field: thumbnail_key}
         AdImage.objects.create(ad=ad, image=orig_key, **kwargs)
         return orig_key, thumbnail_key
 
-    def test_small_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+    def test_small_thumbnail_key_resolves(
+        self, seller, category, city, isolated_media_root
+    ):
         """media_gate returns 200 for a key stored in thumbnail_small."""
         _, thumb_key = self._create_ad_with_thumbnail(
             seller, category, city, "img-small.jpg", "thumbnail_small"
@@ -463,9 +489,13 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        assert (
+            response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        )
 
-    def test_medium_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+    def test_medium_thumbnail_key_resolves(
+        self, seller, category, city, isolated_media_root
+    ):
         """media_gate returns 200 for a key stored in thumbnail_medium."""
         _, thumb_key = self._create_ad_with_thumbnail(
             seller, category, city, "img-medium.jpg", "thumbnail_medium"
@@ -475,9 +505,13 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        assert (
+            response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        )
 
-    def test_large_thumbnail_key_resolves(self, seller, category, city, isolated_media_root):
+    def test_large_thumbnail_key_resolves(
+        self, seller, category, city, isolated_media_root
+    ):
         """media_gate returns 200 for a key stored in thumbnail_large."""
         _, thumb_key = self._create_ad_with_thumbnail(
             seller, category, city, "img-large.jpg", "thumbnail_large"
@@ -487,7 +521,9 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        assert (
+            response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        )
 
     def test_thumbnail_key_with_draft_ad_returns_forbidden(
         self, seller, category, city, isolated_media_root
@@ -496,7 +532,11 @@ class TestMediaGateThumbnailResolution:
         from apps.core.enums import AdStatus
 
         _, thumb_key = self._create_ad_with_thumbnail(
-            seller, category, city, "draft-small.jpg", "thumbnail_small",
+            seller,
+            category,
+            city,
+            "draft-small.jpg",
+            "thumbnail_small",
             status=AdStatus.DRAFT,
         )
         client = Client()
@@ -512,7 +552,11 @@ class TestMediaGateThumbnailResolution:
         from apps.core.enums import AdStatus
 
         _, thumb_key = self._create_ad_with_thumbnail(
-            seller, category, city, "staff-small.jpg", "thumbnail_small",
+            seller,
+            category,
+            city,
+            "staff-small.jpg",
+            "thumbnail_small",
             status=AdStatus.ON_MODERATION,
         )
         client = Client()
@@ -521,7 +565,9 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        assert (
+            response.headers.get("X-Accel-Redirect") == f"/protected-media/{thumb_key}"
+        )
 
     def test_thumbnail_key_prefers_image_field_over_thumbnail_fields(
         self, seller, category, city, isolated_media_root
@@ -543,7 +589,9 @@ class TestMediaGateThumbnailResolution:
         )
         # Create two AdImages — one with image=conflict.jpg, one with thumbnail_small=conflict.jpg
         AdImage.objects.create(ad=ad, image=conflicting_key)
-        AdImage.objects.create(ad=ad, image="other.jpg", thumbnail_small=conflicting_key)
+        AdImage.objects.create(
+            ad=ad, image="other.jpg", thumbnail_small=conflicting_key
+        )
 
         client = Client()
         url = f"/media/{conflicting_key}"
@@ -559,4 +607,3 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
-

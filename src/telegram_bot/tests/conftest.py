@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 import pytest
+import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
@@ -59,12 +60,12 @@ def dp() -> Dispatcher:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def user() -> Any:
+@pytest_asyncio.fixture
+async def user() -> Any:
     """Create a test user."""
     from apps.users.models import User
 
-    user, _ = User.objects.get_or_create(
+    user, _ = await sync_to_async(User.objects.get_or_create)(
         telegram_id=900000100,
         defaults={
             "chat_id": 900000100,

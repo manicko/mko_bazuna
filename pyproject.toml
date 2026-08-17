@@ -181,6 +181,8 @@ reportArgumentType = "none"  # Django model field defaults are valid at runtime 
 reportIncompatibleVariableOverride = "none"  # Django Meta inheritance pattern
 reportAttributeAccessIssue = "none"  # Django adds 'id' at runtime via metaclass
 reportMissingImports = "none"  # Django apps namespace imports resolved at runtime
+reportOperatorIssue = "none"  # Django Q objects support |/~ at runtime but not type-checked
+reportCallIssue = "none"  # Django model methods and pathlib/str mixing in save()
 
 [tool.uv]
 default-groups = []

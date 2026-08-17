@@ -8,6 +8,7 @@ tags:
 related:
   - db-indexes
   - db-enums
+  - db-retention
   - technical-specification
   - architecture-structure
   - packages-list
@@ -55,7 +56,7 @@ chat_id (BIGINT, UNIQUE, nullable)       # stable Telegram chat ID; set on first
 username (VARCHAR, nullable)             # optional public @username; NOT used for t.me link or publishing (decision C)
 is_staff / is_superuser                  # admin/moderator role (decision A)
 is_banned (BOOL)                          # account block (US-A4)
-is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted
+is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted; checked by template consent-banner guard in 5 templates
 is_declined (BOOL, default False)         # user declined consent (browse-only mode)
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 telegram_premium (BOOL, default False)    # Telegram Premium subscription status
@@ -132,9 +133,15 @@ locale-specific column > Russian > original column.
 **Transitions:**
 - DRAFT → ON_MODERATION
 - ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED
+- ON_MODERATION_FAILED → REJECTED (manual review of auto-failed ads; AD-001)
 - PUBLISHED → ARCHIVED → PUBLISHED (reactivation, text re-moderation)
 - PUBLISHED → ON_MODERATION (text edits only; immediate hide; mixed edit follows text rule)
 - any → DELETED
+
+> Zone C4 / D12 (AD-001): Six `CheckConstraint`s enforce timestamp presence at the DB level:
+> `published_at` (PUBLISHED), `archived_at` (ARCHIVED), `rejected_at` (REJECTED),
+> `moderation_failed_at` (ON_MODERATION_FAILED), `deleted_at` (DELETED), and the mutual
+> exclusivity of `moderation_failed_at` and `rejected_at`. See [db-indexes.md > Check Constraints](db-indexes.md#check-constraints--ads-ad-001).
 
 > Zone D1 (hybrid C, decision O5): `category_name` is denormalized + indexed as described above; see [db-indexes.md](db-indexes.md) for the trigger SQL that syncs it.
 

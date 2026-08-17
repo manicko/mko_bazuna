@@ -33,8 +33,6 @@ echo "Running migrations..."
 uv run python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
 
 # Run pytest with short traceback format.
-# --reuse-db caches the test_mko_bazuna schema between runs for fast iteration;
-# --create-db makes Django recreate the schema when it diverges from migrations.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override the flags.
 echo "Running tests..."
-uv run pytest ${PYTEST_OPTS:---reuse-db --create-db --tb=short}
+uv run pytest ${PYTEST_OPTS:- --tb=short}

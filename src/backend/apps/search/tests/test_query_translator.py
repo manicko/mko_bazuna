@@ -49,8 +49,10 @@ class TestTranslateQueryBsToRuFallback:
     def test_timeout_returns_original_query(self) -> None:
         """ThreadPoolExecutor timeout returns original query."""
         with patch(
+            "apps.core.services.translation.TRANSLATION_TIMEOUT_SECONDS", 0.05
+        ), patch(
             _TRANSLATE_PATH,
-            side_effect=lambda *_: time.sleep(1),
+            side_effect=lambda *_: time.sleep(0.2),
         ):
             result = translate_query_bs_to_ru("bok")
         assert result == "bok"

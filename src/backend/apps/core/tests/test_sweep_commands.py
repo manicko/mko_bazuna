@@ -63,21 +63,32 @@ def city():
 def _make_ad(seller, category, city, **kwargs) -> Ad:
     """Create an Ad with required FK fields, overriding any kwargs.
 
-    Timestamp fields (created_at, published_at, moderation_failed_at,
-    rejected_at, deleted_at) use auto_now_add/auto_now in the model, so they
-    cannot be set at creation time. Any such field passed in kwargs is applied
-    via a post-create UPDATE, which bypasses the model's automatic timestamping
-    and lets tests control retention-window boundaries precisely.
+    DB CheckConstraints require timestamps (published_at, archived_at, etc.)
+    to be non-null for their corresponding statuses. To satisfy these at
+    UPDATE time (the row is first created with status=DRAFT, which has no
+    timestamp constraint), any status-specific timestamp not already
+    provided in kwargs is auto-filled with ``timezone.now()`` so the
+    ``QuerySet.update()`` does not violate the DB-level CheckConstraint.
     """
+    _STATUS_TIMESTAMP = {
+        AdStatus.PUBLISHED: "published_at",
+        AdStatus.ARCHIVED: "archived_at",
+        AdStatus.REJECTED: "rejected_at",
+        AdStatus.ON_MODERATION_FAILED: "moderation_failed_at",
+        AdStatus.DELETED: "deleted_at",
+    }
     timestamp_fields = {
         "created_at",
         "published_at",
+        "archived_at",
         "moderation_failed_at",
         "rejected_at",
         "deleted_at",
     }
     timestamps = {k: v for k, v in kwargs.items() if k in timestamp_fields}
-    data = {k: v for k, v in kwargs.items() if k not in timestamp_fields}
+    data = {
+        k: v for k, v in kwargs.items() if k not in timestamp_fields and k != "status"
+    }
     defaults = {
         "user": seller,
         "title": "Valid Title",
@@ -85,12 +96,20 @@ def _make_ad(seller, category, city, **kwargs) -> Ad:
         "category": category,
         "city": city,
         "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
+        "status": AdStatus.DRAFT,
     }
     defaults.update(data)
     ad = Ad.objects.create(**defaults)
-    if timestamps:
-        Ad.objects.filter(pk=ad.pk).update(**timestamps)
+    update_data = {**timestamps}
+    if "status" in kwargs:
+        target_status = kwargs["status"]
+        ts_field = _STATUS_TIMESTAMP.get(target_status)
+        if ts_field and ts_field not in update_data:
+            update_data[ts_field] = timezone.now()
+        update_data["status"] = target_status
+    if update_data:
+        Ad.objects.filter(pk=ad.pk).update(**update_data)
+    ad.refresh_from_db()
     return ad
 
 
@@ -326,7 +345,9 @@ class TestConsentHardDelete:
 
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
-        fresh = User.objects.create(telegram_id=900000003, chat_id=900000003, password="x")
+        fresh = User.objects.create(
+            telegram_id=900000003, chat_id=900000003, password="x"
+        )
         call_command("consent_hard_delete")
         assert not User.objects.filter(pk=seller.pk).exists()
         assert User.objects.filter(pk=fresh.pk).exists()
@@ -335,7 +356,9 @@ class TestConsentHardDelete:
 
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
-        event = AnalyticsEvent.objects.create(event_type="search_performed", user=seller)
+        event = AnalyticsEvent.objects.create(
+            event_type="search_performed", user=seller
+        )
         call_command("consent_hard_delete")
         event.refresh_from_db()
         assert event.user_id is None
@@ -367,7 +390,9 @@ class TestConsentHardDelete:
         """Crash during mutation rolls back atomically - user and history preserved."""
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
-        event = AnalyticsEvent.objects.create(event_type="search_performed", user=seller)
+        event = AnalyticsEvent.objects.create(
+            event_type="search_performed", user=seller
+        )
         log = ModeratorActionLog.objects.create(
             user=seller,
             action_type="ban_account",
@@ -677,7 +702,9 @@ class TestConcurrentSweep:
         # Verify the production path order: tx -> advisory_lock (not session=True)
         send_source = inspect.getsource(send_alerts.Command.handle)
         # Find the production (non-dry-run) advisory_lock
-        prod_lock_idx = send_source.find("with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):")
+        prod_lock_idx = send_source.find(
+            "with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):"
+        )
         prod_tx_idx = send_source.find("with transaction.atomic", 0, prod_lock_idx)
         assert prod_tx_idx != -1 and prod_lock_idx != -1, (
             "send_alerts: missing transaction.atomic wrapping advisory_lock"
