@@ -18,6 +18,7 @@ from django.conf import settings
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
+from apps.core.services.translation import translate_text
 from apps.locations.models import City
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
@@ -766,33 +767,23 @@ async def update_ad_and_moderate(
 
     return await _update_and_moderate()
 
-def _do_translate_to(text: str, target: str) -> str:
-    """Synchronous translation wrapper with configurable target language."""
-    from deep_translator import GoogleTranslator
-
-    return GoogleTranslator(source="auto", target=target).translate(text)
-
 async def translate_all_languages(text: str, target_locales: list[str]) -> dict[str, str]:
-    """Translate text to all target languages in parallel using asyncio.gather.
+    """Translate text to all target languages in parallel.
+
+    Delegates to the shared translation service (apps.core.services.translation)
+    which provides 500ms timeout, circuit breaker, and LRU cache.
 
     Args:
         text: Source text to translate.
         target_locales: List of target locale codes (e.g. ['ru', 'bs', 'en']).
 
     Returns:
-        Dict mapping locale codes to translated text. Falls back to original text on failure.
+        Dict mapping locale codes to translated text. Falls back to original
+        text on failure (via the shared service's graceful fallback).
     """
-    async def translate_one(text: str, target: str) -> str:
-        try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(_do_translate_to, text, target),
-                timeout=15.0,
-            )
-        except Exception:
-            return text
-
     results = await asyncio.gather(
-        *[translate_one(text, loc) for loc in target_locales]
+        *[asyncio.to_thread(translate_text, text, "auto", loc)
+          for loc in target_locales]
     )
     return dict(zip(target_locales, results, strict=True))
 
