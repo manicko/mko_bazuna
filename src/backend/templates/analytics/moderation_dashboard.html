@@ -147,6 +147,8 @@ Staff-only view showing moderation statistics, queue status, performance, and re
         {% endif %}
     </main>
 
+    {% if not request.user.is_authenticated or not request.user.is_deleted %}
     {% include "components/consent_banner.html" %}
+    {% endif %}
 </body>
 </html>

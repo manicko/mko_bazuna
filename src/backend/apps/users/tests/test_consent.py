@@ -8,12 +8,15 @@ Covers:
 - Authentication required for all consent views
 """
 
+import hashlib
+from datetime import timedelta
+
 import pytest
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
-from apps.users.models import User
+from apps.users.models import LoginToken, User
 from django.test import Client
 from django.utils import timezone
 
@@ -229,3 +232,84 @@ class TestConsentWithdrawView:
 
         assert response.cookies.get("consent_given") is not None
         assert response.cookies["consent_given"].value == "withdrawn"
+
+
+# ---------------------------------------------------------------------------
+# Tests: login_status PII masking
+# ---------------------------------------------------------------------------
+
+
+class TestLoginStatusNoPii:
+    """Tests that login_status does not leak raw telegram_id in logs (PII-002)."""
+
+    def test_login_consume_no_raw_telegram_id(self, caplog) -> None:
+        """login_status must not log raw telegram_id after token consumption."""
+        telegram_id = 999888777
+        raw_token = "a" * 32
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        User.objects.create(
+            telegram_id=telegram_id,
+            chat_id=telegram_id,
+            password="x",
+        )
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(minutes=5),
+            consumed_at=None,
+        )
+
+        client = Client()
+        with caplog.at_level("INFO"):
+            response = client.get(f"/login/status/?token={raw_token}")
+
+        assert response.status_code == 200
+        # Raw telegram_id must not appear in any log output
+        assert str(telegram_id) not in caplog.text
+        # Masked value should be present for log correlation
+        assert "tg_" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Tests: consent banner guard for deleted users (PII-009)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def deleted_user() -> User:
+    """Create a soft-deleted user for banner visibility tests."""
+    return User.objects.create(
+        telegram_id=900000031,
+        chat_id=900000031,
+        password="x",
+        is_deleted=True,
+    )
+
+
+class TestConsentBannerGuard:
+    """Consent banner is suppressed for deleted users (PII-009).
+
+    The banner include in every template is guarded by:
+    ``{% if not request.user.is_authenticated or not request.user.is_deleted %}``
+    so that soft-deleted users never see the consent banner, even when they
+    briefly pass through a view before any redirect.
+    """
+
+    def test_banner_hidden_for_deleted_user(self, deleted_user: User) -> None:
+        """Deleted users do *not* see the consent banner on the dashboard."""
+        client = Client()
+        client.force_login(deleted_user)
+        response = client.get("/dashboard/")
+
+        assert response.status_code == 200
+        assert b"consent-banner" not in response.content
+
+    def test_banner_shown_for_active_user(self, user: User) -> None:
+        """Active, non-consenting users see the consent banner on the dashboard."""
+        client = Client()
+        client.force_login(user)
+        response = client.get("/dashboard/")
+
+        assert response.status_code == 200
+        assert b"consent-banner" in response.content
