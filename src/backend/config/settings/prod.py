@@ -3,6 +3,8 @@ Production settings for Mko Bazuna.
 Imports base settings and applies production safety configuration.
 """
 
+import os
+
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403, F401
@@ -11,7 +13,9 @@ DEBUG = False
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
-if not BOT_TOKEN:  # noqa: F405
+# Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
+# placeholder values; the real token is provided at runtime via .env.docker.
+if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
     raise ImproperlyConfigured(
         "BOT_TOKEN must be set in production. "
         "Provide it via the .env.docker runtime file."
