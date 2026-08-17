@@ -1,7 +1,7 @@
 """
 Copy Ad service — creates a new draft ad based on an existing one.
 
-Preserves category, description (all languages), address, coordinates,
+Preserves category, description (all languages), address,
 photos (new rows, same files), features, and contacts.
 The seller must set a new purpose, price, title, and description.
 """
@@ -47,9 +47,6 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
             description_en=source.description_en,
             description_bs=source.description_bs,
             original_language=source.original_language,
-            # Coordinates
-            latitude=source.latitude,
-            longitude=source.longitude,
             # Copy listing purpose
             listing_purpose_id=source.listing_purpose_id,
         )
