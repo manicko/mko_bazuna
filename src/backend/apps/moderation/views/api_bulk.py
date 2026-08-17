@@ -8,6 +8,7 @@ import json
 import logging
 
 from apps.ads.models import Ad
+from apps.core.enums import BulkModerationAction
 from apps.moderation.admin_actions import approve_ad, reject_ad
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required_api
@@ -42,19 +43,23 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
     ad_ids: list[int] = data.get("selected_items", [])
     reason: str = data.get("reason", "")
 
+    try:
+        action_enum = BulkModerationAction(action)
+    except ValueError:
+        logger.warning("Unknown bulk moderation action: %s", action)
+        return JsonResponse({"error": f"Unknown action: {action}"}, status=400)
+
     results: dict[str, object] = {"completed": 0, "errors": []}
 
     for ad_id in ad_ids:
         try:
             ad = Ad.objects.get(id=ad_id)
-            if action == "approve":
+            if action_enum is BulkModerationAction.APPROVE:
                 approve_ad(ad, request.user.id)
-            elif action == "reject":
+            elif action_enum is BulkModerationAction.REJECT:
                 reject_ad(ad, request.user.id, reason)
-            elif action == "flag":
+            elif action_enum is BulkModerationAction.FLAG:
                 PriorityService().calculate_and_save(ad)
-            else:
-                raise ValueError(f"Unknown action: {action}")
 
             results["completed"] += 1  # type: ignore[operator]
         except Exception as e:

@@ -19,7 +19,12 @@ from django.urls import reverse
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdPriorityLevel, AdSource, AdStatus
+from apps.core.enums import (
+    AdPriorityLevel,
+    AdSource,
+    AdStatus,
+    BulkModerationAction,
+)
 from apps.locations.models import City
 from apps.moderation.models import AdModerationPriority, ModerationCriteria
 from apps.moderation.services.priority import PriorityService
@@ -166,7 +171,9 @@ class TestPriorityService(TestCase):
         """calculate_and_save correctly computes score with banned words."""
         _banned_words_setup("spam", "scam")
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="spam offer",
         )
 
@@ -189,7 +196,9 @@ class TestPriorityService(TestCase):
     def test_get_queued_ads_excludes_published_ads(self) -> None:
         """get_queued_ads excludes published ads."""
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             status=AdStatus.PUBLISHED,
         )
         self.service.calculate_and_save(ad)
@@ -201,7 +210,9 @@ class TestPriorityService(TestCase):
     def test_get_queued_ads_excludes_archived_ads(self) -> None:
         """get_queued_ads excludes archived ads."""
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             status=AdStatus.ARCHIVED,
         )
         self.service.calculate_and_save(ad)
@@ -214,13 +225,17 @@ class TestPriorityService(TestCase):
         """get_queued_ads filters by priority level when filter is provided."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
         high_ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="spam scam cheap fake counterfeit",
         )
         self.service.calculate_and_save(high_ad)
 
         low_ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="Clean title",
             description="Clean description",
         )
@@ -246,13 +261,17 @@ class TestPriorityService(TestCase):
         """get_priority_counts returns correct counts per priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
         high_ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="spam scam cheap fake counterfeit",
         )
         self.service.calculate_and_save(high_ad)
 
         low_ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="Clean title",
             description="Clean description",
         )
@@ -267,7 +286,9 @@ class TestPriorityService(TestCase):
     def test_get_priority_counts_excludes_non_moderation_ads(self) -> None:
         """get_priority_counts excludes ads that are not in moderation status."""
         high_ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="spam scam cheap",
             status=AdStatus.PUBLISHED,
         )
@@ -300,12 +321,16 @@ class TestCalculateAdPrioritySignal(TestCase):
         ad.refresh_from_db()
 
         self.assertTrue(hasattr(ad, "moderation_priority"))
-        self.assertEqual(ad.moderation_priority.priority_level, AdPriorityLevel.LOW.value)
+        self.assertEqual(
+            ad.moderation_priority.priority_level, AdPriorityLevel.LOW.value
+        )
 
     def test_signal_does_not_create_priority_for_draft(self) -> None:
         """Signal does NOT create priority for DRAFT ads."""
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             status=AdStatus.DRAFT,
         )
 
@@ -316,7 +341,9 @@ class TestCalculateAdPrioritySignal(TestCase):
     def test_signal_does_not_create_priority_for_published(self) -> None:
         """Signal does NOT create priority for PUBLISHED ads."""
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             status=AdStatus.PUBLISHED,
         )
 
@@ -392,7 +419,9 @@ class TestModerationQueueView(TestCase):
     def test_queue_filters_by_priority(self) -> None:
         """Queue page filters by priority parameter."""
         ad = _make_ad(
-            self.user, self.category, self.city,
+            self.user,
+            self.category,
+            self.city,
             title="Low priority ad",
         )
         PriorityService().calculate_and_save(ad)
@@ -440,7 +469,9 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "approve", "selected_items": []}),
+            data=json.dumps(
+                {"action": BulkModerationAction.APPROVE.value, "selected_items": []}
+            ),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 403)
@@ -459,7 +490,12 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "approve", "selected_items": [ad1.id, ad2.id]}),
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [ad1.id, ad2.id],
+                }
+            ),
             content_type="application/json",
         )
 
@@ -482,11 +518,13 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({
-                "action": "reject",
-                "selected_items": [ad1.id, ad2.id],
-                "reason": "Duplicate content",
-            }),
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.REJECT.value,
+                    "selected_items": [ad1.id, ad2.id],
+                    "reason": "Duplicate content",
+                }
+            ),
             content_type="application/json",
         )
 
@@ -508,7 +546,9 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "flag", "selected_items": [ad.id]}),
+            data=json.dumps(
+                {"action": BulkModerationAction.FLAG.value, "selected_items": [ad.id]}
+            ),
             content_type="application/json",
         )
 
@@ -525,7 +565,12 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "approve", "selected_items": [99999]}),
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [99999],
+                }
+            ),
             content_type="application/json",
         )
 
@@ -535,22 +580,18 @@ class TestBulkModerationActionView(TestCase):
         self.assertEqual(len(data["errors"]), 1)
         self.assertEqual(data["errors"][0]["id"], 99999)
 
-    def test_unknown_action_returns_error(self) -> None:
-        """Unknown action type returns an error for the item."""
-        ad = _make_ad(self.user, self.category, self.city)
-
+    def test_unknown_action_returns_400(self) -> None:
+        """Unknown action type is rejected with 400 before any item is processed."""
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "unknown", "selected_items": [ad.id]}),
+            data=json.dumps({"action": "unknown", "selected_items": [1]}),
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data["completed"], 0)
-        self.assertEqual(len(data["errors"]), 1)
-        self.assertEqual(data["errors"][0]["error"], "Processing failed")
+        self.assertEqual(data["error"], "Unknown action: unknown")
 
     # ── Finding 01: approve_ad enforces POST-only ─────────────────────────
 
@@ -601,7 +642,12 @@ class TestBulkModerationActionView(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.bulk_url,
-            data=json.dumps({"action": "approve", "selected_items": [99999]}),
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [99999],
+                }
+            ),
             content_type="application/json",
         )
 

@@ -130,6 +130,14 @@ class ModeratorActionType(StrEnum):
     OTHER = "other"
 
 
+class BulkModerationAction(StrEnum):
+    """Bulk moderation action types for the moderation API."""
+
+    APPROVE = "approve"
+    REJECT = "reject"
+    FLAG = "flag"
+
+
 class CategoryRejectReason(StrEnum):
     """
     Category reject reasons for UI/admin vocabulary.
@@ -209,6 +217,7 @@ __all__ = [
     "AnalyticsEventType",
     "TrustLevel",
     "ModeratorActionType",
+    "BulkModerationAction",
     "CategoryRejectReason",
     "AdPriorityLevel",
     "ThumbnailSizeStrEnum",
