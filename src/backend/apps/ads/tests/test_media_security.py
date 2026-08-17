@@ -96,7 +96,10 @@ def jpeg_with_exif() -> bytes:
     exif_dict = {
         ExifBase.Make: "CameraMaker",
         ExifBase.Model: "CameraModel",
-        ExifBase.GPSInfo: b"\x02\x03\x04\x05",  # Mock GPS data
+        # GPSInfo (tag 0x8825) must be an IFD sub-table dict, not raw bytes:
+        # PIL's Exif.tobytes() serializes it as a nested IFD, and dict values
+        # are interpreted as the tag's typed IFD entries (e.g. {1: "N"} = GPSLatitudeRef).
+        ExifBase.GPSInfo: {1: "N"},
     }
     exif_bytes = img.getexif()
     for tag, value in exif_dict.items():
