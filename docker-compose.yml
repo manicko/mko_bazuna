@@ -60,6 +60,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
@@ -69,6 +71,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       BOT_TOKEN: ${BOT_TOKEN}
+      REDIS_URL: redis://redis:6379/0
     env_file:
       - .env.docker
     volumes:
@@ -122,6 +125,7 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - SEED_USERS=${SEED_USERS:-10}
       - SEED_ADS=${SEED_ADS:-30}
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env.docker
     volumes:

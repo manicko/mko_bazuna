@@ -1,0 +1,10 @@
+# Shell scripts must use LF line endings (CRLF breaks execution in Linux containers)
+*.sh text eol=lf
+# JSON files: LF for consistency
+*.json text eol=lf
+# YAML files: LF for consistency
+*.yaml text eol=lf
+*.yml text eol=lf
+# CSS and lock files: LF for consistency
+*.css text eol=lf
+*.lock text eol=lf

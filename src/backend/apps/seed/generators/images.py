@@ -44,6 +44,7 @@ class ImageGenerator(BaseGenerator):
         self.ads = ads
         self.photo_pool: dict[str, list[ManifestEntry]] = {}
         self.default_pool: list[ManifestEntry] = []
+        self.all_image_keys: list[str] = []
         self._load_manifest()
 
     def _load_manifest(self) -> None:
@@ -102,6 +103,7 @@ class ImageGenerator(BaseGenerator):
 
         # Phase 1: Pre-process images
         image_keys = self._preprocess_images(all_entries, seed_dir, thumbnail_service)
+        self.all_image_keys = image_keys
 
         # Build lookup: category_slug -> list of storage keys
         category_key_map: dict[str, list[str]] = {}
@@ -190,7 +192,7 @@ class ImageGenerator(BaseGenerator):
 
         Returns:
             List of storage keys for the best-matching category, or the
-            default pool if no category or parent has photos.
+            default pool / all available photos as a last-resort fallback.
         """
         # 1. Direct category match
         keys = category_key_map.get(ad.category.slug)
@@ -205,8 +207,9 @@ class ImageGenerator(BaseGenerator):
                 return keys
             node = node.parent
 
-        # 3. Default pool (neutral, generic photos)
-        return category_key_map.get("__default__", [])
+        # 3. Last resort: default pool, then ALL available photos as a
+        #    safety net so no ad is ever left without images.
+        return category_key_map.get("__default__", []) or self.all_image_keys
 
     def _ensure_seed_dir(self) -> str:
         """Create MEDIA_ROOT/seed/ directory and return its path."""

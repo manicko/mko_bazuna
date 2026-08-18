@@ -52,6 +52,9 @@ services:
   seed:
     profiles: !reset []
     entrypoint: /app/entrypoint-seed.sh
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.dev
+      - REDIS_URL=
     volumes:
       - .:/app
       - ./docker/entrypoint-seed.sh:/app/entrypoint-seed.sh
