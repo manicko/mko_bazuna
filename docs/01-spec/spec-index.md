@@ -85,7 +85,7 @@ any → `DELETED`.
 
 ## Key tables
 
-`users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
+`users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`

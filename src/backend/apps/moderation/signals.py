@@ -12,6 +12,8 @@ from apps.core.enums import AdStatus
 from apps.moderation.models import ModerationCriteria
 from apps.moderation.services.auto_moderation import _invalidate_criteria_cache
 from apps.moderation.services.priority import PriorityService
+from django.conf import settings
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -48,3 +50,27 @@ def calculate_ad_priority(sender, instance, **kwargs):
             logger.info("Calculated priority for ad %s", instance.id)
     except Exception as e:
         logger.error("Failed to calculate priority for ad %s: %s", instance.id, e)
+
+
+@receiver(post_save, sender=Ad)
+def deliver_immediate_alerts_on_publish(sender, instance, **kwargs):
+    """
+    Schedule near-real-time alert delivery when an ad is PUBLISHED (AL-001).
+
+    Guarded by ``settings.IMMEDIATE_ALERTS_ENABLED`` (default OFF = safe
+    rollout, CR15). Delivery runs inside ``transaction.on_commit`` so it only
+    fires after the PUBLISHED commit, and the daily ``send_alerts`` command
+    remains the catch-all/backfill (A5/C8).
+    """
+    if not getattr(settings, "IMMEDIATE_ALERTS_ENABLED", False):
+        return
+
+    if instance.status != AdStatus.PUBLISHED:
+        return
+
+    def _deliver() -> None:
+        from apps.search.services.immediate_alerts import deliver_immediate_alerts
+
+        deliver_immediate_alerts(instance.id)
+
+    transaction.on_commit(_deliver)

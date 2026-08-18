@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     "apps.trust",
     "apps.analytics",
     "apps.seed",
+    "apps.cabinet",
 ]
 
 MIDDLEWARE = [
@@ -213,6 +214,19 @@ LOGIN_URL = "/login/issue/"
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
+
+# Public site URL used for absolute links (e.g. Telegram alert messages).
+# Normalized to have no trailing slash. A sensible dev default is provided so
+# dev/test absolute links never 500 (R10); production reads it from env.
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000").rstrip("/")
+
+# Near-real-time publish-time alert delivery (AL-001). Default OFF so rollout
+# is opt-in (CR15 / R1); the daily `send_alerts` command always backfills.
+IMMEDIATE_ALERTS_ENABLED = os.getenv("IMMEDIATE_ALERTS_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # Plausible analytics host (cookieless, no consent banner needed)
 # Format: hostname only, e.g., "analytics.example.com" or "plausible.io"

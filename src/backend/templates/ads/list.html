@@ -14,10 +14,21 @@
     {% endif %}
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     {% include "components/header_catalog.html" %}
 
     <main class="container mx-auto px-4 py-6">
+        {% if request.user.is_authenticated and cities %}
+            <div class="mb-4 flex justify-end">
+                <button type="button"
+                        onclick="var m=document.getElementById('save-search-modal'); if(m) m.classList.remove('hidden');"
+                        class="px-4 py-2 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm font-medium">
+                    🔔 {% trans "Save search" %}
+                </button>
+                {% include "search/partials/save_search_modal.html" %}
+            </div>
+        {% endif %}
         <!-- Dynamic content (ad grid, suggestions, pagination) -->
         <div id="ad-list">
             {% include "ads/partials/ad_list.html" %}

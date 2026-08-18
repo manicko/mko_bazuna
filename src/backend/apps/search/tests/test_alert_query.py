@@ -7,6 +7,8 @@ Covers:
   ordering, 10-ad limit
 - ``record_notifications``: bulk creation with ``ignore_conflicts`` dedup
 - ``send_alerts`` management command: dry-run mode
+- ``find_matching_saved_searches``: ad-centric matcher (AL-001)
+- ``deliver_immediate_alerts``: idempotent recording + gate behavior (AL-001)
 """
 
 import pytest
@@ -18,7 +20,11 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.search.models import SavedSearch, SavedSearchNotification
-from apps.search.services.alert_query import find_matching_ads, record_notifications
+from apps.search.services.alert_query import (
+    find_matching_ads,
+    find_matching_saved_searches,
+    record_notifications,
+)
 from apps.users.models import User
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
@@ -461,3 +467,144 @@ class TestSendAlertsCommand:
 
         assert "DRY RUN" in caplog.text
         assert "0 saved searches" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# find_matching_saved_searches (ad-centric matcher, AL-001)
+# ---------------------------------------------------------------------------
+
+
+class TestFindMatchingSavedSearches:
+    """Tests for the ad-centric matcher used by immediate alerts."""
+
+    def test_returns_active_searches_matching_ad(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        # No-query search matches the ad via structural filters only.
+        SavedSearch.objects.create(user=buyer, is_active=True)
+
+        matches = find_matching_saved_searches(ad)
+        assert len(matches) == 1
+        assert matches[0].user == buyer
+
+    def test_excludes_inactive_searches(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        SavedSearch.objects.create(
+            user=buyer, query="велосипед", language="ru", is_active=False
+        )
+
+        assert find_matching_saved_searches(ad) == []
+
+    def test_filters_by_city(
+        self, seller: User, buyer: User, category: Category, city: City, other_city: City
+    ) -> None:
+        ad = _create_published_ad(seller, category, city, title="Велосипед")
+        # A search for another city must not match.
+        SavedSearch.objects.create(
+            user=buyer, city=other_city, is_active=True
+        )
+
+        assert find_matching_saved_searches(ad) == []
+
+    def test_filters_by_category_subtree(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        subcategory: Category,
+        unrelated_category: Category,
+        city: City,
+    ) -> None:
+        # Ad in a subcategory matches a search on the parent category (subtree).
+        ad = _create_published_ad(seller, subcategory, city, title="Горный велосипед")
+        SavedSearch.objects.create(user=buyer, category=category, is_active=True)
+        # Ad in an unrelated category must not match.
+        ad_unrelated = _create_published_ad(seller, unrelated_category, city, title="Диван")
+        SavedSearch.objects.create(user=buyer, category=unrelated_category, is_active=True)
+
+        matches = find_matching_saved_searches(ad)
+        assert len(matches) == 1  # only the parent-category search
+
+        matches_unrelated = find_matching_saved_searches(ad_unrelated)
+        assert len(matches_unrelated) == 1  # only the unrelated-category search
+
+    def test_filters_by_price_range(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        in_range = _create_published_ad(seller, category, city, title="В диапазоне", price=200)
+        too_cheap = _create_published_ad(seller, category, city, title="Дешевый", price=50)
+        too_expensive = _create_published_ad(seller, category, city, title="Дорогой", price=500)
+        SavedSearch.objects.create(
+            user=buyer, min_price=100, max_price=300, is_active=True
+        )
+
+        assert len(find_matching_saved_searches(in_range)) == 1
+        assert find_matching_saved_searches(too_cheap) == []
+        assert find_matching_saved_searches(too_expensive) == []
+
+        # No price filter also matches.
+        SavedSearch.objects.create(user=buyer, is_active=True)
+        assert len(find_matching_saved_searches(too_cheap)) == 1
+
+
+# ---------------------------------------------------------------------------
+# Immediate publish-time alerts (AL-001) — dedup + gate
+# ---------------------------------------------------------------------------
+
+
+class TestDeliverImmediateAlerts:
+    """Tests for deliver_immediate_alerts idempotency (no double-send)."""
+
+    def test_records_notification_idempotently(
+        self, seller: User, buyer: User, category: Category, city: City, monkeypatch
+    ) -> None:
+        # Keep the background Telegram thread from running in tests.
+        class FakeThread:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def start(self):
+                pass
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts.threading.Thread", FakeThread
+        )
+
+        from apps.search.services.immediate_alerts import deliver_immediate_alerts
+
+        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        # No-query active search matches the ad via structural filters only.
+        ss = SavedSearch.objects.create(user=buyer, is_active=True)
+
+        deliver_immediate_alerts(ad.id)
+        assert SavedSearchNotification.objects.filter(saved_search=ss, ad=ad).count() == 1
+
+        # Re-running (re-publish / backfill) must not double-send.
+        deliver_immediate_alerts(ad.id)
+        assert SavedSearchNotification.objects.filter(saved_search=ss, ad=ad).count() == 1
+
+    def test_non_published_ad_is_noop(self, seller: User) -> None:
+        from apps.search.services.immediate_alerts import deliver_immediate_alerts
+
+        draft = _create_published_ad(seller, None, None, status=AdStatus.DRAFT)
+        deliver_immediate_alerts(draft.id)
+        assert SavedSearchNotification.objects.count() == 0
+
+
+class TestImmediateAlertsGate:
+    """IMMEDIATE_ALERTS_ENABLED=False (default) disables publish-time delivery."""
+
+    def test_gate_off_does_not_deliver_on_publish(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        # Default gate is OFF; the signal early-returns so no notification is
+        # recorded for the published ad.
+        _create_published_ad(seller, category, city, title="Красный велосипед")
+        SavedSearch.objects.create(
+            user=buyer, query="велосипед", language="ru", is_active=True
+        )
+
+        assert SavedSearchNotification.objects.count() == 0

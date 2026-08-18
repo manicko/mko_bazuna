@@ -1,0 +1,79 @@
+{# Saved-search edit form (CAB-003). Edits the filters; preserves the user's
+   LANGUAGE_CODE on save. #}
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% trans "Edit saved search" %} - Mko Bazuna</title>
+    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+    {% if PLAUSIBLE_HOST %}
+    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+    {% endif %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% include "components/header.html" %}
+
+    <main class="container mx-auto px-4 py-6 max-w-2xl">
+        <h2 class="text-xl font-semibold mb-4">{% trans "Edit saved search" %}</h2>
+
+        {% include "components/cabinet_nav.html" %}
+
+        <form method="post" action="{% url 'cabinet:saved-search-edit' saved_search.id %}"
+              class="bg-white rounded-lg shadow p-6 space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium mb-1">{% trans "Search query" %}</label>
+                <input type="text" name="query" value="{{ saved_search.query|default:'' }}"
+                       class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">{% trans "City (optional)" %}</label>
+                <select name="city_id" class="w-full px-3 py-2 border rounded-lg">
+                    <option value="">{% trans "Any city" %}</option>
+                    {% for city in cities %}
+                    <option value="{{ city.id }}" {% if saved_search.city_id == city.id %}selected{% endif %}>
+                        {{ city.get_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">{% trans "Category (optional)" %}</label>
+                <select name="category_id" class="w-full px-3 py-2 border rounded-lg">
+                    <option value="">{% trans "Any category" %}</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if saved_search.category_id == category.id %}selected{% endif %}>
+                        {{ category.get_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm font-medium mb-1">{% trans "Min price (BAM)" %}</label>
+                    <input type="number" name="min_price" value="{{ saved_search.min_price|default:'' }}"
+                           class="w-full px-3 py-2 border rounded-lg" min="0">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">{% trans "Max price (BAM)" %}</label>
+                    <input type="number" name="max_price" value="{{ saved_search.max_price|default:'' }}"
+                           class="w-full px-3 py-2 border rounded-lg" min="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <a href="{% url 'cabinet:saved-searches' %}"
+                   class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                    {% trans "Cancel" %}
+                </a>
+                <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    {% trans "Save" %}
+                </button>
+            </div>
+        </form>
+    </main>
+</body>
+</html>

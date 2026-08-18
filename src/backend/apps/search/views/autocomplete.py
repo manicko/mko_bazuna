@@ -61,7 +61,7 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
 
     # 1. User search history (highest priority, shown first).
     user_id = request.user.id if request.user.is_authenticated else None
-    user_history = get_user_search_history(user_id)
+    user_history = get_user_search_history(user_id, session=request.session)
     for item in user_history:
         suggestions.append({
             "text": item,

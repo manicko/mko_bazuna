@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from django.conf import settings
+from django.urls import reverse
 
 
 class Ad(models.Model):
@@ -457,6 +458,14 @@ class Ad(models.Model):
                 return val
         return ""
 
+    def get_absolute_url(self) -> str:
+        """Return the absolute URL to this ad's detail page.
+
+        Builds ``{SITE_URL}{reverse('ads:detail', args=[id])}`` so links
+        embedded in Telegram alert messages are publicly reachable.
+        """
+        return f"{settings.SITE_URL}{reverse('ads:detail', args=[self.id])}"
+
 
 class AdImage(models.Model):
     """Ad image with UUID v4 storage key for URL anonymity.
@@ -590,3 +599,47 @@ class AdFeature(models.Model):
 
     def __str__(self) -> str:
         return f"Ad {self.ad_id} -> {self.feature.slug}"
+
+
+class AdFavorite(models.Model):
+    """A user's favorite (bookmarked) ad for the cabinet Favorites section.
+
+    Deduplication is enforced by the ``uq_user_ad_favorite`` unique constraint
+    on ``(user, ad)`` so toggling a favorite with ``ignore_conflicts=True`` is
+    safe.
+    """
+
+    user = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="favorites",
+        help_text="User who favorited the ad",
+    )
+    ad = models.ForeignKey(
+        "ads.Ad",
+        on_delete=models.CASCADE,
+        related_name="favorites",
+        help_text="The favorited ad",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the ad was favorited",
+    )
+
+    class Meta:
+        db_table = "ad_favorites"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "ad"],
+                name="uq_user_ad_favorite",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user_id", "-created_at"],
+                name="ad_favorites_user_created_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"AdFavorite {self.id}: user={self.user_id}, ad={self.ad_id}"

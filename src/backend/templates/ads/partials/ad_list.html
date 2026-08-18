@@ -24,7 +24,11 @@
 {% if page_obj %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for ad in page_obj %}
-            <article class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+            <article class="relative bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                {# Favorite heart (outside the card link so it never blocks navigation) #}
+                <div class="absolute top-2 right-2 z-10 bg-white/90 rounded-full shadow-sm">
+                    {% include "components/favorite_heart.html" with ad=ad is_favorited=ad.is_favorited %}
+                </div>
                 <a href="{% url 'ads:detail' ad.id %}" class="block">
                     {% if ad.images.first %}
                         <img 

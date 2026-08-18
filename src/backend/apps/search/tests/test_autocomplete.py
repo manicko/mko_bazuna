@@ -220,7 +220,7 @@ class TestAutocompleteEndpoint:
     def test_autocomplete_anonymous_user_returns_popular_and_entities(
         self, root_category: Category, city: City
     ) -> None:
-        """Anonymous users get popular + entity suggestions (no user history)."""
+        """Anonymous users with no session history get popular + entity suggestions."""
         PopularSearch.objects.create(
             query="велосипед", query_normalized="велосипед", hit_count=20
         )
@@ -239,9 +239,26 @@ class TestAutocompleteEndpoint:
         suggestions = response.json()["suggestions"]
         # Should have popular search and possibly entity matches
         assert len(suggestions) > 0
-        # No user_history source for anonymous
+        # No user_history source for anonymous with no session history
         for s in suggestions:
             assert s["source"] != SearchSuggestionSource.USER_HISTORY.value
+
+    def test_autocomplete_anonymous_user_returns_session_history(
+        self, root_category: Category, city: City
+    ) -> None:
+        """Anonymous users get their session-scoped history in suggestions."""
+        # Record session history via the anonymous search flow, then query.
+        client = Client()
+        client.get("/search/?q=велосипед-сессия")
+        response = client.get("/api/search/autocomplete", {"q": "вел"})
+        assert response.status_code == 200
+        suggestions = response.json()["suggestions"]
+        user_history = [
+            s["text"]
+            for s in suggestions
+            if s["source"] == SearchSuggestionSource.USER_HISTORY.value
+        ]
+        assert "велосипед-сессия" in user_history
 
     def test_autocomplete_malicious_query_sanitized(
         self,
@@ -335,10 +352,35 @@ class TestSearchHistoryService:
         record_search_history(buyer.id, "тест")
         assert SearchHistory.objects.filter(user=buyer, query_normalized="тест").exists()
 
-    def test_record_search_history_anonymous_is_noop(self) -> None:
-        """Anonymous user (None) is a no-op."""
+    def test_record_search_history_anonymous_without_session_is_noop(self) -> None:
+        """Anonymous user with no session is a no-op."""
         record_search_history(None, "тест")
         assert SearchHistory.objects.count() == 0
+
+    def test_record_search_history_anonymous_session_scoped(self) -> None:
+        """Anonymous user history is stored in the session (not the DB)."""
+        from django.contrib.sessions.backends.db import SessionStore
+
+        session = SessionStore()
+
+        record_search_history(None, "Тест", session=session)
+        record_search_history(None, "тест", session=session)  # dedup by normalized
+
+        # Nothing written to the DB.
+        assert SearchHistory.objects.count() == 0
+        # Stored in the session, deduped to a single entry.
+        assert len(session["search_history"]) == 1
+        assert session["search_history"][0]["query_normalized"] == "тест"
+
+    def test_record_search_history_anonymous_session_caps_at_50(self) -> None:
+        """Anonymous session history is capped at 50 entries."""
+        from django.contrib.sessions.backends.db import SessionStore
+
+        session = SessionStore()
+        for i in range(60):
+            record_search_history(None, f"query{i}", session=session)
+
+        assert len(session["search_history"]) == 50
 
     def test_record_search_history_deduplicates(self, buyer: User) -> None:
         """Same normalized query replaces previous entry."""
@@ -363,8 +405,19 @@ class TestSearchHistoryService:
         assert results == ["третий", "второй", "первый"]
 
     def test_get_user_search_history_anonymous_returns_empty(self) -> None:
-        """Anonymous user returns empty list."""
+        """Anonymous user with no session returns empty list."""
         assert get_user_search_history(None) == []
+
+    def test_get_user_search_history_anonymous_session(self) -> None:
+        """Anonymous user returns session history when present, most-recent-first."""
+        from django.contrib.sessions.backends.db import SessionStore
+
+        session = SessionStore()
+        record_search_history(None, "первый", session=session)
+        record_search_history(None, "второй", session=session)
+
+        assert get_user_search_history(None, session=session) == ["второй", "первый"]
+        assert get_user_search_history(None, limit=1, session=session) == ["второй"]
 
     def test_get_user_search_history_respects_limit(self, buyer: User) -> None:
         """Limit parameter caps the number of results."""
@@ -549,10 +602,10 @@ class TestSearchViewRecordsAutocompleteData:
             user=buyer, query_normalized="велосипед"
         ).exists()
 
-    def test_search_anonymous_does_not_record_history(
+    def test_search_anonymous_records_session_history(
         self, seller: User, root_category: Category, city: City
     ) -> None:
-        """Anonymous user's search is NOT recorded in history (but IS recorded as popular)."""
+        """Anonymous user's search IS recorded in session history (not the DB)."""
         Ad.objects.create(
             user=seller,
             title="Велосипед для продажи",
@@ -567,10 +620,17 @@ class TestSearchViewRecordsAutocompleteData:
         client = Client()
         client.get("/search/?q=велосипед")
 
-        # Anonymous user should not have history
+        # Anonymous user should NOT have DB history...
         assert SearchHistory.objects.filter(query_normalized="велосипед").count() == 0
 
-        # But popular search should still be recorded
+        # ...but SHOULD have session-scoped history.
+        session = client.session
+        assert any(
+            e["query_normalized"] == "велосипед"
+            for e in (session.get("search_history") or [])
+        )
+
+        # And popular search should still be recorded
         assert PopularSearch.objects.filter(query_normalized="велосипед").exists()
 
     def test_search_context_has_breadcrumb_category(

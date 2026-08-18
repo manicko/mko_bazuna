@@ -378,8 +378,28 @@ max_price (POSITIVE INT, nullable)
 is_active (BOOL, default True)
 language (VARCHAR(5), nullable, default 'bs')   # LanguageLocale code; legacy rows backfilled to 'ru'
 created_at (TIMESTAMP)
+updated_at (TIMESTAMP, auto_now=True)          # last-modified (plan 16 / FND-001)
+last_notified_at (TIMESTAMP, nullable)          # last time this search produced a notification
+unsubscribe_token (VARCHAR(40), unique, db_index, nullable)  # opaque capability token (32 URL-safe chars)
 
+Index: IX_saved_searches_user_active (user_id, is_active)
 db_table: saved_searches
+```
+
+---
+
+### AdFavorite
+A user's favorite (bookmarked) ad for the cabinet Favorites section (plan 16 / FND-002).
+
+```
+id (PK)
+user_id (FK → users.id, CASCADE, related_name=favorites)
+ad_id (FK → ads.id, CASCADE, related_name=favorites)
+created_at (TIMESTAMP, auto_now_add=True)
+
+Unique constraint: (user_id, ad_id) — name: uq_user_ad_favorite
+Index: ad_favorites_user_created_idx (user_id, -created_at)
+db_table: ad_favorites
 ```
 
 ---

@@ -56,6 +56,9 @@ class _EmptyQuerySet(list):
     def order_by(self, *args: object, **kwargs: object) -> _EmptyQuerySet:
         return self
 
+    def annotate(self, *args: object, **kwargs: object) -> _EmptyQuerySet:
+        return self
+
 
 class TestListingsFilterContext(SimpleTestCase):
     """vrf_002 — the tsk_002 filter context flows through ``listings()``."""

@@ -127,3 +127,94 @@ def record_notifications(saved_search: SavedSearch, ads: list[Ad]) -> int:
             saved_search.pk,
         )
     return count
+
+
+def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
+    """
+    Find active saved searches whose filters match a given PUBLISHED ad.
+
+    This is the ad-centric inverse of ``find_matching_ads``: per saved search
+    it applies the language-aware FTS query against the *ad's own vector*,
+    a city filter, a category-subtree filter, and a price range. Used by the
+    near-real-time publish-time delivery (AL-001).
+
+    Only ``is_active=True`` searches are considered (reuses the
+    ``IX_saved_searches_user_active`` index). Membership in a category subtree
+    is tested via the ad's ``category_id``.
+
+    Args:
+        ad: A PUBLISHED Ad to match saved searches against.
+
+    Returns:
+        List of active SavedSearch objects matching the ad.
+    """
+    candidates = SavedSearch.objects.filter(is_active=True).select_related(
+        "user", "city", "category"
+    )
+
+    matches: list[SavedSearch] = []
+    for saved_search in candidates:
+        if not _ad_matches_saved_search(ad, saved_search):
+            continue
+        matches.append(saved_search)
+
+    return matches
+
+
+def _ad_matches_saved_search(ad: Ad, saved_search: SavedSearch) -> bool:
+    """Return True when ``ad`` satisfies all of ``saved_search``'s filters."""
+    # City filter
+    if saved_search.city_id and saved_search.city_id != ad.city_id:
+        return False
+
+    # Price range filter
+    if saved_search.min_price is not None:
+        if ad.price is None or ad.price < saved_search.min_price:
+            return False
+    if saved_search.max_price is not None:
+        if ad.price is None or ad.price > saved_search.max_price:
+            return False
+
+    # Category-subtree filter
+    if saved_search.category_id and not _ad_in_category_subtree(
+        ad, saved_search.category_id
+    ):
+        return False
+
+    # Language-aware FTS query against the ad's own vector
+    if saved_search.query and not _ad_matches_vector(ad, saved_search):
+        return False
+
+    return True
+
+
+def _ad_in_category_subtree(ad: Ad, category_id: int) -> bool:
+    """Return True when the ad's category is inside the given subtree."""
+    descendant_ids = list(
+        Category.objects.get(pk=category_id)
+        .get_descendants(include_self=True)
+        .values_list("pk", flat=True)
+    )
+    return ad.category_id in descendant_ids
+
+
+def _ad_matches_vector(ad: Ad, saved_search: SavedSearch) -> bool:
+    """Return True when the saved search's FTS query matches the ad's vector.
+
+    The query is searched against the vector for the saved search's persisted
+    ``language`` (falling back to Russian), reusing the FTS config/field
+    selection pattern from ``find_matching_ads``.
+    """
+    locale = LanguageLocale.from_code(
+        saved_search.language,
+        fallback=LanguageLocale.RUSSIAN,
+    )
+    search_query = SearchQuery(
+        saved_search.query,
+        search_type="websearch",
+        config=locale.fts_config,
+    )
+    return Ad.objects.filter(
+        pk=ad.pk,
+        **{locale.fts_vector_field: search_query},
+    ).exists()

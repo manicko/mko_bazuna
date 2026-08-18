@@ -1,0 +1,29 @@
+{# Shared cabinet section nav. Rendered on all cabinet pages (CAB-001).
+   "Мои объявления" links to the existing /dashboard/ (unchanged, C9). #}
+{% load i18n %}
+<nav class="flex flex-wrap gap-2 mb-6" aria-label="{% trans "Cabinet" %}">
+    <a href="{% url 'cabinet:home' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg {% if request.resolver_match.url_name == 'home' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-blue-50{% endif %}">
+        {% trans "Cabinet" %}
+    </a>
+    <a href="{% url 'cabinet:favorites' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg {% if request.resolver_match.url_name == 'favorites' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-blue-50{% endif %}">
+        {% trans "Favorites" %}
+    </a>
+    <a href="{% url 'cabinet:saved-searches' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg {% if request.resolver_match.url_name == 'saved-searches' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-blue-50{% endif %}">
+        {% trans "Saved searches" %}
+    </a>
+    <a href="{% url 'cabinet:search-history' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg {% if request.resolver_match.url_name == 'search-history' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-blue-50{% endif %}">
+        {% trans "Search history" %}
+    </a>
+    <a href="{% url 'ads:dashboard' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 hover:bg-blue-50">
+        {% trans "My ads" %}
+    </a>
+    <a href="{% url 'cabinet:settings' %}"
+       class="px-3 py-2 text-sm font-medium rounded-lg {% if request.resolver_match.url_name == 'settings' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-blue-50{% endif %}">
+        {% trans "Settings" %}
+    </a>
+</nav>

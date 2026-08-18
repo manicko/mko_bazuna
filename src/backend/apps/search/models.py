@@ -4,6 +4,8 @@ PopularSearch model for autocomplete suggestions.
 Tracks popular search queries with hit count and last seen timestamp.
 """
 
+import secrets
+
 from django.db import models
 
 
@@ -99,6 +101,26 @@ class SavedSearch(models.Model):
         auto_now_add=True,
         help_text="When this saved search was created",
     )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When this saved search was last modified",
+    )
+    last_notified_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Last time this search produced a notification",
+    )
+    unsubscribe_token = models.CharField(
+        max_length=40,
+        unique=True,
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text=(
+            "Opaque server-generated capability token for Telegram unsubscribe "
+            "deep-links and inline callbacks (never derived from the PK)"
+        ),
+    )
 
     class Meta:
         db_table = "saved_searches"
@@ -108,6 +130,12 @@ class SavedSearch(models.Model):
                 fields=["user_id", "is_active"],
             ),
         ]
+
+    def save(self, *args, **kwargs) -> None:
+        """Auto-generate the opaque ``unsubscribe_token`` on creation."""
+        if not self.unsubscribe_token:
+            self.unsubscribe_token = secrets.token_urlsafe(24)  # 32 URL-safe chars
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"SavedSearch {self.id} for User {self.user_id}"

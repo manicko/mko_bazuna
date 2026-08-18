@@ -90,6 +90,19 @@ def search(request: HttpRequest) -> HttpResponse:
         except ValueError:
             pass
 
+    # Resolve the current city/category filters to object ids so the
+    # save-search modal can prefill its selects (FT-002).
+    selected_city_id: int | None = None
+    if current_city:
+        try:
+            selected_city_id = City.objects.get(slug=current_city).id
+        except City.DoesNotExist:
+            selected_city_id = None
+
+    selected_category_id: int | None = (
+        breadcrumb_category.id if breadcrumb_category else None
+    )
+
     # Sort (parsed for context + pagination URL preservation; FTS branch keeps -rank)
     current_sort = request.GET.get("sort", AdSort.DATE_NEW)
 
@@ -123,12 +136,19 @@ def search(request: HttpRequest) -> HttpResponse:
             user_id=request.user.id if request.user.is_authenticated else None,
         )
 
-        # Record popular search and user history for autocomplete
+        # Record popular search and user history for autocomplete.
+        # Anonymous users get session-scoped, deduped, capped history.
         increment_popular_search(query)
-        if request.user.is_authenticated:
-            record_search_history(request.user.id, query)
+        record_search_history(
+            request.user.id if request.user.is_authenticated else None,
+            query,
+            session=request.session,
+        )
 
     # Paginate results
+    from apps.ads.views.favorite import annotate_favorites
+
+    ads = annotate_favorites(ads, request.user.id if request.user.is_authenticated else None)
     paginator = Paginator(ads, PER_PAGE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -151,6 +171,11 @@ def search(request: HttpRequest) -> HttpResponse:
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,
         "consent_shown": is_consent_given(request),
+        # Save-search modal context (FT-002)
+        "cities": City.objects.order_by("name"),
+        "categories": Category.objects.filter(is_active=True).order_by("name"),
+        "selected_city": selected_city_id,
+        "selected_category": selected_category_id,
     }
 
     # HTMX partial rendering support

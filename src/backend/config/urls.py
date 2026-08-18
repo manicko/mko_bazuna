@@ -11,6 +11,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("moderation/", include("apps.moderation.urls")),
     path("analytics/", include("apps.analytics.urls")),
+    path("cabinet/", include("apps.cabinet.urls")),
     path("", include("apps.users.urls")),
     path("", include("apps.ads.urls")),
     path("", include("apps.categories.urls")),

@@ -79,6 +79,11 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
         "ad": ad,
         "consent_shown": is_consent_given(request),
         "bot_username": settings.BOT_USERNAME,
+        "is_favorited": (
+            ad.favorites.filter(user_id=request.user.id).exists()
+            if request.user.is_authenticated
+            else False
+        ),
     }
 
     return render(request, "ads/detail.html", context)
@@ -369,6 +374,14 @@ def listings(
     else:  # date_desc (default)
 
         ads = ads.order_by("-published_at")
+
+
+
+    # Annotate favorite state for the card hearts (FT-001)
+
+    from apps.ads.views.favorite import annotate_favorites
+
+    ads = annotate_favorites(ads, request.user.id if request.user.is_authenticated else None)
 
 
 

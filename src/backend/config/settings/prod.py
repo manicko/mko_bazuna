@@ -21,6 +21,14 @@ if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
         "Provide it via the .env.docker runtime file."
     )
 
+# SITE_URL is required in production so Telegram alert links are absolute and
+# correct. A dev-only default must not silently leak into prod traffic.
+if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+    raise ImproperlyConfigured(
+        "SITE_URL must be set in production. "
+        "Provide it via the .env.docker runtime file."
+    )
+
 # TLS-ready settings
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -24,6 +24,13 @@
                 </h1>
             </div>
             <div class="flex items-center gap-3">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'cabinet:home' %}"
+                       class="text-sm text-gray-700 hover:text-blue-600"
+                       aria-label="{% trans "Cabinet" %}">
+                        {% trans "Cabinet" %}
+                    </a>
+                {% endif %}
                 <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank" rel="noopener"
                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                    data-place-ad>

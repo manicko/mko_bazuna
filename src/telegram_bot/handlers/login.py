@@ -57,6 +57,12 @@ async def handle_login_deep_link(
     if await handle_contact_start(message, bot, deep_link):
         return
 
+    # Delegate saved-search unsubscribe deep-links to alerts module (AL-002)
+    from telegram_bot.handlers.alerts import handle_unsubscribe_start
+
+    if await handle_unsubscribe_start(message, bot, deep_link):
+        return
+
     # Handle login pattern
     match = LOGIN_PATTERN.match(deep_link)
     if not match:

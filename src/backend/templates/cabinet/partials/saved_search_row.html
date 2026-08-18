@@ -1,0 +1,58 @@
+{# Single saved-search row fragment (CAB-003). Rendered by the list and
+   swapped in place by the enable/disable toggle; the delete form swaps the
+   whole row out. Disable keeps the search saved (D9); delete removes it. #}
+{% load i18n %}
+<div id="ss-row-{{ ss.id }}" class="bg-white rounded-lg shadow p-4 flex flex-col md:flex-row md:items-center gap-4">
+    <div class="flex-1">
+        <div class="flex items-center gap-2 mb-1">
+            {% if ss.is_active %}
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">{% trans "On" %}</span>
+            {% else %}
+                <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">{% trans "Off" %}</span>
+            {% endif %}
+            <span class="font-semibold">{{ ss.query|default:""|truncatechars:50 }}</span>
+        </div>
+        <div class="text-sm text-gray-500 space-y-0.5">
+            <div>
+                {% trans "City:" %} {{ ss.city.get_name|default:"—" }}
+                · {% trans "Category:" %} {{ ss.category.get_name|default:"—" }}
+            </div>
+            <div>
+                {% trans "Price:" %}
+                {% if ss.min_price or ss.max_price %}
+                    {% if ss.min_price %}≥ {{ ss.min_price }}{% endif %}
+                    {% if ss.min_price and ss.max_price %} · {% endif %}
+                    {% if ss.max_price %}≤ {{ ss.max_price }}{% endif %}
+                {% else %}—{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+        <form hx-post="{% url 'cabinet:saved-search-toggle' ss.id %}"
+              hx-target="#ss-row-{{ ss.id }}"
+              hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-3 py-1.5 text-sm rounded-lg border {% if ss.is_active %}text-gray-700 bg-white border-gray-200 hover:bg-gray-50{% else %}text-green-700 bg-green-50 border-green-200 hover:bg-green-100{% endif %}">
+                {% if ss.is_active %}{% trans "Disable" %}{% else %}{% trans "Enable" %}{% endif %}
+            </button>
+        </form>
+
+        <a href="{% url 'cabinet:saved-search-edit' ss.id %}"
+           class="px-3 py-1.5 text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200">
+            {% trans "Edit" %}
+        </a>
+
+        <form hx-post="{% url 'cabinet:saved-search-delete' ss.id %}"
+              hx-target="#ss-row-{{ ss.id }}"
+              hx-swap="outerHTML"
+              onsubmit="return confirm('{% trans "Delete this saved search?" %}');">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200">
+                {% trans "Delete" %}
+            </button>
+        </form>
+    </div>
+</div>
