@@ -89,6 +89,9 @@ def _make_ad(
         "status": status,
         "source": AdSource.TELEGRAM,
     }
+    # PUBLISHED ads require published_at (check constraint ck_ads_published_at_if_published)
+    if status == AdStatus.PUBLISHED:
+        defaults["published_at"] = timezone.now()
     defaults.update(overrides)
     return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
