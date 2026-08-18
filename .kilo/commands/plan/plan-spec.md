@@ -52,18 +52,7 @@ Research is mandatory whenever:
 - external libraries or patterns are involved
 - scalability or maintainability may be affected
 
-4. Load structural context
-
-Read:
-- `.ai/structure/*`
-
-Determine:
-- dependency chains
-- integration boundaries
-- coupling zones
-- semantic insertion points
-
-5. Build the execution DAG
+4. Build the execution DAG
 
 Identify:
 - implementation dependencies
@@ -71,7 +60,7 @@ Identify:
 - isolated implementation units
 - parallel execution groups
 
-6. Decompose implementation
+5. Decompose implementation
 Each task must represent one independently implementable unit.
 
 Avoid:
@@ -79,19 +68,16 @@ Avoid:
 - mixed implementation + testing
 - oversized implementation tasks
 
-Split work whenever independent review or parallel implementation is possible.
-
-7. Define semantic implementation targets
+6. Define semantic implementation targets
 
 For every task specify:
-
 - affected modules
 - affected classes
 - affected services
 - affected functions
 - semantic insertion points
 
-Never reference line numbers.
+Never reference line numbers - they change but semantic anchors (functions names, classes names, variable`s names) are stable.
 
 8. Generate implementation task specifications basing on template:
 `.ai/tasks/templates/task_template.yaml`
@@ -120,16 +106,11 @@ Implementation may proceed only after research recommends:
 - Go
 - Go with changes
 
-10. Insert validation tasks
 
-Generate testing tasks only when implementation is non-trivial.
+9. **Insert test tasks** — only for non-trivial features. Tests must validate user-visible behavior, exercise workflows, detect regressions, integration boundaries
 
-Tests should validate:
+10. **Insert verification tasks** —  dedicated verification tasks for multi-stage/high-risk changes.
 
-- user-visible behavior
-- workflows
-- regressions
-- integration boundaries
 
 ---
 

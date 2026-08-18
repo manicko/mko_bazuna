@@ -42,6 +42,7 @@
       "user_link",
       "rejected_reason",
       "action_ad_link",
+      "features_list",
       "get_queryset",
       "has_view_permission",
       "has_change_permission",
@@ -69,6 +70,40 @@
     "functions": []
   },
   {
+    "path": "backend/apps/ads/management/__init__.py",
+    "module": "backend.apps.ads.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/management/commands/__init__.py",
+    "module": "backend.apps.ads.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/management/commands/backfill_translations.py",
+    "module": "backend.apps.ads.management.commands.backfill_translations",
+    "layer": "other",
+    "imports": [
+      "django.core.management.base",
+      "deep_translator",
+      "apps.ads.models"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "_translate_text",
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
     "path": "backend/apps/ads/migrations/0001_initial.py",
     "module": "backend.apps.ads.migrations.0001_initial",
     "layer": "other",
@@ -81,8 +116,21 @@
     "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0002_search_vector_triggers.py",
-    "module": "backend.apps.ads.migrations.0002_search_vector_triggers",
+    "path": "backend/apps/ads/migrations/0002_add_fks_and_search_triggers.py",
+    "module": "backend.apps.ads.migrations.0002_add_fks_and_search_triggers",
+    "layer": "other",
+    "imports": [
+      "django.conf",
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/ads/migrations/0003_ad_i18n_fields.py",
+    "module": "backend.apps.ads.migrations.0003_ad_i18n_fields",
     "layer": "other",
     "imports": [
       "django.db"
@@ -93,8 +141,8 @@
     "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0003_add_index_conditions.py",
-    "module": "backend.apps.ads.migrations.0003_add_index_conditions",
+    "path": "backend/apps/ads/migrations/0004_ad_draft_nullable_fields.py",
+    "module": "backend.apps.ads.migrations.0004_ad_draft_nullable_fields",
     "layer": "other",
     "imports": [
       "django.db"
@@ -105,8 +153,8 @@
     "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0004_ad_i18n_columns.py",
-    "module": "backend.apps.ads.migrations.0004_ad_i18n_columns",
+    "path": "backend/apps/ads/migrations/0005_alter_ad_category_name_alter_ad_description_and_more.py",
+    "module": "backend.apps.ads.migrations.0005_alter_ad_category_name_alter_ad_description_and_more",
     "layer": "other",
     "imports": [
       "django.db"
@@ -117,10 +165,11 @@
     "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0005_multi_lang_search_vector.py",
-    "module": "backend.apps.ads.migrations.0005_multi_lang_search_vector",
+    "path": "backend/apps/ads/migrations/0006_ad_ix_ads_purge_deleted_and_more.py",
+    "module": "backend.apps.ads.migrations.0006_ad_ix_ads_purge_deleted_and_more",
     "layer": "other",
     "imports": [
+      "django.conf",
       "django.db"
     ],
     "classes": [
@@ -129,26 +178,24 @@
     "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0006_backfill_translations.py",
-    "module": "backend.apps.ads.migrations.0006_backfill_translations",
+    "path": "backend/apps/ads/migrations/0007_search_vector_i18n.py",
+    "module": "backend.apps.ads.migrations.0007_search_vector_i18n",
     "layer": "other",
     "imports": [
-      "django.db",
-      "deep_translator"
+      "django.contrib.postgres.search",
+      "django.db"
     ],
     "classes": [
       "Migration"
     ],
-    "functions": [
-      "_translate_text",
-      "backfill_translations"
-    ]
+    "functions": []
   },
   {
-    "path": "backend/apps/ads/migrations/0007_adimage_thumbnails.py",
-    "module": "backend.apps.ads.migrations.0007_adimage_thumbnails",
+    "path": "backend/apps/ads/migrations/0008_search_vector_gin.py",
+    "module": "backend.apps.ads.migrations.0008_search_vector_gin",
     "layer": "other",
     "imports": [
+      "django.contrib.postgres.indexes",
       "django.db"
     ],
     "classes": [
@@ -170,17 +217,21 @@
     "layer": "model",
     "imports": [
       "apps.core.enums",
+      "apps.lookups.enums",
       "django.contrib.postgres.indexes",
       "django.contrib.postgres.search",
       "django.db",
       "django.db.models",
       "django.utils",
-      "django.conf"
+      "django.conf",
+      "apps.media.services.hash_service"
     ],
     "classes": [
       "Ad",
       "Meta",
       "AdImage",
+      "Meta",
+      "AdFeature",
       "Meta"
     ],
     "functions": [
@@ -189,10 +240,43 @@
       "get_title",
       "get_description",
       "__str__",
+      "save",
       "image_url",
       "thumbnail_small_url",
       "thumbnail_medium_url",
-      "thumbnail_large_url"
+      "thumbnail_large_url",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/services/copy_service.py",
+    "module": "backend.apps.ads.services.copy_service",
+    "layer": "service",
+    "imports": [
+      "django.db",
+      "apps.ads.models"
+    ],
+    "classes": [],
+    "functions": [
+      "copy_ad"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/services/images.py",
+    "module": "backend.apps.ads.services.images",
+    "layer": "service",
+    "imports": [
+      "pathlib",
+      "django.conf",
+      "apps.ads.models",
+      "apps.media.services.hash_service"
+    ],
+    "classes": [
+      "AdImageService"
+    ],
+    "functions": [
+      "_compute_sha256",
+      "create_or_skip"
     ]
   },
   {
@@ -202,6 +286,75 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/ads/tests/test_ad_image_service.py",
+    "module": "backend.apps.ads.tests.test_ad_image_service",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "collections.abc",
+      "pathlib",
+      "django.test",
+      "django.utils",
+      "apps.users.models",
+      "apps.users.models",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.ads.services.images",
+      "apps.ads.models",
+      "apps.ads.services.images",
+      "apps.ads.models",
+      "apps.ads.services.images",
+      "apps.ads.services.images"
+    ],
+    "classes": [
+      "TestAdImageServiceCreateOrSkip"
+    ],
+    "functions": [
+      "isolated_media_root",
+      "seller",
+      "seller2",
+      "_make_ad",
+      "test_creates_new_image_with_hash",
+      "test_returns_existing_duplicate_same_user",
+      "test_creates_new_image_different_user",
+      "test_file_missing_creates_empty_hash"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/tests/test_ad_lifecycle.py",
+    "module": "backend.apps.ads.tests.test_ad_lifecycle",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.db",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models"
+    ],
+    "classes": [
+      "TestTransitionValidation",
+      "TestTransitionMatrixEdges",
+      "TestCheckConstraints"
+    ],
+    "functions": [
+      "seller",
+      "category",
+      "city",
+      "_make_ad",
+      "test_invalid_transition_raises_error",
+      "test_terminal_state_blocks_transition",
+      "test_valid_draft_to_on_moderation_succeeds",
+      "test_transition_to_reject_from_moderation_failed_succeeds",
+      "test_transition_to_reject_from_archived_raises",
+      "test_checkconstraint_published_requires_published_at",
+      "test_checkconstraint_archived_requires_archived_at",
+      "test_checkconstraint_mutual_exclusivity"
+    ]
   },
   {
     "path": "backend/apps/ads/tests/test_ad_localization.py",
@@ -222,9 +375,9 @@
       "test_returns_ru_with_default_locale",
       "test_fallback_ru_when_bs_is_none",
       "test_fallback_ru_when_bs_is_empty",
-      "test_fallback_original_when_locale_and_ru_are_none",
-      "test_fallback_original_when_locale_and_ru_are_empty",
-      "test_unknown_locale_falls_to_ru_when_present",
+      "test_fallback_base_when_locale_and_ru_are_none",
+      "test_fallback_base_when_locale_and_ru_are_empty",
+      "test_unknown_locale_falls_to_base_when_present",
       "test_returns_empty_when_all_fields_are_none",
       "test_returns_empty_when_all_fields_are_empty",
       "test_whitespace_only_is_truthy_and_returned",
@@ -234,9 +387,9 @@
       "test_returns_ru_with_default_locale",
       "test_fallback_ru_when_bs_is_none",
       "test_fallback_ru_when_bs_is_empty",
-      "test_fallback_original_when_locale_and_ru_are_none",
-      "test_fallback_original_when_locale_and_ru_are_empty",
-      "test_unknown_locale_falls_to_ru_when_present",
+      "test_fallback_base_when_locale_and_ru_are_none",
+      "test_fallback_base_when_locale_and_ru_are_empty",
+      "test_unknown_locale_falls_to_base_when_present",
       "test_returns_empty_when_all_fields_are_none",
       "test_returns_empty_when_all_fields_are_empty",
       "test_whitespace_only_is_truthy_and_returned",
@@ -313,6 +466,64 @@
     ]
   },
   {
+    "path": "backend/apps/ads/tests/test_detail_context.py",
+    "module": "backend.apps.ads.tests.test_detail_context",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "typing",
+      "unittest.mock",
+      "django.conf",
+      "django.http",
+      "django.test",
+      "apps.ads.views.listings",
+      "pathlib"
+    ],
+    "classes": [
+      "TestAdDetailBotUsernameContext"
+    ],
+    "functions": [
+      "_run_detail",
+      "fake_render",
+      "test_detail_context_contains_bot_username",
+      "test_detail_context_contains_ad",
+      "test_detail_template_uses_bot_username_not_settings"
+    ]
+  },
+  {
+    "path": "backend/apps/ads/tests/test_listings_context.py",
+    "module": "backend.apps.ads.tests.test_listings_context",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "unittest.mock",
+      "django.contrib.auth.models",
+      "django.http",
+      "django.test",
+      "apps.ads.views.listings",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "_EmptyQuerySet",
+      "TestListingsFilterContext"
+    ],
+    "functions": [
+      "filter",
+      "select_related",
+      "prefetch_related",
+      "order_by",
+      "_run_listings",
+      "fake_render",
+      "test_context_contains_all_tsk002_keys",
+      "test_query_params_map_to_context_values",
+      "test_consent_shown_is_true_for_anonymous_browse",
+      "test_empty_queryset_marks_no_results_with_page_obj",
+      "test_path_slugs_populate_current_category_and_city",
+      "test_view_hits_mocked_orm_and_renders_list_template",
+      "fake_render"
+    ]
+  },
+  {
     "path": "backend/apps/ads/tests/test_media_security.py",
     "module": "backend.apps.ads.tests.test_media_security",
     "layer": "other",
@@ -366,6 +577,8 @@
       "test_deleted_ad_returns_forbidden",
       "test_staff_can_view_any_status",
       "test_non_existent_key_returns_404",
+      "test_seed_storage_key_with_path_returns_redirect",
+      "test_shared_seed_key_across_multiple_ads_returns_200",
       "test_strip_photo_exif_removes_make",
       "test_strip_photo_exif_removes_model",
       "test_strip_photo_exif_removes_gps",
@@ -411,11 +624,16 @@
       "seller",
       "_create_published_ad",
       "_fts_match",
-      "test_insert_populates_search_vector",
+      "test_insert_populates_all_search_vectors",
+      "test_russian_vector_searchable",
+      "test_bosnian_vector_searchable",
+      "test_english_vector_searchable",
       "test_insert_denormalizes_category_name",
-      "test_title_update_refreshes_search_vector",
-      "test_description_is_searchable",
+      "test_title_update_refreshes_all_search_vectors",
+      "test_description_is_searchable_in_russian",
       "test_category_rename_propagates",
+      "test_localized_category_name_searchable_per_language",
+      "test_category_name_i18n_edit_cascades_reindex",
       "test_search_rank_orders_by_relevance",
       "test_unpublished_ads_excluded_from_search_view"
     ]
@@ -512,11 +730,13 @@
       "django.http",
       "django.shortcuts",
       "django.core.paginator",
-      "django.db.models"
+      "django.db.models",
+      "django.conf"
     ],
     "classes": [],
     "functions": [
       "ad_detail",
+      "_serve_image",
       "media_gate",
       "listings",
       "_suggest_category",
@@ -641,10 +861,11 @@
     "functions": []
   },
   {
-    "path": "backend/apps/analytics/migrations/0002_analytics_event_ad_fk.py",
-    "module": "backend.apps.analytics.migrations.0002_analytics_event_ad_fk",
+    "path": "backend/apps/analytics/migrations/0002_add_user_fks_and_metrics.py",
+    "module": "backend.apps.analytics.migrations.0002_add_user_fks_and_metrics",
     "layer": "other",
     "imports": [
+      "django.conf",
       "django.db"
     ],
     "classes": [
@@ -653,20 +874,8 @@
     "functions": []
   },
   {
-    "path": "backend/apps/analytics/migrations/0003_daily_ad_metrics.py",
-    "module": "backend.apps.analytics.migrations.0003_daily_ad_metrics",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": []
-  },
-  {
-    "path": "backend/apps/analytics/migrations/0004_analytics_event_fk_set_null_and_index.py",
-    "module": "backend.apps.analytics.migrations.0004_analytics_event_fk_set_null_and_index",
+    "path": "backend/apps/analytics/migrations/0003_change_timestamp_auto_add_to_default.py",
+    "module": "backend.apps.analytics.migrations.0003_change_timestamp_auto_add_to_default",
     "layer": "other",
     "imports": [
       "django.db"
@@ -690,7 +899,8 @@
     "layer": "model",
     "imports": [
       "apps.core.enums",
-      "django.db"
+      "django.db",
+      "django.utils"
     ],
     "classes": [
       "AnalyticsEvent",
@@ -1143,6 +1353,9 @@
       "mptt.admin"
     ],
     "classes": [
+      "CategoryPathInline",
+      "CategoryListingPurposeInline",
+      "CategoryListingFeatureInline",
       "CategoryAdmin"
     ],
     "functions": [
@@ -1160,7 +1373,80 @@
     "classes": [
       "CategoriesConfig"
     ],
+    "functions": [
+      "ready"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/catalog/__init__.py",
+    "module": "backend.apps.categories.catalog.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/categories/catalog/builder.py",
+    "module": "backend.apps.categories.catalog.builder",
+    "layer": "other",
+    "imports": [
+      "pathlib",
+      "typing",
+      "ruamel.yaml",
+      "ruamel.yaml.error",
+      "django.db",
+      "apps.lookups.models",
+      "apps.categories.models",
+      "apps.categories.models",
+      "apps.lookups.models",
+      "apps.categories.models"
+    ],
+    "classes": [],
+    "functions": [
+      "load_catalog",
+      "_load_lookups",
+      "_load_categories",
+      "_process_level",
+      "_load_bindings",
+      "_process_bindings",
+      "_load_category_paths",
+      "_resolve_slug",
+      "_rewrite_yaml",
+      "_rewrite_node"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/management/__init__.py",
+    "module": "backend.apps.categories.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/management/commands/__init__.py",
+    "module": "backend.apps.categories.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/management/commands/load_catalog.py",
+    "module": "backend.apps.categories.management.commands.load_catalog",
+    "layer": "other",
+    "imports": [
+      "pathlib",
+      "django.core.management.base",
+      "apps.categories.catalog"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
   },
   {
     "path": "backend/apps/categories/migrations/0001_initial.py",
@@ -1175,20 +1461,6 @@
     "functions": []
   },
   {
-    "path": "backend/apps/categories/migrations/0002_seed_categories.py",
-    "module": "backend.apps.categories.migrations.0002_seed_categories",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": [
-      "create_categories"
-    ]
-  },
-  {
     "path": "backend/apps/categories/migrations/__init__.py",
     "module": "backend.apps.categories.migrations.__init__",
     "layer": "other",
@@ -1201,17 +1473,79 @@
     "module": "backend.apps.categories.models",
     "layer": "model",
     "imports": [
+      "apps.lookups.enums",
       "django.db",
-      "mptt.models"
+      "mptt.models",
+      "django.core.exceptions"
     ],
     "classes": [
       "Category",
       "MPTTMeta",
+      "Meta",
+      "CategoryPath",
+      "Meta",
+      "CategoryListingPurpose",
+      "Meta",
+      "CategoryListingFeature",
       "Meta"
     ],
     "functions": [
       "get_name",
+      "__str__",
+      "__str__",
+      "clean",
+      "__str__",
       "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/services/__init__.py",
+    "module": "backend.apps.categories.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/categories/services/lookup_resolution.py",
+    "module": "backend.apps.categories.services.lookup_resolution",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.core.cache",
+      "apps.categories.models",
+      "apps.lookups.models",
+      "apps.categories.models",
+      "django.apps"
+    ],
+    "classes": [
+      "CategoryLookupResolver"
+    ],
+    "functions": [
+      "get_resolved_purposes",
+      "get_resolved_features",
+      "get_resolved_purpose_codes",
+      "get_resolved_feature_codes",
+      "invalidate_category",
+      "invalidate_lookup_item",
+      "_get_through_model",
+      "_resolve"
+    ]
+  },
+  {
+    "path": "backend/apps/categories/signals.py",
+    "module": "backend.apps.categories.signals",
+    "layer": "other",
+    "imports": [
+      "django.db.models.signals",
+      "django.dispatch",
+      "apps.categories.services.lookup_resolution",
+      "apps.categories.services.lookup_resolution"
+    ],
+    "classes": [],
+    "functions": [
+      "invalidate_category_lookup_cache",
+      "invalidate_on_lookup_item_change"
     ]
   },
   {
@@ -1272,9 +1606,11 @@
       "AnalyticsEventType",
       "ThumbnailSizeStrEnum",
       "AdPriorityLevel",
+      "PriorityFilter",
       "TrustLevel",
       "TimeRange",
       "ModeratorActionType",
+      "BulkModerationAction",
       "CategoryRejectReason",
       "SearchSuggestionSource",
       "LanguageLocale"
@@ -1282,7 +1618,9 @@
     "functions": [
       "choices",
       "values",
-      "fts_config"
+      "from_code",
+      "fts_config",
+      "fts_vector_field"
     ]
   },
   {
@@ -1376,7 +1714,8 @@
       "django.core.management.base",
       "django.contrib.auth",
       "apps.core.enums",
-      "apps.core.utils.advisory_lock"
+      "apps.core.utils.advisory_lock",
+      "apps.core.utils.sanitize"
     ],
     "classes": [
       "Command"
@@ -1389,6 +1728,29 @@
   {
     "path": "backend/apps/core/management/commands/delete_sweep.py",
     "module": "backend.apps.core.management.commands.delete_sweep",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "django.core.management.base",
+      "django.utils",
+      "django.db",
+      "apps.ads.models",
+      "telegram_bot.services.media"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/core/management/commands/purge_deleted_ads.py",
+    "module": "backend.apps.core.management.commands.purge_deleted_ads",
     "layer": "other",
     "imports": [
       "datetime",
@@ -1493,6 +1855,8 @@
     "imports": [
       "__future__",
       "typing",
+      "django.utils",
+      "django.utils.cache",
       "django.utils.deprecation",
       "apps.core.enums"
     ],
@@ -1509,18 +1873,6 @@
     ]
   },
   {
-    "path": "backend/apps/core/migrations/0001_verify_lifecycle_indexes.py",
-    "module": "backend.apps.core.migrations.0001_verify_lifecycle_indexes",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": []
-  },
-  {
     "path": "backend/apps/core/migrations/__init__.py",
     "module": "backend.apps.core.migrations.__init__",
     "layer": "other",
@@ -1533,7 +1885,8 @@
     "module": "backend.apps.core.services.__init__",
     "layer": "service",
     "imports": [
-      "contact"
+      "contact",
+      "translation"
     ],
     "classes": [],
     "functions": []
@@ -1546,14 +1899,41 @@
       "apps.ads.models",
       "apps.analytics.models",
       "apps.core.enums",
+      "apps.core.utils.sanitize",
       "apps.users.models"
     ],
     "classes": [],
     "functions": [
+      "_check_seller_contactable",
       "can_contact_seller",
       "get_seller_for_contact",
       "record_contact_initiated",
       "record_contact_response"
+    ]
+  },
+  {
+    "path": "backend/apps/core/services/translation.py",
+    "module": "backend.apps.core.services.translation",
+    "layer": "service",
+    "imports": [
+      "concurrent.futures",
+      "functools",
+      "typing",
+      "deep_translator",
+      "requests.exceptions",
+      "apps.core.utils.sanitize"
+    ],
+    "classes": [
+      "TranslationCircuitBreaker"
+    ],
+    "functions": [
+      "__init__",
+      "is_open",
+      "record_success",
+      "record_failure",
+      "translate_cached",
+      "translate_cached_generic",
+      "translate_text"
     ]
   },
   {
@@ -1577,6 +1957,19 @@
     "classes": [],
     "functions": [
       "can_contact"
+    ]
+  },
+  {
+    "path": "backend/apps/core/templatetags/dict_tags.py",
+    "module": "backend.apps.core.templatetags.dict_tags",
+    "layer": "other",
+    "imports": [
+      "typing",
+      "django"
+    ],
+    "classes": [],
+    "functions": [
+      "get_item"
     ]
   },
   {
@@ -1605,6 +1998,7 @@
     "module": "backend.apps.core.tests.test_contact",
     "layer": "other",
     "imports": [
+      "types",
       "telegram_bot.handlers.contact",
       "apps.ads.models",
       "apps.core.enums",
@@ -1612,19 +2006,25 @@
       "apps.users.models",
       "django.utils",
       "apps.categories.models",
-      "apps.locations.models"
+      "apps.locations.models",
+      "django.utils",
+      "apps.core.enums"
     ],
     "classes": [
       "TestCanContactSellerLogic",
       "MockSeller",
       "MockAdWithSellerNone",
       "MockAdWithTelegramIdNone",
-      "TestContactPattern"
+      "TestContactPattern",
+      "TestContactResponseNoPii",
+      "TestCheckSellerContactable",
+      "TestGetSellerForContactIntegration"
     ],
     "functions": [
       "seller",
       "category",
       "city",
+      "_set_status_timestamp",
       "_make_ad",
       "test_all_conditions_true_returns_true",
       "test_archived_ad_returns_false",
@@ -1636,7 +2036,21 @@
       "test_seller_banned_returns_false",
       "test_consent_revoked_returns_false",
       "test_contact_pattern_matches_ad_id",
-      "test_contact_pattern_extracts_ad_id"
+      "test_contact_pattern_extracts_ad_id",
+      "test_contact_no_seller_no_pii_in_log",
+      "test_all_conditions_met_returns_true",
+      "test_ad_not_published_returns_false",
+      "test_seller_is_none_returns_false",
+      "test_telegram_id_none_returns_false",
+      "test_seller_deleted_returns_false",
+      "test_seller_banned_returns_false",
+      "test_consent_revoked_returns_false",
+      "test_returns_seller_when_contactable",
+      "test_returns_false_none_when_ad_not_found",
+      "test_returns_false_none_when_not_published",
+      "test_returns_false_none_when_seller_deleted",
+      "test_returns_false_none_when_seller_banned",
+      "test_returns_false_none_when_consent_revoked"
     ]
   },
   {
@@ -1705,7 +2119,59 @@
       "test_requires_username_and_password",
       "test_sets_password_correctly",
       "test_lock_id_is_create_admin",
-      "test_idempotent_on_rerun"
+      "test_idempotent_on_rerun",
+      "test_command_dry_run_does_not_leak_telegram_id"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_csp_report.py",
+    "module": "backend.apps.core.tests.test_csp_report",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "django.urls"
+    ],
+    "classes": [
+      "CspReportViewTests"
+    ],
+    "functions": [
+      "url",
+      "test_get_returns_405",
+      "test_post_valid_report_returns_200",
+      "test_post_invalid_json_returns_400"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_language_end_to_end.py",
+    "module": "backend.apps.core.tests.test_language_end_to_end",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.test",
+      "django.urls",
+      "django.utils",
+      "django.utils",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.models"
+    ],
+    "classes": [
+      "LanguageEndToEndTests"
+    ],
+    "functions": [
+      "setUpTestData",
+      "setUp",
+      "test_lang_param_wins_over_accept_language",
+      "test_cookie_persists_language_without_param",
+      "test_lang_param_bs_renders_bosnian",
+      "test_default_no_signal_renders_russian",
+      "test_invalid_lang_falls_back_to_russian_and_does_not_persist",
+      "test_listing_card_switches_language",
+      "test_vary_and_content_language_headers",
+      "test_thread_local_matches_request_language_code"
     ]
   },
   {
@@ -1717,11 +2183,18 @@
       "apps.core.enums"
     ],
     "classes": [
-      "LanguageLocaleTests"
+      "LanguageLocaleTests",
+      "LanguageLocaleFromCodeTests"
     ],
     "functions": [
       "test_language_locale_values",
-      "test_fts_config_property"
+      "test_fts_config_property",
+      "test_from_code_russian",
+      "test_from_code_english_with_region",
+      "test_from_code_bosnian",
+      "test_from_code_none_falls_back",
+      "test_from_code_unsupported_falls_back",
+      "test_from_code_defaults_to_bosnian"
     ]
   },
   {
@@ -1731,8 +2204,10 @@
     "imports": [
       "__future__",
       "unittest.mock",
+      "django.contrib.auth.models",
       "django.http",
       "django.test",
+      "django.utils",
       "apps.core.middleware.language"
     ],
     "classes": [
@@ -1754,7 +2229,12 @@
       "test_accept_language_empty_string",
       "test_default_to_russian",
       "test_cookie_set_when_lang_param_used",
-      "test_cookie_not_set_when_no_lang_param"
+      "test_cookie_not_set_when_no_lang_param",
+      "test_lang_param_with_session_but_no_user_does_not_crash",
+      "test_anonymous_user_does_not_persist_session",
+      "test_authenticated_user_persists_session",
+      "test_thread_local_matches_request_language_code",
+      "test_invalid_lang_still_syncs_to_russian"
     ]
   },
   {
@@ -1772,6 +2252,24 @@
     ]
   },
   {
+    "path": "backend/apps/core/tests/test_sanitize.py",
+    "module": "backend.apps.core.tests.test_sanitize",
+    "layer": "other",
+    "imports": [
+      "apps.core.utils.sanitize"
+    ],
+    "classes": [
+      "TestMaskTelegramId"
+    ],
+    "functions": [
+      "test_mask_telegram_id_masks_int",
+      "test_mask_telegram_id_none",
+      "test_mask_telegram_id_is_stable",
+      "test_mask_telegram_id_different_inputs",
+      "test_mask_telegram_id_no_raw_id"
+    ]
+  },
+  {
     "path": "backend/apps/core/tests/test_sweep_commands.py",
     "module": "backend.apps.core.tests.test_sweep_commands",
     "layer": "other",
@@ -1785,7 +2283,12 @@
       "django.core.management",
       "django.utils",
       "apps.categories.models",
-      "apps.locations.models"
+      "apps.locations.models",
+      "apps.core.management.commands",
+      "apps.core.management.commands",
+      "apps.analytics.management.commands",
+      "apps.media.management.commands",
+      "apps.search.management.commands"
     ],
     "classes": [
       "TestArchiveSweep",
@@ -1795,7 +2298,9 @@
       "TestConsentHardDelete",
       "_CrashOnDeleteQuerySet",
       "TestPurgeFailedAds",
-      "TestPurgeRejectedAds"
+      "TestPurgeRejectedAds",
+      "TestPurgeDeletedAds",
+      "TestConcurrentSweep"
     ],
     "functions": [
       "seller",
@@ -1831,6 +2336,7 @@
       "count",
       "values_list",
       "delete",
+      "exists",
       "test_dry_run_does_not_delete",
       "test_purges_failed_ads_older_than_7_days",
       "test_does_not_purge_other_statuses",
@@ -1838,7 +2344,35 @@
       "test_dry_run_does_not_delete",
       "test_purges_rejected_ads_older_than_90_days",
       "test_preserves_moderation_log_with_ad_set_null",
-      "test_lock_id_is_purge_rejected_ads"
+      "test_lock_id_is_purge_rejected_ads",
+      "test_purge_deleted_ads_deletes_old_deleted",
+      "test_purge_deleted_ads_preserves_recent",
+      "test_purge_deleted_ads_skips_non_deleted",
+      "test_purge_deleted_ads_advisory_lock",
+      "test_purge_deleted_ads_dry_run",
+      "test_purge_deleted_ads_media_cleanup",
+      "_record",
+      "test_archive_sweep_lock_inside_transaction",
+      "test_all_sweeps_lock_inside_transaction",
+      "test_file_deletion_after_commit_not_inside_transaction",
+      "_raise"
+    ]
+  },
+  {
+    "path": "backend/apps/core/tests/test_templates.py",
+    "module": "backend.apps.core.tests.test_templates",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "pathlib",
+      "django.conf",
+      "django.test"
+    ],
+    "classes": [
+      "TestConsentBannerGuardInTemplates"
+    ],
+    "functions": [
+      "test_consent_banner_guard_in_all_templates"
     ]
   },
   {
@@ -1893,6 +2427,7 @@
     "module": "backend.apps.core.utils.migrate_locked",
     "layer": "other",
     "imports": [
+      "pathlib",
       "apps.core.enums",
       "apps.core.utils.advisory_lock"
     ],
@@ -1911,7 +2446,8 @@
     "classes": [],
     "functions": [
       "sanitize_query_for_log",
-      "sanitize_autocomplete_query"
+      "sanitize_autocomplete_query",
+      "mask_telegram_id"
     ]
   },
   {
@@ -1924,7 +2460,8 @@
     ],
     "classes": [],
     "functions": [
-      "health_check"
+      "health_check",
+      "csp_report"
     ]
   },
   {
@@ -1976,20 +2513,6 @@
     "functions": []
   },
   {
-    "path": "backend/apps/locations/migrations/0002_seed_cities.py",
-    "module": "backend.apps.locations.migrations.0002_seed_cities",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": [
-      "create_cities"
-    ]
-  },
-  {
     "path": "backend/apps/locations/migrations/__init__.py",
     "module": "backend.apps.locations.migrations.__init__",
     "layer": "other",
@@ -2020,6 +2543,139 @@
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/__init__.py",
+    "module": "backend.apps.lookups.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/admin.py",
+    "module": "backend.apps.lookups.admin",
+    "layer": "other",
+    "imports": [
+      "apps.lookups.models",
+      "django.contrib"
+    ],
+    "classes": [
+      "LookupItemInline",
+      "LookupGroupAdmin",
+      "LookupItemAdmin"
+    ],
+    "functions": [
+      "item_count",
+      "has_delete_permission"
+    ]
+  },
+  {
+    "path": "backend/apps/lookups/apps.py",
+    "module": "backend.apps.lookups.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "LookupsConfig"
+    ],
+    "functions": [
+      "ready"
+    ]
+  },
+  {
+    "path": "backend/apps/lookups/enums.py",
+    "module": "backend.apps.lookups.enums",
+    "layer": "other",
+    "imports": [
+      "enum"
+    ],
+    "classes": [
+      "LookupGroupCode"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/migrations/0001_initial.py",
+    "module": "backend.apps.lookups.migrations.0001_initial",
+    "layer": "other",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "Migration"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/migrations/__init__.py",
+    "module": "backend.apps.lookups.migrations.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/models.py",
+    "module": "backend.apps.lookups.models",
+    "layer": "model",
+    "imports": [
+      "django.db"
+    ],
+    "classes": [
+      "LookupGroup",
+      "Meta",
+      "LookupItem",
+      "Meta"
+    ],
+    "functions": [
+      "__str__",
+      "__str__"
+    ]
+  },
+  {
+    "path": "backend/apps/lookups/services/__init__.py",
+    "module": "backend.apps.lookups.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/lookups/services/cache_service.py",
+    "module": "backend.apps.lookups.services.cache_service",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.core.cache",
+      "apps.lookups.models",
+      "apps.lookups.models"
+    ],
+    "classes": [
+      "LookupCacheService"
+    ],
+    "functions": [
+      "get_all_groups",
+      "get_active_items",
+      "invalidate_all",
+      "invalidate_group"
+    ]
+  },
+  {
+    "path": "backend/apps/lookups/signals.py",
+    "module": "backend.apps.lookups.signals",
+    "layer": "other",
+    "imports": [
+      "django.db.models.signals",
+      "django.dispatch",
+      "django_redis.exceptions",
+      "apps.lookups.services.cache_service"
+    ],
+    "classes": [],
+    "functions": [
+      "invalidate_lookup_cache"
+    ]
   },
   {
     "path": "backend/apps/media/__init__.py",
@@ -2082,12 +2738,46 @@
     ]
   },
   {
+    "path": "backend/apps/media/management/commands/sweep_orphaned_media.py",
+    "module": "backend.apps.media.management.commands.sweep_orphaned_media",
+    "layer": "other",
+    "imports": [
+      "django.conf",
+      "django.core.management.base",
+      "django.db",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "_collect_referenced_keys",
+      "_walk_media_files",
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
     "path": "backend/apps/media/services/__init__.py",
     "module": "backend.apps.media.services.__init__",
     "layer": "service",
     "imports": [],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/apps/media/services/hash_service.py",
+    "module": "backend.apps.media.services.hash_service",
+    "layer": "service",
+    "imports": [],
+    "classes": [
+      "FileHashService"
+    ],
+    "functions": [
+      "calculate_sha256"
+    ]
   },
   {
     "path": "backend/apps/media/services/thumbnails.py",
@@ -2152,6 +2842,26 @@
       "test_backfill_batch_processing",
       "test_backfill_generated_thumbnails_are_valid_jpeg",
       "test_backfill_zero_records_succeeds"
+    ]
+  },
+  {
+    "path": "backend/apps/media/tests/test_save_photo_exif.py",
+    "module": "backend.apps.media.tests.test_save_photo_exif",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "PIL",
+      "PIL.ExifTags",
+      "django.test",
+      "telegram_bot.handlers.ad_create"
+    ],
+    "classes": [
+      "TestSavePhotoExifStripping"
+    ],
+    "functions": [
+      "jpeg_with_exif",
+      "_tiff_tag",
+      "test_save_photo_strips_exif_on_disk"
     ]
   },
   {
@@ -2221,9 +2931,10 @@
     "imports": [
       "apps.ads.models",
       "apps.core.enums",
+      "apps.core.utils.sanitize",
       "apps.moderation.services.moderation_log",
       "apps.users.models",
-      "django.utils"
+      "django.db"
     ],
     "classes": [],
     "functions": [
@@ -2264,36 +2975,11 @@
     "functions": []
   },
   {
-    "path": "backend/apps/moderation/migrations/0002_singleton_enforcement.py",
-    "module": "backend.apps.moderation.migrations.0002_singleton_enforcement",
+    "path": "backend/apps/moderation/migrations/0002_add_fks_and_priority_indexes.py",
+    "module": "backend.apps.moderation.migrations.0002_add_fks_and_priority_indexes",
     "layer": "other",
     "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": [
-      "ensure_singleton"
-    ]
-  },
-  {
-    "path": "backend/apps/moderation/migrations/0003_ad_moderation_priority.py",
-    "module": "backend.apps.moderation.migrations.0003_ad_moderation_priority",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": []
-  },
-  {
-    "path": "backend/apps/moderation/migrations/0004_ad_moderation_priority_default.py",
-    "module": "backend.apps.moderation.migrations.0004_ad_moderation_priority_default",
-    "layer": "other",
-    "imports": [
+      "django.conf",
       "django.db"
     ],
     "classes": [
@@ -2351,6 +3037,7 @@
     "imports": [
       "difflib",
       "typing",
+      "django.db",
       "apps.ads.models",
       "apps.analytics.models",
       "apps.core.enums",
@@ -2383,6 +3070,7 @@
     "layer": "service",
     "imports": [
       "typing",
+      "django.db",
       "apps.core.enums",
       "apps.moderation.models",
       "apps.ads.models"
@@ -2471,12 +3159,53 @@
     "functions": []
   },
   {
+    "path": "backend/apps/moderation/tests/test_admin_actions.py",
+    "module": "backend.apps.moderation.tests.test_admin_actions",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "unittest.mock",
+      "django.utils",
+      "apps.ads.models",
+      "apps.core.enums",
+      "apps.moderation.admin_actions",
+      "apps.users.models",
+      "apps.categories.models",
+      "apps.locations.models",
+      "django.utils",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "TestApproveAdRouting",
+      "TestRejectAdRouting",
+      "TestSoftDeleteAdRouting"
+    ],
+    "functions": [
+      "seller",
+      "category",
+      "city",
+      "_set_status_timestamp",
+      "_make_ad",
+      "test_approve_ad_routes_through_set_published",
+      "test_approve_ad_only_from_moderation",
+      "test_reject_ad_routes_through_set_rejected",
+      "test_reject_ad_from_moderation_succeeds",
+      "test_reject_ad_from_moderation_failed_succeeds",
+      "test_reject_ad_from_published_raises",
+      "test_reject_ad_from_archived_raises",
+      "test_reject_ad_already_rejected_noop",
+      "test_soft_delete_ad_routes_through_transition_to",
+      "test_soft_delete_any_active_state"
+    ]
+  },
+  {
     "path": "backend/apps/moderation/tests/test_auto_moderation.py",
     "module": "backend.apps.moderation.tests.test_auto_moderation",
     "layer": "other",
     "imports": [
       "django.core.cache",
       "apps.ads.models",
+      "apps.analytics.models",
       "apps.categories.models",
       "apps.core.enums",
       "apps.locations.models",
@@ -2528,7 +3257,8 @@
       "_setup",
       "_create_ad",
       "test_check_returns_passed_on_valid_ad",
-      "test_check_returns_seller_safe_error_on_fail"
+      "test_check_returns_seller_safe_error_on_fail",
+      "test_failed_ad_not_counted_in_active_limit"
     ]
   },
   {
@@ -2593,7 +3323,8 @@
       "apps.locations.models",
       "apps.moderation.models",
       "apps.moderation.services.priority",
-      "apps.users.models"
+      "apps.users.models",
+      "django.utils"
     ],
     "classes": [
       "TestPriorityService",
@@ -2606,6 +3337,7 @@
       "_make_staff_user",
       "_make_category",
       "_make_city",
+      "_set_status_timestamp",
       "_make_ad",
       "_banned_words_setup",
       "setUpTestData",
@@ -2616,6 +3348,7 @@
       "test_get_queued_ads_excludes_published_ads",
       "test_get_queued_ads_excludes_archived_ads",
       "test_get_queued_ads_filters_by_priority",
+      "test_get_queued_ads_priority_filter_none_returns_all",
       "test_get_priority_counts_returns_zero_for_empty",
       "test_get_priority_counts_counts_correctly",
       "test_get_priority_counts_excludes_non_moderation_ads",
@@ -2631,6 +3364,9 @@
       "test_empty_queue_shows_message",
       "test_queue_shows_ads",
       "test_queue_filters_by_priority",
+      "test_queue_priority_all_default",
+      "test_queue_priority_all_explicit",
+      "test_priority_filter_invalid_value_defaults_to_all",
       "test_queue_shows_priority_counts",
       "setUpTestData",
       "test_requires_staff_forbidden",
@@ -2639,7 +3375,11 @@
       "test_bulk_reject",
       "test_bulk_flag",
       "test_bulk_errors_reported",
-      "test_unknown_action_returns_error"
+      "test_unknown_action_returns_400",
+      "test_approve_ad_get_returns_405",
+      "test_malformed_json_body_returns_400",
+      "test_empty_body_returns_400",
+      "test_error_messages_sanitized"
     ]
   },
   {
@@ -2725,6 +3465,7 @@
     "layer": "other",
     "imports": [
       "apps.ads.models",
+      "apps.core.enums",
       "apps.moderation.admin_actions",
       "apps.moderation.services.priority",
       "apps.moderation.views.decorators",
@@ -2757,6 +3498,7 @@
     "module": "backend.apps.moderation.views.queue",
     "layer": "other",
     "imports": [
+      "apps.core.enums",
       "apps.moderation.services.priority",
       "apps.moderation.views.decorators",
       "django.http",
@@ -2777,6 +3519,7 @@
       "apps.moderation.views.decorators",
       "django.http",
       "django.shortcuts",
+      "django.views.decorators.http",
       "apps.moderation.admin_actions",
       "apps.moderation.admin_actions",
       "apps.moderation.admin_actions"
@@ -2849,7 +3592,8 @@
       "add_arguments",
       "handle",
       "_dry_run_check",
-      "_send_alerts",
+      "_collect_alerts",
+      "_persist_alerts",
       "_send_user_digests",
       "_format_digest"
     ]
@@ -2867,10 +3611,11 @@
     "functions": []
   },
   {
-    "path": "backend/apps/search/migrations/0002_searchhistory_related_name_and_index.py",
-    "module": "backend.apps.search.migrations.0002_searchhistory_related_name_and_index",
+    "path": "backend/apps/search/migrations/0002_add_fks_indexes_constraints.py",
+    "module": "backend.apps.search.migrations.0002_add_fks_indexes_constraints",
     "layer": "other",
     "imports": [
+      "django.conf",
       "django.db"
     ],
     "classes": [
@@ -2879,8 +3624,8 @@
     "functions": []
   },
   {
-    "path": "backend/apps/search/migrations/0003_saved_search_indexes.py",
-    "module": "backend.apps.search.migrations.0003_saved_search_indexes",
+    "path": "backend/apps/search/migrations/0003_savedsearch_language.py",
+    "module": "backend.apps.search.migrations.0003_savedsearch_language",
     "layer": "other",
     "imports": [
       "django.db"
@@ -2888,19 +3633,9 @@
     "classes": [
       "Migration"
     ],
-    "functions": []
-  },
-  {
-    "path": "backend/apps/search/migrations/0004_fix_index_name_too_long.py",
-    "module": "backend.apps.search.migrations.0004_fix_index_name_too_long",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": []
+    "functions": [
+      "backfill_legacy_language"
+    ]
   },
   {
     "path": "backend/apps/search/migrations/__init__.py",
@@ -2953,8 +3688,7 @@
       "apps.ads.models",
       "apps.categories.models",
       "apps.core.enums",
-      "apps.search.models",
-      "apps.search.services.query_translator"
+      "apps.search.models"
     ],
     "classes": [],
     "functions": [
@@ -2990,33 +3724,6 @@
     "functions": [
       "increment_popular_search",
       "get_popular_suggestions"
-    ]
-  },
-  {
-    "path": "backend/apps/search/services/query_translator.py",
-    "module": "backend.apps.search.services.query_translator",
-    "layer": "service",
-    "imports": [
-      "concurrent.futures",
-      "functools",
-      "typing",
-      "deep_translator",
-      "requests.exceptions",
-      "apps.core.utils.sanitize"
-    ],
-    "classes": [
-      "TranslationCircuitBreaker"
-    ],
-    "functions": [
-      "__init__",
-      "is_open",
-      "record_success",
-      "record_failure",
-      "translate_query_bs_to_ru",
-      "translate_cached",
-      "invalidate_translation_cache",
-      "translate_cached_generic",
-      "translate_query"
     ]
   },
   {
@@ -3085,6 +3792,9 @@
       "other_city",
       "_create_published_ad",
       "test_returns_matching_ads_by_query",
+      "test_bosnian_query_searches_bosnian_vector",
+      "test_english_query_searches_english_vector",
+      "test_legacy_null_language_searches_russian_vector",
       "test_excludes_non_matching_ads",
       "test_filters_by_city",
       "test_filters_by_category_subtree",
@@ -3141,12 +3851,14 @@
       "inactive_category",
       "city",
       "city2",
+      "_reset_rate_limit",
       "test_autocomplete_returns_suggestions",
       "test_autocomplete_empty_query_returns_empty",
       "test_autocomplete_rate_limit",
       "test_autocomplete_deduplication",
       "test_autocomplete_anonymous_user_returns_popular_and_entities",
       "test_autocomplete_malicious_query_sanitized",
+      "_clear_cache",
       "test_increment_popular_search_creates_new_entry",
       "test_increment_popular_search_increments_existing",
       "test_increment_popular_search_empty_query_is_noop",
@@ -3174,27 +3886,22 @@
     ]
   },
   {
-    "path": "backend/apps/search/tests/test_query_translator.py",
-    "module": "backend.apps.search.tests.test_query_translator",
+    "path": "backend/apps/search/tests/test_autocomplete_template.py",
+    "module": "backend.apps.search.tests.test_autocomplete_template",
     "layer": "other",
     "imports": [
-      "unittest.mock",
-      "requests.exceptions",
-      "apps.search.services.query_translator"
+      "pathlib",
+      "django.test"
     ],
     "classes": [
-      "TestTranslateQueryBsToRuSuccess",
-      "TestTranslateQueryBsToRuFallback",
-      "TestTranslateQueryBsToRuShortCircuit"
+      "TestAutocompleteTemplate"
     ],
     "functions": [
-      "_reset_translation_state",
-      "test_returns_translated_text",
-      "test_timeout_returns_original_query",
-      "test_request_exception_returns_original_query",
-      "test_generic_exception_returns_original_query",
-      "test_empty_query_returns_empty",
-      "test_whitespace_only_returns_whitespace"
+      "setUpClass",
+      "test_search_input_has_htmx_autocomplete_attributes",
+      "test_autocomplete_dropdown_element_exists",
+      "test_inline_script_follows_htmx",
+      "test_no_settings_dot_access_in_template"
     ]
   },
   {
@@ -3282,13 +3989,15 @@
       "apps.analytics.models",
       "apps.categories.models",
       "apps.core.enums",
+      "apps.locations.models",
+      "apps.users.views.consent",
       "django.contrib.postgres.search",
       "django.http",
       "django.shortcuts",
       "django.core.paginator",
+      "django.db.models",
       "apps.core.utils.sanitize",
       "apps.search.services.popular_search",
-      "apps.search.services.query_translator",
       "apps.search.services.search_history",
       "difflib"
     ],
@@ -3296,7 +4005,466 @@
     "functions": [
       "search",
       "_is_single_word",
-      "_fuzzy_category_match"
+      "_fuzzy_category_match",
+      "_fuzzy_match_by_name"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/__init__.py",
+    "module": "backend.apps.seed.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/apps.py",
+    "module": "backend.apps.seed.apps",
+    "layer": "other",
+    "imports": [
+      "django.apps"
+    ],
+    "classes": [
+      "SeedConfig"
+    ],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/generators/__init__.py",
+    "module": "backend.apps.seed.generators.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/generators/ads.py",
+    "module": "backend.apps.seed.generators.ads",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "pathlib",
+      "typing",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.seed.generators.base",
+      "apps.users.models"
+    ],
+    "classes": [
+      "AdGenerator"
+    ],
+    "functions": [
+      "__init__",
+      "_load_templates",
+      "_load_word_lists",
+      "_fill_template",
+      "_replace_vars",
+      "generate",
+      "_normalize_weights",
+      "_weighted_status",
+      "_generate_price"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/generators/analytics.py",
+    "module": "backend.apps.seed.generators.analytics",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "typing",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.core.enums",
+      "apps.seed.generators.base"
+    ],
+    "classes": [
+      "AnalyticsGenerator"
+    ],
+    "functions": [
+      "__init__",
+      "_coerce_datetime",
+      "generate_events",
+      "generate_contact_events",
+      "generate_daily_metrics"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/generators/base.py",
+    "module": "backend.apps.seed.generators.base",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "datetime",
+      "typing",
+      "faker"
+    ],
+    "classes": [
+      "BaseGenerator"
+    ],
+    "functions": [
+      "__init__",
+      "_random_choice",
+      "_random_date",
+      "_chunked"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/generators/images.py",
+    "module": "backend.apps.seed.generators.images",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "typing",
+      "django.conf",
+      "apps.ads.models",
+      "apps.media.services.thumbnails",
+      "apps.seed.generators.base",
+      "apps.seed.paths"
+    ],
+    "classes": [
+      "ImageGenerator"
+    ],
+    "functions": [
+      "__init__",
+      "_load_manifest",
+      "_get_photos_for_category",
+      "generate",
+      "_find_category_keys",
+      "_ensure_seed_dir",
+      "_preprocess_images",
+      "_thumbnail_key"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/generators/users.py",
+    "module": "backend.apps.seed.generators.users",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "typing",
+      "django.contrib.auth.hashers",
+      "apps.seed.generators.base",
+      "apps.users.models"
+    ],
+    "classes": [
+      "UserGenerator"
+    ],
+    "functions": [
+      "__init__",
+      "generate",
+      "_maybe_username"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/management/__init__.py",
+    "module": "backend.apps.seed.management.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/management/commands/__init__.py",
+    "module": "backend.apps.seed.management.commands.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/management/commands/seed.py",
+    "module": "backend.apps.seed.management.commands.seed",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "django.core.management.base",
+      "apps.seed.services.seed_service"
+    ],
+    "classes": [
+      "Command"
+    ],
+    "functions": [
+      "add_arguments",
+      "handle"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/paths.py",
+    "module": "backend.apps.seed.paths",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "pathlib"
+    ],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/services/__init__.py",
+    "module": "backend.apps.seed.services.__init__",
+    "layer": "service",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/services/seed_service.py",
+    "module": "backend.apps.seed.services.seed_service",
+    "layer": "service",
+    "imports": [
+      "__future__",
+      "pathlib",
+      "typing",
+      "django.db",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.core.utils.advisory_lock",
+      "apps.locations.models",
+      "apps.media.services.hash_service",
+      "apps.search.models",
+      "apps.seed.generators.ads",
+      "apps.seed.generators.analytics",
+      "apps.seed.generators.images",
+      "apps.seed.generators.users",
+      "apps.trust.services.trust_calculator",
+      "apps.users.models",
+      "django.conf",
+      "apps.categories.catalog.builder",
+      "django.core.serializers"
+    ],
+    "classes": [
+      "SeedService"
+    ],
+    "functions": [
+      "__init__",
+      "_load_config",
+      "run",
+      "_clean",
+      "_load_category_fixtures",
+      "_load_city_fixtures",
+      "_log_progress",
+      "_backfill_image_hashes",
+      "_seed_popular_searches"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/tests/__init__.py",
+    "module": "backend.apps.seed.tests.__init__",
+    "layer": "other",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/apps/seed/tests/test_download_seed_photos.py",
+    "module": "backend.apps.seed.tests.test_download_seed_photos",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "pathlib",
+      "unittest.mock"
+    ],
+    "classes": [
+      "TestUnsplashSearch",
+      "TestPexelsSearch",
+      "TestPickPhotoWithErrors",
+      "TestProcessCategoryResilience",
+      "TestProcessCategoryExistingFiles",
+      "TestFixCleanup",
+      "TestParseCliArgs",
+      "TestPrioritizeCategories"
+    ],
+    "functions": [
+      "make_response",
+      "config",
+      "sleep_mock",
+      "test_200_returns_results",
+      "test_429_marks_exhausted_and_returns_empty",
+      "test_429_logs_warning",
+      "test_403_marks_exhausted_and_returns_empty",
+      "test_403_logs_error",
+      "test_500_exhausts_retries_and_returns_empty",
+      "test_503_then_200_retries_then_succeeds",
+      "test_connection_error_then_200_retries_then_succeeds",
+      "test_connection_error_exhausts_and_returns_empty",
+      "test_already_exhausted_returns_empty_without_request",
+      "test_401_marks_exhausted",
+      "test_200_returns_results",
+      "test_429_marks_exhausted_and_returns_empty",
+      "test_403_marks_exhausted_and_returns_empty",
+      "test_500_exhausts_retries_and_returns_empty",
+      "test_connection_error_exhausts_and_returns_empty",
+      "test_pick_photo_returns_none_on_empty_results",
+      "test_pick_photo_returns_none_when_exhausted",
+      "test_next_available_page_handles_empty_results",
+      "test_process_category_returns_zero_when_source_always_429",
+      "test_process_category_succeeds_when_source_recovers",
+      "_make_source",
+      "test_existing_file_registered_in_manifest",
+      "test_existing_file_not_duplicated_when_in_manifest",
+      "test_all_existing_files_no_download_called",
+      "test_mixed_existing_and_new_files",
+      "fake_download",
+      "test_category_satisfied_skips_second_source",
+      "seed_fs",
+      "test_find_missing_returns_correct_entries",
+      "test_find_missing_returns_empty_when_all_exist",
+      "test_fix_cleanup_removes_only_missing",
+      "test_fix_cleanup_returns_correct_count",
+      "test_fix_cleanup_warns_when_category_empty",
+      "test_fix_cleanup_keeps_empty_category_in_manifest",
+      "test_fix_cleanup_atomic_write_not_corrupted",
+      "test_fix_cleanup_does_not_modify_downloaded_ids",
+      "test_fix_cleanup_end_to_end",
+      "test_validate_then_fix_cleanup_end_to_end",
+      "test_category_equals_form",
+      "test_category_space_form",
+      "test_category_hyphenated_slug_equals_form",
+      "test_category_hyphenated_slug_space_form",
+      "test_fix_equals_form",
+      "test_fix_space_form",
+      "test_all_flag",
+      "test_validate_flag",
+      "test_defaults_no_args",
+      "test_combined_flags_space_and_equals",
+      "test_invalid_fix_mode_equals_exits",
+      "test_invalid_fix_mode_space_exits",
+      "test_fix_without_value_exits",
+      "test_category_without_value_exits",
+      "test_unknown_arg_exits",
+      "test_fix_followed_by_flag_does_not_swallow",
+      "test_category_followed_by_flag_does_not_swallow",
+      "test_count_returns_manifest_count",
+      "test_count_returns_zero_for_empty_manifest",
+      "test_prioritize_zero_photo_first",
+      "test_prioritize_preserves_all_categories",
+      "test_prioritize_deterministic_order_among_ties",
+      "test_prioritize_re_sorts_when_manifest_changes"
+    ]
+  },
+  {
+    "path": "backend/apps/seed/tests/test_seed.py",
+    "module": "backend.apps.seed.tests.test_seed",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "io",
+      "pathlib",
+      "unittest.mock",
+      "django.core.management",
+      "django.test",
+      "apps.ads.models",
+      "apps.analytics.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.seed.generators.ads",
+      "apps.seed.generators.analytics",
+      "apps.seed.generators.base",
+      "apps.seed.generators.images",
+      "apps.seed.generators.users",
+      "apps.seed.paths",
+      "apps.users.models",
+      "PIL",
+      "apps.seed.generators.images",
+      "apps.seed.generators.images",
+      "apps.seed.generators.images",
+      "apps.seed.generators.images",
+      "apps.seed.generators.ads",
+      "apps.seed.generators.ads",
+      "apps.seed.generators.ads",
+      "apps.categories.models",
+      "apps.categories.models",
+      "apps.seed.generators.ads",
+      "apps.categories.models",
+      "apps.seed.generators.ads",
+      "apps.categories.models",
+      "apps.seed.generators.ads",
+      "apps.categories.models",
+      "apps.seed.generators.ads",
+      "apps.categories.models",
+      "apps.locations.models",
+      "django.conf",
+      "apps.categories.catalog.builder"
+    ],
+    "classes": [
+      "TestBaseGenerator",
+      "TestUserGenerator",
+      "TestAdGenerator",
+      "TestImageGenerator",
+      "TestAnalyticsGenerator",
+      "TestSeedCommand",
+      "TestSeedEnums",
+      "TestImageGeneratorManifest",
+      "TestAdGeneratorMultiLang",
+      "TestSeedCommandEnhanced",
+      "TestSeedCategoryIntegration"
+    ],
+    "functions": [
+      "test_deterministic_faker_seed",
+      "test_random_choice_without_weights",
+      "test_random_choice_with_weights",
+      "test_chunked_splits_correctly",
+      "test_generates_correct_count",
+      "test_unique_telegram_ids",
+      "test_deterministic_output",
+      "test_username_optional",
+      "test_users_are_active",
+      "test_bulk_create_works",
+      "setUpTestData",
+      "test_generates_correct_count",
+      "test_source_is_seed",
+      "test_status_distribution_default",
+      "test_fk_references_exist",
+      "test_no_transition_to_called",
+      "test_bulk_create_works",
+      "setUpTestData",
+      "setUp",
+      "tearDown",
+      "test_generates_ad_images",
+      "test_image_keys_have_correct_format",
+      "setUpTestData",
+      "test_events_created_for_published_ads",
+      "test_events_have_ad_viewed_type",
+      "test_daily_metrics_created",
+      "test_bulk_create_events_works",
+      "setUpTestData",
+      "test_seed_with_zero_count",
+      "test_seed_force_skips_prompt",
+      "test_seed_with_analytics",
+      "test_seed_produces_seed_source",
+      "test_seed_idempotent",
+      "test_ad_source_seed",
+      "test_advisory_lock_id_seed",
+      "setUp",
+      "tearDown",
+      "_create_patch",
+      "test_manifest_loading",
+      "test_get_photos_for_category",
+      "test_fallback_to_default",
+      "test_empty_default_fallback",
+      "setUpTestData",
+      "test_word_lists_loaded",
+      "test_templates_loaded",
+      "test_template_variables_filled",
+      "test_generated_ads_have_multi_language_fields",
+      "test_original_language_set",
+      "test_deterministic_multi_language",
+      "test_fallback_template_for_unknown_category",
+      "setUpTestData",
+      "test_media_cleanup",
+      "test_seed_produces_multi_language_ads",
+      "setUpTestData",
+      "test_builder_loads_all_leaf_slugs",
+      "test_ad_generator_with_builder_categories",
+      "test_photo_manifest_loading",
+      "test_full_seed_with_builder_categories"
     ]
   },
   {
@@ -3332,10 +4500,11 @@
     "functions": []
   },
   {
-    "path": "backend/apps/trust/migrations/0002_trust_level_default.py",
-    "module": "backend.apps.trust.migrations.0002_trust_level_default",
+    "path": "backend/apps/trust/migrations/0002_add_user_fks.py",
+    "module": "backend.apps.trust.migrations.0002_add_user_fks",
     "layer": "other",
     "imports": [
+      "django.conf",
       "django.db"
     ],
     "classes": [
@@ -3383,6 +4552,7 @@
       "__future__",
       "typing",
       "apps.ads.models",
+      "apps.analytics.services.trust_analytics",
       "apps.core.enums",
       "apps.trust.models",
       "apps.users.models",
@@ -3482,7 +4652,30 @@
       "test_trust_level_pro_threshold",
       "test_response_score_with_no_contacts",
       "test_response_score_with_contacts",
-      "test_calculate_and_save_updates_existing"
+      "test_calculate_and_save_updates_existing",
+      "test_calculate_and_save_records_trust_event",
+      "test_calculate_and_save_records_on_update"
+    ]
+  },
+  {
+    "path": "backend/apps/trust/tests/test_trust_prefetch.py",
+    "module": "backend.apps.trust.tests.test_trust_prefetch",
+    "layer": "other",
+    "imports": [
+      "__future__",
+      "unittest.mock",
+      "django.template",
+      "django.test",
+      "apps.core.enums"
+    ],
+    "classes": [
+      "TestTrustBadgePrefetchNoQuery"
+    ],
+    "functions": [
+      "_render",
+      "test_uses_prefetched_trust_score_without_db_query",
+      "test_falls_back_to_db_when_not_prefetched",
+      "test_returns_empty_for_anonymous_user"
     ]
   },
   {
@@ -3568,20 +4761,8 @@
     "functions": []
   },
   {
-    "path": "backend/apps/users/migrations/0002_user_chat_id.py",
-    "module": "backend.apps.users.migrations.0002_user_chat_id",
-    "layer": "other",
-    "imports": [
-      "django.db"
-    ],
-    "classes": [
-      "Migration"
-    ],
-    "functions": []
-  },
-  {
-    "path": "backend/apps/users/migrations/0003_user_telegram_premium.py",
-    "module": "backend.apps.users.migrations.0003_user_telegram_premium",
+    "path": "backend/apps/users/migrations/0002_alter_user_telegram_id_null.py",
+    "module": "backend.apps.users.migrations.0002_alter_user_telegram_id_null",
     "layer": "other",
     "imports": [
       "django.db"
@@ -3652,6 +4833,7 @@
     "module": "backend.apps.users.services.deletion",
     "layer": "service",
     "imports": [
+      "django.db",
       "apps.ads.models",
       "apps.core.enums",
       "apps.users.models",
@@ -3664,6 +4846,21 @@
       "withdraw_consent",
       "soft_delete_user_ads",
       "give_consent"
+    ]
+  },
+  {
+    "path": "backend/apps/users/services/login_rate_limit.py",
+    "module": "backend.apps.users.services.login_rate_limit",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.core.cache",
+      "django.http"
+    ],
+    "classes": [],
+    "functions": [
+      "login_rate_limit_check",
+      "_get_client_ip"
     ]
   },
   {
@@ -3727,6 +4924,7 @@
     "module": "backend.apps.users.tests.test_consent",
     "layer": "other",
     "imports": [
+      "datetime",
       "apps.ads.models",
       "apps.categories.models",
       "apps.core.enums",
@@ -3738,7 +4936,9 @@
     "classes": [
       "TestConsentAcceptView",
       "TestConsentDeclineView",
-      "TestConsentWithdrawView"
+      "TestConsentWithdrawView",
+      "TestLoginStatusNoPii",
+      "TestConsentBannerGuard"
     ],
     "functions": [
       "user",
@@ -3754,7 +4954,12 @@
       "test_withdraw_requires_authentication",
       "test_withdraw_triggers_user_soft_delete",
       "test_withdraw_soft_deletes_ads",
-      "test_withdraw_sets_withdrawn_cookie"
+      "test_withdraw_sets_withdrawn_cookie",
+      "test_withdraw_button_renders_on_dashboard",
+      "test_login_consume_no_raw_telegram_id",
+      "deleted_user",
+      "test_banner_hidden_for_deleted_user",
+      "test_banner_shown_for_active_user"
     ]
   },
   {
@@ -3768,13 +4973,22 @@
       "apps.ads.models",
       "apps.categories.models",
       "apps.core.enums",
+      "apps.locations.models",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
+      "apps.locations.models",
+      "apps.ads.models",
+      "apps.categories.models",
+      "apps.core.enums",
       "apps.locations.models"
     ],
     "classes": [
       "TestWithdrawConsentInvalidatesTokens",
       "TestDeclineConsentDoesNotInvalideTokens",
       "TestWithdrawConsentSoftDeletesAds",
-      "TestGiveConsent"
+      "TestGiveConsent",
+      "TestWithdrawConsentAtomicity"
     ],
     "functions": [
       "user",
@@ -3784,7 +4998,45 @@
       "test_decline_preserves_login_tokens",
       "test_withdraw_soft_deletes_user_ads",
       "test_give_consent_sets_timestamp",
-      "test_give_consent_does_not_alter_other_flags"
+      "test_give_consent_does_not_alter_other_flags",
+      "test_withdraw_is_atomic_rollback",
+      "_raise",
+      "test_withdraw_returns_storage_keys",
+      "_spy",
+      "test_withdraw_idempotent",
+      "test_soft_delete_user_ads_returns_keys_not_count",
+      "_spy"
+    ]
+  },
+  {
+    "path": "backend/apps/users/tests/test_login.py",
+    "module": "backend.apps.users.tests.test_login",
+    "layer": "other",
+    "imports": [
+      "datetime",
+      "apps.users.models",
+      "django.test",
+      "django.utils",
+      "django.core.cache"
+    ],
+    "classes": [
+      "TestLoginIssue",
+      "TestLoginStatus"
+    ],
+    "functions": [
+      "_clear_cache",
+      "test_login_issue_renders_deep_link",
+      "test_login_issue_stores_token_hash_not_raw",
+      "test_login_issue_token_expires_in_5_minutes",
+      "test_login_issue_returns_429_on_rate_limit",
+      "test_login_issue_passes_raw_token_to_template",
+      "test_login_status_410_no_token",
+      "test_login_status_410_nonexistent_token",
+      "test_login_status_204_pending",
+      "test_login_status_410_expired",
+      "test_login_status_410_already_consumed",
+      "test_login_status_200_claimed_and_user_exists",
+      "test_login_status_410_user_banned"
     ]
   },
   {
@@ -3815,11 +5067,16 @@
       "django.conf",
       "django.contrib.auth",
       "django.contrib.auth.decorators",
+      "django.db",
       "django.http",
       "django.shortcuts",
       "django.utils",
+      "django.views.decorators.cache",
+      "django.views.decorators.http",
+      "apps.core.utils.sanitize",
       "apps.users.models",
-      "apps.users.services"
+      "apps.users.services",
+      "apps.users.services.login_rate_limit"
     ],
     "classes": [],
     "functions": [
@@ -3884,6 +5141,7 @@
     "module": "backend.config.settings.prod",
     "layer": "config",
     "imports": [
+      "django.core.exceptions",
       "base"
     ],
     "classes": [],
@@ -3898,6 +5156,31 @@
     ],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "backend/config/settings/tests/__init__.py",
+    "module": "backend.config.settings.tests.__init__",
+    "layer": "config",
+    "imports": [],
+    "classes": [],
+    "functions": []
+  },
+  {
+    "path": "backend/config/settings/tests/test_settings_secrets.py",
+    "module": "backend.config.settings.tests.test_settings_secrets",
+    "layer": "config",
+    "imports": [
+      "django.test"
+    ],
+    "classes": [
+      "SettingsSecretsTests"
+    ],
+    "functions": [
+      "_run_in_subprocess",
+      "test_django_secret_key_required",
+      "test_bot_token_allowed_empty_in_debug",
+      "test_bot_token_required_in_production"
+    ]
   },
   {
     "path": "backend/config/urls.py",
@@ -3933,26 +5216,6 @@
     ]
   },
   {
-    "path": "backend/theme/__init__.py",
-    "module": "backend.theme.__init__",
-    "layer": "other",
-    "imports": [],
-    "classes": [],
-    "functions": []
-  },
-  {
-    "path": "backend/theme/apps.py",
-    "module": "backend.theme.apps",
-    "layer": "other",
-    "imports": [
-      "django.apps"
-    ],
-    "classes": [
-      "ThemeConfig"
-    ],
-    "functions": []
-  },
-  {
     "path": "telegram_bot/__init__.py",
     "module": "telegram_bot.__init__",
     "layer": "other",
@@ -3967,10 +5230,28 @@
     "imports": [
       "login",
       "ad_create",
-      "alerts"
+      "alerts",
+      "ad_copy"
     ],
     "classes": [],
     "functions": []
+  },
+  {
+    "path": "telegram_bot/handlers/ad_copy.py",
+    "module": "telegram_bot.handlers.ad_copy",
+    "layer": "other",
+    "imports": [
+      "asgiref.sync",
+      "aiogram",
+      "aiogram.filters",
+      "aiogram.fsm.context",
+      "apps.ads.services.copy_service",
+      "telegram_bot.states"
+    ],
+    "classes": [],
+    "functions": [
+      "cmd_copy"
+    ]
   },
   {
     "path": "telegram_bot/handlers/ad_create.py",
@@ -3981,10 +5262,13 @@
       "aiogram.filters",
       "aiogram.fsm.context",
       "aiogram.fsm.state",
+      "aiogram.utils.keyboard",
       "django.conf",
       "apps.ads.models",
+      "apps.ads.services.images",
       "apps.categories.models",
       "apps.core.enums",
+      "apps.core.services.translation",
       "apps.locations.models",
       "telegram_bot.schemas.message_payloads",
       "telegram_bot.services.media",
@@ -3997,10 +5281,23 @@
       "asgiref.sync",
       "asgiref.sync",
       "asgiref.sync",
-      "deep_translator",
       "asgiref.sync",
       "apps.moderation.services.auto_moderation",
-      "deep_translator"
+      "django.db",
+      "asgiref.sync",
+      "apps.categories.services.lookup_resolution",
+      "apps.categories.models",
+      "asgiref.sync",
+      "apps.categories.services.lookup_resolution",
+      "apps.categories.models",
+      "asgiref.sync",
+      "apps.categories.models",
+      "asgiref.sync",
+      "apps.lookups.models",
+      "asgiref.sync",
+      "apps.lookups.models",
+      "asgiref.sync",
+      "apps.lookups.models"
     ],
     "classes": [
       "AdCreateForm"
@@ -4009,6 +5306,10 @@
       "cmd_post",
       "cmd_cancel",
       "process_category",
+      "process_category_selected",
+      "proceed_to_features_or_city",
+      "process_purpose",
+      "process_features",
       "process_city",
       "process_title",
       "process_description",
@@ -4033,14 +5334,23 @@
       "_get",
       "get_city",
       "_get",
-      "_do_translate",
-      "translate_to_russian",
-      "translate_one",
       "update_ad_and_moderate",
       "_update_and_moderate",
-      "_do_translate_to",
       "translate_all_languages",
-      "translate_one"
+      "get_resolved_purposes",
+      "_get",
+      "get_resolved_features",
+      "_get",
+      "get_default_purpose",
+      "_get",
+      "get_lookup_item_by_slug",
+      "_get",
+      "get_lookup_item",
+      "_get",
+      "get_feature_names",
+      "_get",
+      "build_purpose_keyboard",
+      "build_feature_keyboard"
     ]
   },
   {
@@ -4096,6 +5406,7 @@
     "classes": [],
     "functions": [
       "handle_login_deep_link",
+      "_claim_login_token",
       "handle_login_orm",
       "_handle"
     ]
@@ -4215,6 +5526,19 @@
     ]
   },
   {
+    "path": "telegram_bot/services/rate_limit.py",
+    "module": "telegram_bot.services.rate_limit",
+    "layer": "service",
+    "imports": [
+      "typing",
+      "django.core.cache"
+    ],
+    "classes": [],
+    "functions": [
+      "check_upload_rate_limit"
+    ]
+  },
+  {
     "path": "telegram_bot/states.py",
     "module": "telegram_bot.states",
     "layer": "other",
@@ -4244,7 +5568,10 @@
       "typing",
       "aiogram",
       "aiogram.fsm.storage.memory",
+      "asgiref.sync",
       "django.conf",
+      "django.db",
+      "django.db.backends.signals",
       "django.utils",
       "telegram_bot.handlers",
       "telegram_bot.middlewares",
@@ -4257,7 +5584,37 @@
       "dp",
       "user",
       "login_token_factory",
-      "_create"
+      "_create",
+      "_register_connection",
+      "_close_all_thread_connections",
+      "_reap_worker_connections",
+      "_reap_stale_backends_session"
+    ]
+  },
+  {
+    "path": "telegram_bot/tests/test_ad_create.py",
+    "module": "telegram_bot.tests.test_ad_create",
+    "layer": "other",
+    "imports": [
+      "unittest.mock",
+      "asgiref.sync",
+      "apps.users.models",
+      "telegram_bot.handlers.ad_create",
+      "apps.ads.models",
+      "telegram_bot.handlers.ad_create",
+      "apps.ads.models"
+    ],
+    "classes": [
+      "TestProcessPreviewLanguageDetection"
+    ],
+    "functions": [
+      "seller_id",
+      "permissive_criteria",
+      "_build_message",
+      "_build_state",
+      "_mock_translate",
+      "test_original_language_detected_from_user",
+      "test_original_language_falls_back_to_bosnian"
     ]
   },
   {
@@ -4377,7 +5734,8 @@
     "imports": [
       "apps.users.models",
       "django.utils",
-      "telegram_bot.handlers.login"
+      "telegram_bot.handlers.login",
+      "asgiref.sync"
     ],
     "classes": [
       "TestClaimLoginToken"
@@ -4385,10 +5743,6 @@
     "functions": [
       "telegram_id",
       "token_hash",
-      "future_token",
-      "expired_token",
-      "claimed_token",
-      "consumed_token",
       "test_fresh_unclaimed_token",
       "test_reclaim_blocked",
       "test_expired_token_rejected",
@@ -4401,13 +5755,17 @@
     "module": "telegram_bot.tests.test_media",
     "layer": "other",
     "imports": [
+      "pathlib",
+      "types",
+      "unittest.mock",
       "PIL",
       "telegram_bot.services.media"
     ],
     "classes": [
       "TestValidateJpegBytes",
       "TestValidatePhoto",
-      "TestGenerateStorageKey"
+      "TestGenerateStorageKey",
+      "TestDeletePhoto"
     ],
     "functions": [
       "valid_jpeg_bytes",
@@ -4427,7 +5785,12 @@
       "test_ends_with_dot_jpg",
       "test_uuid_v4_format",
       "test_unique_keys",
-      "test_no_pii_in_key"
+      "test_no_pii_in_key",
+      "_isolate_media_root",
+      "test_delete_photo_file_not_found_silent",
+      "test_delete_photo_file_not_found_does_not_retry",
+      "test_delete_photo_handles_os_error",
+      "test_delete_photo_retries_on_temporary_failure"
     ]
   },
   {
@@ -4436,12 +5799,14 @@
     "layer": "other",
     "imports": [
       "unittest.mock",
+      "apps.core.services.translation",
       "telegram_bot.handlers.ad_create"
     ],
     "classes": [
       "TestTranslateAllLanguages"
     ],
     "functions": [
+      "_reset_translation_state",
       "test_returns_dict_with_all_locale_codes",
       "test_translation_non_empty_for_valid_input",
       "test_translates_each_locale_independently",
@@ -4449,7 +5814,11 @@
       "test_partial_failure_falls_back_per_locale",
       "_side_effect",
       "test_empty_string_input",
-      "test_single_locale"
+      "test_single_locale",
+      "test_circuit_breaker_open_short_circuits",
+      "test_timeout_fallback_returns_original",
+      "slow_translate",
+      "test_empty_string_returns_empty"
     ]
   },
   {
@@ -4471,5 +5840,19 @@
       "ThemeConfig"
     ],
     "functions": []
+  },
+  {
+    "path": "theme/storage.py",
+    "module": "theme.storage",
+    "layer": "other",
+    "imports": [
+      "whitenoise.storage"
+    ],
+    "classes": [
+      "ThemeStaticFilesStorage"
+    ],
+    "functions": [
+      "post_process"
+    ]
   }
 ]
