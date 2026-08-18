@@ -88,6 +88,13 @@ class SavedSearch(models.Model):
         default=True,
         help_text="Inactive searches do not receive notifications",
     )
+    language = models.CharField(
+        max_length=5,
+        blank=True,
+        null=True,
+        default="bs",
+        help_text="LanguageLocale code ('ru', 'bs' or 'en') used to search ads",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="When this saved search was created",

@@ -5,9 +5,10 @@ Provides Google Translate-backed text translation with timeout (~500ms),
 fallback, LRU cache, and circuit-breaker for graceful degradation under
 translator throttling.
 
-Both the search-side query translator (``apps.search.services.query_translator``)
-and the bot's ad-creation translator (``telegram_bot.handlers.ad_create``)
-use this single implementation.
+Used at publication time by the bot's ad-creation translator
+(``telegram_bot.handlers.ad_create``). Search/alert query translation was
+removed — the search path now uses language-aware per-language FTS vectors
+with no external translation.
 """
 
 import logging
@@ -89,59 +90,6 @@ class TranslationCircuitBreaker:
 _CIRCUIT_BREAKER: Final[TranslationCircuitBreaker] = TranslationCircuitBreaker()
 
 
-def translate_query_bs_to_ru(query: str) -> str:
-    """
-    Translate Bosnian query to Russian with timeout, fallback, and circuit-breaker.
-
-    Uses deep-translator (Google Translate) for translation. If translation
-    fails or times out (exception), returns the original query as fallback.
-    After 3 consecutive failures the circuit opens and short-circuits to the
-    fallback for 60 seconds to avoid hammering a throttled endpoint.
-
-    Args:
-        query: The search query in Bosnian
-
-    Returns:
-        Translated query in Russian, or original query on failure
-    """
-    if not query or not query.strip():
-        return query
-
-    # Closed/half-open check.  While open, bail immediately.
-    if _CIRCUIT_BREAKER.is_open:
-        logger.info(
-            "Circuit open – fallback to original query '%s' (breaker)",
-            sanitize_query_for_log(query),
-        )
-        return query
-
-    try:
-        future = _EXECUTOR.submit(translate_cached, query)
-        result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
-        if result:
-            _CIRCUIT_BREAKER.record_success()
-            logger.debug(
-                "Translated query '%s' -> '%s'",
-                sanitize_query_for_log(query),
-                sanitize_query_for_log(result),
-            )
-            return result
-    except (TimeoutError, RequestException, Exception) as e:
-        _CIRCUIT_BREAKER.record_failure()
-        logger.warning(
-            "Translation failed for query '%s': %s",
-            sanitize_query_for_log(query),
-            e,
-        )
-
-    # Fallback: return original query if translation fails
-    logger.info(
-        "Translation fallback: returning original query '%s'",
-        sanitize_query_for_log(query),
-    )
-    return query
-
-
 @lru_cache(maxsize=128)
 def translate_cached(query: str) -> str:
     """
@@ -160,12 +108,6 @@ def translate_cached(query: str) -> str:
     return translator.translate(query)
 
 
-def invalidate_translation_cache() -> None:
-    """Invalidate the translation caches for both legacy and generic translators."""
-    translate_cached.cache_clear()
-    translate_cached_generic.cache_clear()
-
-
 @lru_cache(maxsize=256)
 def translate_cached_generic(
     query: str, source_locale: str, target_locale: str
@@ -174,7 +116,6 @@ def translate_cached_generic(
     Cached translation function supporting any language pair.
 
     Uses lru_cache with maxsize=256 to cache translations.
-    The cache is invalidated by calling invalidate_translation_cache().
 
     Args:
         query: The text to translate
@@ -243,7 +184,3 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
         sanitize_query_for_log(text),
     )
     return text
-
-
-# Backward-compatible alias – search-side callers import this name.
-translate_query = translate_text

@@ -5,21 +5,21 @@ Provides functions to find PUBLISHED ads matching a saved search's filters
 (FTS query, city, category subtree, price range) and record notifications
 to prevent duplicate alerts.
 
-Reuses FTS patterns from the web search view with Bosnian-to-Russian
-translation, SearchRank ordering, and Efficient Exists/OuterRef dedup.
+Reuses FTS patterns from the web search view. The saved search's persisted
+``language`` picks the matching per-language vector + FTS config (no query
+translation), with SearchRank ordering and Efficient Exists/OuterRef dedup.
 """
 
 import logging
 from typing import cast
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
-from django.db.models import Exists, OuterRef, QuerySet
+from django.db.models import Exists, F, OuterRef, QuerySet
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, LanguageLocale
 from apps.search.models import SavedSearch, SavedSearchNotification
-from apps.search.services.query_translator import translate_query_bs_to_ru
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
     """
     Find newly published ads matching a saved search.
 
-    Applies FTS query (with Bosnian-to-Russian translation), category
-    subtree, city, and price filters.  Matches are ranked by relevance
-    and capped at 10 per digest.  Ads already notified via
-    ``SavedSearchNotification`` are excluded via a correlated NOT EXISTS
-    subquery for efficiency.
+    Applies an FTS query (searched in the saved search's language via
+    ``saved_search.language``, no translation), category subtree, city, and
+    price filters.  Matches are ranked by relevance and capped at 10 per
+    digest.  Ads already notified via ``SavedSearchNotification`` are
+    excluded via a correlated NOT EXISTS subquery for efficiency.
 
     Args:
         saved_search: The SavedSearch to match against.
@@ -45,19 +45,24 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
         .select_related("category", "city")
     )
 
-    # Apply FTS query with Bosnian-to-Russian translation
+    # Apply FTS query in the saved search's persisted language (no translation)
     if saved_search.query:
-        translated_query = translate_query_bs_to_ru(saved_search.query)
+        locale = LanguageLocale.from_code(
+            saved_search.language,
+            fallback=LanguageLocale.RUSSIAN,
+        )
+        vector_field = locale.fts_vector_field
+        config = locale.fts_config
 
         search_query = SearchQuery(
-            translated_query,
+            saved_search.query,
             search_type="websearch",
-            config="russian",
+            config=config,
         )
         queryset = queryset.annotate(
-            rank=SearchRank("search_vector", search_query),
+            rank=SearchRank(F(vector_field), search_query),
         ).filter(
-            search_vector=search_query,
+            **{vector_field: search_query},
         ).order_by("-rank")
 
     # Apply city filter if specified

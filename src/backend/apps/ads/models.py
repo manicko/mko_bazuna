@@ -178,11 +178,26 @@ class Ad(models.Model):
         help_text="Manually rejected; drives 90-day cleanup (mutually exclusive with moderation_failed_at)",
     )
 
-    # Search vector (NOT GENERATED ALWAYS - maintained by trigger)
+    # Search vectors (NOT GENERATED ALWAYS - maintained by trigger)
     search_vector = SearchVectorField(
         blank=True,
         null=True,
         help_text="TSVECTOR for native PostgreSQL FTS; NOT GENERATED ALWAYS",
+    )
+    search_vector_ru = SearchVectorField(
+        blank=True,
+        null=True,
+        help_text="Russian TSVECTOR for native PostgreSQL FTS; NOT GENERATED ALWAYS",
+    )
+    search_vector_bs = SearchVectorField(
+        blank=True,
+        null=True,
+        help_text="Bosnian TSVECTOR for native PostgreSQL FTS; NOT GENERATED ALWAYS",
+    )
+    search_vector_en = SearchVectorField(
+        blank=True,
+        null=True,
+        help_text="English TSVECTOR for native PostgreSQL FTS; NOT GENERATED ALWAYS",
     )
 
     # Moderator references
@@ -209,6 +224,18 @@ class Ad(models.Model):
             GinIndex(
                 name="IX_ads_search_gin",
                 fields=["search_vector"],
+            ),
+            GinIndex(
+                name="IX_ads_search_gin_ru",
+                fields=["search_vector_ru"],
+            ),
+            GinIndex(
+                name="IX_ads_search_gin_bs",
+                fields=["search_vector_bs"],
+            ),
+            GinIndex(
+                name="IX_ads_search_gin_en",
+                fields=["search_vector_en"],
             ),
             models.Index(
                 name="IX_ads_pub_listing",
@@ -319,7 +346,7 @@ class Ad(models.Model):
             AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
             AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
             AdStatus.REJECTED: set(),  # Terminal
-            AdStatus.ON_MODERATION_FAILED: set(),  # Terminal
+            AdStatus.ON_MODERATION_FAILED: {AdStatus.REJECTED},  # manual review of auto-failed ads (AD-001)
             AdStatus.DELETED: set(),  # Terminal
         }
 

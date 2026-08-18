@@ -14,13 +14,13 @@ related:
 
 ## Purpose
 
-Document search UI patterns and implementation strategies for the Mko Bazuna classifieds board. Search is multi-language over Russian content with Russian, Bosnian, and English query translation support.
+Document search UI patterns and implementation strategies for the Mko Bazuna classifieds board. Ads are translated once per language at publication; search runs in the buyer's language against per-language FTS vectors.
 
 ## Main Concepts
 
 - **Search-first architecture:** 70%+ of platform traffic originates from search
-- **Multi-language query translation:** Russian, Bosnian, and English queries translate to Russian before FTS
-- **Native PostgreSQL FTS:** No external search engine; uses `tsvector` + GIN index with multi-language support
+- **Language-aware search:** Russian, Bosnian, and English queries search their matching per-language vector — no query-time translation
+- **Native PostgreSQL FTS:** No external search engine; uses per-language `tsvector` + GIN indexes
 - **Empty state handling:** Friendly guidance when no results found
 
 ## Hero Search with Location
@@ -59,43 +59,33 @@ The homepage search combines keyword input with city selection for local discove
 
 Related user stories: US-B2, US-B3, US-B7
 
-## Query Translation Flow
+## Multi-Language Search Flow
 
-All content is stored in Russian; Russian, Bosnian, and English queries translate to Russian before FTS.
+Ads are translated once at publication time into Russian, Bosnian, and English
+and stored per-language. Search runs **in the buyer's language** against a
+per-language FTS vector column — no external translator is called on the search
+critical path.
 
 ### Process
 
 1. User enters query in search input (Russian, Bosnian, or English)
-2. `deep-translator` library translates to Russian via Google Translate
-3. Translation passes through an LRU cache to prevent duplicate calls within the same process
-4. PostgreSQL FTS executes on Russian-translated query
-5. Results optionally tagged "translated from Russian"
+2. The `search` view resolves the locale from `request.LANGUAGE_CODE` via
+   `LanguageLocale.from_code()` and picks the matching per-language vector
+   column (`search_vector_ru/bs/en`) and FTS config (`russian`/`simple`/`english`)
+3. PostgreSQL FTS runs the original query against the matching vector **without
+   translation**
+4. Single-word queries trigger locale-aware fuzzy category detection against the
+   locale-appropriate category name (`Category.get_name(locale)`)
 
 ### Implementation
 
-All translation logic now lives in the shared module `apps/core/services/translation.py`,
-used by both the search-side query translator (`apps/search/services/query_translator`) and
-the bot's ad-creation translator (`translate_all_languages` in `telegram_bot/handlers/ad_create.py`).
-The legacy `apps/search/services/query_translator.py` is now a backward-compatibility re-export shim
-that re-exports names from the shared module.
+Ads store per-language `TSVECTOR` columns maintained by the `ads_search_vector_fn`
+trigger at publication time. The publication-time translator
+(`translate_all_languages` in `telegram_bot/handlers/ad_create.py`) remains the only
+use of `deep-translator` — content is translated once when the ad is created.
 
-The consolidated resilience policy is enforced by the shared service:
-- **500ms timeout** via `ThreadPoolExecutor` future result (timeout exceptions trigger fallback)
-- **Circuit breaker:** 3 consecutive failures → circuit opens for 60s cooldown (half-open on next call)
-- **LRU cache:** `lru_cache(maxsize=128)` for query translation, `lru_cache(maxsize=256)` for generic translation
-
-```python
-# apps/core/services/translation.py  (shared — used by search + bot)
-def translate_query(text: str, source_locale: str, target_locale: str) -> str:
-    """Translate text from source_locale to target_locale using deep-translator."""
-    if not text or not text.strip():
-        return text
-    
-    # ... implements 500ms timeout, LRU cache, and circuit-breaker for graceful degradation
-    
-    return translated_text
-
-```
+Saved search alerts search the persisted `SavedSearch.language` field (the alert
+command runs without a request), falling back to `ru` for legacy rows.
 
 ### Privacy Note
 
@@ -188,14 +178,16 @@ Related user stories: US-B2
 
 ## Category Name Search
 
-Category names are searchable via denormalized field in `search_vector`.
+Category names are searchable via per-language fields in the search vectors.
 
 ### Implementation Notes
 
-- `category_name` is denormalized into `ads.category_name` field
-- Included in `search_vector` with weight 'C'
+- `category_name` is denormalized into `ads.category_name` (Russian)
+- The trigger indexes the Russian name in `search_vector_ru`, and the localized
+  `name_i18n->>'bs'` / `->>'en'` names (falling back to the Russian name) in
+  `search_vector_bs` / `search_vector_en`, at weight 'C'
 - Single-word queries matching category names set `category_id` filter
-- All queries translate to Russian before matching
+  (locale-aware via `Category.get_name(locale)`)
 
 Related user stories: US-B3, US-B6
 
@@ -205,8 +197,8 @@ Target response time: ≤2 seconds for search queries.
 
 ### Optimization Strategies
 
-- `GinIndex IX_ads_search_gin` on `search_vector` column
-- Query cache for translations
+- `GinIndex IX_ads_search_gin_ru`, `IX_ads_search_gin_bs`, `IX_ads_search_gin_en`
+  on the per-language `search_vector_*` columns (built with `CONCURRENTLY`)
 - Database indexes on filtered columns (city, category, status)
 - Pagination limits (standard page size = 24 ads)
 

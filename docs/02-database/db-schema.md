@@ -115,7 +115,10 @@ archived_at (TIMESTAMP, nullable)
 deleted_at (TIMESTAMP, nullable)
 moderation_failed_at (TIMESTAMP, nullable)         # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
 rejected_at (TIMESTAMP, nullable)                  # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
-search_vector (TSVECTOR)                            # NOT GENERATED ALWAYS — maintained by trigger (needs FK-lookup of category_name)
+search_vector (TSVECTOR)                            # NOT GENERATED ALWAYS — legacy concatenated vector (maintained by trigger)
+search_vector_ru (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (russian config), trigger-maintained
+search_vector_bs (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (simple config), trigger-maintained
+search_vector_en (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (english config), trigger-maintained
 published_by (FK → users.id, nullable, SET_NULL)    # moderator who manually published
 moderated_by (FK → users.id, nullable, SET_NULL)    # moderator who manually rejected
 ```
@@ -373,6 +376,7 @@ category_id (FK → categories.id, SET_NULL, nullable)
 min_price (POSITIVE INT, nullable)
 max_price (POSITIVE INT, nullable)
 is_active (BOOL, default True)
+language (VARCHAR(5), nullable, default 'bs')   # LanguageLocale code; legacy rows backfilled to 'ru'
 created_at (TIMESTAMP)
 
 db_table: saved_searches

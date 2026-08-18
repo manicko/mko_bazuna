@@ -15,10 +15,10 @@ related:
 
 ## Purpose
 
-Indexes and the `search_vector` trigger SQL for phases 1 and 2. Single source of truth for the
-named indexes and the two plpgsql trigger functions that keep `search_vector` and the denormalized
-`category_name` in sync. Table/column definitions live in [db-schema.md](db-schema.md); StrEnum
-types live in [db-enums.md](db-enums.md).
+Indexes and the search-vector trigger SQL for phases 1 and 2. Single source of truth for the
+named indexes and the two plpgsql trigger functions that keep the per-language
+`search_vector_ru/bs/en` and the denormalized `category_name` in sync. Table/column
+definitions live in [db-schema.md](db-schema.md); StrEnum types live in [db-enums.md](db-enums.md).
 
 ## Indexes — ads
 ```python
@@ -26,7 +26,10 @@ models.Index(name='IX_ads_pub_listing',
     fields=['status', 'category_id', 'city_id', '-published_at'],
     condition=Q(status=AdStatus.PUBLISHED))                 # partial: ~99% of public reads
 models.Index(name='IX_ads_user_status', fields=['user_id', 'status'])
-GinIndex(name='IX_ads_search_gin', fields=['search_vector'])  # real GIN on TSVECTOR
+GinIndex(name='IX_ads_search_gin', fields=['search_vector'])          # legacy concatenated vector (to be dropped)
+GinIndex(name='IX_ads_search_gin_ru', fields=['search_vector_ru'])    # real GIN on Russian TSVECTOR
+GinIndex(name='IX_ads_search_gin_bs', fields=['search_vector_bs'])    # real GIN on Bosnian TSVECTOR
+GinIndex(name='IX_ads_search_gin_en', fields=['search_vector_en'])    # real GIN on English TSVECTOR
 models.Index(name='IX_ads_archive_sweep', fields=['status', 'published_at'],
     condition=Q(status=AdStatus.PUBLISHED))                 # archive @2mo
 models.Index(name='IX_ads_delete_sweep', fields=['status', 'published_at'],
@@ -47,17 +50,24 @@ models.Index(name='IX_users_erasure_sweep', fields=['consent_revoked_at'])  # zo
 > consent withdrawal (decision O3).
 
 ## search_vector triggers (zone D1, sync-safety, multi-language)
-Because `search_vector` includes the category name (another table), the column cannot be
-`GENERATED ALWAYS` — a plpgsql trigger fills it. All computation lives in ONE function so INSERT and
+Because the search vectors include the category name (another table), the columns cannot be
+`GENERATED ALWAYS` — a plpgsql trigger fills them. All computation lives in ONE function so INSERT and
 UPDATE paths don't diverge. Code writes `title`/`description`/`category_id`; the trigger fills
-`category_name` + `search_vector`.
+`category_name` + the per-language `search_vector_ru/bs/en` (and, during the transition, the legacy
+concatenated `search_vector`).
 
-For multi-language support, the search vector includes all language variants with appropriate FTS configurations:
+The trigger dual-writes the legacy vector and the three per-language vectors, using the correct
+config per language and localized category names:
 ```sql
 CREATE OR REPLACE FUNCTION ads_search_vector_fn() RETURNS TRIGGER AS $$
-DECLARE v_cat TEXT;
+DECLARE
+  v_cat TEXT;
+  v_name_bs TEXT;
+  v_name_en TEXT;
 BEGIN
-  SELECT name INTO v_cat FROM categories WHERE id = NEW.category_id;
+  SELECT name, name_i18n->>'bs', name_i18n->>'en'
+    INTO v_cat, v_name_bs, v_name_en
+    FROM categories WHERE id = NEW.category_id;
   NEW.category_name := v_cat;
   NEW.search_vector :=
     setweight(to_tsvector('russian', coalesce(NEW.title,'')), 'A') ||
@@ -67,6 +77,18 @@ BEGIN
     setweight(to_tsvector('english', coalesce(NEW.title_en,'')), 'A') ||
     setweight(to_tsvector('english', coalesce(NEW.description_en,'')), 'B') ||
     setweight(to_tsvector('simple', coalesce(v_cat,'')), 'C');
+  NEW.search_vector_ru :=
+    setweight(to_tsvector('russian', coalesce(NEW.title,'')), 'A') ||
+    setweight(to_tsvector('russian', coalesce(NEW.description,'')), 'B') ||
+    setweight(to_tsvector('russian', coalesce(v_cat,'')), 'C');
+  NEW.search_vector_bs :=
+    setweight(to_tsvector('simple', coalesce(NEW.title_bs,'')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(NEW.description_bs,'')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(coalesce(v_name_bs, v_cat),'')), 'C');
+  NEW.search_vector_en :=
+    setweight(to_tsvector('english', coalesce(NEW.title_en,'')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description_en,'')), 'B') ||
+    setweight(to_tsvector('english', coalesce(coalesce(v_name_en, v_cat),'')), 'C');
   RETURN NEW;
 END; $$ LANGUAGE plpgsql;
 
@@ -86,22 +108,24 @@ thumbnail_large (storage key for 1280x960 thumbnail)
 ```sql
 CREATE OR REPLACE FUNCTION categories_name_propagate() RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE ads SET category_id = ads.category_id  -- trigger #2 recomputes category_name+search_vector
+  UPDATE ads SET category_name = NEW.name  -- trigger #2 recomputes category_name + search vectors
   WHERE category_id = NEW.id;
   RETURN NEW;
 END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER on_category_name_update
-  AFTER UPDATE OF name ON categories
+  AFTER UPDATE OF name, name_i18n ON categories
   FOR EACH ROW EXECUTE FUNCTION categories_name_propagate();
 ```
 
 > Zone D1 (sync-safety): `ads_search_vector_fn` and `categories_name_propagate` keep
-> `category_name` + `search_vector` consistent across INSERT/UPDATE and category renames.
+> `category_name` + the per-language search vectors consistent across INSERT/UPDATE and
+> category renames / `name_i18n` edits. The trigger fires on `name_i18n` updates so localized
+> category name changes re-index all affected ads.
 
-**Migration notes:** one-time `UPDATE ads SET category_id = category_id` (or backfill) to fill
-`category_name` + `search_vector` for existing rows. O(n_ads) per category rename — acceptable for
-~30-50 categories.
+**Migration notes:** one-time `UPDATE ads SET title = title` to backfill the per-language vectors
+for existing rows (seed uses `bulk_create`, bypassing the trigger). O(n_ads) per category rename —
+acceptable for ~30-50 categories.
 
 ## Indexes — analytics_events
 ```python

@@ -110,6 +110,16 @@ def city2() -> City:
 class TestAutocompleteEndpoint:
     """Integration tests for the autocomplete HTTP endpoint."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_rate_limit(self) -> None:
+        """Clear the rate-limit cache before each test to prevent state bleed.
+
+        The rate limiter keys on the client IP (127.0.0.1 in tests), and
+        ``test_autocomplete_rate_limit`` exhausts the per-IP limit, so without
+        a reset subsequent endpoint tests would be rejected with 429.
+        """
+        cache.clear()
+
     def test_autocomplete_returns_suggestions(
         self, buyer: User, root_category: Category, city: City
     ) -> None:

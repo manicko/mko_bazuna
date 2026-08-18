@@ -114,8 +114,9 @@ configurations for language-aware search.
 | `ENGLISH` | English | `english` |
 
 The `fts_config` property returns the appropriate PostgreSQL text search
-configuration name for each locale. Used by the search service to select the
-correct search configuration when queries are in different languages.
+configuration name for each locale, and `fts_vector_field` returns the matching
+per-language `ads.search_vector_*` column. Used by the search and alert services
+to select the correct vector + config when queries are in different languages.
 
 ## TrustLevel
 Seller trust level for badge display and trust scoring (see [db-schema.md](db-schema.md)).

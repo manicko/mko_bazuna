@@ -223,6 +223,15 @@ class LanguageLocale(StrEnum):
             "en": "english",
         }[self.value]
 
+    @property
+    def fts_vector_field(self) -> str:
+        """Ads search vector column name for this language."""
+        return {
+            "ru": "search_vector_ru",
+            "bs": "search_vector_bs",
+            "en": "search_vector_en",
+        }[self.value]
+
 
 __all__ = [
     "AdSort",

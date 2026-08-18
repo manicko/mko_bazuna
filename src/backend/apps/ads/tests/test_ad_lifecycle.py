@@ -190,7 +190,7 @@ class TestCheckConstraints:
         ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
-            with transaction.atomic():
+            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
                 Ad.objects.filter(id=ad.id).update(status=AdStatus.PUBLISHED)
 
         # Original row must be untouched (savepoint rollback)
@@ -204,7 +204,7 @@ class TestCheckConstraints:
         ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
-            with transaction.atomic():
+            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
                 Ad.objects.filter(id=ad.id).update(status=AdStatus.ARCHIVED)
 
         ad.refresh_from_db()
@@ -217,7 +217,7 @@ class TestCheckConstraints:
         ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
-            with transaction.atomic():
+            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
                 Ad.objects.filter(id=ad.id).update(
                     moderation_failed_at=timezone.now(),
                     rejected_at=timezone.now(),

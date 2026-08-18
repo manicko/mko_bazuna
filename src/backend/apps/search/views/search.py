@@ -1,7 +1,9 @@
 """
 Search view for Mko Bazuna.
 
-FTS search on search_vector with Bosnian->Russian translation.
+Language-aware FTS search on per-language search vectors.
+The query is searched in the buyer's own language against the matching
+vector column — no external translation on the search critical path.
 One-word queries trigger fuzzy category detection.
 """
 
@@ -11,16 +13,16 @@ import re
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
+from apps.core.enums import AdStatus, AdSort, AnalyticsEventType, LanguageLocale
 from apps.locations.models import City
 from apps.users.views.consent import is_consent_given
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from django.db.models import F
 from apps.core.utils.sanitize import sanitize_query_for_log
 from apps.search.services.popular_search import increment_popular_search
-from apps.search.services.query_translator import translate_query
 from apps.search.services.search_history import record_search_history
 
 logger = logging.getLogger(__name__)
@@ -28,12 +30,13 @@ logger = logging.getLogger(__name__)
 
 def search(request: HttpRequest) -> HttpResponse:
     """
-    Search view using PostgreSQL FTS on search_vector.
+    Search view using PostgreSQL FTS on per-language search vectors.
 
     Features:
-        - Query translated to Russian for FTS search based on request language
-        - One-word queries apply fuzzy category detection
-        - GIN index used for search_vector (Task 5)
+        - Resolves the locale from request.LANGUAGE_CODE and searches the
+          matching per-language vector without query translation
+        - One-word queries apply fuzzy category detection (locale-aware)
+        - GIN index used for each per-language search vector
         - Records SEARCH_PERFORMED analytics event
         - Paginated results (24 per page) with HTMX partial support
 
@@ -89,16 +92,16 @@ def search(request: HttpRequest) -> HttpResponse:
     current_sort = request.GET.get("sort", AdSort.DATE_NEW)
 
     if query:
-        # Detect language from request preference and translate to Russian if needed
-        query_language = request.LANGUAGE_CODE
-        if query_language != "ru":
-            translated_query = translate_query(query, query_language, "ru")
-        else:
-            translated_query = query
+        # Resolve locale from the request's UI language preference. The query is
+        # searched in its original language against the matching vector column;
+        # no external translator runs on the search critical path.
+        locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
+        vector_field = locale.fts_vector_field
+        config = locale.fts_config
 
-        # One-word queries: apply fuzzy category detection
+        # One-word queries: apply fuzzy category detection (locale-aware)
         if _is_single_word(query):
-            category_filter = _fuzzy_category_match(translated_query)
+            category_filter = _fuzzy_category_match(query, locale)
             if category_filter:
                 # Expand to category subtree (consistent with listings.py)
                 descendant_ids = category_filter.get_descendants(include_self=True).values_list(
@@ -106,11 +109,11 @@ def search(request: HttpRequest) -> HttpResponse:
                 )
                 ads = ads.filter(category_id__in=descendant_ids)
 
-        # FTS search on search_vector
-        search_query = SearchQuery(translated_query, search_type="websearch", config="russian")
+        # FTS search on the locale's per-language vector
+        search_query = SearchQuery(query, search_type="websearch", config=config)
         ads = ads.annotate(
-            rank=SearchRank("search_vector", search_query)
-        ).filter(search_vector=search_query).order_by("-rank")
+            rank=SearchRank(F(vector_field), search_query)
+        ).filter(**{vector_field: search_query}).order_by("-rank")
 
         # Record search event (analytics) after successful execution
         AnalyticsEvent.objects.create(
@@ -171,31 +174,49 @@ def _is_single_word(text: str) -> bool:
     return len(words) == 1
 
 
-def _fuzzy_category_match(query: str) -> Category | None:
+def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None:
     """
-    Find category matching the query using fuzzy string matching.
+    Find category matching the query using the locale-appropriate name.
+
+    Matches against ``Category.get_name(locale)`` so single-word queries find
+    the category in the buyer's own language.
 
     Args:
         query: The single-word search query
+        locale: The active search locale
 
     Returns:
         Matching Category or None
     """
-    # Try exact match first (use first() to handle duplicate category names)
-    return Category.objects.filter(name__iexact=query, is_active=True).first() or (
-        # Try slug match (slug is unique so first() is safe)
-        Category.objects.filter(slug__iexact=query, is_active=True).first()
-    ) or _fuzzy_match_by_name(query)
+    # Try slug match first (slug is unique so first() is safe)
+    by_slug = Category.objects.filter(slug__iexact=query, is_active=True).first()
+    if by_slug:
+        return by_slug
+    # Exact match against the locale-appropriate display name (case-insensitive)
+    for category in Category.objects.filter(is_active=True):
+        if category.get_name(locale.value).lower() == query.lower():
+            return category
+    return _fuzzy_match_by_name(query, locale)
 
 
-def _fuzzy_match_by_name(query: str) -> Category | None:
-    """Find the closest category name match using difflib fuzzy matching."""
+def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
+    """Find the closest category name match using difflib fuzzy matching.
+
+    Args:
+        query: The single-word search query
+        locale: The active search locale
+
+    Returns:
+        Matching Category or None
+    """
     from difflib import get_close_matches
 
-    all_names = list(
-        Category.objects.filter(is_active=True).values_list("name", flat=True)
-    )
+    active = list(Category.objects.filter(is_active=True))
+    all_names = [category.get_name(locale.value) for category in active]
     matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
     if matches:
-        return Category.objects.filter(name__iexact=matches[0], is_active=True).first()
+        matched_name = matches[0]
+        for category in active:
+            if category.get_name(locale.value) == matched_name:
+                return category
     return None
