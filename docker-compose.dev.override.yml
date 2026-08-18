@@ -39,10 +39,18 @@ services:
 
   load_catalog:
     entrypoint: /app/entrypoint-catalog.sh
+    environment:
+      # migrate/load_catalog use prod settings (base compose); give them a dev
+      # SITE_URL so the prod SITE_URL guard is satisfied without editing .env.docker.
+      - SITE_URL=${SITE_URL:-http://localhost:8000}
     volumes:
       - .:/app
       - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
       - ./.env.docker:/app/src/.env:ro
+
+  migrate:
+    environment:
+      - SITE_URL=${SITE_URL:-http://localhost:8000}
 
   # Dev: seed runs automatically after load_catalog completes.
   # profiles: !reset [] replaces the ["seed"] profile gate from base compose,
