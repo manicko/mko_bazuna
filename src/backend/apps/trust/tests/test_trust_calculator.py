@@ -11,6 +11,7 @@ from __future__ import annotations
 
 
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
@@ -76,6 +77,14 @@ def _make_ad(
         "status": status,
         "source": AdSource.TELEGRAM,
     }
+    # DB CheckConstraints require status-specific timestamps to be non-null
+    now = timezone.now()
+    if status == AdStatus.PUBLISHED:
+        defaults["published_at"] = now
+    elif status == AdStatus.REJECTED:
+        defaults["rejected_at"] = now
+    elif status == AdStatus.ON_MODERATION_FAILED:
+        defaults["moderation_failed_at"] = now
     defaults.update(overrides)
     return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 

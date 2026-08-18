@@ -94,6 +94,12 @@ def _make_ad(
         "status": status,
         "source": AdSource.TELEGRAM,
     }
+    # DB CheckConstraints require status-specific timestamps to be non-null
+    now = timezone.now()
+    if status == AdStatus.PUBLISHED:
+        defaults["published_at"] = now
+    elif status == AdStatus.REJECTED:
+        defaults["rejected_at"] = now
     defaults.update(overrides)
     ad = Ad.objects.create(**defaults)  # type: ignore[arg-type]
     # Ad.created_at is ``auto_now_add=True``: Django silently overwrites any

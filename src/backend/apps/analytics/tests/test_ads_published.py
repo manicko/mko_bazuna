@@ -9,6 +9,7 @@ rejected, or other non-published statuses. This tests the fix for F4
 from __future__ import annotations
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.analytics.services import SellerStats
@@ -54,17 +55,27 @@ def _make_ad(
     title: str = "Stats Test Ad",
     status: AdStatus = AdStatus.PUBLISHED,
 ) -> Ad:
-    """Create an Ad with sensible defaults."""
-    return Ad.objects.create(
-        user=user,
-        title=title,
-        description="Stats test description",
-        category=category,
-        city=city,
-        category_name=category.name,
-        status=status,
-        source=AdSource.TELEGRAM,
-    )
+    """Create an Ad with sensible defaults.
+
+    Status-specific timestamps are auto-set to satisfy DB CheckConstraints
+    (published_at for PUBLISHED, rejected_at for REJECTED, etc.).
+    """
+    defaults: dict = {
+        "user": user,
+        "title": title,
+        "description": "Stats test description",
+        "category": category,
+        "city": city,
+        "category_name": category.name,
+        "status": status,
+        "source": AdSource.TELEGRAM,
+    }
+    now = timezone.now()
+    if status == AdStatus.PUBLISHED:
+        defaults["published_at"] = now
+    elif status == AdStatus.REJECTED:
+        defaults["rejected_at"] = now
+    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
 
 @override_settings(
