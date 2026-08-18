@@ -180,7 +180,7 @@ Task files are moved with PowerShell only: `Rename-Item`, `Move-Item`. Never `gi
 
 ## Step 9 — Commit Changes
 
-1. `git add -A` (or `git add <specific-files>`)
+1.  `git add <specific-files>`
 2. Check `git status --porcelain` — if empty, skip commit
 3. Determine commit type from task content: `feat` (new feature), `fix` (bug fix), `refactor` (restructure), `test` (tests only), `chore` (other)
 4. Determine scope from affected module (e.g. `auth`, `api`, `frontend`, `db`)

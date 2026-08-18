@@ -2,12 +2,7 @@
 
 Аудит (Researcher-агенты по папкам + ручная проверка) выявил следующие файлы/директории,
 которые не относятся к основному коду проекта (Django classifieds + aiogram bot) и
-рекомендованы к удалению. Всё подтверждено фактом наличия в рабочем дереве.
-
-## Уже удалено пользователем
-- `src/backend/apps/users/edit_audit.py` — сломанный скрипт (invalid syntax, line 3:
-  `pathlib.Path(rC:\py_dev\mko_bazuna\...`). Был одноразовой утилитой, созданной
-  ИИ и закоммиченной в корень apps/users/. Удалён из рабочего дерева.
+рекомендованы к удалению. 
 
 ## Мусор — удалить
 1. `src/backend/apps/urls.py.bak` — устаревший `.bak` корня `apps/`. Ссылается на
@@ -16,12 +11,6 @@
 2. `src/backend/apps/seed/fixtures/_validate_transport.py.bak` — одноразовый debug-скрипт
    внутри директории fixtures; использует `print()` и жёстко захардкоженные Windows-пути.
    *Отслеживается git: удалять via `git rm`.*
-3. `src/backend/apps/api/` — пустой скелет приложения (`serializers/` + `views/` только,
-   без `__init__.py`/`apps.py`/`models.py`/`urls.py`). Не в `INSTALLED_APPS`, не
-   используется ни `include()`, ни `from apps.api`. Либо удалить, либо реализовать.
-4. `src/telegram_bot/bot/filters/`, `bot/handlers/`, `bot/states/` — пустые директории
-   без `__init__.py`, без единой ссылки в коде. Заброшенная scaffolding-разметка.
-5. `src/telegram_bot/parsers/` — пустая директория, без `__init__.py`, 0 ссылок.
 6. `src/static/` — пустая директория; `STATICFILES_DIRS` указывает на корень `static/`.
    *Проверить, что ни одно tooling не ожидает `src/static` перед удалением.*
 7. `src/templates/` — пустая директория; `TEMPLATES["DIRS"]` указывает на
@@ -30,11 +19,6 @@
    (не файл!). Реальный скрипт живёт в корне `docker/entrypoint-test.sh` (1357 байт).
    Удалить пустую директорию.
 
-## Сломан (orphaned+broken) — выковырять или удалить
-9. `src/backend/templates/search/partials/save_search_modal.html` — не используется
-   ни одним `{% include %}`, ни одним view. При этом ссылается на несуществующие URL
-   `{% url 'search:list' %}` и `{% url 'search:save-search' %}` (в `search/urls.py` только
-   `search:search` и `search:autocomplete`). Либо реализовать view+URL+include, либо удалить.
 
 ## Старые .pyc без .py источника (14 штук) — gitignored локальные артефакты, удалить
 Это устаревшие байтокоды, ссылающиеся на переименованные/удалённые модули:
@@ -76,16 +60,3 @@
     миграция работает. Только naivные AST-парсеры (как build.bat) ругаются на U+FEFF.
     Можно удалить BOM при желании: `python -c "import pathlib; p=pathlib.Path(...); ..."`
     — не является синтаксической ошибкой интерпретатора.
-
-## НЕ мусор (проверено, оставить на месте)
-- `apps/moderation/tests.py` (562 строк) + `apps/search/tests.py` (413 строк) — полноценные
-  view-level тест-сьюты (TST-004), корректно коллектятся pytest
-  (`python_files = ["tests.py", "test_*.py"]`, `--import-mode=importlib`). Не orphaned.
-- Русский текст в тест-фикстурах — намеренные локализованные данные (LANGUAGE_CODE="ru").
-- `src/__init__.py` — пустой 0-байтовый маркер src-layout (`BASE_DIR = src/`).
-- `src/.env` + `src/backend/.env` — gitignored локальная конфигурация.
-
-## Итог
-**Удалить:** пункты 1–8 + 14 .pyc-артефактов.
-**Сломан/незавершён:** пункт 9 (save_search_modal.html — реализовать или удалить), пункт 10 (BOM — optional strip).
-**Чисто:** apps/{ads,analytics,categories,core,locations,lookups,media,seed,trust,users,maps}, config/, manage.py, src/telegram_bot/, src/theme/, src/backend/templates/ (кроме \partials/orphan).
