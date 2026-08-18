@@ -54,9 +54,11 @@ def search(request: HttpRequest) -> HttpResponse:
     # Category filter (by slug) — applies in addition to FTS
     current_category = request.GET.get("category")
     suggested_category = None
+    breadcrumb_category = None
     if current_category:
         try:
             category = Category.objects.get(slug=current_category, is_active=True)
+            breadcrumb_category = category
             descendant_ids = category.get_descendants(include_self=True).values_list(
                 "id", flat=True
             )
@@ -147,6 +149,7 @@ def search(request: HttpRequest) -> HttpResponse:
         "max_price": max_price,
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
+        "breadcrumb_category": breadcrumb_category,
         "consent_shown": is_consent_given(request),
     }
 

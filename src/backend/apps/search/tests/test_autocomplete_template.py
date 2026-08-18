@@ -1,10 +1,12 @@
 """
-Verification test for HTMX autocomplete dropdown on the listings page.
+Verification test for HTMX autocomplete dropdown on the shared catalog header.
 
-Confirms that ``list.html`` wires up the htmx-powered search autocomplete
-correctly: ``hx-get``, ``hx-trigger``, ``hx-target``, ``hx-swap``, the
-``autocomplete-dropdown`` element, the ``search-input`` id, and that an inline
-``<script>`` follows the htmx.org script tag.
+Confirms that ``components/header_catalog.html`` (the shared Avito-style header
+rendered via ``{% include %}`` on ``ads/list.html`` and ``ads/detail.html``)
+wires up the htmx-powered search autocomplete correctly: ``hx-get``,
+``hx-trigger``, ``hx-target``, ``hx-swap``, the ``autocomplete-dropdown``
+element, the ``search-input`` id, and that an inline ``<script>`` containing an
+``htmx:afterRequest`` listener is present.
 
 This test reads the template source directly and performs string assertions —
 it does NOT require a database (``SimpleTestCase``).
@@ -16,13 +18,13 @@ from django.test import SimpleTestCase
 
 
 class TestAutocompleteTemplate(SimpleTestCase):
-    """Verify HTMX autocomplete wiring in ``ads/list.html``."""
+    """Verify HTMX autocomplete wiring in ``components/header_catalog.html``."""
 
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
         cls.template_path = (
-            Path("src/backend/templates/ads/list.html").resolve()
+            Path("src/backend/templates/components/header_catalog.html").resolve()
         )
         cls.content = cls.template_path.read_text(encoding="utf-8")
 
@@ -55,3 +57,20 @@ class TestAutocompleteTemplate(SimpleTestCase):
         """Template should not reference ``settings.BOT_USERNAME`` directly
         (settings must be passed via context, not context processors)."""
         self.assertNotIn("settings.BOT_USERNAME", self.content)
+
+    def test_bot_username_comes_from_context(self) -> None:
+        """The place-an-ad deep-link uses the ``bot_username`` context var."""
+        self.assertIn("{{ bot_username }}", self.content)
+
+    def test_catalog_header_included_in_pages(self) -> None:
+        """list.html and detail.html render the shared catalog header."""
+        list_path = Path("src/backend/templates/ads/list.html").resolve()
+        detail_path = Path("src/backend/templates/ads/detail.html").resolve()
+        self.assertIn(
+            '{% include "components/header_catalog.html" %}',
+            list_path.read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            '{% include "components/header_catalog.html" %}',
+            detail_path.read_text(encoding="utf-8"),
+        )

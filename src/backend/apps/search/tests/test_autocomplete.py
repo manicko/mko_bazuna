@@ -429,6 +429,37 @@ class TestEntitySuggestionsService:
                 SearchSuggestionSource.CITY.value,
             ]
 
+    def test_category_suggestion_has_category_path(
+        self, root_category: Category, child_category: Category
+    ) -> None:
+        """Category suggestions expose a root→leaf ``category_path`` string."""
+        results = get_entity_suggestions("вел")
+        cat = next((r for r in results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert "category_path" in cat
+        assert cat["category_path"] == "Транспорт > Велосипеды"
+
+    def test_entity_suggestions_expose_slug(
+        self, root_category: Category, child_category: Category, city: City
+    ) -> None:
+        """Category and city suggestions expose a ``slug`` for click navigation."""
+        cat_results = get_entity_suggestions("вел")
+        cat = next((r for r in cat_results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert cat["slug"] == "bicycles"
+
+        city_results = get_entity_suggestions("тест")
+        city_sug = next((r for r in city_results if r.get("type") == "city"), None)
+        assert city_sug is not None
+        assert city_sug["slug"] == city.slug
+
+    def test_non_category_sources_omit_category_path(self, city: City) -> None:
+        """City suggestions carry no ``category_path`` key."""
+        results = get_entity_suggestions("тест")
+        for r in results:
+            if r.get("type") != "category":
+                assert "category_path" not in r
+
 
 # ---------------------------------------------------------------------------
 # Rate limit service
@@ -541,3 +572,22 @@ class TestSearchViewRecordsAutocompleteData:
 
         # But popular search should still be recorded
         assert PopularSearch.objects.filter(query_normalized="велосипед").exists()
+
+    def test_search_context_has_breadcrumb_category(
+        self, seller: User, root_category: Category, city: City
+    ) -> None:
+        """Search view exposes the resolved category for breadcrumbs (T-500)."""
+        Ad.objects.create(
+            user=seller,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            category=root_category,
+            city=city,
+            category_name=root_category.name,
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        client = Client()
+        response = client.get("/search/", {"category": "transport"})
+        assert response.status_code == 200
+        assert response.context["breadcrumb_category"] == root_category

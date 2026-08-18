@@ -1,0 +1,378 @@
+{# Shared Avito-style catalog header. Rendered via a Django include on the
+   catalog (listings/search) and ad-detail pages. Hosts: place-an-ad CTA, the
+   "All Categories" dropdown, breadcrumbs, and the search bar with a grouped
+   autocomplete dropdown. Vanilla JS behavior (HTMX 1.9.12 has no hx-on).
+
+   Context: bot_username + root_categories (context processor), query,
+   breadcrumb_category (listings/search) or ad.category (detail). #}
+{% load i18n %}
+{% load static %}
+{% firstof breadcrumb_category ad.category as current_cat %}
+<header class="bg-white shadow-sm border-b">
+    <div class="container mx-auto px-4 py-3">
+        {# ── Top row: mobile hamburger + brand | place-an-ad + language ── #}
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <button type="button" class="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900"
+                        data-mobile-categories-toggle aria-label="{% trans "Categories" %}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold text-gray-800">
+                    <a href="/">Mko Bazuna</a>
+                </h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank" rel="noopener"
+                   class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                   data-place-ad>
+                    + Подать объявление
+                </a>
+                {% include "components/language_switcher.html" %}
+            </div>
+        </div>
+
+        {# ── Search row: categories dropdown + search bar ── #}
+        <div class="mt-3">
+            <div class="flex gap-2 items-stretch">
+                {# "All Categories" dropdown (desktop) #}
+                <div class="relative hidden md:block" data-categories-trigger>
+                    <button type="button" data-categories-toggle
+                            class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]">
+                        <span data-categories-label>
+                            {% if current_cat %}{{ current_cat.get_name }}{% else %}Все категории{% endif %}
+                        </span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div data-categories-panel class="absolute left-0 z-[90] mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
+                        <ul class="py-1 max-h-96 overflow-y-auto">
+                            {% for cat in root_categories %}
+                            <li data-category-slug="{{ cat.slug }}">
+                                <div class="flex items-center justify-between">
+                                    <a href="{% url 'ads:listings_category' cat.slug %}"
+                                       data-category-link="{{ cat.slug }}"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        {{ cat.get_name }}
+                                    </a>
+                                    {% if cat.get_children_count %}
+                                    <button type="button" data-category-expand="{{ cat.slug }}"
+                                            class="px-2 py-2 text-gray-400 hover:text-blue-600 min-h-[44px]"
+                                            aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat.get_name }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="{{ cat.slug }}"></div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                {# Search form + grouped autocomplete #}
+                <form method="get" action="{% url 'search:search' %}" class="relative flex-1" data-search-form>
+                    {% csrf_token %}
+                    <div class="relative">
+                        <input type="search" id="search-input" name="q"
+                               value="{{ query|default:'' }}"
+                               placeholder="Поиск по объявлениям..."
+                               class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+                               hx-get="{% url 'search:autocomplete' %}"
+                               hx-trigger="input delay:300ms"
+                               hx-target="#autocomplete-dropdown"
+                               hx-swap="none"
+                               autocomplete="off"
+                        >
+                        <ul id="autocomplete-dropdown"
+                            class="autocomplete-dropdown absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto hidden">
+                        </ul>
+                        <button type="submit" class="hidden">Поиск</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {# ── Breadcrumbs ── #}
+        {% include "components/breadcrumb.html" with breadcrumb_category=current_cat %}
+    </div>
+</header>
+
+{# ── Mobile off-canvas categories panel + backdrop ── #}
+<div data-mobile-categories-panel
+     class="fixed inset-y-0 left-0 z-[90] w-72 bg-white shadow-lg transform -translate-x-full transition-transform lg:hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+        <span class="font-semibold text-gray-800">Категории</span>
+        <button type="button" data-mobile-categories-close class="p-2 text-gray-500 hover:text-gray-700" aria-label="{% trans "Close" %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    <ul class="py-1 overflow-y-auto" style="height: calc(100% - 56px);">
+        {% for cat in root_categories %}
+        <li data-category-slug="{{ cat.slug }}">
+            <div class="flex items-center justify-between">
+                <a href="{% url 'ads:listings_category' cat.slug %}"
+                   data-category-link="{{ cat.slug }}"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    {{ cat.get_name }}
+                </a>
+                {% if cat.get_children_count %}
+                <button type="button" data-category-expand="{{ cat.slug }}"
+                        class="px-2 py-2 text-gray-400 hover:text-blue-600 min-h-[44px]"
+                        aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat.get_name }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+            <div class="hidden ml-4" data-category-submenu="{{ cat.slug }}"></div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+<div data-mobile-categories-backdrop class="fixed inset-0 z-[80] bg-black/30 hidden lg:hidden"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── Autocomplete dropdown ─────────────────────────────────────────── */
+    var dropdown = document.getElementById('autocomplete-dropdown');
+    var searchInput = document.getElementById('search-input');
+    var searchForm = document.querySelector('[data-search-form]');
+
+    if (dropdown && searchInput) {
+
+        function escapeHtml(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function hide() {
+            dropdown.classList.add('hidden');
+            dropdown.innerHTML = '';
+        }
+
+        function sectionHeader(title, iconSvg) {
+            return '<li class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">'
+                + (iconSvg || '') + ' ' + escapeHtml(title) + '</li>';
+        }
+
+        function render(json) {
+            var suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
+            if (!suggestions.length) { hide(); return; }
+            var html = '';
+            var showAll = escapeHtml((json && json.query) || '');
+            html += '<li class="px-4 pt-2 pb-1"><a href="{% url 'search:search' %}?q=' + encodeURIComponent(json ? json.query : '')
+                 + '" class="text-sm text-blue-600 hover:underline">Показать все результаты</a></li>';
+            ['city', 'category', 'popular_search', 'user_history'].forEach(function (section) {
+                var matches = suggestions.filter(function (s) { return s.type === section || s.source === section; });
+                if (!matches.length) return;
+                if (section === 'city') html += sectionHeader('Города');
+                else if (section === 'category') html += sectionHeader('Категории');
+                else if (section === 'popular_search') html += sectionHeader('Популярные запросы');
+                else if (section === 'user_history') html += sectionHeader('История');
+                matches.forEach(function (s) {
+                    var text = escapeHtml(s.text || '');
+                    var sub = s.category_path ? '<span class="block text-xs text-gray-400">' + escapeHtml(s.category_path) + '</span>' : '';
+                    var icon = (section === 'popular_search' || s.source === 'popular_search')
+                        ? '<svg class="w-4 h-4 inline-block text-orange-500 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73 0-0.31 0.04-0.6 0.11-0.88 -2.15 1.21-3.31 3.08-3.31 5.55 0 3.73 2.98 6.49 7.09 6.49 4.1 0 7.08-2.76 7.08-6.49 0-5.64-4.67-9.4-4.67-9.4z" transform="translate(0 2)"/></svg>'
+                        : (section === 'user_history' || s.source === 'user_history')
+                            ? '<svg class="w-4 h-4 inline-block text-gray-400 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10h4v2h-6V7h2v5z"/></svg>'
+                            : '';
+                    html += '<li><a href="#" data-suggestion-type="' + escapeHtml(s.type || s.source || '')
+                        + '" data-suggestion-text="' + escapeHtml(text)
+                        + '" data-suggestion-slug="' + escapeHtml(s.slug || '')
+                        + '" class="block w-full px-4 py-2.5 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-start min-h-[44px]">'
+                        + '<span class="mr-2 mt-1">' + icon + '</span>'
+                        + '<span>' + text + sub + '</span></a></li>';
+                });
+            });
+            dropdown.innerHTML = html;
+            dropdown.classList.remove('hidden');
+        }
+
+        document.body.addEventListener('htmx:afterRequest', function (e) {
+            var detail = e.detail || {};
+            if (detail.target !== dropdown) return;
+            var xhr = detail.xhr;
+            if (!xhr) return;
+            if (xhr.status === 429) { hide(); return; }
+            var parsed;
+            try { parsed = JSON.parse(xhr.responseText); } catch (_) { return; }
+            if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
+            render(parsed);
+        });
+
+        function getCsrf() {
+            var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            if (input) return input.value;
+            return '';
+        }
+
+        dropdown.addEventListener('click', function (e) {
+            var link = e.target.closest('a[data-suggestion-text]');
+            if (!link) return;
+            e.preventDefault();
+            var type = link.getAttribute('data-suggestion-type');
+            var text = link.getAttribute('data-suggestion-text');
+            var slug = link.getAttribute('data-suggestion-slug');
+            if (type === 'city' && slug) {
+                // Persist preferred city (cookie) then filter by navigating to the city listing.
+                var fd = new FormData();
+                fd.append('slug', slug);
+                fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCsrf() } });
+                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+            } else if (type === 'category' && slug) {
+                // Filter by category.
+                window.location.href = '/category/' + encodeURIComponent(slug) + '/';
+            } else {
+                // Text suggestion (popular search / user history): populate + submit.
+                searchInput.value = text;
+                if (searchForm) searchForm.submit();
+            }
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            var items = dropdown.querySelectorAll('a[data-suggestion-text]');
+            if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var active = document.activeElement;
+                var idx = Array.from(items).indexOf(active);
+                var next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
+                next.focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                var active = document.activeElement;
+                var idx = Array.from(items).indexOf(active);
+                var prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
+                prev.focus();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchForm) searchForm.submit();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) hide();
+        });
+
+        hide();
+    }
+
+    /* ── "All Categories" dropdown (desktop) + submenu lazy-load ────────── */
+    var catToggle = document.querySelector('[data-categories-toggle]');
+    var catPanel = document.querySelector('[data-categories-panel]');
+
+    function loadSubmenu(container) {
+        var li = container.closest('li');
+        if (!li) return;
+        var slug = (container.getAttribute('data-category-submenu') || '').replace(/"/g, '');
+        if (!slug) return;
+        fetch('/categories/' + encodeURIComponent(slug) + '/submenu/')
+            .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(function (html) {
+                container.innerHTML = html;
+                container.classList.remove('hidden');
+                var expand = li.querySelector('[data-category-expand]');
+                if (expand) expand.setAttribute('aria-expanded', 'true');
+            })
+            .catch(function () { /* ignore load errors */ });
+    }
+
+    function collapseBranches(panel) {
+        panel.querySelectorAll('[data-category-submenu]').forEach(function (c) { c.classList.add('hidden'); });
+        panel.querySelectorAll('[data-category-expand]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+    }
+
+    function attachCategoryHandlers(panel) {
+        if (!panel) return;
+        panel.addEventListener('click', function (e) {
+            if (e.target.closest('a[data-category-link]')) {
+                // category navigation — allow default, close panels
+                closeCategories();
+                return;
+            }
+            var expand = e.target.closest('[data-category-expand]');
+            if (expand) {
+                e.preventDefault();
+                e.stopPropagation();
+                var slug = expand.getAttribute('data-category-expand');
+                var container = panel.querySelector('[data-category-submenu="' + slug + '"]');
+                var isOpen = container && !container.classList.contains('hidden');
+                collapseBranches(panel);
+                if (!isOpen && container) loadSubmenu(container);
+            }
+        });
+    }
+
+    attachCategoryHandlers(catPanel);
+
+    function closeCategories() {
+        if (catPanel) {
+            catPanel.classList.add('hidden');
+            collapseBranches(catPanel);
+            var toggle = catPanel.parentNode.querySelector('[data-categories-toggle]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    if (catToggle && catPanel) {
+        catToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !catPanel.classList.contains('hidden');
+            if (isOpen) { closeCategories(); return; }
+            catPanel.classList.remove('hidden');
+            catToggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) {
+            var trigger = catPanel.parentNode;
+            if (trigger && !trigger.contains(e.target)) closeCategories();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeCategories();
+        });
+    }
+
+    /* ── Mobile off-canvas categories ───────────────────────────────────── */
+    var mobileToggle = document.querySelector('[data-mobile-categories-toggle]');
+    var mobilePanel = document.querySelector('[data-mobile-categories-panel]');
+    var mobileBackdrop = document.querySelector('[data-mobile-categories-backdrop]');
+    var mobileClose = document.querySelector('[data-mobile-categories-close]');
+
+    function openMobile() {
+        if (!mobilePanel) return;
+        mobilePanel.classList.remove('-translate-x-full');
+        if (mobileBackdrop) mobileBackdrop.classList.remove('hidden');
+    }
+    function closeMobile() {
+        if (!mobilePanel) return;
+        mobilePanel.classList.add('-translate-x-full');
+        if (mobileBackdrop) mobileBackdrop.classList.add('hidden');
+        collapseBranches(mobilePanel);
+    }
+
+    attachCategoryHandlers(mobilePanel);
+
+    if (mobileToggle) mobileToggle.addEventListener('click', openMobile);
+    if (mobileClose) mobileClose.addEventListener('click', closeMobile);
+    if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobile);
+
+    function closeAll() { hide(); closeCategories(); closeMobile(); }
+
+    window.addEventListener('htmx:afterSwap', function (e) {
+        // Re-parse any newly injected submenu panels for accordion behavior.
+        if (e.target) attachCategoryHandlers(e.target);
+    });
+})();
+</script>

@@ -16,9 +16,10 @@
     {% if PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
     {% endif %}
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    {% include "components/header.html" %}
+    {% include "components/header_catalog.html" %}
 
     <main class="container mx-auto px-4 py-6">
         <article class="bg-white rounded-lg shadow overflow-hidden">

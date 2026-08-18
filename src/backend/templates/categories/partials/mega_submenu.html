@@ -1,0 +1,31 @@
+{# Category submenu partial for the header "All Categories" dropdown.
+   Renders a category's active children as expandable items; each child can
+   lazy-load its own submenu via HTMX. Wired client-side by
+   components/header_catalog.html. #}
+{% load i18n %}
+<ul class="py-1" role="menu">
+    {% for child in children %}
+        <li class="relative" data-category-slug="{{ child.slug }}" role="none">
+            <div class="flex items-center justify-between">
+                <a href="{% url 'ads:listings_category' child.slug %}"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors"
+                   role="menuitem"
+                   data-category-link="{{ child.slug }}">
+                    {{ child.get_name }}
+                </a>
+                {% if child.get_children_count %}
+                <button type="button"
+                        class="px-2 py-2 text-gray-400 hover:text-blue-600"
+                        aria-expanded="false"
+                        data-category-expand="{{ child.slug }}"
+                        aria-label="{% trans "Expand" %} {{ child.get_name }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+            <div class="ml-4" data-category-submenu="{{ child.slug }}"></div>
+        </li>
+    {% endfor %}
+</ul>

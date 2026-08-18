@@ -14,6 +14,24 @@ from apps.locations.models import City
 logger = logging.getLogger(__name__)
 
 
+def _category_path(category: Category) -> str:
+    """Build a root→leaf, human-readable path for a category suggestion.
+
+    Uses ``get_ancestors(include_self=True)`` (root→leaf order) joined by
+    ``" > "``, e.g. ``"Товары > Транспорт"``. Names come from ``get_name`` so
+    i18n names are honored when available (falling back to Russian ``name``).
+
+    Args:
+        category: The category to build a path for.
+
+    Returns:
+        The joined ancestor+self path string.
+    """
+    return " > ".join(
+        item.get_name() for item in category.get_ancestors(include_self=True)
+    )
+
+
 def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     """
     Get matching category and city names for autocomplete.
@@ -50,6 +68,8 @@ def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
             "text": cat.name,
             "source": SearchSuggestionSource.CATEGORY.value,
             "type": "category",
+            "slug": cat.slug,
+            "category_path": _category_path(cat),
         }
         for cat in categories
     ]
@@ -59,6 +79,7 @@ def get_entity_suggestions(prefix: str, limit: int = 5) -> list[dict]:
             "text": city.name,
             "source": SearchSuggestionSource.CITY.value,
             "type": "city",
+            "slug": city.slug,
         }
         for city in cities
     )

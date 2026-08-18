@@ -93,23 +93,30 @@ def published_ad(user: User, category: Category, city: City) -> Ad:
 
 
 class TestAnonymousHeader:
-    """Anonymous visitors see the header Login link on public pages."""
+    """Public catalog pages render the Avito-style shared header.
 
-    def test_home_shows_login_link(self) -> None:
+    Per the catalog-ui spec (PO Q9 / R-05c), the public catalog and ad-detail
+    pages use the shared ``header_catalog.html`` component, which carries the
+    search bar and place-an-ad CTA rather than a login link (login lives on the
+    seller pages). These assert that shared header renders on anonymous pages.
+    """
+
+    def test_home_renders_catalog_header(self) -> None:
         client = Client()
         response = client.get("/")
         assert response.status_code == 200
         content = response.content.decode()
-        assert ">Login<" in content
-        assert "/login/issue/" in content
+        # Place-an-ad CTA + search input from header_catalog.html.
+        assert "Подать объявление" in content
+        assert 'id="search-input"' in content
 
-    def test_detail_shows_login_link(self, published_ad: Ad) -> None:
+    def test_detail_renders_catalog_header(self, published_ad: Ad) -> None:
         client = Client()
         response = client.get(reverse("ads:detail", args=[published_ad.id]))
         assert response.status_code == 200
         content = response.content.decode()
-        assert ">Login<" in content
-        assert "/login/issue/" in content
+        assert "Подать объявление" in content
+        assert 'id="search-input"' in content
 
     def test_login_issue_renders_header(self) -> None:
         client = Client()

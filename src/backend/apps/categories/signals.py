@@ -2,7 +2,9 @@
 Signal handlers for categories app.
 
 Invalidates CategoryLookupResolver caches on through-table changes,
-LookupItem is_active toggles, and Category MPTT moves.
+LookupItem is_active toggles, and Category MPTT moves. Also bumps the
+category tree version so header submenu fragments are invalidated on
+structural Category / CategoryPath changes.
 """
 
 import logging
@@ -11,6 +13,20 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender="categories.Category")
+@receiver(post_delete, sender="categories.Category")
+@receiver(post_save, sender="categories.CategoryPath")
+@receiver(post_delete, sender="categories.CategoryPath")
+def bump_tree_version_on_structure_change(sender, instance, **kwargs):  # type: ignore[no-untyped-def]
+    """Invalidate header submenu fragments when the category tree changes."""
+    from apps.categories.cache import bump_tree_version
+
+    bump_tree_version()
+    logger.debug(
+        "Bumped category tree version due to %s change", sender.__name__
+    )
 
 
 @receiver(post_save, sender="categories.CategoryListingPurpose")

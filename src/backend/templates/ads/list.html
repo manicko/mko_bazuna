@@ -1,4 +1,4 @@
-{# Listings template for Mko Bazuna. XSS-safe via Django autoescape. HTMX-compatible MPA. #}
+{# Listings template for Mko Bazuna. XSS-safe via Django autoescape. HTMX-compatible MPA. Uses the shared Avito-style catalog header. #}
 {% load static %}
 {% load i18n %}
 
@@ -15,31 +15,9 @@
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    {% include "components/header.html" %}
+    {% include "components/header_catalog.html" %}
 
     <main class="container mx-auto px-4 py-6">
-        <!-- Search form -->
-        <form method="get" action="{% url 'search:search' %}" class="mb-6">
-            <div class="relative flex gap-2">
-                <input 
-                    type="search" id="search-input"
-                    name="q" 
-                    value="{{ query|default:'' }}" 
-                    placeholder="{% trans "Search ads..." %}" 
-                    class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    hx-get="{% url 'search:autocomplete' %}"
-                    hx-trigger="input delay:300ms"
-                    hx-target="#autocomplete-dropdown"
-                    hx-swap="none"
-                    autocomplete="off"
-                >
-                <ul id="autocomplete-dropdown" class="autocomplete-dropdown"></ul>
-                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    {% trans "Search" %}
-                </button>
-            </div>
-        </form>
-
         <!-- Dynamic content (ad grid, suggestions, pagination) -->
         <div id="ad-list">
             {% include "ads/partials/ad_list.html" %}
@@ -49,81 +27,5 @@
     {% if not request.user.is_authenticated or not request.user.is_deleted %}
     {% include "components/consent_banner.html" %}
     {% endif %}
-    <script>
-        (function () {
-            const dropdown = document.getElementById('autocomplete-dropdown');
-            const input = document.getElementById('search-input');
-            if (!dropdown || !input) return;
-
-            function escapeHtml(str) {
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;');
-            }
-
-            function parseJson(str) {
-                try { return JSON.parse(str); } catch (_) { return null; }
-            }
-
-            function hide() {
-                dropdown.classList.add('hidden');
-                dropdown.innerHTML = '';
-            }
-
-            function render(json) {
-                const suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
-                if (!suggestions.length) { hide(); return; }
-                const html = suggestions.map(function (s) {
-                    const text = escapeHtml(s.text || '');
-                    const encoded = encodeURIComponent(s.text || '');
-                    const src = s.source ? ' (' + escapeHtml(s.source) + ')' : '';
-                    return '<li><a href="{% url 'search:search' %}?q=' + encoded +
-                           '" class="block w-full px-3 py-2 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">' +
-                           text + src + '</a></li>';
-                }).join('');
-                dropdown.innerHTML = html;
-                dropdown.classList.remove('hidden');
-            }
-
-            document.body.addEventListener('htmx:afterRequest', function (e) {
-                const detail = e.detail || {};
-                if (detail.target !== dropdown) return;
-                const xhr = detail.xhr;
-                if (!xhr) return;
-                if (xhr.status === 429) { hide(); return; }
-                const parsed = parseJson(xhr.responseText);
-                if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
-                render(parsed);
-            });
-
-            input.addEventListener('keydown', function (e) {
-                const items = dropdown.querySelectorAll('li a');
-                if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
-                if (!items.length) return;
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    const active = document.activeElement;
-                    const idx = Array.from(items).indexOf(active);
-                    const next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
-                    next.focus();
-                }
-                if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    const active = document.activeElement;
-                    const idx = Array.from(items).indexOf(active);
-                    const prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
-                    prev.focus();
-                }
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    window.location.href = items[0].href;
-                }
-            });
-
-            hide();
-        })();
-    </script>
 </body>
 </html>

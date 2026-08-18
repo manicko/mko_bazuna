@@ -135,6 +135,7 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "apps.core.context_processors.plausible_host",
                 "apps.core.context_processors.language",
+                "apps.core.context_processors.header_context",
             ],
         },
     },

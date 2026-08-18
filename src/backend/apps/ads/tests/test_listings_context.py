@@ -115,7 +115,6 @@ class TestListingsFilterContext(SimpleTestCase):
     def test_context_contains_all_tsk002_keys(self) -> None:
         """Every tsk_002 filter key is present in the render context."""
         _, context = self._run_listings(_SPEC_QUERY)
-
         expected_keys = {
             "current_category",
             "current_city",
@@ -127,6 +126,16 @@ class TestListingsFilterContext(SimpleTestCase):
             "consent_shown",
         }
         assert expected_keys <= set(context)
+
+    def test_context_contains_breadcrumb_category(self) -> None:
+        """T-500: the resolved category is exposed for header breadcrumbs."""
+        _, context = self._run_listings("", category_slug="electronics")
+        assert "breadcrumb_category" in context
+
+    def test_breadcrumb_category_is_none_without_category(self) -> None:
+        """Without a category path, ``breadcrumb_category`` is None."""
+        _, context = self._run_listings(_SPEC_QUERY)
+        assert context["breadcrumb_category"] is None
 
     def test_query_params_map_to_context_values(self) -> None:
         """GET filter params propagate to the matching context values.

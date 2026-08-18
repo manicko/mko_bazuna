@@ -258,11 +258,15 @@ def listings(
 
     suggested_category = None
 
+    breadcrumb_category = None
+
     if category_slug:
 
         try:
 
             category = Category.objects.get(slug=category_slug, is_active=True)
+
+            breadcrumb_category = category
 
             # Get all descendants including self
 
@@ -395,6 +399,8 @@ def listings(
         "suggested_category": suggested_category,
 
         "suggested_city": suggested_city,
+
+        "breadcrumb_category": breadcrumb_category,
 
         "current_category": category_slug,
 
