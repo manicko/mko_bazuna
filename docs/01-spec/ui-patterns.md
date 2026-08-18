@@ -147,43 +147,104 @@ Related user stories: US-B5
 
 ## Image Gallery for Ad Detail Page
 
-Ad detail pages display 1-5 Telegram photos in a responsive grid.
+Ad detail pages display 1-5 Telegram photos. Each photo is wrapped in a GLightbox v3.3.1 anchor
+opening a fullscreen gallery (`components` loaded from the unpkg CDN, inline init). Images render in
+`AdImage.position` order (the `{% for image in ad.images.all %}` iteration uses the model default
+ordering). The static grid remains intact as a no-JS fallback (progressive enhancement).
 
 ### Implementation
 
 ```html
 <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
     {% for image in ad.images.all %}
-        <img src="{{ image.image_url }}" alt="Photo {{ forloop.counter }} for {{ ad.title }}"
-             class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg">
+        <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
+           data-description="{{ image.alt_text|default:"" }}" aria-label="Open image {{ forloop.counter }}">
+            <img src="{{ image.thumbnail_large_url|default:image.image_url }}" alt="Photo {{ forloop.counter }}"
+                 class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg">
+        </a>
     {% endfor %}
 </div>
 ```
 
+The GLightbox CSS is loaded in `<head>`:
+
+```html
+<link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
+```
+
+The GLightbox JS and inline init are added before `</body>` (relying on the library's built-in
+counter and prev/next/zoom/swipe defaults — no custom counter option):
+
+```html
+<script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    GLightbox({
+      selector: '.glightbox',
+      touchNavigation: true,
+      loop: true,
+      zoomable: true,
+      closeOnOutsideClick: true,
+      navigation: { next: true, prev: true },
+    });
+  });
+</script>
+```
+
 ### Behavior
 
-- Single photo: Full width, max-height 96 (24rem/384px)
-- Multiple photos: 2-column grid on tablet/desktop
-- All photos: 64px height (h-64), object-fit cover
-- No lightbox/modal in phase 1; static grid display
+- Clicking any image opens the GLightbox overlay with the full `image.image_url`.
+- Prev/next arrows, dark backdrop, image counter, ESC/backdrop click to close, arrow-key/Tab
+  navigation, mobile swipe and pinch-zoom (per GLightbox defaults).
+- **Progressive enhancement:** with JavaScript disabled, the original static grid still renders with
+  valid thumbnails and working links — no broken markup.
+- **CSP:** CSP is report-only in this codebase; the unpkg CDN load and GLightbox inline styles are
+  already allowed (unpkg is also used for HTMX). No `script-src`/`style-src` settings were added.
+
+This supersedes the earlier phase-1 statement of "no lightbox/modal; static grid only".
 
 Related user stories: US-S2
 
 ## Sticky Navigation Header
 
-The header remains visible during scroll with consistent navigation.
+A shared, auth-aware top navigation. Rendered on all public and seller pages via the re-usable
+component `{% include "components/header.html" %}` ([`components/header.html`](../../src/backend/templates/components/header.html)).
 
 ### Structure
 
 ```html
 <header class="bg-white shadow-sm border-b">
-    <div class="container mx-auto px-4 py-4">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-800">
-            <a href="/">Mko Bazuna</a>
+            <a href="{% url 'ads:listings' %}">Mko Bazuna</a>
         </h1>
+        {% include "components/language_switcher.html" %}
+        <nav class="flex gap-4 items-center">
+            {% if request.user.is_authenticated %}
+                <a href="{% url 'ads:dashboard' %}">Dashboard</a>
+                {% if request.user.is_staff %}
+                    <a href="/admin/">Admin</a>
+                {% endif %}
+                <form method="post" action="{% url 'consent:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit">Logout</button>
+                </form>
+            {% else %}
+                <a href="{% url 'consent:login_issue' %}">Login</a>
+            {% endif %}
+        </nav>
     </div>
 </header>
 ```
+
+### Component behavior
+
+- **Branding:** Logo links to the home listings page (`ads:listings`).
+- **Language switcher:** Always rendered via `components/language_switcher.html`.
+- **Anonymous visitors:** See a "Login" link to `consent:login_issue`.
+- **Authenticated sellers:** See "Dashboard" (seller cabinet, `ads:dashboard`) and a **POST + CSRF**
+  "Logout" form posting to `consent:logout` (GET logout is not allowed — POST only, per CR4).
+- **Staff users:** Additionally see an "Admin" link to `/admin/` (CR7).
 
 ### Classes
 
@@ -194,7 +255,10 @@ The header remains visible during scroll with consistent navigation.
 
 Header height on mobile: `py-4` (32px padding top/bottom). No explicit sticky positioning currently, but shadow and border provide visual anchoring.
 
-Related user stories: US-B8
+The consent banner is **not** part of the header — it renders at the bottom of each page behind its
+per-page guard (CR9). Page-specific titles live in each page's `<main>`.
+
+Related user stories: US-B8, US-S8, US-S1
 
 ## Touch Target Guidelines
 

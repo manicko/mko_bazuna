@@ -14,29 +14,22 @@
     {% endif %}
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/">Mko Bazuna</a>
-                <span class="text-gray-400 mx-2">/</span>
-                <span class="text-blue-600">Dashboard</span>
-            </h1>
-            <div class="mt-2 flex gap-4 items-center">
-                <a href="/logout/" class="text-sm text-gray-600 hover:text-red-600">Logout</a>
-                <form method="post" action="{% url 'consent:withdraw' %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="text-sm text-red-600 hover:text-red-800 font-medium"
-                            onclick="return confirm('Withdrawing consent permanently erases your Telegram ID, all ads, and prevents re-login. Are you sure?');">
-                        Withdraw Data
-                    </button>
-                </form>
-            </div>
-        </div>
-    </header>
+    {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-6">
         <h2 class="text-xl font-semibold mb-4">Your Ads</h2>
+
+        {# ── Withdraw consent ── #}
+        <div class="mb-4">
+            <form method="post" action="{% url 'consent:withdraw' %}" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-sm text-red-600 hover:text-red-800 font-medium"
+                        onclick="return confirm('Withdrawing consent permanently erases your Telegram ID, all ads, and prevents re-login. Are you sure?');">
+                    Withdraw Data
+                </button>
+            </form>
+        </div>
 
         {# ── Stats card ── #}
         {% if seller_stats %}

@@ -207,6 +207,7 @@ STORAGES = {
 # Login redirect
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+LOGIN_URL = "/login/issue/"
 
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"

@@ -33,9 +33,9 @@ automatically during deployment when `ADMIN_PASSWORD` is set in the environment.
 | Password | (must be set) | `ADMIN_PASSWORD` |
 | Telegram ID | `-1` | `ADMIN_TELEGRAM_ID` |
 
-**Important:** The User model uses `telegram_id` as the `USERNAME_FIELD`. The Django admin login
-form displays "Telegram ID" as the username field. Enter the `ADMIN_TELEGRAM_ID` value (default:
-`-1`) as the username along with the password.
+**Important:** The User model uses `username` as the `USERNAME_FIELD` (not `telegram_id`). The Django
+admin login form displays "Username". Enter the admin username (default: `admin`, or the
+`ADMIN_USERNAME` env var) along with the password from the `ADMIN_PASSWORD` env var.
 
 ### Setup Methods
 

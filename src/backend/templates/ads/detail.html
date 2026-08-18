@@ -12,19 +12,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ ad|get_title:LANGUAGE_CODE }} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+    <link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
     {% if PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
     {% endif %}
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/">Mko Bazuna</a>
-            </h1>
-            {% include "components/language_switcher.html" %}
-        </div>
-    </header>
+    {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-6">
         <article class="bg-white rounded-lg shadow overflow-hidden">
@@ -32,13 +26,16 @@
             {% if ad.images.all %}
                 <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
                     {% for image in ad.images.all %}
-                        <img 
-                            src="{{ image.thumbnail_large_url|default:image.image_url }}" 
-                            alt="{% trans "Photo" %} {{ forloop.counter }} {% trans "for" %} {{ ad|get_title:LANGUAGE_CODE }}"
-                            class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
-                            loading="lazy"
-                            width="1280" height="960"
-                        >
+                        <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
+                           data-description="{{ image.alt_text|default:"" }}" aria-label="{% trans "Open image" %} {{ forloop.counter }}">
+                            <img
+                                src="{{ image.thumbnail_large_url|default:image.image_url }}"
+                                alt="{% trans "Photo" %} {{ forloop.counter }} {% trans "for" %} {{ ad|get_title:LANGUAGE_CODE }}"
+                                class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
+                                loading="lazy"
+                                width="1280" height="960"
+                            >
+                        </a>
                     {% endfor %}
                 </div>
             {% endif %}
@@ -106,5 +103,19 @@
     {% if not request.user.is_authenticated or not request.user.is_deleted %}
     {% include "components/consent_banner.html" %}
     {% endif %}
+
+    <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        GLightbox({
+          selector: '.glightbox',
+          touchNavigation: true,
+          loop: true,
+          zoomable: true,
+          closeOnOutsideClick: true,
+          navigation: { next: true, prev: true },
+        });
+      });
+    </script>
 </body>
 </html>

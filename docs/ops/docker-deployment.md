@@ -622,9 +622,9 @@ This is a one-time setup that runs automatically during `make up` when `ADMIN_PA
 | is_staff | `True` | Can access Django admin |
 | is_superuser | `True` | Full admin privileges |
 
-**Important:** The User model uses `telegram_id` as the `USERNAME_FIELD`, so the Django admin
-login form displays "Telegram ID" as the username field. Enter the `ADMIN_TELEGRAM_ID` value
-(default: `-1`) as the username, along with the password.
+**Important:** The User model uses `username` as the `USERNAME_FIELD` (not `telegram_id`), so the
+Django admin login form displays "Username". Enter the admin username (default: `admin`, or the
+`ADMIN_USERNAME` env var) along with the password from the `ADMIN_PASSWORD` env var.
 
 ### Automatic Creation
 

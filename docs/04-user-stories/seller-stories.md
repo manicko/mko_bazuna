@@ -26,6 +26,11 @@ the bot writes the sender `telegram_id` into `login_tokens`; the site authentica
 (create/find). One-time atomic token, constant-time compare; expired/invalid tokens show a clear
 retry path. Persistent session cookie. Re-login reuses the existing account. See decision H.
 
+The shared header renders a persistent **Login** link (to `consent:login_issue`) for anonymous
+visitors on all public pages. Once authenticated, sellers reach the dashboard (their cabinet) via
+the header **Dashboard** link and log out via the header's POST+CSRF **Logout** form (logout is
+POST-only — there is no dead GET logout link).
+
 ### US-S2 — Create ad via bot
 Strictly step-by-step dialog: category → city → title → description → price (if applicable) →
 photos, each confirmed. Category from the closed admin tree (bot suggests top 3–5; free-text as new

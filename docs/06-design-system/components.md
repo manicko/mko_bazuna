@@ -467,25 +467,31 @@ Full-width single ad display.
 
 ### Header Navigation
 
-Site-wide navigation with consistent branding.
+Site-wide, auth-aware top navigation with consistent branding. Rendered on all pages via the shared
+component `{% include "components/header.html" %}`
+([`components/header.html`](../../src/backend/templates/components/header.html)).
 
 ```html
 <header class="bg-white shadow-sm border-b">
-    <div class="container mx-auto px-4 py-4">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/" class="hover:text-gray-600">Mko Bazuna</a>
-            </h1>
-            
-            <nav class="flex items-center gap-4">
-                <a href="{% url 'ads:dashboard' %}" class="text-sm text-gray-600 hover:text-gray-800 transition-colors">
-                    Dashboard
-                </a>
-                <a href="{% url 'users:logout' %}" class="text-sm text-gray-600 hover:text-red-600 transition-colors">
-                    Logout
-                </a>
-            </nav>
-        </div>
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800">
+            <a href="{% url 'ads:listings' %}">Mko Bazuna</a>
+        </h1>
+        {% include "components/language_switcher.html" %}
+        <nav class="flex gap-4 items-center">
+            {% if request.user.is_authenticated %}
+                <a href="{% url 'ads:dashboard' %}" class="text-sm text-gray-700 hover:text-blue-600">Dashboard</a>
+                {% if request.user.is_staff %}
+                    <a href="/admin/" class="text-sm text-gray-700 hover:text-blue-600">Admin</a>
+                {% endif %}
+                <form method="post" action="{% url 'consent:logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-sm text-gray-600 hover:text-red-600">Logout</button>
+                </form>
+            {% else %}
+                <a href="{% url 'consent:login_issue' %}" class="text-sm text-gray-700 hover:text-blue-600">Login</a>
+            {% endif %}
+        </nav>
     </div>
 </header>
 ```
@@ -495,7 +501,12 @@ Site-wide navigation with consistent branding.
 | Background | `bg-white` |
 | Height | ~64px (`py-4`) |
 | Shadow | `shadow-sm border-b` |
-| Pages | All templates |
+| Auth nav | Login (anon) / Dashboard + POST Logout (authed), Admin (staff only) |
+| Logout | POST + CSRF to `consent:logout` (no GET logout) |
+| Pages | All public/seller templates |
+
+The consent banner is **not** part of this component; it renders separately at the page bottom
+behind its per-page guard.
 
 ### Pagination Controls
 

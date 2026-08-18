@@ -16,19 +16,7 @@ Staff-only view showing moderation statistics, queue status, performance, and re
     {% endif %}
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/">Mko Bazuna</a>
-                <span class="text-gray-400 mx-2">/</span>
-                <span class="text-red-600">Moderation Analytics</span>
-            </h1>
-            <div class="mt-2 flex gap-4">
-                <a href="/admin/" class="text-sm text-gray-600 hover:text-blue-600">Admin</a>
-                <a href="/logout/" class="text-sm text-gray-600 hover:text-red-600">Logout</a>
-            </div>
-        </div>
-    </header>
+    {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-6">
         <h2 class="text-xl font-semibold mb-4">Moderation Statistics (Last {{ days }} Days)</h2>

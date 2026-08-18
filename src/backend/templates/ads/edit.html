@@ -13,17 +13,7 @@
     {% endif %}
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/">Mko Bazuna</a>
-                <span class="text-gray-400 mx-2">/</span>
-                <a href="{% url 'ads:dashboard' %}" class="text-blue-600 hover:underline">Dashboard</a>
-                <span class="text-gray-400 mx-2">/</span>
-                <span class="text-gray-700">Edit Ad</span>
-            </h1>
-        </div>
-    </header>
+    {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-6 max-w-2xl">
         <h2 class="text-xl font-semibold mb-4">Edit Ad</h2>

@@ -17,24 +17,14 @@ from apps.analytics.services.moderation_analytics import (
     get_pending_queue_size,
     get_rejection_reasons,
 )
-from django.http import Http404, HttpRequest, HttpResponse
+from apps.moderation.views.decorators import staff_required
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 
 
-def _staff_required(view_func):
-    """Decorator to require staff or superuser access."""
-
-    def wrapper(request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        if not (request.user.is_staff or request.user.is_superuser):
-            raise Http404("Not found")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-@_staff_required
+@staff_required
 def moderation_analytics(request: HttpRequest) -> HttpResponse:
     """Staff dashboard showing moderation analytics and statistics.
 
