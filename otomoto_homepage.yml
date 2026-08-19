@@ -1,0 +1,983 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - link [ref=e11] [cursor=pointer]:
+            - /url: https://www.otomoto.pl
+            - img "Logo" [ref=e12]
+          - generic [ref=e13]:
+            - navigation [ref=e14]:
+              - list [ref=e15]:
+                - listitem [ref=e16]:
+                  - link [ref=e17] [cursor=pointer]:
+                    - /url: /
+                    - text: Osobowe
+                - listitem [ref=e18]:
+                  - link [ref=e19] [cursor=pointer]:
+                    - /url: /?category=ciezarowe
+                    - text: Ciężarowe
+                - listitem [ref=e20]:
+                  - link [ref=e21] [cursor=pointer]:
+                    - /url: /?category=maszyny-budowlane
+                    - text: Budowlane
+                - listitem [ref=e22]:
+                  - link [ref=e23] [cursor=pointer]:
+                    - /url: /?category=dostawcze
+                    - text: Dostawcze
+                - listitem [ref=e24]:
+                  - link [ref=e25] [cursor=pointer]:
+                    - /url: /?category=motocykle-i-quady
+                    - text: Motocykle
+                - listitem [ref=e26]:
+                  - link [ref=e27] [cursor=pointer]:
+                    - /url: /?category=przyczepy
+                    - text: Przyczepy
+                - listitem [ref=e28]:
+                  - link [ref=e29] [cursor=pointer]:
+                    - /url: /?category=maszyny-rolnicze
+                    - text: Rolnicze
+                - listitem [ref=e30]:
+                  - link [ref=e31] [cursor=pointer]:
+                    - /url: /?category=czesci
+                    - text: Części
+            - button "Osobowe" [ref=e32] [cursor=pointer]
+          - generic [ref=e39]:
+            - navigation [ref=e40]:
+              - list [ref=e41]:
+                - listitem [ref=e42]:
+                  - link [ref=e43] [cursor=pointer]:
+                    - /url: /osobowe
+                    - text: Wszystkie samochody
+                - listitem [ref=e44]:
+                  - link [ref=e45] [cursor=pointer]:
+                    - /url: /osobowe/uzywane
+                    - text: Używane
+                - listitem [ref=e46]:
+                  - link [ref=e47] [cursor=pointer]:
+                    - /url: /osobowe/nowe
+                    - text: Nowe samochody
+                - listitem [ref=e48]:
+                  - link [ref=e49] [cursor=pointer]:
+                    - /url: /homepage-advert-search-summary?category_id=29&filter_enum_financial_option=1
+                    - text: Z finansowaniem
+                - listitem [ref=e50]:
+                  - link [ref=e51] [cursor=pointer]:
+                    - /url: /homepage-advert-search-summary?category_id=29&filter_enum_leasing_concession=1
+                    - text: Z leasingiem
+                - listitem [ref=e52]:
+                  - link [ref=e53] [cursor=pointer]:
+                    - /url: /homepage-advert-search-summary?category_id=29&filter_enum_fuel_type=electric
+                    - text: Samochody elektryczne
+                - listitem [ref=e54]:
+                  - link [ref=e55] [cursor=pointer]:
+                    - /url: /homepage-advert-search-summary?category_id=29&filter_string_vehicle_verification_status=1
+                    - text: Auta zweryfikowane
+            - button "Znajdź Osobowe" [ref=e57] [cursor=pointer]
+          - generic [ref=e61]:
+            - navigation [ref=e62]:
+              - list [ref=e63]:
+                - listitem [ref=e64]:
+                  - link [ref=e65] [cursor=pointer]:
+                    - /url: /finansowanie
+                    - text: Finansowanie
+                - listitem [ref=e66]:
+                  - link [ref=e67] [cursor=pointer]:
+                    - /url: https://www.otomoto.pl/otomotolease
+                    - text: Leasing
+                - listitem [ref=e68]:
+                  - link [ref=e69] [cursor=pointer]:
+                    - /url: /news/strefa-marek
+                    - text: Otomoto News
+                - listitem [ref=e70]:
+                  - link [ref=e71] [cursor=pointer]:
+                    - /url: /wycena-samochodu
+                    - text: Wyceń auto
+                - listitem [ref=e72]:
+                  - link [ref=e73] [cursor=pointer]:
+                    - /url: /inspekcja
+                    - text: Umów inspekcję
+                - listitem [ref=e74]:
+                  - link [ref=e75] [cursor=pointer]:
+                    - /url: https://www.carvertical.com/pl/landing/v3?a=570761428&b=cd0ff666&chan=oto_novin_d
+                    - text: Sprawdź historię
+            - button "Finanse i zasoby" [ref=e76] [cursor=pointer]
+        - generic [ref=e80]:
+          - button "Zacznij sprzedawać" [ref=e81] [cursor=pointer]
+          - link "Obserwowane" [ref=e88] [cursor=pointer]:
+            - /url: /obserwowane
+          - link "Zapytania" [ref=e92] [cursor=pointer]:
+            - /url: /authentication?redirectUrl=%2Fmojekonto%2Fmessages
+          - button "Zaloguj się" [ref=e95] [cursor=pointer]
+    - main [ref=e97]:
+      - generic [ref=e98]:
+        - generic [ref=e99]:
+          - banner "Advertisement banner" [ref=e101]
+          - article [ref=e102]:
+            - heading "Największa platforma motoryzacyjna w Polsce" [level=1] [ref=e103]
+            - generic [ref=e105]:
+              - button "Osobowe" [pressed] [ref=e106] [cursor=pointer]:
+                - generic [ref=e108]:
+                  - figure [ref=e109]:
+                    - img "category-selection/input-29" [ref=e110]
+                  - generic [ref=e111]: Osobowe
+              - button "Elektryczne" [ref=e112] [cursor=pointer]
+              - button "Ciężarowe" [ref=e116] [cursor=pointer]
+              - button "Budowlane" [ref=e120] [cursor=pointer]
+              - button "Dostawcze" [ref=e124] [cursor=pointer]
+              - button "Motocykle" [ref=e128] [cursor=pointer]
+              - button "Przyczepy" [ref=e132] [cursor=pointer]
+              - button "Rolnicze" [ref=e136] [cursor=pointer]
+              - button "Części" [ref=e140] [cursor=pointer]
+            - article "Czego szukasz?" [ref=e144]:
+              - article [ref=e145]:
+                - group [ref=e146]:
+                  - generic [ref=e148]:
+                    - combobox [ref=e151]:
+                      - group [ref=e152]:
+                        - textbox "Marka pojazdu" [ref=e153]
+                        - button [ref=e154] [cursor=pointer]
+                    - combobox [ref=e159]:
+                      - group [ref=e160]:
+                        - textbox "Model pojazdu" [disabled] [ref=e161]
+                        - button [ref=e162] [cursor=pointer]
+                    - combobox [ref=e167]:
+                      - group [ref=e168]:
+                        - textbox "Cena do" [ref=e169]
+                        - button [ref=e170] [cursor=pointer]
+                    - combobox [ref=e175]:
+                      - group [ref=e176]:
+                        - textbox "Rok produkcji od" [ref=e177]
+                        - button [ref=e178] [cursor=pointer]
+                    - combobox [ref=e183]:
+                      - group [ref=e184]:
+                        - textbox "Rodzaj paliwa" [ref=e185]
+                        - button [ref=e186] [cursor=pointer]
+                    - generic [ref=e191]:
+                      - button "Kup"
+                      - button "Leasing" [ref=e192] [cursor=pointer]
+                    - button "Więcej filtrów" [ref=e195] [cursor=pointer]
+                    - button "Pokaż 234 712 Ogłoszeń" [ref=e201] [cursor=pointer]
+        - generic [ref=e205]:
+          - heading "Sprzedaj na OTOMOTO" [level=2] [ref=e207]
+          - generic [ref=e208]:
+            - button [ref=e209] [cursor=pointer]:
+              - button "Zacznij sprzedawać" [ref=e210]
+              - img "Zacznij sprzedawać" [ref=e212]
+            - button [ref=e213] [cursor=pointer]:
+              - button "Otrzymaj bezpłatną wycenę" [ref=e214]
+              - img "Otrzymaj bezpłatną wycenę" [ref=e216]
+            - button [ref=e217] [cursor=pointer]:
+              - button "Sprawdź porady sprzedażowe" [ref=e218]
+              - img "Sprawdź porady sprzedażowe" [ref=e220]
+        - generic [ref=e221]:
+          - region [ref=e223]:
+            - link "Ford Fiesta 1.0 EcoBoost ST-Line" [ref=e224] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/ford-fiesta-ID6IbcTN.html
+              - article [ref=e225]:
+                - img "Ford Fiesta 1.0 EcoBoost ST-Line" [ref=e226]
+                - region "Information" [ref=e227]:
+                  - heading "Oferta dnia" [level=2] [ref=e229]
+                  - heading "Ford Fiesta 1.0 EcoBoost ST-Line" [level=2] [ref=e230]
+                  - region "Characteristics" [ref=e231]:
+                    - list [ref=e232]:
+                      - listitem [ref=e233]: "2017"
+                      - listitem [ref=e234]: 199 200 km
+                      - listitem [ref=e235]: Benzyna
+                      - listitem [ref=e236]: 100 KM
+                      - listitem [ref=e237]: 998 cm3
+                  - region "Price" [ref=e238]:
+                    - heading [level=4] [ref=e239]:
+                      - text: 24 750
+                      - superscript [ref=e240]: PLN
+          - region "Oferty Wyróżnione" [ref=e242]:
+            - generic [ref=e243]:
+              - heading "Oferty Wyróżnione" [level=2] [ref=e244]
+              - link "Zobacz wszystkie" [ref=e245] [cursor=pointer]:
+                - /url: /promoted
+            - generic [ref=e246]:
+              - link "Audi A6 Avant 2.8 FSI Quattro S tronic" [ref=e247] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/osobowe/oferta/audi-a6-avant-ID6IcuC7.html
+                - article [ref=e248]:
+                  - img "Audi A6 Avant 2.8 FSI Quattro S tronic" [ref=e249]
+                  - region "Information" [ref=e250]:
+                    - generic [ref=e251]:
+                      - heading "Audi A6 Avant 2.8 FSI Quattro S tronic" [level=2] [ref=e252]
+                      - region "Characteristics" [ref=e253]:
+                        - list [ref=e254]:
+                          - listitem [ref=e255]: "2013"
+                          - listitem [ref=e256]: 138 613 km
+                          - listitem [ref=e257]: Benzyna
+                          - listitem [ref=e258]: 204 KM
+                          - listitem [ref=e259]: 2 773 cm3
+                    - region "Price" [ref=e260]:
+                      - heading [level=4] [ref=e261]:
+                        - text: 63 000
+                        - superscript [ref=e262]: PLN
+              - link "Skoda Superb 1.6 TDI Ambition DSG" [ref=e263] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/osobowe/oferta/skoda-superb-ID6IazDY.html
+                - article [ref=e264]:
+                  - img "Skoda Superb 1.6 TDI Ambition DSG" [ref=e265]
+                  - region "Information" [ref=e266]:
+                    - generic [ref=e267]:
+                      - heading "Skoda Superb 1.6 TDI Ambition DSG" [level=2] [ref=e268]
+                      - region "Characteristics" [ref=e269]:
+                        - list [ref=e270]:
+                          - listitem [ref=e271]: "2017"
+                          - listitem [ref=e272]: 178 000 km
+                          - listitem [ref=e273]: Diesel
+                          - listitem [ref=e274]: 120 KM
+                          - listitem [ref=e275]: 1 598 cm3
+                    - region "Price" [ref=e276]:
+                      - heading [level=4] [ref=e277]:
+                        - text: 52 000
+                        - superscript [ref=e278]: PLN
+              - link "Mercedes-Benz GLE" [ref=e279] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/osobowe/oferta/mercedes-benz-gle-ID6I4nhm.html
+                - article [ref=e280]:
+                  - img "Mercedes-Benz GLE" [ref=e281]
+                  - region "Information" [ref=e282]:
+                    - generic [ref=e283]:
+                      - heading "Mercedes-Benz GLE" [level=2] [ref=e284]
+                      - region "Characteristics" [ref=e285]:
+                        - list [ref=e286]:
+                          - listitem [ref=e287]: "2024"
+                          - listitem [ref=e288]: 37 500 km
+                          - listitem [ref=e289]: Benzyna
+                          - listitem [ref=e290]: 333 KM
+                          - listitem [ref=e291]: 1 999 cm3
+                    - region "Price" [ref=e292]:
+                      - heading [level=4] [ref=e293]:
+                        - text: 249 000
+                        - superscript [ref=e294]: PLN
+              - link "Citroën C4 Picasso 2.0 HDi Exclusive" [ref=e295] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/osobowe/oferta/citroen-c4-picasso-ID6IcOJO.html
+                - article [ref=e296]:
+                  - img "Citroën C4 Picasso 2.0 HDi Exclusive" [ref=e297]
+                  - region "Information" [ref=e298]:
+                    - generic [ref=e299]:
+                      - heading "Citroën C4 Picasso 2.0 HDi Exclusive" [level=2] [ref=e300]
+                      - region "Characteristics" [ref=e301]:
+                        - list [ref=e302]:
+                          - listitem [ref=e303]: "2011"
+                          - listitem [ref=e304]: 266 250 km
+                          - listitem [ref=e305]: Diesel
+                          - listitem [ref=e306]: 150 KM
+                          - listitem [ref=e307]: 1 997 cm3
+                    - region "Price" [ref=e308]:
+                      - heading [level=4] [ref=e309]:
+                        - text: 14 900
+                        - superscript [ref=e310]: PLN
+        - region "Oferty Wyróżnione" [ref=e312]:
+          - generic [ref=e313]:
+            - link "Citroën C3 1.2 PureTech Shine" [ref=e314] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/citroen-c3-ID6IcRB2.html
+              - article [ref=e315]:
+                - img "Citroën C3 1.2 PureTech Shine" [ref=e316]
+                - region "Information" [ref=e317]:
+                  - generic [ref=e318]:
+                    - heading "Citroën C3 1.2 PureTech Shine" [level=2] [ref=e319]
+                    - region "Characteristics" [ref=e320]:
+                      - list [ref=e321]:
+                        - listitem [ref=e322]: "2017"
+                        - listitem [ref=e323]: 124 000 km
+                        - listitem [ref=e324]: Benzyna
+                        - listitem [ref=e325]: 82 KM
+                        - listitem [ref=e326]: 1 199 cm3
+                  - region "Price" [ref=e327]:
+                    - heading [level=4] [ref=e328]:
+                      - text: 27 900
+                      - superscript [ref=e329]: PLN
+            - link "Porsche Macan PDK" [ref=e330] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/porsche-macan-ID6IcKeL.html
+              - article [ref=e331]:
+                - img "Porsche Macan PDK" [ref=e332]
+                - region "Information" [ref=e333]:
+                  - generic [ref=e334]:
+                    - heading "Porsche Macan PDK" [level=2] [ref=e335]
+                    - region "Characteristics" [ref=e336]:
+                      - list [ref=e337]:
+                        - listitem [ref=e338]: "2019"
+                        - listitem [ref=e339]: 56 936 km
+                        - listitem [ref=e340]: Benzyna
+                        - listitem [ref=e341]: 252 KM
+                        - listitem [ref=e342]: 1 984 cm3
+                  - region "Price" [ref=e343]:
+                    - heading [level=4] [ref=e344]:
+                      - text: 48 700
+                      - superscript [ref=e345]: PLN
+            - link "Mercedes-Benz Klasa S 350 d 4-Matic 9G-TRONIC" [ref=e346] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/mercedes-benz-klasa-s-ID6IcJIS.html
+              - article [ref=e347]:
+                - img "Mercedes-Benz Klasa S 350 d 4-Matic 9G-TRONIC" [ref=e348]
+                - region "Information" [ref=e349]:
+                  - generic [ref=e350]:
+                    - heading "Mercedes-Benz Klasa S 350 d 4-Matic 9G-TRONIC" [level=2] [ref=e351]
+                    - region "Characteristics" [ref=e352]:
+                      - list [ref=e353]:
+                        - listitem [ref=e354]: "2018"
+                        - listitem [ref=e355]: 131 000 km
+                        - listitem [ref=e356]: Diesel
+                        - listitem [ref=e357]: 286 KM
+                        - listitem [ref=e358]: 2 925 cm3
+                  - region "Price" [ref=e359]:
+                    - heading [level=4] [ref=e360]:
+                      - text: 149 000
+                      - superscript [ref=e361]: PLN
+            - link "Ford Fiesta 1.25 Titanium" [ref=e362] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/ford-fiesta-ID6IcGtd.html
+              - article [ref=e363]:
+                - img "Ford Fiesta 1.25 Titanium" [ref=e364]
+                - region "Information" [ref=e365]:
+                  - generic [ref=e366]:
+                    - heading "Ford Fiesta 1.25 Titanium" [level=2] [ref=e367]
+                    - region "Characteristics" [ref=e368]:
+                      - list [ref=e369]:
+                        - listitem [ref=e370]: "2010"
+                        - listitem [ref=e371]: 167 000 km
+                        - listitem [ref=e372]: Benzyna
+                        - listitem [ref=e373]: 82 KM
+                        - listitem [ref=e374]: 1 242 cm3
+                  - region "Price" [ref=e375]:
+                    - heading [level=4] [ref=e376]:
+                      - text: 13 600
+                      - superscript [ref=e377]: PLN
+            - link "BMW M2" [ref=e378] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/bmw-m2-ID6IcDM8.html
+              - article [ref=e379]:
+                - img "BMW M2" [ref=e380]
+                - region "Information" [ref=e381]:
+                  - generic [ref=e382]:
+                    - heading "BMW M2" [level=2] [ref=e383]
+                    - region "Characteristics" [ref=e384]:
+                      - list [ref=e385]:
+                        - listitem [ref=e386]: "2017"
+                        - listitem [ref=e387]: 85 000 km
+                        - listitem [ref=e388]: Benzyna
+                        - listitem [ref=e389]: 370 KM
+                        - listitem [ref=e390]: 2 979 cm3
+                  - region "Price" [ref=e391]:
+                    - heading [level=4] [ref=e392]:
+                      - text: 169 000
+                      - superscript [ref=e393]: PLN
+            - link "Audi A6 Limousine" [ref=e394] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/osobowe/oferta/audi-a6-limousine-ID6IcB9S.html
+              - article [ref=e395]:
+                - img "Audi A6 Limousine" [ref=e396]
+                - region "Information" [ref=e397]:
+                  - generic [ref=e398]:
+                    - heading "Audi A6 Limousine" [level=2] [ref=e399]
+                    - region "Characteristics" [ref=e400]:
+                      - list [ref=e401]:
+                        - listitem [ref=e402]: "2009"
+                        - listitem [ref=e403]: 264 414 km
+                        - listitem [ref=e404]: Diesel
+                        - listitem [ref=e405]: 240 KM
+                        - listitem [ref=e406]: 2 967 cm3
+                  - region "Price" [ref=e407]:
+                    - heading [level=4] [ref=e408]:
+                      - text: 12 800
+                      - superscript [ref=e409]: PLN
+        - generic:
+          - generic:
+            - banner
+        - generic [ref=e411]:
+          - link [ref=e412] [cursor=pointer]:
+            - /url: https://motopedia.otomoto.pl/strefa-marek?utm_source=strefamarek&utm_medium=banner&utm_campaign=SGotomoto
+            - img "Strefa Marek" [ref=e413]
+          - link [ref=e414] [cursor=pointer]:
+            - /url: https://www.otomoto.pl/finansowanie/redirect/home-banner-entrypoint?platform=web&epp=home&epb=banner&partnerId=inbank
+            - img "Inbank raty" [ref=e415]
+          - link [ref=e416] [cursor=pointer]:
+            - /url: https://motopedia.otomoto.pl?utm_source=otomotonews&utm_medium=banner&utm_campaign=SGotomoto
+            - img "OTOMOTO News" [ref=e417]
+        - generic [ref=e419]:
+          - generic [ref=e420]:
+            - heading "Najpopularniejsze marki samochodów:" [level=4] [ref=e421]
+            - list [ref=e422]:
+              - listitem [ref=e423]:
+                - link "Volkswagen" [ref=e424] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen
+              - listitem [ref=e425]:
+                - link "Opel" [ref=e426] [cursor=pointer]:
+                  - /url: /osobowe/opel
+              - listitem [ref=e427]:
+                - link "Audi" [ref=e428] [cursor=pointer]:
+                  - /url: /osobowe/audi
+              - listitem [ref=e429]:
+                - link "BMW" [ref=e430] [cursor=pointer]:
+                  - /url: /osobowe/bmw
+              - listitem [ref=e431]:
+                - link "Toyota" [ref=e432] [cursor=pointer]:
+                  - /url: /osobowe/toyota
+              - listitem [ref=e433]:
+                - link "Skoda" [ref=e434] [cursor=pointer]:
+                  - /url: /osobowe/skoda
+              - listitem [ref=e435]:
+                - link "Peugeot" [ref=e436] [cursor=pointer]:
+                  - /url: /osobowe/peugeot
+              - listitem [ref=e437]:
+                - link "Renault" [ref=e438] [cursor=pointer]:
+                  - /url: /osobowe/renault
+              - listitem [ref=e439]:
+                - link "Ford" [ref=e440] [cursor=pointer]:
+                  - /url: /osobowe/ford
+              - listitem [ref=e441]:
+                - link "Mercedes-Benz" [ref=e442] [cursor=pointer]:
+                  - /url: /osobowe/mercedes-benz
+          - generic [ref=e443]:
+            - heading "Najpopularniejsze modele samochodów:" [level=4] [ref=e444]
+            - list [ref=e445]:
+              - listitem [ref=e446]:
+                - link "Audi A4 B8" [ref=e447] [cursor=pointer]:
+                  - /url: /osobowe/audi/a4?search[filter_enum_generation]=gen-b8-2007-2015
+              - listitem [ref=e448]:
+                - link "BMW Seria 3 E46" [ref=e449] [cursor=pointer]:
+                  - /url: /osobowe/bmw/seria-3?search[filter_enum_generation]=gen-e46-1998-2007
+              - listitem [ref=e450]:
+                - link "Volkswagen Golf V" [ref=e451] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/golf?search[filter_enum_generation]=gen-v-2003-2009
+              - listitem [ref=e452]:
+                - link "Opel Astra H" [ref=e453] [cursor=pointer]:
+                  - /url: /osobowe/opel/astra?search[filter_enum_generation]=gen-h-2004-2013
+              - listitem [ref=e454]:
+                - link "Opel Astra J" [ref=e455] [cursor=pointer]:
+                  - /url: /opel/astra?search[filter_enum_generation]=gen-j-2009-2015
+              - listitem [ref=e456]:
+                - link "Volkswagen Golf IV" [ref=e457] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/golf?search[filter_enum_generation]=gen-iv-1997-2006
+              - listitem [ref=e458]:
+                - link "Volkswagen Passat B6" [ref=e459] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/passat?search[filter_enum_generation]=gen-b6-2005-2010
+              - listitem [ref=e460]:
+                - link "Volkswagen Golf VI" [ref=e461] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/golf?search[filter_enum_generation]=gen-vi-2008-2013
+              - listitem [ref=e462]:
+                - link "Audi A6 C6" [ref=e463] [cursor=pointer]:
+                  - /url: /osobowe/audi/a6?search[filter_enum_generation]=gen-c6-2004-2011
+              - listitem [ref=e464]:
+                - link "Audi A4 B7" [ref=e465] [cursor=pointer]:
+                  - /url: /osobowe/audi/a4?search[filter_enum_generation]=gen-b7-2004-2007
+          - generic [ref=e466]:
+            - heading "Samochody w najmie długoterminowym, leasingu i kredycie:" [level=4] [ref=e467]
+            - list [ref=e468]:
+              - listitem [ref=e469]:
+                - link "Hyundai" [ref=e470] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/hyundai
+              - listitem [ref=e471]:
+                - link "Citroen" [ref=e472] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/citroen
+              - listitem [ref=e473]:
+                - link "Toyota" [ref=e474] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/toyota
+              - listitem [ref=e475]:
+                - link "Volkswagen" [ref=e476] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/volkswagen
+              - listitem [ref=e477]:
+                - link "Seat" [ref=e478] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/seat
+              - listitem [ref=e479]:
+                - link "Mini" [ref=e480] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/mini-bmw
+              - listitem [ref=e481]:
+                - link "Mercedes-Benz" [ref=e482] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/mercedes-benz
+              - listitem [ref=e483]:
+                - link "BMW" [ref=e484] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/bmw
+              - listitem [ref=e485]:
+                - link "Peugeot" [ref=e486] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/peugeot
+              - listitem [ref=e487]:
+                - link "Nissan" [ref=e488] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/nissan
+              - listitem [ref=e489]:
+                - link "Audi" [ref=e490] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/audi
+              - listitem [ref=e491]:
+                - link "Fiat" [ref=e492] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/fiat
+              - listitem [ref=e493]:
+                - link "Dacia" [ref=e494] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/dacia
+              - listitem [ref=e495]:
+                - link "Volvo" [ref=e496] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/volvo
+              - listitem [ref=e497]:
+                - link "Skoda" [ref=e498] [cursor=pointer]:
+                  - /url: https://www.otomoto.pl/otomotolease/marka/skoda
+          - generic [ref=e499]:
+            - heading "Najpopularniejsze marki motocykli:" [level=4] [ref=e500]
+            - list [ref=e501]:
+              - listitem [ref=e502]:
+                - link "Harley Davidson" [ref=e503] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/harley-davidson
+              - listitem [ref=e504]:
+                - link "Yamaha" [ref=e505] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/yamaha
+              - listitem [ref=e506]:
+                - link "Kawasaki" [ref=e507] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/kawasaki
+              - listitem [ref=e508]:
+                - link "BMW" [ref=e509] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/bmw
+              - listitem [ref=e510]:
+                - link "Bashan" [ref=e511] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/bashan
+              - listitem [ref=e512]:
+                - link "Aprilla" [ref=e513] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/aprilia
+              - listitem [ref=e514]:
+                - link "Ducati" [ref=e515] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/ducati
+              - listitem [ref=e516]:
+                - link "Can-Am" [ref=e517] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/can-am
+              - listitem [ref=e518]:
+                - link "Benelli" [ref=e519] [cursor=pointer]:
+                  - /url: /motocykle-i-quady/benelli
+          - generic [ref=e520]:
+            - heading "Pozostałe pojazdy na sprzedaż:" [level=4] [ref=e521]
+            - list [ref=e522]:
+              - listitem [ref=e523]:
+                - link "Samochody dostawcze" [ref=e524] [cursor=pointer]:
+                  - /url: /dostawcze
+              - listitem [ref=e525]:
+                - link "Traktory" [ref=e526] [cursor=pointer]:
+                  - /url: /maszyny-rolnicze/traktory
+              - listitem [ref=e527]:
+                - link "Koparko-ładowarki" [ref=e528] [cursor=pointer]:
+                  - /url: /maszyny-budowlane/koparko-ladowarki
+              - listitem [ref=e529]:
+                - link "Ciężarówki" [ref=e530] [cursor=pointer]:
+                  - /url: /ciezarowe/uzytkowe/scania
+              - listitem [ref=e531]:
+                - link "Naczepy i wywrotki" [ref=e532] [cursor=pointer]:
+                  - /url: /przyczepy/maczepy_wywrotki
+              - listitem [ref=e533]:
+                - link "Wywrotki" [ref=e534] [cursor=pointer]:
+                  - /url: /ciezarowe/wywrotki#form
+              - listitem [ref=e535]:
+                - link "Przyczepy budowlane" [ref=e536] [cursor=pointer]:
+                  - /url: /przyczepy/przyczepy-budowlane
+              - listitem [ref=e537]:
+                - link "Koparki" [ref=e538] [cursor=pointer]:
+                  - /url: /maszyny-budowlane/koparki
+              - listitem [ref=e539]:
+                - link "Autolawety" [ref=e540] [cursor=pointer]:
+                  - /url: /ciezarowe/autolaweta
+              - listitem [ref=e541]:
+                - link "Autobusy" [ref=e542] [cursor=pointer]:
+                  - /url: /ciezarowe/autobusy
+          - generic [ref=e543]:
+            - heading "Popularne modele Volkswagena:" [level=4] [ref=e544]
+            - list [ref=e545]:
+              - listitem [ref=e546]:
+                - link "Volkswagen Golf" [ref=e547] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/golf
+              - listitem [ref=e548]:
+                - link "Volkswagen Polo" [ref=e549] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/polo
+              - listitem [ref=e550]:
+                - link "Volkswagen Tiguan" [ref=e551] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/tiguan
+              - listitem [ref=e552]:
+                - link "Volkswagen Passat" [ref=e553] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/passat
+              - listitem [ref=e554]:
+                - link "Volkswagen Scirocco" [ref=e555] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/scirocco
+              - listitem [ref=e556]:
+                - link "Volkswagen Touran" [ref=e557] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/touran
+              - listitem [ref=e558]:
+                - link "Volkswagen Sharan" [ref=e559] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/sharan
+              - listitem [ref=e560]:
+                - link "Volkswagen Golf Plus" [ref=e561] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/golf-plus
+              - listitem [ref=e562]:
+                - link "Volkswagen Touareg" [ref=e563] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/touareg
+              - listitem [ref=e564]:
+                - link "Volkswagen Jetta" [ref=e565] [cursor=pointer]:
+                  - /url: /osobowe/volkswagen/jetta
+          - generic [ref=e566]:
+            - heading "Popularne modele BMW:" [level=4] [ref=e567]
+            - list [ref=e568]:
+              - listitem [ref=e569]:
+                - link "BMW Seria 1" [ref=e570] [cursor=pointer]:
+                  - /url: /osobowe/bmw/seria-1
+              - listitem [ref=e571]:
+                - link "BMW Seria 3" [ref=e572] [cursor=pointer]:
+                  - /url: /osobowe/bmw/seria-3
+              - listitem [ref=e573]:
+                - link "BMW X5" [ref=e574] [cursor=pointer]:
+                  - /url: /osobowe/bmw/x5
+              - listitem [ref=e575]:
+                - link "BMW Seria 5" [ref=e576] [cursor=pointer]:
+                  - /url: /osobowe/bmw/seria-5
+              - listitem [ref=e577]:
+                - link "BMW M3" [ref=e578] [cursor=pointer]:
+                  - /url: /osobowe/bmw/m3
+              - listitem [ref=e579]:
+                - link "BMW X3" [ref=e580] [cursor=pointer]:
+                  - /url: /osobowe/bmw/x3
+              - listitem [ref=e581]:
+                - link "BMW X1" [ref=e582] [cursor=pointer]:
+                  - /url: /osobowe/bmw/x1
+              - listitem [ref=e583]:
+                - link "BMW M2" [ref=e584] [cursor=pointer]:
+                  - /url: /osobowe/bmw/m2
+              - listitem [ref=e585]:
+                - link "BMW i8" [ref=e586] [cursor=pointer]:
+                  - /url: /osobowe/bmw/i8
+              - listitem [ref=e587]:
+                - link "BMW X6" [ref=e588] [cursor=pointer]:
+                  - /url: /osobowe/bmw/x6
+          - generic [ref=e589]:
+            - heading "Popularne modele Audi:" [level=4] [ref=e590]
+            - list [ref=e591]:
+              - listitem [ref=e592]:
+                - link "Audi A3" [ref=e593] [cursor=pointer]:
+                  - /url: /osobowe/audi/a3
+              - listitem [ref=e594]:
+                - link "Audi A4" [ref=e595] [cursor=pointer]:
+                  - /url: /osobowe/audi/a4
+              - listitem [ref=e596]:
+                - link "Audi A6" [ref=e597] [cursor=pointer]:
+                  - /url: /osobowe/audi/a6
+              - listitem [ref=e598]:
+                - link "Audi RS7" [ref=e599] [cursor=pointer]:
+                  - /url: /osobowe/audi/rs7
+              - listitem [ref=e600]:
+                - link "Audi A5" [ref=e601] [cursor=pointer]:
+                  - /url: /osobowe/audi/a5
+              - listitem [ref=e602]:
+                - link "Audi Q5" [ref=e603] [cursor=pointer]:
+                  - /url: /osobowe/audi/q5
+              - listitem [ref=e604]:
+                - link "Audi TT" [ref=e605] [cursor=pointer]:
+                  - /url: /osobowe/audi/tt
+              - listitem [ref=e606]:
+                - link "Audi A7" [ref=e607] [cursor=pointer]:
+                  - /url: /osobowe/audi/a7
+              - listitem [ref=e608]:
+                - link "Audi A8" [ref=e609] [cursor=pointer]:
+                  - /url: /osobowe/audi/a8
+              - listitem [ref=e610]:
+                - link "Audi R8" [ref=e611] [cursor=pointer]:
+                  - /url: /osobowe/audi/r8
+          - generic [ref=e612]:
+            - heading "Szukaj w miastach:" [level=4] [ref=e613]
+            - list [ref=e614]:
+              - listitem [ref=e615]:
+                - link "Białystok" [ref=e616] [cursor=pointer]:
+                  - /url: /osobowe/bialystok?search[dist]=50
+              - listitem [ref=e617]:
+                - link "Bydgoszcz" [ref=e618] [cursor=pointer]:
+                  - /url: /osobowe/bydgoszcz?search[dist]=50
+              - listitem [ref=e619]:
+                - link "Gdańsk" [ref=e620] [cursor=pointer]:
+                  - /url: /osobowe/gdansk?search[dist]=50
+              - listitem [ref=e621]:
+                - link "Kielce" [ref=e622] [cursor=pointer]:
+                  - /url: /osobowe/kielce?search[dist]=50
+              - listitem [ref=e623]:
+                - link "Koszalin" [ref=e624] [cursor=pointer]:
+                  - /url: /osobowe/koszalin?search[dist]=50
+              - listitem [ref=e625]:
+                - link "Kraków" [ref=e626] [cursor=pointer]:
+                  - /url: /osobowe/krakow?search[dist]=50
+              - listitem [ref=e627]:
+                - link "Łódź" [ref=e628] [cursor=pointer]:
+                  - /url: /osobowe/lodz?search[dist]=50
+              - listitem [ref=e629]:
+                - link "Olsztyn" [ref=e630] [cursor=pointer]:
+                  - /url: /osobowe/olsztyn?search[dist]=50
+              - listitem [ref=e631]:
+                - link "Opole" [ref=e632] [cursor=pointer]:
+                  - /url: /osobowe/opole?search[dist]=50
+              - listitem [ref=e633]:
+                - link "Poznań" [ref=e634] [cursor=pointer]:
+                  - /url: /osobowe/poznan?search[dist]=50
+              - listitem [ref=e635]:
+                - link "Rzeszów" [ref=e636] [cursor=pointer]:
+                  - /url: /osobowe/rzeszow?search[dist]=50
+              - listitem [ref=e637]:
+                - link "Szczecin" [ref=e638] [cursor=pointer]:
+                  - /url: /osobowe/szczecin?search[dist]=50
+              - listitem [ref=e639]:
+                - link "Warszawa" [ref=e640] [cursor=pointer]:
+                  - /url: /osobowe/warszawa?search[dist]=50
+              - listitem [ref=e641]:
+                - link "Wrocław" [ref=e642] [cursor=pointer]:
+                  - /url: /osobowe/wroclaw?search[dist]=50
+              - listitem [ref=e643]:
+                - link "Zielona Góra" [ref=e644] [cursor=pointer]:
+                  - /url: /osobowe/zielonagora?search[dist]=50
+              - listitem [ref=e645]:
+                - link "Bielsko-Biała" [ref=e646] [cursor=pointer]:
+                  - /url: /osobowe/bielsko-biala?search[dist]=50
+              - listitem [ref=e647]:
+                - link "Bytom" [ref=e648] [cursor=pointer]:
+                  - /url: /osobowe/bytom?search[dist]=50
+              - listitem [ref=e649]:
+                - link "Częstochowa" [ref=e650] [cursor=pointer]:
+                  - /url: /osobowe/czestochowa?search[dist]=50
+              - listitem [ref=e651]:
+                - link "Gdynia" [ref=e652] [cursor=pointer]:
+                  - /url: /osobowe/gdynia?search[dist]=50
+              - listitem [ref=e653]:
+                - link "Gliwice" [ref=e654] [cursor=pointer]:
+                  - /url: /osobowe/gliwice?search[dist]=50
+              - listitem [ref=e655]:
+                - link "Gniezno" [ref=e656] [cursor=pointer]:
+                  - /url: /osobowe/gniezno?search[dist]=50
+              - listitem [ref=e657]:
+                - link "Rybnik" [ref=e658] [cursor=pointer]:
+                  - /url: /osobowe/rybnik?search[dist]=50
+              - listitem [ref=e659]:
+                - link "Siedlce" [ref=e660] [cursor=pointer]:
+                  - /url: /osobowe/siedlce?search[dist]=50
+              - listitem [ref=e661]:
+                - link "Sosnowiec" [ref=e662] [cursor=pointer]:
+                  - /url: /osobowe/sosnowiec?search[dist]=50
+              - listitem [ref=e663]:
+                - link "Toruń" [ref=e664] [cursor=pointer]:
+                  - /url: /osobowe/torun?search[dist]=50
+          - generic [ref=e665]:
+            - heading "Szukaj w województwach:" [level=4] [ref=e666]
+            - list [ref=e667]:
+              - listitem [ref=e668]:
+                - link "Mazowieckie" [ref=e669] [cursor=pointer]:
+                  - /url: /osobowe/mazowieckie
+              - listitem [ref=e670]:
+                - link "Wielkopolskie" [ref=e671] [cursor=pointer]:
+                  - /url: /osobowe/wielkopolskie
+              - listitem [ref=e672]:
+                - link "Śląskie" [ref=e673] [cursor=pointer]:
+                  - /url: /osobowe/slaskie
+              - listitem [ref=e674]:
+                - link "Małopolskie" [ref=e675] [cursor=pointer]:
+                  - /url: /osobowe/malopolskie
+              - listitem [ref=e676]:
+                - link "Dolnośląskie" [ref=e677] [cursor=pointer]:
+                  - /url: /osobowe/dolnoslaskie
+              - listitem [ref=e678]:
+                - link "Pomorskie" [ref=e679] [cursor=pointer]:
+                  - /url: /osobowe/pomorskie
+              - listitem [ref=e680]:
+                - link "Łódzkie" [ref=e681] [cursor=pointer]:
+                  - /url: /osobowe/lodzkie
+              - listitem [ref=e682]:
+                - link "Lubelskie" [ref=e683] [cursor=pointer]:
+                  - /url: /osobowe/lubelskie
+              - listitem [ref=e684]:
+                - link "Zachodniopomorskie" [ref=e685] [cursor=pointer]:
+                  - /url: /osobowe/zachodniopomorskie
+              - listitem [ref=e686]:
+                - link "Podkarpackie" [ref=e687] [cursor=pointer]:
+                  - /url: /osobowe/podkarpackie
+              - listitem [ref=e688]:
+                - link "Świętokrzyskie" [ref=e689] [cursor=pointer]:
+                  - /url: /osobowe/swietokrzyskie
+              - listitem [ref=e690]:
+                - link "Lubuskie" [ref=e691] [cursor=pointer]:
+                  - /url: /osobowe/lubuskie
+              - listitem [ref=e692]:
+                - link "Podlaskie" [ref=e693] [cursor=pointer]:
+                  - /url: /osobowe/podlaskie
+              - listitem [ref=e694]:
+                - link "Opolskie" [ref=e695] [cursor=pointer]:
+                  - /url: /osobowe/opolskie
+      - generic [ref=e696]:
+        - heading "Jesteś klientem profesjonalnym?" [level=4] [ref=e697]
+        - link "Załóż konto firmowe opens in a new tab" [ref=e698] [cursor=pointer]:
+          - /url: https://www.otomoto.pl/konto/rejestracja-dealer/
+          - generic [ref=e699]: Załóż konto firmowe
+          - generic: opens in a new tab
+    - contentinfo [ref=e700]:
+      - generic [ref=e701]:
+        - article [ref=e702]:
+          - heading "Znajdź nas" [level=3] [ref=e703]
+          - list [ref=e704]:
+            - listitem [ref=e705]:
+              - link [ref=e706] [cursor=pointer]:
+                - /url: https://www.facebook.com/otomotopl
+                - paragraph [ref=e709]: Facebook
+            - listitem [ref=e710]:
+              - link [ref=e711] [cursor=pointer]:
+                - /url: https://www.instagram.com/otomotopl/
+                - paragraph [ref=e714]: Instagram
+            - listitem [ref=e715]:
+              - link [ref=e716] [cursor=pointer]:
+                - /url: https://www.youtube.com/user/otomotopl?utm_source=otomoto&utm_medium=footer&utm_campaign=footer
+                - paragraph [ref=e719]: YouTube
+            - listitem [ref=e720]:
+              - link [ref=e721] [cursor=pointer]:
+                - /url: https://www.tiktok.com/@otomotopl
+                - paragraph [ref=e724]: TikTok
+          - heading "Obsługa klienta" [level=3] [ref=e725]
+          - list [ref=e726]:
+            - list [ref=e727]:
+              - listitem [ref=e728]:
+                - paragraph [ref=e729]:
+                  - text: "Telefon: +48 61 880 32 21, 48 539 146 861"
+                  - generic [ref=e730]: (od pn. do pt. w godz. 08:00 - 17:00)
+              - listitem [ref=e731]:
+                - paragraph [ref=e732]:
+                  - text: "Email: pomoc@otomoto.pl"
+                  - generic [ref=e733]: (od pn. do nd. w godz. 08:00 - 20:00)
+              - listitem [ref=e734]:
+                - paragraph [ref=e735]: "Chat:"
+                - generic [ref=e736]: (od pn. do pt. w godz. 09:00 - 17:00)
+        - article [ref=e737]:
+          - heading "Otomoto" [level=3] [ref=e738]
+          - list [ref=e739]:
+            - listitem [ref=e740]:
+              - link [ref=e741] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/
+                - paragraph [ref=e742]: Pomoc
+            - listitem [ref=e743]:
+              - link [ref=e744] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/contactsupport?referral=product_web
+                - paragraph [ref=e745]: Kontakt
+            - listitem [ref=e746]:
+              - link [ref=e747] [cursor=pointer]:
+                - /url: https://reklama.olx.pl/homepage/
+                - paragraph [ref=e748]: Reklama
+            - listitem [ref=e749]:
+              - link [ref=e750] [cursor=pointer]:
+                - /url: https://media.otomoto.pl/
+                - paragraph [ref=e751]: Biuro prasowe
+            - listitem [ref=e752]:
+              - link [ref=e753] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/polityka-prywatnosci
+                - paragraph [ref=e754]: Polityka prywatności
+            - listitem [ref=e755]:
+              - link [ref=e756] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/polityka-dotyczaca-cookies-i-podobnych-technologii
+                - paragraph [ref=e757]: Polityka plików "cookies"
+            - listitem [ref=e758]:
+              - link [ref=e759] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/Zasady-odpowiedzialnej--Sztucznej-Inteligencji
+                - paragraph [ref=e760]: Zasady odpowiedzialnej AI
+            - listitem [ref=e761]:
+              - link [ref=e762] [cursor=pointer]:
+                - /url: "#"
+                - paragraph [ref=e763]: Ustawienia plików cookie
+            - listitem [ref=e764]:
+              - link [ref=e765] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/regulamin-dla-klientow-indywidualnych/
+                - paragraph [ref=e766]: Regulamin dla Klientów Indywidualnych
+            - listitem [ref=e767]:
+              - link [ref=e768] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/regulamin-dla-klientow-biznesowych
+                - paragraph [ref=e769]: Regulamin dla Klientów Biznesowych
+        - article [ref=e770]:
+          - heading "Usługi i narzędzia" [level=3] [ref=e771]
+          - list [ref=e772]:
+            - listitem [ref=e773]:
+              - link [ref=e774] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/umowa-kupna-sprzedazy/
+                - paragraph [ref=e775]: Umowa kupna sprzedaży
+            - listitem [ref=e776]:
+              - link [ref=e777] [cursor=pointer]:
+                - /url: /wycena-samochodu
+                - paragraph [ref=e778]: Ile jest wart Twój samochód?
+            - link [ref=e780] [cursor=pointer]:
+              - /url: https://www.otomoto.pl/finansowanie/redirect/footer-entrypoint
+              - paragraph [ref=e781]: Finansowanie
+              - button "Informacje" [ref=e782]
+          - heading "Partnerzy" [level=3] [ref=e785]
+          - list [ref=e786]:
+            - listitem [ref=e787]:
+              - link [ref=e788] [cursor=pointer]:
+                - /url: https://www.olx.pl
+                - paragraph [ref=e798]: OLX.pl
+            - listitem [ref=e799]:
+              - link [ref=e800] [cursor=pointer]:
+                - /url: https://www.otodom.pl
+                - paragraph [ref=e803]: Otodom.pl
+            - listitem [ref=e804]:
+              - link [ref=e805] [cursor=pointer]:
+                - /url: https://fixly.pl/?utm_source=footer-otomoto&utm_medium=footer&utm_campaign=Otomoto
+                - paragraph [ref=e810]: Fixly.pl
+        - article [ref=e811]:
+          - heading "Przydatne informacje" [level=3] [ref=e812]
+          - list [ref=e813]:
+            - listitem [ref=e814]:
+              - link [ref=e815] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/cennik-dla-klientow-indywidualnych
+                - paragraph [ref=e816]: Cennik dla Klientów Indywidualnych
+            - listitem [ref=e817]:
+              - link [ref=e818] [cursor=pointer]:
+                - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/cennik-dla-klientow-biznesowych
+                - paragraph [ref=e819]: Cennik dla Klientów Biznesowych
+            - listitem [ref=e820]:
+              - link [ref=e821] [cursor=pointer]:
+                - /url: https://www.youtube.com/user/otomotopl?utm_source=otomoto&utm_medium=footer&utm_campaign=footer
+                - paragraph [ref=e822]: Testy samochodów
+            - listitem [ref=e823]:
+              - link [ref=e824] [cursor=pointer]:
+                - /url: https://motopedia.otomoto.pl/motoryzacja-w-pigulce-internetowy-samochod-roku-2021/
+                - paragraph [ref=e825]: Internetowy Samochód Roku
+            - listitem [ref=e826]:
+              - link [ref=e827] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/sitemap
+                - paragraph [ref=e828]: Mapa kategorii
+            - listitem [ref=e829]:
+              - link [ref=e830] [cursor=pointer]:
+                - /url: https://www.otomoto.pl/sitemap/regions
+                - paragraph [ref=e831]: Mapa miejscowości
+            - listitem [ref=e832]:
+              - link [ref=e833] [cursor=pointer]:
+                - /url: https://www.olxgroup.com/careers
+                - paragraph [ref=e834]: Kariera
+            - listitem [ref=e835]:
+              - link [ref=e836] [cursor=pointer]:
+                - /url: https://czesci.otomoto.pl
+                - paragraph [ref=e837]: Części - dobre praktyki
+      - article [ref=e839]:
+        - paragraph [ref=e840]: Powered by OTOMOTO
+        - list [ref=e841]:
+          - listitem [ref=e842]:
+            - link [ref=e843] [cursor=pointer]:
+              - /url: https://otomoto.pl/otomotolease/?utm_source=otomoto&utm_medium=footer
+              - img "Otomoto Lease logo" [ref=e844]
+          - listitem [ref=e845]:
+            - link [ref=e846] [cursor=pointer]:
+              - /url: https://motopedia.otomoto.pl/?utm_source=otomoto&utm_medium=footer
+              - img "Motopedia.otomoto.pl" [ref=e847]
+      - article [ref=e851]:
+        - paragraph [ref=e852]: Nasze aplikacje w twoim telefonie
+        - list [ref=e853]:
+          - link [ref=e854] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=pl.otomoto
+            - img "Google Play Store" [ref=e855]
+          - link [ref=e856] [cursor=pointer]:
+            - /url: https://itunes.apple.com/us/app/id444086109?mt=8&uo=4
+            - img "App Store" [ref=e857]
+  - dialog "Dbamy o Twoją prywatność" [ref=e860]:
+    - generic [ref=e862]:
+      - generic [ref=e864]:
+        - heading "Dbamy o Twoją prywatność" [level=2] [ref=e865]
+        - generic [ref=e866]:
+          - text: My i nasi 375 partnerzy przechowujemy lub uzyskujemy dostęp do informacji na urządzeniu, takich jak unikalne identyfikatory w plikach cookie w celu przetwarzania danych osobowych. Użytkownik może zaakceptować wybory lub zarządzać nimi, klikając poniżej lub w dowolnym momencie na stronie polityki prywatności. Te wybory będą sygnalizowane naszym partnerom i nie będą miały wpływu na dane przeglądania.
+          - link "Polityka cookies, otwiera się w nowym oknie" [active] [ref=e867] [cursor=pointer]:
+            - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/kA0090000027mPiCAI
+            - text: Polityka cookies,
+          - link "Polityka Prywatności, otwiera się w nowym oknie" [ref=e868] [cursor=pointer]:
+            - /url: https://pomoc.otomoto.pl/otomotohelpcenter/s/article/kA0090000027mPdCAI
+            - text: Polityka Prywatności
+        - generic [ref=e869]:
+          - heading "Wraz z naszymi partnerami przetwarzamy dane w celu zapewnienia:" [level=3] [ref=e870]
+          - paragraph [ref=e872]:
+            - text: Użycie dokładnych danych geolokalizacyjnych. Aktywne skanowanie charakterystyki urządzenia do celów identyfikacji. Przechowywanie informacji na urządzeniu lub dostęp do nich. Spersonalizowane reklamy i treści, pomiar reklam i treści, badnie odbiorców i ulepszanie usług.
+            - button "Lista partnerów (dostawców)" [ref=e873] [cursor=pointer]
+      - generic [ref=e875]:
+        - button "Zezwól na wszystkie" [ref=e876] [cursor=pointer]
+        - button "Zezwól tylko na niezbędne" [ref=e877] [cursor=pointer]
+        - button "Ustaw preferencje, otwiera okno dialogowe centrum preferencji" [ref=e878] [cursor=pointer]: Ustaw preferencje
+  - alert [ref=e879]

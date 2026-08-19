@@ -304,19 +304,26 @@ The production override file (`docker-compose.prod.yml`) includes:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
+| `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
-| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing |
+| `BOT_USERNAME` | Yes | Telegram bot username (without `@`) — used for contact deep-links and login QR codes |
+| `ALLOWED_HOSTS` | Yes (prod) | Comma-separated list of host/domain names the app can serve. `prod.py` raises `ValueError` if empty |
+| `SITE_URL` | Yes* | Public site URL for absolute links in Telegram alerts (no trailing slash). Example: `https://mko-bazuna.example.com` |
+| `IMMEDIATE_ALERTS_ENABLED` | No (default: `false`) | Enable near-real-time publish-time Telegram alerts to buyers with matching saved searches. Daily backfill runs regardless |
 | `POSTGRES_USER` | Yes | Database username |
 | `POSTGRES_PASSWORD` | Yes | Database password |
 | `POSTGRES_DB` | Yes | Database name |
-| `BOT_USERNAME` | Yes | Telegram bot username (without @) |
-| `TLS_CERT_PATH` | No | Path to TLS certs (default: `/etc/nginx/certs/`) |
-| `PLAUSIBLE_HOST` | No | Analytics host for traffic tracking |
-| `ADMIN_USERNAME` | No | Admin username (default: admin) |
-| `ADMIN_PASSWORD` | No* | Admin password; required for auto-creation |
-| `ADMIN_TELEGRAM_ID` | No | Placeholder telegram_id (default: -1) |
-| `SEED_USERS` | No | Number of demo users to generate (default: 10) |
-| `SEED_ADS` | No | Number of demo ads to generate (default: 30) |
+| `POSTGRES_HOST` | No (default: `db`) | Database host. Set inline to `db` (compose service name) in all services; documents the Django `DATABASES` fallback for local non-Docker development |
+| `POSTGRES_PORT` | No (default: `5432`) | Database port. Used by Django `DATABASES` fallback and the prod backup service |
+| `REDIS_URL` | No (default: `redis://localhost:6379/0`) | Redis connection for cache and rate-limiting. Set inline to `redis://redis:6379/0` in all prod Compose services |
+| `PLAUSIBLE_HOST` | No | Analytics host for Plausible traffic tracking (cookieless, no consent banner). Empty disables analytics |
+| `TLS_CERT_PATH` | No (default: `/etc/nginx/certs/`) | Path to TLS certificates (fullchain.pem / privkey.pem) mounted into nginx |
+| `ADMIN_USERNAME` | No (default: `admin`) | Django admin username for the `create_admin` one-shot service |
+| `ADMIN_PASSWORD` | No* | Admin password; required for `create_admin` auto-creation. Create manually if not set |
+| `ADMIN_TELEGRAM_ID` | No (default: `-1`) | Placeholder telegram_id for the admin user (negative avoids collision with real Telegram IDs) |
+| `SEED_USERS` | No (default: `10`) | Number of demo users to generate (seed service) |
+| `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.docker` — the compose files build it from the
@@ -618,7 +625,6 @@ This is a one-time setup that runs automatically during `make up` when `ADMIN_PA
 | Username | `admin` (or `ADMIN_USERNAME` env var) | Admin login username |
 | Password | Set via `ADMIN_PASSWORD` env var | Must be provided for auto-creation |
 | Telegram ID | `-1` (or `ADMIN_TELEGRAM_ID` env var) | Placeholder for username/password auth |
-| Email | (empty) | Optional; can be set via `ADMIN_EMAIL` |
 | is_staff | `True` | Can access Django admin |
 | is_superuser | `True` | Full admin privileges |
 

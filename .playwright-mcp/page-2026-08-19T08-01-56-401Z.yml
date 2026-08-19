@@ -1,0 +1,6 @@
+- generic [ref=e3]:
+  - heading "Страницата не е открита" [level=3] [ref=e16]
+  - paragraph [ref=e17]: Провери отново адреса на страницата
+  - link [ref=e18] [cursor=pointer]:
+    - /url: http://olx.bg
+    - button "Отиди на заглавна страница" [ref=e19]

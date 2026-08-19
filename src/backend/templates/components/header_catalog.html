@@ -1,10 +1,10 @@
-{# Shared Avito-style catalog header. Rendered via a Django include on the
+{% comment %} Shared Avito-style catalog header. Rendered via a Django include on the
    catalog (listings/search) and ad-detail pages. Hosts: place-an-ad CTA, the
    "All Categories" dropdown, breadcrumbs, and the search bar with a grouped
    autocomplete dropdown. Vanilla JS behavior (HTMX 1.9.12 has no hx-on).
 
    Context: bot_username + root_categories (context processor), query,
-   breadcrumb_category (listings/search) or ad.category (detail). #}
+   breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
 {% load i18n %}
 {% load static %}
 {% firstof breadcrumb_category ad.category as current_cat %}

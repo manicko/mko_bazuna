@@ -13,6 +13,7 @@ related:
   - packages-list
   - user-stories-index
   - spec-index
+  - filter-ui
 ---
 
 ## Purpose
@@ -102,9 +103,9 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Three UI languages:** Russian (ru), Bosnian (bs-latin), and English (en). Language preference detected via `LanguagePreMiddleware` which reads `?lang=X` query parameter, `lang_pref` cookie, or `Accept-Language` header (priority order), defaulting to Russian.
 - **Language switcher UI:** Dropdown component in header allows users to switch languages; selection sets `lang_pref` cookie for persistence and navigates via `?lang=X` parameter.
 - **Content stored in Russian** as base language. Multi-language columns (`title_en`, `title_bs`, `description_en`, `description_bs`) store translated content for UI display. `original_language` tracks source language for audit.
-- **Search (phase 1) is over Russian content.** Queries in Bosnian or English translate to Russian at search time via `apps/search/services/query_translator.py`. Multi-language search vector includes all language variants using appropriate FTS configurations (`russian`, `simple`, `english`).
-- **Stored-content-invariant (zone D5):** seller may input in any supported language, but the bot MUST translate title+description to Russian on ad creation. The bot delegates to the shared `apps.core.services.translation.translate_text` function (invoked in parallel via `asyncio.gather` + `asyncio.to_thread`), inheriting the same 500ms timeout, circuit breaker (3 failures → 60s cooldown), and LRU cache as the search-side translator, so `to_tsvector('russian', …)` is correct. UI displays localized content via `Ad.get_title(locale)` and `Ad.get_description(locale)` template filters.
-- **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation) and search queries (on lookup) to **Google Translate** for language normalization. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
+- **Search is language-aware** via per-language FTS vectors (`search_vector_ru/bs/en` on `ads`, each maintained by the `ads_search_vector_fn` trigger). The buyer's locale (`request.LANGUAGE_CODE` resolved via `LanguageLocale.from_code()`) selects the matching vector column and PostgreSQL text-search config (`russian` / `simple` / `english`). The query is searched in its original language — **no query-time translation**. Category names are indexed per language via `name_i18n->>'bs'` / `->>'en'` (falling back to Russian `name`) at weight 'C'.
+- **Stored-content-invariant (zone D5):** seller may input in any supported language, but the bot MUST translate title+description to Russian on ad creation. The bot delegates to the shared `apps.core.services.translation.translate_text` function (invoked in parallel via `asyncio.gather` + `asyncio.to_thread`), inheriting the same 500ms timeout, circuit breaker (3 failures → 60s cooldown), and LRU cache. The per-language vector columns (`title_ru/en/bs`, `description_ru/en/bs`) are populated from this publication-time translation; `to_tsvector('russian', …)` is correct for the Russian vector. UI displays localized content via `Ad.get_title(locale)` and `Ad.get_description(locale)` template filters.
+- **Translation egress (data flow):** The `deep-translator` wrapper sends ad title/description (on creation only) to **Google Translate** for language normalization. No search queries are sent to any translation service — search runs per-language on pre-translated vectors. This is a best-effort, non-identifying content transfer — no user PII (`telegram_id`, `username`, IP) is included in the translation request. The egress is documented in the privacy/consent material (see zone R3, decision F).
 - **Result sorting:** buyer chooses — by date (newest first) or by price.
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.
 - **City typos:** show "did you mean" suggestion via `difflib.get_close_matches` (no separate fuzzy lib needed for MVP).
@@ -161,6 +162,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Rollup command** (`rollup_daily_metrics`): management command that computes `DailyAdMetrics` for all published ads, updates trust scores, and records moderation events. Uses advisory lock for idempotency.
 
 ### Q. Enhanced moderation tooling
+
 - **AdModerationPriority model**: one-to-one with `Ad`; stores `base_score`, `priority_level` (`HIGH`/`MEDIUM`/`LOW`), risk `flags`, `confidence_score`, and `escalation_required` flag.
 - **PriorityCalculator service**: computes priority scores from content risk (banned words) and user history (repeat offender, trust level). Maps score to `AdPriorityLevel` enum.
 - **ModerationAnalytics service**: aggregates moderation statistics — pending queue size, moderator performance metrics, rejection reason breakdowns.

@@ -44,8 +44,8 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 
 - Python 3.14, Django 5.2 LTS (`>=5.2.16,<6.0`), PostgreSQL 18
 - django-mptt (categories), django-filter, django-tailwind + django-htmx (MPA), Pillow
-- aiogram 3.x (Telegram bot), deep-translator (Montenegrin→Russian query translation)
-- Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN, russian config)
+- aiogram 3.x (Telegram bot), deep-translator (Montenegrin→Russian at ad publication only; search is per-language FTS, no query-time translation)
+- Search: native PostgreSQL FTS (per-language `search_vector_ru/bs/en` TSVECTOR + GIN)
 - Background jobs: Django management commands + cron (Celery deferred)
 - Deployment: Docker (db + web[gunicorn sync WSGI] + bot + nginx)
 
@@ -67,7 +67,7 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 
 - **Moderation (A):** auto-check is the only gate before `PUBLISHED`; moderator = admin role. Failed ads purged ≤1 week.
 - **Contact (C):** no seller identity on site; "Contact" deep-link `t.me/<bot>?start=contact_<ad_id>`; rendered only if `PUBLISHED` + seller valid + consent not revoked.
-- **Categories (D):** closed admin mptt tree; category-name search REQUIRED (denormalized `category_name` in `search_vector`, weight 'C' + `difflib` fuzzy → `category_id`).
+- **Categories (D):** closed admin mptt tree; category-name search REQUIRED (denormalized `category_name` + per-language `search_vector_*` weight 'C' + `difflib` fuzzy → `category_id`). Search runs per-language FTS; no query-time translation.
 - **Photos (E):** 1–5 Telegram-compressed JPEG only; local `MEDIA_ROOT` via `FileSystemStorage`.
 - **Consent (F):** DECLINE (browse-only) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days).
 - **Language/search (G):** content stored Russian; Montenegrin query translated before FTS; exact city match + did-you-mean.
@@ -85,7 +85,7 @@ any → `DELETED`.
 
 ## Key tables
 
-`users`, `login_tokens`, `ads`, `categories`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
+`users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `ad_features`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`
@@ -98,8 +98,8 @@ UI/UX patterns are documented in [`ui-patterns.md`](ui-patterns.md):
 - **Card-Based Ad Display:** Image, title, price, location hierarchy for quick scanning
 - **Price Display:** Prominent `text-blue-600` styling
 - **Contact Seller Button:** Deep-link to Telegram bot, anonymity-preserving
-- **Image Gallery:** 1-5 Telegram photos in responsive grid
-- **Sticky Navigation Header:** Consistent header with shadow separation
+- **Image Gallery:** 1-5 Telegram photos in responsive grid with GLightbox v3.3.1 fullscreen overlay
+- **Shared Navigation Headers:** Two variants — catalog header (list/detail) and auth header (dashboards)
 - **Touch Target Guidelines:** 44px minimum for interactive elements
 - **Progressive Disclosure:** Truncated descriptions, empty states, HTMX pagination
 
@@ -108,7 +108,7 @@ UI/UX patterns are documented in [`ui-patterns.md`](ui-patterns.md):
 Search UI patterns documented in [`search-patterns.md`](search-patterns.md):
 
 - **Hero Search with Location:** Combined keyword + city selector on homepage
-- **Query Translation:** Montenegrin→Russian before PostgreSQL FTS
+- **Language-aware FTS Search:** Per-language search vectors; no query-time translation
 - **Did-You-Mean:** City typo suggestions via `difflib.get_close_matches`
 - **Sort Options:** Date (newest) or price (low/high)
 - **Empty States:** Friendly guidance when no results found
@@ -163,6 +163,7 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Photo Thumbnails** | Three-size thumbnail generation (small/medium/large) for ad images | `ThumbnailService`, `AdImage` thumbnail fields, media app |
 | **Search Autocomplete** | Hybrid autocomplete from user history, popular searches, and entity matching | `PopularSearch`, `SearchHistory`, `SavedSearch`, `AutocompleteView`, rate limiting |
 | **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
+| **Filter UI** | Sticky sidebar filters (desktop), slide-up drawer (mobile), removable filter chips, hierarchical category tree, closed-list city selector, and price range inputs with HTMX partial updates | [`filter-ui.md`](filter-ui.md), `CategoryFilterForm`, query params `category`/`city`/`price_min`/`price_max` |
 | **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
 | **Seed Data Module** | Development-only demo data generation with configurable CLI parameters | `apps.seed` app, `SeedService`, `UserGenerator`, `AdGenerator`, `ImageGenerator`, `AnalyticsGenerator`, `Seed` advisory lock (ID 110). See [`docs/seed-workflow.md`](../seed-workflow.md) for full workflow documentation. |

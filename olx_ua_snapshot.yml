@@ -1,0 +1,86 @@
+- generic [ref=e2]:
+  - generic:
+    - grid "Skip links":
+      - row "Перейти до основного вмісту":
+        - gridcell "Перейти до основного вмісту"
+      - row "Перейти до нижнього колонтитула":
+        - gridcell "Перейти до нижнього колонтитула"
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "OLX, головна сторінка" [ref=e5] [cursor=pointer]:
+        - /url: /uk/
+      - generic [ref=e10]:
+        - link "Чат" [ref=e11] [cursor=pointer]:
+          - /url: /uk/myaccount/answers/
+        - list [ref=e17]
+        - link "Виділені" [ref=e22] [cursor=pointer]:
+          - /url: /uk/favorites/search/
+        - generic [ref=e25]
+        - link "Ваш профіль" [ref=e29] [cursor=pointer]:
+          - /url: /uk/myaccount?backUrl=%2Fmyaccount
+        - link "Додати оголошення" [ref=e34] [cursor=pointer]:
+          - /url: /uk/adding
+  - generic [ref=e37]:
+    - generic: Реклама
+    - generic [ref=e38]:
+      - generic [ref=e44]:
+        - combobox "Що шукаєте?" [ref=e53]
+        - combobox "Уся Україна" [ref=e64]
+        - button "Пошук" [ref=e66] [cursor=pointer]
+      - generic [ref=e73]:
+        - heading "Розділи на сервісі OLX" [level=2] [ref=e74]
+        - generic [ref=e75]
+      - generic [ref=e119]:
+        - generic: Реклама
+        - generic [ref=e120]
+      - generic [ref=e522]:
+        - generic [ref=e523]
+        - link "Дізнатися більше" [ref=e526] [cursor=pointer]:
+          - /url: https://business.olx.ua/uk
+      - generic [ref=e528]:
+        - generic [ref=e531]: Усі онлайн-оголошення України на OLX - тут ви знайдете те, що шукали! Натиснувши на кнопку Подати оголошення, ви зможете розмістити оголошення на будь-яку тематику легко й швидко. За допомогою сервісу OLX ви зможете купити чи продати з рук у руки практично все, що завгодно.
+        - generic [ref=e533]
+      - generic [ref=e546]:
+        - generic [ref=e549]
+        - generic [ref=e569]
+  - generic [ref=e592]:
+    - generic [ref=e593]:
+      - list [ref=e594]:
+        - listitem [ref=e595]
+        - listitem [ref=e597]
+        - listitem [ref=e599]
+        - listitem [ref=e601]
+        - listitem [ref=e603]
+        - listitem [ref=e605]
+        - listitem [ref=e607]
+        - listitem [ref=e609]
+        - listitem [ref=e611]
+      - list [ref=e613]:
+        - listitem [ref=e614]
+        - listitem [ref=e616]
+        - listitem [ref=e618]
+        - listitem [ref=e620]
+        - listitem [ref=e622]
+        - listitem [ref=e624]
+        - listitem [ref=e626]
+        - listitem [ref=e628]
+        - listitem [ref=e630]
+      - generic [ref=e632]:
+        - list [ref=e633]
+        - generic [ref=e640]: Безкоштовний застосунок на твій телефон
+    - generic [ref=e642]:
+      - link "OLX.bg" [ref=e643] [cursor=pointer]:
+        - /url: https://olx.bg
+      - link "OLX.pl" [ref=e650] [cursor=pointer]:
+        - /url: https://olx.pl
+      - link "OLX.ro" [ref=e657] [cursor=pointer]:
+        - /url: https://olx.ro
+      - link "OLX.pt" [ref=e664] [cursor=pointer]:
+        - /url: https://olx.pt
+  - generic [ref=e673]:
+    - img "Cookie Layer" [ref=e675]
+    - paragraph [ref=e677]:
+      - text: Цей сайт використовує cookies. Ви можете змінити налаштування cookies у своєму браузері.
+      - link "Дізнатись більше." [ref=e678] [cursor=pointer]:
+        - /url: https://help.olx.ua/olxuahelp/s/article/політика-використання-cookies-V28
+    - button "Закрити" [ref=e680] [cursor=pointer]

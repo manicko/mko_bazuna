@@ -288,7 +288,7 @@ Status indicators and category tags.
 | Shape | `rounded-full` |
 | Background | `bg-blue-100` |
 | Text | `text-blue-800` |
-| Pages | `filter-ui.md` (planned) |
+| Pages | `filter-ui.md` |
 
 ---
 
@@ -408,68 +408,153 @@ Primary listing card for search results.
 
 ### Ad Card (Detail View)
 
-Full-width single ad display.
+Full-width single ad display. Photo gallery uses **GLightbox 3.3.1** (CDN)
+for a lightbox gallery experience; individual images are not linked to separate
+pages. Content is localized via `get_title`/`get_description` template filters
+keyed on `LANGUAGE_CODE`.
 
 ```html
 <article class="bg-white rounded-lg shadow overflow-hidden">
-    <!-- Image Gallery -->
-    <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
-        {% for image in ad.images.all %}
-            <img 
-                src="{{ image.image_url }}" 
-                alt="Photo {{ forloop.counter }} for {{ ad.title }}"
-                class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
-            >
-        {% endfor %}
-    </div>
-    
+    <!-- Photo gallery (GLightbox) -->
+    {% if ad.images.all %}
+        <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
+            {% for image in ad.images.all %}
+                <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
+                   data-description="{{ image.alt_text|default:"" }}">
+                    <img src="{{ image.thumbnail_large_url|default:image.image_url }}"
+                         alt="Photo {{ forloop.counter }} for {{ ad|get_title:LANGUAGE_CODE }}"
+                         class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
+                         loading="lazy" width="1280" height="960">
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <!-- Content -->
     <div class="p-6">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">{{ ad.title }}</h1>
-        
+        <div class="flex items-start justify-between gap-4">
+            <h1 class="text-3xl font-bold mb-4">
+                {{ ad|get_title:LANGUAGE_CODE }}
+                {% render_trust_badge ad.user %}
+            </h1>
+            {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
+        </div>
+
         {% if ad.price %}
             <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad.price }} BAM</p>
         {% endif %}
-        
-        <div class="prose max-w-none mb-6">
-            <p class="text-gray-700 whitespace-pre-wrap">{{ ad.description }}</p>
+
+        <div class="mb-6">
+            <p class="text-gray-700 whitespace-pre-wrap">{{ ad|get_description:LANGUAGE_CODE }}</p>
         </div>
-        
+
         <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
-            <div><span class="font-medium">Location:</span> {{ ad.city.get_name|default:ad.city.name }}</div>
-            <div><span class="font-medium">Category:</span> {{ ad.category.get_name|default:ad.category.name }}</div>
+            <div><span class="font-medium">Location:</span> {{ ad.city.get_name }}</div>
+            <div><span class="font-medium">Category:</span> {{ ad.category.get_name }}</div>
             <div><time datetime="{{ ad.published_at|date:'Y-m-d' }}">Published: {{ ad.published_at|date:'M d, Y' }}</time></div>
         </div>
     </div>
-    
+
     <!-- Contact Seller -->
     <div class="p-6 border-t bg-gray-50">
         {% if ad|can_contact %}
-            <a href="https://t.me/{{ settings.BOT_USERNAME }}?start=contact_{{ ad.id }}" class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
+               class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
                 Contact Seller
             </a>
-            <p class="text-xs text-gray-500 mt-2">Message sent through Telegram bot</p>
         {% else %}
-            <button type="button" disabled class="px-6 py-3 bg-gray-300 text-white rounded-lg font-medium cursor-not-allowed">
+            <button type="button" disabled
+                    class="px-6 py-3 bg-gray-300 text-white rounded-lg font-medium cursor-not-allowed">
                 Contact Seller
             </button>
             <p class="text-xs text-gray-500 mt-2">Seller unavailable for contact</p>
         {% endif %}
     </div>
 </article>
+
+<!-- GLightbox init -->
+<script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        GLightbox({
+            selector: '.glightbox',
+            touchNavigation: true,
+            loop: true,
+            zoomable: true,
+            closeOnOutsideClick: true,
+        });
+    });
+</script>
 ```
 
 | Property | Value |
 |----------|-------|
-| Padding | `p-6` |
-| Image | 1-2 column grid responsive |
+| Gallery | GLightbox 3.3.1 (CDN) |
+| Gallery ID | `ad-gallery` (single gallery per ad) |
+| Thumbnail | `image.thumbnail_large_url` (fallback: `image.image_url`) |
+| Lazy load | `loading="lazy"` on all images |
+| Title | `ad|get_title:LANGUAGE_CODE` |
+| Description | `ad|get_description:LANGUAGE_CODE` |
+| Contact button | `bot_username` context var (never `settings.BOT_USERNAME`) |
 | Pages | `ads/detail.html` |
 
-### Header Navigation
+### Shared Navigation Headers
 
-Site-wide, auth-aware top navigation with consistent branding. Rendered on all pages via the shared
-component `{% include "components/header.html" %}`
-([`components/header.html`](../../src/backend/templates/components/header.html)).
+Two header variants share a global context processor (`apps.core.context_processors.header_context`)
+that injects `bot_username` and `root_categories`. Both are rendered as Django
+include fragments.
+
+| Header | Template | Used on |
+|--------|----------|---------|
+| **Catalog header** | `components/header_catalog.html` | `ads/list.html`, `ads/detail.html` |
+| **Auth header** | `components/header.html` | `ads/dashboard.html`, `ads/edit.html`, `cabinet/*`, `analytics/*`, `users/login_issue.html` |
+
+#### Catalog Header (`header_catalog.html`)
+
+Avito-style header with place-an-ad CTA, categories accordion dropdown, HTMX
+autocomplete search, and breadcrumbs. Full structure and behavior documented
+in [UI Patterns — Shared Navigation Headers](../01-spec/ui-patterns.md#shared-navigation-headers).
+
+```html
+<header class="bg-white shadow-sm border-b">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <!-- mobile hamburger + brand -->
+        <div class="flex items-center gap-2">
+            <button type="button" class="lg:hidden" data-mobile-categories-toggle>…</button>
+            <a href="/">Mko Bazuna</a>
+        </div>
+        <!-- place-an-ad CTA + language -->
+        <div class="flex items-center gap-3">
+            <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
+               class="px-4 py-2 bg-blue-600 text-white rounded-lg" data-place-ad>
+                + Подать объявление
+            </a>
+            {% include "components/language_switcher.html" %}
+        </div>
+    </div>
+    <!-- search + categories dropdown -->
+    <form method="get" action="{% url 'search:search' %}" class="relative flex-1" data-search-form>
+        <input type="search" name="q"
+               hx-get="{% url 'search:autocomplete' %}"
+               hx-trigger="input delay:300ms"
+               hx-target="#autocomplete-dropdown" hx-swap="none" autocomplete="off">
+        <ul id="autocomplete-dropdown" class="absolute z-20 hidden"></ul>
+    </form>
+    {% include "components/breadcrumb.html" with breadcrumb_category=current_cat %}
+</header>
+```
+
+| Property | Value |
+|----------|-------|
+| Height (mobile) | `py-3` (~52px top row) |
+| Search | HTMX autocomplete, 300ms delay |
+| Categories | Desktop accordion + mobile off-canvas |
+| Breadcrumbs | `components/breadcrumb.html` |
+| Deep-link | `bot_username` context var |
+
+#### Auth Header (`header.html`)
+
+Simpler auth-aware header for dashboard/cabinet pages. No search, categories, or breadcrumbs.
 
 ```html
 <header class="bg-white shadow-sm border-b">
@@ -480,6 +565,7 @@ component `{% include "components/header.html" %}`
         {% include "components/language_switcher.html" %}
         <nav class="flex gap-4 items-center">
             {% if request.user.is_authenticated %}
+                <a href="{% url 'cabinet:home' %}" class="text-sm text-gray-700 hover:text-blue-600">Cabinet</a>
                 <a href="{% url 'ads:dashboard' %}" class="text-sm text-gray-700 hover:text-blue-600">Dashboard</a>
                 {% if request.user.is_staff %}
                     <a href="/admin/" class="text-sm text-gray-700 hover:text-blue-600">Admin</a>
@@ -501,12 +587,9 @@ component `{% include "components/header.html" %}`
 | Background | `bg-white` |
 | Height | ~64px (`py-4`) |
 | Shadow | `shadow-sm border-b` |
-| Auth nav | Login (anon) / Dashboard + POST Logout (authed), Admin (staff only) |
+| Auth nav | Login (anon) / Cabinet + Dashboard + POST Logout (authed), Admin (staff only) |
 | Logout | POST + CSRF to `consent:logout` (no GET logout) |
-| Pages | All public/seller templates |
-
-The consent banner is **not** part of this component; it renders separately at the page bottom
-behind its per-page guard.
+| Pages | Dashboard, cabinet, edit, login
 
 ### Pagination Controls
 
@@ -670,10 +753,12 @@ document.addEventListener('DOMContentLoaded', function() {
 | Badge | Dashboard, Admin | `dashboard.html`, `review.html` | ✅ Implemented |
 | Ad Card (List) | List, Home | `ads/partials/ad_list.html` | ✅ Implemented |
 | Ad Card (Detail) | Detail | `ads/detail.html` | ✅ Implemented |
-| Search Bar | List, Home | `ads/list.html` | ✅ Implemented |
-| Header | All | All templates | ✅ Implemented |
+| Search Bar (HTMX) | Catalog | `ads/list.html` | ✅ Implemented |
+| Catalog Header | List, Detail | `ads/list.html`, `ads/detail.html` | ✅ Implemented |
+| Auth Header | Dashboards | `ads/dashboard.html`, `cabinet/*`, `analytics/*` | ✅ Implemented |
 | Pagination | List | `ads/partials/ad_list.html` | ✅ Implemented |
 | Consent Banner | All | `components/consent_banner.html` | ✅ Implemented |
 | Language Switcher | All | `components/language_switcher.html` | ✅ Implemented |
-| Filter Sidebar | Planned | `filter-ui.md` | 📋 Documented |
-| Mobile Drawer | Planned | `filter-ui.md` | 📋 Documented |
+| Filter Sidebar | Filter UI | `filter-ui.md` | ✅ Implemented |
+| Mobile Drawer | Filter UI | `filter-ui.md` | ✅ Implemented |
+| Filter Chips | Filter UI | `filter-ui.md` | ✅ Implemented |

@@ -55,7 +55,7 @@ The homepage search combines keyword input with city selection for local discove
 | Placeholder | "Search ads..." or localized equivalent |
 | Minimum width | 27 characters (recommended) |
 | Submission | Form submit or HTMX `hx-get` |
-| Autocomplete | Not in phase 1; future enhancement |
+| Autocomplete | HTMX-driven, `delay:300ms`, 10-item cap, 429 on rate limit |
 
 Related user stories: US-B2, US-B3, US-B7
 
@@ -174,9 +174,80 @@ When no results match, show clear guidance to help users refine their search.
 </div>
 ```
 
-Related user stories: US-B2
+Related user stories: US-B2, US-B3, US-B6
 
-## Category Name Search
+## Search Autocomplete
+
+## Search Autocomplete
+
+HTMX-driven autocomplete dropdown wired into the catalog header search bar
+(`components/header_catalog.html`). Typing triggers `GET search:autocomplete`
+with a 300ms delay; the JSON response is rendered by inline vanilla JS.
+
+### Endpoint
+
+| Property | Value |
+|----------|-------|
+| URL name | `search:autocomplete` |
+| Method | `GET` |
+| Query param | `q` (sanitized: stripped, non-empty, max 255 chars) |
+| Rate limit | 30 req/min per IP (cache-based); HTTP 429 on overflow |
+| Response | `application/json` |
+
+### Response Format
+
+```json
+{
+  "query": "tele",
+  "suggestions": [
+    {
+      "text": "Телефоны",
+      "type": "category",
+      "source": "category",
+      "slug": "telefony",
+      "category_path": "Товары > Электроника > Телефоны"
+    },
+    {
+      "text": "Сараево",
+      "type": "city",
+      "source": "city",
+      "slug": "saraevo"
+    },
+    {
+      "text": "терминал",
+      "source": "user_history",
+      "type": "popular_search"
+    }
+  ]
+}
+```
+
+### Suggestion Sources
+
+Suggestions are merged in priority order (user history first), deduplicated by
+`text`, and capped at 10 total:
+
+| Source | `source` value | `type` value | Fields | Description |
+|--------|----------------|--------------|--------|-------------|
+| User history | `user_history` | `user_history` | `text`, `source`, `type` | Authenticated user's recent queries; session-based for anonymous |
+| Categories | `category` | `category` | `text`, `source`, `type`, `slug`, `category_path` | Active categories with name prefix match |
+| Cities | `city` | `city` | `text`, `source`, `type`, `slug` | City prefix match |
+| Popular searches | `popular_search` | `popular_search` | `text`, `source`, `type` | Frequently searched terms |
+
+### Frontend Behavior
+
+The inline JS in `header_catalog.html` renders suggestions grouped by section
+(Cities, Categories, Popular, History), each with appropriate SVG icons. Clicking
+a suggestion:
+
+- **City** (`type=city`): POSTs to `search:preferred_city` to persist the city,
+  then navigates to `/city/<slug>/`.
+- **Category** (`type=category`): navigates to `/category/<slug>/`.
+- **Text** (popular/history): populates the search input and submits the form
+  to `search:search`.
+
+Rate-limit responses (HTTP 429) hide the dropdown. Arrow-key navigation and
+Escape-to-close are handled client-side.
 
 Category names are searchable via per-language fields in the search vectors.
 

@@ -124,19 +124,31 @@ Customized for marketplace browsing patterns.
 
 ## Sticky / Fixed Positioning
 
-### Header Navigation
+### Shared Navigation Headers
+
+Two header variants are used across the site. See
+[Components — Shared Navigation Headers](components.md#shared-navigation-headers)
+for full templates.
 
 ```html
+<!-- Catalog header (list, detail) -->
 <header class="bg-white shadow-sm border-b">
-    <div class="container mx-auto px-4 py-4">
-        <!-- Header content -->
-    </div>
+    <div class="container mx-auto px-4 py-3"> … </div>
+</header>
+
+<!-- Auth header (dashboard, cabinet) -->
+<header class="bg-white shadow-sm border-b">
+    <div class="container mx-auto px-4 py-4"> … </div>
 </header>
 ```
 
-- **Position:** Static (no explicit sticky)
-- **Z-index:** None (flows naturally)
-- **Separation:** `shadow-sm border-b`
+| Property | Catalog Header | Auth Header |
+|----------|---------------|-------------|
+| Position | Static (no explicit sticky) | Static (no explicit sticky) |
+| Z-index | None (flows naturally) | None (flows naturally) |
+| Separation | `shadow-sm border-b` | `shadow-sm border-b` |
+| Padding | `py-3` (~44px) | `py-4` (~64px) |
+| Content | Brand + categories + search + breadcrumbs | Brand + auth nav only |
 
 ### Mobile Filter Button
 
@@ -176,7 +188,7 @@ Customized for marketplace browsing patterns.
 ```
 Page (bg-gray-50)
 └── Container (px-4)
-    └── Header (py-4 = 32px height)
+    └── Header (catalog: py-3 ~44px; auth: py-4 ~64px)
     └── Main Content (py-6 = 48px top/bottom)
         └── Section (mb-8 = 32px between sections)
 ```

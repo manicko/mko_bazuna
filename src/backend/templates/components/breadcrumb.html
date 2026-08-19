@@ -1,11 +1,11 @@
-{# Breadcrumb trail for the shared catalog header.
+{% comment %} Breadcrumb trail for the shared catalog header.
    Renders the category ancestor chain (root -> leaf) with the last segment as
    plain text, using "›" separators. On search queries the query text is shown
    separately below the trail. On the home page (no category, no query) nothing
    is rendered.
 
    Expects ``breadcrumb_category`` (a Category or None) and ``query`` in the
-   include context. #}
+   include context. {% endcomment %}
 <nav aria-label="Breadcrumb" class="mt-3 flex flex-wrap items-center text-sm text-gray-500">
     {% if breadcrumb_category %}
         <a href="/" class="hover:text-blue-600">Главная</a>

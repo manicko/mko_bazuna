@@ -126,7 +126,7 @@ Button renders only when ALL conditions are met:
 ```html
 <div class="p-6 border-t bg-gray-50">
     {% if ad|can_contact %}
-        <a href="https://t.me/{{ settings.BOT_USERNAME }}?start=contact_{{ ad.id }}"
+        <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
            class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
             Contact Seller
         </a>
@@ -205,12 +205,111 @@ This supersedes the earlier phase-1 statement of "no lightbox/modal; static grid
 
 Related user stories: US-S2
 
-## Sticky Navigation Header
+## Shared Navigation Headers
 
-A shared, auth-aware top navigation. Rendered on all public and seller pages via the re-usable
-component `{% include "components/header.html" %}` ([`components/header.html`](../../src/backend/templates/components/header.html)).
+The site uses **two header variants** rather than a single monolithic header. Both
+are server-rendered Django include fragments and share a global context processor
+(`apps.core.context_processors.header_context`) that injects `bot_username`
+(the Telegram deep-link target) and `root_categories` (ordered top-level
+`Category` nodes for the "All Categories" dropdown).
 
-### Structure
+| Header | Template | Used on |
+|--------|----------|---------|
+| **Catalog header** | `components/header_catalog.html` | `ads/list.html`, `ads/detail.html` |
+| **Auth header** | `components/header.html` | `ads/dashboard.html`, `ads/edit.html`, `cabinet/*`, `analytics/*`, `users/login_issue.html` |
+
+### Catalog Header (`header_catalog.html`)
+
+An Avito-style header hosting the place-an-ad CTA, an "All Categories"
+accordion dropdown, a search bar with a grouped HTMX autocomplete, and
+breadcrumbs. HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
+`detail.html` (the autocomplete relies on `htmx:afterRequest` events).
+
+```html
+<header class="bg-white shadow-sm border-b">
+    <div class="container mx-auto px-4 py-3">
+        <!-- Top row: mobile hamburger + brand | place-an-ad + language -->
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <button type="button" class="lg:hidden p-2 -ml-2"
+                        data-mobile-categories-toggle aria-label="Categories">…</button>
+                <h1 class="text-xl font-bold text-gray-800">
+                    <a href="/">Mko Bazuna</a>
+                </h1>
+            </div>
+            <div class="flex items-center gap-3">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'cabinet:home' %}" class="text-sm">Cabinet</a>
+                {% endif %}
+                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
+                   class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
+                   data-place-ad>+ Подать объявление</a>
+                {% include "components/language_switcher.html" %}
+            </div>
+        </div>
+
+        <!-- Search row: "All Categories" dropdown + HTMX autocomplete search -->
+        <div class="mt-3">
+            <div class="flex gap-2 items-stretch">
+                <div class="relative hidden md:block" data-categories-trigger>
+                    <button type="button" data-categories-toggle>…</button>
+                    <div data-categories-panel class="absolute z-[90] hidden">
+                        {% for cat in root_categories %}
+                            <li data-category-slug="{{ cat.slug }}">
+                                <a href="{% url 'ads:listings_category' cat.slug %}"
+                                   data-category-link="{{ cat.slug }}">{{ cat.get_name }}</a>
+                                {% if cat.get_children_count %}
+                                    <button data-category-expand="{{ cat.slug }}">…</button>
+                                    <div data-category-submenu="{{ cat.slug }}" class="hidden"></div>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </div>
+                </div>
+                <form method="get" action="{% url 'search:search' %}" class="relative flex-1"
+                      data-search-form>
+                    <input type="search" name="q" value="{{ query|default:'' }}"
+                           hx-get="{% url 'search:autocomplete' %}"
+                           hx-trigger="input delay:300ms"
+                           hx-target="#autocomplete-dropdown"
+                           hx-swap="none" autocomplete="off">
+                    <ul id="autocomplete-dropdown"
+                        class="absolute z-20 w-full hidden">
+                    </ul>
+                </form>
+            </div>
+        </div>
+
+        <!-- Breadcrumbs -->
+        {% include "components/breadcrumb.html" with breadcrumb_category=current_cat %}
+    </div>
+</header>
+```
+
+### Catalog Header — Component behavior
+
+- **Place-an-ad CTA:** Opens the Telegram bot deep-link
+  `https://t.me/{{ bot_username }}?start=create_ad` in a new tab. Uses the
+  `bot_username` context variable (never references `settings.BOT_USERNAME`
+  directly).
+- **"All Categories" dropdown (desktop):** Lazy-loading accordion. The panel
+  is rendered server-side with top-level `root_categories`; submenus are
+  fetched via `GET /categories/<slug>/submenu/` on first expand and injected
+  via HTMX swap.
+- **Mobile off-canvas:** Same category tree in a slide-over panel toggled by
+  `data-mobile-categories-toggle`; closes on backdrop click or Escape.
+- **Search bar:** HTMX-powered autocomplete — `input delay:300ms` triggers
+  `GET search:autocomplete`; the response JSON (`{ query, suggestions: [] }`)
+  is rendered into `#autocomplete-dropdown` by inline vanilla JS. Suggestion
+  items carry `data-suggestion-type` / `data-suggestion-text` /
+  `data-suggestion-slug` attributes for click-to-navigate behavior.
+- **Breadcrumbs:** `components/breadcrumb.html`, included with
+  `breadcrumb_category` (listings/search) or `ad.category` (detail).
+
+### Auth Header (`header.html`)
+
+A simpler auth-aware header for dashboard and cabinet pages. Does not
+include search, categories, or breadcrumbs.
 
 ```html
 <header class="bg-white shadow-sm border-b">
@@ -221,6 +320,7 @@ component `{% include "components/header.html" %}` ([`components/header.html`](.
         {% include "components/language_switcher.html" %}
         <nav class="flex gap-4 items-center">
             {% if request.user.is_authenticated %}
+                <a href="{% url 'cabinet:home' %}">Cabinet</a>
                 <a href="{% url 'ads:dashboard' %}">Dashboard</a>
                 {% if request.user.is_staff %}
                     <a href="/admin/">Admin</a>
@@ -237,13 +337,14 @@ component `{% include "components/header.html" %}` ([`components/header.html`](.
 </header>
 ```
 
-### Component behavior
+### Auth Header — Component behavior
 
 - **Branding:** Logo links to the home listings page (`ads:listings`).
 - **Language switcher:** Always rendered via `components/language_switcher.html`.
 - **Anonymous visitors:** See a "Login" link to `consent:login_issue`.
-- **Authenticated sellers:** See "Dashboard" (seller cabinet, `ads:dashboard`) and a **POST + CSRF**
-  "Logout" form posting to `consent:logout` (GET logout is not allowed — POST only, per CR4).
+- **Authenticated sellers:** See "Cabinet" (`cabinet:home`), "Dashboard"
+  (`ads:dashboard`), and a **POST + CSRF** "Logout" form posting to
+  `consent:logout` (GET logout is not allowed — POST only, per CR4).
 - **Staff users:** Additionally see an "Admin" link to `/admin/` (CR7).
 
 ### Classes
@@ -251,12 +352,11 @@ component `{% include "components/header.html" %}` ([`components/header.html`](.
 - `bg-white`: White background
 - `shadow-sm`: Subtle shadow for depth
 - `border-b`: Bottom border for separation
-- `container mx-auto px-4 py-4`: Constrained width with horizontal padding
+- `container mx-auto px-4 py-3`: Constrained width with horizontal padding (catalog header uses `py-3`; auth header uses `py-4`)
 
-Header height on mobile: `py-4` (32px padding top/bottom). No explicit sticky positioning currently, but shadow and border provide visual anchoring.
-
-The consent banner is **not** part of the header — it renders at the bottom of each page behind its
-per-page guard (CR9). Page-specific titles live in each page's `<main>`.
+The consent banner is **not** part either header — it renders at the bottom of
+each page behind its per-page guard (CR9). Page-specific titles live in each
+page's `<main>`.
 
 Related user stories: US-B8, US-S8, US-S1
 

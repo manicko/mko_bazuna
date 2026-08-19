@@ -27,7 +27,7 @@ django-mptt is not yet validated against Django 6.0.
 - Django 5.2 LTS + PostgreSQL 18
 - Admin: Django Admin
 - Filtration: django-filter, django-mptt
-- Search: PostgreSQL native FTS (`search_vector` TSVECTOR + GIN, russian config)
+- Search: PostgreSQL native FTS (per-language `search_vector_ru/bs/en` TSVECTOR + GIN, ru/bs/en configs)
 - UI: Django Templates + HTMX + Alpine.js MPA (phase 1)
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
 - Background jobs: Django management commands + systemd timer / cron (Celery)
@@ -47,7 +47,7 @@ django-tailwind>=4.4.0            # Tailwind standalone CLI (NO Node.js). daisyU
 django-htmx>=1.19.0               # HTMX for the MPA.
 pillow>=10.4.0                    # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1.
 aiogram>=3.15.0                   # Bot API bot (login/contact/publish). NO built-in PG FSM storage — draft Ad stored via ORM.
-deep-translator>=1.11.0           # Montenegrin→Russian query translation. Fragile backend → hard timeout + fallback wrapper.
+deep-translator>=1.11.0           # Ad title/description translation at publication time (deep-translator). NOT used for search queries (search is per-language FTS, no query-time translation).
 # Search: native PostgreSQL FTS only (no haystack/Whoosh).
 # API (DRF): DEFERRED to post-MVP.
 # Tasks (celery/redis): DEFERRED to post-MVP (management commands + cron instead).

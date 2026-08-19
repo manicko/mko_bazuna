@@ -1,7 +1,7 @@
-{# Category submenu partial for the header "All Categories" dropdown.
+{% comment %} Category submenu partial for the header "All Categories" dropdown.
    Renders a category's active children as expandable items; each child can
    lazy-load its own submenu via HTMX. Wired client-side by
-   components/header_catalog.html. #}
+   components/header_catalog.html. {% endcomment %}
 {% load i18n %}
 <ul class="py-1" role="menu">
     {% for child in children %}

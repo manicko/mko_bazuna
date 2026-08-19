@@ -54,11 +54,20 @@ src/
 │   │   │   ├── models.py
 │   │   │   └── urls.py
 │   │   ├── categories/            # mptt tree (django-mptt>=0.18.0, single source of truth)
+│   │   │   ├── catalog/              # categories.yaml + builder.py (plan16)
 │   │   │   ├── migrations/
 │   │   │   ├── admin.py
 │   │   │   ├── apps.py
 │   │   │   ├── models.py
+│   │   │   ├── services/             # lookup_resolution (CategoryLookupResolver)
 │   │   │   └── urls.py
+│   │   ├── lookups/               # universal lookup system (LookupGroup, LookupItem) — plan16
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # cache_service (LookupCacheService)
+│   │   │   ├── enums.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   └── models.py
 │   │   ├── locations/             # cities / regions
 │   │   │   ├── migrations/
 │   │   │   ├── admin.py
@@ -84,15 +93,16 @@ src/
 │   │   │   ├── management/commands/  # seed.py
 │   │   │   ├── services/             # SeedService orchestrator
 │   │   │   └── tests/                # test_seed.py
-│   │   ├── search/                # PostgreSQL FTS (search_vector, GIN, russian) — no haystack/whoosh
+│   │   ├── search/                # PostgreSQL FTS (per-language search_vector_ru/bs/en, GIN, ru/bs/en configs) — no haystack/whoosh
 │   │   │   ├── migrations/
-│   │   │   ├── services/             # alert_query, entity_suggestions, popular_search, query_translator, rate_limit, search_history
+│   │   │   ├── services/             # alert_query, entity_suggestions, popular_search, rate_limit, search_history
 │   │   │   ├── tests/
 │   │   │   ├── views/                # autocomplete, search
 │   │   │   ├── apps.py
 │   │   │   ├── models.py
 │   │   │   ├── tests.py
 │   │   │   └── urls.py
+│   │   ├── cabinet/               # user cabinet hub (favorites, saved searches, history, settings)
 │   │   ├── analytics/             # analytics events, daily rollups, trust & moderation analytics
 │   │   │   ├── management/commands/  # rollup_daily_metrics, show_metrics
 │   │   │   ├── migrations/
@@ -101,11 +111,11 @@ src/
 │   │   │   ├── admin.py
 │   │   │   ├── apps.py
 │   │   │   └── models.py
-│   │   ├── media/                 # thumbnail generation, image processing (Pillow)
-│   │   │   ├── management/commands/
-│   │   │   ├── services/             # thumbnails
-│   │   │   ├── tests/
-│   │   │   └── apps.py
+  │   │   ├── media/                 # thumbnail generation, image processing (Pillow)
+  │   │   │   ├── management/commands/
+  │   │   │   ├── services/             # thumbnails, hash_service (FileHashService — plan16)
+  │   │   │   ├── tests/
+  │   │   │   └── apps.py
 │   │   ├── trust/                 # trust scoring, seller verification, trust badges
 │   │   │   ├── migrations/
 │   │   │   ├── services/             # trust_calculator

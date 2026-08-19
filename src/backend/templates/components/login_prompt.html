@@ -1,6 +1,6 @@
-{# Guest login-gate fragment shown when an anonymous user taps a favorite
+{% comment %} Guest login-gate fragment shown when an anonymous user taps a favorite
    heart. Returned in place of the heart component (NO 302) so htmx swaps it
-   in. Links to the Telegram login flow. #}
+   in. Links to the Telegram login flow. {% endcomment %}
 {% load i18n %}
 <a href="{% url 'consent:login_issue' %}"
    class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"

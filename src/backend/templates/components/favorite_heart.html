@@ -1,6 +1,6 @@
-{# HTMX heart toggle for favorite an ad. Rendered on listing cards and the
+{% comment %} HTMX heart toggle for favorite an ad. Rendered on listing cards and the
    detail page. POSTs to ads:favorite_toggle and swaps itself via outerHTML;
-   anonymous taps swap in the login_prompt fragment instead (no 302). #}
+   anonymous taps swap in the login_prompt fragment instead (no 302). {% endcomment %}
 {% load i18n %}
 <form class="inline-block"
       hx-post="{% url 'ads:favorite_toggle' ad.id %}"

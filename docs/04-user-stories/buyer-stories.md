@@ -62,7 +62,14 @@ shell only; ad content is stored in Russian and translated on display. See decis
 As the buyer types in the search bar, a dropdown shows hybrid suggestions from three sources: the buyer's own search history, popular searches across all users, and matching category/city names. Suggestions are rate-limited (30 requests per minute per IP). Results are deduplicated and capped at 10. See decision O.
 
 ### US-B11 — Saved search alerts
-Buyer saves a search query with optional city, category, and price filters. When a new matching ad is published, the buyer receives a notification. Notifications are deduplicated so the same ad does not trigger multiple alerts for the same saved search. See decision O.
+Buyer saves a search query with optional city, category, and price filters. When a new matching ad
+is published, the buyer receives a notification delivered via Telegram (near-real-time at publish
+time, gated by `IMMEDIATE_ALERTS_ENABLED`; a daily backfill command runs regardless). Each notification
+includes the ad title, city, price, an absolute ad link, and an inline `[Turn off alerts]` button
+(callback), with a `/start` deep-link fallback for unsubscribe. Notifications are deduplicated per
+search-ad pair (`uq_saved_search_ad`) so the same ad does not trigger multiple alerts for the same
+saved search. Buyers may also manage subscriptions from the User Cabinet under
+`Saved searches`. See decision O and [search-patterns.md](../01-spec/search-patterns.md).
 
 ### US-B12 — Search history
 The buyer's recent search queries are remembered and surfaced as autocomplete suggestions on return visits. History is deduplicated and capped at 50 entries per user. Anonymous users also receive search history suggestions (session-scoped). See decision O.

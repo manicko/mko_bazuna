@@ -1,35 +1,17 @@
----
-id: decision-018-preferred-city
-domain: decisions
-tags:
-  - catalog-ui
-  - search
-  - user-profile
-  - mvp
-related:
-  - 14_catalog-ui-avito_spec
-  - 15_catalog-ui-avito_plan
-  - db-schema
-  - architecture-structure
----
 
-## Decision 018 — Preferred-city persistence strategy (plan 15, T-100)
-
-**Status:** Approved
-**Date:** 2026-08-18
-**Scope:** Resolves the storage strategy for a buyer's `preferred_city` (search/autocomplete
-feature). Gates plan-15 task T-700.
 
 ## Context
 
-The catalog header (spec_014) lets a buyer click a **city** suggestion, which should
-remember the choice and filter results. Spec §8.3 originally stated the registered-user path
-uses `UserProfile.preferred_city`, but **no `UserProfile` model exists** in `apps/users`
-(the app has a single custom `User` model and `LoginToken`). A repository-wide grep confirms
-zero consumers reference a non-existent `UserProfile`.
+Нам нужно сделать полноценное исследование, как работает выбор города на платформах вида OLX и Avito 
+1) - на что влияет и как используется.
+Я бы хотел иметь возможность иметь свой заданный город в профиле с одной стороны, с другой - иметь гибкость при поиске объявлений в других городах. 
+2) Как и где пользователь может выбрать город и на что - это влияет (расположение кнопок на страницах, нам тоже нужно добавить такие же кнопки)
 
-Three storage options were evaluated against the project rules (#5 avoid overengineering, #7
-follow existing patterns, #13 migrations for schema changes, strict separation of concerns):
+Ниже рассуждения, которые нужно проверить и доработать по результатам исследования. 
+Пока это лишь наброски, а не руководство к действию
+
+
+
 
 - **(a) New `UserProfile` model** with `preferred_city = FK("locations.City")` — adds a whole
   profile subsystem (model, migration, OneToOne wiring, auto-creation signal) for a single
@@ -41,30 +23,367 @@ follow existing patterns, #13 migrations for schema changes, strict separation o
   suggestion click; works for both guests and registered buyers on the public pages that
   render the shared header. No schema, no migration, no server write path.
 
-## Decision
 
-**Option (c) — cookie-only `preferred_city` for this plan.**
+После сравнения с OLX я считаю, что для нашего проекта **город лучше сделать свойством пользователя**, а не только cookie.
 
-The Product Owner explicitly capped MVP at "preferred-city storage without complex
-personalization" (spec §2 Out of Scope, PO Q1). The header is rendered on public
-catalog/search/detail pages for all visitors; being authenticated does not change the header
-behavior, so a cookie is a sufficient and uniform persistence mechanism for both guests and
-registered buyers. This keeps the change purely additive (no new table/column, no migration,
-no server persistence endpoint with schema implications — consistent with the plan's
-low-risk, additive posture).
+Но при этом **не надо ради этого создавать `UserProfile`**.
 
-Registered-user profile persistence (FK on a future `UserProfile` / `User`) is **deferred** to
-a dedicated task that will be designed together with the buyer-profile subsystem, when there
-are real consumers.
+### Что видно по OLX
 
-## Consequences
+OLX явно рассматривает локацию как полноценный параметр поиска: она является одним из основных фильтров, а при публикации пользователь отдельно выбирает локацию объявления. ([PIK blog][1])
 
-- City-suggestion click sets the `preferred_city` cookie client-side and filters results via
-  the existing URL-based city filter.
-- No `apps/users` schema change; `makemigrations --check` remains clean.
-- T-700 scope is reduced to the cookie write + the header's city-click filter navigation; the
-  profile-storage dimension is out of scope for this plan.
+При этом OLX использует cookies как часть пользовательского опыта, то есть сама идея запоминать настройки на уровне браузера нормальна. ([PIK blog][2])
 
-## Verdict
+Но здесь важно разделить две вещи:
 
-**Go with changes** — T-700 proceeds with the cookie-only implementation.
+**местоположение объявления** и **предпочтительный город покупателя**.
+
+У нас:
+
+```text
+Ad.city
+```
+
+— обязательное свойство самого объявления.
+
+А:
+
+```text
+User.preferred_city
+```
+
+— предпочтение пользователя для поиска.
+
+Это разные сущности.
+
+---
+
+# Я бы сделал гибрид
+
+Не:
+
+```text
+только cookie
+```
+
+и не:
+
+```text
+только User.preferred_city
+```
+
+а:
+
+```text
+                    preferred_city
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+          авторизован             гость
+              │                     │
+        User.preferred_city       Cookie
+```
+
+То есть:
+
+### Авторизованный пользователь
+
+```text
+User
+ └── preferred_city → City
+```
+
+### Гость
+
+```text
+Cookie:
+preferred_city=podgorica
+```
+
+Это очень простая схема.
+
+---
+
+# Почему я бы всё-таки добавил поле в User
+
+Ты правильно заметил проблему с cookie.
+
+Представим:
+
+### Пользователь дома
+
+```text
+Подгорица
+```
+
+Выбрал её → cookie на 30 дней.
+
+Через неделю пришел с телефона:
+
+```text
+Budva
+```
+
+Cookie там нет.
+
+Ему снова предлагают выбрать город.
+
+Или:
+
+```text
+Chrome
+→ Подгорица
+
+Firefox
+→ Будва
+```
+
+Хотя это **один и тот же зарегистрированный пользователь**.
+
+Это уже не очень хороший UX.
+
+Если город является частью концепции поиска, я считаю разумным сохранить его в аккаунте.
+
+---
+
+# Но `UserProfile` действительно не нужен
+
+Вот здесь я полностью согласен с Decision 018.
+
+Не надо:
+
+```text
+User
+  ↓ 1:1
+UserProfile
+  ↓
+preferred_city
+```
+
+ради одного поля.
+
+Просто:
+
+```python
+class User(AbstractUser):
+    ...
+    preferred_city = models.ForeignKey(
+        "locations.City",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+```
+
+Одна миграция.
+
+Никаких:
+
+* signals;
+* ProfileService;
+* OneToOne;
+* дополнительной таблицы.
+
+Это соответствует вашему принципу **«не усложнять без необходимости»**.
+
+---
+
+# А cookie всё равно оставляем
+
+Вот это важно.
+
+При выборе города:
+
+```text
+Пользователь выбирает Подгорицу
+             ↓
+        cookie = Podgorica
+             +
+       если авторизован
+             ↓
+User.preferred_city = Podgorica
+```
+
+Получаем быстрый UX даже без дополнительного запроса к серверу для каждого autocomplete.
+
+---
+
+# При открытии сайта
+
+Приоритет:
+
+```text
+1. Явный город в текущем URL/фильтре
+        ↓
+2. Cookie preferred_city
+        ↓
+3. User.preferred_city
+        ↓
+4. Город по умолчанию
+```
+
+Но здесь я бы слегка поменял порядок для авторизованного пользователя:
+
+```text
+1. Явно выбранный город в текущем поиске
+2. User.preferred_city
+3. Cookie
+4. default
+```
+
+А после логина синхронизировать cookie с `User.preferred_city`.
+
+---
+
+# И ещё важнее: город не должен автоматически ломать поиск
+
+Например пользователь выбрал:
+
+> Подгорица
+
+А потом ищет:
+
+> квартира Будва
+
+Мы **не должны насильно фильтровать по Подгорице**, если в запросе/фильтре явно выбрана Будва.
+
+То есть:
+
+```text
+preferred_city
+```
+
+— это **default filter**, а не жесткое ограничение.
+
+Пользователь всегда может выбрать:
+
+```text
+📍 Будва
+```
+
+и текущий поиск становится:
+
+```text
+city=budva
+```
+
+Но `preferred_city` остается:
+
+```text
+Подгорица
+```
+
+если он просто временно посмотрел Будву.
+
+---
+
+# Как это будет выглядеть в интерфейсе
+
+В шапке:
+
+```text
+📍 Подгорица     [⌄]
+```
+
+Пользователь нажал:
+
+```text
+📍 Подгорица
+
+Выбрать город
+
+Подгорица
+Будва
+Котор
+Бар
+Никшич
+...
+```
+
+Выбирает Будву:
+
+```text
+📍 Будва
+```
+
+И:
+
+```text
+preferred_city = Budva
+```
+
+Все последующие каталожные поиски по умолчанию идут по Будве.
+
+---
+
+# А что делать с cookie 30 дней?
+
+Я бы **не ограничивал его 30 днями**, если это именно выбранный город.
+
+30 дней — нормально для временного состояния поиска, но пользователь может выбрать город сегодня и прийти через два месяца.
+
+Лучше:
+
+```text
+preferred_city cookie
+Max-Age = 1 year
+```
+
+или вообще более длительный срок.
+
+А серверное:
+
+```text
+User.preferred_city
+```
+
+вообще не имеет срока жизни.
+
+При logout можно оставить cookie — это не секрет и не приватная информация.
+
+---
+
+# Итого я бы изменил Decision 018
+
+Вместо:
+
+> **(c) Cookie-only**
+
+я бы принял:
+
+> **(d) Hybrid — User.preferred_city + cookie fallback**
+
+### Для зарегистрированного:
+
+```text
+User.preferred_city → City
+```
+
+### Для анонимного:
+
+```text
+preferred_city cookie
+```
+
+### При выборе города:
+
+```text
+                    City selected
+                         │
+              ┌──────────┴──────────┐
+              ↓                     ↓
+           Cookie              Authenticated?
+                                   │
+                                   ↓
+                           User.preferred_city
+```
+
+
+**Я бы выбрал `User.preferred_city + cookie`.**
+
+Это всего одно поле в уже существующей модели `User`, одна миграция и очень простой write-path. Для проекта уровня Avito/OLX это уже не выглядит преждевременным усложнением — город является одним из основных элементов каталожного UX. OLX, например, прямо описывает локацию как основной фильтр поиска. ([PIK blog][1])
+
+И ещё один момент: **не надо путать `preferred_city` с сохраненным поиском**. `preferred_city` — это быстрый глобальный контекст пользователя («обычно ищу здесь»), а `SavedSearch.city` — конкретное условие конкретного сохраненного поиска. Это должны быть независимые вещи.
+
+

@@ -436,12 +436,13 @@ Acceptance:
 
 - BOSNIAN fts_config returns "simple" (no "bosnian" PostgreSQL config). Correct.
 - Seed images are pre-existing JPEG fixtures in fixtures/images/.
-- translate_query 500ms timeout may fail in Docker dev without internet, but
-  degrades gracefully (falls back to original query).
+- No query-time translation egress: ad title/description are pre-translated at
+  creation time via `deep-translator` (documented in technical-specification.md,
+  zone R3). Search runs per-language on pre-built `search_vector_ru`,
+  `search_vector_bs`, `search_vector_en` columns — no Google Translate API
+  calls at search time.
 - Cache backend in dev is LocMemCache (single-process); rate limiter works
   but won't be shared across processes.
-- search() view calls translate_query(query, LANGUAGE_CODE, "ru") — if language
-  is "en" or "bs", calls Google Translate API; if "ru", skips translation.
 - Seed users have telegram_id and chat_id set (required fields) but no username
   for 70% of users (null username allowed by PostgreSQL unique constraint).
 - consent_shown context var is checked in consent_banner.html include: if True,

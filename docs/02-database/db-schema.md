@@ -26,7 +26,7 @@ details live in sibling files: [db-indexes.md](db-indexes.md) and [db-enums.md](
 - Category tree: django-mptt>=0.18.0 (single source of truth; no denormalized path/level columns).
 - Category-specific attributes (EAV).
 - Tags — generation source to be determined in reserach phase.
-- Search: native PostgreSQL FTS (`search_vector` TSVECTOR + GIN, russian config).
+- Search: native PostgreSQL FTS (per-language `search_vector_ru/bs/en` TSVECTOR + GIN, ru/bs/en configs).
 - One user = one Telegram account.
 
 ### Top-level relationships
@@ -291,11 +291,12 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 ---
 
 ### Search (logic, not a table)
-- `search_vector` on `ads` (trigger-maintained: title + description + category_name).
-- `GIN index` on `search_vector` (`IX_ads_search_gin`) — see [db-indexes.md](db-indexes.md).
-- **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN index after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
+- Per-language `search_vector_ru/bs/en` on `ads` (trigger-maintained: title + description + localized category_name; see [db-indexes.md](db-indexes.md) for the dual-write trigger SQL).
+- `GIN index` on each vector (`IX_ads_search_gin_ru/_bs/_en`) — see [db-indexes.md](db-indexes.md).
+- Legacy `search_vector` retained during dual-write transition (to be dropped in Phase 3).
+- **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN indexes after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
-- Search fill: **title (weight A) + description (weight B) + category_name (weight C)**, `to_tsvector('russian', …)`. Queries detected by language and translated to Russian before search (decision G), so they match the Russian content.
+- Search fill per language: **title (weight A) + description (weight B) + category_name (weight C)**, using the locale-appropriate `to_tsvector` config (`russian`/`simple`/`english`). Queries are searched **in the buyer's own language** against the matching per-language vector — no query-time translation (decision G). Single-word queries matching category names also apply an explicit `category_id` filter (locale-aware via `Category.get_name(locale)`).
 
 > Zone D5 / D6: seller input may be Montenegrin/Russian/English, but the bot MUST translate
 > title+description to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin/English
