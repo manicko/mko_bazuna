@@ -40,9 +40,36 @@
             </div>
         </div>
 
-        {# ── Search row: categories dropdown + search bar ── #}
+        {# ── Search row: city selector + categories dropdown + search bar ── #}
         <div class="mt-3">
             <div class="flex gap-2 items-stretch">
+                {# Preferred-city button + dropdown #}
+                <div class="relative" data-preferred-city-trigger>
+                    <button type="button" data-preferred-city-toggle
+                            class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            aria-label="{% trans "Preferred city" %}">
+                        <span aria-hidden="true">📍</span>
+                        <span data-preferred-city-label>{{ preferred_city_display }}</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div data-preferred-city-panel
+                         class="absolute left-0 z-[90] mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
+                        <ul class="py-1 max-h-96 overflow-y-auto">
+                            {% for city in cities %}
+                            <li>
+                                <button type="button" data-city-option="{{ city.slug }}"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    {{ city.get_name }}
+                                </button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
                 {# "All Categories" dropdown (desktop) #}
                 <div class="relative hidden md:block" data-categories-trigger>
                     <button type="button" data-categories-toggle
@@ -375,7 +402,49 @@
     if (mobileClose) mobileClose.addEventListener('click', closeMobile);
     if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobile);
 
-    function closeAll() { hide(); closeCategories(); closeMobile(); }
+    /* ── Preferred-city dropdown ────────────────────────────────────────── */
+    var cityToggle = document.querySelector('[data-preferred-city-toggle]');
+    var cityPanel = document.querySelector('[data-preferred-city-panel]');
+
+    function cityGetCsrf() {
+        var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return input ? input.value : '';
+    }
+
+    function closeCity() {
+        if (cityPanel) cityPanel.classList.add('hidden');
+        if (cityToggle) cityToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    if (cityToggle && cityPanel) {
+        cityToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !cityPanel.classList.contains('hidden');
+            if (isOpen) { closeCity(); return; }
+            cityPanel.classList.remove('hidden');
+            cityToggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) {
+            var trigger = cityPanel.parentNode;
+            if (trigger && !trigger.contains(e.target)) closeCity();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeCity();
+        });
+        cityPanel.addEventListener('click', function (e) {
+            var link = e.target.closest('[data-city-option]');
+            if (link) {
+                e.preventDefault();
+                var slug = link.getAttribute('data-city-option');
+                var fd = new FormData();
+                fd.append('slug', slug);
+                fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': cityGetCsrf() } });
+                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+            }
+        });
+    }
+
+    function closeAll() { hide(); closeCategories(); closeCity(); closeMobile(); }
 
     window.addEventListener('htmx:afterSwap', function (e) {
         // Re-parse any newly injected submenu panels for accordion behavior.

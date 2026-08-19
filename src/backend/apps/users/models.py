@@ -67,6 +67,18 @@ class User(AbstractUser):
         help_text="User has Telegram Premium subscription",
     )
 
+    # Buyer's preferred city for default catalog/search filtering.
+    # Nullable; SET_NULL on city removal (a preference must never block a city
+    # from being removed from the catalog). Slug cloud: related_name="+".
+    preferred_city = models.ForeignKey(
+        "locations.City",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Buyer's preferred city for default catalog/search filtering (nullable; SET_NULL on city removal)",
+    )
+
     # Timestamps for account lifecycle
     deleted_at = models.DateTimeField(
         blank=True,

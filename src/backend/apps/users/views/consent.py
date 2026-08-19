@@ -29,7 +29,9 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.utils.sanitize import mask_telegram_id
+from apps.locations.models import City
 from apps.users.models import LoginToken, User
 from apps.users.services import (
     can_login,
@@ -203,6 +205,40 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _reconcile_preferred_city_on_login(request: HttpRequest, user: User) -> None:
+    """Migrate a guest's ``preferred_city`` cookie into the account (AC-6).
+
+    Runs immediately after ``auth_login``. If the just-authenticated user has no
+    ``User.preferred_city`` and the ``preferred_city`` cookie references a
+    currently-valid city, the preference is backfilled onto the account. If the
+    user already has a preference, the DB value wins (it is never overwritten by
+    the cookie). The cookie is always retained as the anonymous-session fallback.
+
+    Args:
+        request: The request carrying the ``preferred_city`` cookie.
+        user: The just-authenticated user.
+    """
+    if user.preferred_city_id is not None:
+        # DB preference already set — it wins; do not overwrite from the cookie.
+        return
+
+    cookie_slug = request.COOKIES.get(PREFERRED_CITY_COOKIE_NAME)
+    if not cookie_slug or not City.objects.filter(slug=cookie_slug).exists():
+        return
+
+    try:
+        user.preferred_city = City.objects.get(slug=cookie_slug)
+        user.save(update_fields=["preferred_city"])
+    except City.DoesNotExist:
+        # The cookie referenced a city removed during this request; skip.
+        logger.info("Skipping preferred-city backfill for unknown slug %r", cookie_slug)
+        return
+
+    logger.info(
+        "Backfilled User %s preferred_city from cookie=%r", user.id, cookie_slug
+    )
+
+
 @never_cache
 def login_status(request: HttpRequest) -> HttpResponse:
     """
@@ -283,6 +319,9 @@ def login_status(request: HttpRequest) -> HttpResponse:
     # auth_login() already calls cycle_key() for anonymous->authenticated transitions,
     # so an explicit cycle_key() here would be redundant.
     auth_login(request, user)
+
+    # Migrate a guest's preferred-city cookie into the account (guest->registered).
+    _reconcile_preferred_city_on_login(request, user)
 
     logger.info(
         f"Web session established for user {user.id} (telegram_id={mask_telegram_id(token.telegram_id)})"

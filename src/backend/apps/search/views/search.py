@@ -66,8 +66,10 @@ def search(request: HttpRequest) -> HttpResponse:
         except Category.DoesNotExist:
             suggested_category = current_category
 
-    # City filter (by slug)
-    current_city = request.GET.get("city")
+    # City filter (by slug). An explicit ?city= always wins; otherwise the
+    # middleware-resolved preferred city is the *default* filter (R-05).
+    explicit_city = request.GET.get("city")
+    current_city = explicit_city or getattr(request, "preferred_city", None)
     suggested_city = None
     if current_city:
         try:

@@ -11,6 +11,7 @@ import hashlib
 from datetime import timedelta
 
 import pytest
+from apps.locations.models import City
 from apps.users.models import LoginToken, User
 from django.test import Client
 from django.utils import timezone
@@ -197,3 +198,110 @@ class TestLoginStatus:
         client = Client()
         response = client.get(f"/login/status/?token={raw_token}")
         assert response.status_code == 410
+
+
+# ---------------------------------------------------------------------------
+# preferred-city login reconciliation (AC-6 / R-08)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def podgorica_city() -> City:
+    """A valid Montenegro city used as the preferred city."""
+    return City.objects.create(
+        country_code="ME",
+        name="Подгорица",
+        region="Central",
+        slug="podgorica",
+    )
+
+
+@pytest.fixture
+def budva_city() -> City:
+    """A second valid Montenegro city for override tests."""
+    return City.objects.create(
+        country_code="ME",
+        name="Будва",
+        region="Coastal",
+        slug="budva",
+    )
+
+
+def _claim_login(client: Client, user: User, username: str) -> None:
+    """Create a claimed login token for *user* and complete the web login."""
+    raw_token = f"{username}_32chars_abcde_abcdefghij"
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    LoginToken.objects.create(
+        token_hash=token_hash,
+        telegram_id=user.telegram_id,
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    response = client.get(f"/login/status/?token={raw_token}")
+    assert response.status_code == 200
+
+
+class TestLoginPreferredCitySync:
+    """Guest -> account preferred-city migration on login (AC-6 / R-08)."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        """Clear rate-limiter cache between tests."""
+        from django.core.cache import cache
+
+        cache.clear()
+        yield
+        cache.clear()
+
+    def test_login_backfills_db_from_cookie(
+        self, client: Client, podgorica_city: City
+    ) -> None:
+        """Guest cookie `podgorica` + NULL DB -> DB backfilled on login (AC-6)."""
+        user = User.objects.create(
+            telegram_id=700000400,
+            chat_id=700000400,
+            username="cookie_user",
+        )
+        client.cookies["preferred_city"] = "podgorica"
+
+        _claim_login(client, user, "cookie_user")
+
+        user.refresh_from_db()
+        assert user.preferred_city_id == podgorica_city.id
+        # Cookie is retained as the anonymous fallback (R-09 / D-8).
+        assert client.cookies["preferred_city"].value == "podgorica"
+
+    def test_login_does_not_overwrite_existing_db_preference(
+        self,
+        client: Client,
+        podgorica_city: City,
+        budva_city: City,
+    ) -> None:
+        """Existing DB preference wins over a conflicting cookie (D-13)."""
+        user = User.objects.create(
+            telegram_id=700000401,
+            chat_id=700000401,
+            username="existing_pref",
+            preferred_city=podgorica_city,
+        )
+        client.cookies["preferred_city"] = "budva"
+
+        _claim_login(client, user, "existing_pref")
+
+        user.refresh_from_db()
+        # DB value is Podgorica (not overwritten by the budva cookie).
+        assert user.preferred_city_id == podgorica_city.id
+
+    def test_login_without_cookie_does_not_crash(
+        self, client: Client, podgorica_city: City
+    ) -> None:
+        """No preferred_city cookie -> no exception, no DB change."""
+        user = User.objects.create(
+            telegram_id=700000402,
+            chat_id=700000402,
+            username="no_cookie_user",
+        )
+
+        _claim_login(client, user, "no_cookie_user")
+
+        user.refresh_from_db()
+        assert user.preferred_city_id is None
