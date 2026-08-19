@@ -77,6 +77,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     context = {
         "ad": ad,
+        "breadcrumb_category": ad.category,
         "consent_shown": is_consent_given(request),
         "bot_username": settings.BOT_USERNAME,
         "is_favorited": (

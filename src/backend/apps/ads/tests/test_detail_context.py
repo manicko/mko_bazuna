@@ -9,6 +9,7 @@ because ``settings`` is not in Django's context processors.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -80,11 +81,22 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
         context = self._run_detail(ad)
         self.assertEqual(context["ad"], ad)
 
+    def test_detail_context_contains_breadcrumb_category(self) -> None:
+        """``ad_detail`` must pass ``breadcrumb_category`` (= ``ad.category``) so
+        the catalog header breadcrumbs render the full category path (Spec_020
+        R-04a)."""
+        ad = MagicMock()
+        context = self._run_detail(ad)
+        self.assertIn(
+            "breadcrumb_category",
+            context,
+            msg="breadcrumb_category must be passed in the context dict",
+        )
+        self.assertEqual(context["breadcrumb_category"], ad.category)
+
     def test_detail_template_uses_bot_username_not_settings(self) -> None:
         """The rendered template variable name is ``bot_username``, not
         ``settings.BOT_USERNAME``."""
-        from pathlib import Path
-
         content = (
             Path("src/backend/templates/ads/detail.html")
             .resolve()
@@ -92,3 +104,35 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
         )
         self.assertIn("{{ bot_username }}", content)
         self.assertNotIn("settings.BOT_USERNAME", content)
+
+
+class TestBreadcrumbEllipsisTemplate(SimpleTestCase):
+    """Verify the breadcrumb ellipsis truncation logic (Spec_020 R-05).
+
+    When the ancestor chain exceeds 2 ancestors (3+ segments incl. root and
+    current), intermediate segments are collapsed with a ``…`` ellipsis, keeping
+    the ``&rsaquo;`` separator (PO decision Q4). Template-source assertion only
+    (no DB).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.content = (
+            Path("src/backend/templates/components/breadcrumb.html")
+            .resolve()
+            .read_text(encoding="utf-8")
+        )
+
+    def test_ellipsis_truncation_branch_present(self) -> None:
+        """The template must gate truncation on the ancestor-chain length."""
+        self.assertIn("{% if ancestors|length > 2 %}", self.content)
+        self.assertIn("{% endwith %}", self.content)
+
+    def test_ellipsis_literal_present(self) -> None:
+        """The ``…`` ellipsis literal is rendered for long chains."""
+        self.assertIn(">…<", self.content)
+
+    def test_separator_preserved(self) -> None:
+        """The ``&rsaquo;`` separator is kept in truncated and full chains."""
+        self.assertIn("&rsaquo;", self.content)

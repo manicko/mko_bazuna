@@ -10,11 +10,23 @@
     {% if breadcrumb_category %}
         <a href="/" class="hover:text-blue-600">Главная</a>
         <span class="mx-1 text-gray-400">&rsaquo;</span>
-        {% for cat in breadcrumb_category.get_ancestors %}
-            <a href="{% url 'ads:listings_category' cat.slug %}" class="hover:text-blue-600">{{ cat.get_name }}</a>
-            <span class="mx-1 text-gray-400">&rsaquo;</span>
-        {% endfor %}
-        <span class="font-medium text-gray-800">{{ breadcrumb_category.get_name }}</span>
+        {% with ancestors=breadcrumb_category.get_ancestors last_ancestor=breadcrumb_category.get_ancestors|last %}
+            {% if ancestors|length > 2 %}
+                <a href="{% url 'ads:listings_category' ancestors.0.slug %}" class="hover:text-blue-600">{{ ancestors.0.get_name }}</a>
+                <span class="mx-1 text-gray-400">&rsaquo;</span>
+                <span class="mx-1 text-gray-400">…</span>
+                <span class="mx-1 text-gray-400">&rsaquo;</span>
+                <a href="{% url 'ads:listings_category' last_ancestor.slug %}" class="hover:text-blue-600">{{ last_ancestor.get_name }}</a>
+                <span class="mx-1 text-gray-400">&rsaquo;</span>
+                <span class="font-medium text-gray-800">{{ breadcrumb_category.get_name }}</span>
+            {% else %}
+                {% for cat in ancestors %}
+                    <a href="{% url 'ads:listings_category' cat.slug %}" class="hover:text-blue-600">{{ cat.get_name }}</a>
+                    <span class="mx-1 text-gray-400">&rsaquo;</span>
+                {% endfor %}
+                <span class="font-medium text-gray-800">{{ breadcrumb_category.get_name }}</span>
+            {% endif %}
+        {% endwith %}
     {% endif %}
 </nav>
 {% if query %}

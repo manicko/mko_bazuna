@@ -74,3 +74,49 @@ class TestAutocompleteTemplate(SimpleTestCase):
             '{% include "components/header_catalog.html" %}',
             detail_path.read_text(encoding="utf-8"),
         )
+
+
+class TestCatalogMenuAccordionTemplate(SimpleTestCase):
+    """Verify the category accordion redesign (Spec_020) in the templates.
+
+    Confirms the ``hidden`` class on the dynamically-injected submenu container
+    in ``mega_submenu.html`` (the prerequisite for level-2+ expansion) and that
+    ``header_catalog.html`` identifies branches via ``closeBranch`` /
+    ``collapseSiblings`` rather than the removed ``collapseBranches`` which
+    destroyed ancestor state. Template-source assertions only (no DB).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.header_content = (
+            Path("src/backend/templates/components/header_catalog.html")
+            .resolve()
+            .read_text(encoding="utf-8")
+        )
+        cls.submenu_content = (
+            Path("src/backend/templates/categories/partials/mega_submenu.html")
+            .resolve()
+            .read_text(encoding="utf-8")
+        )
+
+    def test_submenu_container_carries_hidden_class(self) -> None:
+        """The lazy-loaded submenu container must start hidden so the accordion
+        can detect ``isOpen`` correctly (Spec_020 R-01a)."""
+        self.assertIn(
+            'class="hidden ml-4" data-category-submenu="',
+            self.submenu_content,
+            msg="mega_submenu.html submenu container must carry the hidden class",
+        )
+
+    def test_closeBranch_function_present(self) -> None:
+        """``closeBranch`` must be defined in header_catalog.html."""
+        self.assertIn("function closeBranch(", self.header_content)
+
+    def test_collapseSiblings_function_present(self) -> None:
+        """``collapseSiblings`` must be defined in header_catalog.html."""
+        self.assertIn("function collapseSiblings(", self.header_content)
+
+    def test_collapseBranches_removed(self) -> None:
+        """The old all-panel collapse helper must be removed."""
+        self.assertNotIn("collapseBranches", self.header_content)
