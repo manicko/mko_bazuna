@@ -36,8 +36,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--ads",
             type=int,
-            default=30,
-            help="Number of ads to generate (default: 30)",
+            default=600,
+            help="Number of ads to generate (default: 600)",
         )
         parser.add_argument(
             "--force",

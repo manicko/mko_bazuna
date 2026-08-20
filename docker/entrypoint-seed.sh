@@ -6,4 +6,4 @@ set -e
 
 exec uv run python src/backend/manage.py seed --force \
     --users "${SEED_USERS:-10}" \
-    --ads "${SEED_ADS:-30}"
+    --ads "${SEED_ADS:-600}"

@@ -24,6 +24,7 @@ from apps.seed.generators.base import BaseGenerator
 from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
 from apps.seed.paths import FIXTURES_IMAGES_DIR
+from apps.seed.services.seed_service import SeedService
 from apps.users.models import User
 
 
@@ -1014,7 +1015,11 @@ class TestSeedCategoryIntegration(TestCase):
 
     def test_ad_generator_with_builder_categories(self) -> None:
         """AdGenerator creates ads with valid category slugs from builder."""
-        categories = list(Category.objects.exclude(slug__in=["test-seed", "test-analytics", "test", "test-city"]))
+        categories = list(
+            Category.objects.filter(children__isnull=True).exclude(
+                slug__in=["test-seed", "test-analytics", "test", "test-city"]
+            )
+        )
         self.assertGreater(len(categories), 0, "No categories loaded from builder")
 
         # Create users
@@ -1094,3 +1099,113 @@ class TestSeedCategoryIntegration(TestCase):
             self.assertIsNotNone(ad.title_en)
             self.assertIsNotNone(ad.title_bs)
             self.assertEqual(ad.original_language, "ru")
+
+
+# ─── Seed leaf-category coverage tests ──────────────────────────────────
+
+
+class TestLeafCategoryFiltering(TestCase):
+    """Verify that seed category loading returns only leaf categories."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        from apps.categories.catalog.builder import load_catalog
+
+        CATALOG_PATH = (
+            Path(__file__).resolve().parents[2]
+            / "categories"
+            / "catalog"
+            / "categories.yaml"
+        )
+        load_catalog(CATALOG_PATH)
+
+    def test_load_category_fixtures_returns_leaf_only(self) -> None:
+        """SeedService._load_category_fixtures() returns only leaf categories."""
+        service = SeedService()
+        categories = service._load_category_fixtures()
+        # Every returned category should have no children.
+        for cat in categories:
+            self.assertFalse(
+                cat.children.exists(),
+                f"Category {cat.slug} is not a leaf (has children)",
+            )
+        # 171 leaf categories in the catalog (no test categories created here).
+        self.assertEqual(len(categories), 171)
+
+    def test_non_leaf_categories_excluded(self) -> None:
+        """Non-leaf categories are not in the returned list."""
+        service = SeedService()
+        categories = service._load_category_fixtures()
+        slug_set = {c.slug for c in categories}
+        # These are known non-leaf (parent) categories.
+        self.assertNotIn("real-estate", slug_set)
+        self.assertNotIn("transport", slug_set)
+        self.assertNotIn("goods", slug_set)
+        self.assertNotIn("services-jobs", slug_set)
+        self.assertNotIn("business", slug_set)
+
+
+class TestAdGeneratorLeafOnly(TestCase):
+    """Verify seed ads are only ever assigned to leaf categories."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        from apps.categories.catalog.builder import load_catalog
+
+        CATALOG_PATH = (
+            Path(__file__).resolve().parents[2]
+            / "categories"
+            / "catalog"
+            / "categories.yaml"
+        )
+        load_catalog(CATALOG_PATH)
+
+    def test_no_non_leaf_category_assigned(self) -> None:
+        """Full seed never assigns ads to non-leaf categories."""
+        out = StringIO()
+        call_command(
+            "seed",
+            "--users=5",
+            "--ads=50",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+        # Non-leaf category IDs (categories that have children).
+        non_leaf_ids = list(
+            Category.objects.filter(children__isnull=False).values_list("id", flat=True)
+        )
+        ads_in_non_leaf = Ad.objects.filter(
+            source=AdSource.SEED, category_id__in=non_leaf_ids
+        )
+        self.assertFalse(
+            ads_in_non_leaf.exists(),
+            f"Ads assigned to non-leaf categories: {list(ads_in_non_leaf.values_list('category__slug', flat=True))}",
+        )
+
+    def test_full_seed_coverage(self) -> None:
+        """Full seed with 600 ads covers >=90% of leaf categories with ads."""
+        out = StringIO()
+        call_command(
+            "seed",
+            "--users=10",
+            "--ads=600",
+            "--force",
+            "--analytics=False",
+            stdout=out,
+        )
+        total_leaf = Category.objects.filter(children__isnull=True).count()
+        # Published seed ads whose category is a leaf category.
+        covered_slugs = set(
+            Ad.objects.filter(
+                source=AdSource.SEED,
+                status=AdStatus.PUBLISHED,
+                category__children__isnull=True,
+            ).values_list("category__slug", flat=True)
+        )
+        coverage_pct = len(covered_slugs) / total_leaf * 100
+        self.assertGreaterEqual(
+            coverage_pct,
+            90.0,
+            f"Coverage {coverage_pct:.1f}% is below 90% threshold",
+        )
