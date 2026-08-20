@@ -120,3 +120,34 @@ class TestCatalogMenuAccordionTemplate(SimpleTestCase):
     def test_collapseBranches_removed(self) -> None:
         """The old all-panel collapse helper must be removed."""
         self.assertNotIn("collapseBranches", self.header_content)
+
+    def test_children_exists_replaces_get_children_count_in_header(self) -> None:
+        """Expand-button condition uses ``get_children.exists``, not the
+        non-existent ``get_children_count`` (RC-A)."""
+        self.assertIn("cat.get_children.exists", self.header_content)
+        self.assertNotIn("get_children_count", self.header_content)
+
+    def test_children_exists_replaces_get_children_count_in_submenu(self) -> None:
+        """mega_submenu.html uses ``get_children.exists`` (RC-A)."""
+        self.assertIn("child.get_children.exists", self.submenu_content)
+        self.assertNotIn("get_children_count", self.submenu_content)
+
+    def test_firstof_replaced_with_with_tag(self) -> None:
+        """``current_cat`` must be set via ``{% with %}`` so it stays a Category
+        instance, not a string (RC-B)."""
+        self.assertNotIn("firstof", self.header_content)
+        self.assertIn(
+            "{% with current_cat=breadcrumb_category %}", self.header_content
+        )
+
+    def test_breadcrumb_uses_safe_last_element_access(self) -> None:
+        """breadcrumb.html must not index the ancestor queryset with ``|last``
+        (crashes on empty); it binds the last ancestor inside the length-guarded
+        branch (RC-C)."""
+        breadcrumb_content = (
+            Path("src/backend/templates/components/breadcrumb.html")
+            .resolve()
+            .read_text(encoding="utf-8")
+        )
+        self.assertNotIn("get_ancestors|last", breadcrumb_content)
+        self.assertIn('slice:"::-1"|first', breadcrumb_content)

@@ -136,3 +136,12 @@ class TestBreadcrumbEllipsisTemplate(SimpleTestCase):
     def test_separator_preserved(self) -> None:
         """The ``&rsaquo;`` separator is kept in truncated and full chains."""
         self.assertIn("&rsaquo;", self.content)
+
+    def test_breadcrumb_with_tag_no_last_ancestor(self) -> None:
+        """The ``{% with %}`` must not bind ``last_ancestor`` via ``|last``
+        (which raises on an empty ancestor queryset); the last ancestor is bound
+        safely inside the length-guarded branch (RC-C)."""
+        self.assertNotIn("last_ancestor=breadcrumb_category", self.content)
+        self.assertNotIn("get_ancestors|last", self.content)
+        self.assertIn('{% with ancestors=breadcrumb_category.get_ancestors %}', self.content)
+        self.assertIn('slice:"::-1"|first', self.content)

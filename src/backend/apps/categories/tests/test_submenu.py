@@ -9,6 +9,7 @@ Covers the HTMX partial used by the header's "All Categories" dropdown:
 """
 
 import pytest
+from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
 from django.test import Client
 
@@ -62,3 +63,38 @@ class TestCategorySubmenu:
 
         response = client.get("/categories/transport/submenu/")
         assert "NewChild" in response.content.decode("utf-8")
+
+
+@pytest.fixture
+def catalog() -> None:
+    """Load the full category catalog from categories.yaml."""
+    from pathlib import Path
+
+    catalog_path = (
+        Path(__file__).resolve().parents[2]
+        / "categories"
+        / "catalog"
+        / "categories.yaml"
+    )
+    load_catalog(catalog_path)
+
+
+class TestExpandButtons:
+    """Expand buttons render only for categories that have children (RC-A)."""
+
+    def test_expand_button_present_for_category_with_children(self, catalog: None) -> None:
+        client = Client()
+        response = client.get("/categories/business/submenu/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        # business has children with children of their own (e.g.
+        # business-commercial-real-estate) -> expand buttons must render.
+        assert "data-category-expand" in content
+
+    def test_expand_button_absent_for_leaf_category(self, catalog: None) -> None:
+        client = Client()
+        response = client.get("/categories/ready-business/submenu/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        # ready-business is a leaf node (no children) -> no expand buttons.
+        assert "data-category-expand" not in content
