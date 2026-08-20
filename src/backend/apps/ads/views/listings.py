@@ -296,8 +296,9 @@ def listings(
 
 
     # City filter with did-you-mean. Priority: URL path ``city_slug`` wins, then
-    # an explicit ``?city=`` param (did-you-mean only), then the
-    # middleware-resolved preferred city as the *default* filter (R-06).
+    # an explicit ``?city=`` param is a real filter (F-5), then the
+    # middleware-resolved preferred city as the *default* filter (R-06). Only an
+    # invalid slug yields a did-you-mean suggestion (F-6).
     suggested_city = None
     effective_city = None
     if city_slug:
@@ -310,7 +311,13 @@ def listings(
             suggested_city = _suggest_city(city_slug)
             # Show all ads but provide city suggestions
     elif request.GET.get("city"):
-        suggested_city = _suggest_city(request.GET.get("city", ""))
+        effective_city = request.GET["city"]
+        try:
+            city = City.objects.get(slug=effective_city)
+            ads = ads.filter(city_id=city.id)
+        except City.DoesNotExist:
+            # Invalid slug: did-you-mean banner, no filter (F-6).
+            suggested_city = _suggest_city(effective_city)
     else:
         # Default fallback to the preferred city (middleware-validated slug).
         preferred_city = getattr(request, "preferred_city", None)

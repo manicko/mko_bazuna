@@ -141,15 +141,16 @@ class TestListingsFilterContext(SimpleTestCase):
     def test_query_params_map_to_context_values(self) -> None:
         """GET filter params propagate to the matching context values.
 
-        ``current_category`` / ``current_city`` mirror the URL *path* slugs
-        (absent here, so ``None``); the ``category`` / ``city`` GET params only
-        drive did-you-mean suggestions, which resolve to ``None`` against the
-        empty mocked taxonomy.
+        ``current_category`` mirrors the URL *path* slug (absent here, so
+        ``None``); an explicit ``?city=`` is a real filter (F-5), so
+        ``current_city`` reflects the query param. With the empty mocked
+        taxonomy the city cannot be resolved, so the did-you-mean suggestion
+        resolves to ``None``.
         """
         _, context = self._run_listings(_SPEC_QUERY)
 
         assert context["current_category"] is None
-        assert context["current_city"] is None
+        assert context["current_city"] == "kyiv"
         assert context["current_sort"] == AdSort.PRICE_LOW
         assert context["min_price"] == "100"
         assert context["max_price"] == "500"

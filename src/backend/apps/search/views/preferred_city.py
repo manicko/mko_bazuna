@@ -39,6 +39,25 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
         JSON ``{"ok": true}`` on success, or ``{"error": "invalid_city"}`` with
         HTTP 400 when the city slug is unknown.
     """
+    # "Clear preferred city" intent (Decision 23 D-2). Accepts either an explicit
+    # ``action=clear`` or a present-but-empty ``slug`` (POST slug=""). A *missing*
+    # slug key is still invalid input -> 400 below (preserves
+    # test_post_with_missing_slug_returns_400).
+    clear_action = request.POST.get("action") == "clear"
+    slug_present_empty = (
+        "slug" in request.POST and not (request.POST.get("slug") or "").strip()
+    )
+    if clear_action or slug_present_empty:
+        response = JsonResponse({"ok": True})
+        response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)
+        if request.user.is_authenticated:
+            request.user.preferred_city = None
+            request.user.save(update_fields=["preferred_city"])
+        logger.info(
+            "Cleared preferred_city for user=%s", getattr(request.user, "id", None)
+        )
+        return response
+
     slug = (request.POST.get("slug") or "").strip()
     if not slug or not City.objects.filter(slug=slug).exists():
         return JsonResponse({"error": "invalid_city"}, status=400)

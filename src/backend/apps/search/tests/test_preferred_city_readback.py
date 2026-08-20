@@ -178,15 +178,62 @@ class TestListingsPreferredCityReadback:
         assert _result_ids(response) == [podgorica_ad.id]
         assert response.context["current_city"] == "podgorica"
 
-    def test_explicit_query_param_prevents_preferred_default(
+    def test_explicit_query_param_filters_to_city(
         self, client: Client, podgorica_ad: Ad, budva_ad: Ad
     ) -> None:
-        """A ?city= param in listings disables the preferred default (did-you-mean only)."""
+        """A valid ?city= param in listings is a real filter (F-5)."""
         client.cookies["preferred_city"] = "podgorica"
         response = client.get("/?city=budva")
         assert response.status_code == 200
-        # ?city= drives did-you-mean only (no filter); the preferred default is
-        # NOT applied, so both ads appear.
+        # ?city=budva filters to Budva, mirroring search() (no did-you-mean).
+        assert _result_ids(response) == [budva_ad.id]
+        assert response.context["current_city"] == "budva"
+        assert response.context["suggested_city"] is None
+
+    def test_invalid_query_param_suggests_only(
+        self, client: Client, podgorica_ad: Ad, budva_ad: Ad
+    ) -> None:
+        """An invalid ?city= slug yields a did-you-mean banner and no filter (F-6)."""
+        client.cookies["preferred_city"] = "podgorica"
+        response = client.get("/?city=budv")
+        assert response.status_code == 200
+        # Invalid slug -> no filter (all ads shown, no city restriction) but a
+        # did-you-mean suggestion is offered.
         assert set(_result_ids(response)) == {podgorica_ad.id, budva_ad.id}
-        assert response.context["suggested_city"] == "budva"
-        assert response.context["current_city"] is None
+        assert response.context["suggested_city"] is not None
+
+    def test_pagination_with_explicit_city_matches_page_one(
+        self,
+        client: Client,
+        seller: User,
+        category: Category,
+        podgorica: City,
+        budva: City,
+    ) -> None:
+        """Page 2 with ?city=<preferred> keeps the same city filter (no divergence, AC-NEW-2)."""
+        # Fill page 1 with Budva ads (plus a competing city) so page 2 is
+        # non-empty and the city filter — not the all-ads fallthrough — decides
+        # what page 2 shows. PER_PAGE is the view's constant 24.
+        budva_ids: list[int] = []
+        for _ in range(30):
+            budva_ids.append(_published_ad(seller, category, budva).id)
+        for _ in range(30):
+            _published_ad(seller, category, podgorica)
+
+        client.cookies["preferred_city"] = "budva"
+
+        # Page 2 with an explicit ?city= stays Budva-filtered (no divergence).
+        response = client.get("/?page=2&city=budva")
+        assert response.status_code == 200
+        assert response.context["current_city"] == "budva"
+        results = _result_ids(response)
+        assert results, "expected a non-empty page 2"
+        assert all(ad_id in budva_ids for ad_id in results)
+
+        # Page 2 with no ?city= falls back to the preferred city (Budva).
+        response = client.get("/?page=2")
+        assert response.status_code == 200
+        assert response.context["current_city"] == "budva"
+        results = _result_ids(response)
+        assert results
+        assert all(ad_id in budva_ids for ad_id in results)

@@ -12,9 +12,13 @@ buyers):
 """
 
 import pytest
+from apps.ads.models import Ad
+from apps.categories.models import Category
+from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 from django.test import Client
+from django.utils import timezone
 
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_MAX_AGE
 
@@ -40,6 +44,45 @@ def buyer() -> User:
         chat_id=930000501,
         password="y",
     )
+
+
+@pytest.fixture
+def seller() -> User:
+    """Create a seller who owns published ads for read-back checks."""
+    return User.objects.create(
+        telegram_id=930000502,
+        chat_id=930000502,
+        password="x",
+    )
+
+
+@pytest.fixture
+def category() -> Category:
+    return Category.objects.create(name="Транспорт", slug="transport")
+
+
+@pytest.fixture
+def budva() -> City:
+    return City.objects.create(
+        country_code="ME",
+        name="Будва",
+        region="Coastal",
+        slug="budva",
+    )
+
+
+def _published_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
+    defaults = {
+        "user": seller,
+        "title": "Велосипед",
+        "category": category,
+        "city": city,
+        "category_name": category.name,
+        "status": AdStatus.PUBLISHED,
+        "published_at": timezone.now(),
+    }
+    defaults.update(kwargs)
+    return Ad.objects.create(**defaults)
 
 
 class TestPreferredCityView:
@@ -121,6 +164,9 @@ class TestHeaderCityBadge:
         assert "Подгорица" in content
         # Dropdown lists the city as a selectable option.
         assert 'data-city-option="podgorica"' in content
+        # Dropdown exposes the "whole country" reset head-item (F-3 / T-02).
+        assert "data-city-clear" in content
+        assert "Вся страна" in content
 
     def test_header_renders_country_wide_label_when_unset(self) -> None:
         """Without a preference the badge shows the country-wide label."""
@@ -129,3 +175,79 @@ class TestHeaderCityBadge:
         assert response.status_code == 200
         content = response.content.decode()
         assert "Вся страна" in content
+
+
+class TestReset:
+    """Preferred-city reset (clear) contract (Spec_23 T5 / AC-5*, AC-8, AC-NEW-1)."""
+
+    def test_clear_deletes_cookie_and_returns_all_cities_anonymous(
+        self, seller: User, category: Category, city: City, budva: City
+    ) -> None:
+        """A clear for an anonymous buyer deletes the cookie; / then returns all-cities."""
+        podgorica_ad = _published_ad(seller, category, city)
+        budva_ad = _published_ad(seller, category, budva)
+
+        # Establish a preference via the cookie, then clear it.
+        client = Client()
+        client.cookies["preferred_city"] = "budva"
+
+        response = client.post("/api/preferred-city/", {"action": "clear"})
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        # delete_cookie schedules the cookie for deletion (R-3 observable here).
+        assert response.cookies["preferred_city"].value == ""
+
+        # A fresh request sees no preference -> all-cities results + country badge.
+        # (The browser no longer sends the cleared preferred_city cookie.)
+        fresh = Client()
+        list_response = fresh.get("/")
+        assert list_response.status_code == 200
+        assert {ad.id for ad in list_response.context["page_obj"].object_list} == {
+            podgorica_ad.id,
+            budva_ad.id,
+        }
+        content = list_response.content.decode()
+        assert "Вся страна" in content
+
+    def test_clear_nulls_fk_and_returns_all_cities_authenticated(
+        self,
+        client: Client,
+        buyer: User,
+        seller: User,
+        category: Category,
+        city: City,
+        budva: City,
+    ) -> None:
+        """A clear for an authenticated buyer NULLs User.preferred_city (F-1/F-4)."""
+        podgorica_ad = _published_ad(seller, category, city)
+        budva_ad = _published_ad(seller, category, budva)
+
+        buyer.preferred_city = city
+        buyer.save(update_fields=["preferred_city"])
+        client.force_login(buyer)
+        client.cookies["preferred_city"] = "budva"
+
+        response = client.post("/api/preferred-city/", {"action": "clear"})
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+        buyer.refresh_from_db()
+        assert buyer.preferred_city_id is None
+
+        # A fresh request falls back to all-cities (no cookie, no DB preference).
+        fresh = Client()
+        fresh.force_login(buyer)
+        list_response = fresh.get("/")
+        assert list_response.status_code == 200
+        assert {ad.id for ad in list_response.context["page_obj"].object_list} == {
+            podgorica_ad.id,
+            budva_ad.id,
+        }
+
+    def test_clear_with_empty_slug_equivalent_to_action_clear(self) -> None:
+        """A present-but-empty slug signals clear intent (D-P1)."""
+        client = Client()
+        response = client.post("/api/preferred-city/", {"slug": ""})
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        assert response.cookies["preferred_city"].value == ""

@@ -53,6 +53,12 @@
                     <div data-preferred-city-panel
                          class="absolute left-0 z-[90] mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
                         <ul class="py-1 max-h-96 overflow-y-auto">
+                            <li>
+                                <button type="button" data-city-clear
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Вся страна
+                                </button>
+                            </li>
                             {% for city in cities %}
                             <li>
                                 <button type="button" data-city-option="{{ city.slug }}"
@@ -457,6 +463,15 @@
             if (e.key === 'Escape') closeCity();
         });
         cityPanel.addEventListener('click', function (e) {
+            var clearItem = e.target.closest('[data-city-clear]');
+            if (clearItem) {
+                e.preventDefault();
+                var fd = new FormData();
+                fd.append('action', 'clear');
+                fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': cityGetCsrf() } });
+                window.location.href = '/';
+                return;
+            }
             var link = e.target.closest('[data-city-option]');
             if (link) {
                 e.preventDefault();
