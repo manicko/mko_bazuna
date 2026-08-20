@@ -1,0 +1,447 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e5]:
+    - link "Skip to main content" [ref=e7] [cursor=pointer]:
+      - /url: "#mainContent"
+    - navigation [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]:
+          - text: Hi!
+          - link "Sign in" [ref=e12] [cursor=pointer]:
+            - /url: https://signin.ebay.com/ws/eBayISAPI.dll?SignIn&sgfl=gh&ru=https%3A%2F%2Fwww.ebay.com%2F
+          - generic [ref=e13]:
+            - text: or
+            - link "register" [ref=e14] [cursor=pointer]:
+              - /url: https://signup.ebay.com/pa/crte?ru=https%3A%2F%2Fwww.ebay.com%2F
+        - link "Deals" [ref=e16] [cursor=pointer]:
+          - /url: https://www.ebay.com/deals
+        - link "Brand Outlet" [ref=e18] [cursor=pointer]:
+          - /url: https://www.ebay.com/b/Brand-Outlet/bn_7115532402
+        - link "Help & Contact" [ref=e20] [cursor=pointer]:
+          - /url: https://www.ebay.com/help/home
+      - generic [ref=e21]:
+        - button "Ship to" [ref=e23] [cursor=pointer]
+        - link "Sell" [ref=e27] [cursor=pointer]:
+          - /url: https://www.ebay.com/sl/sell
+        - generic [ref=e28]:
+          - link "Watchlist" [ref=e29] [cursor=pointer]:
+            - /url: https://www.ebay.com/mye/myebay/watchlist
+          - button "Expand Watch List" [ref=e31]
+        - generic [ref=e32]:
+          - link "My eBay" [ref=e33] [cursor=pointer]:
+            - /url: https://www.ebay.com/mys/home?source=GBH
+          - button "Expand My eBay" [ref=e35]
+        - button "Notifications" [ref=e38] [cursor=pointer]
+        - generic [ref=e41]:
+          - link "Your shopping cart contains 0 items" [ref=e42] [cursor=pointer]:
+            - /url: https://cart.ebay.com
+          - button "Expand Cart" [ref=e44]
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - link "eBay Home" [ref=e47] [cursor=pointer]:
+          - /url: https://www.ebay.com
+          - img "eBay Home" [ref=e48]
+        - button "Shop by category" [ref=e56] [cursor=pointer]
+      - generic [ref=e58]:
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - combobox "Search for anything" [ref=e62]
+            - button "Camera icon" [ref=e63]
+          - combobox "Select a category for search" [ref=e64]:
+            - option "All Categories" [selected]
+            - option "Antiques"
+            - option "Art"
+            - option "Baby"
+            - option "Books"
+            - option "Business & Industrial"
+            - option "Cameras & Photo"
+            - option "Cell Phones & Accessories"
+            - option "Clothing, Shoes & Accessories"
+            - option "Coins & Paper Money"
+            - option "Collectibles"
+            - option "Computers/Tablets & Networking"
+            - option "Consumer Electronics"
+            - option "Crafts"
+            - option "Dolls & Bears"
+            - option "Movies & TV"
+            - option "eBay Motors"
+            - option "Entertainment Memorabilia"
+            - option "Gift Cards & Coupons"
+            - option "Health & Beauty"
+            - option "Home & Garden"
+            - option "Jewelry & Watches"
+            - option "Music"
+            - option "Musical Instruments & Gear"
+            - option "Pet Supplies"
+            - option "Pottery & Glass"
+            - option "Real Estate"
+            - option "Specialty Services"
+            - option "Sporting Goods"
+            - option "Sports Mem, Cards & Fan Shop"
+            - option "Stamps"
+            - option "Tickets & Experiences"
+            - option "Toys & Hobbies"
+            - option "Travel"
+            - option "Video Games & Consoles"
+            - option "Everything Else"
+        - generic [ref=e65]:
+          - button "Search" [ref=e66] [cursor=pointer]
+          - link "Advanced" [ref=e68] [cursor=pointer]:
+            - /url: https://www.ebay.com/sch/ebayadvsearch
+  - main [ref=e69]:
+    - heading "Electronics, Cars, Fashion, Collectibles &amp; More | eBay" [level=1] [ref=e70]
+    - generic [ref=e72]:
+      - list [ref=e76]:
+        - listitem [ref=e77] [cursor=pointer]:
+          - link "Saved" [ref=e78]:
+            - /url: https://www.ebay.com/mye/myebay/saved
+        - listitem [ref=e79] [cursor=pointer]:
+          - link "Electronics" [ref=e80]:
+            - /url: https://www.ebay.com/b/Electronics/bn_7000259124
+          - 'button "Expand: Electronics" [ref=e81]'
+        - listitem [ref=e82] [cursor=pointer]:
+          - link "Motors" [ref=e83]:
+            - /url: https://www.ebay.com/b/Auto-Parts-and-Vehicles/6000/bn_1865334
+          - 'button "Expand: Motors" [ref=e84]'
+        - listitem [ref=e85] [cursor=pointer]:
+          - link "Fashion" [ref=e86]:
+            - /url: https://www.ebay.com/b/Fashion/bn_7000259856
+          - 'button "Expand: Fashion" [ref=e87]'
+        - listitem [ref=e88] [cursor=pointer]:
+          - link "Collectibles and art" [ref=e89]:
+            - /url: https://www.ebay.com/b/Collectibles-Art/bn_7000259855
+          - 'button "Expand: Collectibles and art" [ref=e90]'
+        - listitem [ref=e91] [cursor=pointer]:
+          - link "Sports" [ref=e92]:
+            - /url: https://www.ebay.com/b/Sporting-Goods/888/bn_1865031
+          - 'button "Expand: Sports" [ref=e93]'
+        - listitem [ref=e94] [cursor=pointer]:
+          - link "Health and beauty" [ref=e95]:
+            - /url: https://www.ebay.com/b/Health-Beauty/26395/bn_1865479
+          - 'button "Expand: Health and beauty" [ref=e96]'
+        - listitem [ref=e97] [cursor=pointer]:
+          - link "Industrial equipment" [ref=e98]:
+            - /url: https://www.ebay.com/b/Business-Industrial/12576/bn_1853744
+          - 'button "Expand: Industrial equipment" [ref=e99]'
+        - listitem [ref=e100] [cursor=pointer]:
+          - link "Home and garden" [ref=e101]:
+            - /url: https://www.ebay.com/b/Home-Garden/11700/bn_1853126
+          - 'button "Expand: Home and garden" [ref=e102]'
+        - listitem [ref=e103] [cursor=pointer]:
+          - link "Deals" [ref=e104]:
+            - /url: https://www.ebay.com/globaldeals
+        - listitem [ref=e105] [cursor=pointer]:
+          - link "Sell" [ref=e106]:
+            - /url: https://export.ebay.com/en/
+          - 'button "Expand: Sell" [ref=e107]'
+      - generic [ref=e108]:
+        - group [ref=e109]:
+          - generic [ref=e110]:
+            - button "Previous Slide" [ref=e111] [cursor=pointer]
+            - list [ref=e113]:
+              - listitem [ref=e114]:
+                - generic [ref=e120]:
+                  - generic [ref=e121]:
+                    - heading "Don't miss out on insider perks" [level=2] [ref=e122]
+                    - paragraph [ref=e123]: What are you waiting for? Make the most of eBay account benefits.
+                  - link "Sign in" [ref=e124] [cursor=pointer]:
+                    - /url: https://signin.ebay.com/SignIn
+              - listitem [ref=e125]:
+                - generic [ref=e128]:
+                  - heading [level=2] [ref=e129]: Claim your in-app $15* off!
+                  - paragraph [ref=e130]: Save on your favorites when you spend over $100.
+                  - link [ref=e131] [cursor=pointer]:
+                    - /url: https://ebay.onelink.me/TAsm/j5a21ws0
+                    - text: Redeem the coupon
+                  - paragraph [ref=e132]:
+                    - link [ref=e134] [cursor=pointer]:
+                      - /url: https://pages.ebay.com/promo/2026/app15web/#section-0
+                      - text: "*Ends 09/30. Max $15 off. 1x. See T&Cs."
+              - listitem [ref=e137]:
+                - generic [ref=e143]:
+                  - generic [ref=e144]:
+                    - heading [level=2] [ref=e145]: Get more with an eBay account
+                    - paragraph [ref=e146]: Enjoy exclusive benefits-deals, app-only coupons, and more.
+                  - link [ref=e147] [cursor=pointer]:
+                    - /url: https://signin.ebay.com/SignIn
+                    - text: Sign in
+              - listitem [ref=e148]:
+                - generic [ref=e152]:
+                  - generic [ref=e153]:
+                    - generic [ref=e154]:
+                      - heading [level=2] [ref=e155]: Revamp your ride inside and out
+                      - paragraph [ref=e156]: Get the right parts to keep your vehicle in top form.
+                    - link [ref=e157] [cursor=pointer]:
+                      - /url: https://www.ebay.com/b/Car-Truck-Parts-Accessories/6030/bn_562630
+                      - text: Shop now
+                  - list [ref=e158]:
+                    - listitem [ref=e159]:
+                      - link [ref=e160] [cursor=pointer]:
+                        - /url: https://www.ebay.com/b/Car-Truck-Exterior-Parts-Accessories/33637/bn_584029
+                        - generic [ref=e161]: Exterior parts
+                    - listitem [ref=e162]:
+                      - link [ref=e163] [cursor=pointer]:
+                        - /url: https://www.ebay.com/b/Car-Truck-Interior-Parts-Accessories/33694/bn_584056
+                        - generic [ref=e164]: Interior parts
+                    - listitem [ref=e165]:
+                      - link [ref=e166] [cursor=pointer]:
+                        - /url: https://www.ebay.com/b/Car-Truck-Lighting-Lamps/33707/bn_557923
+                        - generic [ref=e167]: Lighting
+            - button "Next Slide" [ref=e168] [cursor=pointer]
+            - button "Pause" [ref=e169] [cursor=pointer]
+        - list [ref=e171]:
+          - listitem [ref=e172]
+          - listitem [ref=e173]
+          - listitem [ref=e174]
+          - listitem [ref=e175]
+      - region [ref=e176]:
+        - heading "The future in your hands" [level=2] [ref=e177]
+        - group [ref=e178]:
+          - list [ref=e181]:
+            - listitem [ref=e182]:
+              - link "Laptops" [ref=e183] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Laptops-Netbooks/175672/bn_1648276
+            - listitem [ref=e187]:
+              - link "Computer parts" [ref=e188] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Computer-Components-Parts/175673/bn_1643095
+            - listitem [ref=e192]:
+              - link "Smartphones" [ref=e193] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Cell-Phones-Smartphones/9355/bn_320094
+            - listitem [ref=e197]:
+              - link "Enterprise networking" [ref=e198] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Enterprise-Networking-Servers/175698/bn_1309143
+            - listitem [ref=e202]:
+              - link "Tablets and eBooks" [ref=e203] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Tablets-eReaders/171485/bn_320042
+            - listitem [ref=e207]:
+              - link "Storage and blank media" [ref=e208] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Computer-Drives-Storage-Blank-Media/165/bn_738891
+            - listitem [ref=e212]:
+              - link "Lenses and filters" [ref=e213] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Camera-Lenses-Filters/78997/bn_152392
+      - region [ref=e217]:
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - heading [level=2] [ref=e220]:
+              - link "Shopping made easy" [ref=e221] [cursor=pointer]:
+                - /url: https://pages.ebay.com/international-shipping/
+            - paragraph [ref=e223]: Enjoy reliability, secure deliveries and hassle-free returns.
+          - link "Start now" [ref=e224] [cursor=pointer]:
+            - /url: https://pages.ebay.com/international-shipping/
+      - generic [ref=e227]:
+        - heading "Shop the world. Ship for free." [level=2] [ref=e228]
+        - paragraph [ref=e229]: Discover international finds with free shipping included.
+        - link "Shop now" [ref=e230] [cursor=pointer]:
+          - /url: https://www.ebay.com/e/latam/your-items-with-free-shipping
+      - region [ref=e233]:
+        - heading "Trending on eBay" [level=2] [ref=e234]
+        - group [ref=e235]:
+          - list [ref=e238]:
+            - listitem [ref=e239]:
+              - link "Tech" [ref=e240] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Electronics/bn_7000259124
+            - listitem [ref=e244]:
+              - link "Motors" [ref=e245] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Auto-Parts-Accessories/6028/bn_569479
+            - listitem [ref=e249]:
+              - link "Luxury" [ref=e250] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Luxury-on-eBay/bn_7109710914
+            - listitem [ref=e254]:
+              - link "Collectibles and art" [ref=e255] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Collectibles-Art/bn_7000259855
+            - listitem [ref=e259]:
+              - link "Home and garden" [ref=e260] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Home-Garden/11700/bn_1853126
+            - listitem [ref=e264]:
+              - link "Trading cards" [ref=e265] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Collectible-Card-Games-Accessories/2536/bn_1852210
+            - listitem [ref=e269]:
+              - link "Health and beauty" [ref=e270] [cursor=pointer]:
+                - /url: https://www.ebay.com/b/Health-Beauty/26395/bn_1865479
+      - generic [ref=e276]:
+        - heading "Endless accessories. Epic prices." [level=2] [ref=e277]
+        - paragraph [ref=e278]: Browse millions of upgrades for your ride.
+        - link "Shop now" [ref=e279] [cursor=pointer]:
+          - /url: https://www.ebay.com/b/Car-Truck-Parts-Accessories/6030/bn_562630
+  - contentinfo [ref=e286]:
+    - generic [ref=e287]:
+      - generic [ref=e289]:
+        - heading [level=3] [ref=e290]:
+          - link "Buy" [ref=e291] [cursor=pointer]:
+            - /url: https://www.ebay.com/n/all-categories
+        - list [ref=e292]:
+          - listitem [ref=e293]:
+            - link "Registration" [ref=e294] [cursor=pointer]:
+              - /url: https://www.ebay.com/help/account/default/ebay-account?id=4188
+          - listitem [ref=e295]:
+            - link "Bidding & buying help" [ref=e296] [cursor=pointer]:
+              - /url: https://www.ebay.com/help/buying
+          - listitem [ref=e297]:
+            - link "Stores" [ref=e298] [cursor=pointer]:
+              - /url: https://www.ebay.com/b/Stores-HUB/bn_7004224522
+          - listitem [ref=e299]:
+            - link "Creator Collections" [ref=e300] [cursor=pointer]:
+              - /url: https://storefronts.ebay.com/
+          - listitem [ref=e301]:
+            - link "eBay for Charity" [ref=e302] [cursor=pointer]:
+              - /url: https://www.charity.ebay.com/
+          - listitem [ref=e303]:
+            - link "Charity Shop" [ref=e304] [cursor=pointer]:
+              - /url: https://www.ebay.com/b/Charity/bn_7114598164
+          - listitem [ref=e305]:
+            - link "Seasonal Sales and events" [ref=e306] [cursor=pointer]:
+              - /url: https://www.ebay.com/b/Sales-Events/bn_7115049177
+      - generic [ref=e307]:
+        - generic [ref=e308]:
+          - heading [level=3] [ref=e309]:
+            - link "Sell" [ref=e310] [cursor=pointer]:
+              - /url: https://www.ebay.com/sl/sell
+          - list [ref=e311]:
+            - listitem [ref=e312]:
+              - link "Start selling" [ref=e313] [cursor=pointer]:
+                - /url: https://www.ebay.com/sl/sell
+            - listitem [ref=e314]:
+              - link "How to sell" [ref=e315] [cursor=pointer]:
+                - /url: https://pages.ebay.com/seller-center/get-started/selling-basics.html?utm_source=gf-learn-to-sell&utm_medium=onsite
+            - listitem [ref=e316]:
+              - link "Business sellers" [ref=e317] [cursor=pointer]:
+                - /url: https://pages.ebay.com/seller-center/listing-and-marketing/seller-hub.html
+            - listitem [ref=e318]:
+              - link "Affiliates" [ref=e319] [cursor=pointer]:
+                - /url: https://ambassador.ebay.com/
+        - generic [ref=e320]:
+          - heading "Tools & apps" [level=3] [ref=e321]
+          - list [ref=e322]:
+            - listitem [ref=e323]:
+              - link "Developers" [ref=e324] [cursor=pointer]:
+                - /url: https://developer.ebay.com/
+            - listitem [ref=e325]:
+              - link "Security center" [ref=e326] [cursor=pointer]:
+                - /url: https://pages.ebay.com/securitycenter/index.html
+            - listitem [ref=e327]:
+              - link "Site map" [ref=e328] [cursor=pointer]:
+                - /url: https://pages.ebay.com/sitemap.html
+      - generic [ref=e329]:
+        - generic [ref=e330]:
+          - heading "eBay companies" [level=3] [ref=e331]
+          - link "TCGplayer" [ref=e333] [cursor=pointer]:
+            - /url: https://www.tcgplayer.com/
+        - generic [ref=e334]:
+          - heading "Stay connected" [level=3] [ref=e335]
+          - list [ref=e336]:
+            - listitem [ref=e337]:
+              - link "Facebook" [ref=e338] [cursor=pointer]:
+                - /url: https://www.facebook.com/ebay/
+            - listitem [ref=e339]:
+              - link "X (Twitter)" [ref=e340] [cursor=pointer]:
+                - /url: https://twitter.com/eBay
+      - generic [ref=e342]:
+        - heading [level=3] [ref=e343]:
+          - link "About eBay" [ref=e344] [cursor=pointer]:
+            - /url: https://www.ebayinc.com/
+        - list [ref=e345]:
+          - listitem [ref=e346]:
+            - link "Company info" [ref=e347] [cursor=pointer]:
+              - /url: https://www.ebayinc.com/company/
+          - listitem [ref=e348]:
+            - link "News" [ref=e349] [cursor=pointer]:
+              - /url: https://www.ebayinc.com/stories/news/
+          - listitem [ref=e350]:
+            - link "Deferred Prosecution Agreement with District of Massachusetts" [ref=e351] [cursor=pointer]:
+              - /url: https://www.ebayinc.com/stories/press-room/#assets-settlements
+          - listitem [ref=e352]:
+            - link "Investors" [ref=e353] [cursor=pointer]:
+              - /url: https://investors.ebayinc.com/overview/default.aspx
+          - listitem [ref=e354]:
+            - link "Careers" [ref=e355] [cursor=pointer]:
+              - /url: https://careers.ebayinc.com/
+          - listitem [ref=e356]:
+            - link "Diversity & Inclusion" [ref=e357] [cursor=pointer]:
+              - /url: https://www.ebayinc.com/company/diversity-equity-inclusion/
+          - listitem [ref=e358]:
+            - link "Global Impact" [ref=e359] [cursor=pointer]:
+              - /url: https://www.ebayinc.com/impact/
+          - listitem [ref=e360]:
+            - link "Government relations" [ref=e361] [cursor=pointer]:
+              - /url: https://www.ebaymainstreet.com/
+          - listitem [ref=e362]:
+            - link "Advertise with us" [ref=e363] [cursor=pointer]:
+              - /url: https://www.ebay.com/sellercenter/growth/ebay-advertising
+          - listitem [ref=e364]:
+            - link "Policies" [ref=e365] [cursor=pointer]:
+              - /url: https://www.ebay.com/help/policies/default/ebays-rules-policies?id=4205
+          - listitem [ref=e366]:
+            - link "Verified Rights Owner (VeRO) Program" [ref=e367] [cursor=pointer]:
+              - /url: https://pages.ebay.com/vero/
+          - listitem [ref=e368]:
+            - link "eCI Licenses" [ref=e369] [cursor=pointer]:
+              - /url: https://pages.ebay.com/ebayCommerce/mtl.html
+          - listitem [ref=e370]:
+            - link "Product Safety Tips" [ref=e371] [cursor=pointer]:
+              - /url: https://pages.ebay.com/safetytips
+      - generic [ref=e372]:
+        - generic [ref=e373]:
+          - heading [level=3] [ref=e374]:
+            - link "Help & Contact" [ref=e375] [cursor=pointer]:
+              - /url: https://www.ebay.com/help/home
+          - list [ref=e376]:
+            - listitem [ref=e377]:
+              - link "Seller Center" [ref=e378] [cursor=pointer]:
+                - /url: https://pages.ebay.com/seller-center/index.html?utm_source=gf&utm_medium=onsite
+            - listitem [ref=e379]:
+              - link "Contact Us" [ref=e380] [cursor=pointer]:
+                - /url: https://www.ebay.com/help/home
+            - listitem [ref=e381]:
+              - link "eBay Returns" [ref=e382] [cursor=pointer]:
+                - /url: https://pages.ebay.com/returns/
+            - listitem [ref=e383]:
+              - link "eBay Money Back Guarantee" [ref=e384] [cursor=pointer]:
+                - /url: https://pages.ebay.com/ebay-money-back-guarantee/
+        - generic [ref=e385]:
+          - heading [level=3] [ref=e386]:
+            - link "Community" [ref=e387] [cursor=pointer]:
+              - /url: https://community.ebay.com/
+          - list [ref=e388]:
+            - listitem [ref=e389]:
+              - link "Announcements" [ref=e390] [cursor=pointer]:
+                - /url: https://community.ebay.com/t5/Announcements/bg-p/Announcements
+            - listitem [ref=e391]:
+              - link "eBay Community" [ref=e392] [cursor=pointer]:
+                - /url: https://community.ebay.com/
+            - listitem [ref=e393]:
+              - link "eBay for Business Podcast" [ref=e394] [cursor=pointer]:
+                - /url: https://community.ebay.com/t5/Podcasts/ct-p/Podcasts
+        - generic [ref=e395]:
+          - heading "eBay Sites" [level=3] [ref=e396]
+          - list [ref=e397]:
+            - listitem [ref=e398]:
+              - button "eBay Sites - United States - change site" [ref=e400] [cursor=pointer]:
+                - generic [ref=e402]: United States
+    - generic [ref=e403]:
+      - text: Copyright © 1995-2026 eBay Inc. All Rights Reserved.
+      - link "Accessibility" [ref=e404] [cursor=pointer]:
+        - /url: https://www.ebayinc.com/accessibility/
+      - text: ","
+      - link "User Agreement" [ref=e405] [cursor=pointer]:
+        - /url: https://www.ebay.com/help/policies/member-behaviour-policies/user-agreement?id=4259
+      - text: ","
+      - link "Privacy" [ref=e406] [cursor=pointer]:
+        - /url: https://www.ebay.com/help/policies/member-behaviour-policies/user-privacy-notice-privacy-policy?id=4260
+      - text: ","
+      - link "Consumer Health Data" [ref=e407] [cursor=pointer]:
+        - /url: https://www.ebayinc.com/company/privacy-center/privacy-notice/consumer-health-data-privacy-policy/
+      - text: ","
+      - link "Payments Terms of Use" [ref=e408] [cursor=pointer]:
+        - /url: https://pages.ebay.com/payment/2.0/terms.html
+      - text: ","
+      - link "Cookies" [ref=e409] [cursor=pointer]:
+        - /url: https://www.ebay.com/help/policies/member-behaviour-policies/ebay-cookie-notice?id=4267
+      - text: ","
+      - link "CA Privacy Notice" [ref=e410] [cursor=pointer]:
+        - /url: https://www.ebayinc.com/company/privacy-center/privacy-notice/state-privacy-disclosures/#california
+      - text: ","
+      - link "Your Privacy Choices" [ref=e411] [cursor=pointer]:
+        - /url: https://www.ebay.com/adchoice/ccpa
+      - text: and
+      - link "AdChoice" [ref=e412] [cursor=pointer]:
+        - /url: https://www.ebay.com/adchoice
+  - paragraph [ref=e414]

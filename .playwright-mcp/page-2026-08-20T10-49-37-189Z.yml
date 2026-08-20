@@ -1,0 +1,993 @@
+- generic [ref=f335e1]:
+  - generic [ref=f335e5]:
+    - generic [ref=f335e6]:
+      - img "Картинка баннера" [ref=f335e8]
+      - generic [ref=f335e10]:
+        - paragraph [ref=f335e12]: Получите кешбэк от Альфа‑Банка за покупки с Авито Доставкой.
+        - paragraph [ref=f335e14]:
+          - link "Подробнее" [ref=f335e15] [cursor=pointer]:
+            - /url: https://www.avito.ru/brand/alfabank-cashback-delivery-big/?erid=2VfnxwVDFLX&utm_medium=big_banner_web&source=big_banner_web&utm_source=avito&utm_campaign=alfa_2507&utm_content=cashback&idfa=%7Bios_ifa%7D&gps_adid=%7Bgoogle_aid%7D&oaid=%7Boaid%7D&adjust_t=1q2q247r_1q4x2svy&adjust_campaign=alfa2507
+    - generic [ref=f335e21]:
+      - list [ref=f335e23]:
+        - listitem [ref=f335e24]:
+          - button [ref=f335e27] [cursor=pointer]
+        - listitem [ref=f335e33]:
+          - link "Карьера в Авито" [ref=f335e34] [cursor=pointer]:
+            - /url: //career.avito.com/?utm_source=avito.ru&utm_medium=referral&utm_campaign=test_placement_to_career&utm_content=top_vacancy
+        - listitem [ref=f335e35]:
+          - link "Помощь" [ref=f335e36] [cursor=pointer]:
+            - /url: //support.avito.ru
+        - listitem [ref=f335e37]:
+          - button [ref=f335e40] [cursor=pointer]
+      - generic [ref=f335e43]:
+        - link "Избранное" [ref=f335e44] [cursor=pointer]:
+          - /url: /favorites
+        - link "Корзина" [ref=f335e47] [cursor=pointer]:
+          - /url: "#login?next=%2Forder%2Fcart"
+      - link [ref=f335e51] [cursor=pointer]:
+        - /url: "#login?authsrc=h"
+      - link [ref=f335e55] [cursor=pointer]:
+        - /url: "#login?next=%2Fadditem&authsrc=ca"
+    - generic [ref=f335e64]:
+      - generic [ref=f335e68]:
+        - link "Авито — сайт объявлений" [ref=f335e71] [cursor=pointer]:
+          - /url: /
+        - generic [ref=f335e80]:
+          - button [ref=f335e85]:
+            - button [ref=f335e88] [cursor=pointer]
+          - generic [ref=f335e93]:
+            - textbox [active] [ref=f335e104]:
+              - /placeholder: Поиск по объявлениям
+            - button [ref=f335e106] [cursor=pointer]:
+              - paragraph [ref=f335e109]: Найти
+        - button "Пермь" [ref=f335e114] [cursor=pointer]:
+          - paragraph [ref=f335e117]:
+            - generic [ref=f335e118]: Пермь
+      - generic [ref=f335e119]:
+        - generic [ref=f335e128]:
+          - link [ref=f335e129] [cursor=pointer]:
+            - /url: /perm/transport?localPriority=0
+            - article [ref=f335e131]:
+              - paragraph [ref=f335e132]: Авто
+            - img "Авто" [ref=f335e133]
+          - link [ref=f335e134] [cursor=pointer]:
+            - /url: /perm/nedvizhimost?localPriority=0
+            - article [ref=f335e136]:
+              - paragraph [ref=f335e137]: Недвижимость
+            - img "Недвижимость" [ref=f335e138]
+          - link [ref=f335e139] [cursor=pointer]:
+            - /url: /perm/travel?context=H4sIAAAAAAAA_0q0MrSqLraysFJKK8rPDUhMT1WyLrYyNLBSKipNKspMTizJL1KyrgUEAAD__-WN5hwnAAAA&localPriority=0&segment=travel
+            - article [ref=f335e141]:
+              - paragraph [ref=f335e142]: Жильё для путешествия
+            - img "Путешествия" [ref=f335e143]
+          - link [ref=f335e144] [cursor=pointer]:
+            - /url: /perm/dlya_doma_i_dachi?localPriority=0
+            - article [ref=f335e146]:
+              - paragraph [ref=f335e147]: Для дома и дачи
+            - img "Для дома и дачи" [ref=f335e148]
+          - link [ref=f335e149] [cursor=pointer]:
+            - /url: /perm/zapchasti_i_aksessuary?localPriority=0
+            - article [ref=f335e151]:
+              - paragraph [ref=f335e152]: Запчасти
+            - img "Запчасти" [ref=f335e153]
+          - link [ref=f335e154] [cursor=pointer]:
+            - /url: /perm/predlozheniya_uslug?localPriority=0
+            - article [ref=f335e156]:
+              - paragraph [ref=f335e157]: Услуги
+            - img "Услуги" [ref=f335e158]
+          - link [ref=f335e159] [cursor=pointer]:
+            - /url: /perm/bytovaya_elektronika?localPriority=0
+            - article [ref=f335e161]:
+              - paragraph [ref=f335e162]: Электроника
+            - img "Электроника" [ref=f335e163]
+          - link [ref=f335e164] [cursor=pointer]:
+            - /url: /perm/vakansii?localPriority=0
+            - article [ref=f335e166]:
+              - paragraph [ref=f335e167]: Работа и подработка
+            - img "Работа" [ref=f335e168]
+          - link [ref=f335e169] [cursor=pointer]:
+            - /url: /perm/avito_for_business?localPriority=0
+            - article [ref=f335e171]:
+              - paragraph [ref=f335e172]: Бизнес 360
+            - img "Бизнес 360" [ref=f335e173]
+          - link [ref=f335e174] [cursor=pointer]:
+            - /url: /perm/lichnye_veschi?localPriority=0
+            - article [ref=f335e176]:
+              - paragraph [ref=f335e177]: Одежда, обувь, аксессуары
+            - img "Одежда, обувь, аксессуары" [ref=f335e178]
+        - generic [ref=f335e184]:
+          - generic [ref=f335e187]:
+            - banner [ref=f335e188]:
+              - link [ref=f335e189] [cursor=pointer]:
+                - /url: /perm/oborudovanie_dlya_biznesa/videoekran_ulichnyy_8163899379?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e192]:
+                  - listitem [ref=f335e193]:
+                    - img "Видеоэкран уличный" [ref=f335e195]
+                  - listitem [ref=f335e196]:
+                    - img "Видеоэкран уличный" [ref=f335e198]
+                  - listitem [ref=f335e199]:
+                    - img "Видеоэкран уличный" [ref=f335e201]
+                  - listitem [ref=f335e202]:
+                    - img "Видеоэкран уличный" [ref=f335e204]
+                  - listitem [ref=f335e205]:
+                    - img "Видеоэкран уличный" [ref=f335e207]
+                    - generic [ref=f335e208]: Ещё4 фото
+            - generic [ref=f335e209]:
+              - generic [ref=f335e211]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e213] [cursor=pointer]
+                - button [ref=f335e217] [cursor=pointer]
+              - heading [level=2] [ref=f335e222]:
+                - link "Видеоэкран уличный" [ref=f335e223] [cursor=pointer]:
+                  - /url: /perm/oborudovanie_dlya_biznesa/videoekran_ulichnyy_8163899379?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e229]:
+                - strong [ref=f335e230]: 54 100 ₽
+              - paragraph [ref=f335e234]:
+                - generic [ref=f335e235]: Пермь, р-н Ленинский
+          - generic [ref=f335e242]:
+            - banner [ref=f335e243]:
+              - link [ref=f335e244] [cursor=pointer]:
+                - /url: /perm/odezhda_obuv_aksessuary/plate_zhenskoe_8277098172?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e247]:
+                  - listitem [ref=f335e248]:
+                    - img "Платье женское" [ref=f335e250]
+                  - listitem [ref=f335e251]:
+                    - img "Платье женское" [ref=f335e253]
+            - generic [ref=f335e254]:
+              - generic [ref=f335e256]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e258] [cursor=pointer]
+                - button [ref=f335e262] [cursor=pointer]
+              - heading [level=2] [ref=f335e267]:
+                - link "Платье женское" [ref=f335e268] [cursor=pointer]:
+                  - /url: /perm/odezhda_obuv_aksessuary/plate_zhenskoe_8277098172?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e274]:
+                - strong [ref=f335e275]: 549 ₽
+          - generic [ref=f335e278]:
+            - banner [ref=f335e279]:
+              - link [ref=f335e280] [cursor=pointer]:
+                - /url: /perm/predlozheniya_uslug/restrukturizatsiya_kredita_-_umenshim_vash_platezh_8325529238?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e283]:
+                  - listitem [ref=f335e284]:
+                    - img "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e286]
+                  - listitem [ref=f335e287]:
+                    - img "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e289]
+                  - listitem [ref=f335e290]:
+                    - img "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e292]
+                  - listitem [ref=f335e293]:
+                    - img "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e295]
+                  - listitem [ref=f335e296]:
+                    - img "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e298]
+                    - generic [ref=f335e299]: Ещё5 фото
+            - generic [ref=f335e300]:
+              - generic [ref=f335e302]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e304] [cursor=pointer]
+                - button [ref=f335e308] [cursor=pointer]
+              - heading [level=2] [ref=f335e313]:
+                - link "Реструктуризация кредита - уменьшим ваш платеж" [ref=f335e314] [cursor=pointer]:
+                  - /url: /perm/predlozheniya_uslug/restrukturizatsiya_kredita_-_umenshim_vash_platezh_8325529238?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e320]:
+                - strong [ref=f335e321]: 1 500 ₽
+              - paragraph [ref=f335e325]:
+                - generic [ref=f335e326]: Пермь, р-н Дзержинский
+          - generic [ref=f335e333]:
+            - banner [ref=f335e334]:
+              - link [ref=f335e335] [cursor=pointer]:
+                - /url: /perm/sobaki/vostochnoevropeyskaya_ovcharka_vyazka_8329097778?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e338]:
+                  - listitem [ref=f335e339]:
+                    - img "Восточноевропейская овчарка, вязка" [ref=f335e341]
+                  - listitem [ref=f335e342]:
+                    - img "Восточноевропейская овчарка, вязка" [ref=f335e344]
+                  - listitem [ref=f335e345]:
+                    - img "Восточноевропейская овчарка, вязка" [ref=f335e347]
+            - generic [ref=f335e348]:
+              - generic [ref=f335e350]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e352] [cursor=pointer]
+                - button [ref=f335e356] [cursor=pointer]
+              - heading [level=2] [ref=f335e361]:
+                - link "Восточноевропейская овчарка, вязка" [ref=f335e362] [cursor=pointer]:
+                  - /url: /perm/sobaki/vostochnoevropeyskaya_ovcharka_vyazka_8329097778?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e368]:
+                - strong [ref=f335e369]: 10 ₽
+              - paragraph [ref=f335e373]:
+                - generic [ref=f335e374]: Пермь, р-н Мотовилихинский
+          - generic [ref=f335e381]:
+            - banner [ref=f335e382]:
+              - link [ref=f335e383] [cursor=pointer]:
+                - /url: /perm/zemelnye_uchastki/uchastok_10_sot._snt_dnp_8299379767?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e386]:
+                  - listitem:
+                    - img "Участок 10 сот. (СНТ, ДНП)" [ref=f335e388]
+            - generic [ref=f335e389]:
+              - generic [ref=f335e391]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e393] [cursor=pointer]
+                - button [ref=f335e397] [cursor=pointer]
+              - heading [level=2] [ref=f335e402]:
+                - link "Участок 10 сот. (СНТ, ДНП)" [ref=f335e403] [cursor=pointer]:
+                  - /url: /perm/zemelnye_uchastki/uchastok_10_sot._snt_dnp_8299379767?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e409]:
+                - strong [ref=f335e410]: 60 000 ₽ в месяц
+              - paragraph [ref=f335e414]:
+                - generic [ref=f335e415]: Пермь
+          - generic [ref=f335e422]:
+            - banner [ref=f335e423]:
+              - link [ref=f335e424] [cursor=pointer]:
+                - /url: /perm/sobaki/chihuahua_schenok_8244569658?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e427]:
+                  - listitem [ref=f335e428]:
+                    - img "Чихуахуа, щенок" [ref=f335e430]
+                  - listitem [ref=f335e431]:
+                    - img "Чихуахуа, щенок" [ref=f335e433]
+                  - listitem [ref=f335e434]:
+                    - img "Чихуахуа, щенок" [ref=f335e436]
+                  - listitem [ref=f335e437]:
+                    - img "Чихуахуа, щенок" [ref=f335e439]
+                  - listitem [ref=f335e440]:
+                    - img "Чихуахуа, щенок" [ref=f335e442]
+                    - generic [ref=f335e443]: Ещё3 фото
+            - generic [ref=f335e444]:
+              - generic [ref=f335e446]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e448] [cursor=pointer]
+                - button [ref=f335e452] [cursor=pointer]
+              - heading [level=2] [ref=f335e457]:
+                - link "Чихуахуа, щенок" [ref=f335e458] [cursor=pointer]:
+                  - /url: /perm/sobaki/chihuahua_schenok_8244569658?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e464]:
+                - strong [ref=f335e465]: 35 000 ₽
+          - generic [ref=f335e468]:
+            - banner [ref=f335e469]:
+              - link [ref=f335e470] [cursor=pointer]:
+                - /url: /perm/sport_i_otdyh/trenazher_7972969455?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e473]:
+                  - listitem [ref=f335e474]:
+                    - img "Тренажер" [ref=f335e476]
+                  - listitem [ref=f335e477]:
+                    - img "Тренажер" [ref=f335e479]
+                  - listitem [ref=f335e480]:
+                    - img "Тренажер" [ref=f335e482]
+            - generic [ref=f335e483]:
+              - generic [ref=f335e485]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e487] [cursor=pointer]
+                - button [ref=f335e491] [cursor=pointer]
+              - heading [level=2] [ref=f335e496]:
+                - link "Тренажер" [ref=f335e497] [cursor=pointer]:
+                  - /url: /perm/sport_i_otdyh/trenazher_7972969455?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e503]:
+                - strong [ref=f335e504]: 15 000 ₽
+          - generic [ref=f335e507]:
+            - banner [ref=f335e508]:
+              - link [ref=f335e509] [cursor=pointer]:
+                - /url: /perm/gotoviy_biznes/avtobaza_baza_dlya_gruzovikov_i_spetstehniki_8206138152?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e512]:
+                  - listitem:
+                    - img "Автобаза, база для грузовиков и спецтехники" [ref=f335e514]
+            - generic [ref=f335e515]:
+              - generic [ref=f335e517]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e519] [cursor=pointer]
+                - button [ref=f335e523] [cursor=pointer]
+              - heading [level=2] [ref=f335e528]:
+                - link "Автобаза, база для грузовиков и спецтехники" [ref=f335e529] [cursor=pointer]:
+                  - /url: /perm/gotoviy_biznes/avtobaza_baza_dlya_gruzovikov_i_spetstehniki_8206138152?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e535]:
+                - strong [ref=f335e536]: 82 000 000 ₽
+              - paragraph [ref=f335e540]:
+                - generic [ref=f335e541]: Пермь, р-н Кировский
+          - generic [ref=f335e548]:
+            - banner [ref=f335e549]:
+              - link [ref=f335e550] [cursor=pointer]:
+                - /url: /perm/tovary_dlya_zhivotnyh/korm_dlya_sobak_nd_quinoa_8343604443?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e553]:
+                  - listitem [ref=f335e554]:
+                    - img "Корм для собак N&D quinoa" [ref=f335e556]
+                  - listitem [ref=f335e557]:
+                    - img "Корм для собак N&D quinoa" [ref=f335e559]
+            - generic [ref=f335e560]:
+              - generic [ref=f335e562]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e564] [cursor=pointer]
+                - button [ref=f335e568] [cursor=pointer]
+              - heading [level=2] [ref=f335e573]:
+                - link "Корм для собак N&D quinoa" [ref=f335e574] [cursor=pointer]:
+                  - /url: /perm/tovary_dlya_zhivotnyh/korm_dlya_sobak_nd_quinoa_8343604443?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e580]:
+                - strong [ref=f335e581]: 4 300 ₽
+              - paragraph [ref=f335e585]:
+                - generic [ref=f335e586]: Пермь, р-н Свердловский
+          - generic [ref=f335e593]:
+            - banner [ref=f335e594]:
+              - link [ref=f335e595] [cursor=pointer]:
+                - /url: /perm/drugie_zhivotnye/triton_akvariumnyy_8339199448?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e598]:
+                  - listitem [ref=f335e599]:
+                    - img "Тритон аквариумный" [ref=f335e601]
+                  - listitem [ref=f335e602]:
+                    - img "Тритон аквариумный" [ref=f335e604]
+                  - listitem [ref=f335e605]:
+                    - img "Тритон аквариумный" [ref=f335e607]
+            - generic [ref=f335e608]:
+              - generic [ref=f335e610]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e612] [cursor=pointer]
+                - button [ref=f335e616] [cursor=pointer]
+              - heading [level=2] [ref=f335e621]:
+                - link "Тритон аквариумный" [ref=f335e622] [cursor=pointer]:
+                  - /url: /perm/drugie_zhivotnye/triton_akvariumnyy_8339199448?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e628]:
+                - strong [ref=f335e629]: 2 000 ₽
+              - paragraph [ref=f335e633]:
+                - generic [ref=f335e634]: Пермь, р-н Ленинский
+          - generic [ref=f335e641]:
+            - banner [ref=f335e642]:
+              - link [ref=f335e643] [cursor=pointer]:
+                - /url: /perm/tovary_dlya_detey_i_igrushki/kolyaska_2_v_1_bu_7929180511?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e646]:
+                  - listitem [ref=f335e647]:
+                    - img "Коляска 2 в 1 бу" [ref=f335e649]
+                  - listitem [ref=f335e650]:
+                    - img "Коляска 2 в 1 бу" [ref=f335e652]
+                  - listitem [ref=f335e653]:
+                    - img "Коляска 2 в 1 бу" [ref=f335e655]
+                  - listitem [ref=f335e656]:
+                    - img "Коляска 2 в 1 бу" [ref=f335e658]
+                  - listitem [ref=f335e659]:
+                    - img "Коляска 2 в 1 бу" [ref=f335e661]
+            - generic [ref=f335e662]:
+              - generic [ref=f335e664]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e666] [cursor=pointer]
+                - button [ref=f335e670] [cursor=pointer]
+              - heading [level=2] [ref=f335e675]:
+                - link "Коляска 2 в 1 бу" [ref=f335e676] [cursor=pointer]:
+                  - /url: /perm/tovary_dlya_detey_i_igrushki/kolyaska_2_v_1_bu_7929180511?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e682]:
+                - strong [ref=f335e683]: 9 000 ₽
+              - paragraph [ref=f335e687]:
+                - generic [ref=f335e688]: Пермь, р-н Орджоникидзевский
+          - generic [ref=f335e695]:
+            - banner [ref=f335e696]:
+              - link [ref=f335e697] [cursor=pointer]:
+                - /url: /perm/predlozheniya_uslug/shtrablenie_pod_klyuch_8320696031?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e700]:
+                  - listitem:
+                    - img "Штрабление под ключ" [ref=f335e702]
+            - generic [ref=f335e703]:
+              - generic [ref=f335e705]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e707] [cursor=pointer]
+                - button [ref=f335e711] [cursor=pointer]
+              - heading [level=2] [ref=f335e716]:
+                - link "Штрабление под ключ" [ref=f335e717] [cursor=pointer]:
+                  - /url: /perm/predlozheniya_uslug/shtrablenie_pod_klyuch_8320696031?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e723]:
+                - strong [ref=f335e724]: 3 000 ₽
+              - paragraph [ref=f335e728]:
+                - generic [ref=f335e729]: Пермь, р-н Ленинский
+          - generic [ref=f335e738]:
+            - banner [ref=f335e739]:
+              - link [ref=f335e740] [cursor=pointer]:
+                - /url: /perm/sport_i_otdyh/shtanga_grif_bliny_bu_7974565212?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e743]:
+                  - listitem [ref=f335e744]:
+                    - img "Штанга, гриф, блины, бу" [ref=f335e746]
+                  - listitem [ref=f335e747]:
+                    - img "Штанга, гриф, блины, бу" [ref=f335e749]
+            - generic [ref=f335e750]:
+              - generic [ref=f335e752]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e754] [cursor=pointer]
+                - button [ref=f335e758] [cursor=pointer]
+              - heading [level=2] [ref=f335e763]:
+                - link "Штанга, гриф, блины, бу" [ref=f335e764] [cursor=pointer]:
+                  - /url: /perm/sport_i_otdyh/shtanga_grif_bliny_bu_7974565212?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e770]:
+                - strong [ref=f335e771]: 23 000 ₽
+              - paragraph [ref=f335e775]:
+                - generic [ref=f335e776]: Пермь, р-н Дзержинский
+          - generic [ref=f335e783]:
+            - banner [ref=f335e784]:
+              - link [ref=f335e785] [cursor=pointer]:
+                - /url: /perm/oborudovanie_dlya_biznesa/ustanovka_mikroklimata_8240377804?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e788]:
+                  - listitem [ref=f335e789]:
+                    - img "Установка микроклимата" [ref=f335e791]
+                  - listitem [ref=f335e792]:
+                    - img "Установка микроклимата" [ref=f335e794]
+            - generic [ref=f335e795]:
+              - generic [ref=f335e797]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e799] [cursor=pointer]
+                - button [ref=f335e803] [cursor=pointer]
+              - heading [level=2] [ref=f335e808]:
+                - link "Установка микроклимата" [ref=f335e809] [cursor=pointer]:
+                  - /url: /perm/oborudovanie_dlya_biznesa/ustanovka_mikroklimata_8240377804?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e815]:
+                - strong [ref=f335e816]: 234 600 ₽
+              - paragraph [ref=f335e820]:
+                - generic [ref=f335e821]: Пермь, р-н Ленинский
+          - generic [ref=f335e828]:
+            - banner [ref=f335e829]:
+              - link [ref=f335e830] [cursor=pointer]:
+                - /url: /perm/orgtehnika_i_rashodniki/panel_operatora_siemens_ktp1000_basic_dp_8303073124?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e833]:
+                  - listitem [ref=f335e834]:
+                    - img "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e836]
+                  - listitem [ref=f335e837]:
+                    - img "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e839]
+                  - listitem [ref=f335e840]:
+                    - img "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e842]
+                  - listitem [ref=f335e843]:
+                    - img "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e845]
+                  - listitem [ref=f335e846]:
+                    - img "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e848]
+            - generic [ref=f335e849]:
+              - generic [ref=f335e851]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e853] [cursor=pointer]
+                - button [ref=f335e857] [cursor=pointer]
+              - heading [level=2] [ref=f335e862]:
+                - link "Панель оператора Siemens KTP1000 Basic DP" [ref=f335e863] [cursor=pointer]:
+                  - /url: /perm/orgtehnika_i_rashodniki/panel_operatora_siemens_ktp1000_basic_dp_8303073124?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e869]:
+                - strong [ref=f335e870]: 60 000 ₽
+          - generic [ref=f335e873]:
+            - banner [ref=f335e874]:
+              - link [ref=f335e875] [cursor=pointer]:
+                - /url: /perm/vakansii/gornyy_rabochiy_v_artel_dalnevostochnyy_okrug_8034890630?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e878]:
+                  - listitem:
+                    - img "Горный рабочий в Артель Дальневосточный округ" [ref=f335e880]
+            - generic [ref=f335e881]:
+              - generic [ref=f335e883]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e885] [cursor=pointer]
+                - button [ref=f335e889] [cursor=pointer]
+              - heading [level=2] [ref=f335e894]:
+                - link "Горный рабочий в Артель Дальневосточный округ" [ref=f335e895] [cursor=pointer]:
+                  - /url: /perm/vakansii/gornyy_rabochiy_v_artel_dalnevostochnyy_okrug_8034890630?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e901]:
+                - strong [ref=f335e902]: 160 000 ₽ на руки
+              - paragraph [ref=f335e906]:
+                - generic [ref=f335e907]: Пермь, р-н Ленинский
+          - generic [ref=f335e914]:
+            - banner [ref=f335e915]:
+              - link [ref=f335e916] [cursor=pointer]:
+                - /url: /perm/kvartiry/5-k._kvartira_1661_m_411_et._8011131000?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e919]:
+                  - listitem [ref=f335e920]:
+                    - img "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e922]
+                  - listitem [ref=f335e923]:
+                    - img "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e925]
+                  - listitem [ref=f335e926]:
+                    - img "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e928]
+                  - listitem [ref=f335e929]:
+                    - img "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e931]
+                  - listitem [ref=f335e932]:
+                    - img "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e934]
+                    - generic [ref=f335e935]: Ещё5 фото
+            - generic [ref=f335e936]:
+              - generic [ref=f335e938]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e940] [cursor=pointer]
+                - button [ref=f335e944] [cursor=pointer]
+              - heading [level=2] [ref=f335e949]:
+                - link "5-к. квартира, 166,1 м², 4/11 эт." [ref=f335e950] [cursor=pointer]:
+                  - /url: /perm/kvartiry/5-k._kvartira_1661_m_411_et._8011131000?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e956]:
+                - strong [ref=f335e957]: 320 000 ₽ в месяц
+              - paragraph [ref=f335e961]:
+                - generic [ref=f335e962]: Пермь, р-н Ленинский
+          - generic [ref=f335e969]:
+            - banner [ref=f335e970]:
+              - link [ref=f335e971] [cursor=pointer]:
+                - /url: /perm/koshki/evropeyskiy_burmanskiy_kotenok_8240484118?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e974]:
+                  - listitem [ref=f335e975]:
+                    - img "Европейский бурманский котёнок" [ref=f335e977]
+                  - listitem [ref=f335e978]:
+                    - img "Европейский бурманский котёнок" [ref=f335e980]
+                  - listitem [ref=f335e981]:
+                    - img "Европейский бурманский котёнок" [ref=f335e983]
+                  - listitem [ref=f335e984]:
+                    - img "Европейский бурманский котёнок" [ref=f335e986]
+            - generic [ref=f335e987]:
+              - generic [ref=f335e989]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e991] [cursor=pointer]
+                - button [ref=f335e995] [cursor=pointer]
+              - heading [level=2] [ref=f335e1000]:
+                - link "Европейский бурманский котёнок" [ref=f335e1001] [cursor=pointer]:
+                  - /url: /perm/koshki/evropeyskiy_burmanskiy_kotenok_8240484118?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1007]:
+                - strong [ref=f335e1008]: 55 000 ₽
+          - generic [ref=f335e1011]:
+            - banner [ref=f335e1012]:
+              - link [ref=f335e1013] [cursor=pointer]:
+                - /url: /perm/odezhda_obuv_aksessuary/kozhanaya_kurtka_kosuha_8244845066?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1016]:
+                  - listitem [ref=f335e1017]:
+                    - img "Кожаная куртка косуха" [ref=f335e1019]
+                  - listitem [ref=f335e1020]:
+                    - img "Кожаная куртка косуха" [ref=f335e1022]
+                  - listitem [ref=f335e1023]:
+                    - img "Кожаная куртка косуха" [ref=f335e1025]
+            - generic [ref=f335e1026]:
+              - generic [ref=f335e1028]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1030] [cursor=pointer]
+                - button [ref=f335e1034] [cursor=pointer]
+              - heading [level=2] [ref=f335e1039]:
+                - link "Кожаная куртка косуха" [ref=f335e1040] [cursor=pointer]:
+                  - /url: /perm/odezhda_obuv_aksessuary/kozhanaya_kurtka_kosuha_8244845066?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1046]:
+                - strong [ref=f335e1047]: 1 000 ₽
+              - paragraph [ref=f335e1051]:
+                - generic [ref=f335e1052]: Пермь, р-н Свердловский
+          - generic [ref=f335e1059]:
+            - banner [ref=f335e1060]:
+              - link [ref=f335e1061] [cursor=pointer]:
+                - /url: /perm/telefony/samsung_galaxy_a5_2016_sm-a510f_216_gb_2_sim_8263135594?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1064]:
+                  - listitem [ref=f335e1065]:
+                    - img "Samsung Galaxy A5 (2016) SM-A510F, 2/16 ГБ, 2 SIM" [ref=f335e1067]
+                  - listitem [ref=f335e1068]:
+                    - img "Samsung Galaxy A5 (2016) SM-A510F, 2/16 ГБ, 2 SIM" [ref=f335e1070]
+                  - listitem [ref=f335e1071]:
+                    - img "Samsung Galaxy A5 (2016) SM-A510F, 2/16 ГБ, 2 SIM" [ref=f335e1073]
+                  - listitem [ref=f335e1074]:
+                    - img "Samsung Galaxy A5 (2016) SM-A510F, 2/16 ГБ, 2 SIM" [ref=f335e1076]
+            - generic [ref=f335e1077]:
+              - generic [ref=f335e1079]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1081] [cursor=pointer]
+                - button [ref=f335e1085] [cursor=pointer]
+              - heading [level=2] [ref=f335e1090]:
+                - link "Samsung Galaxy A5 (2016) SM-A510F, 2/16 ГБ, 2 SIM" [ref=f335e1091] [cursor=pointer]:
+                  - /url: /perm/telefony/samsung_galaxy_a5_2016_sm-a510f_216_gb_2_sim_8263135594?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1097]:
+                - strong [ref=f335e1098]: 1 000 ₽
+          - generic [ref=f335e1101]:
+            - banner [ref=f335e1102]:
+              - link [ref=f335e1103] [cursor=pointer]:
+                - /url: /perm/orgtehnika_i_rashodniki/zapchast_canon_cover_hinge_lower_left_fe2-a113_8228051668?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1106]:
+                  - listitem:
+                    - img "Запчасть Canon cover, hinge lower, left / FE2-A113" [ref=f335e1108]
+            - generic [ref=f335e1109]:
+              - generic [ref=f335e1111]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1113] [cursor=pointer]
+                - button [ref=f335e1117] [cursor=pointer]
+              - heading [level=2] [ref=f335e1122]:
+                - link "Запчасть Canon cover, hinge lower, left / FE2-A113" [ref=f335e1123] [cursor=pointer]:
+                  - /url: /perm/orgtehnika_i_rashodniki/zapchast_canon_cover_hinge_lower_left_fe2-a113_8228051668?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1129]:
+                - strong [ref=f335e1130]: Бесплатно
+              - paragraph [ref=f335e1134]:
+                - generic [ref=f335e1135]: Пермь, р-н Мотовилихинский
+          - generic [ref=f335e1142]:
+            - banner [ref=f335e1143]:
+              - link [ref=f335e1144] [cursor=pointer]:
+                - /url: /perm/knigi_i_zhurnaly/detskie_knigi_8279123245?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1147]:
+                  - listitem:
+                    - img "Детские книги" [ref=f335e1149]
+            - generic [ref=f335e1150]:
+              - generic [ref=f335e1152]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1154] [cursor=pointer]
+                - button [ref=f335e1158] [cursor=pointer]
+              - heading [level=2] [ref=f335e1163]:
+                - link "Детские книги" [ref=f335e1164] [cursor=pointer]:
+                  - /url: /perm/knigi_i_zhurnaly/detskie_knigi_8279123245?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1170]:
+                - strong [ref=f335e1171]: 250 ₽
+          - generic [ref=f335e1174]:
+            - banner [ref=f335e1175]:
+              - link [ref=f335e1176] [cursor=pointer]:
+                - /url: /perm/krasota_i_zdorove/trost_trives_4-h_opornaya_ca842_8329339934?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1179]:
+                  - listitem [ref=f335e1180]:
+                    - img "Трость trives 4-х опорная CA842" [ref=f335e1182]
+                  - listitem [ref=f335e1183]:
+                    - img "Трость trives 4-х опорная CA842" [ref=f335e1185]
+            - generic [ref=f335e1186]:
+              - generic [ref=f335e1188]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1190] [cursor=pointer]
+                - button [ref=f335e1194] [cursor=pointer]
+              - heading [level=2] [ref=f335e1199]:
+                - link "Трость trives 4-х опорная CA842" [ref=f335e1200] [cursor=pointer]:
+                  - /url: /perm/krasota_i_zdorove/trost_trives_4-h_opornaya_ca842_8329339934?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1206]:
+                - strong [ref=f335e1207]: 600 ₽
+          - generic [ref=f335e1210]:
+            - banner [ref=f335e1211]:
+              - link [ref=f335e1212] [cursor=pointer]:
+                - /url: /perm/akvarium/akvarium_trebuet_remonta_8342164110?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1215]:
+                  - listitem:
+                    - img "Аквариум требует ремонта" [ref=f335e1217]
+            - generic [ref=f335e1218]:
+              - generic [ref=f335e1220]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1222] [cursor=pointer]
+                - button [ref=f335e1226] [cursor=pointer]
+              - heading [level=2] [ref=f335e1231]:
+                - link "Аквариум требует ремонта" [ref=f335e1232] [cursor=pointer]:
+                  - /url: /perm/akvarium/akvarium_trebuet_remonta_8342164110?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1238]:
+                - strong [ref=f335e1239]: 390 ₽
+          - generic [ref=f335e1248]:
+            - generic [ref=f335e1269] [cursor=pointer]:
+              - generic [ref=f335e1270]: Служба по контракту для мужчин
+              - generic [ref=f335e1279]: Полное сопровождение, прозрачные условия. Реклама
+            - button "Подробнее" [ref=f335e1282] [cursor=pointer]
+          - generic [ref=f335e1287]:
+            - banner [ref=f335e1288]:
+              - link [ref=f335e1289] [cursor=pointer]:
+                - /url: /perm/akvarium/dekor_dlya_akvariuma_bu_8263499580?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1292]:
+                  - listitem [ref=f335e1293]:
+                    - img "Декор для аквариума бу" [ref=f335e1295]
+                  - listitem [ref=f335e1296]:
+                    - img "Декор для аквариума бу" [ref=f335e1298]
+            - generic [ref=f335e1299]:
+              - generic [ref=f335e1301]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1303] [cursor=pointer]
+                - button [ref=f335e1307] [cursor=pointer]
+              - heading [level=2] [ref=f335e1312]:
+                - link "Декор для аквариума бу" [ref=f335e1313] [cursor=pointer]:
+                  - /url: /perm/akvarium/dekor_dlya_akvariuma_bu_8263499580?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1319]:
+                - strong [ref=f335e1320]: 150 ₽
+              - paragraph [ref=f335e1324]:
+                - generic [ref=f335e1325]: Пермь, р-н Дзержинский
+          - generic [ref=f335e1332]:
+            - banner [ref=f335e1333]:
+              - link [ref=f335e1334] [cursor=pointer]:
+                - /url: /perm/akvarium/filtr_akvariumnyy_vnutrenniy_aquael_8322812644?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1337]:
+                  - listitem [ref=f335e1338]:
+                    - img "Фильтр аквариумный внутренний Aquael" [ref=f335e1340]
+                  - listitem [ref=f335e1341]:
+                    - img "Фильтр аквариумный внутренний Aquael" [ref=f335e1343]
+                  - listitem [ref=f335e1344]:
+                    - img "Фильтр аквариумный внутренний Aquael" [ref=f335e1346]
+            - generic [ref=f335e1347]:
+              - generic [ref=f335e1349]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1351] [cursor=pointer]
+                - button [ref=f335e1355] [cursor=pointer]
+              - heading [level=2] [ref=f335e1360]:
+                - link "Фильтр аквариумный внутренний Aquael" [ref=f335e1361] [cursor=pointer]:
+                  - /url: /perm/akvarium/filtr_akvariumnyy_vnutrenniy_aquael_8322812644?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1367]:
+                - strong [ref=f335e1368]: 500 ₽
+              - paragraph [ref=f335e1372]:
+                - generic [ref=f335e1373]: Пермь, р-н Ленинский
+          - generic [ref=f335e1380]:
+            - banner [ref=f335e1381]:
+              - link [ref=f335e1382] [cursor=pointer]:
+                - /url: /perm/akvarium/chernopolosaya_tsihlazoma_8383016652?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1385]:
+                  - listitem [ref=f335e1386]:
+                    - img "Чернополосая цихлазома" [ref=f335e1388]
+                  - listitem [ref=f335e1389]:
+                    - img "Чернополосая цихлазома" [ref=f335e1391]
+                  - listitem [ref=f335e1392]:
+                    - img "Чернополосая цихлазома" [ref=f335e1394]
+                  - listitem [ref=f335e1395]:
+                    - img "Чернополосая цихлазома" [ref=f335e1397]
+                  - listitem [ref=f335e1398]:
+                    - img "Чернополосая цихлазома" [ref=f335e1400]
+                    - generic [ref=f335e1401]: Ещё2 фото
+            - generic [ref=f335e1402]:
+              - generic [ref=f335e1404]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1406] [cursor=pointer]
+                - button [ref=f335e1410] [cursor=pointer]
+              - heading [level=2] [ref=f335e1415]:
+                - link "Чернополосая цихлазома" [ref=f335e1416] [cursor=pointer]:
+                  - /url: /perm/akvarium/chernopolosaya_tsihlazoma_8383016652?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1422]:
+                - strong [ref=f335e1423]: Бесплатно
+              - paragraph [ref=f335e1427]:
+                - generic [ref=f335e1428]: Пермь, р-н Свердловский
+          - generic [ref=f335e1435]:
+            - banner [ref=f335e1436]:
+              - link [ref=f335e1437] [cursor=pointer]:
+                - /url: /perm/tovary_dlya_zhivotnyh/perevozka_dlya_sobak_v_t_ch_v_samolete_8312763023?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1440]:
+                  - listitem [ref=f335e1441]:
+                    - img "Перевозка для собак (в т ч ) в самолёте" [ref=f335e1443]
+                  - listitem [ref=f335e1444]:
+                    - img "Перевозка для собак (в т ч ) в самолёте" [ref=f335e1446]
+                  - listitem [ref=f335e1447]:
+                    - img "Перевозка для собак (в т ч ) в самолёте" [ref=f335e1449]
+                  - listitem [ref=f335e1450]:
+                    - img "Перевозка для собак (в т ч ) в самолёте" [ref=f335e1452]
+            - generic [ref=f335e1453]:
+              - generic [ref=f335e1455]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1457] [cursor=pointer]
+                - button [ref=f335e1461] [cursor=pointer]
+              - heading [level=2] [ref=f335e1466]:
+                - link "Перевозка для собак (в т ч ) в самолёте" [ref=f335e1467] [cursor=pointer]:
+                  - /url: /perm/tovary_dlya_zhivotnyh/perevozka_dlya_sobak_v_t_ch_v_samolete_8312763023?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1473]:
+                - strong [ref=f335e1474]: 11 000 ₽
+          - generic [ref=f335e1477]:
+            - banner [ref=f335e1478]:
+              - link [ref=f335e1479] [cursor=pointer]:
+                - /url: /perm/akvarium/akvarium_atman_8325134527?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1482]:
+                  - listitem [ref=f335e1483]:
+                    - img "Аквариум atman" [ref=f335e1485]
+                  - listitem [ref=f335e1486]:
+                    - img "Аквариум atman" [ref=f335e1488]
+                  - listitem [ref=f335e1489]:
+                    - img "Аквариум atman" [ref=f335e1491]
+                  - listitem [ref=f335e1492]:
+                    - img "Аквариум atman" [ref=f335e1494]
+                  - listitem [ref=f335e1495]:
+                    - img "Аквариум atman" [ref=f335e1497]
+                    - generic [ref=f335e1498]: Ещё1 фото
+            - generic [ref=f335e1499]:
+              - generic [ref=f335e1501]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1503] [cursor=pointer]
+                - button [ref=f335e1507] [cursor=pointer]
+              - heading [level=2] [ref=f335e1512]:
+                - link "Аквариум atman" [ref=f335e1513] [cursor=pointer]:
+                  - /url: /perm/akvarium/akvarium_atman_8325134527?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1519]:
+                - strong [ref=f335e1520]: 3 000 ₽
+              - paragraph [ref=f335e1524]:
+                - generic [ref=f335e1525]: Пермь, р-н Мотовилихинский
+          - generic [ref=f335e1538]:
+            - generic [ref=f335e1559] [cursor=pointer]:
+              - generic [ref=f335e1560]: Права от 22 950 ₽ в Автошколе!
+              - generic [ref=f335e1569]: Сдашь с 1-го раза, или вернём деньги. Реклама
+            - button "Подробнее" [ref=f335e1572] [cursor=pointer]
+          - generic [ref=f335e1577]:
+            - banner [ref=f335e1578]:
+              - link [ref=f335e1579] [cursor=pointer]:
+                - /url: /perm/akvarium/akvarium_8383523329?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1582]:
+                  - listitem [ref=f335e1583]:
+                    - img "Аквариум" [ref=f335e1585]
+                  - listitem [ref=f335e1586]:
+                    - img "Аквариум" [ref=f335e1588]
+            - generic [ref=f335e1589]:
+              - generic [ref=f335e1591]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1593] [cursor=pointer]
+                - button [ref=f335e1597] [cursor=pointer]
+              - heading [level=2] [ref=f335e1602]:
+                - link "Аквариум" [ref=f335e1603] [cursor=pointer]:
+                  - /url: /perm/akvarium/akvarium_8383523329?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1609]:
+                - strong [ref=f335e1610]: 1 000 ₽
+              - paragraph [ref=f335e1614]:
+                - generic [ref=f335e1615]: Пермь, р-н Дзержинский
+          - generic [ref=f335e1622]:
+            - banner [ref=f335e1623]:
+              - link [ref=f335e1624] [cursor=pointer]:
+                - /url: /perm/odezhda_obuv_aksessuary/kozhanaya_kurtka_kosuha_42_8242151235?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1627]:
+                  - listitem [ref=f335e1628]:
+                    - img "Кожаная куртка косуха 42" [ref=f335e1630]
+                  - listitem [ref=f335e1631]:
+                    - img "Кожаная куртка косуха 42" [ref=f335e1633]
+                  - listitem [ref=f335e1634]:
+                    - img "Кожаная куртка косуха 42" [ref=f335e1636]
+            - generic [ref=f335e1637]:
+              - generic [ref=f335e1639]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1641] [cursor=pointer]
+                - button [ref=f335e1645] [cursor=pointer]
+              - heading [level=2] [ref=f335e1650]:
+                - link "Кожаная куртка косуха 42" [ref=f335e1651] [cursor=pointer]:
+                  - /url: /perm/odezhda_obuv_aksessuary/kozhanaya_kurtka_kosuha_42_8242151235?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1657]:
+                - strong [ref=f335e1658]: 250 ₽
+          - generic [ref=f335e1661]:
+            - banner [ref=f335e1662]:
+              - link [ref=f335e1663] [cursor=pointer]:
+                - /url: /perm/tovary_dlya_zhivotnyh/lezhanka_dlya_koshek_i_sobak_8241260879?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1666]:
+                  - listitem [ref=f335e1667]:
+                    - img "Лежанка для кошек и собак" [ref=f335e1669]
+                  - listitem [ref=f335e1670]:
+                    - img "Лежанка для кошек и собак" [ref=f335e1672]
+                  - listitem [ref=f335e1673]:
+                    - img "Лежанка для кошек и собак" [ref=f335e1675]
+                  - listitem [ref=f335e1676]:
+                    - img "Лежанка для кошек и собак" [ref=f335e1678]
+                  - listitem [ref=f335e1679]:
+                    - img "Лежанка для кошек и собак" [ref=f335e1681]
+            - generic [ref=f335e1682]:
+              - generic [ref=f335e1684]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1686] [cursor=pointer]
+                - button [ref=f335e1690] [cursor=pointer]
+              - heading [level=2] [ref=f335e1695]:
+                - link "Лежанка для кошек и собак" [ref=f335e1696] [cursor=pointer]:
+                  - /url: /perm/tovary_dlya_zhivotnyh/lezhanka_dlya_koshek_i_sobak_8241260879?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1702]:
+                - strong [ref=f335e1703]: 300 ₽
+          - generic [ref=f335e1706]:
+            - banner [ref=f335e1707]:
+              - link [ref=f335e1708] [cursor=pointer]:
+                - /url: /perm/akvarium/skalyarii_8312143845?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1711]:
+                  - listitem [ref=f335e1712]:
+                    - img "Скалярии" [ref=f335e1714]
+                  - listitem [ref=f335e1715]:
+                    - img "Скалярии" [ref=f335e1717]
+                  - listitem [ref=f335e1718]:
+                    - img "Скалярии" [ref=f335e1720]
+                  - listitem [ref=f335e1721]:
+                    - img "Скалярии" [ref=f335e1723]
+                  - listitem [ref=f335e1724]:
+                    - img "Скалярии" [ref=f335e1726]
+                    - generic [ref=f335e1727]: Ещё1 фото
+            - generic [ref=f335e1728]:
+              - generic [ref=f335e1730]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1732] [cursor=pointer]
+                - button [ref=f335e1736] [cursor=pointer]
+              - heading [level=2] [ref=f335e1741]:
+                - link "Скалярии" [ref=f335e1742] [cursor=pointer]:
+                  - /url: /perm/akvarium/skalyarii_8312143845?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1748]:
+                - strong [ref=f335e1749]: 150 ₽
+              - paragraph [ref=f335e1753]:
+                - generic [ref=f335e1754]: Пермь, р-н Дзержинский
+          - generic [ref=f335e1761]:
+            - banner [ref=f335e1762]:
+              - link [ref=f335e1763] [cursor=pointer]:
+                - /url: /perm/akvarium/diffuzor_dlya_uglekisloty_8330856163?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1766]:
+                  - listitem:
+                    - img "Диффузор для углекислоты" [ref=f335e1768]
+            - generic [ref=f335e1769]:
+              - generic [ref=f335e1771]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1773] [cursor=pointer]
+                - button [ref=f335e1777] [cursor=pointer]
+              - heading [level=2] [ref=f335e1782]:
+                - link "Диффузор для углекислоты" [ref=f335e1783] [cursor=pointer]:
+                  - /url: /perm/akvarium/diffuzor_dlya_uglekisloty_8330856163?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1789]:
+                - strong [ref=f335e1790]: Бесплатно
+              - paragraph [ref=f335e1794]:
+                - generic [ref=f335e1795]: Пермь, р-н Свердловский
+          - generic [ref=f335e1808]:
+            - generic [ref=f335e1829] [cursor=pointer]:
+              - generic [ref=f335e1830]: Заберите ваш ПОДАРОК сегодня
+              - generic [ref=f335e1839]: Вчера вы не забрали ПОДАРОК по итогам июля. Реклама
+            - button "Подробнее" [ref=f335e1842] [cursor=pointer]
+          - generic [ref=f335e1847]:
+            - banner [ref=f335e1848]:
+              - link [ref=f335e1849] [cursor=pointer]:
+                - /url: /perm/odezhda_obuv_aksessuary/plate-futlyar_s_razrezom_8383436164?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+                - list [ref=f335e1852]:
+                  - listitem [ref=f335e1853]:
+                    - img "Платье-футляр с разрезом" [ref=f335e1855]
+                  - listitem [ref=f335e1856]:
+                    - img "Платье-футляр с разрезом" [ref=f335e1858]
+                  - listitem [ref=f335e1859]:
+                    - img "Платье-футляр с разрезом" [ref=f335e1861]
+                  - listitem [ref=f335e1862]:
+                    - img "Платье-футляр с разрезом" [ref=f335e1864]
+                  - listitem [ref=f335e1865]:
+                    - img "Платье-футляр с разрезом" [ref=f335e1867]
+            - generic [ref=f335e1868]:
+              - generic [ref=f335e1870]:
+                - generic "Добавить в избранное и в сравнение" [ref=f335e1872] [cursor=pointer]
+                - button [ref=f335e1876] [cursor=pointer]
+              - heading [level=2] [ref=f335e1881]:
+                - link "Платье-футляр с разрезом" [ref=f335e1882] [cursor=pointer]:
+                  - /url: /perm/odezhda_obuv_aksessuary/plate-futlyar_s_razrezom_8383436164?context=H4sIAAAAAAAA_wEmANn_YToxOntzOjE6IngiO3M6MTY6Im4wV1hiN1ZxWU9tMWJyT2siO33CPb3gJgAAAA
+              - paragraph [ref=f335e1888]:
+                - strong [ref=f335e1889]: 1 100 ₽
+    - generic [ref=f335e1894]:
+      - generic [ref=f335e1896]:
+        - link "Помощь" [ref=f335e1897] [cursor=pointer]:
+          - /url: https://support.avito.ru
+        - link "Безопасность" [ref=f335e1898] [cursor=pointer]:
+          - /url: https://www.avito.ru/safety
+        - link "Реклама на сайте" [ref=f335e1899] [cursor=pointer]:
+          - /url: /ads?utm_source=avito&utm_medium=footer
+        - link "О компании" [ref=f335e1900] [cursor=pointer]:
+          - /url: /company
+        - link "Карьера" [ref=f335e1901] [cursor=pointer]:
+          - /url: /company/job
+        - link "Авито Журнал" [ref=f335e1902] [cursor=pointer]:
+          - /url: /journal/articles
+        - link "Блог" [ref=f335e1903] [cursor=pointer]:
+          - /url: /blog
+        - link "#яПомогаю" [ref=f335e1904] [cursor=pointer]:
+          - /url: /avito-care/crisis-help?from=footer
+        - link "Приложение" [ref=f335e1905] [cursor=pointer]:
+          - /url: https://www.avito.ru/journal/tools/app
+        - generic [ref=f335e1906]: Регионы
+        - list [ref=f335e1910]:
+          - listitem [ref=f335e1911]:
+            - link [ref=f335e1912] [cursor=pointer]:
+              - /url: /moskva
+              - text: Москва
+          - listitem [ref=f335e1913]:
+            - link [ref=f335e1914] [cursor=pointer]:
+              - /url: /sankt-peterburg
+              - text: Санкт-Петербург
+          - listitem [ref=f335e1915]:
+            - link [ref=f335e1916] [cursor=pointer]:
+              - /url: /novosibirsk
+              - text: Новосибирск
+          - listitem [ref=f335e1917]:
+            - link [ref=f335e1918] [cursor=pointer]:
+              - /url: /ekaterinburg
+              - text: Екатеринбург
+          - listitem [ref=f335e1919]:
+            - link [ref=f335e1920] [cursor=pointer]:
+              - /url: /kazan
+              - text: Казань
+          - listitem [ref=f335e1921]:
+            - link [ref=f335e1922] [cursor=pointer]:
+              - /url: /nizhniy_novgorod
+              - text: Нижний Новгород
+          - listitem [ref=f335e1923]:
+            - link [ref=f335e1924] [cursor=pointer]:
+              - /url: /chelyabinsk
+              - text: Челябинск
+          - listitem [ref=f335e1925]:
+            - link [ref=f335e1926] [cursor=pointer]:
+              - /url: /samara
+              - text: Самара
+          - listitem [ref=f335e1927]:
+            - link [ref=f335e1928] [cursor=pointer]:
+              - /url: /omsk
+              - text: Омск
+          - listitem [ref=f335e1929]:
+            - link [ref=f335e1930] [cursor=pointer]:
+              - /url: /rostov-na-donu
+              - text: Ростов-на-Дону
+          - listitem [ref=f335e1931]:
+            - link [ref=f335e1932] [cursor=pointer]:
+              - /url: /regions
+              - text: Все регионы
+        - generic [ref=f335e1933]: Ещё
+        - list [ref=f335e1937]:
+          - listitem [ref=f335e1938]:
+            - link [ref=f335e1939] [cursor=pointer]:
+              - /url: /finance/zaimy
+              - text: Займы онлайн
+          - listitem [ref=f335e1940]:
+            - link [ref=f335e1941] [cursor=pointer]:
+              - /url: /catalog/auto-ASgBAgICAUTQvA7~m9EB
+              - text: Каталог автомобилей
+          - listitem [ref=f335e1942]:
+            - link [ref=f335e1943] [cursor=pointer]:
+              - /url: /all/kvartiry/catalog/novostroyki-ASgBAgICA0SSA8YQ5geOUvLFDvCTmgI
+              - text: Каталог новостроек
+          - listitem [ref=f335e1944]:
+            - link [ref=f335e1945] [cursor=pointer]:
+              - /url: /links/all
+              - text: Карта сайта
+          - listitem [ref=f335e1946]:
+            - link [ref=f335e1947] [cursor=pointer]:
+              - /url: /links/items/all
+              - text: Свежие объявления
+          - listitem [ref=f335e1948]:
+            - link [ref=f335e1949] [cursor=pointer]:
+              - /url: /populyarnye-zaprosy
+              - text: Популярные запросы
+      - paragraph [ref=f335e1951]:
+        - text: Авито —
+        - link "сайт объявлений России" [ref=f335e1952] [cursor=pointer]:
+          - /url: /rossiya
+        - text: . © ООО «КЕХ еКоммерц» 2007–2026.
+        - link "Правила Авито" [ref=f335e1953] [cursor=pointer]:
+          - /url: https://www.avito.ru/legal/
+        - text: .
+        - link "Политика конфиденциальности" [ref=f335e1954] [cursor=pointer]:
+          - /url: https://www.avito.ru/safety/personal/company
+        - text: . Оплачивая услуги на Авито, вы принимаете
+        - link "оферту" [ref=f335e1955] [cursor=pointer]:
+          - /url: https://support.avito.ru/articles/200026938
+        - text: . Авито использует
+        - link "рекомендательные технологии" [ref=f335e1956] [cursor=pointer]:
+          - /url: https://www.avito.ru/legal/rules/rec-technologies/
+        - text: .
+      - generic [ref=f335e1958]:
+        - link [ref=f335e1960] [cursor=pointer]:
+          - /url: https://vk.com/avito
+        - link [ref=f335e1965] [cursor=pointer]:
+          - /url: https://ok.ru/avito
+        - link [ref=f335e1970] [cursor=pointer]:
+          - /url: https://t.me/+mdSS8SofnB9mYmIy
+        - link [ref=f335e1975] [cursor=pointer]:
+          - /url: https://rutube.ru/channel/24896637
+        - link [ref=f335e1980] [cursor=pointer]:
+          - /url: https://max.ru/avito
+  - iframe
+  - iframe [ref=f335e1984]:
+    
+  - iframe [ref=f335e1985]:
+    

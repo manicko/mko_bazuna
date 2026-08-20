@@ -1,0 +1,913 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category - Mko Bazuna</title>
+    <link rel="stylesheet" href="/static/theme/css/output.css">
+    
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="bg-gray-50 min-h-screen"
+      hx-headers='{"X-CSRFToken": "DHThP15Iebcfu1nPwRb202TKwG16Lqxoi1TLaCN6s53caZb929b6kWkiVpnOZsII"}'>
+    
+
+
+
+<header class="bg-white shadow-sm border-b">
+    <div class="container mx-auto px-4 py-3">
+        
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <button type="button" class="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900"
+                        data-mobile-categories-toggle aria-label="Categories">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold text-gray-800">
+                    <a href="/">Mko Bazuna</a>
+                </h1>
+            </div>
+            <div class="flex items-center gap-3">
+                
+                <a href="https://t.me/&lt;your-bot-username&gt;?start=create_ad" target="_blank" rel="noopener"
+                   class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                   data-place-ad>
+                    + Подать объявление
+                </a>
+                
+
+
+
+<div class="relative inline-block" id="lang-switcher">
+    
+    <button
+        type="button"
+        class="flex items-center gap-1 px-3 py-1 text-sm rounded hover:bg-gray-100 transition-colors"
+        aria-haspopup="true"
+        aria-expanded="false"
+        data-lang-switcher-toggle
+    >
+        <span class="font-medium">RU</span>
+        <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+    </button>
+
+    
+    <div
+        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
+        data-lang-switcher-menu
+    >
+        
+        
+        
+
+        
+            <a
+                href="?lang=ru"
+                class="block px-4 py-2 text-sm transition-colors bg-gray-100 text-gray-900 font-medium cursor-default"
+                data-lang="ru"
+                data-lang-switcher-link
+                aria-current="true"
+            >
+                Русский
+            </a>
+        
+            <a
+                href="?lang=bs"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="bs"
+                data-lang-switcher-link
+                
+            >
+                bosanski
+            </a>
+        
+            <a
+                href="?lang=en"
+                class="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                data-lang="en"
+                data-lang-switcher-link
+                
+            >
+                English
+            </a>
+        
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const COOKIE_NAME = 'lang_pref';
+    const COOKIE_PATH = '/';
+    const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
+    const container = document.getElementById('lang-switcher');
+    if (!container) return;
+
+    const toggleBtn = container.querySelector('[data-lang-switcher-toggle]');
+    const menu = container.querySelector('[data-lang-switcher-menu]');
+    const links = container.querySelectorAll('[data-lang-switcher-link]');
+
+    /**
+     * Set a cookie with the given name, value, and options.
+     */
+    function setCookie(name, value, maxAge, path) {
+        var parts = [
+            encodeURIComponent(name) + '=' + encodeURIComponent(value),
+            'max-age=' + maxAge,
+            'path=' + path,
+            'SameSite=Lax'
+        ];
+        document.cookie = parts.join('; ');
+    }
+
+    /**
+     * Toggle dropdown visibility.
+     */
+    function toggleDropdown() {
+        var isHidden = menu.classList.contains('hidden');
+        if (isHidden) {
+            menu.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            menu.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    /**
+     * Close dropdown and reset ARIA state.
+     */
+    function closeDropdown() {
+        menu.classList.add('hidden');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    // Toggle on button click
+    toggleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleDropdown();
+    });
+
+    // On language link click: set cookie, then allow default navigation
+    links.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            var lang = link.getAttribute('data-lang');
+            if (lang) {
+                setCookie(COOKIE_NAME, lang, COOKIE_MAX_AGE, COOKIE_PATH);
+            }
+            // Allow default browser navigation (href carries ?lang=X)
+            closeDropdown();
+        });
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    // Close dropdown on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeDropdown();
+            toggleBtn.focus();
+        }
+    });
+})();
+</script>
+            </div>
+        </div>
+
+        
+        <div class="mt-3">
+            <div class="flex gap-2 items-stretch">
+                
+                <div class="relative" data-preferred-city-trigger>
+                    <button type="button" data-preferred-city-toggle
+                            class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            aria-label="Preferred city">
+                        <span aria-hidden="true">📍</span>
+                        <span data-preferred-city-label>Вся страна</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div data-preferred-city-panel
+                         class="absolute left-0 z-[90] mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
+                        <ul class="py-1 max-h-96 overflow-y-auto">
+                            
+                            <li>
+                                <button type="button" data-city-option="bar"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Бар
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="berane"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Беране
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="bijelo-polje"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Биело-Поле
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="budva"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Будва
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="danilovgrad"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Даниловград
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="kotor"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Котор
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="mojkovac"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Мойковац
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="niksic"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Никшич
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="pljevlja"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Плевля
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="podgorica"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Подгорица
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="rozaje"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Рожае
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="tivat"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Тиват
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="ulcinj"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Улцинь
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="herceg-novi"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Херцег-Нови
+                                </button>
+                            </li>
+                            
+                            <li>
+                                <button type="button" data-city-option="cetinje"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Цетине
+                                </button>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                </div>
+
+                
+                <div class="relative hidden md:block" data-categories-trigger>
+                    <button type="button" data-categories-toggle
+                            class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]">
+                        <span data-categories-label>
+                            
+                        </span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div data-categories-panel class="absolute left-0 z-[90] mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
+                        <ul class="py-1 max-h-96 overflow-y-auto">
+                            
+                            <li data-category-slug="business">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/business/"
+                                       data-category-link="business"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Бизнес
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="business"></div>
+                            </li>
+                            
+                            <li data-category-slug="charity">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/charity/"
+                                       data-category-link="charity"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Благотворительность
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="charity"></div>
+                            </li>
+                            
+                            <li data-category-slug="animals">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/animals/"
+                                       data-category-link="animals"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Животные
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="animals"></div>
+                            </li>
+                            
+                            <li data-category-slug="real-estate">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/real-estate/"
+                                       data-category-link="real-estate"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Недвижимость
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="real-estate"></div>
+                            </li>
+                            
+                            <li data-category-slug="goods">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/goods/"
+                                       data-category-link="goods"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Товары
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="goods"></div>
+                            </li>
+                            
+                            <li data-category-slug="transport">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/transport/"
+                                       data-category-link="transport"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Транспорт
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="transport"></div>
+                            </li>
+                            
+                            <li data-category-slug="services-jobs">
+                                <div class="flex items-center justify-between">
+                                    <a href="/category/services-jobs/"
+                                       data-category-link="services-jobs"
+                                       class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+                                        Услуги, работа, вакансии
+                                    </a>
+                                    
+                                </div>
+                                <div class="hidden ml-4" data-category-submenu="services-jobs"></div>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                </div>
+
+                
+                <form method="get" action="/search/" class="relative flex-1" data-search-form>
+                    <input type="hidden" name="csrfmiddlewaretoken" value="DHThP15Iebcfu1nPwRb202TKwG16Lqxoi1TLaCN6s53caZb929b6kWkiVpnOZsII">
+                    <div class="relative">
+                        <input type="search" id="search-input" name="q"
+                               value=""
+                               placeholder="Поиск по объявлениям..."
+                               class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+                               hx-get="/api/search/autocomplete"
+                               hx-trigger="input delay:300ms"
+                               hx-target="#autocomplete-dropdown"
+                               hx-swap="none"
+                               autocomplete="off"
+                        >
+                        <ul id="autocomplete-dropdown"
+                            class="autocomplete-dropdown absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto hidden">
+                        </ul>
+                        <button type="submit" class="hidden">Поиск</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        
+        
+<nav aria-label="Breadcrumb" class="mt-3 flex flex-wrap items-center text-sm text-gray-500">
+    
+        <a href="/" class="hover:text-blue-600">Главная</a>
+        <span class="mx-1 text-gray-400">&rsaquo;</span>
+        
+            
+                
+                <span class="font-medium text-gray-800"></span>
+            
+        
+    
+</nav>
+
+
+    </div>
+</header>
+
+
+<div data-mobile-categories-panel
+     class="fixed inset-y-0 left-0 z-[90] w-72 bg-white shadow-lg transform -translate-x-full transition-transform lg:hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+        <span class="font-semibold text-gray-800">Категории</span>
+        <button type="button" data-mobile-categories-close class="p-2 text-gray-500 hover:text-gray-700" aria-label="Закрыть">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    <ul class="py-1 overflow-y-auto" style="height: calc(100% - 56px);">
+        
+        <li data-category-slug="business">
+            <div class="flex items-center justify-between">
+                <a href="/category/business/"
+                   data-category-link="business"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Бизнес
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="business"></div>
+        </li>
+        
+        <li data-category-slug="charity">
+            <div class="flex items-center justify-between">
+                <a href="/category/charity/"
+                   data-category-link="charity"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Благотворительность
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="charity"></div>
+        </li>
+        
+        <li data-category-slug="animals">
+            <div class="flex items-center justify-between">
+                <a href="/category/animals/"
+                   data-category-link="animals"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Животные
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="animals"></div>
+        </li>
+        
+        <li data-category-slug="real-estate">
+            <div class="flex items-center justify-between">
+                <a href="/category/real-estate/"
+                   data-category-link="real-estate"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Недвижимость
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="real-estate"></div>
+        </li>
+        
+        <li data-category-slug="goods">
+            <div class="flex items-center justify-between">
+                <a href="/category/goods/"
+                   data-category-link="goods"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Товары
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="goods"></div>
+        </li>
+        
+        <li data-category-slug="transport">
+            <div class="flex items-center justify-between">
+                <a href="/category/transport/"
+                   data-category-link="transport"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Транспорт
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="transport"></div>
+        </li>
+        
+        <li data-category-slug="services-jobs">
+            <div class="flex items-center justify-between">
+                <a href="/category/services-jobs/"
+                   data-category-link="services-jobs"
+                   class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
+                    Услуги, работа, вакансии
+                </a>
+                
+            </div>
+            <div class="hidden ml-4" data-category-submenu="services-jobs"></div>
+        </li>
+        
+    </ul>
+</div>
+<div data-mobile-categories-backdrop class="fixed inset-0 z-[80] bg-black/30 hidden lg:hidden"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── Autocomplete dropdown ─────────────────────────────────────────── */
+    var dropdown = document.getElementById('autocomplete-dropdown');
+    var searchInput = document.getElementById('search-input');
+    var searchForm = document.querySelector('[data-search-form]');
+
+    if (dropdown && searchInput) {
+
+        function escapeHtml(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function hide() {
+            dropdown.classList.add('hidden');
+            dropdown.innerHTML = '';
+        }
+
+        function sectionHeader(title, iconSvg) {
+            return '<li class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">'
+                + (iconSvg || '') + ' ' + escapeHtml(title) + '</li>';
+        }
+
+        function render(json) {
+            var suggestions = (json && Array.isArray(json.suggestions)) ? json.suggestions : [];
+            if (!suggestions.length) { hide(); return; }
+            var html = '';
+            var showAll = escapeHtml((json && json.query) || '');
+            html += '<li class="px-4 pt-2 pb-1"><a href="/search/?q=' + encodeURIComponent(json ? json.query : '')
+                 + '" class="text-sm text-blue-600 hover:underline">Показать все результаты</a></li>';
+            ['city', 'category', 'popular_search', 'user_history'].forEach(function (section) {
+                var matches = suggestions.filter(function (s) { return s.type === section || s.source === section; });
+                if (!matches.length) return;
+                if (section === 'city') html += sectionHeader('Города');
+                else if (section === 'category') html += sectionHeader('Категории');
+                else if (section === 'popular_search') html += sectionHeader('Популярные запросы');
+                else if (section === 'user_history') html += sectionHeader('История');
+                matches.forEach(function (s) {
+                    var text = escapeHtml(s.text || '');
+                    var sub = s.category_path ? '<span class="block text-xs text-gray-400">' + escapeHtml(s.category_path) + '</span>' : '';
+                    var icon = (section === 'popular_search' || s.source === 'popular_search')
+                        ? '<svg class="w-4 h-4 inline-block text-orange-500 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73 0-0.31 0.04-0.6 0.11-0.88 -2.15 1.21-3.31 3.08-3.31 5.55 0 3.73 2.98 6.49 7.09 6.49 4.1 0 7.08-2.76 7.08-6.49 0-5.64-4.67-9.4-4.67-9.4z" transform="translate(0 2)"/></svg>'
+                        : (section === 'user_history' || s.source === 'user_history')
+                            ? '<svg class="w-4 h-4 inline-block text-gray-400 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10h4v2h-6V7h2v5z"/></svg>'
+                            : '';
+                    html += '<li><a href="#" data-suggestion-type="' + escapeHtml(s.type || s.source || '')
+                        + '" data-suggestion-text="' + escapeHtml(text)
+                        + '" data-suggestion-slug="' + escapeHtml(s.slug || '')
+                        + '" class="block w-full px-4 py-2.5 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-start min-h-[44px]">'
+                        + '<span class="mr-2 mt-1">' + icon + '</span>'
+                        + '<span>' + text + sub + '</span></a></li>';
+                });
+            });
+            dropdown.innerHTML = html;
+            dropdown.classList.remove('hidden');
+        }
+
+        document.body.addEventListener('htmx:afterRequest', function (e) {
+            var detail = e.detail || {};
+            if (detail.target !== dropdown) return;
+            var xhr = detail.xhr;
+            if (!xhr) return;
+            if (xhr.status === 429) { hide(); return; }
+            var parsed;
+            try { parsed = JSON.parse(xhr.responseText); } catch (_) { return; }
+            if (!parsed || parsed.error === 'rate_limit') { hide(); return; }
+            render(parsed);
+        });
+
+        function getCsrf() {
+            var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            if (input) return input.value;
+            return '';
+        }
+
+        dropdown.addEventListener('click', function (e) {
+            var link = e.target.closest('a[data-suggestion-text]');
+            if (!link) return;
+            e.preventDefault();
+            var type = link.getAttribute('data-suggestion-type');
+            var text = link.getAttribute('data-suggestion-text');
+            var slug = link.getAttribute('data-suggestion-slug');
+            if (type === 'city' && slug) {
+                // Persist preferred city (cookie) then filter by navigating to the city listing.
+                var fd = new FormData();
+                fd.append('slug', slug);
+                fetch('/api/preferred-city/', { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCsrf() } });
+                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+            } else if (type === 'category' && slug) {
+                // Filter by category.
+                window.location.href = '/category/' + encodeURIComponent(slug) + '/';
+            } else {
+                // Text suggestion (popular search / user history): populate + submit.
+                searchInput.value = text;
+                if (searchForm) searchForm.submit();
+            }
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            var items = dropdown.querySelectorAll('a[data-suggestion-text]');
+            if (e.key === 'Escape') { hide(); e.preventDefault(); return; }
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var active = document.activeElement;
+                var idx = Array.from(items).indexOf(active);
+                var next = (idx < 0 || idx === items.length - 1) ? items[0] : items[idx + 1];
+                next.focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                var active = document.activeElement;
+                var idx = Array.from(items).indexOf(active);
+                var prev = (idx <= 0) ? items[items.length - 1] : items[idx - 1];
+                prev.focus();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchForm) searchForm.submit();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) hide();
+        });
+
+        hide();
+    }
+
+    /* ── "All Categories" dropdown (desktop) + submenu lazy-load ────────── */
+    var catToggle = document.querySelector('[data-categories-toggle]');
+    var catPanel = document.querySelector('[data-categories-panel]');
+
+    function loadSubmenu(container) {
+        var li = container.closest('li');
+        if (!li) return;
+        var slug = (container.getAttribute('data-category-submenu') || '').replace(/"/g, '');
+        if (!slug) return;
+        fetch('/categories/' + encodeURIComponent(slug) + '/submenu/')
+            .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(function (html) {
+                container.innerHTML = html;
+                container.classList.remove('hidden');
+                var expand = li.querySelector('[data-category-expand]');
+                if (expand) expand.setAttribute('aria-expanded', 'true');
+            })
+            .catch(function () { /* ignore load errors */ });
+    }
+
+    function closeBranch(container) {
+        container.classList.add('hidden');
+        container.querySelectorAll('[data-category-submenu]').forEach(function (c) {
+            c.classList.add('hidden');
+        });
+        var li = container.closest('li');
+        if (li) {
+            li.querySelectorAll('[data-category-expand]').forEach(function (b) {
+                b.setAttribute('aria-expanded', 'false');
+            });
+        }
+    }
+
+    function collapseSiblings(container) {
+        var li = container.closest('li');
+        if (!li) return;
+        var siblings = li.parentElement.querySelectorAll(':scope > li');
+        siblings.forEach(function (sibLi) {
+            var sibContainer = sibLi.querySelector('[data-category-submenu]');
+            if (sibContainer && sibContainer !== container) {
+                closeBranch(sibContainer);
+            }
+        });
+    }
+
+    function attachCategoryHandlers(panel) {
+        if (!panel) return;
+        panel.addEventListener('click', function (e) {
+            if (e.target.closest('a[data-category-link]')) {
+                // category navigation — allow default, close panels
+                closeCategories();
+                return;
+            }
+            var expand = e.target.closest('[data-category-expand]');
+            if (expand) {
+                e.preventDefault();
+                e.stopPropagation();
+                var slug = expand.getAttribute('data-category-expand');
+                var container = panel.querySelector('[data-category-submenu="' + slug + '"]');
+                var isOpen = container && !container.classList.contains('hidden');
+                if (isOpen) {
+                    closeBranch(container);
+                } else {
+                    collapseSiblings(container);
+                    loadSubmenu(container);
+                }
+            }
+        });
+    }
+
+    function collapsePanel(panel) {
+        panel.querySelectorAll('[data-category-submenu]').forEach(function (c) { c.classList.add('hidden'); });
+        panel.querySelectorAll('[data-category-expand]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+    }
+
+    attachCategoryHandlers(catPanel);
+
+    function closeCategories() {
+        if (catPanel) {
+            catPanel.classList.add('hidden');
+            collapsePanel(catPanel);
+            var toggle = catPanel.parentNode.querySelector('[data-categories-toggle]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    if (catToggle && catPanel) {
+        catToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !catPanel.classList.contains('hidden');
+            if (isOpen) { closeCategories(); return; }
+            catPanel.classList.remove('hidden');
+            catToggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) {
+            var trigger = catPanel.parentNode;
+            if (trigger && !trigger.contains(e.target)) closeCategories();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeCategories();
+        });
+    }
+
+    /* ── Mobile off-canvas categories ───────────────────────────────────── */
+    var mobileToggle = document.querySelector('[data-mobile-categories-toggle]');
+    var mobilePanel = document.querySelector('[data-mobile-categories-panel]');
+    var mobileBackdrop = document.querySelector('[data-mobile-categories-backdrop]');
+    var mobileClose = document.querySelector('[data-mobile-categories-close]');
+
+    function openMobile() {
+        if (!mobilePanel) return;
+        mobilePanel.classList.remove('-translate-x-full');
+        if (mobileBackdrop) mobileBackdrop.classList.remove('hidden');
+    }
+    function closeMobile() {
+        if (!mobilePanel) return;
+        mobilePanel.classList.add('-translate-x-full');
+        if (mobileBackdrop) mobileBackdrop.classList.add('hidden');
+        collapsePanel(mobilePanel);
+    }
+
+    attachCategoryHandlers(mobilePanel);
+
+    if (mobileToggle) mobileToggle.addEventListener('click', openMobile);
+    if (mobileClose) mobileClose.addEventListener('click', closeMobile);
+    if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobile);
+
+    /* ── Preferred-city dropdown ────────────────────────────────────────── */
+    var cityToggle = document.querySelector('[data-preferred-city-toggle]');
+    var cityPanel = document.querySelector('[data-preferred-city-panel]');
+
+    function cityGetCsrf() {
+        var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return input ? input.value : '';
+    }
+
+    function closeCity() {
+        if (cityPanel) cityPanel.classList.add('hidden');
+        if (cityToggle) cityToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    if (cityToggle && cityPanel) {
+        cityToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !cityPanel.classList.contains('hidden');
+            if (isOpen) { closeCity(); return; }
+            cityPanel.classList.remove('hidden');
+            cityToggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) {
+            var trigger = cityPanel.parentNode;
+            if (trigger && !trigger.contains(e.target)) closeCity();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeCity();
+        });
+        cityPanel.addEventListener('click', function (e) {
+            var link = e.target.closest('[data-city-option]');
+            if (link) {
+                e.preventDefault();
+                var slug = link.getAttribute('data-city-option');
+                var fd = new FormData();
+                fd.append('slug', slug);
+                fetch('/api/preferred-city/', { method: 'POST', body: fd, headers: { 'X-CSRFToken': cityGetCsrf() } });
+                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+            }
+        });
+    }
+
+    function closeAll() { hide(); closeCategories(); closeCity(); closeMobile(); }
+
+    window.addEventListener('htmx:afterSwap', function (e) {
+        // Re-parse any newly injected submenu panels for accordion behavior.
+        if (e.target) attachCategoryHandlers(e.target);
+    });
+})();
+</script>
+
+
+    <main class="container mx-auto px-4 py-6">
+        
+        <!-- Dynamic content (ad grid, suggestions, pagination) -->
+        <div id="ad-list">
+            
+
+
+
+
+<!-- Did-you-mean suggestions -->
+
+
+
+
+<!-- Ads grid -->
+
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No ads available</p>
+        <p class="text-gray-500 mt-2">Check back later for new listings</p>
+    </div>
+
+
+<!-- Empty state when no query and no ads -->
+
+    <div class="text-center py-12 bg-white rounded-lg">
+        <p class="text-gray-600 text-lg">No ads available yet</p>
+        <p class="text-gray-500 mt-2">Be the first to create an ad via Telegram!</p>
+    </div>
+
+        </div>
+    </main>
+
+    
+    
+
+
+
+    
+</body>
+</html>

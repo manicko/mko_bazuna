@@ -99,7 +99,7 @@ UI/UX patterns are documented in [`ui-patterns.md`](ui-patterns.md):
 - **Price Display:** Prominent `text-blue-600` styling
 - **Contact Seller Button:** Deep-link to Telegram bot, anonymity-preserving
 - **Image Gallery:** 1-5 Telegram photos in responsive grid with GLightbox v3.3.1 fullscreen overlay
-- **Shared Navigation Headers:** Two variants — catalog header (list/detail) and auth header (dashboards)
+- **Shared Navigation Headers:** Two variants — catalog header (list/detail, now includes auth/cabinet entry + favorites badge) and auth header (dashboards)
 - **Touch Target Guidelines:** 44px minimum for interactive elements
 - **Progressive Disclosure:** Truncated descriptions, empty states, HTMX pagination
 

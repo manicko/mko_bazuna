@@ -1,0 +1,445 @@
+- generic [ref=f17e2]:
+  - generic:
+    - grid "Skip links":
+      - row "Навигиране до основното съдържание":
+        - gridcell "Навигиране до основното съдържание"
+      - row "Навигиране до долен колонтитул":
+        - gridcell "Навигиране до долен колонтитул"
+  - banner [ref=f17e3]:
+    - generic [ref=f17e4]:
+      - link "OLX, заглавна страница" [ref=f17e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f17e10]:
+        - link "Чат" [ref=f17e11] [cursor=pointer]:
+          - /url: /myaccount/answers/
+        - link [ref=f17e18] [cursor=pointer]:
+          - /url: /observed/search/
+          - img "Любими" [ref=f17e19]
+        - generic [ref=f17e21]:
+          - button "Нотификации" [ref=f17e22] [cursor=pointer]
+          - generic:
+            - generic:
+              - heading "Нотификации" [level=4]
+        - link [ref=f17e25] [cursor=pointer]:
+          - /url: /myaccount?backUrl=%2Fmyaccount
+          - paragraph [ref=f17e28]: Твоят профил
+        - link "Добави обява" [ref=f17e30] [cursor=pointer]:
+          - /url: /adding
+  - generic [ref=f17e34]:
+    - generic [ref=f17e40]:
+      - combobox "Какво търсиш?" [ref=f17e49]
+      - combobox "Цялата страна" [ref=f17e60]
+      - button "Търсене" [ref=f17e62] [cursor=pointer]
+    - generic [ref=f17e69]:
+      - heading "Главни категории" [level=2] [ref=f17e70]
+      - generic [ref=f17e71]:
+        - link [ref=f17e72] [cursor=pointer]:
+          - /url: /avtochasti-aksesoari/
+          - paragraph [ref=f17e73]: Авточасти, аксесоари
+        - link [ref=f17e74] [cursor=pointer]:
+          - /url: /antiki-i-kolektsii/
+          - paragraph [ref=f17e75]: Антики и колекции
+        - link [ref=f17e76] [cursor=pointer]:
+          - /url: /nedvizhimi-imoti/
+          - paragraph [ref=f17e77]: Недвижими имоти
+        - link [ref=f17e78] [cursor=pointer]:
+          - /url: /avtomobili-karavani-lodki/
+          - paragraph [ref=f17e79]: Автомобили, каравани, лодки
+        - link [ref=f17e80] [cursor=pointer]:
+          - /url: /elektronika/
+          - paragraph [ref=f17e81]: Електроника
+        - link [ref=f17e82] [cursor=pointer]:
+          - /url: /sport-knigi-hobi/
+          - paragraph [ref=f17e83]: Спорт, книги, хоби
+        - link [ref=f17e84] [cursor=pointer]:
+          - /url: /zhivotni/
+          - paragraph [ref=f17e85]: Животни
+        - link [ref=f17e86] [cursor=pointer]:
+          - /url: /dom-i-gradina/
+          - paragraph [ref=f17e87]: Дом и градина
+        - link [ref=f17e88] [cursor=pointer]:
+          - /url: /moda/
+          - paragraph [ref=f17e89]: Мода
+        - link [ref=f17e90] [cursor=pointer]:
+          - /url: /za-bebeto-i-deteto/
+          - paragraph [ref=f17e91]: За бебето и детето
+        - link [ref=f17e92] [cursor=pointer]:
+          - /url: /ekskurzii-pochivki/
+          - paragraph [ref=f17e93]: Екскурзии, почивки
+        - link [ref=f17e94] [cursor=pointer]:
+          - /url: /uslugi/
+          - paragraph [ref=f17e95]: Услуги
+        - link [ref=f17e96] [cursor=pointer]:
+          - /url: /mashini-instrumenti-biznes-oborudvane/
+          - paragraph [ref=f17e97]: Машини, инструменти, бизнес оборудване
+        - link [ref=f17e98] [cursor=pointer]:
+          - /url: /rabota/
+          - paragraph [ref=f17e99]: Работа
+        - link [ref=f17e100] [cursor=pointer]:
+          - /url: /podaryavam/
+          - paragraph [ref=f17e101]: Подарявам
+        - link [ref=f17e102] [cursor=pointer]:
+          - /url: https://broshuri.olx.bg/
+          - paragraph [ref=f17e103]: Брошури
+    - generic [ref=f17e108]:
+      - heading "Промо обяви" [level=2] [ref=f17e109]
+      - generic [ref=f17e110]:
+        - generic [ref=f17e113]:
+          - link [ref=f17e115] [cursor=pointer]:
+            - /url: /d/ad/rolex-oyster-datejust-chisto-nov-CID655-IDa4tMs.html?reason=hp%7Cpromoted
+            - img "Rolex Oyster Datejust - чисто нов" [ref=f17e118]
+          - generic [ref=f17e121]:
+            - link "Rolex Oyster Datejust - чисто нов" [ref=f17e123] [cursor=pointer]:
+              - /url: /d/ad/rolex-oyster-datejust-chisto-nov-CID655-IDa4tMs.html?reason=hp%7Cpromoted
+              - heading "Rolex Oyster Datejust - чисто нов" [level=4] [ref=f17e124]
+            - generic [ref=f17e126]:
+              - paragraph [ref=f17e127]: гр. Пловдив, Гагарин - Обновено на 17 август 2026 г.
+              - paragraph [ref=f17e128]: 159 €
+            - 'button "Последвай: Rolex Oyster Datejust - чисто нов" [ref=f17e129] [cursor=pointer]'
+        - generic [ref=f17e134]:
+          - link [ref=f17e136] [cursor=pointer]:
+            - /url: /d/ad/la-coste-gornischa-i-dolnischa-CID655-ID9Y8Yu.html?reason=hp%7Cpromoted
+            - img "La coste горнища и долнища" [ref=f17e139]
+          - generic [ref=f17e142]:
+            - link "La coste горнища и долнища" [ref=f17e144] [cursor=pointer]:
+              - /url: /d/ad/la-coste-gornischa-i-dolnischa-CID655-ID9Y8Yu.html?reason=hp%7Cpromoted
+              - heading "La coste горнища и долнища" [level=4] [ref=f17e145]
+            - generic [ref=f17e147]:
+              - paragraph [ref=f17e148]: гр. София, Център - Обновено на 19 август 2026 г.
+              - generic [ref=f17e150]:
+                - generic [ref=f17e151]: Lacoste
+                - generic [ref=f17e157]: Черен
+              - paragraph [ref=f17e162]: 25 €
+            - 'button "Последвай: La coste горнища и долнища" [ref=f17e163] [cursor=pointer]'
+        - generic [ref=f17e168]:
+          - link [ref=f17e170] [cursor=pointer]:
+            - /url: /d/ad/toaletna-kabina-wc-mobilna-toaletna-dostavki-v-tsyalata-strana-CID262-IDa4uo0.html?reason=hp%7Cpromoted
+            - img "Тоалетна кабина. WC. Мобилна тоалетна. Доставки в цялата страна!" [ref=f17e173]
+          - generic [ref=f17e181]:
+            - link "Тоалетна кабина. WC. Мобилна тоалетна. Доставки в цялата страна!" [ref=f17e183] [cursor=pointer]:
+              - /url: /d/ad/toaletna-kabina-wc-mobilna-toaletna-dostavki-v-tsyalata-strana-CID262-IDa4uo0.html?reason=hp%7Cpromoted
+              - heading "Тоалетна кабина. WC. Мобилна тоалетна. Доставки в цялата страна!" [level=4] [ref=f17e184]
+            - generic [ref=f17e186]:
+              - paragraph [ref=f17e187]: гр. София, Суходол - Обновено на 17 август 2026 г.
+              - paragraph [ref=f17e188]: 1125 €
+            - 'button "Последвай: Тоалетна кабина. WC. Мобилна тоалетна. Доставки в цялата страна!" [ref=f17e189] [cursor=pointer]'
+        - generic [ref=f17e194]:
+          - link [ref=f17e196] [cursor=pointer]:
+            - /url: /d/ad/tendzheri-4-broya-za-gotvene-nezalepvascho-pokritie-i-pod-nalyagane-CID262-IDa4uCY.html?reason=hp%7Cpromoted
+            - img "Тенджери 4 БРОЯ за готвене незалепващо покритие и под налягане" [ref=f17e199]
+          - generic [ref=f17e207]:
+            - link "Тенджери 4 БРОЯ за готвене незалепващо покритие и под налягане" [ref=f17e209] [cursor=pointer]:
+              - /url: /d/ad/tendzheri-4-broya-za-gotvene-nezalepvascho-pokritie-i-pod-nalyagane-CID262-IDa4uCY.html?reason=hp%7Cpromoted
+              - heading "Тенджери 4 БРОЯ за готвене незалепващо покритие и под налягане" [level=4] [ref=f17e210]
+            - generic [ref=f17e212]:
+              - paragraph [ref=f17e213]: гр. Стара Загора, Аязмото - Обновено на 18 август 2026 г.
+              - paragraph [ref=f17e214]: 50 €
+            - 'button "Последвай: Тенджери 4 БРОЯ за готвене незалепващо покритие и под налягане" [ref=f17e215] [cursor=pointer]'
+        - generic [ref=f17e220]:
+          - link [ref=f17e222] [cursor=pointer]:
+            - /url: /d/ad/hartieni-stelki-za-avtomobili-s-vasheto-logo-i-pechat-po-porachka-CID555-ID9t9M9.html?reason=hp%7Cpromoted
+            - img "Хартиени стелки за автомобили с Вашето лого I Печат по поръчка" [ref=f17e225]
+          - generic [ref=f17e228]:
+            - link "Хартиени стелки за автомобили с Вашето лого I Печат по поръчка" [ref=f17e230] [cursor=pointer]:
+              - /url: /d/ad/hartieni-stelki-za-avtomobili-s-vasheto-logo-i-pechat-po-porachka-CID555-ID9t9M9.html?reason=hp%7Cpromoted
+              - heading "Хартиени стелки за автомобили с Вашето лого I Печат по поръчка" [level=4] [ref=f17e231]
+            - paragraph [ref=f17e234]: гр. Пловдив, Западен - Обновено на 17 август 2026 г.
+            - 'button "Последвай: Хартиени стелки за автомобили с Вашето лого I Печат по поръчка" [ref=f17e235] [cursor=pointer]'
+        - generic [ref=f17e240]:
+          - link [ref=f17e242] [cursor=pointer]:
+            - /url: /d/ad/prodavam-estestveni-indiyski-udalzheniya-za-kosa-CID655-IDa4cX3.html?reason=hp%7Cpromoted
+            - img "Продавам естествени индийски удължения за коса" [ref=f17e245]
+          - generic [ref=f17e248]:
+            - link "Продавам естествени индийски удължения за коса" [ref=f17e250] [cursor=pointer]:
+              - /url: /d/ad/prodavam-estestveni-indiyski-udalzheniya-za-kosa-CID655-IDa4cX3.html?reason=hp%7Cpromoted
+              - heading "Продавам естествени индийски удължения за коса" [level=4] [ref=f17e251]
+            - generic [ref=f17e253]:
+              - paragraph [ref=f17e254]: гр. Бургас, Долно Езерово - Обновено днес в 05:34 ч.
+              - generic [ref=f17e256]:
+                - generic [ref=f17e257]: Други
+                - generic [ref=f17e263]: Черен
+                - generic [ref=f17e268]: Друг
+              - paragraph [ref=f17e274]: 160 €
+            - 'button "Последвай: Продавам естествени индийски удължения за коса" [ref=f17e275] [cursor=pointer]'
+        - generic [ref=f17e280]:
+          - link [ref=f17e282] [cursor=pointer]:
+            - /url: /d/ad/siguren-podzemen-garazh-v-tsentara-na-ruse-CID368-ID8f9VH.html?reason=hp%7Cpromoted
+            - img "Сигурен подземен гараж-в центъра на Русе." [ref=f17e285]
+          - generic [ref=f17e288]:
+            - link "Сигурен подземен гараж-в центъра на Русе." [ref=f17e290] [cursor=pointer]:
+              - /url: /d/ad/siguren-podzemen-garazh-v-tsentara-na-ruse-CID368-ID8f9VH.html?reason=hp%7Cpromoted
+              - heading "Сигурен подземен гараж-в центъра на Русе." [level=4] [ref=f17e291]
+            - generic [ref=f17e293]:
+              - paragraph [ref=f17e294]: гр. Русе, Център - Обновено на 06 август 2026 г.
+              - generic [ref=f17e295]: 25 кв.м - 4
+              - paragraph [ref=f17e299]: 100 €
+            - 'button "Последвай: Сигурен подземен гараж-в центъра на Русе." [ref=f17e300] [cursor=pointer]'
+        - generic [ref=f17e305]:
+          - link [ref=f17e307] [cursor=pointer]:
+            - /url: /d/ad/avtomatichna-samopochistvascha-smart-toaletna-s-wi-fi-CID339-ID9Q9Ag.html?reason=hp%7Cpromoted
+            - img "Автоматична самопочистваща смарт тоалетна с Wi-Fi" [ref=f17e310]
+          - generic [ref=f17e318]:
+            - link "Автоматична самопочистваща смарт тоалетна с Wi-Fi" [ref=f17e320] [cursor=pointer]:
+              - /url: /d/ad/avtomatichna-samopochistvascha-smart-toaletna-s-wi-fi-CID339-ID9Q9Ag.html?reason=hp%7Cpromoted
+              - heading "Автоматична самопочистваща смарт тоалетна с Wi-Fi" [level=4] [ref=f17e321]
+            - generic [ref=f17e323]:
+              - paragraph [ref=f17e324]: гр. Шумен, Боян Българанов 1 - 15 август 2026 г.
+              - paragraph [ref=f17e325]: 306.26 €
+            - 'button "Последвай: Автоматична самопочистваща смарт тоалетна с Wi-Fi" [ref=f17e326] [cursor=pointer]'
+        - generic [ref=f17e331]:
+          - link [ref=f17e333] [cursor=pointer]:
+            - /url: /d/ad/komplekt-futbolni-vrati-2-broya-s-mrezhi-topka-pompa-i-8-kolcheta-detski-futbol-basketbol-metalna-vrata-basketbolen-kosh-igrachka-nova-podarak-CID139-ID7h0yr.html?reason=hp%7Cpromoted
+            - img "Комплект Футболни Врати 2 Броя с Мрежи Топка Помпа и 8 Колчета Детски Футбол Баскетбол Метална врата, Баскетболен кош Играчка Нова Подарък" [ref=f17e336]
+          - generic [ref=f17e339]:
+            - link "Комплект Футболни Врати 2 Броя с Мрежи Топка Помпа и 8 Колчета Детски Футбол Баскетбол Метална врата, Баскетболен кош Играчка Нова Подарък" [ref=f17e341] [cursor=pointer]:
+              - /url: /d/ad/komplekt-futbolni-vrati-2-broya-s-mrezhi-topka-pompa-i-8-kolcheta-detski-futbol-basketbol-metalna-vrata-basketbolen-kosh-igrachka-nova-podarak-CID139-ID7h0yr.html?reason=hp%7Cpromoted
+              - heading "Комплект Футболни Врати 2 Броя с Мрежи Топка Помпа и 8 Колчета Детски Футбол Баскетбол Метална врата, Баскетболен кош Играчка Нова Подарък" [level=4] [ref=f17e342]
+            - generic [ref=f17e344]:
+              - paragraph [ref=f17e345]: гр. Пловдив, Център - Обновено днес в 04:15 ч.
+              - paragraph [ref=f17e346]: 11.99 €
+            - 'button "Последвай: Комплект Футболни Врати 2 Броя с Мрежи Топка Помпа и 8 Колчета Детски Футбол Баскетбол Метална врата, Баскетболен кош Играчка Нова Подарък" [ref=f17e347] [cursor=pointer]'
+        - generic [ref=f17e352]:
+          - link [ref=f17e354] [cursor=pointer]:
+            - /url: /d/ad/playstation-4-spetsialni-izdaniya-igri-ps4-ps5-pro-CID632-ID9Nm6p.html?reason=hp%7Cpromoted
+            - img "PlayStation 4 [Специални Издания] игри PS4 PS5 Pro" [ref=f17e357]
+          - generic [ref=f17e360]:
+            - link "PlayStation 4 [Специални Издания] игри PS4 PS5 Pro" [ref=f17e362] [cursor=pointer]:
+              - /url: /d/ad/playstation-4-spetsialni-izdaniya-igri-ps4-ps5-pro-CID632-ID9Nm6p.html?reason=hp%7Cpromoted
+              - heading "PlayStation 4 [Специални Издания] игри PS4 PS5 Pro" [level=4] [ref=f17e363]
+            - generic [ref=f17e365]:
+              - paragraph [ref=f17e366]: гр. Харманли - Обновено на 18 август 2026 г.
+              - paragraph [ref=f17e367]: 60 €
+            - 'button "Последвай: PlayStation 4 [Специални Издания] игри PS4 PS5 Pro" [ref=f17e368] [cursor=pointer]'
+        - generic [ref=f17e373]:
+          - link [ref=f17e375] [cursor=pointer]:
+            - /url: /d/ad/demontazh-kartene-pochistvane-kopaene-varna-CID555-ID9NGJu.html?reason=hp%7Cpromoted
+            - img "Демонтаж, къртене, почистване, копаене – Варна" [ref=f17e378]
+          - generic [ref=f17e381]:
+            - link "Демонтаж, къртене, почистване, копаене – Варна" [ref=f17e383] [cursor=pointer]:
+              - /url: /d/ad/demontazh-kartene-pochistvane-kopaene-varna-CID555-ID9NGJu.html?reason=hp%7Cpromoted
+              - heading "Демонтаж, къртене, почистване, копаене – Варна" [level=4] [ref=f17e384]
+            - paragraph [ref=f17e387]: гр. Варна, Левски - Обновено днес в 07:39 ч.
+            - 'button "Последвай: Демонтаж, къртене, почистване, копаене – Варна" [ref=f17e388] [cursor=pointer]'
+        - generic [ref=f17e393]:
+          - link [ref=f17e395] [cursor=pointer]:
+            - /url: /d/ad/sur-ron-light-bee-x-2025-CID360-IDa42QJ.html?reason=hp%7Cpromoted
+            - img "Sur-Ron Light Bee X 2025" [ref=f17e398]
+          - generic [ref=f17e401]:
+            - link "Sur-Ron Light Bee X 2025" [ref=f17e403] [cursor=pointer]:
+              - /url: /d/ad/sur-ron-light-bee-x-2025-CID360-IDa42QJ.html?reason=hp%7Cpromoted
+              - heading "Sur-Ron Light Bee X 2025" [level=4] [ref=f17e404]
+            - generic [ref=f17e406]:
+              - paragraph [ref=f17e407]: гр. Пловдив, Сточна гара - Обновено на 18 август 2026 г.
+              - paragraph [ref=f17e408]: 4750 €
+            - 'button "Последвай: Sur-Ron Light Bee X 2025" [ref=f17e409] [cursor=pointer]'
+        - generic [ref=f17e414]:
+          - link [ref=f17e416] [cursor=pointer]:
+            - /url: /d/ad/vw-crafter-2-5-tdi-na-chasti-CID1625-ID9GbN0.html?reason=hp%7Cpromoted
+            - img "VW Crafter 2.5 tdi на части" [ref=f17e419]
+          - generic [ref=f17e422]:
+            - link "VW Crafter 2.5 tdi на части" [ref=f17e424] [cursor=pointer]:
+              - /url: /d/ad/vw-crafter-2-5-tdi-na-chasti-CID1625-ID9GbN0.html?reason=hp%7Cpromoted
+              - heading "VW Crafter 2.5 tdi на части" [level=4] [ref=f17e425]
+            - generic [ref=f17e427]:
+              - paragraph [ref=f17e428]: гр. София, Военна рампа - Обновено на 19 август 2026 г.
+              - paragraph [ref=f17e429]: 255.65 €
+            - 'button "Последвай: VW Crafter 2.5 tdi на части" [ref=f17e430] [cursor=pointer]'
+        - generic [ref=f17e435]:
+          - link [ref=f17e437] [cursor=pointer]:
+            - /url: /d/ad/nikon-coolpix-s3500-ultra-kompakten-tsifrov-fotoaparat-digitalna-kamera-v-srebaren-tsvyat-20mp-i-7h-optichen-zum-nova-palen-komplekt-raboti-otlichno-CID632-IDa4uA3.html?reason=hp%7Cpromoted
+            - img "Nikon Coolpix S3500 ултра компактен цифров фотоапарат, дигитална камера в сребърен цвят 20MP и 7х оптичен зум, НОВА, пълен комплект, работи отлично!" [ref=f17e440]
+          - generic [ref=f17e448]:
+            - link "Nikon Coolpix S3500 ултра компактен цифров фотоапарат, дигитална камера в сребърен цвят 20MP и 7х оптичен зум, НОВА, пълен комплект, работи отлично!" [ref=f17e450] [cursor=pointer]:
+              - /url: /d/ad/nikon-coolpix-s3500-ultra-kompakten-tsifrov-fotoaparat-digitalna-kamera-v-srebaren-tsvyat-20mp-i-7h-optichen-zum-nova-palen-komplekt-raboti-otlichno-CID632-IDa4uA3.html?reason=hp%7Cpromoted
+              - heading "Nikon Coolpix S3500 ултра компактен цифров фотоапарат, дигитална камера в сребърен цвят 20MP и 7х оптичен зум, НОВА, пълен комплект, работи отлично!" [level=4] [ref=f17e451]
+            - generic [ref=f17e453]:
+              - paragraph [ref=f17e454]: гр. Пловдив, Център - Обновено на 18 август 2026 г.
+              - paragraph [ref=f17e455]: 230 €
+            - 'button "Последвай: Nikon Coolpix S3500 ултра компактен цифров фотоапарат, дигитална камера в сребърен цвят 20MP и 7х оптичен зум, НОВА, пълен комплект, работи отлично!" [ref=f17e456] [cursor=pointer]'
+        - generic [ref=f17e461]:
+          - link [ref=f17e463] [cursor=pointer]:
+            - /url: /d/ad/ured-za-testvane-na-dvigatelno-maslo-autool-as503-s-lcd-displey-CID1625-ID9IHXZ.html?reason=hp%7Cpromoted
+            - img "Уред за тестване на двигателно масло, Autool AS503 с LCD Дисплей" [ref=f17e466]
+          - generic [ref=f17e474]:
+            - link "Уред за тестване на двигателно масло, Autool AS503 с LCD Дисплей" [ref=f17e476] [cursor=pointer]:
+              - /url: /d/ad/ured-za-testvane-na-dvigatelno-maslo-autool-as503-s-lcd-displey-CID1625-ID9IHXZ.html?reason=hp%7Cpromoted
+              - heading "Уред за тестване на двигателно масло, Autool AS503 с LCD Дисплей" [level=4] [ref=f17e477]
+            - generic [ref=f17e479]:
+              - paragraph [ref=f17e480]: гр. София, Младост 4 - Обновено днес в 07:13 ч.
+              - paragraph [ref=f17e481]: 60 €
+            - 'button "Последвай: Уред за тестване на двигателно масло, Autool AS503 с LCD Дисплей" [ref=f17e482] [cursor=pointer]'
+        - generic [ref=f17e487]:
+          - link [ref=f17e489] [cursor=pointer]:
+            - /url: /d/ad/xiaomi-poco-x7-pro-5g-512gb-12ram-black-green-yellow-2g-garantsiya-CID632-ID9SZS4.html?reason=hp%7Cpromoted
+            - img "Xiaomi Poco X7 Pro 5G 512GB 12RAM Black / Green/ Yellow 2г. Гаранция!" [ref=f17e492]
+          - generic [ref=f17e500]:
+            - link "Xiaomi Poco X7 Pro 5G 512GB 12RAM Black / Green/ Yellow 2г. Гаранция!" [ref=f17e502] [cursor=pointer]:
+              - /url: /d/ad/xiaomi-poco-x7-pro-5g-512gb-12ram-black-green-yellow-2g-garantsiya-CID632-ID9SZS4.html?reason=hp%7Cpromoted
+              - heading "Xiaomi Poco X7 Pro 5G 512GB 12RAM Black / Green/ Yellow 2г. Гаранция!" [level=4] [ref=f17e503]
+            - generic [ref=f17e505]:
+              - paragraph [ref=f17e506]: гр. София, Център - Обновено на 17 август 2026 г.
+              - paragraph [ref=f17e507]: 355 €
+            - 'button "Последвай: Xiaomi Poco X7 Pro 5G 512GB 12RAM Black / Green/ Yellow 2г. Гаранция!" [ref=f17e508] [cursor=pointer]'
+    - generic [ref=f17e512]:
+      - generic [ref=f17e513]:
+        - generic [ref=f17e514]: Изпъкни като бизнес
+        - heading "Вижте офертата на OLX за бизнес" [level=4] [ref=f17e515]
+      - link "Научи повече" [ref=f17e516] [cursor=pointer]:
+        - /url: https://business.olx.bg
+    - generic [ref=f17e518]: "OLX.bg e сайт за безплатни обяви в категории: Недвижими имоти, Автомобили и авточасти, Eлектроника, Мода, За бебето и детето, Дом и градина, Свободно време, Домашни любимци, Услути, Работа, Екскурзии и почивки. Тук може да намериш интересни обяви и лесно да се свържеш с продавача. Ако искаш да купиш нещо - може да намериш атрактивни предложения на цени, по-ниски, отколкото в магазина. Ако искаш да продадеш нещо - можеш да добавиш обява бързо, лесно и безплатно (до определен лимит) и да пуснеш за продажба практически всичко, за което се сетиш. Купувай и продавай в OLX.bg!"
+    - generic [ref=f17e523]:
+      - generic [ref=f17e526]:
+        - generic [ref=f17e527]: "Главни категории:"
+        - link "Авточасти, аксесоари," [ref=f17e528] [cursor=pointer]:
+          - /url: /avtochasti-aksesoari/
+        - link "Антики и колекции," [ref=f17e529] [cursor=pointer]:
+          - /url: /antiki-i-kolektsii/
+        - link "Недвижими имоти," [ref=f17e530] [cursor=pointer]:
+          - /url: /nedvizhimi-imoti/
+        - link "Автомобили, каравани, лодки," [ref=f17e531] [cursor=pointer]:
+          - /url: /avtomobili-karavani-lodki/
+        - link "Електроника," [ref=f17e532] [cursor=pointer]:
+          - /url: /elektronika/
+        - link "Спорт, книги, хоби," [ref=f17e533] [cursor=pointer]:
+          - /url: /sport-knigi-hobi/
+        - link "Животни," [ref=f17e534] [cursor=pointer]:
+          - /url: /zhivotni/
+        - link "Дом и градина," [ref=f17e535] [cursor=pointer]:
+          - /url: /dom-i-gradina/
+        - link "Мода," [ref=f17e536] [cursor=pointer]:
+          - /url: /moda/
+        - link "За бебето и детето," [ref=f17e537] [cursor=pointer]:
+          - /url: /za-bebeto-i-deteto/
+        - link "Екскурзии, почивки," [ref=f17e538] [cursor=pointer]:
+          - /url: /ekskurzii-pochivki/
+        - link "Услуги," [ref=f17e539] [cursor=pointer]:
+          - /url: /uslugi/
+        - link "Машини, инструменти, бизнес оборудване," [ref=f17e540] [cursor=pointer]:
+          - /url: /mashini-instrumenti-biznes-oborudvane/
+        - link "Работа," [ref=f17e541] [cursor=pointer]:
+          - /url: /rabota/
+        - link "Подарявам" [ref=f17e542] [cursor=pointer]:
+          - /url: /podaryavam/
+      - generic [ref=f17e545]:
+        - generic [ref=f17e546]: "Популярни търсения:"
+        - link "къща," [ref=f17e547] [cursor=pointer]:
+          - /url: /nedvizhimi-imoti/q-къща/
+        - link "работа за ученици," [ref=f17e548] [cursor=pointer]:
+          - /url: /rabota/q-работа-за-ученици/
+        - link "кросов мотор," [ref=f17e549] [cursor=pointer]:
+          - /url: /avtomobili-karavani-lodki/q-кросов-мотор/
+        - link "телета," [ref=f17e550] [cursor=pointer]:
+          - /url: /zhivotni/q-телета/
+        - link "скутер 50 кубика," [ref=f17e551] [cursor=pointer]:
+          - /url: /avtomobili-karavani-lodki/q-скутер-50-кубика/
+        - link "atv," [ref=f17e552] [cursor=pointer]:
+          - /url: /avtomobili-karavani-lodki/q-atv/
+        - link "iphone 13," [ref=f17e553] [cursor=pointer]:
+          - /url: /elektronika/q-iphone-13/
+        - link "немска овчарка," [ref=f17e554] [cursor=pointer]:
+          - /url: /zhivotni/q-немска-овчарка/
+        - link "померан," [ref=f17e555] [cursor=pointer]:
+          - /url: /zhivotni/q-померан/
+        - link "френски булдог," [ref=f17e556] [cursor=pointer]:
+          - /url: /zhivotni/q-френски-булдог/
+        - link "alessa," [ref=f17e557] [cursor=pointer]:
+          - /url: /moda/q-alessa/
+        - link "варна," [ref=f17e558] [cursor=pointer]:
+          - /url: /rabota/q-варна/
+        - link "мекица," [ref=f17e559] [cursor=pointer]:
+          - /url: /sport-knigi-hobi/q-мекица/
+        - link "той пудел," [ref=f17e560] [cursor=pointer]:
+          - /url: /zhivotni/q-той-пудел/
+        - link "мобилен климатик," [ref=f17e561] [cursor=pointer]:
+          - /url: /elektronika/q-мобилен-климатик/
+        - link "магическа аудио," [ref=f17e562] [cursor=pointer]:
+          - /url: /sport-knigi-hobi/q-магическа-аудио/
+        - link "balenciaga," [ref=f17e563] [cursor=pointer]:
+          - /url: /moda/q-balenciaga/
+        - link "софия," [ref=f17e564] [cursor=pointer]:
+          - /url: /rabota/q-софия/
+        - link "електрическа тротинетка," [ref=f17e565] [cursor=pointer]:
+          - /url: /sport-knigi-hobi/q-електрическа-тротинетка/
+        - link "rolex" [ref=f17e566] [cursor=pointer]:
+          - /url: /moda/q-rolex/
+  - generic [ref=f17e568]:
+    - generic [ref=f17e569]:
+      - list [ref=f17e570]:
+        - listitem [ref=f17e571]:
+          - link "Мобилни приложения" [ref=f17e572] [cursor=pointer]:
+            - /url: https://www.olx.bg/mobileapps
+        - listitem [ref=f17e573]:
+          - link "Помощ и връзка с нас" [ref=f17e574] [cursor=pointer]:
+            - /url: https://help.olx.bg/olxbghelp/s/
+        - listitem [ref=f17e575]:
+          - link "Промо обяви" [ref=f17e576] [cursor=pointer]:
+            - /url: https://www.olx.bg/payment/whypromote/
+        - listitem [ref=f17e577]:
+          - link "OLX за твоя бизнес" [ref=f17e578] [cursor=pointer]:
+            - /url: https://business.olx.bg/
+        - listitem [ref=f17e579]:
+          - link "OLX блог" [ref=f17e580] [cursor=pointer]:
+            - /url: https://blog.olx.bg
+        - listitem [ref=f17e581]:
+          - link "Общи условия" [ref=f17e582] [cursor=pointer]:
+            - /url: https://help.olx.bg/olxbghelp/s/topic/0TO09000000khOcGAI
+        - listitem [ref=f17e583]:
+          - link "Политика за поверителност" [ref=f17e584] [cursor=pointer]:
+            - /url: https://help.olx.bg/olxbghelp/s/article/kA009000001vDdsCAE
+        - listitem [ref=f17e585]:
+          - link "Реклама" [ref=f17e586] [cursor=pointer]:
+            - /url: https://blog.olx.bg/%d0%be%d0%b1%d1%89%d0%b8-%d1%83%d1%81%d0%bb%d0%be%d0%b2%d0%b8%d1%8f-%d0%b7%d0%b0-%d1%80%d0%b5%d0%ba%d0%bb%d0%b0%d0%bc%d0%b0-%d0%b2-olx/
+        - listitem [ref=f17e587]:
+          - link "OLX Доставка" [ref=f17e588] [cursor=pointer]:
+            - /url: https://dostavka.olx.bg
+        - listitem [ref=f17e589]:
+          - button "Настройки за бисквитките" [ref=f17e590] [cursor=pointer]
+      - list [ref=f17e591]:
+        - listitem [ref=f17e592]:
+          - link "Съвети за сигурност" [ref=f17e593] [cursor=pointer]:
+            - /url: https://blog.olx.bg/как-да-се-предпазите-от-най-новите-фиши/?utm_source=footer&utm_medium=link&utm_campaign=Anti_Phishing
+        - listitem [ref=f17e594]:
+          - link "Карта на категориите" [ref=f17e595] [cursor=pointer]:
+            - /url: /sitemap/
+        - listitem [ref=f17e596]:
+          - link "Обяви по градове" [ref=f17e597] [cursor=pointer]:
+            - /url: /sitemap/regions/
+        - listitem [ref=f17e598]:
+          - link "Карта на бизнес страниците" [ref=f17e599] [cursor=pointer]:
+            - /url: /sitemap/shops/
+        - listitem [ref=f17e600]:
+          - link "Популярни търсения" [ref=f17e601] [cursor=pointer]:
+            - /url: /popular/
+        - listitem [ref=f17e602]:
+          - link "Кариера в OLX" [ref=f17e603] [cursor=pointer]:
+            - /url: https://www.olxgroup.com/careers
+        - listitem [ref=f17e604]:
+          - link "Как работи?" [ref=f17e605] [cursor=pointer]:
+            - /url: https://www.olx.bg/howitworks
+        - listitem [ref=f17e606]:
+          - link "Политика за бисквитки" [ref=f17e607] [cursor=pointer]:
+            - /url: https://help.olx.bg/olxbghelp/s/article/kA009000001vFBNCA2
+      - generic [ref=f17e608]:
+        - list [ref=f17e609]:
+          - listitem [ref=f17e610]:
+            - link [ref=f17e611] [cursor=pointer]:
+              - /url: https://play.google.com/store/apps/details?id=com.sirmamobile.prodavalnik&utm_source=mobpage&utm_medium=page&utm_campaign=button_android&referrer=utm_source%3Dolx.bg%26utm_medium%3Dcpc%26utm_campaign%3Dandroid-app-footer
+              - img "Google Play" [ref=f17e612]
+          - listitem [ref=f17e613]:
+            - link [ref=f17e614] [cursor=pointer]:
+              - /url: https://itunes.apple.com/bg/app/prodavalnik/id688184262?mt=8&utm_source=mobpage&utm_medium=page&utm_campaign=button_ios
+              - img "App Store" [ref=f17e615]
+        - paragraph [ref=f17e616]: Свали приложението на OLX за твоя телефон!
+    - list [ref=f17e618]:
+      - listitem [ref=f17e619]:
+        - link "OLX.pl" [ref=f17e620] [cursor=pointer]:
+          - /url: https://olx.pl
+      - listitem [ref=f17e626]:
+        - link "OLX.ro" [ref=f17e627] [cursor=pointer]:
+          - /url: https://olx.ro
+      - listitem [ref=f17e633]:
+        - link "OLX.ua" [ref=f17e634] [cursor=pointer]:
+          - /url: https://olx.ua
+      - listitem [ref=f17e639]:
+        - link "OLX.pt" [ref=f17e640] [cursor=pointer]:
+          - /url: https://olx.pt

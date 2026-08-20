@@ -210,8 +210,10 @@ Related user stories: US-S2
 The site uses **two header variants** rather than a single monolithic header. Both
 are server-rendered Django include fragments and share a global context processor
 (`apps.core.context_processors.header_context`) that injects `bot_username`
-(the Telegram deep-link target) and `root_categories` (ordered top-level
-`Category` nodes for the "All Categories" dropdown).
+(the Telegram deep-link target), `root_categories` (ordered top-level
+`Category` nodes for the "All Categories" dropdown), and
+`favorites_count` (the authenticated user's favorited-ad count, for the header
+badge; `None` for anonymous).
 
 | Header | Template | Used on |
 |--------|----------|---------|
@@ -221,8 +223,9 @@ are server-rendered Django include fragments and share a global context processo
 ### Catalog Header (`header_catalog.html`)
 
 An Avito-style header hosting the place-an-ad CTA, an "All Categories"
-accordion dropdown, a search bar with a grouped HTMX autocomplete, and
-breadcrumbs. HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
+accordion dropdown, a search bar with a grouped HTMX autocomplete,
+breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
+§Auth Entry in Catalog Header below). HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
 `detail.html` (the autocomplete relies on `htmx:afterRequest` events).
 
 ```html
@@ -237,10 +240,9 @@ breadcrumbs. HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
                     <a href="/">Mko Bazuna</a>
                 </h1>
             </div>
-            <div class="flex items-center gap-3">
-                {% if request.user.is_authenticated %}
-                    <a href="{% url 'cabinet:home' %}" class="text-sm">Cabinet</a>
-                {% endif %}
+            <div class="flex items-center gap-2">
+                {% include "components/header_favorites_badge.html" %}
+                {% include "components/header_auth_entry.html" %}
                 <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
                    data-place-ad>+ Подать объявление</a>
@@ -305,6 +307,21 @@ breadcrumbs. HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
   `data-suggestion-slug` attributes for click-to-navigate behavior.
 - **Breadcrumbs:** `components/breadcrumb.html`, included with
   `breadcrumb_category` (listings/search) or `ad.category` (detail).
+
+### Auth Entry in Catalog Header (R-06, Spec 24)
+
+The catalog header includes an auth/cabinet entry in the top-right corner
+(to the left of the "Place an ad" CTA), per PO clarification (2026-08-20).
+This corrects the previous Spec-14 R-05c which excluded auth nav.
+
+- **Anonymous:** icon-only outline UserIcon (44px) -> `/login/issue/`
+- **Authenticated:** filled avatar/icon button (44px) with dropdown menu
+  (Cabinet, My Ads, Favorites, Settings, Logout; Admin if staff; POST+CSRF logout)
+- **Favorites badge:** heart icon + count; outline for anonymous, filled+count for authenticated
+- **Mobile:** always visible top-right; category hamburger stays separate
+- **Dropdown:** vanilla JS toggle (no `hx-on`); closes on click-outside, Escape, HTMX configRequest
+
+See `24_catalog-header-auth-entry_spec.md` for full requirements.
 
 ### Auth Header (`header.html`)
 

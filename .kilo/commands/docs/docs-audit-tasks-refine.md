@@ -1,6 +1,6 @@
 ---
-name: docs-audit-improve
-description: docs-audit-improve
+name: docs-audit-tasks-refine
+description: docs-audit-tasks-refine
 agent: auditor
 alwaysApply: false
 ---

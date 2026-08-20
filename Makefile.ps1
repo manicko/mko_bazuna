@@ -42,7 +42,7 @@ function Show-Help {
     Write-Host "Usage: .\Makefile.ps1 <target>"
     Write-Host ""
     Write-Host "Targets:"
-    Write-Host "  up             Start development environment (web on :8000, hot-reload)"
+    Write-Host "  up             Start dev environment (web on :8000, hot-reload) + test DB on :5433"
     Write-Host "  down           Stop and remove containers"
     Write-Host "  build          Rebuild Docker images without cache"
     Write-Host "  test           Run pytest in test container (auto-starts test DB on :5433)"
@@ -67,12 +67,17 @@ function Show-Help {
     Write-Host "  restore        Restore database from backup file"
     Write-Host "  prune-backups  Manually prune backups older than 7 days"
     Write-Host "  clean          Stop containers and remove volumes"
+    Write-Host "  fullclean      Full reset: stop dev+test, wipe volumes, prune images/networks/build cache"
 }
 
 # Start development environment
 function Invoke-Up {
     $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+    # Also start the long-running test PostgreSQL (host :5433) so the test
+    # environment's DB is ready for `test`/`test-db` immediately. Idempotent.
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
 }
 
 # Rebuild images without cache (equiv. to: make build)
@@ -254,6 +259,31 @@ function Invoke-Clean {
     }
 }
 
+# Full environment reset: stop both dev and test projects (wiping volumes),
+# then remove dangling containers, networks, volumes, unused images, and the
+# build cache. Recommended after stale containers or uv layer issues.
+# See docs/ops/docker-deployment.md "Full environment reset".
+function Invoke-FullClean {
+    Write-Host "Stopping dev environment (wiping volumes)..." -ForegroundColor Cyan
+    $env:COMPOSE_PROJECT_NAME = $DevProject
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+
+    Write-Host "Stopping test environment (wiping volumes)..." -ForegroundColor Cyan
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml down -v --remove-orphans
+
+    Write-Host "Removing dangling containers, networks, and volumes..." -ForegroundColor Yellow
+    docker system prune -f --volumes
+
+    Write-Host "Removing all unused images..." -ForegroundColor Yellow
+    docker image prune -a -f
+
+    Write-Host "Clearing build cache (important for uv layer issues)..." -ForegroundColor Yellow
+    docker builder prune -a -f
+
+    Write-Host "Full clean completed. Run 'build' and 'up' to restart." -ForegroundColor Green
+}
+
 # Consolidate migrations (threshold-based)
 function Invoke-Consolidate {
     $env:COMPOSE_PROJECT_NAME = $DevProject
@@ -313,6 +343,7 @@ switch ($Target.ToLower()) {
     "restore" { Invoke-Restore }
     "prune-backups" { Invoke-PruneBackups }
     "clean" { Invoke-Clean }
+    "fullclean" { Invoke-FullClean }
     default {
         Write-Host "Unknown target: $Target" -ForegroundColor Red
         Show-Help

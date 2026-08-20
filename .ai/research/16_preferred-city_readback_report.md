@@ -1,4 +1,4 @@
-# Research Report — Preferred-City Cookie Read-Back
+﻿# Research Report — Preferred-City Cookie Read-Back
 
 **Research task ID:** `ses_fe70eab92ffeDsgqQMfJ5z9gO1`
 **Spec:** `.ai/problems/16_preferred-city_spec.md`
@@ -214,16 +214,80 @@ Following the `LanguagePreMiddleware` precedent (`?lang=X` > cookie > `Accept-La
 
 ## 3. Modern Best Practices Summary
 
-### 3.1 Classifieds city-persistence patterns
+### 3.1 Classifieds city-persistence patterns (LIVE DOM INSPECTION — 2026-08-19)
 
-| Platform | City-persistence pattern | Source |
-|----------|--------------------------|--------|
-| **Avito** | Location embedded in URL path (`/fr/maroc/...`); region context in URL for SEO. No explicit "remember my city" cookie documented. | `docs/07-design-researches/Design_02/01-avito-design.md` §6, §10 |
-| **OLX** | Geolocation auto-fill for current city; "nearby" locations based on coordinates. No persistent city cookie documented. | `docs/07-design-researches/Design_02/02-jiji-olx-design.md` §4.1, §4.3 |
-| **Jiji** | Location-first design; city selector prominently placed in onboarding. | `docs/07-design-researches/Design_02/02-jiji-olx-design.md` §1.3 (location-first) |
-| **eBay** | Location-aware but session-scoped. | `docs/07-design-researches/Design_01/02-search-filters.md` §4.1 |
+> **Methodology update:** The previous version of this section relied on internal design docs (`docs/07-design-researches/Design_02/`). The findings below are from **live DOM inspection** via Playwright on 2026-08-19, providing concrete evidence of current UI patterns. All observations were made on the public homepages of each platform.
 
-**Key finding:** No major classifieds platform documents a persistent city cookie as a best practice. Avito uses URL-embedded location; OLX uses geolocation. The **cookie-based persistence** chosen by Decision_018 is a **project-specific decision**, not an industry standard. It is a reasonable MVP approach for anonymous users (no server-side session needed), but it is **less robust than URL-based city state** because it creates the race condition documented in §1.8 and requires server-side read-back to be effective.
+#### Three dominant UI patterns identified
+
+**Pattern A — Header city button (Avito.ru):**
+The city selector is a `<button>` in the site header, positioned to the right of the search bar. Its text content is the **current city name** (observed: "Пермь" / Perm). The URL embeds the city slug in the **path** (`/perm/`, `/perm/transport/`, `/perm/nedvizhimost/`). Persistence: cookie + localStorage confirmed via web research (Context7). Geo-IP determines the initial city for anonymous users. Authenticated users sync city via profile. Precedence: URL path > cookie > Geo-IP > default regional office.
+
+**Pattern B — Search-form combobox (OLX.ua):**
+The city selector is an `<input role="combobox">` (testid="location-search-input") **embedded within the search form**, positioned between the main search input and the search button. Its placeholder is "All Ukraine" (Уся Україна), indicating country-wide search as the default. **Notably absent from the header:** any city indicator. Persistence: localStorage scan returned empty — no OLX-native city keys found. Cookies visible to document.cookie contain only third-party trackers. Persistence mechanism for anonymous users could not be confirmed (likely server-side HttpOnly cookie or Geo-IP).
+
+**Pattern C — Filter sidebar region dropdown (Mobile.bg):**
+The location filter is a `<select>` in the **search filter sidebar** (not the header), labeled "Намира се в" (Located in). Uses **Oblast (region) level** granularity — Bulgaria's 28 oblasts, not individual cities. Default: "всички" (All). Appropriate for the automotive vertical where regional scope is sufficient.
+
+#### Secondary observations
+
+**Otomoto.pl (automotive only):** No dedicated city selector at all. Instead, a "Szukaj w miastach:" (Search in cities) section on the homepage displays city name **links**. Clicking a link navigates to results filtered by that city + distance radius (search[dist]=50). Header contains only category tabs and user actions.
+
+**SS.com (Latvia-wide):** No city or region selector whatsoever. The entire site is a Latvia-wide unified catalog. No geographic filtering is available to users.
+
+#### Revised key finding
+
+The previous conclusion — "no major classifieds platform documents a persistent city cookie as a best practice" — is **partially contradicted** by the live Avito.ru inspection. Avito.ru **does** use cookie + localStorage persistence (confirmed via web research), and provides a **persistent header button** showing the current city.
+
+However, the following observations still support the spirit of the original conclusion:
+
+1. **OLX.ua and SS.com** have **no persistent city cookie** for anonymous users — they rely on Geo-IP or session-scoped state.
+2. **Mobile.bg** encodes location in URL query parameters (pseudo-persistence via bookmarkable URLs).
+3. The **header city button** pattern (Avito) is the **strongest UX** for persistent city awareness, but it requires a URL path rewrite mechanism (the site navigates to `/city-slug/` which becomes the URL path). For Mko Bazuna, the `/city/<slug>/` path structure is **already implemented** — this is a direct match.
+4. The cookie-based persistence chosen by Decision_018 is a **reasonable approach** for anonymous users, but it is only effective **if the cookie is actually read back**. The current codebase sets the cookie but never reads it — this is the gap to fix.
+
+**Net assessment:** Cookie-based persistence is a valid MVP approach (Avito.ru proves it). The critical implementation requirement is server-side read-back via middleware (see §2.1 and §3.3 for the middleware vs. inline comparison). Without read-back, the cookie is dead weight.
+
+#### UI placement implications for Mko Bazuna
+
+The live inspection reveals three distinct approaches to city-selector placement:
+
+1. **Header-level (Avito):** Highest discoverability and persistent awareness. The city is always visible. Best for markets where location is the primary browsing context. Requires a path-rewrite URL scheme (/city-slug/ as URL path).
+
+2. **Search-form-level (OLX):** Good discoverability for users who are actively searching. Lower header clutter. Risk: users who are not searching may never notice the location selector. No persistent indicator of current city.
+
+3. **Filter-sidebar-level (Mobile.bg):** Lowest discoverability on initial page load (user must scroll to / find the filters). Appropriate for domain-specific (automotive) where filtering is expected. Not applicable to Mko Bazuna's general classifieds model.
+
+**Mko Bazuna current placement (autocomplete-only):** City selection is hidden inside the search autocomplete dropdown, revealed only when the user types in the search box. This is the **least discoverable** of all observed patterns. A user who wants to switch cities must:
+
+1. Click into the search box
+2. Type something (even a city name)
+3. Find the city in the suggestion list
+4. Click the city suggestion
+
+This creates unnecessary friction and makes the city preference invisible to users who are not actively searching.
+
+**Recommendation for Montenegro header:**
+- Follow **Pattern B** (search-form combobox, like OLX.ua) as the primary interaction — place a visible city combobox in the hero search area, between the main search input and the search button. This ensures discoverability without requiring a typing interaction.
+- Add a **minimal Pattern A element** — a small header badge showing the current city name (or a fallback label like "Це цело" / whole country) — positioned near the language switcher in the header. This provides persistent awareness without a full modal picker.
+- The URL path-based city scheme (`/city/<slug>/`) is already implemented and matches Avito.ru's pattern. No URL restructuring needed.
+
+**Montenegro-specific note:** With ~30 cities, a combobox (not a modal picker) is the right interaction — Avito's modal is justified by Russia's ~1000+ cities. A simple inline `<select>` or combobox listing Montenegro's cities is sufficient and simpler.
+
+---
+
+#### UI placement comparison (new)
+
+| Platform | City selector location | Visible without interaction? | Persistent header indicator? |
+|---|---|---|---|
+| Avito.ru | Header (button, right of search) | Yes — always visible | Yes |
+| OLX.ua | Hero search form (combobox) | Yes — in search form | No |
+| Mobile.bg | Search filter sidebar | Yes — in sidebar | No |
+| Otomoto.pl | Homepage content links | Only on homepage | No |
+| SS.com | None | N/A | No |
+
+Mko Bazuna currently places city selection **inside the autocomplete dropdown** (only visible after typing in the search box) — the **least discoverable** of all observed patterns. This is a significant UX gap for the Montenegro launch.
+
 
 ### 3.2 Middleware vs. inline for default filter resolution
 

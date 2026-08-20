@@ -139,15 +139,28 @@ detail).
 | R-05e | htmx `<script src="https://unpkg.com/htmx.org@1.9.12">` must be loaded on every page that renders the shared header (catalog + detail at minimum). | `template_architecture_research.md` §1.3, §2.2 |
 | R-05f | The autocomplete inline `<script>` (containing `htmx:afterRequest` handler) must also be loaded on every page rendering the shared header. | `autocomplete_architecture_research.md` §3.4 |
 
-### R-06: Mobile Responsiveness
+### R-06: Auth / Cabinet Entry (catalog header)
+
+> **PO clarification (2026-08-20):** Spec 12 CR1 requires a Login link on **all** public pages. R-05c and the previous test contract (`test_auth_nav.py::TestAnonymousHeader`) documented the catalog header as intentionally omitting a login link ("login lives on the seller pages"). The PO has confirmed this was an error — the auth/cabinet entry **must** appear in `header_catalog.html` on all catalog and detail pages. See `24_catalog-header-auth-entry_spec.md` for the full treatment.
 
 | ID | Requirement | Source |
 |---|---|---|
-| R-06a | "All Categories" opens an **off-canvas panel** (☰ hamburger-style) on mobile. | PO #4 |
-| R-06b | Category tree inside the off-canvas panel uses **accordion** behavior (tap a parent to expand children, siblings collapse). | PO #4 |
-| R-06c | Search dropdown on mobile spans effectively full available width. | PO #4 |
-| R-06d | Tap targets must be ≥ 44×44 px. | `htmx_dropdown_research.md` §3.5 |
-| R-06e | On desktop, hover opens category submenus with a 300ms debounce; click is the primary toggle. | `htmx_dropdown_research.md` §3.4; PO #3 |
+| R-06a | **Anonymous visitors** on catalog/detail pages see a compact **icon-only** user button (outline `UserIcon`, 44×44 px) in the top-right corner. Clicking it navigates to `/login/issue/` (Telegram deep-link flow). | PO choice V2(A); Decision_014 §1 |
+| R-06b | **Authenticated users** see a **filled avatar/icon** (initials circle or outline→filled `UserIcon`) in the top-right. Clicking it opens a dropdown menu (vanilla JS — HTMX 1.9.12 has no `hx-on`). | PO choice V2(B), V3 |
+| R-06c | **Dropdown menu** contains: Cabinet (hub), My Ads (→ `/dashboard/`), Favorites (→ `/cabinet/favorites/`), Settings (→ `/cabinet/settings/`), and Logout (POST+CSRF form). Staff additionally see Admin (→ `/admin/`). | PO choice V3; Spec_012 CR2/CR7 |
+| R-06d | **Favorites indicator**: a heart icon (outline for anonymous, filled for authenticated) with a small badge showing the user's saved-favorites count. For anonymous users, the heart is outline with no badge; clicking opens login. | PO choice V4 |
+| R-06e | Auth entry is rendered **inside** `header_catalog.html` top-right group, to the left of (or grouped with) the language switcher. Always visible, even on mobile. | PO choice V5 |
+| R-06f | The existing tiny text "Cabinet" link (previously the only auth element for authenticated users) is **replaced** by the icon button + dropdown per R-06b–R-06c. | PO correction |
+
+### R-07: Mobile Responsiveness
+
+| ID | Requirement | Source |
+|---|---|---|
+| R-07a | "All Categories" opens an **off-canvas panel** (☰ hamburger-style) on mobile. | PO #4 |
+| R-07b | Category tree inside the off-canvas panel uses **accordion** behavior (tap a parent to expand children, siblings collapse). | PO #4 |
+| R-07c | Search dropdown on mobile spans effectively full available width. | PO #4 |
+| R-07d | Tap targets must be ≥ 44×44 px. | `htmx_dropdown_research.md` §3.5 |
+| R-07e | On desktop, hover opens category submenus with a 300ms debounce; click is the primary toggle. | `htmx_dropdown_research.md` §3.4; PO #3 |
 
 ---
 
@@ -188,6 +201,7 @@ All open questions from the initial analysis have been answered:
 | 7 | All Categories button label | Dynamic: "Все категории" when no category active; current category name when active. Dropdown still allows returning to "All". |
 | 8 | Close on outside click | Yes. Also Escape-to-close. Also closes on suggestion selection or navigation. Implemented via vanilla JS `click`/`keydown` listeners (HTMX 1.9.12 has no `hx-on`). |
 | 9 | Scope | New header for **public catalog + detail** pages. Dashboard/edit pages get a **separate, simpler** header — not unified. |
+| 10 | Auth entry in catalog header | **Add** auth/cabinet entry to `header_catalog.html` per PO clarification (2026-08-20). Anonymous = outline user icon button → `/login/issue/`; authenticated = avatar/filled icon with dropdown menu (Cabinet, My Ads, Favorites, Settings, Logout; Admin if staff). Heart icon with favorites count badge. Always visible top-right, even mobile. See `24_catalog-header-auth-entry_spec.md`. |
 
 ---
 
@@ -245,6 +259,7 @@ All open questions from the initial analysis have been answered:
 - Separate mobile search interface — desktop dropdown adapts to mobile width.
 - Avito.ru exact visual styling — Avito is the *pattern* reference, not a pixel-match requirement.
 - Server-side session storage for buyer history (using `localStorage` per PO #1).
+- Unifying the two headers into a single template — the auth entry is added to `header_catalog.html` while preserving the separate `header.html` for dashboard/cabinet/login pages (see R-06).
 
 ---
 
@@ -289,6 +304,9 @@ All open questions from the initial analysis have been answered:
 - `list.html` and `detail.html` both render the identical header via `{% include %}`.
 - htmx script loaded on both pages.
 - Dashboard / edit / login pages are **not** affected (separate headers).
+- The catalog header includes an auth/cabinet entry: anonymous users see an icon-only Login button in the top-right; authenticated users see an avatar/icon button with a dropdown menu (Cabinet, My Ads, Favorites, Settings, Logout).
+- The catalog header includes a heart icon with favorites count badge (filled + count for authenticated, outline without badge for anonymous).
+- Anonymous catalog pages render the login entry (previously omitted — see R-06 PO correction).
 
 ---
 
@@ -298,6 +316,7 @@ All open questions from the initial analysis have been answered:
 - **T3 (submenu endpoint)** must precede T8 (lazy-load needs the URL).
 - **T11 (htmx on detail)** is required before the shared header search works on `detail.html`.
 - **T4 (positioning fix)** must precede T5 (group rendering relies on correct positioning).
+- **Auth entry (R-06):** See `24_catalog-header-auth-entry_spec.md` — the auth/cabinet entry and favorites badge in the catalog header depend on the context processor providing `favorites_count` for authenticated users (Spec_012 login/logout routes and Spec_015 cabinet URLs are prerequisites).
 
 ---
 

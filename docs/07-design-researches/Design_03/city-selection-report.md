@@ -213,3 +213,312 @@ Latvia's general classifieds platform.
 **Location selection:** None. Latvia-wide unified catalog with no city/region filter.
 
 ---
+## 7. Cross-Platform Comparison Matrix
+
+### 7.1 UI location
+
+| Platform | UI Location | Element Type | Placement |
+|---|---|---|---|
+| Avito.ru | Header | <button> (text = city) | Right of search bar, persistent |
+| OLX.ua | Hero search form | <input role="combobox"> | Between search input and button |
+| Mobile.bg | Filter sidebar | <select> | In left filter column |
+| Otomoto.pl | Homepage content | City links | In "Search in cities" section |
+| SS.com | None | - | - |
+
+### 7.2 Primary effect
+
+| Platform | URL Change | Page Reload | SPA Nav | Effect |
+|---|---|---|---|---|
+| Avito.ru | Path rewrite | Full reload | No | Filters all listings by city |
+| OLX.ua | SPA state/params | SPA navigation | Yes | Filters search results |
+| Mobile.bg | Query param (likely) | Full reload | No | Filters automotive ads by region |
+| Otomoto.pl | Path + search[dist]=50 | Full reload | No | Filters by city + radius |
+| SS.com | None | None | None | No geographic filtering |
+
+### 7.3 Default fallback
+
+| Platform | Default | UI Text |
+|---|---|---|
+| Avito.ru | Geo-IP detected city | City name on button |
+| OLX.ua | Country-wide | "All Ukraine" |
+| Mobile.bg | Country-wide | "All" |
+| Otomoto.pl | None (must select) | - |
+| SS.com | N/A | - |
+
+### 7.4 Header city indicator
+
+| Platform | Header indicator? |
+|---|---|
+| Avito.ru | Yes - button with city name |
+| OLX.ua | No |
+| Mobile.bg | No |
+| Otomoto.pl | No |
+| SS.com | No |
+
+Only Avito.ru provides persistent city awareness in the header.
+
+---
+
+## 8. Persistence Mechanisms
+
+### 8.1 Avito.ru
+
+| Mechanism | Evidence | Confidence |
+|---|---|---|
+| Cookie | Confirmed (Context7) | HIGH |
+| localStorage | Confirmed (Context7) | HIGH |
+| Server-side (auth) | Confirmed (Context7) | HIGH |
+| Geo-IP (first visit) | Confirmed | HIGH |
+
+- Anonymous first visit: Geo-IP -> set cookie
+- Explicit city choice: cookie + localStorage persisted
+- Authenticated: stored in profile, syncs across devices
+
+### 8.2 OLX.ua
+
+| Mechanism | Evidence | Confidence |
+|---|---|---|
+| Cookie (visible) | Not found | LOW (may be HttpOnly) |
+| localStorage | Empty - no city/region keys | HIGH |
+| Server-side session | Possible | LOW |
+
+City selection persistence for anonymous users could not be confirmed.
+
+### 8.3 Mobile.bg
+
+| Mechanism | Evidence | Confidence |
+|---|---|---|
+| URL query params | Likely | MEDIUM |
+| Cookie | Not inspected | LOW |
+
+---
+
+## 9. Precedence Rules
+
+### 9.1 Avito.ru
+
+| Priority | Source | Behavior |
+|---|---|---|
+| 1 (highest) | URL path | /city-slug/ overrides all |
+| 2 | Cookie / localStorage | Used when URL has no city segment |
+| 3 | Geo-IP | First visit, anonymous |
+| 4 | Default | Moscow/Saint Petersburg fallback |
+
+### 9.2 OLX.ua
+
+Could not be fully determined. Likely relies on Geo-IP + SPA state for anonymous users.
+
+---
+
+## 10. Cross-Device Behavior
+
+| Platform | Anonymous cross-device | Authenticated cross-device |
+|---|---|---|
+| Avito.ru | No (cookie/localStorage device-local) | Yes (profile sync) |
+| OLX.ua | Unknown | Likely yes (auth profile) |
+| Mobile.bg | Unknown | Unknown |
+
+**Mko Bazuna implication:** Buyers browse without login (anonymous primary). City preference must work via cookie/localStorage for anonymous users.
+
+---
+
+## 11. Mko Bazuna Current State
+
+### 11.1 City selection flow
+
+```
+User types in search box
+  ->
+Autocomplete dropdown appears (city suggestions alongside category/popular)
+  ->
+User clicks city suggestion [data-type="city"]
+  ->
+POST /api/preferred-city/ -> sets preferred_city cookie (30d, HttpOnly, SameSite=Lax)
+  ->
+Redirect to /city/<slug>/
+  ->
+Search/Listings view reads city from URL PATH (not cookie)
+  ->
+Listings filtered by city_slug
+```
+
+### 11.2 Cookie specification (Decision_018)
+
+File: src/backend/apps/search/views/preferred_city.py
+
+| Property | Value |
+|---|---|
+| Cookie name | preferred_city (hardcoded string) |
+| Value | City slug (e.g., podgorica) |
+| max_age | 2592000 (30 days) |
+| httponly | True |
+| samesite | "Lax" |
+| secure | request.is_secure() |
+| path | / |
+
+### 11.3 Cookie is NEVER read - evidence
+
+```python
+# src/backend/apps/search/views/search.py line 70
+current_city = request.GET.get("city")  # URL query param, NOT cookie
+
+# src/backend/apps/ads/views/listings.py line 304
+city_slug = ...  # from URL path, NOT cookie
+```
+
+No code anywhere reads request.COOKIES.get("preferred_city") or similar.
+
+### 11.4 Only cookie-reading precedent
+
+```python
+# src/backend/core/middleware/language.py line 64
+class LanguagePreMiddleware:
+    """Read LANGUAGE_COOKIE_NAME and set request.LANGUAGE_CODE."""
+```
+
+This proves the infrastructure exists. A PreferredCityMiddleware mirroring this pattern can be added.
+
+### 11.5 Header template
+
+File: src/backend/templates/components/header_catalog.html
+
+Current header: Logo + category menu (left), Search input with autocomplete (center), Language/login/profile/add-ad (right).
+
+**No dedicated city button.** City selection only via autocomplete dropdown within search input.
+
+### 11.6 URL structure
+
+Cities are encoded in URL **path**: /city/<slug>/ (e.g., /city/podgorica/).
+
+### 11.7 _suggest_city helper
+
+_suggest_city in the search view uses difflib.get_close_matches() for typo tolerance.
+
+---
+
+## 12. Gap Analysis
+
+### 12.1 Critical gap: Cookie set but never consumed
+
+| Aspect | Current | Expected |
+|---|---|---|
+| Cookie write | Working (POST /api/preferred-city/) | Keep |
+| Cookie read | Nothing reads it | Add middleware |
+| Default city | Falls back to whole country | Read cookie -> set default |
+| Cross-session | Cookie exists but has no effect | Persist city across sessions |
+
+**Impact:** Returning user with preferred_city=podgorica cookie sees country-wide results when visiting homepage directly. Must re-select city via autocomplete every time.
+
+### 12.2 No persisted city indicator
+
+| Platform | Header city indicator | Mko Bazuna |
+|---|---|---|
+| Avito.ru | Button with city name | None |
+| OLX.ua | None | None |
+| Mko Bazuna | - | None |
+
+No visual indicator of current city anywhere on the page.
+
+### 12.3 City selection hidden in autocomplete
+
+OLX.ua combobox is visible on page load. Avito.ru has header button. Mko Bazuna requires typing in search box to see city suggestions.
+
+### 12.4 Code quality gaps
+
+- Cookie name "preferred_city" is a hardcoded string, not a StrEnum constant (violates project rule: "All fixed values must use StrEnum")
+- No City model or registry - cities are derived from ad data, not curated
+
+### 12.5 Montenegro-specific
+
+~30 cities/municipalities need to be in autocomplete data. 7 largest should be prioritized. No "whole country" option exists in current data.
+
+---
+
+## 13. Recommendation for Montenegro Launch
+
+### 13.1 Recommended approach: Hybrid (Pattern B + Pattern A header indicator)
+
+| Element | Pattern | Implementation |
+|---|---|---|
+| City selection interaction | Pattern B (OLX.ua) | Combobox in hero search form, visible on page load |
+| Current city indicator | Pattern A (Avito.ru) | Small header badge showing current city or "Tshe tselo" |
+| Persistence | Avito.ru model | Cookie-based (Decision_018), ADD middleware to read it |
+| Default behavior | OLX.ua model | "Tshe tselo" (whole country) as default |
+| URL structure | Avito.ru model | Path-based (/city/<slug>/) - already in place |
+| Precedence | Avito.ru model | URL > cookie > default |
+
+### 13.2 Implementation steps
+
+**Phase 1: Close the cookie gap (high priority, low effort)**
+
+1. Create src/backend/apps/search/middleware/preferred_city.py with PreferredCityMiddleware:
+   - Reads preferred_city from request.COOKIES
+   - Sets request.preferred_city (City object or None)
+   - Mirrors LanguagePreMiddleware pattern exactly
+2. Register in settings.py (after LanguagePreMiddleware, before views)
+3. Update SearchView and ListingsView to use request.preferred_city as fallback when no city in URL
+4. Extract cookie name into a StrEnum constant (project rule compliance)
+
+**Phase 2: Visible city combobox (medium priority)**
+
+1. Refactor header to show city combobox in search form (visible on load, not just on typing):
+   - Shows current city text or "Tshe tselo" as placeholder
+   - Opens dropdown of Montenegro cities on click
+   - Persists via existing POST /api/preferred-city/
+   - Navigates to /city/<slug>/ after selection
+2. Add minimal header badge showing current city (like Avito's "Perm" button)
+
+**Phase 3: Curated city registry (lower priority)**
+
+1. Create a City model or StrEnum-based registry with:
+   - Slug, display name (Serbian/Latin), population ranking, oblast grouping
+2. Populate with Montenegro's ~30 cities, prioritizing 7 largest:
+   - Podgorica
+   - Niksic
+   - Pljevlja
+   - ... etc.
+   - "Tshe tselo" (whole country) as last option
+
+### 13.3 Why not copy Avito's header button exactly?
+
+Russia has ~1000+ cities - a header button + modal makes sense. Montenegro has ~30 cities - an inline combobox is simpler and more discoverable.
+
+### 13.4 Why not copy OLX's search-form combobox exactly?
+
+OLX has no persisted city indicator in the header. A returning user lands on the homepage with no awareness of which city's results they will see. Adding a minimal header badge provides persistent awareness.
+
+### 13.5 Default fallback
+
+Default should be "Tshe tselo" (whole country), mirroring OLX's "All Ukraine". Appropriate because:
+- Montenegro population ~620K - country-wide results are manageable
+- New visitors likely want to browse all ads
+- Search autocomplete still surfaces city-specific results via keywords
+
+---
+
+## Appendix F: Evidence Files
+
+**Live DOM snapshots** (stored in .playwright-mcp/):
+
+| File | Platform | Description |
+|---|---|---|
+| page-2026-08-19T07-59-47-184Z.yml | Avito.ru | Full page DOM (city button "Perm" at ref e114, footer Regions section) |
+| olx_full_page.yml | OLX.ua | Full page DOM (header + homepage categories) |
+| olx_city_combobox_snapshot.yml | OLX.ua | City combobox element (input[testid="location-search-input"]) |
+| mobile_bg_search.yml | Mobile.bg | Search page DOM (location combobox in filter sidebar) |
+| otomoto_homepage.yml | Otomoto.pl | Homepage DOM ("Search in cities" city links section) |
+
+**Mko Bazuna codebase files inspected:**
+
+| File | Key finding |
+|---|---|
+| src/backend/apps/search/views/preferred_city.py | Cookie SET: name="preferred_city", max_age=30d, httponly=True, samesite="Lax", secure=request.is_secure() |
+| src/backend/apps/search/views/search.py:70 | current_city = request.GET.get("city") - URL param only |
+| src/backend/apps/ads/views/listings.py:304 | Reads city_slug from URL path |
+| src/backend/apps/search/views/autocomplete.py:34 | Entity suggestions include matching category and city names |
+| src/backend/core/middleware/language.py:64 | Only cookie-reading precedent: LanguagePreMiddleware |
+| src/backend/templates/components/header_catalog.html | City click handler: POST /api/preferred-city/ -> redirect /city/<slug>/ |
+
+---
+
+*End of report.*
