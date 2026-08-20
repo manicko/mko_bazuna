@@ -26,6 +26,8 @@ _TEMPLATES_WITH_BANNER: list[str] = [
     "ads/list.html",
     "analytics/seller_dashboard.html",
     "analytics/moderation_dashboard.html",
+    "cabinet/hub.html",
+    "cabinet/settings.html",
 ]
 
 _GUARD_OPEN = (
@@ -39,7 +41,7 @@ class TestConsentBannerGuardInTemplates(SimpleTestCase):
     """Every consent banner include is wrapped in the deleted-user guard."""
 
     def test_consent_banner_guard_in_all_templates(self) -> None:
-        """All five templates guard the consent banner for deleted users."""
+        """All seven templates guard the consent banner for deleted users."""
         templates_dir = Path(settings.TEMPLATES[0]["DIRS"][0])
 
         for rel_path in _TEMPLATES_WITH_BANNER:

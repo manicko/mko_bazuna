@@ -28,15 +28,19 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from pydantic import ValidationError
 
+from apps.core.enums import ConsentChoice
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
 from apps.users.models import LoginToken, User
+from apps.users.schemas import ConsentSubmission
 from apps.users.services import (
     can_login,
     decline_consent,
     give_consent,
+    record_consent_action,
     withdraw_consent,
 )
 from apps.users.services.login_rate_limit import login_rate_limit_check
@@ -44,65 +48,163 @@ from apps.users.services.login_rate_limit import login_rate_limit_check
 logger = logging.getLogger(__name__)
 
 CONSENT_COOKIE_NAME = "consent_given"
-CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
+CONSENT_ANALYTICS_COOKIE = "consent_analytics"
+CONSENT_PREFERENCES_COOKIE = "consent_preferences"
+CONSENT_TIMESTAMP_COOKIE = "consent_timestamp"
+# 12 months (PO-05 / T-05). Browser-side expiry is the primary re-prompt
+# mechanism; the context processor adds a server-side timestamp check (T-08).
+CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 
-@login_required
-def consent_accept(request: HttpRequest) -> HttpResponse:
-    """
-    Accept consent (decision F).
-
-    Sets consent_given_at to now() for the user.
-    Sets a cookie to persist the decision client-side.
-
-    Args:
-        request: HTTP request (authenticated user required)
-
-    Returns:
-        Redirect to dashboard or home page
-    """
-    user = request.user
-    give_consent(user)
-
-    response = redirect("ads:dashboard")
+def _set_consent_cookie(
+    response: HttpResponse,
+    name: str,
+    value: str,
+) -> None:
+    """Set a consent cookie with the standard secure attributes."""
     response.set_cookie(
-        CONSENT_COOKIE_NAME,
-        "true",
+        name,
+        value,
         max_age=CONSENT_COOKIE_MAX_AGE,
         httponly=True,
         samesite="Lax",
+        secure=True,
     )
-    logger.info(f"User {user.id} accepted consent via web")
+
+
+def _set_consent_cookies(
+    response: HttpResponse,
+    choice: ConsentChoice,
+    analytics: bool,
+    preferences: bool,
+) -> None:
+    """Persist consent state + granular categories + timestamp cookies.
+
+    All consent cookies use ``max_age=12 months``, ``httponly=True``,
+    ``samesite="Lax"`` and ``secure=True`` (D-COOKIES).
+    """
+    _set_consent_cookie(response, CONSENT_COOKIE_NAME, choice.value)
+    _set_consent_cookie(response, CONSENT_ANALYTICS_COOKIE, "true" if analytics else "false")
+    _set_consent_cookie(response, CONSENT_PREFERENCES_COOKIE, "true" if preferences else "false")
+    _set_consent_cookie(
+        response,
+        CONSENT_TIMESTAMP_COOKIE,
+        str(int(timezone.now().timestamp())),
+    )
+
+
+def _parse_submission(request: HttpRequest) -> ConsentSubmission | None:
+    """Parse and validate the consent form submission via the Pydantic DTO.
+
+    Returns ``None`` when the posted data is absent or invalid (callers fall
+    back to a safe default rather than erroring on a malformed consent post).
+    """
+    try:
+        return ConsentSubmission.model_validate(request.POST.dict())
+    except ValidationError:
+        logger.warning("Invalid consent submission rejected")
+        return None
+
+
+@require_POST
+def consent_accept(request: HttpRequest) -> HttpResponse:
+    """
+    Accept consent (decision F / T-05).
+
+    Authenticated: calls ``give_consent`` (which also clears any prior decline
+    state, D6) and redirects to the dashboard. Anonymous: sets the consent
+    cookies only (no DB mutation) and redirects to the home page.
+
+    Always sets the granular-category and timestamp cookies with secure flags.
+
+    Args:
+        request: HTTP request (authenticated or anonymous).
+
+    Returns:
+        Redirect to the dashboard (authenticated) or home page (anonymous).
+    """
+    submission = _parse_submission(request)
+    analytics = (
+        submission.analytics
+        if submission and "analytics" in request.POST
+        else True
+    )
+    preferences = (
+        submission.preferences
+        if submission and "preferences" in request.POST
+        else True
+    )
+    user = request.user if request.user.is_authenticated else None
+
+    if user is not None:
+        give_consent(user)
+        target: str = "ads:dashboard"
+    else:
+        target = "/"
+
+    response = redirect(target)
+    _set_consent_cookies(
+        response,
+        ConsentChoice.ACCEPTED,
+        analytics,
+        preferences,
+    )
+    record_consent_action(
+        user=user,
+        choice=ConsentChoice.ACCEPTED,
+        categories={"analytics": analytics, "preferences": preferences},
+        request=request,
+        consent_version=submission.consent_version if submission else "1.0",
+    )
+    logger.info(f"User {getattr(user, 'id', 'anonymous')} accepted consent via web")
     return response
 
 
-@login_required
+@require_POST
 def consent_decline(request: HttpRequest) -> HttpResponse:
     """
-    Decline consent (browse-only, decision K).
+    Decline consent (browse-only, decision K / T-05).
 
-    Sets ads_auto_publish=False. Does NOT set consent_revoked_at.
-    Does NOT trigger any deletion. Contact button continues to work.
-    Sets a cookie to persist the decision client-side.
+    Rejects non-essential analytics cookies (PO-02). Authenticated users are
+    set to browse-only via ``decline_consent``. Anonymous users get the cookies
+    only. No account deletion occurs.
 
     Args:
-        request: HTTP request (authenticated user required)
+        request: HTTP request (authenticated or anonymous).
 
     Returns:
-        Redirect to dashboard or home page
+        Redirect to the dashboard (authenticated) or home page (anonymous).
     """
-    user = request.user
-    decline_consent(user)
-
-    response = redirect("ads:dashboard")
-    response.set_cookie(
-        CONSENT_COOKIE_NAME,
-        "declined",
-        max_age=CONSENT_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="Lax",
+    submission = _parse_submission(request)
+    analytics = False  # decline always rejects analytics
+    preferences = (
+        submission.preferences
+        if submission and "preferences" in request.POST
+        else True
     )
-    logger.info(f"User {user.id} declined consent via web - browse-only mode")
+    user = request.user if request.user.is_authenticated else None
+
+    if user is not None:
+        decline_consent(user)
+        target = "ads:dashboard"
+    else:
+        target = "/"
+
+    response = redirect(target)
+    _set_consent_cookies(
+        response,
+        ConsentChoice.DECLINED,
+        analytics,
+        preferences,
+    )
+    record_consent_action(
+        user=user,
+        choice=ConsentChoice.DECLINED,
+        categories={"analytics": analytics, "preferences": preferences},
+        request=request,
+        consent_version=submission.consent_version if submission else "1.0",
+    )
+    logger.info(f"User {getattr(user, 'id', 'anonymous')} declined consent via web")
     return response
 
 
@@ -110,28 +212,35 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
 @require_POST
 def consent_withdraw(request: HttpRequest) -> HttpResponse:
     """
-    Withdraw consent and trigger immediate soft-delete.
+    Withdraw consent and trigger immediate soft-delete (decision F).
 
-    Calls withdraw_consent which sets consent_revoked_at, soft-deletes
-    the user and their ads, and nullifies PII (telegram_id, username).
-    Sets a cookie to persist the decision client-side.
+    Calls ``withdraw_consent`` which sets ``consent_revoked_at``, soft-deletes
+    the user and their ads, and nullifies PII (telegram_id, username). Sets the
+    consent cookies (withdrawn + all categories false) with secure flags.
+
+    Withdrawal is an account-level action and therefore keeps ``@login_required``.
 
     Args:
-        request: HTTP request (authenticated user required)
+        request: HTTP request (authenticated user required).
 
     Returns:
-        Redirect to dashboard or home page
+        Redirect to the dashboard.
     """
     user = request.user
     withdraw_consent(user)
 
     response = redirect("ads:dashboard")
-    response.set_cookie(
-        CONSENT_COOKIE_NAME,
-        "withdrawn",
-        max_age=CONSENT_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="Lax",
+    _set_consent_cookies(
+        response,
+        ConsentChoice.WITHDRAWN,
+        analytics=False,
+        preferences=False,
+    )
+    record_consent_action(
+        user=user,
+        choice=ConsentChoice.WITHDRAWN,
+        categories={"analytics": False, "preferences": False},
+        request=request,
     )
     logger.info(f"User {user.id} withdrew consent via web - soft-delete triggered")
     return response
@@ -139,24 +248,21 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
 
 def is_consent_given(request: HttpRequest) -> bool:
     """
-    Check if consent banner should be shown (has user acted?).
+    [Deprecated] Check if the user has acted on consent (banner hidden).
 
-    For anonymous users: returns True (banner not shown - they can browse without consent).
-    For authenticated users: returns True if user has acted (accepted or declined).
+    This function is kept as a backward-compatible shim. Its logic now lives in
+    ``apps.users.context_processors.consent_state``, which computes
+    ``consent_shown`` for every template. Prefer the context processor.
 
     Args:
-        request: HTTP request
+        request: HTTP request.
 
     Returns:
-        True if user has acted on consent (banner hidden), False if banner should show.
+        ``True`` if the user has acted (banner hidden), ``False`` otherwise.
     """
-    if not request.user.is_authenticated:
-        # Anonymous users can browse without consent - no banner needed
-        return True
+    from apps.users.context_processors import consent_state
 
-    user = request.user
-    # User has acted if they accepted (consent_given_at set) or declined (ads_auto_publish=False)
-    return user.consent_given_at is not None or not user.ads_auto_publish
+    return consent_state(request)["consent_shown"]
 
 
 @never_cache

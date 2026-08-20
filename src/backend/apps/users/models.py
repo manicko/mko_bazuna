@@ -8,6 +8,8 @@ One user = one Telegram account. Authentication via atomic login tokens.
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from apps.core.enums import ConsentChoice
+
 
 class User(AbstractUser):
     """
@@ -168,3 +170,66 @@ class LoginToken(models.Model):
 
     def __str__(self) -> str:
         return f"LoginToken {self.id}"
+
+
+class ConsentRecord(models.Model):
+    """
+    Server-side consent audit record (GDPR Article 7(1) accountability).
+
+    Records every consent action (accept / decline / withdraw) with the banner
+    version shown, the choice made, granular categories, and HTTP-layer context
+    (anonymized IP + truncated user agent) for demonstrable proof of consent.
+
+    ``user`` is nullable: anonymous visitors record consent via cookies only and
+    are identified by ``session_key`` instead of a user account.
+    """
+
+    user = models.ForeignKey(
+        "users.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="consent_records",
+        help_text="User who acted (null for anonymous cookie-based consent)",
+    )
+    session_key = models.CharField(
+        max_length=40,
+        null=True,
+        blank=True,
+        help_text="Session key identifying an anonymous consent action",
+    )
+    consent_given_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp of the consent action",
+    )
+    consent_version = models.CharField(
+        max_length=20,
+        default="1.0",
+        help_text="Banner text version shown to the user",
+    )
+    choice = models.CharField(
+        max_length=20,
+        choices=[(c.value, c.value) for c in ConsentChoice],
+        help_text="Consent choice made by the user",
+    )
+    categories = models.JSONField(
+        default=dict,
+        help_text="Granular category flags (CookieCategory -> bool)",
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="Anonymized IP (last IPv4 octet zeroed)",
+    )
+    user_agent = models.TextField(
+        blank=True,
+        max_length=500,
+        help_text="Truncated User-Agent header from the consent request",
+    )
+
+    class Meta:
+        db_table = "consent_records"
+        ordering = ["-consent_given_at"]
+
+    def __str__(self) -> str:
+        return f"ConsentRecord {self.id} ({self.choice})"

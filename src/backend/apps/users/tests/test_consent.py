@@ -14,9 +14,9 @@ from datetime import timedelta
 import pytest
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ConsentChoice
 from apps.locations.models import City
-from apps.users.models import LoginToken, User
+from apps.users.models import ConsentRecord, LoginToken, User
 from django.test import Client
 from django.utils import timezone
 
@@ -87,18 +87,31 @@ def _create_ad(
 class TestConsentAcceptView:
     """consent_accept view sets consent_given_at and redirects."""
 
-    def test_accept_requires_authentication(self) -> None:
-        """Anonymous users are redirected to login."""
+    def test_accept_anonymous_redirects_home_and_sets_cookie(self) -> None:
+        """Anonymous POST accept redirects home and sets consent cookies."""
+        client = Client()
+        response = client.post("/consent/accept/")
+
+        assert response.status_code == 302
+        assert response.url == "/"
+
+        # No DB write for anonymous consent (security gate D-3).
+        assert (
+            ConsentRecord.objects.filter(user__isnull=False, choice=ConsentChoice.ACCEPTED).count()
+            == 0
+        )
+
+    def test_accept_requires_post(self) -> None:
+        """GET /consent/accept/ is rejected (405 Method Not Allowed)."""
         client = Client()
         response = client.get("/consent/accept/")
-        # LoginRequiredMiddleware redirects to login page
-        assert response.status_code == 302
+        assert response.status_code == 405
 
     def test_accept_sets_consent_given_at(self, user: User) -> None:
         """consent_accept sets consent_given_at on the user."""
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/accept/")
+        response = client.post("/consent/accept/")
 
         assert response.status_code == 302
         # Check redirect target
@@ -111,13 +124,63 @@ class TestConsentAcceptView:
         assert user.is_deleted is False
 
     def test_accept_sets_consent_cookie(self, user: User) -> None:
-        """consent_accept sets the consent_given cookie."""
+        """consent_accept sets the structured consent_given cookie."""
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/accept/")
+        response = client.post("/consent/accept/")
 
         assert response.cookies.get("consent_given") is not None
-        assert response.cookies["consent_given"].value == "true"
+        assert response.cookies["consent_given"].value == "accepted"
+
+    def test_accept_sets_category_cookies(self, user: User) -> None:
+        """consent_accept sets analytics and preferences cookies to 'true'."""
+        client = Client()
+        client.force_login(user)
+        response = client.post("/consent/accept/")
+
+        assert response.cookies["consent_analytics"].value == "true"
+        assert response.cookies["consent_preferences"].value == "true"
+
+    def test_accept_cookie_has_secure_flag(self, user: User) -> None:
+        """consent cookies are marked Secure (T-05 / D-COOKIES)."""
+        client = Client()
+        client.force_login(user)
+        response = client.post("/consent/accept/")
+
+        for name in ("consent_given", "consent_analytics", "consent_preferences"):
+            assert response.cookies[name]["secure"] is True, name
+
+    def test_anonymous_accept_sets_cookie_no_db_write(self) -> None:
+        """Anonymous accept sets cookies without creating a DB record."""
+        client = Client()
+        before = ConsentRecord.objects.count()
+        response = client.post("/consent/accept/")
+
+        assert response.status_code == 302
+        assert response.url == "/"
+        assert response.cookies["consent_given"].value == "accepted"
+        assert response.cookies["consent_analytics"].value == "true"
+        assert response.cookies["consent_preferences"].value == "true"
+        # Exactly one consent record, with a null user (anonymous identity).
+        assert ConsentRecord.objects.count() == before + 1
+        record = ConsentRecord.objects.order_by("-id").first()
+        assert record.user_id is None
+
+    def test_accept_after_decline_restores_publishing(self, user: User) -> None:
+        """Accept after decline clears is_declined and restores ads_auto_publish (D6)."""
+        client = Client()
+        client.force_login(user)
+
+        client.post("/consent/decline/")
+        user.refresh_from_db()
+        assert user.is_declined is True
+        assert user.ads_auto_publish is False
+
+        client.post("/consent/accept/")
+        user.refresh_from_db()
+        assert user.is_declined is False
+        assert user.ads_auto_publish is True
+        assert user.consent_given_at is not None
 
 
 # ---------------------------------------------------------------------------
@@ -128,17 +191,33 @@ class TestConsentAcceptView:
 class TestConsentDeclineView:
     """consent_decline view sets ads_auto_publish=False and redirects."""
 
-    def test_decline_requires_authentication(self) -> None:
-        """Anonymous users are redirected to login."""
+    def test_decline_requires_post(self) -> None:
+        """GET /consent/decline/ is rejected (405 Method Not Allowed)."""
         client = Client()
         response = client.get("/consent/decline/")
+        assert response.status_code == 405
+
+    def test_anonymous_decline_sets_cookie_no_db_write(self) -> None:
+        """Anonymous decline redirects home, sets declined cookie, no DB write."""
+        client = Client()
+        response = client.post("/consent/decline/")
+
         assert response.status_code == 302
+        assert response.url == "/"
+        assert response.cookies["consent_given"].value == "declined"
+        assert response.cookies["consent_analytics"].value == "false"
+        assert response.cookies["consent_preferences"].value == "true"
+        # Anonymous consent never persists a DB record for a user account.
+        assert (
+            ConsentRecord.objects.filter(user__isnull=False, choice=ConsentChoice.DECLINED).count()
+            == 0
+        )
 
     def test_decline_sets_ads_auto_publish_false(self, user: User) -> None:
         """consent_decline sets ads_auto_publish=False and is_declined=True."""
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/decline/")
+        response = client.post("/consent/decline/")
 
         assert response.status_code == 302
         assert response.url == "/dashboard/"
@@ -156,10 +235,13 @@ class TestConsentDeclineView:
         """consent_decline sets the consent_given cookie to 'declined'."""
         client = Client()
         client.force_login(user)
-        response = client.get("/consent/decline/")
+        response = client.post("/consent/decline/")
 
         assert response.cookies.get("consent_given") is not None
         assert response.cookies["consent_given"].value == "declined"
+        assert response.cookies["consent_analytics"].value == "false"
+        # Preferences remain available even on decline (PO-02).
+        assert response.cookies["consent_preferences"].value == "true"
 
 
 # ---------------------------------------------------------------------------

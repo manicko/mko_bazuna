@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% trans "Cabinet" %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if PLAUSIBLE_HOST %}
+    {% if consent_analytics and PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
     {% endif %}
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -33,5 +33,6 @@
     {% if not request.user.is_authenticated or not request.user.is_deleted %}
     {% include "components/consent_banner.html" %}
     {% endif %}
+    {% include "components/footer.html" %}
 </body>
 </html>

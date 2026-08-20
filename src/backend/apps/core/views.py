@@ -4,9 +4,32 @@ import json
 import logging
 
 from django.db import connection
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
+
+
+def privacy_policy(request: HttpRequest) -> HttpResponse:
+    """Render the public privacy policy page (GDPR Article 13).
+
+    Publicly accessible — no authentication required. Discloses the cookie
+    declaration, third-party data flows, processing purposes, legal bases,
+    user rights, controller contact, and the 30-day erasure policy.
+
+    Args:
+        request: HTTP request (anonymous or authenticated).
+
+    Returns:
+        Rendered ``templates/privacy.html`` page.
+    """
+    from django.conf import settings
+
+    return render(
+        request,
+        "privacy.html",
+        {"bot_username": settings.BOT_USERNAME},
+    )
 
 
 def health_check(request):

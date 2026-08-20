@@ -232,7 +232,11 @@ def give_consent(user: User) -> None:
 
     including bot interactions.
 
+    Also clears any prior decline or withdrawal state (D6): accepting after a
 
+    decline restores full publishing ability and clears a prior revocation
+
+    timestamp.
 
     Args:
 
@@ -242,6 +246,19 @@ def give_consent(user: User) -> None:
 
     user.consent_given_at = timezone.now()
 
-    user.save(update_fields=["consent_given_at"])
+    user.is_declined = False
+
+    user.ads_auto_publish = True
+
+    user.consent_revoked_at = None
+
+    user.save(
+        update_fields=[
+            "consent_given_at",
+            "is_declined",
+            "ads_auto_publish",
+            "consent_revoked_at",
+        ]
+    )
 
     logger.info(f"User {user.id} gave consent - consent_given_at set")

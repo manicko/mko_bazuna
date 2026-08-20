@@ -27,8 +27,6 @@ from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
 
 from apps.locations.models import City
 
-from apps.users.views.consent import is_consent_given
-
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 
 from django.shortcuts import render
@@ -78,7 +76,6 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     context = {
         "ad": ad,
         "breadcrumb_category": ad.category,
-        "consent_shown": is_consent_given(request),
         "bot_username": settings.BOT_USERNAME,
         "is_favorited": (
             ad.favorites.filter(user_id=request.user.id).exists()
@@ -431,8 +428,6 @@ def listings(
         "max_price": max_price,
 
         "has_results": has_results,
-
-        "consent_shown": is_consent_given(request),
 
     }
 

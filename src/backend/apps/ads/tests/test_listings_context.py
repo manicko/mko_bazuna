@@ -102,7 +102,6 @@ class TestListingsFilterContext(SimpleTestCase):
             factory = RequestFactory()
             url = f"/?{query_string}" if query_string else "/"
             request = factory.get(url)
-            # Anonymous browser => is_consent_given(request) returns True.
             request.user = AnonymousUser()
 
             response = listings_view(
@@ -126,7 +125,6 @@ class TestListingsFilterContext(SimpleTestCase):
             "max_price",
             "suggested_category",
             "suggested_city",
-            "consent_shown",
         }
         assert expected_keys <= set(context)
 
@@ -158,11 +156,6 @@ class TestListingsFilterContext(SimpleTestCase):
         assert context["suggested_category"] is None
         assert context["suggested_city"] is None
 
-    def test_consent_shown_is_true_for_anonymous_browse(self) -> None:
-        """Anonymous browsers get ``consent_shown=True`` (no consent banner)."""
-        _, context = self._run_listings(_SPEC_QUERY)
-        assert context["consent_shown"] is True
-
     def test_empty_queryset_marks_no_results_with_page_obj(self) -> None:
         """With no ads in the mocked queryset, ``has_results`` is False."""
         response, context = self._run_listings(_SPEC_QUERY)
@@ -191,7 +184,6 @@ class TestListingsFilterContext(SimpleTestCase):
         assert context["max_price"] is None
         assert context["suggested_category"] is None
         assert context["suggested_city"] is None
-        assert context["consent_shown"] is True
         assert context["has_results"] is False
 
     def test_view_hits_mocked_orm_and_renders_list_template(self) -> None:

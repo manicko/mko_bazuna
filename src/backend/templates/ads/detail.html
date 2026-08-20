@@ -13,7 +13,7 @@
     <title>{{ ad|get_title:LANGUAGE_CODE }} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
-    {% if PLAUSIBLE_HOST %}
+    {% if consent_analytics and PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
     {% endif %}
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -109,6 +109,7 @@
     {% include "components/consent_banner.html" %}
     {% endif %}
 
+    {% if consent_analytics %}
     <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
@@ -122,5 +123,7 @@
         });
       });
     </script>
+    {% endif %}
+    {% include "components/footer.html" %}
 </body>
 </html>

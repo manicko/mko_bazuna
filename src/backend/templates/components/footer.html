@@ -1,0 +1,12 @@
+{# Site footer component (GDPR Article 7(3) preference center access). #}
+{% load i18n %}
+
+<footer class="bg-white border-t border-gray-200 mt-8">
+    <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
+        <p>&copy; 2026 Mko Bazuna</p>
+        <nav class="flex flex-wrap items-center gap-4">
+            <a href="{% url 'core:privacy' %}" class="underline hover:text-gray-800">{% trans "Privacy Policy" %}</a>
+            <a href="?ref=preferences" class="underline hover:text-gray-800">{% trans "Cookie settings" %}</a>
+        </nav>
+    </div>
+</footer>

@@ -27,9 +27,9 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
         """Invoke ``ad_detail`` with DB/managers mocked to capture context.
 
         ``Ad.objects.select_related(...).prefetch_related(...).get(...)`` is
-        mocked to return a MagicMock ad. ``AnalyticsEvent.objects.create`` and
-        ``is_consent_given`` are patched to avoid DB/consent-table hits.
-        ``render`` is stubbed to capture the 3rd positional ``context`` arg.
+        mocked to return a MagicMock ad. ``AnalyticsEvent.objects.create`` is
+        patched to avoid DB/analytics hits. ``render`` is stubbed to capture
+        the 3rd positional ``context`` arg.
         """
         context_box: list[dict[str, Any]] = []
 
@@ -45,7 +45,6 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
         with (
             patch("apps.ads.views.listings.Ad") as mock_ad,
             patch("apps.ads.views.listings.AnalyticsEvent") as mock_ae,
-            patch("apps.ads.views.listings.is_consent_given", return_value=False),
             patch(
                 "apps.ads.views.listings.render",
                 side_effect=fake_render,

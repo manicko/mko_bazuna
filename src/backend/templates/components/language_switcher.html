@@ -108,9 +108,11 @@ Dependencies:
     links.forEach(function(link) {
         link.addEventListener('click', function(e) {
             var lang = link.getAttribute('data-lang');
+            {% if consent_preferences %}
             if (lang) {
                 setCookie(COOKIE_NAME, lang, COOKIE_MAX_AGE, COOKIE_PATH);
             }
+            {% endif %}
             // Allow default browser navigation (href carries ?lang=X)
             closeDropdown();
         });

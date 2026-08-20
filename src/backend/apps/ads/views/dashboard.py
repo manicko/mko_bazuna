@@ -9,7 +9,6 @@ import logging
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from apps.users.views.consent import is_consent_given
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -82,7 +81,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             AdStatus.ARCHIVED: "Archived",
             AdStatus.REJECTED: "Rejected",
         },
-        "consent_shown": is_consent_given(request),
         "seller_stats": seller_stats,
         "per_ad_stats_dict": per_ad_stats_dict,
         "selected_time_range": time_range.value,

@@ -84,6 +84,19 @@ def _create_published_ad(
     return ad
 
 
+def _consent_client() -> Client:
+    """A client that has accepted analytics consent (enables script rendering).
+
+    GLightbox JS is gated behind ``consent_analytics`` (D7 / T-06b), so tests
+    that assert the JS presence must act as a consenting visitor.
+    """
+    client = Client()
+    client.cookies["consent_given"] = "accepted"
+    client.cookies["consent_analytics"] = "true"
+    client.cookies["consent_preferences"] = "true"
+    return client
+
+
 class TestGalleryMarkup:
     """Ad detail page renders the GLightbox gallery for published ads."""
 
@@ -92,7 +105,7 @@ class TestGalleryMarkup:
     ) -> None:
         """The GLightbox CSS link, JS script, and inline init are present."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
-        client = Client()
+        client = _consent_client()
         response =         client.get(reverse("ads:detail", args=[ad.id]))
         assert response.status_code == 200
         content = response.content.decode()
@@ -119,7 +132,7 @@ class TestGalleryMarkup:
     ) -> None:
         """The GLightbox init exposes the expected interaction options."""
         ad = _create_published_ad(seller, category, city, image_positions=[0])
-        client = Client()
+        client = _consent_client()
         response =         client.get(reverse("ads:detail", args=[ad.id]))
         content = response.content.decode()
         for option in [

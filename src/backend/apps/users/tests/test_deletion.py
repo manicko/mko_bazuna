@@ -203,6 +203,20 @@ class TestGiveConsent:
         assert user.telegram_id is not None
         assert user.username is None  # default for test fixture
 
+    def test_give_consent_after_decline_restores_publishing(self, user: User):
+        """give_consent after decline_consent clears decline state (D6)."""
+        decline_consent(user)
+        user.refresh_from_db()
+        assert user.is_declined is True
+        assert user.ads_auto_publish is False
+
+        give_consent(user)
+        user.refresh_from_db()
+        assert user.is_declined is False
+        assert user.ads_auto_publish is True
+        assert user.consent_given_at is not None
+        assert user.consent_revoked_at is None
+
 
 class TestWithdrawConsentAtomicity:
     """Tests for transaction.atomic() wrapping in withdraw_consent (PII-008)."""

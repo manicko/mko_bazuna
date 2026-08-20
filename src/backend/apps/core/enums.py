@@ -233,6 +233,22 @@ class LanguageLocale(StrEnum):
         }[self.value]
 
 
+class ConsentChoice(StrEnum):
+    """User consent decision (decision F/K, zone R3)."""
+
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    WITHDRAWN = "withdrawn"
+
+
+class CookieCategory(StrEnum):
+    """Granular cookie categories (ePrivacy Art. 5(3) prior consent)."""
+
+    ESSENTIAL = "essential"
+    ANALYTICS = "analytics"
+    PREFERENCES = "preferences"
+
+
 __all__ = [
     "AdSort",
     "AdvisoryLockId",
@@ -249,4 +265,6 @@ __all__ = [
     "SearchSuggestionSource",
     "LanguageLocale",
     "TimeRange",
+    "ConsentChoice",
+    "CookieCategory",
 ]

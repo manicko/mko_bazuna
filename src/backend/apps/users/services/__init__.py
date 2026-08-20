@@ -7,6 +7,7 @@ from .account_state import (
     get_account_state,
     get_state_badge,
 )
+from .consent_record import record_consent_action
 from .deletion import (
     decline_consent,
     give_consent,
@@ -24,4 +25,5 @@ __all__ = [
     "give_consent",
     "soft_delete_user_ads",
     "withdraw_consent",
+    "record_consent_action",
 ]

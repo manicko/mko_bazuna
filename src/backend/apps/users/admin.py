@@ -4,7 +4,7 @@ Django admin registration for users app.
 Custom admin with restricted access and consents visibility.
 """
 
-from apps.users.models import LoginToken, User
+from apps.users.models import ConsentRecord, LoginToken, User
 from django.contrib import admin
 from apps.users.services import withdraw_consent
 
@@ -61,6 +61,43 @@ class UserAdmin(admin.ModelAdmin):
         for user in queryset:
             withdraw_consent(user)
         self.message_user(request, f"Withdrew consent for {queryset.count()} user(s).")
+
+
+@admin.register(ConsentRecord)
+class ConsentRecordAdmin(admin.ModelAdmin):
+    """
+    Read-mostly admin for the consent audit log (GDPR Article 7(1)).
+    """
+
+    list_display = [
+        "id",
+        "consent_given_at",
+        "user",
+        "session_key",
+        "choice",
+        "consent_version",
+    ]
+    list_filter = ["choice", "consent_version", "consent_given_at"]
+    search_fields = ["session_key"]
+    readonly_fields = [
+        "user",
+        "session_key",
+        "consent_given_at",
+        "consent_version",
+        "choice",
+        "categories",
+        "ip_address",
+        "user_agent",
+    ]
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return request.user.is_superuser
 
 
 @admin.register(LoginToken)

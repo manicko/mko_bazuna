@@ -46,7 +46,9 @@ class TestPreferredCityView:
     """Preferred-city view contract."""
 
     def test_post_with_valid_slug_sets_cookie(self, city: City) -> None:
+        """A consented visitor's selection is persisted as a cookie."""
         client = Client()
+        client.cookies["consent_preferences"] = "true"
         response = client.post("/api/preferred-city/", {"slug": "podgorica"})
         assert response.status_code == 200
         assert response.json() == {"ok": True}
@@ -56,6 +58,14 @@ class TestPreferredCityView:
         assert int(cookie["max-age"]) == PREFERRED_CITY_COOKIE_MAX_AGE
         assert cookie["httponly"] is True
         assert cookie["samesite"] == "Lax"
+
+    def test_post_without_preferences_consent_sets_no_cookie(self, city: City) -> None:
+        """Without preferences consent the cookie is NOT set (T-06c / ePrivacy)."""
+        client = Client()
+        response = client.post("/api/preferred-city/", {"slug": "podgorica"})
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        assert "preferred_city" not in response.cookies
 
     def test_post_with_valid_slug_persists_db_for_authenticated(
         self, city: City, buyer: User
@@ -73,8 +83,9 @@ class TestPreferredCityView:
         assert buyer.preferred_city_id == city.id
 
     def test_post_with_valid_slug_cookie_only_for_anonymous(self, city: City) -> None:
-        """Anonymous selection sets the cookie only (no DB write)."""
+        """A consented anonymous selection sets the cookie only (no DB write)."""
         client = Client()
+        client.cookies["consent_preferences"] = "true"
         response = client.post("/api/preferred-city/", {"slug": "podgorica"})
         assert response.status_code == 200
         assert response.cookies["preferred_city"].value == "podgorica"

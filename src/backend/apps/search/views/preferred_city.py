@@ -54,13 +54,16 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
             logger.warning("Preferred city %s disappeared during save", slug)
 
     response = JsonResponse({"ok": True})
-    response.set_cookie(
-        PREFERRED_CITY_COOKIE_NAME,
-        slug,
-        max_age=PREFERRED_CITY_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="Lax",
-        secure=request.is_secure(),
-    )
+    # Gate the preference cookie behind preferences consent (T-06c / ePrivacy).
+    # The authenticated user's DB preference still applies without the cookie.
+    if request.COOKIES.get("consent_preferences") == "true":
+        response.set_cookie(
+            PREFERRED_CITY_COOKIE_NAME,
+            slug,
+            max_age=PREFERRED_CITY_COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="Lax",
+            secure=request.is_secure(),
+        )
     logger.info("Set preferred_city to %s", slug)
     return response

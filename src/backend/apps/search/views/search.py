@@ -15,7 +15,6 @@ from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, AdSort, AnalyticsEventType, LanguageLocale
 from apps.locations.models import City
-from apps.users.views.consent import is_consent_given
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -172,7 +171,6 @@ def search(request: HttpRequest) -> HttpResponse:
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,
-        "consent_shown": is_consent_given(request),
         # Save-search modal context (FT-002)
         "cities": City.objects.order_by("name"),
         "categories": Category.objects.filter(is_active=True).order_by("name"),
