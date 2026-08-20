@@ -23,14 +23,9 @@
                     <a href="/">Mko Bazuna</a>
                 </h1>
             </div>
-            <div class="flex items-center gap-3">
-                {% if request.user.is_authenticated %}
-                    <a href="{% url 'cabinet:home' %}"
-                       class="text-sm text-gray-700 hover:text-blue-600"
-                       aria-label="{% trans "Cabinet" %}">
-                        {% trans "Cabinet" %}
-                    </a>
-                {% endif %}
+            <div class="relative flex items-center gap-2">
+                {% include "components/header_favorites_badge.html" %}
+                {% include "components/header_auth_entry.html" %}
                 <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank" rel="noopener"
                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                    data-place-ad>
@@ -474,7 +469,47 @@
         });
     }
 
-    function closeAll() { hide(); closeCategories(); closeCity(); closeMobile(); }
+    /* ── Header auth dropdown ──────────────────────────────────────────── */
+    var authToggle = document.querySelector('[data-header-auth-toggle]');
+    var authMenu = document.querySelector('[data-header-auth-menu]');
+
+    function closeAuth() {
+        if (authMenu) authMenu.classList.add('hidden');
+        if (authToggle) authToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    if (authToggle && authMenu) {
+        authToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !authMenu.classList.contains('hidden');
+            if (isOpen) { closeAuth(); return; }
+            authMenu.classList.remove('hidden');
+            authToggle.setAttribute('aria-expanded', 'true');
+        });
+        document.addEventListener('click', function (e) {
+            if (!authToggle.contains(e.target) && !authMenu.contains(e.target)) closeAuth();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { closeAuth(); authToggle.focus(); }
+        });
+        // Close on menu selection (link click or logout submit).
+        authMenu.addEventListener('click', function (e) {
+            if (e.target.closest('a') || e.target.closest('button')) closeAuth();
+        });
+    }
+
+    /* ── Header favorites badge auto-refresh ───────────────────────────── */
+    document.addEventListener('favorite:toggled', function () {
+        if (typeof htmx === 'undefined') return;
+        var badge = document.querySelector('[data-favorites-badge]');
+        if (!badge) return;
+        htmx.get('{% url "cabinet:favorites_count" %}', {
+            target: badge,
+            swap: 'outerHTML'
+        });
+    });
+
+    function closeAll() { hide(); closeCategories(); closeCity(); closeMobile(); closeAuth(); }
 
     window.addEventListener('htmx:afterSwap', function (e) {
         // Re-parse any newly injected submenu panels for accordion behavior.

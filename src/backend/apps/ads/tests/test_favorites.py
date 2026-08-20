@@ -126,6 +126,23 @@ class TestFavoriteToggle:
         resp = client.post("/favorite/999999/")
         assert resp.status_code == 404
 
+    def test_heart_template_no_hx_on(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """The heart component no longer uses the unsupported hx-on attribute.
+
+        HTMX 1.9.12 has no ``hx-on``; the event dispatch was replaced with a
+        native ``htmx:afterRequest`` listener, so a toggled heart must not
+        carry the broken attribute.
+        """
+        ad = _published_ad(seller, category, city)
+        client = Client()
+        client.force_login(buyer)
+
+        resp = client.post(f"/favorite/{ad.id}/")
+        assert resp.status_code == 200
+        assert "hx-on" not in resp.content.decode()
+
     def test_non_published_ad_is_404(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:

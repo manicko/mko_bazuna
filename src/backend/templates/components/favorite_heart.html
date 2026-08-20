@@ -6,7 +6,6 @@
       hx-post="{% url 'ads:favorite_toggle' ad.id %}"
       hx-target="closest form"
       hx-swap="outerHTML"
-      hx-on::after-request="document.dispatchEvent(new Event('favorite:toggled'))"
       aria-label="{% if is_favorited %}{% trans "Remove from favorites" %}{% else %}{% trans "Add to favorites" %}{% endif %}">
     <button type="submit"
             class="favorite-btn flex items-center justify-center w-9 h-9 rounded-full transition-colors
@@ -23,3 +22,17 @@
         {% endif %}
     </button>
 </form>
+
+<script>
+(function () {
+    'use strict';
+    // HTMX 1.9.12 does not support the inline event attribute that this
+    // component previously relied on; dispatch `favorite:toggled` natively so
+    // the header heart badge can refresh after a toggle.
+    var form = document.currentScript.previousElementSibling;
+    if (!form || form.tagName !== 'FORM') return;
+    form.addEventListener('htmx:afterRequest', function () {
+        document.dispatchEvent(new Event('favorite:toggled'));
+    });
+})();
+</script>

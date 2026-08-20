@@ -112,3 +112,24 @@ class HeaderContextProcessorTests(SimpleTestCase):
         request.LANGUAGE_CODE = "ru"
         result = self._call_header_context(request)
         assert "cities" in result["context"]
+
+    def test_favorites_count_none_for_anonymous(self) -> None:
+        """Anonymous (or missing) request user yields ``favorites_count=None``."""
+        request = HttpRequest()
+        request.LANGUAGE_CODE = "ru"
+        result = self._call_header_context(request)
+        assert result["context"]["favorites_count"] is None
+
+    def test_favorites_count_for_authenticated(self) -> None:
+        """Authenticated user yields an integer favorites count."""
+        user = MagicMock()
+        user.is_authenticated = True
+        user.favorites.count.return_value = 3
+
+        request = HttpRequest()
+        request.LANGUAGE_CODE = "ru"
+        request.user = user
+        result = self._call_header_context(request)
+
+        assert result["context"]["favorites_count"] == 3
+        user.favorites.count.assert_called_once()

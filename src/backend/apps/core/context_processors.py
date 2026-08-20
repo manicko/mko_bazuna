@@ -51,6 +51,15 @@ def header_context(request) -> dict:
             locale = getattr(request, "LANGUAGE_CODE", "ru") or "ru"
             preferred_city_display = city.get_name(locale)
 
+    # Number of the authenticated user's favorites (header heart badge).
+    # Anonymous visitors get ``None`` (the badge renders an outline heart with
+    # no count). Uses ``getattr`` so bare ``HttpRequest()`` (no middleware-set
+    # ``user``) does not raise — existing context-processor tests rely on this.
+    user = getattr(request, "user", None)
+    favorites_count = None
+    if user is not None and user.is_authenticated:
+        favorites_count = user.favorites.count()
+
     return {
         "bot_username": settings.BOT_USERNAME,
         "root_categories": list(
@@ -58,4 +67,5 @@ def header_context(request) -> dict:
         ),
         "preferred_city_display": preferred_city_display,
         "cities": list(City.objects.order_by("name")),
+        "favorites_count": favorites_count,
     }

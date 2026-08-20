@@ -46,3 +46,23 @@ def favorites_list(request: HttpRequest) -> HttpResponse:
         return render(request, "ads/partials/ad_list.html", context)
 
     return render(request, "cabinet/favorites.html", context)
+
+
+def favorites_count_badge(request: HttpRequest) -> HttpResponse:
+    """Render the header favorites-badge fragment for the given request.
+
+    Served to HTMX after a ``favorite:toggled`` event so the heart-with-count
+    badge in the catalog header refreshes without a full page reload.
+
+    Anonymous requests render the outline heart (no count); authenticated
+    requests render the filled heart with ``request.user.favorites.count()``.
+    """
+    user = request.user
+    favorites_count = None
+    if user.is_authenticated:
+        favorites_count = user.favorites.count()
+    return render(
+        request,
+        "components/header_favorites_badge.html",
+        {"favorites_count": favorites_count},
+    )

@@ -2,7 +2,8 @@
 Shared auth-aware header rendering tests (TST-SCB-001 / spec 12).
 
 Verifies the extracted ``components/header.html`` across representative pages:
-- Anonymous visitors see a header "Login" link pointing to ``consent:login_issue``
+- Anonymous visitors on catalog/detail pages see an icon-only Login button in the header (header_catalog.html)
+- Anonymous visitors on login/dashboard/cabinet pages see a Login link in the auth header (header.html)
 - Authenticated sellers see Dashboard + a POST Logout form; no Admin link (non-staff)
 - Staff sellers additionally see an Admin link
 - The logout control is a POST form carrying a CSRF token
@@ -10,6 +11,7 @@ Verifies the extracted ``components/header.html`` across representative pages:
 - ``@login_required`` pages redirect anonymous users to ``/login/issue/``
 - The Withdraw Data form is preserved on the dashboard (relocated into <main>)
 - The consent banner still renders behind its per-page guard (CR9)
+- Authenticated users see an avatar icon with a dropdown menu + heart-with-count badge in the catalog header
 """
 
 import pytest
@@ -95,10 +97,12 @@ def published_ad(user: User, category: Category, city: City) -> Ad:
 class TestAnonymousHeader:
     """Public catalog pages render the Avito-style shared header.
 
-    Per the catalog-ui spec (PO Q9 / R-05c), the public catalog and ad-detail
-    pages use the shared ``header_catalog.html`` component, which carries the
-    search bar and place-an-ad CTA rather than a login link (login lives on the
-    seller pages). These assert that shared header renders on anonymous pages.
+    Per the catalog-ui spec (R-06, §6 / 24_catalog-header-auth-entry_spec),
+    the catalog header now includes an auth/cabinet entry in the top-right
+    corner: an icon-only Login button (outline user icon) for anonymous
+    visitors, and an avatar/filled-icon button with a dropdown menu plus a
+    heart-with-count badge for authenticated users. See
+    ``24_catalog-header-auth-entry_spec.md``.
     """
 
     def test_home_renders_catalog_header(self) -> None:
@@ -109,6 +113,9 @@ class TestAnonymousHeader:
         # Place-an-ad CTA + search input from header_catalog.html.
         assert "Подать объявление" in content
         assert 'id="search-input"' in content
+        # Auth entry: anonymous visitors see the Login button in the catalog header.
+        assert "/login/issue/" in content
+        assert "auth-entry" in content
 
     def test_detail_renders_catalog_header(self, published_ad: Ad) -> None:
         client = Client()
@@ -117,6 +124,9 @@ class TestAnonymousHeader:
         content = response.content.decode()
         assert "Подать объявление" in content
         assert 'id="search-input"' in content
+        # Auth entry: anonymous visitors see the Login button in the catalog header.
+        assert "/login/issue/" in content
+        assert "auth-entry" in content
 
     def test_login_issue_renders_header(self) -> None:
         client = Client()
@@ -175,3 +185,23 @@ class TestAuthenticatedHeader:
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
         assert b"consent-banner" in response.content
+
+    def test_authenticated_catalog_header_shows_dropdown_and_badge(self, user: User) -> None:
+        """Authenticated users on the homepage see the avatar button + dropdown
+        and the favorites heart badge in the catalog header (CR2, CR4, CR6)."""
+        client = Client()
+        client.force_login(user)
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Dropdown toggle button + menu present.
+        assert "data-header-auth-toggle" in content
+        assert "data-header-auth-menu" in content
+        # Menu entries.
+        assert 'href="/cabinet/"' in content
+        assert 'href="/dashboard/"' in content
+        assert 'action="/logout/"' in content
+        # Non-staff sees no admin link.
+        assert 'href="/admin/"' not in content
+        # Favorites heart badge links to the cabinet favorites page.
+        assert 'aria-label="My favorites"' in content

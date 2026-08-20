@@ -6,7 +6,7 @@ which are serialized here to avoid concurrent-edit conflicts.
 """
 
 from apps.cabinet.views import cabinet_hub, cabinet_settings
-from apps.cabinet.views.favorites import favorites_list
+from apps.cabinet.views.favorites import favorites_count_badge, favorites_list
 from apps.cabinet.views.saved_searches import (
     saved_search_delete,
     saved_search_edit,
@@ -22,6 +22,7 @@ urlpatterns = [
     path("", cabinet_hub, name="home"),
     path("settings/", cabinet_settings, name="settings"),
     path("favorites/", favorites_list, name="favorites"),
+    path("favorites/count/", favorites_count_badge, name="favorites_count"),
     path(
         "saved-searches/",
         saved_searches_list,
