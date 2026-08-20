@@ -28,6 +28,8 @@ from telegram_bot.services.media import (
     validate_photo,
 )
 
+pytestmark = [pytest.mark.unit]
+
 
 # ---------------------------------------------------------------------------
 # Fixtures

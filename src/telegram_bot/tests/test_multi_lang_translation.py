@@ -22,7 +22,7 @@ from apps.core.services.translation import (
 )
 from telegram_bot.handlers.ad_create import translate_all_languages
 
-pytestmark = [pytest.mark.asyncio]
+pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
 
 # Patch target: translate_cached_generic in the shared translation module.
 # translate_text looks up this name at call-time from the module namespace,

@@ -16,7 +16,11 @@ import os
 import subprocess
 import sys
 
+import pytest
 from django.test import SimpleTestCase
+
+
+pytestmark = [pytest.mark.unit, pytest.mark.settings]
 
 
 class SettingsSecretsTests(SimpleTestCase):

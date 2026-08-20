@@ -6,6 +6,7 @@ Unit tests for validation rules without database dependencies.
 
 import pytest
 from django.core.cache import cache
+from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.analytics.models import AnalyticsEvent
@@ -239,6 +240,18 @@ class TestCheckFunction:
             "status": AdStatus.ON_MODERATION,
         }
         defaults.update(kwargs)
+        # Set status-specific timestamps to satisfy Ad check constraints
+        # (e.g. ck_ads_published_at_if_published, ck_ads_moderation_failed_at_if_failed).
+        status = defaults.get("status", AdStatus.ON_MODERATION)
+        if status == AdStatus.PUBLISHED and "published_at" not in defaults:
+            defaults["published_at"] = timezone.now()
+        elif status == AdStatus.REJECTED and "rejected_at" not in defaults:
+            defaults["rejected_at"] = timezone.now()
+        elif (
+            status == AdStatus.ON_MODERATION_FAILED
+            and "moderation_failed_at" not in defaults
+        ):
+            defaults["moderation_failed_at"] = timezone.now()
         return Ad.objects.create(**defaults)
 
     def test_check_returns_passed_on_valid_ad(self):

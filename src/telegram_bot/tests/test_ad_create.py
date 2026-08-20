@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from asgiref.sync import sync_to_async
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration, pytest.mark.concurrent]
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,10 @@ fi
 echo "Running migrations..."
 uv run python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
 
-# Run pytest with short traceback format.
+# Run pytest with short traceback format and duration reporting for slowness visibility.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override the flags.
+# --reuse-db skips test DB schema rebuild on subsequent runs (DB container persists
+# between runs via the named postgres_data volume). Use `make test-recreate` to
+# force a fresh schema (--no-reuse-db --create-db).
 echo "Running tests..."
-uv run pytest ${PYTEST_OPTS:- --tb=short}
+uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short --durations=10}

@@ -1,110 +1,191 @@
 ---
 name: audit-bad-tests
-description: audit-bad-tests
-agent: auditor
+
+description: Audit test quality, identify obsolete or low-value tests, and recommend test improvements or missing coverage using multi-agent research
+
+agent: tech-lead
+
 alwaysApply: false
+
 ---
 
-# Test Quality Audit
+# Task: Test Quality Audit
 
-## Step 0 — Ensure Docker Environment is Running
+## Goal
 
-Start Docker services in **both development and test modes** (never production) before executing any test commands. Follow the setup instructions in `docs/11-guides/docker.md`. Confirm all required containers are in `running` or `healthy` state before proceeding. If the environment cannot be started, document why and skip dependent steps.
+Identify tests that are outdated, low-value, redundant, fragile, or inconsistent with the current architecture, and identify important missing test coverage.
 
-## Objective
+The orchestrator must delegate analysis to specialized agents and synthesize their structured findings.
 
-Identify tests that:
-1. **Don't match current architecture** — outdated contracts, wrong patterns, force production code to satisfy tests
-2. **Have low verification value** — don't test business logic, only check status codes or mock calls
-3. **Should be improved or removed** — redundant, fragile, or testing the wrong thing
+---
 
-Also recommend **missing test coverage** for critical business flows that have no tests at all.
+# Workflow
 
-## Recommendation Types
+## Step 0. Verify Test Environment
 
-Label every finding:
-- `[TEST-DELETE]` — test is harmful or worthless; delete it
-- `[TEST-REWRITE]` — test intent is right but implementation is wrong; rewrite
-- `[TEST-UPDATE]` — test needs minor updates to match current code
-- `[BEST-PRACTICE]` — missing test coverage or quality improvement; advisory
-- `[DOC-UPDATE]` — test reveals that docs/spec are wrong, not the code
+**Goal:** Ensure the test environment is available for reliable analysis.
 
-## Research
+**Launch Agent:** `test-engineer`
 
-Use `websearch` to verify current best practices for:
-- pytest async testing patterns
-- FastAPI test client patterns (httpx AsyncClient)
-- SQLAlchemy async test fixtures
-- Meaningful test coverage vs coverage for its own sake
+Start the required test environment and verify that required services are running.
 
-## Bad Test Indicators (subject to deletion or complete rewrite):
+If the environment cannot be started, document the reason and continue with static analysis where possible.
 
-### Architecture / Contract Mismatch
-- Use `sync` instead of `async`/`await`
-- Call deprecated methods, functions, or settings
-- Violate the current layer separation (API → Service → Repository)
-- Test against old response shapes (e.g., login returning only `{access_token}` instead of `TokenWithUser` with `user` + `display_name`)
-- Reference removed or renamed StrEnum classes (e.g., old enum names)
-- Test for `print()` output instead of logger calls
+---
 
-### No Business Logic Verification
-- Only verify object creation or HTTP status codes (e.g., `assert response.status_code == 200` with no body checks)
-- Verify method calls instead of business rules
-- Mock completely replaces business logic
-- Assertions check mock values, not real results
-- Don't verify side effects (DB state, processing_logs entries, temp file cleanup)
+## Step 1. Analyze Current Architecture and Test Conventions
 
-### Weak Coverage & Low Value
-- Ignore negative scenarios and boundary conditions
-- Use minimal/artificial data instead of realistic data
-- Don't verify DB state, logs, or side effects after execution
-- Superficial tests ("field exists", "function doesn't crash")
-- `assert True` or no `assert` at all
-- `assert result is None` without verifying WHY it's None
+**Goal:** Establish the current implementation and determine what tests should be considered valid.
 
-### Quality & Maintenance Problems
-- Redundant and duplicate tests
-- Depend on test execution order
-- Strongly coupled to internal implementation (fragile)
-- Excessive mocking where test DB or real dependencies would suffice
-- Don't use pytest fixtures from `conftest.py` (duplicate fixture definitions)
-- Don't use `pytest.mark.asyncio` for async tests
+**Launch Agent:** `researcher`
 
-### Specific Anti-Patterns
-- Tests that don't verify JSONB normalization (dims key sorting)
-- Tests that don't verify `display_name` is computed from email prefix
-- Tests that don't verify `TokenWithUser` response shape (token + user profile)
-- Tests that don't verify admin bypass for dashboard access
-- Tests that don't verify 403/404 dual-signal behavior
-- Tests that don't verify rate limiting (fail-open/fail-closed)
-- Tests that don't verify temp file cleanup after processing
-- Tests that don't verify processing_logs status lifecycle transitions
-- Tests that don't verify registration approval flow (temp password generation)
-- Tests that don't verify StrEnum values match PostgreSQL ENUM types
-- Tests that use `unittest.TestCase` instead of pytest style
+Inspect:
 
-## Special Attention
+- current architecture and layer boundaries;
+- relevant models, APIs, services, and workflows;
+- project testing conventions;
+- relevant specifications and documentation;
+- existing test configuration and fixtures.
 
-- Tests without `assert` or with `assert True` / `assert not None`
-- Mocks of repositories/services inside unit tests when test DB would suffice
-- Tests that break after architecture refactoring without behavior change
-- Tests written for old code version and not updated
-- Tests that import from wrong module paths (e.g., old package structure)
+Identify current contracts and important business behaviors that tests should verify.
 
-**Rule:** If a test requires significant changes to production code just to make the test pass — delete that test.
+Return a concise structured report.
 
-**Rule:** If a test was written for old code and the code has legitimately evolved, update the test — don't revert the code.
+---
 
-**Rule:** When a test fails because the spec was wrong (not the code), recommend updating the spec, not the code.
+## Step 2. Audit Test Quality
 
-## Report Format
+**Goal:** Identify tests that provide insufficient value or conflict with the current implementation.
 
-Create file: `.ai/audit/tests/audit_report_<number>.md` (next available number)
+**Launch Agent:** `test-engineer`
+
+Analyze the test suite against the current architecture and conventions.
+
+Look for:
+
+- outdated contracts or imports;
+- tests coupled to obsolete implementation details;
+- tests that force production code to satisfy obsolete assumptions;
+- missing or weak assertions;
+- tests that only verify status codes or mock calls;
+- tests that do not verify meaningful business behavior;
+- excessive or inappropriate mocking;
+- missing side-effect verification;
+- redundant or duplicate tests;
+- fragile or order-dependent tests;
+- artificial or unrealistic test data;
+- tests that should use shared fixtures;
+- superficial tests with little verification value;
+- tests that fail or require production changes because their assumptions are obsolete.
+
+Identify missing coverage for important business flows, negative cases, boundaries, and side effects.
+
+Return findings grouped by root cause.
+
+---
+
+## Step 3. Validate Findings
+
+**Goal:** Confirm that proposed test changes are justified by the current system behavior.
+
+**Launch Agent:** `researcher`
+
+For each significant finding, verify:
+
+- what the test currently expects;
+- what the current implementation actually does;
+- whether the behavior is defined by current requirements or documentation;
+- whether the test is obsolete, incorrectly implemented, or exposing a real behavior that should remain protected.
+
+Classify each finding as:
+
+- `[TEST-DELETE]` — test has no meaningful value or is harmful;
+- `[TEST-REWRITE]` — test intent is valid but implementation is fundamentally wrong;
+- `[TEST-UPDATE]` — test requires a minor update to current behavior;
+- `[BEST-PRACTICE]` — recommended quality or missing-coverage improvement;
+- `[DOC-UPDATE]` — test and implementation agree, but documentation/specification is outdated or incorrect.
+
+Do not assume that a failing or outdated-looking test should be deleted without validating the intended behavior.
+
+---
+
+## Step 4. Produce the Audit Report
+
+**Goal:** Produce a concise, actionable test-quality audit.
+
+**Launch Agent:** `auditor`
+
+Synthesize the findings into a report containing:
 
 | FilePath | TestName | Type | Problem | Recommendation |
 |----------|----------|------|---------|----------------|
-| tests/test_auth.py | test_login_old_response | [TEST-REWRITE] | Checks only `{access_token}`, not `TokenWithUser` with `display_name` | Rewrite to verify full response shape |
-| tests/test_processing.py | test_process_uses_pandas | [TEST-DELETE] | Imports pandas instead of polars | Delete — violates tech stack |
-| tests/test_upload.py | test_no_assert | [TEST-DELETE] | Has no assert statement | Delete or add meaningful assertions |
-| tests/test_dashboards.py | — | [BEST-PRACTICE] | No tests for 403/404 dual-signal | Add negative scenario tests |
-| tests/test_upload.py | test_upload_cleanup | [DOC-UPDATE] | Test expects old cleanup behavior, code evolved | Update test to match current `platformdirs` cleanup |
+
+Include:
+
+- obsolete tests;
+- tests requiring rewrite or update;
+- redundant or low-value tests;
+- fragile tests;
+- missing critical coverage;
+- documentation/specification issues.
+
+Group related findings where they share the same root cause.
+
+Output path:
+
+`.ai/audit/tests/audit_report_<number>.md`
+
+Use the next available report number.
+
+---
+
+## Step 5. Create the Implementation Plan
+
+**Goal:** Turn the audit findings into a prioritized implementation plan.
+
+**Launch Agent:** `planner`
+
+Using the audit report, create a plan covering:
+
+- tests to delete;
+- tests to rewrite;
+- tests to update;
+- missing tests to add;
+- documentation/specification updates;
+- dependencies between changes;
+- recommended implementation order;
+- validation required after each group of changes.
+
+Prioritize changes by:
+
+1. correctness and regression risk;
+2. business importance;
+3. impact on test quality;
+4. implementation effort.
+
+Do not modify tests, production code, or configuration.
+
+Output path:
+
+`.ai/plans`
+
+---
+
+# Constraints
+
+- Evaluate tests against the current architecture and intended behavior.
+- Do not preserve obsolete tests merely to increase coverage.
+- Do not delete a test solely because it is simple; determine whether it protects meaningful behavior.
+- Do not weaken assertions to make tests pass.
+- Do not change production code during the audit.
+- Do not recommend changing production code merely to satisfy an obsolete test.
+- Preserve meaningful business, integration, and regression coverage.
+- Prefer testing observable behavior and business rules over implementation details.
+- Mark uncertain cases explicitly rather than guessing.
+- Base recommendations on evidence from the codebase, tests, and current project documentation.
+
+---
+
+# Expected Result
+
+A validated test-quality audit and a prioritized implementation plan identifying which tests should be deleted, rewritten, or updated, which important scenarios are missing, and which documentation/specification changes are required.

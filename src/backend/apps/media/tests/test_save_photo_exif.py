@@ -77,8 +77,8 @@ class TestSavePhotoExifStripping:
         media_root = tmp_path / "media"
         media_root.mkdir()
         with override_settings(MEDIA_ROOT=media_root):
-            storage_key, sha256 = asyncio.run(
-                save_photo("exif-test.jpg", jpeg_with_exif, user_id=None)
+            storage_key = asyncio.run(
+                save_photo("exif-test.jpg", jpeg_with_exif)
             )
 
         written_path = media_root / storage_key
@@ -98,7 +98,3 @@ class TestSavePhotoExifStripping:
 
         # The stripped output must differ from the input (proves stripping ran).
         assert written_bytes != jpeg_with_exif, "EXIF was not stripped from written bytes"
-
-        # SHA-256 must be over the cleaned bytes (deterministic, non-empty).
-        assert sha256, "save_photo did not return a SHA-256 digest"
-        assert len(sha256) == 64, "SHA-256 must be a 64-char hex digest"

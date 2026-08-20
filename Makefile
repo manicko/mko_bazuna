@@ -35,7 +35,7 @@ help:
 	@echo "  build          Rebuild images without cache"
 	@echo ""
 	@echo "Test Environment:"
-	@echo "  test           Run tests (auto-starts test DB on :5433)"
+	@echo "  test           Run tests (auto-starts test DB on :5433, reuses DB via --reuse-db)"
 	@echo "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
 	@echo "  test-logs      Follow test environment logs"

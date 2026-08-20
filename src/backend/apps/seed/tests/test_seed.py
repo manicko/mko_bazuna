@@ -10,8 +10,10 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
@@ -268,6 +270,7 @@ class TestImageGenerator(TestCase):
             category_name="Тест",
             status=AdStatus.PUBLISHED,
             source=AdSource.SEED,
+            published_at=timezone.now(),
         )
 
     def setUp(self) -> None:
@@ -280,6 +283,7 @@ class TestImageGenerator(TestCase):
             path.unlink(missing_ok=True)
         shutil.rmtree("/tmp/test_seed_media", ignore_errors=True)
 
+    @pytest.mark.seed
     @override_settings(MEDIA_ROOT="/tmp/test_seed_media")
     def test_generates_ad_images(self) -> None:
         """ImageGenerator creates AdImage instances for ads."""
@@ -438,6 +442,7 @@ class TestAnalyticsGenerator(TestCase):
 # ─── Management command tests ────────────────────────────────────────────
 
 
+@pytest.mark.seed
 class TestSeedCommand(TestCase):
     """Tests for the seed management command."""
 
@@ -852,6 +857,7 @@ class TestAdGeneratorMultiLang(TestCase):
 # ─── SeedCommand enhanced tests ──────────────────────────────────────────
 
 
+@pytest.mark.seed
 class TestSeedCommandEnhanced(TestCase):
     """Tests for SeedCommand with new media cleanup and realistic photos."""
 
@@ -929,6 +935,7 @@ class TestSeedCommandEnhanced(TestCase):
 # ─── Seed category integration tests ─────────────────────────────────────
 
 
+@pytest.mark.seed
 class TestSeedCategoryIntegration(TestCase):
     """Integration tests verifying the full seed pipeline with the new category system.
 
@@ -1104,6 +1111,7 @@ class TestSeedCategoryIntegration(TestCase):
 # ─── Seed leaf-category coverage tests ──────────────────────────────────
 
 
+@pytest.mark.seed
 class TestLeafCategoryFiltering(TestCase):
     """Verify that seed category loading returns only leaf categories."""
 
@@ -1145,6 +1153,7 @@ class TestLeafCategoryFiltering(TestCase):
         self.assertNotIn("business", slug_set)
 
 
+@pytest.mark.seed
 class TestAdGeneratorLeafOnly(TestCase):
     """Verify seed ads are only ever assigned to leaf categories."""
 

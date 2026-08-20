@@ -42,6 +42,8 @@ CliArgs = download.CliArgs
 count_category_photos = download.count_category_photos
 prioritize_categories = download.prioritize_categories
 
+pytestmark = [pytest.mark.unit]
+
 
 # ─── Helpers ────────────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration, pytest.mark.concurrent]
 
 
 class TestClaimLoginToken:

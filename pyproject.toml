@@ -157,12 +157,17 @@ minversion = "8.4"
 asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]
 pythonpath = ["src", "src/backend"]
-addopts = ["--import-mode=importlib","-ra", "-q", "--cov", "--cov-report=term-missing"]
+addopts = ["--import-mode=importlib", "-ra", "-q"]
 console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning
 markers = [
-  "slow: marks tests as slow (use -m slow to run)",
+  "unit: marks tests that require no database (pure unit tests)",
   "integration: marks tests that require a database (use -m integration to run)",
+  "e2e: marks multi-component end-to-end tests (HTTP client, FTS, views)",
+  "seed: marks tests that invoke call_command('seed') or ImageGenerator (nightly only)",
+  "settings: marks import-time settings validation tests using subprocess isolation",
+  "concurrent: marks tests requiring transaction=True (TRUNCATE per test)",
+  "slow: marks tests that take >5 seconds individually (use -m 'not slow' to skip)",
 ]
 
 # Coverage.py configuration (used by pytest-cov)
@@ -192,17 +197,13 @@ default-groups = []
 [dependency-groups]
 dev = [
     "basedpyright>=1.39.9",
-    "hypothesis>=6.156.1",
-    "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.12.0",
-    "pytest-factoryboy>=2.7.0",
-    "model-bakery>=1.23.0",
+    "pytest-xdist>=3.8.0",
     "radon>=6.0.1",
     "ruff>=0.16.0",
-    "factory-boy>=3.3.3",
     "coverage>=7.15.2",
     "requests>=2.34.2",
 ]

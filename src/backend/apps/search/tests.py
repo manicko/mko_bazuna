@@ -97,16 +97,27 @@ def _create_ad(
     status: AdStatus = AdStatus.PUBLISHED,
 ) -> Ad:
     """Create an ad with the given status."""
-    return Ad.objects.create(
-        user=seller,
-        title=title,
-        description="Test description for the ad",
-        category=category,
-        city=city,
-        category_name=category.name,
-        status=status,
-        published_at=timezone.now() if status == AdStatus.PUBLISHED else None,
-    )
+    kwargs: dict[str, object] = {
+        "user": seller,
+        "title": title,
+        "description": "Test description for the ad",
+        "category": category,
+        "city": city,
+        "category_name": category.name,
+        "status": status,
+    }
+    # Set status-specific timestamps to satisfy Ad check constraints.
+    if status == AdStatus.PUBLISHED:
+        kwargs["published_at"] = timezone.now()
+    elif status == AdStatus.REJECTED:
+        kwargs["rejected_at"] = timezone.now()
+    elif status == AdStatus.ARCHIVED:
+        kwargs["archived_at"] = timezone.now()
+    elif status == AdStatus.ON_MODERATION_FAILED:
+        kwargs["moderation_failed_at"] = timezone.now()
+    elif status == AdStatus.DELETED:
+        kwargs["deleted_at"] = timezone.now()
+    return Ad.objects.create(**kwargs)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -226,26 +237,28 @@ class TestSearchViewDescendantCategories:
         city: City,
     ) -> None:
         """A single-word query matching a category name returns ads from all descendants."""
-        # Create ads in the descendant tree
+        # Create ads in the descendant tree.
+        # Titles must contain the Russian word "Транспорт" so the per-language
+        # FTS query (config=russian, vector=search_vector_ru) matches them.
         ad_root = _create_ad(
             seller,
             root_category,
             city,
-            title="Root transport ad",
+            title="Транспорт — продажа прицепа",
             status=AdStatus.PUBLISHED,
         )
         ad_child = _create_ad(
             seller,
             child_category,
             city,
-            title="Child bicycle ad",
+            title="Транспорт — детский велосипед",
             status=AdStatus.PUBLISHED,
         )
         ad_grandchild = _create_ad(
             seller,
             grandchild_category,
             city,
-            title="Grandchild mountain bike ad",
+            title="Транспорт — горный велосипед",
             status=AdStatus.PUBLISHED,
         )
         # Create ad in a non-descendant category (should NOT appear)

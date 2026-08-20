@@ -80,6 +80,15 @@ def _make_ad(
         "status": status,
         "source": AdSource.TELEGRAM,
     }
+    # Set status-specific timestamps to satisfy Ad check constraints
+    # (e.g. ck_ads_rejected_at_if_rejected). ``auto_now_add`` ignores the
+    # constructor value for created_at, so callers backdate via .update().
+    if status == AdStatus.REJECTED and "rejected_at" not in defaults:
+        defaults["rejected_at"] = timezone.now()
+    elif status == AdStatus.ON_MODERATION_FAILED and "moderation_failed_at" not in defaults:
+        defaults["moderation_failed_at"] = timezone.now()
+    elif status == AdStatus.PUBLISHED and "published_at" not in defaults:
+        defaults["published_at"] = timezone.now()
     defaults.update(overrides)
     return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
