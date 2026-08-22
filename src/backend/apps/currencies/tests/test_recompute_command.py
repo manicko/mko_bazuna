@@ -11,7 +11,7 @@ from conftest import create_test_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

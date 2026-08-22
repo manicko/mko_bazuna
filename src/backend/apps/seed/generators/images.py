@@ -83,50 +83,50 @@ class ImageGenerator(BaseGenerator):
     def generate(self) -> list[AdImage]:
         """Generate AdImage records for all seed ads.
 
-        Pre-processes manifest photos once, then assigns them to ads
-        based on each ad's category slug.
+        Builds the category → photo map from manifest METADATA (no disk I/O),
+        then lazily preprocesses only the photos actually selected for ads.
+        Photos that are never selected are never read from disk or written to
+        MEDIA_ROOT, which makes ``--ads=0`` skip preprocessing entirely.
 
         Returns:
             List of AdImage instances ready for bulk_create.
         """
-        all_entries: list[ManifestEntry] = []
-        for category_photos in self.photo_pool.values():
-            all_entries.extend(category_photos)
-        all_entries.extend(self.default_pool)
+        # Build lookup: category_slug -> list of storage keys, filtering to
+        # manifest entries whose fixture file exists (identical selection
+        # surface to the old eager pipeline, which skipped missing files).
+        category_key_map: dict[str, list[str]] = {}
+        for cat_slug, photos in self.photo_pool.items():
+            for entry in photos:
+                storage_key = f"seed/{entry['filename']}"
+                if (FIXTURES_IMAGES_DIR / entry["filename"]).exists():
+                    category_key_map.setdefault(cat_slug, []).append(storage_key)
+        for entry in self.default_pool:
+            storage_key = f"seed/{entry['filename']}"
+            if not (FIXTURES_IMAGES_DIR / entry["filename"]).exists():
+                continue
+            # Default pool photos — make them available to all categories
+            for cat_slug in self.photo_pool:
+                category_key_map.setdefault(cat_slug, []).append(storage_key)
+            # Also keep as fallback
+            category_key_map.setdefault("__default__", []).append(storage_key)
 
-        if not all_entries:
+        # Flat list of all available storage keys, used only as a last-resort
+        # fallback in ``_find_category_keys``.
+        self.all_image_keys = [
+            key
+            for keys in category_key_map.values()
+            for key in keys
+        ]
+
+        if not self.all_image_keys:
             logger.warning("No photos in manifest, using empty image pool")
             return []
 
         seed_dir = self._ensure_seed_dir()
         thumbnail_service = ThumbnailService(storage_dir=seed_dir)
 
-        # Phase 1: Pre-process images
-        image_keys = self._preprocess_images(all_entries, seed_dir, thumbnail_service)
-        self.all_image_keys = image_keys
-
-        # Build lookup: category_slug -> list of storage keys
-        category_key_map: dict[str, list[str]] = {}
-        for entry in all_entries:
-            filename = entry["filename"]
-            # Determine which category this photo belongs to
-            photo_category = None
-            for cat_slug, photos in self.photo_pool.items():
-                if entry in photos:
-                    photo_category = cat_slug
-                    break
-            storage_key = f"seed/{filename}"
-            if storage_key in image_keys:
-                if photo_category:
-                    category_key_map.setdefault(photo_category, []).append(storage_key)
-                else:
-                    # Default pool photos — make them available to all categories
-                    for cat_slug in self.photo_pool:
-                        category_key_map.setdefault(cat_slug, []).append(storage_key)
-                    # Also keep as fallback
-                    category_key_map.setdefault("__default__", []).append(storage_key)
-
-        # Phase 2: Assign images to ads
+        # Phase 2: Assign images to ads, preprocessing each selected photo
+        # lazily so unused photos never touch the disk.
         image_count_config = self.config.get("image_count", {"min": 1, "max": 3})
         min_images = image_count_config.get("min", 1)
         max_images = image_count_config.get("max", 3)
@@ -163,6 +163,8 @@ class ImageGenerator(BaseGenerator):
                 unique=True,
             )
             for position, key in enumerate(selected, start=1):
+                if not self._preprocess_one(key, seed_dir, thumbnail_service):
+                    continue
                 ad_img = AdImage(
                     ad=ad,
                     image=key,
@@ -229,6 +231,9 @@ class ImageGenerator(BaseGenerator):
     ) -> list[str]:
         """Pre-process all manifest photos: write originals, generate thumbnails.
 
+        Deprecated eager bulk variant retained for compatibility; the lazy
+        ``generate`` path uses ``_preprocess_one`` instead.
+
         Args:
             manifest_entries: List of manifest photo entries (each has 'filename').
             seed_dir: Target directory for seed images.
@@ -239,37 +244,60 @@ class ImageGenerator(BaseGenerator):
         """
         keys: list[str] = []
         for entry in manifest_entries:
-            filename = entry["filename"]
-            fixture_path = FIXTURES_IMAGES_DIR / filename
-            if not fixture_path.exists():
-                logger.warning("Photo file not found: %s, skipping", fixture_path)
-                continue
-
-            storage_key = f"seed/{filename}"
-            original_path = os.path.join(seed_dir, filename)
-
-            # Read JPEG bytes from fixture
-            with open(fixture_path, "rb") as f:
-                img_bytes = f.read()
-
-            # Write original image
-            with open(original_path, "wb") as f:
-                f.write(img_bytes)
-
-            # Generate thumbnails
-            thumb_small = os.path.join(seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg")
-            if os.path.exists(thumb_small):
+            storage_key = f"seed/{entry['filename']}"
+            if self._preprocess_one(storage_key, seed_dir, thumbnail_service):
                 keys.append(storage_key)
-                continue
-
-            try:
-                thumbnail_service.generate_thumbnails(img_bytes, filename)
-            except FileExistsError:
-                logger.warning("Thumbnails already exist for %s, skipping", filename)
-
-            keys.append(storage_key)
-
         return keys
+
+    def _preprocess_one(
+        self,
+        storage_key: str,
+        seed_dir: str,
+        thumbnail_service: ThumbnailService,
+    ) -> bool:
+        """Pre-process a single seed photo on demand.
+
+        Reads the fixture JPEG, writes the original to ``seed_dir``, and
+        generates thumbnails. Skips photos whose fixture file is missing and
+        skips already-generated thumbnails (cache check), matching the old
+        eager pipeline's per-file behavior exactly.
+
+        Args:
+            storage_key: Original storage key, e.g. ``"seed/kvartiry_01.jpg"``.
+            seed_dir: Target directory for seed images.
+            thumbnail_service: ThumbnailService instance.
+
+        Returns:
+            True if the photo is available (keys usable), False if its fixture
+            file is missing.
+        """
+        filename = storage_key[5:] if storage_key.startswith("seed/") else storage_key
+        fixture_path = FIXTURES_IMAGES_DIR / filename
+        if not fixture_path.exists():
+            logger.warning("Photo file not found: %s, skipping", fixture_path)
+            return False
+
+        original_path = os.path.join(seed_dir, filename)
+
+        # Read JPEG bytes from fixture
+        with open(fixture_path, "rb") as f:
+            img_bytes = f.read()
+
+        # Write original image
+        with open(original_path, "wb") as f:
+            f.write(img_bytes)
+
+        # Generate thumbnails
+        thumb_small = os.path.join(seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg")
+        if os.path.exists(thumb_small):
+            return True
+
+        try:
+            thumbnail_service.generate_thumbnails(img_bytes, filename)
+        except FileExistsError:
+            logger.warning("Thumbnails already exist for %s, skipping", filename)
+
+        return True
 
     @staticmethod
     def _thumbnail_key(original_key: str, size: str) -> str:

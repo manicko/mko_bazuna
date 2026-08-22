@@ -10,9 +10,12 @@ Uses SimpleTestCase with in-memory AdImage instances (no DB).
 
 from __future__ import annotations
 
+import pytest
 from django.test import SimpleTestCase, override_settings
 
 from apps.ads.models import AdImage
+
+pytestmark = [pytest.mark.unit]
 
 
 @override_settings(MEDIA_URL="/media/")

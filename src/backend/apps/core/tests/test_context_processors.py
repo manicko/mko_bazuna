@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.http import HttpRequest
 from django.test import SimpleTestCase
 
 from apps.core.context_processors import header_context, language
+
+pytestmark = [pytest.mark.unit]
 
 
 class LanguageContextProcessorTests(SimpleTestCase):

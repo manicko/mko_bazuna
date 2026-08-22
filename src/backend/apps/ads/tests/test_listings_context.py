@@ -21,12 +21,15 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse, HttpRequest
 from django.test import RequestFactory, SimpleTestCase
 
 from apps.ads.views.listings import listings as listings_view
 from apps.core.enums import AdSort, AdStatus
+
+pytestmark = [pytest.mark.unit]
 
 # Canonical filter query from the vrf_002 spec.
 _SPEC_QUERY = "category=electronics&city=kyiv&min_price=100&max_price=500&sort=price_asc"

@@ -8,8 +8,12 @@ There is no ``title_ru``/``description_ru`` column — the Russian base lives in
 Uses SimpleTestCase with in-memory ``Ad`` instances (no DB).
 """
 
-from apps.ads.models import Ad
+import pytest
 from django.test import SimpleTestCase
+
+from apps.ads.models import Ad
+
+pytestmark = [pytest.mark.unit]
 
 
 def _make_ad(**kwargs) -> Ad:

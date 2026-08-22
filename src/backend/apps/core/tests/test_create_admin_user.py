@@ -19,7 +19,7 @@ from apps.core.enums import AdvisoryLockId
 
 User = get_user_model()
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestCreateAdminUser:

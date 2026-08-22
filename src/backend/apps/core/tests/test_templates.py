@@ -16,8 +16,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from django.conf import settings
 from django.test import SimpleTestCase
+
+pytestmark = [pytest.mark.unit]
 
 # Templates that include the consent banner component.
 _TEMPLATES_WITH_BANNER: list[str] = [

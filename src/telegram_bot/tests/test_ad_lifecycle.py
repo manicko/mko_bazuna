@@ -8,12 +8,15 @@ All tests use the real ORM with monkeypatched criteria to avoid DB cache couplin
 """
 
 import pytest
+from datetime import timedelta
+
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.moderation.services.auto_moderation import auto_moderate
 from apps.users.models import User
+from django.utils import timezone
 
 from conftest import create_test_ad
 
@@ -287,11 +290,16 @@ class TestPublishedAtUpdates:
         # First publish
         auto_moderate(ad)
         ad.refresh_from_db()
-        first_published = ad.published_at
 
-        # Short pause so timestamps differ
-        import time
-        time.sleep(0.01)
+        # Backdate the first publish's timestamps so the re-publish timestamp
+        # is deterministically later — no wall-clock pause needed.
+        now = timezone.now()
+        Ad.objects.filter(pk=ad.pk).update(
+            published_at=now - timedelta(seconds=10),
+            original_published_at=now - timedelta(seconds=10),
+        )
+        ad.refresh_from_db()
+        first_published = ad.published_at
 
         # Archive and re-publish
         ad.transition_to(AdStatus.ARCHIVED)

@@ -6,9 +6,12 @@ language-code resolution via ``from_code``.
 No database interaction required.
 """
 
+import pytest
 from django.test import SimpleTestCase
 
 from apps.core.enums import LanguageLocale
+
+pytestmark = [pytest.mark.unit]
 
 
 class LanguageLocaleTests(SimpleTestCase):

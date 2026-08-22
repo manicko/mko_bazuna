@@ -13,11 +13,14 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from apps.ads.views.listings import ad_detail
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestAdDetailBotUsernameContext(SimpleTestCase):

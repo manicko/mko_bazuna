@@ -12,6 +12,7 @@ from asgiref.sync import sync_to_async
 from apps.core.enums import AdStatus
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration, pytest.mark.concurrent]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 class TestCreateDraftAd:

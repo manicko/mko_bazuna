@@ -14,7 +14,10 @@ it does NOT require a database (``SimpleTestCase``).
 
 from pathlib import Path
 
+import pytest
 from django.test import SimpleTestCase
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestAutocompleteTemplate(SimpleTestCase):

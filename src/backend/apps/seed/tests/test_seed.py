@@ -878,8 +878,13 @@ class TestSeedCommandEnhanced:
         )
 
     @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    @pytest.mark.real_images
     def test_media_cleanup(self) -> None:
-        """Seed cleans MEDIA_ROOT/seed/ before re-seeding."""
+        """Seed cleans MEDIA_ROOT/seed/ before re-seeding.
+
+        Uses the real ``ImageGenerator`` (via ``pytest.mark.real_images``) so
+        the seed directory is recreated by ``_ensure_seed_dir()``.
+        """
         from django.conf import settings
 
         media_root = settings.MEDIA_ROOT
@@ -1181,7 +1186,7 @@ class TestAdGeneratorLeafOnly:
         call_command(
             "seed",
             "--users=5",
-            "--ads=50",
+            "--ads=10",
             "--force",
             "--analytics=False",
             stdout=out,

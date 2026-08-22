@@ -163,10 +163,12 @@ console_output_style = "classic"
 markers = [
   "unit: marks tests that require no database (pure unit tests)",
   "integration: marks tests that require a database (use -m integration to run)",
-   "seed: marks tests that invoke call_command('seed') or ImageGenerator (nightly only)",
+  "seed: marks tests that invoke call_command('seed') or ImageGenerator (nightly only)",
   "settings: marks import-time settings validation tests using subprocess isolation",
   "concurrent: marks tests requiring transaction=True (TRUNCATE per test)",
   "slow: marks tests that take >5 seconds individually (use -m 'not slow' to skip)",
+  "real_images: keep the real seed image pipeline for tests that assert on it",
+  "xdist_group: marks tests pinned to a single xdist worker",
 ]
 
 # Coverage.py configuration (used by pytest-cov)

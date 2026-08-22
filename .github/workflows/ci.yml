@@ -82,7 +82,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest -m "not seed" -n auto --dist loadscope --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db
+        run: uv run pytest -m "not seed" -n auto --dist loadgroup --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db
         working-directory: src/backend
 
       - name: Upload coverage report

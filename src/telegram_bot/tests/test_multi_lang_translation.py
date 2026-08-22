@@ -152,13 +152,16 @@ class TestTranslateAllLanguages:
             mock_translate.assert_not_called()
 
     async def test_timeout_fallback_returns_original(self) -> None:
-        """Translation exceeding the 500ms timeout falls back to original text."""
+        """Translation exceeding the (patched) timeout falls back to original text."""
 
         def slow_translate(text: str, source: str, target: str) -> str:
-            time.sleep(0.8)  # exceeds 500ms timeout
+            time.sleep(0.1)  # exceeds the patched 0.05s timeout
             return "too slow"
 
-        with patch(_TRANSLATE_PATH, side_effect=slow_translate):
+        with (
+            patch("apps.core.services.translation.TRANSLATION_TIMEOUT_SECONDS", 0.05),
+            patch(_TRANSLATE_PATH, side_effect=slow_translate),
+        ):
             result = await translate_all_languages("original", ["ru"])
 
         assert result["ru"] == "original"

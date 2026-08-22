@@ -24,7 +24,7 @@ from apps.moderation.models import ModerationCriteria
 from apps.moderation.services.priority_calculator import PriorityCalculator
 from apps.moderation.services.priority import PriorityService
 
-from conftest import create_test_ad
+from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -173,15 +173,14 @@ class TestUserHistoryScoring:
     ) -> None:
         """User with >50 ads receives +15 user score."""
         _banned_words_setup()
-        for i in range(51):
-            create_test_ad(
-                seller,
-                category,
-                city,
-                title=f"Ad {i}",
-                description=f"Description {i}",
-                status=AdStatus.PUBLISHED,
-            )
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            51,
+            title_prefix="Ad",
+            status=AdStatus.PUBLISHED,
+        )
 
         ad = create_test_ad(
             seller,
@@ -262,15 +261,14 @@ class TestUserHistoryScoring:
     ) -> None:
         """User with ≤50 ads gets no bonus from ad count."""
         _banned_words_setup()
-        for i in range(49):
-            create_test_ad(
-                seller,
-                category,
-                city,
-                title=f"Ad {i}",
-                description=f"Description {i}",
-                status=AdStatus.PUBLISHED,
-            )
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            49,
+            title_prefix="Ad",
+            status=AdStatus.PUBLISHED,
+        )
 
         ad = create_test_ad(
             seller,
@@ -290,25 +288,23 @@ class TestUserHistoryScoring:
         """Both >50 ads and repeat offender stack for combined user score of 40."""
         _banned_words_setup()
         now = timezone.now()
-        for i in range(4):
-            create_test_ad(
-                seller,
-                category,
-                city,
-                title=f"Rejected Ad {i}",
-                description=f"Rejected description {i}",
-                status=AdStatus.REJECTED,
-                created_at=now - timedelta(hours=i),
-            )
-        for i in range(51):
-            create_test_ad(
-                seller,
-                category,
-                city,
-                title=f"Ad {i}",
-                description=f"Description {i}",
-                status=AdStatus.PUBLISHED,
-            )
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            4,
+            title_prefix="Rejected Ad",
+            status=AdStatus.REJECTED,
+            created_at=now - timedelta(hours=3),
+        )
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            51,
+            title_prefix="Ad",
+            status=AdStatus.PUBLISHED,
+        )
 
         ad = create_test_ad(
             seller,

@@ -18,7 +18,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.utils import timezone
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def _anon_request(**cookies) -> object:

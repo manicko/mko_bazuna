@@ -117,6 +117,49 @@ def create_test_ad(
     return Ad.objects.create(**defaults)
 
 
+def create_test_ads_bulk(
+    user: User,
+    category: Category,
+    city: City,
+    count: int,
+    *,
+    title_prefix: str = "Test Ad",
+    description: str = "Test description",
+    status: AdStatus = AdStatus.ON_MODERATION,
+    price: int | Decimal | None = 100,
+    price_currency: CurrencyCode | str = CurrencyCode.EUR,
+    source: AdSource = AdSource.TELEGRAM,
+    **kwargs: Any,
+) -> list[Ad]:
+    """Bulk-create ``count`` ``Ad`` rows with status-specific timestamps.
+
+    Companion to ``create_test_ad`` for tests that need many rows. Uses
+    ``Ad.objects.bulk_create`` to collapse the rows into one multi-row INSERT;
+    the FTS trigger is row-level, so behavior is identical to individual
+    inserts. Rows are titled ``f"{title_prefix} {i}"`` (numbering can be
+    disabled by passing an explicit ``title`` via ``kwargs``).
+    """
+    ads: list[Ad] = []
+    for i in range(count):
+        defaults: dict[str, Any] = {
+            "user": user,
+            "title": f"{title_prefix} {i}",
+            "description": description,
+            "price_amount": price,
+            "price_currency": CurrencyCode(price_currency).value,
+            "price_normalized_eur": price,
+            "category": category,
+            "city": city,
+            "category_name": category.name,
+            "status": status,
+            "source": source,
+        }
+        defaults.update(kwargs)
+        _set_status_timestamp(defaults, status)
+        ads.append(Ad(**defaults))
+    return Ad.objects.bulk_create(ads)
+
+
 def _set_status_timestamp(defaults: dict[str, Any], status: AdStatus) -> None:
     """Inject the timestamp required by the check constraint for *status*.
 

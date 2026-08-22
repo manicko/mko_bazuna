@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 from django.test import SimpleTestCase
@@ -26,6 +27,8 @@ from apps.core.middleware.preferred_city import (
     PREFERRED_CITY_COOKIE_NAME,
     PreferredCityMiddleware,
 )
+
+pytestmark = [pytest.mark.unit]
 
 
 def _make_request(

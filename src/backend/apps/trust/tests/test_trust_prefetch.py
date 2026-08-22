@@ -12,10 +12,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import pytest
 from django.template import Context, Template
 from django.test import SimpleTestCase
 
 from apps.core.enums import TrustLevel
+
+pytestmark = [pytest.mark.unit]
 
 
 class TestTrustBadgePrefetchNoQuery(SimpleTestCase):

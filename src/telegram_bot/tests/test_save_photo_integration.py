@@ -39,6 +39,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.concurrent,
 ]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 def _make_test_image(width: int = 800, height: int = 600) -> bytes:

@@ -11,7 +11,7 @@ from apps.currencies.models import ExchangeRate
 from apps.currencies.services.exceptions import ExchangeRateNotFoundError
 from apps.currencies.services.price_normalizer import PriceNormalizer
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

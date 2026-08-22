@@ -12,7 +12,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestPrivacyPage:

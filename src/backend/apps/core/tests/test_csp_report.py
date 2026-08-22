@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from django.test import SimpleTestCase
 from django.urls import reverse
+
+pytestmark = [pytest.mark.unit]
 
 
 class CspReportViewTests(SimpleTestCase):

@@ -21,6 +21,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.concurrent,
 ]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 @pytest.fixture
