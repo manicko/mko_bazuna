@@ -71,7 +71,7 @@ def load_catalog(
 
     slug_rename_map: dict[str, str] = {}
 
-    with transaction.atomic():
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
         # Phase 1: Load lookups
         group_map = _load_lookups(data.get("lookups", {}), apps=apps)
 

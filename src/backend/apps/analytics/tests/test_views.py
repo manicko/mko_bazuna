@@ -8,6 +8,7 @@ Tests cover:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -108,7 +109,7 @@ class TestSellerTrustDashboardView:
     """Tests for the seller trust dashboard view (login-required)."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, dashboard_seller) -> None:
+    def _setup(self, dashboard_seller) -> Iterator[None]:
         """Apply locmem cache settings for each test."""
         self._cache_ctx = override_settings(
             CACHES={
@@ -274,7 +275,7 @@ class TestModerationAnalyticsView:
     """Tests for the moderation analytics view (staff-only)."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, moderation_context) -> None:
+    def _setup(self, moderation_context) -> Iterator[None]:
         """Apply storage settings for each test."""
         self._storage_ctx = override_settings(
             STORAGES={

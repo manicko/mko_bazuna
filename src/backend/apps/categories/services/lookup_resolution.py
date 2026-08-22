@@ -56,12 +56,12 @@ class CategoryLookupResolver:
     @staticmethod
     def get_resolved_purpose_codes(category: Category) -> list[str]:
         """Get resolved purpose codes as string slugs."""
-        return [item.slug for item in CategoryLookupResolver.get_resolved_purposes(category)]
+        return [str(item.slug) for item in CategoryLookupResolver.get_resolved_purposes(category)]
 
     @staticmethod
     def get_resolved_feature_codes(category: Category) -> list[str]:
         """Get resolved feature codes as string slugs."""
-        return [item.slug for item in CategoryLookupResolver.get_resolved_features(category)]
+        return [str(item.slug) for item in CategoryLookupResolver.get_resolved_features(category)]
 
     @staticmethod
     def invalidate_category(category_id: int) -> None:

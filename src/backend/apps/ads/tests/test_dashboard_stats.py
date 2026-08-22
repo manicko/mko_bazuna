@@ -9,7 +9,6 @@ in the HTML response.
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import patch
 
 import pytest
 from django.test import Client, override_settings

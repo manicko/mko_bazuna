@@ -12,7 +12,6 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
-from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.analytics.services.trust_analytics import (
     calculate_seller_trust_score,
@@ -20,9 +19,7 @@ from apps.analytics.services.trust_analytics import (
     get_trust_level,
     record_trust_event,
 )
-from apps.categories.models import Category
 from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
-from apps.locations.models import City
 from apps.trust.models import SellerVerification
 from apps.users.models import User
 
