@@ -2,14 +2,14 @@
 Unit tests for TrustAnalytics service (TASK_057).
 
 Tests cover trust score calculation, trust level mapping, trust event recording,
-and daily metrics query. Uses ``django.test.TestCase`` for DB-backed assertions.
+and daily metrics query.
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
 
-from django.test import TestCase
+import pytest
 from django.utils import timezone
 
 from apps.ads.models import Ad
@@ -21,10 +21,15 @@ from apps.analytics.services.trust_analytics import (
     record_trust_event,
 )
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.locations.models import City
 from apps.trust.models import SellerVerification
 from apps.users.models import User
+
+from conftest import create_test_ad
+
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -43,201 +48,132 @@ def _make_user(telegram_id: int = 990010001, **overrides: object) -> User:
     return User.objects.create(**defaults)  # type: ignore[arg-type]
 
 
-def _make_category(slug: str = "trust-cat") -> Category:
-    """Create a Category with sensible defaults."""
-    return Category.objects.create(
-        name="Trust Category",
-        slug=slug,
-    )
-
-
-def _make_city(slug: str = "trust-city") -> City:
-    """Create a City with sensible defaults."""
-    return City.objects.create(
-        country_code="ME",
-        name="Trust City",
-        region="Trust Region",
-        slug=slug,
-    )
-
-
-def _make_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Trust Ad",
-    status: AdStatus = AdStatus.PUBLISHED,
-    **overrides: object,
-) -> Ad:
-    """Create an Ad with sensible defaults for trust analytics tests."""
-    defaults: dict = {
-        "user": user,
-        "title": title,
-        "description": "Trust analytics test description",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-        "source": AdSource.TELEGRAM,
-    }
-    # DB CheckConstraints require status-specific timestamps to be non-null
-    now = timezone.now()
-    if status == AdStatus.PUBLISHED:
-        defaults["published_at"] = now
-    elif status == AdStatus.REJECTED:
-        defaults["rejected_at"] = now
-    defaults.update(overrides)
-    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
-
-
 # ---------------------------------------------------------------------------
 # Tests: calculate_seller_trust_score
 # ---------------------------------------------------------------------------
 
 
-class TestCalculateSellerTrustScore(TestCase):
+class TestCalculateSellerTrustScore:
     """Tests for the trust score calculation algorithm."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.category = _make_category()
-        cls.city = _make_city()
-
-    def test_base_score_no_ads_no_verification(self) -> None:
+    def test_base_score_no_ads_no_verification(self, category, city) -> None:
         """A seller with no ads and no verification gets the base score of 50."""
         user = _make_user(telegram_id=990010101)
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 50.0)
+        assert abs(score - 50.0) < 0.01
 
-    def test_published_ads_increase_score(self) -> None:
+    def test_published_ads_increase_score(self, category, city) -> None:
         """Each published ad adds +10, up to a maximum of +50 (5 ads)."""
         user = _make_user(telegram_id=990010102)
 
         # 2 published ads → +20
         for i in range(2):
-            _make_ad(user, self.category, self.city, title=f"Pub Ad {i}")
+            create_test_ad(user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED)
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 70.0)
+        assert abs(score - 70.0) < 0.01
 
-    def test_published_ads_capped_at_five(self) -> None:
+    def test_published_ads_capped_at_five(self, category, city) -> None:
         """More than 5 published ads still caps the bonus at +50."""
         user = _make_user(telegram_id=990010103)
 
         # 10 published ads → bonus capped at +50
         for i in range(10):
-            _make_ad(user, self.category, self.city, title=f"Pub Ad {i}")
+            create_test_ad(user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED)
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 100.0)
+        assert abs(score - 100.0) < 0.01
 
-    def test_admin_verification_adds_bonus(self) -> None:
+    def test_admin_verification_adds_bonus(self, category, city) -> None:
         """Admin-verified seller gets +20."""
         user = _make_user(telegram_id=990010104)
         SellerVerification.objects.create(user=user, verified_by_admin=True)
 
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 70.0)
+        assert abs(score - 70.0) < 0.01
 
-    def test_admin_verification_no_bonus_when_not_verified(self) -> None:
+    def test_admin_verification_no_bonus_when_not_verified(self, category, city) -> None:
         """SellerVerification exists but verified_by_admin is False → no bonus."""
         user = _make_user(telegram_id=990010105)
         SellerVerification.objects.create(user=user, verified_by_admin=False)
 
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 50.0)
+        assert abs(score - 50.0) < 0.01
 
-    def test_rejected_ads_reduce_score(self) -> None:
+    def test_rejected_ads_reduce_score(self, category, city) -> None:
         """Each rejected ad subtracts 10, floored at 0."""
         user = _make_user(telegram_id=990010106)
 
         # 6 rejected ads → -60, floor at 0 (base 50 - 60 = -10 → 0)
         for i in range(6):
-            _make_ad(
-                user,
-                self.category,
-                self.city,
-                title=f"Rej Ad {i}",
-                status=AdStatus.REJECTED,
+            create_test_ad(
+                user, category, city, title=f"Rej Ad {i}", status=AdStatus.REJECTED,
             )
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 0.0)
+        assert abs(score - 0.0) < 0.01
 
-    def test_combined_published_rejected_and_verified(self) -> None:
+    def test_combined_published_rejected_and_verified(self, category, city) -> None:
         """Mix of published (+30), verified (+20), and rejected (-20)."""
         user = _make_user(telegram_id=990010107)
 
         # 3 published ads → +30
         for i in range(3):
-            _make_ad(user, self.category, self.city, title=f"Pub {i}")
+            create_test_ad(user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED)
 
         # 2 rejected ads → -20
         for i in range(2):
-            _make_ad(
-                user,
-                self.category,
-                self.city,
-                title=f"Rej {i}",
-                status=AdStatus.REJECTED,
-            )
+            create_test_ad(user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED)
 
         # Admin verified → +20
         SellerVerification.objects.create(user=user, verified_by_admin=True)
 
         # Score: 50 + 30 + 20 - 20 = 80
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 80.0)
+        assert abs(score - 80.0) < 0.01
 
-    def test_score_clamped_at_100(self) -> None:
+    def test_score_clamped_at_100(self, category, city) -> None:
         """Score cannot exceed 100 even with high bonuses."""
         user = _make_user(telegram_id=990010108)
 
         # 5 published → +50
         for i in range(5):
-            _make_ad(user, self.category, self.city, title=f"Pub {i}")
+            create_test_ad(user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED)
 
         # Verified → +20
         SellerVerification.objects.create(user=user, verified_by_admin=True)
 
         # Net: 50 + 50 + 20 = 120 → clamped to 100
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 100.0)
+        assert abs(score - 100.0) < 0.01
 
-    def test_score_not_below_zero(self) -> None:
+    def test_score_not_below_zero(self, category, city) -> None:
         """Score cannot go below 0 even with many rejections."""
         user = _make_user(telegram_id=990010109)
 
         # Many rejected ads
         for i in range(20):
-            _make_ad(
-                user,
-                self.category,
-                self.city,
-                title=f"Rej {i}",
-                status=AdStatus.REJECTED,
-            )
+            create_test_ad(user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED)
 
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 0.0)
+        assert abs(score - 0.0) < 0.01
 
-    def test_other_users_ads_do_not_affect_score(self) -> None:
+    def test_other_users_ads_do_not_affect_score(self, category, city) -> None:
         """Only the given user's ads are counted."""
         user = _make_user(telegram_id=990010110)
         other = _make_user(telegram_id=990010111)
 
         # Other user has many published ads
         for i in range(5):
-            _make_ad(other, self.category, self.city, title=f"Other {i}")
+            create_test_ad(other, category, city, title=f"Other {i}", status=AdStatus.PUBLISHED)
 
         # Primary user has nothing → base 50
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 50.0)
+        assert abs(score - 50.0) < 0.01
 
-    def test_seller_verification_does_not_exist_returns_base(self) -> None:
+    def test_seller_verification_does_not_exist_returns_base(self, category, city) -> None:
         """Missing SellerVerification row is handled gracefully."""
         user = _make_user(telegram_id=990010112)
         # No SellerVerification created
         score = calculate_seller_trust_score(user.id)
-        self.assertAlmostEqual(score, 50.0)
+        assert abs(score - 50.0) < 0.01
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +181,7 @@ class TestCalculateSellerTrustScore(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestGetTrustLevel(TestCase):
+class TestGetTrustLevel:
     """Tests for mapping numeric trust scores to TrustLevel enum."""
 
     def test_unverified_at_zero(self) -> None:
@@ -294,7 +230,7 @@ class TestGetTrustLevel(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestRecordTrustEvent(TestCase):
+class TestRecordTrustEvent:
     """Tests for recording trust-related analytics events."""
 
     def test_creates_analytics_event(self) -> None:
@@ -303,10 +239,10 @@ class TestRecordTrustEvent(TestCase):
         record_trust_event(user.id, AnalyticsEventType.SELLER_VERIFIED)
 
         events = AnalyticsEvent.objects.filter(user_id=user.id)
-        self.assertEqual(events.count(), 1)
+        assert events.count() == 1
         event = events.first()
         assert event is not None
-        self.assertEqual(event.event_type, AnalyticsEventType.SELLER_VERIFIED)
+        assert event.event_type == AnalyticsEventType.SELLER_VERIFIED
 
     def test_creates_event_without_ad(self) -> None:
         """Trust events are created without an associated ad."""
@@ -314,7 +250,7 @@ class TestRecordTrustEvent(TestCase):
         record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
 
         event = AnalyticsEvent.objects.get(user_id=user.id)
-        self.assertIsNone(event.ad)
+        assert event.ad is None
 
     def test_creates_multiple_events_independently(self) -> None:
         """Multiple calls create separate events."""
@@ -323,17 +259,11 @@ class TestRecordTrustEvent(TestCase):
         record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
 
         events = AnalyticsEvent.objects.filter(user_id=user.id).order_by("timestamp")
-        self.assertEqual(events.count(), 2)
+        assert events.count() == 2
         assert events[0] is not None
         assert events[1] is not None
-        self.assertEqual(
-            events[0].event_type,
-            AnalyticsEventType.SELLER_VERIFIED,
-        )
-        self.assertEqual(
-            events[1].event_type,
-            AnalyticsEventType.TRUST_LEVEL_UPDATED,
-        )
+        assert events[0].event_type == AnalyticsEventType.SELLER_VERIFIED
+        assert events[1].event_type == AnalyticsEventType.TRUST_LEVEL_UPDATED
 
 
 # ---------------------------------------------------------------------------
@@ -341,120 +271,104 @@ class TestRecordTrustEvent(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestGetSellerDailyMetrics(TestCase):
+@pytest.fixture
+def daily_metrics_data(category, city):
+    """Create DailyAdMetrics records for two sellers across multiple dates."""
+    user = _make_user(telegram_id=990010301)
+    other = _make_user(telegram_id=990010302)
+
+    ad = create_test_ad(user, category, city, title="Metrics Ad", status=AdStatus.PUBLISHED)
+    other_ad = create_test_ad(other, category, city, title="Other Metrics Ad", status=AdStatus.PUBLISHED)
+
+    today = timezone.now().date()
+
+    metrics_day1 = DailyAdMetrics.objects.create(
+        ad=ad, date=today - timedelta(days=2),
+        views_count=10, contacts_count=2, trust_score=0.8,
+    )
+    metrics_day2 = DailyAdMetrics.objects.create(
+        ad=ad, date=today - timedelta(days=1),
+        views_count=20, contacts_count=3, trust_score=0.9,
+    )
+    metrics_day3 = DailyAdMetrics.objects.create(
+        ad=ad, date=today,
+        views_count=30, contacts_count=5, trust_score=0.95,
+    )
+
+    # Noise: another seller's metrics (should not appear)
+    DailyAdMetrics.objects.create(
+        ad=other_ad, date=today, views_count=999, contacts_count=999,
+    )
+
+    return {
+        "user": user, "other": other,
+        "ad": ad, "other_ad": other_ad,
+        "metrics_day1": metrics_day1, "metrics_day2": metrics_day2,
+        "metrics_day3": metrics_day3,
+    }
+
+
+class TestGetSellerDailyMetrics:
     """Tests for querying daily aggregated ad metrics."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.category = _make_category("metrics-cat")
-        cls.city = _make_city("metrics-city")
-
-        cls.user = _make_user(telegram_id=990010301)
-        cls.other = _make_user(telegram_id=990010302)
-
-        cls.ad = _make_ad(
-            cls.user,
-            cls.category,
-            cls.city,
-            title="Metrics Ad",
-            status=AdStatus.PUBLISHED,
-        )
-        cls.other_ad = _make_ad(
-            cls.other,
-            cls.category,
-            cls.city,
-            title="Other Metrics Ad",
-            status=AdStatus.PUBLISHED,
-        )
-
-        today = timezone.now().date()
-
-        # Daily metrics for the primary seller's ad on 3 different dates
-        cls.metrics_day1 = DailyAdMetrics.objects.create(
-            ad=cls.ad,
-            date=today - timedelta(days=2),
-            views_count=10,
-            contacts_count=2,
-            trust_score=0.8,
-        )
-        cls.metrics_day2 = DailyAdMetrics.objects.create(
-            ad=cls.ad,
-            date=today - timedelta(days=1),
-            views_count=20,
-            contacts_count=3,
-            trust_score=0.9,
-        )
-        cls.metrics_day3 = DailyAdMetrics.objects.create(
-            ad=cls.ad,
-            date=today,
-            views_count=30,
-            contacts_count=5,
-            trust_score=0.95,
-        )
-
-        # Noise: another seller's metrics (should not appear)
-        DailyAdMetrics.objects.create(
-            ad=cls.other_ad,
-            date=today,
-            views_count=999,
-            contacts_count=999,
-        )
-
-    def test_returns_metrics_for_seller(self) -> None:
+    def test_returns_metrics_for_seller(self, daily_metrics_data) -> None:
         """Returns only DailyAdMetrics for the specified seller's ads."""
-        metrics = get_seller_daily_metrics(self.user.id)
-        self.assertEqual(len(metrics), 3)
+        metrics = get_seller_daily_metrics(daily_metrics_data["user"].id)
+        assert len(metrics) == 3
 
         ad_ids = {m.ad_id for m in metrics}
-        assert self.ad.id is not None
-        self.assertEqual(ad_ids, {self.ad.id})
+        assert daily_metrics_data["ad"].id is not None
+        assert ad_ids == {daily_metrics_data["ad"].id}
 
-    def test_excludes_other_sellers(self) -> None:
+    def test_excludes_other_sellers(self, daily_metrics_data) -> None:
         """Other sellers' metrics are not included."""
-        metrics = get_seller_daily_metrics(self.user.id)
-        assert self.other_ad.id is not None
-        other_ad_ids = {m.ad_id for m in metrics if m.ad_id == self.other_ad.id}
-        self.assertEqual(len(other_ad_ids), 0)
+        metrics = get_seller_daily_metrics(daily_metrics_data["user"].id)
+        other_ad_id = daily_metrics_data["other_ad"].id
+        other_ad_ids = {m.ad_id for m in metrics if m.ad_id == other_ad_id}
+        assert len(other_ad_ids) == 0
 
-    def test_ordered_by_date_desc_then_ad_id(self) -> None:
+    def test_ordered_by_date_desc_then_ad_id(self, daily_metrics_data) -> None:
         """Results are ordered by date descending, then ad_id."""
-        metrics = get_seller_daily_metrics(self.user.id)
+        metrics = get_seller_daily_metrics(daily_metrics_data["user"].id)
         dates = [m.date for m in metrics]
-        self.assertEqual(dates, sorted(dates, reverse=True))
+        assert dates == sorted(dates, reverse=True)
 
-    def test_days_parameter_filters_by_cutoff(self) -> None:
+    def test_days_parameter_filters_by_cutoff(self, daily_metrics_data) -> None:
         """The days parameter limits the lookback window.
 
         The service uses an inclusive cutoff (``date >= today - days``), the same
         convention as the moderation analytics services and the production
         dashboard views. So ``days=1`` includes today *and* yesterday.
         """
-        metrics_1_day = get_seller_daily_metrics(self.user.id, days=1)
-        # cutoff = today - 1 day -> includes today and yesterday (2 records)
-        self.assertEqual(len(metrics_1_day), 2)
-        # Ordered by ``-date``, the most recent day (today) is first.
-        assert self.metrics_day3 is not None
-        self.assertEqual(metrics_1_day[0].date, self.metrics_day3.date)
+        user_id = daily_metrics_data["user"].id
+        m3 = daily_metrics_data["metrics_day3"]
 
-        metrics_2_days = get_seller_daily_metrics(self.user.id, days=2)
+        metrics_1_day = get_seller_daily_metrics(user_id, days=1)
+        # cutoff = today - 1 day -> includes today and yesterday (2 records)
+        assert len(metrics_1_day) == 2
+        assert m3 is not None
+        assert metrics_1_day[0].date == m3.date
+
+        metrics_2_days = get_seller_daily_metrics(user_id, days=2)
         # cutoff = today - 2 days -> includes today, yesterday and day-before (3)
-        self.assertEqual(len(metrics_2_days), 3)
+        assert len(metrics_2_days) == 3
 
     def test_empty_when_no_metrics(self) -> None:
         """A seller with no metrics returns an empty list."""
         empty_user = _make_user(telegram_id=990010303)
         metrics = get_seller_daily_metrics(empty_user.id)
-        self.assertEqual(metrics, [])
+        assert metrics == []
 
-    def test_returns_all_metric_fields(self) -> None:
+    def test_returns_all_metric_fields(self, daily_metrics_data) -> None:
         """Returned metrics contain all expected fields."""
-        metrics = get_seller_daily_metrics(self.user.id, days=1)
+        metrics = get_seller_daily_metrics(daily_metrics_data["user"].id, days=1)
         # Inclusive cutoff (date >= today - 1) -> today and yesterday (2 rows).
-        self.assertEqual(len(metrics), 2)
+        assert len(metrics) == 2
         # Ordered by ``-date``, the most recent day (today) is first.
         m = metrics[0]
-        assert self.ad.id is not None
-        self.assertEqual(m.ad_id, self.ad.id)
-        self.assertEqual(m.views_count, 30)
-        self.assertEqual(m.contacts_count, 5)
-        self.assertAlmostEqual(m.trust_score, 0.95)  # type: ignore[arg-type]
+        ad = daily_metrics_data["ad"]
+        assert ad.id is not None
+        assert m.ad_id == ad.id
+        assert m.views_count == 30
+        assert m.contacts_count == 5
+        assert abs(m.trust_score - 0.95) < 0.01

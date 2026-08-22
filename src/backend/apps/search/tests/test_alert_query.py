@@ -13,9 +13,7 @@ Covers:
 
 import pytest
 from django.core.management import call_command
-from django.utils import timezone
 
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
@@ -27,22 +25,14 @@ from apps.search.services.alert_query import (
 )
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=910000200,
-        chat_id=910000200,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -53,12 +43,6 @@ def buyer() -> User:
         chat_id=910000201,
         password="y",
     )
-
-
-@pytest.fixture
-def category() -> Category:
-    """Create a root-level category."""
-    return Category.objects.create(name="Транспорт", slug="transport")
 
 
 @pytest.fixture
@@ -76,17 +60,6 @@ def unrelated_category() -> Category:
 
 
 @pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
-@pytest.fixture
 def other_city() -> City:
     """Create another city."""
     return City.objects.create(
@@ -95,21 +68,6 @@ def other_city() -> City:
         region="Central",
         slug="moscow",
     )
-
-
-def _create_published_ad(seller, category, city, **kwargs) -> Ad:
-    """Create a PUBLISHED ad with searchable content."""
-    defaults = {
-        "user": seller,
-        "title": "Красный велосипед",
-        "description": "Продается товар по объявлению",
-        "category": category,
-        "city": city,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now() - timezone.timedelta(days=1),
-    }
-    defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -124,8 +82,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """FTS query matches ads with relevant Russian content."""
-        _create_published_ad(seller, category, city, title="Красный велосипед")
-        _create_published_ad(seller, category, city, title="Мебель деревянная")
+        create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
+        create_test_ad(seller, category, city, title="Мебель деревянная", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=True
@@ -139,15 +97,16 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """A saved search in Bosnian matches the bs vector, not ru/en."""
-        _create_published_ad(
+        create_test_ad(
             seller,
             category,
             city,
             title_bs="Crveni bicikl",
             description_bs="Prodaje se bicikl",
+            status=AdStatus.PUBLISHED,
         )
         # Russian-only ad must not match the Bosnian vector.
-        _create_published_ad(seller, category, city, title="Красный велосипед")
+        create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="bicikl", language="bs", is_active=True
@@ -161,14 +120,15 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """A saved search in English matches the en vector, not ru/bs."""
-        _create_published_ad(
+        create_test_ad(
             seller,
             category,
             city,
             title_en="Red bicycle",
             description_en="bicycle for sale",
+            status=AdStatus.PUBLISHED,
         )
-        _create_published_ad(seller, category, city, title="Красный велосипед")
+        create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="bicycle", language="en", is_active=True
@@ -182,7 +142,7 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Saved searches with no language (legacy rows) fall back to Russian."""
-        _create_published_ad(seller, category, city, title="Красный велосипед")
+        create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", language=None, is_active=True
@@ -195,7 +155,7 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """FTS query does not match unrelated ads."""
-        _create_published_ad(seller, category, city, title="Мебель деревянная")
+        create_test_ad(seller, category, city, title="Мебель деревянная", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=True
@@ -208,8 +168,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City, other_city: City
     ) -> None:
         """City filter narrows results to ads in the specified city."""
-        _create_published_ad(seller, category, city, title="Велосипед в городе")
-        _create_published_ad(seller, category, other_city, title="Велосипед в другом")
+        create_test_ad(seller, category, city, title="Велосипед в городе", status=AdStatus.PUBLISHED)
+        create_test_ad(seller, category, other_city, title="Велосипед в другом", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", city=city, language="ru", is_active=True
@@ -229,11 +189,13 @@ class TestFindMatchingAds:
         city: City,
     ) -> None:
         """Category filter includes descendants (subtree)."""
-        ad_in_sub = _create_published_ad(
-            seller, subcategory, city, title="Горный велосипед"
+        ad_in_sub = create_test_ad(
+            seller, subcategory, city, title="Горный велосипед",
+            status=AdStatus.PUBLISHED,
         )
-        _create_published_ad(
-            seller, unrelated_category, city, title="Диван"
+        create_test_ad(
+            seller, unrelated_category, city, title="Диван",
+            status=AdStatus.PUBLISHED,
         )
 
         # Filter by parent category -> should include subcategory ads
@@ -249,8 +211,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Price range filters narrow results."""
-        _create_published_ad(seller, category, city, title="Дешевый велосипед", price=50)
-        _create_published_ad(seller, category, city, title="Дорогой велосипед", price=500)
+        create_test_ad(seller, category, city, title="Дешевый велосипед", price=50, status=AdStatus.PUBLISHED)
+        create_test_ad(seller, category, city, title="Дорогой велосипед", price=500, status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", min_price=100, max_price=300, language="ru", is_active=True
@@ -263,8 +225,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """min_price filter works independently."""
-        _create_published_ad(seller, category, city, title="Дешевый велосипед", price=50)
-        expensive = _create_published_ad(seller, category, city, title="Дорогой велосипед", price=500)
+        create_test_ad(seller, category, city, title="Дешевый велосипед", price=50, status=AdStatus.PUBLISHED)
+        expensive = create_test_ad(seller, category, city, title="Дорогой велосипед", price=500, status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", min_price=100, language="ru", is_active=True
@@ -278,8 +240,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """max_price filter works independently."""
-        cheap = _create_published_ad(seller, category, city, title="Дешевый велосипед", price=50)
-        _create_published_ad(seller, category, city, title="Дорогой велосипед", price=500)
+        cheap = create_test_ad(seller, category, city, title="Дешевый велосипед", price=50, status=AdStatus.PUBLISHED)
+        create_test_ad(seller, category, city, title="Дорогой велосипед", price=500, status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="велосипед", max_price=100, language="ru", is_active=True
@@ -293,7 +255,7 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Ads already in SavedSearchNotification are excluded."""
-        ad = _create_published_ad(seller, category, city, title="Уже отправлено")
+        ad = create_test_ad(seller, category, city, title="Уже отправлено", status=AdStatus.PUBLISHED)
         saved_search = SavedSearch.objects.create(
             user=buyer, query="отправлено", language="ru", is_active=True
         )
@@ -309,8 +271,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Saved search without filters matches all published ads."""
-        _create_published_ad(seller, category, city, title="Любой товар")
-        _create_published_ad(seller, category, city, title="Еще товар")
+        create_test_ad(seller, category, city, title="Любой товар", status=AdStatus.PUBLISHED)
+        create_test_ad(seller, category, city, title="Еще товар", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, is_active=True
@@ -324,8 +286,9 @@ class TestFindMatchingAds:
     ) -> None:
         """Result set is capped at 10 ads for digest."""
         for i in range(15):
-            _create_published_ad(
-                seller, category, city, title=f"Товар {i}", price=i * 10
+            create_test_ad(
+                seller, category, city, title=f"Товар {i}", price=i * 10,
+                status=AdStatus.PUBLISHED,
             )
 
         saved_search = SavedSearch.objects.create(
@@ -339,15 +302,17 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Results are ordered by SearchRank descending."""
-        _create_published_ad(
+        create_test_ad(
             seller, category, city,
             title="Велосипед горный",
             description="отличный горный велосипед",
+            status=AdStatus.PUBLISHED,
         )
-        _create_published_ad(
+        create_test_ad(
             seller, category, city,
             title="Самокат детский",
             description="самокат",
+            status=AdStatus.PUBLISHED,
         )
 
         saved_search = SavedSearch.objects.create(
@@ -362,7 +327,7 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Empty query on saved search matches all published ads."""
-        _create_published_ad(seller, category, city, title="Любой товар")
+        create_test_ad(seller, category, city, title="Любой товар", status=AdStatus.PUBLISHED)
 
         saved_search = SavedSearch.objects.create(
             user=buyer, query="", is_active=True
@@ -384,7 +349,7 @@ class TestRecordNotifications:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """record_notifications creates SavedSearchNotification records."""
-        ad = _create_published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
 
         count = record_notifications(saved_search, [ad])
@@ -397,7 +362,7 @@ class TestRecordNotifications:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Duplicate (saved_search, ad) pairs are silently skipped."""
-        ad = _create_published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
 
         # First call creates
@@ -412,7 +377,7 @@ class TestRecordNotifications:
     ) -> None:
         """Multiple ads are recorded in a single batch."""
         ads = [
-            _create_published_ad(seller, category, city, title=f"Товар {i}")
+            create_test_ad(seller, category, city, title=f"Товар {i}", status=AdStatus.PUBLISHED)
             for i in range(3)
         ]
         saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
@@ -434,7 +399,7 @@ class TestSendAlertsCommand:
         self, seller: User, buyer: User, category: Category, city: City, caplog
     ) -> None:
         """Dry run logs counts without sending messages."""
-        _create_published_ad(seller, category, city, title="Велосипед для теста")
+        create_test_ad(seller, category, city, title="Велосипед для теста", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=True
         )
@@ -457,7 +422,7 @@ class TestSendAlertsCommand:
         self, seller: User, buyer: User, category: Category, city: City, caplog
     ) -> None:
         """Inactive saved searches are excluded from dry-run counts."""
-        _create_published_ad(seller, category, city, title="Велосипед")
+        create_test_ad(seller, category, city, title="Велосипед", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=False
         )
@@ -480,7 +445,7 @@ class TestFindMatchingSavedSearches:
     def test_returns_active_searches_matching_ad(
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
-        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        ad = create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
         # No-query search matches the ad via structural filters only.
         SavedSearch.objects.create(user=buyer, is_active=True)
 
@@ -491,7 +456,7 @@ class TestFindMatchingSavedSearches:
     def test_excludes_inactive_searches(
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
-        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        ad = create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=False
         )
@@ -501,7 +466,7 @@ class TestFindMatchingSavedSearches:
     def test_filters_by_city(
         self, seller: User, buyer: User, category: Category, city: City, other_city: City
     ) -> None:
-        ad = _create_published_ad(seller, category, city, title="Велосипед")
+        ad = create_test_ad(seller, category, city, title="Велосипед", status=AdStatus.PUBLISHED)
         # A search for another city must not match.
         SavedSearch.objects.create(
             user=buyer, city=other_city, is_active=True
@@ -519,10 +484,10 @@ class TestFindMatchingSavedSearches:
         city: City,
     ) -> None:
         # Ad in a subcategory matches a search on the parent category (subtree).
-        ad = _create_published_ad(seller, subcategory, city, title="Горный велосипед")
+        ad = create_test_ad(seller, subcategory, city, title="Горный велосипед", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(user=buyer, category=category, is_active=True)
         # Ad in an unrelated category must not match.
-        ad_unrelated = _create_published_ad(seller, unrelated_category, city, title="Диван")
+        ad_unrelated = create_test_ad(seller, unrelated_category, city, title="Диван", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(user=buyer, category=unrelated_category, is_active=True)
 
         matches = find_matching_saved_searches(ad)
@@ -534,9 +499,9 @@ class TestFindMatchingSavedSearches:
     def test_filters_by_price_range(
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
-        in_range = _create_published_ad(seller, category, city, title="В диапазоне", price=200)
-        too_cheap = _create_published_ad(seller, category, city, title="Дешевый", price=50)
-        too_expensive = _create_published_ad(seller, category, city, title="Дорогой", price=500)
+        in_range = create_test_ad(seller, category, city, title="В диапазоне", price=200, status=AdStatus.PUBLISHED)
+        too_cheap = create_test_ad(seller, category, city, title="Дешевый", price=50, status=AdStatus.PUBLISHED)
+        too_expensive = create_test_ad(seller, category, city, title="Дорогой", price=500, status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(
             user=buyer, min_price=100, max_price=300, is_active=True
         )
@@ -575,7 +540,7 @@ class TestDeliverImmediateAlerts:
 
         from apps.search.services.immediate_alerts import deliver_immediate_alerts
 
-        ad = _create_published_ad(seller, category, city, title="Красный велосипед")
+        ad = create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
         # No-query active search matches the ad via structural filters only.
         ss = SavedSearch.objects.create(user=buyer, is_active=True)
 
@@ -586,10 +551,12 @@ class TestDeliverImmediateAlerts:
         deliver_immediate_alerts(ad.id)
         assert SavedSearchNotification.objects.filter(saved_search=ss, ad=ad).count() == 1
 
-    def test_non_published_ad_is_noop(self, seller: User) -> None:
+    def test_non_published_ad_is_noop(
+        self, seller: User, category: Category, city: City
+    ) -> None:
         from apps.search.services.immediate_alerts import deliver_immediate_alerts
 
-        draft = _create_published_ad(seller, None, None, status=AdStatus.DRAFT)
+        draft = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         deliver_immediate_alerts(draft.id)
         assert SavedSearchNotification.objects.count() == 0
 
@@ -602,7 +569,7 @@ class TestImmediateAlertsGate:
     ) -> None:
         # Default gate is OFF; the signal early-returns so no notification is
         # recorded for the published ad.
-        _create_published_ad(seller, category, city, title="Красный велосипед")
+        create_test_ad(seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED)
         SavedSearch.objects.create(
             user=buyer, query="велосипед", language="ru", is_active=True
         )

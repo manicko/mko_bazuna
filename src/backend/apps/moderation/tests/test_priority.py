@@ -1,96 +1,37 @@
 """
-Unit tests for PriorityCalculator moderation triage service (TASK_044).
+Tests for PriorityCalculator moderation triage service (TASK_044).
 
-Tests cover content scoring, user history assessment, priority level mapping,
-escalation detection, and confidence score estimation.
-Uses ``django.test.TestCase`` for DB-backed assertions.
+Covers content scoring, user history assessment, priority level mapping,
+escalation detection, and confidence score via the **public** ``calculate_priority``
+API only (no private-method coupling).
 
-Requires a working PostgreSQL database per project spec.
+Migrated from ``django.test.TestCase`` to pytest-django (``@pytest.mark.django_db``)
+per the test-optimization plan.  Uses the canonical root-conftest fixtures
+(``seller``, ``category``, ``city``) and ``create_test_ad`` helper instead of
+local duplicates.
 """
 
 from __future__ import annotations
 
-
 from datetime import timedelta
 
-from django.test import TestCase
+import pytest
 from django.utils import timezone
 
 from apps.ads.models import Ad
-from apps.categories.models import Category
-from apps.core.enums import AdPriorityLevel, AdSource, AdStatus
-from apps.locations.models import City
+from apps.core.enums import AdPriorityLevel, AdStatus
 from apps.moderation.models import ModerationCriteria
 from apps.moderation.services.priority_calculator import PriorityCalculator
-from apps.users.models import User
+from apps.moderation.services.priority import PriorityService
+
+from conftest import create_test_ad
+
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+
 
 # ---------------------------------------------------------------------------
-# Test helpers
+# Module-level helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990030001, **overrides: object) -> User:
-    """Create a User with sensible defaults for priority tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)  # type: ignore[arg-type]
-
-
-def _make_category(slug: str = "priority-test-cat") -> Category:
-    """Create a Category with sensible defaults."""
-    return Category.objects.create(
-        name="Priority Test Category",
-        slug=slug,
-    )
-
-
-def _make_city(slug: str = "priority-test-city") -> City:
-    """Create a City with sensible defaults."""
-    return City.objects.create(
-        country_code="ME",
-        name="Priority Test City",
-        region="Priority Test Region",
-        slug=slug,
-    )
-
-
-def _make_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Priority Test Ad",
-    description: str = "Priority test description",
-    status: AdStatus = AdStatus.ON_MODERATION,
-    **overrides: object,
-) -> Ad:
-    """Create an Ad with sensible defaults for priority tests."""
-    defaults: dict = {
-        "user": user,
-        "title": title,
-        "description": description,
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-        "source": AdSource.TELEGRAM,
-    }
-    # Set status-specific timestamps to satisfy Ad check constraints
-    # (e.g. ck_ads_rejected_at_if_rejected). ``auto_now_add`` ignores the
-    # constructor value for created_at, so callers backdate via .update().
-    if status == AdStatus.REJECTED and "rejected_at" not in defaults:
-        defaults["rejected_at"] = timezone.now()
-    elif status == AdStatus.ON_MODERATION_FAILED and "moderation_failed_at" not in defaults:
-        defaults["moderation_failed_at"] = timezone.now()
-    elif status == AdStatus.PUBLISHED and "published_at" not in defaults:
-        defaults["published_at"] = timezone.now()
-    defaults.update(overrides)
-    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
 
 def _banned_words_setup(*words: str) -> None:
@@ -100,369 +41,379 @@ def _banned_words_setup(*words: str) -> None:
     criteria.save()
 
 
+@pytest.fixture
+def calculator() -> PriorityCalculator:
+    """A fresh PriorityCalculator instance (no state to reset)."""
+    return PriorityCalculator()
+
+
 # ---------------------------------------------------------------------------
-# Tests
+# Tests: banned-word content scoring
 # ---------------------------------------------------------------------------
 
 
-class TestPriorityCalculator(TestCase):
-    """Comprehensive tests for PriorityCalculator scoring algorithm."""
+class TestPriorityCalculator:
+    """Tests for PriorityCalculator.calculate_priority (public API)."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        """Create shared fixtures for all test methods."""
-        cls.calculator = PriorityCalculator()
-
-        cls.category = _make_category()
-        cls.city = _make_city()
-
-        cls.user = _make_user(telegram_id=990030001)
-
-    # ── test_banned_word_detection ──────────────────────────────────────
-
-    def test_banned_word_detection_in_title(self) -> None:
-        """Banned word found in title adds 20 points and flags 'banned_word'."""
+    def test_banned_word_in_title(self, calculator, seller, category, city) -> None:
+        """One banned word in title → content score 20, flag 'banned_word'."""
         _banned_words_setup("spam", "scam", "cheap")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="Spam offer for you",
             description="Normal description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
-        self.assertEqual(result["base_score"], 20)
+        assert "banned_word" in result["flags"]
+        assert result["base_score"] == 20  # max(20, 0)
 
-    def test_banned_word_detection_in_description(self) -> None:
-        """Banned word found in description adds 20 points and flags 'banned_word'."""
+    def test_banned_word_in_description(self, calculator, seller, category, city) -> None:
+        """One banned word in description → content score 20."""
         _banned_words_setup("scam", "fake")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="Genuine item",
             description="This is not a scam at all",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
-        self.assertEqual(result["base_score"], 20)
+        assert "banned_word" in result["flags"]
+        assert result["base_score"] == 20
 
-    def test_banned_word_case_insensitive(self) -> None:
+    def test_banned_word_case_insensitive(
+        self, calculator, seller, category, city
+    ) -> None:
         """Banned word matching is case-insensitive."""
         _banned_words_setup("scam")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="SCAM ALERT",
             description="buy now",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertIn("banned_word", result["flags"])
-        # Content: 20 (1 banned word), User: 0 → max(20, 0) = 20
-        self.assertEqual(result["base_score"], 20)
+        assert "banned_word" in result["flags"]
+        assert result["base_score"] == 20
 
-    def test_banned_word_multiple_words_increase_score(self) -> None:
-        """Multiple banned words add 20 points each, capped at 100."""
+    def test_banned_word_multiple_capped_at_100(
+        self, calculator, seller, category, city
+    ) -> None:
+        """5 banned words → 100 (capped), priority_level HIGH."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="spam scam cheap",
             description="fake counterfeit offer",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        # Content: 100 (5 × 20, capped), User: 0 → max(100, 0) = 100
-        self.assertEqual(result["base_score"], 100)
-        self.assertEqual(result["priority_level"], AdPriorityLevel.HIGH.value)
+        assert result["base_score"] == 100
+        assert result["priority_level"] == AdPriorityLevel.HIGH.value
 
-    def test_banned_word_no_match_returns_zero(self) -> None:
-        """No matching banned words yields no banned_word flag and 0 content score."""
+    def test_no_banned_words_zero_score(
+        self, calculator, seller, category, city
+    ) -> None:
+        """No matching banned words → no flag, score 0."""
         _banned_words_setup("spam", "scam")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="Clean ad title",
             description="Clean description content",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertNotIn("banned_word", result["flags"])
-        self.assertEqual(result["base_score"], 0)
+        assert "banned_word" not in result["flags"]
+        assert result["base_score"] == 0
 
-    def test_banned_word_empty_list_returns_zero(self) -> None:
-        """Empty banned words list yields no banned_word flag."""
+    def test_empty_banned_words_list_zero_score(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Empty banned words list → no flag."""
         _banned_words_setup()
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="Spammy title",
             description="Scam description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertNotIn("banned_word", result["flags"])
-        self.assertEqual(result["base_score"], 0)
+        assert "banned_word" not in result["flags"]
+        assert result["base_score"] == 0
 
-    # ── test_established_user_scoring ───────────────────────────────────
 
-    def test_established_user_many_ads(self) -> None:
+# ---------------------------------------------------------------------------
+# Tests: user-history scoring
+# ---------------------------------------------------------------------------
+
+
+class TestUserHistoryScoring:
+    """Tests for PriorityCalculator user-score component."""
+
+    def test_many_ads_user_score_bonus(
+        self, calculator, seller, category, city
+    ) -> None:
         """User with >50 ads receives +15 user score."""
+        _banned_words_setup()
         for i in range(51):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Ad {i}",
                 description=f"Description {i}",
                 status=AdStatus.PUBLISHED,
             )
 
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="New ad",
             description="New description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        # Content: 0, User: 15 → max(0, 15) = 15
-        self.assertEqual(result["base_score"], 15)
+        assert result["base_score"] == 15  # max(0, 15)
 
-    def test_established_user_repeat_offender(self) -> None:
-        """>3 rejections in 7 days adds 25 points and flags 'repeat_offender'."""
+    def test_repeat_offender_flag(
+        self, calculator, seller, category, city
+    ) -> None:
+        """>3 rejections in 7 days → +25 user score, flag 'repeat_offender'."""
+        _banned_words_setup()
         now = timezone.now()
         for i in range(4):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Rejected Ad {i}",
                 description=f"Rejected description {i}",
                 status=AdStatus.REJECTED,
                 created_at=now - timedelta(hours=i),
             )
 
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="New ad",
             description="New description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertIn("repeat_offender", result["flags"])
-        # Content: 0, User: 25 → max(0, 25) = 25
-        self.assertEqual(result["base_score"], 25)
+        assert "repeat_offender" in result["flags"]
+        assert result["base_score"] == 25  # max(0, 25)
 
-    def test_established_user_rejections_outside_window(self) -> None:
+    def test_rejections_outside_window_no_bonus(
+        self, calculator, seller, category, city
+    ) -> None:
         """Rejections older than 7 days do NOT trigger repeat_offender."""
+        _banned_words_setup()
         old = timezone.now() - timedelta(days=10)
-        old_rejected_ids: list[int] = []
+        old_ids: list[int] = []
         for i in range(4):
-            ad = _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            a = create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Old Rejected {i}",
                 description=f"Old description {i}",
                 status=AdStatus.REJECTED,
             )
-            old_rejected_ids.append(ad.id)
+            old_ids.append(a.id)
+        Ad.objects.filter(id__in=old_ids).update(created_at=old)
 
-        # auto_now_add=True silently ignores created_at passed to the constructor.
-        # Backdate via QuerySet.update(), which bypasses save() and therefore
-        # does not trigger auto_now / auto_now_add.
-        Ad.objects.filter(id__in=old_rejected_ids).update(created_at=old)
-
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="New ad",
             description="New description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertNotIn("repeat_offender", result["flags"])
-        # Content: 0, User: 0 (rejections > 7 days old) → max(0, 0) = 0
-        self.assertEqual(result["base_score"], 0)
+        assert "repeat_offender" not in result["flags"]
+        assert result["base_score"] == 0  # max(0, 0)
 
-    def test_established_user_below_ad_threshold(self) -> None:
+    def test_below_ad_threshold_no_bonus(
+        self, calculator, seller, category, city
+    ) -> None:
         """User with ≤50 ads gets no bonus from ad count."""
-        # 49 published + 1 new ad being evaluated = 50 total.
-        # Threshold is strict "> 50", so 50 ads -> no bonus.
+        _banned_words_setup()
         for i in range(49):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Ad {i}",
                 description=f"Description {i}",
                 status=AdStatus.PUBLISHED,
             )
 
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="New ad",
             description="New description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        # Content: 0, User: 0 (≤50 ads, no recent rejections) → max(0, 0) = 0
-        self.assertEqual(result["base_score"], 0)
+        assert result["base_score"] == 0
 
-    def test_established_user_combined_bonus(self) -> None:
+    def test_combined_bonus(
+        self, calculator, seller, category, city
+    ) -> None:
         """Both >50 ads and repeat offender stack for combined user score of 40."""
+        _banned_words_setup()
         now = timezone.now()
         for i in range(4):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Rejected Ad {i}",
                 description=f"Rejected description {i}",
                 status=AdStatus.REJECTED,
                 created_at=now - timedelta(hours=i),
             )
         for i in range(51):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Ad {i}",
                 description=f"Description {i}",
                 status=AdStatus.PUBLISHED,
             )
 
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="New ad",
             description="New description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        # Content: 0, User: 40 (15 + 25) → max(0, 40) = 40
-        self.assertEqual(result["base_score"], 40)
-        self.assertIn("repeat_offender", result["flags"])
+        assert result["base_score"] == 40  # max(0, 40)
+        assert "repeat_offender" in result["flags"]
 
-    # ── test_priority_level_mapping ─────────────────────────────────────
 
-    def test_priority_level_low_from_public_api(self) -> None:
-        """Score < 50 maps to LOW priority level via calculate_priority."""
+# ---------------------------------------------------------------------------
+# Tests: score→level boundary mapping (public API, G-09 + G-10)
+# ---------------------------------------------------------------------------
+
+
+class TestPriorityLevelBoundaries:
+    """Verify score→level mapping through the public ``calculate_priority`` API.
+
+    The content score increments in steps of 20 (banned-word count × 20, capped
+    at 100).  Combined with max(content, user_score), the achievable scores at
+    or near the LOW/MEDIUM/HIGH thresholds (50, 80) are: 0, 20, 40, 60, 80, 100.
+    """
+
+    def test_score_zero_maps_to_low(self, calculator, seller, category, city) -> None:
+        """Score 0 (no banned words, no user history) → LOW."""
         _banned_words_setup()
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Clean title",
-            description="Clean description",
+        ad = create_test_ad(seller, category, city, title="Clean", description="Clean")
+        result = calculator.calculate_priority(ad)
+        assert result["base_score"] == 0
+        assert result["priority_level"] == AdPriorityLevel.LOW.value
+
+    def test_score_40_below_medium_threshold_maps_to_low(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Score 40 (2 banned words) → LOW (below the 50 threshold)."""
+        _banned_words_setup("spam", "scam")
+        ad = create_test_ad(
+            seller, category, city, title="spam scam", description="desc"
         )
+        result = calculator.calculate_priority(ad)
+        assert result["base_score"] == 40
+        assert result["priority_level"] == AdPriorityLevel.LOW.value
 
-        result = self.calculator.calculate_priority(ad)
-
-        self.assertEqual(result["priority_level"], AdPriorityLevel.LOW.value)
-        self.assertLess(result["base_score"], 50)
-
-    def test_priority_level_medium_from_public_api(self) -> None:
-        """Score 50-79 maps to MEDIUM priority level via calculate_priority."""
-        now = timezone.now()
-        for i in range(4):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
-                title=f"Rejected {i}",
-                description=f"Rejected description {i}",
-                status=AdStatus.REJECTED,
-                created_at=now - timedelta(hours=i),
-            )
-        for i in range(51):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
-                title=f"Ad {i}",
-                description=f"Description {i}",
-                status=AdStatus.PUBLISHED,
-            )
-
-        # 3 banned words → content = 60; user = 40 → max(60, 40) = 60 → MEDIUM
+    def test_score_60_maps_to_medium(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Score 60 (3 banned words) → MEDIUM (at or above the 50 threshold)."""
         _banned_words_setup("spam", "scam", "cheap")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap title",
-            description="spam scam cheap description",
+        ad = create_test_ad(
+            seller, category, city, title="spam scam cheap", description="desc"
         )
+        result = calculator.calculate_priority(ad)
+        assert result["base_score"] == 60
+        assert result["priority_level"] == AdPriorityLevel.MEDIUM.value
 
-        result = self.calculator.calculate_priority(ad)
+    def test_score_80_maps_to_high(self, calculator, seller, category, city) -> None:
+        """Score 80 (4 banned words) → HIGH (at or above the 80 threshold)."""
+        _banned_words_setup("spam", "scam", "cheap", "fake")
+        ad = create_test_ad(
+            seller, category, city, title="spam scam cheap fake", description="desc"
+        )
+        result = calculator.calculate_priority(ad)
+        assert result["base_score"] == 80
+        assert result["priority_level"] == AdPriorityLevel.HIGH.value
 
-        self.assertEqual(result["base_score"], 60)
-        self.assertEqual(result["priority_level"], AdPriorityLevel.MEDIUM.value)
+    def test_score_100_maps_to_high(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Score 100 (5+ banned words, capped) → HIGH."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            description="desc",
+        )
+        result = calculator.calculate_priority(ad)
+        assert result["base_score"] == 100
+        assert result["priority_level"] == AdPriorityLevel.HIGH.value
 
-    def test_priority_level_boundaries(self) -> None:
-        """Verify score-to-level mapping at exact boundaries via _get_priority_level."""
-        # 0-49 → LOW
-        self.assertEqual(
-            self.calculator._get_priority_level(0), AdPriorityLevel.LOW,
-        )
-        self.assertEqual(
-            self.calculator._get_priority_level(49), AdPriorityLevel.LOW,
-        )
-        # 50-79 → MEDIUM
-        self.assertEqual(
-            self.calculator._get_priority_level(50), AdPriorityLevel.MEDIUM,
-        )
-        self.assertEqual(
-            self.calculator._get_priority_level(79), AdPriorityLevel.MEDIUM,
-        )
-        # 80-100 → HIGH
-        self.assertEqual(
-            self.calculator._get_priority_level(80), AdPriorityLevel.HIGH,
-        )
-        self.assertEqual(
-            self.calculator._get_priority_level(100), AdPriorityLevel.HIGH,
-        )
 
-    # ── test_escalation_required ────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Tests: escalation_required
+# ---------------------------------------------------------------------------
 
-    def test_escalation_required_when_flag_count_reaches_three(self) -> None:
+
+class TestEscalationRequired:
+    """Tests for the ``escalation_required`` flag in the public API."""
+
+    def test_escalation_when_flag_count_reaches_three(
+        self, calculator, seller, category, city
+    ) -> None:
         """Escalation is required when len(flags) >= 3."""
         now = timezone.now()
         for i in range(4):
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
+            create_test_ad(
+                seller,
+                category,
+                city,
                 title=f"Rejected {i}",
                 description=f"Rejected description {i}",
                 status=AdStatus.REJECTED,
@@ -470,80 +421,152 @@ class TestPriorityCalculator(TestCase):
             )
 
         _banned_words_setup("spam", "scam", "cheap")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
             title="spam scam cheap offer",
             description="spam scam cheap offer description",
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
         # Flags: 3× "banned_word" + 1× "repeat_offender" = 4 flags >= 3
-        self.assertTrue(result["escalation_required"])
-        self.assertGreaterEqual(len(result["flags"]), 3)
+        assert result["escalation_required"] is True
+        assert len(result["flags"]) >= 3
 
-    def test_escalation_not_required_when_low_score_and_few_flags(self) -> None:
+    def test_no_escalation_when_low_score_and_few_flags(
+        self, calculator, seller, category, city
+    ) -> None:
         """Escalation is not required when score < 80 and flags < 3."""
         _banned_words_setup()
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Clean title",
-            description="Clean description",
+        ad = create_test_ad(
+            seller, category, city, title="Clean", description="Clean"
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
-        self.assertFalse(result["escalation_required"])
-        self.assertEqual(result["base_score"], 0)
-        self.assertEqual(len(result["flags"]), 0)
+        assert result["escalation_required"] is False
+        assert result["base_score"] == 0
+        assert len(result["flags"]) == 0
 
-    def test_escalation_flag_logic_is_or(self) -> None:
-        """Escalation condition uses OR — either high score OR many flags triggers it."""
-        # Create scenario with 2 banned words → flags = ["banned_word", "banned_word"] = 2
+    def test_escalation_or_logic(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Escalation condition uses OR — 2 banned words (score 40, 2 flags) → not required."""
         _banned_words_setup("spam", "scam")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam title",
-            description="spam scam description",
+        ad = create_test_ad(
+            seller, category, city, title="spam scam", description="spam scam"
         )
 
-        result = self.calculator.calculate_priority(ad)
+        result = calculator.calculate_priority(ad)
 
         # Content: 40, User: 0, total: 40, flags: 2
         # 40 < 80 AND 2 < 3 → escalation_required = False
-        self.assertFalse(result["escalation_required"])
-        self.assertEqual(len(result["flags"]), 2)
+        assert result["escalation_required"] is False
+        assert len(result["flags"]) == 2
 
-    # ── test_confidence_score_estimation ────────────────────────────────
 
-    def test_confidence_score_default_in_public_api(self) -> None:
+# ---------------------------------------------------------------------------
+# Tests: confidence score (public API, G-09)
+# ---------------------------------------------------------------------------
+
+
+class TestConfidenceScore:
+    """Tests for the ``confidence_score`` field in ``calculate_priority`` return dict."""
+
+    def test_confidence_score_is_0_7_placeholder(self, calculator, seller, category, city) -> None:
         """Confidence score is 0.7 (placeholder for future ML) via calculate_priority."""
-        result = self.calculator.calculate_priority(
-            _make_ad(
-                self.user,
-                self.category,
-                self.city,
-                title="Any title",
-                description="Any description",
-            ),
+        _banned_words_setup()
+        ad = create_test_ad(
+            seller, category, city, title="Any title", description="Any description"
         )
 
-        self.assertEqual(result["confidence_score"], 0.7)
+        result = calculator.calculate_priority(ad)
 
-    def test_confidence_score_direct_method(self) -> None:
-        """_estimate_confidence returns 0.7 for any ad."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Test",
-            description="Test description",
+        assert result["confidence_score"] == 0.7
+
+    def test_confidence_score_is_constant_across_states(
+        self, calculator, seller, category, city
+    ) -> None:
+        """Confidence score is always 0.7 regardless of ad content/state."""
+        _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            description="desc",
         )
-        confidence = self.calculator._estimate_confidence(ad)
-        self.assertEqual(confidence, 0.7)
+
+        result = calculator.calculate_priority(ad)
+
+        assert result["confidence_score"] == 0.7
+
+
+# ---------------------------------------------------------------------------
+# Tests: PriorityService persisted boundary levels (G-10)
+# ---------------------------------------------------------------------------
+
+
+class TestPriorityServiceBoundaries:
+    """Persist ``AdModerationPriority`` rows via ``calculate_and_save`` and
+    verify the ``priority_level`` column at achievable score boundaries.
+
+    The scoring system produces discrete values (multiples of 20 for content
+    score).  These tests verify the persisted ``priority_level`` matches the
+    ``calculate_priority`` return value at each boundary.
+    """
+
+    @pytest.mark.parametrize(
+        ("banned_count", "expected_score", "expected_level"),
+        [
+            (0, 0, AdPriorityLevel.LOW),
+            (1, 20, AdPriorityLevel.LOW),
+            (2, 40, AdPriorityLevel.LOW),
+            (3, 60, AdPriorityLevel.MEDIUM),
+            (4, 80, AdPriorityLevel.HIGH),
+            (5, 100, AdPriorityLevel.HIGH),
+        ],
+    )
+    def test_persisted_priority_level_at_boundaries(
+        self,
+        banned_count: int,
+        expected_score: int,
+        expected_level: AdPriorityLevel,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """``calculate_and_save`` persists the correct ``priority_level`` for each score."""
+        words = ["spam", "scam", "cheap", "fake", "counterfeit", "extra1"]
+        _banned_words_setup(*words[:banned_count])
+
+        title = " ".join(words[:banned_count])
+        ad = create_test_ad(seller, category, city, title=title, description="desc")
+
+        service = PriorityService()
+        priority = service.calculate_and_save(ad)
+
+        assert priority.base_score == expected_score
+        assert priority.priority_level == expected_level.value
+
+    def test_persisted_priority_updated_on_recalculate(
+        self, seller, category, city
+    ) -> None:
+        """Calling ``calculate_and_save`` twice updates the existing row (not a duplicate)."""
+        _banned_words_setup()
+        ad = create_test_ad(seller, category, city, title="Clean", description="Clean")
+
+        service = PriorityService()
+        first = service.calculate_and_save(ad)
+
+        # Now add banned words and recalculate.
+        _banned_words_setup("spam")
+        create_test_ad(seller, category, city, title="spam", description="x")  # bump user's ad count
+        ad.title = "spam"
+        ad.save(update_fields=["title"])
+        second = service.calculate_and_save(ad)
+
+        assert first.id == second.id
+        assert second.base_score == 20

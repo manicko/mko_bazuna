@@ -15,7 +15,6 @@ import re
 import pytest
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -23,37 +22,9 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create an ad owner for gallery fixtures."""
-    return User.objects.create(
-        telegram_id=930000001,
-        chat_id=930000001,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> Category:
-    """Create a leaf category for ad fixtures."""
-    return Category.objects.create(
-        name="Gallery Cat",
-        slug="gallery-cat",
-    )
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Gallery City",
-        region="Gallery Region",
-        slug="gallery-city",
-    )
 
 
 def _create_published_ad(
@@ -64,15 +35,13 @@ def _create_published_ad(
     image_positions: list[int],
 ) -> Ad:
     """Create a PUBLISHED ad with AdImage rows at the given positions."""
-    ad = Ad.objects.create(
-        user=seller,
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
         title="Gallery Ad",
         description="Gallery description",
-        category=category,
-        city=city,
-        category_name=category.name,
         status=AdStatus.PUBLISHED,
-        published_at=timezone.now(),
     )
     for pos in image_positions:
         AdImage.objects.create(

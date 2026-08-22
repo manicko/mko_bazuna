@@ -14,22 +14,11 @@ from datetime import timedelta
 
 import pytest
 from apps.users.context_processors import consent_state
-from apps.users.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.utils import timezone
 
 pytestmark = [pytest.mark.django_db]
-
-
-@pytest.fixture
-def user() -> User:
-    """An authenticated user with no consent state."""
-    return User.objects.create(
-        telegram_id=900000040,
-        chat_id=900000040,
-        password="x",
-    )
 
 
 def _anon_request(**cookies) -> object:
@@ -40,7 +29,7 @@ def _anon_request(**cookies) -> object:
     return request
 
 
-def _auth_request(user: User, **cookies) -> object:
+def _auth_request(user, **cookies) -> object:
     """Build an authenticated request for ``user`` with the given cookies."""
     request = RequestFactory().get("/")
     request.user = user
@@ -99,12 +88,12 @@ class TestAnonymousCookieState:
 class TestAuthenticatedState:
     """Authenticated consent state is derived from the User record (D5)."""
 
-    def test_active_user_without_consent_shows_banner(self, user: User) -> None:
+    def test_active_user_without_consent_shows_banner(self, user) -> None:
         """Authenticated user with no consent state => banner shown."""
         ctx = consent_state(_auth_request(user))
         assert ctx["consent_shown"] is False
 
-    def test_accepted_user_hides_banner(self, user: User) -> None:
+    def test_accepted_user_hides_banner(self, user) -> None:
         """Authenticated user with consent_given_at => banner hidden."""
         user.consent_given_at = timezone.now()
         user.save(update_fields=["consent_given_at"])
@@ -113,7 +102,7 @@ class TestAuthenticatedState:
         assert ctx["consent_analytics"] is True
         assert ctx["consent_preferences"] is True
 
-    def test_declined_user_hides_banner(self, user: User) -> None:
+    def test_declined_user_hides_banner(self, user) -> None:
         """Authenticated user who declined is not re-prompted."""
         user.is_declined = True
         user.ads_auto_publish = False
@@ -121,7 +110,7 @@ class TestAuthenticatedState:
         ctx = consent_state(_auth_request(user))
         assert ctx["consent_shown"] is True
 
-    def test_deleted_user_hides_banner(self, user: User) -> None:
+    def test_deleted_user_hides_banner(self, user) -> None:
         """Soft-deleted users never see the banner (guard also in templates)."""
         user.is_deleted = True
         user.save(update_fields=["is_deleted"])
@@ -133,7 +122,7 @@ class TestRePrompt:
     """12-month re-prompt (T-08)."""
 
     def test_authenticated_consent_older_than_12_months_reprompts(
-        self, user: User
+        self, user
     ) -> None:
         """Consent older than 365 days => banner reappears."""
         user.consent_given_at = timezone.now() - timedelta(days=400)
@@ -141,7 +130,7 @@ class TestRePrompt:
         ctx = consent_state(_auth_request(user))
         assert ctx["consent_shown"] is False
 
-    def test_authenticated_consent_younger_than_12_months(self, user: User) -> None:
+    def test_authenticated_consent_younger_than_12_months(self, user) -> None:
         """Recent consent keeps the banner hidden."""
         user.consent_given_at = timezone.now() - timedelta(days=100)
         user.save(update_fields=["consent_given_at"])
@@ -161,7 +150,7 @@ class TestRePrompt:
 class TestPreferenceCenterOverride:
     """``?ref=preferences`` forces the banner (T-09)."""
 
-    def test_ref_preferences_forces_banner(self, user: User) -> None:
+    def test_ref_preferences_forces_banner(self, user) -> None:
         """Requesting the preference center re-shows the banner."""
         user.consent_given_at = timezone.now()
         user.save(update_fields=["consent_given_at"])

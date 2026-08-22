@@ -63,6 +63,46 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
 
         return context_box[0]
 
+    def test_detail_prefetch_includes_trust_score(self) -> None:
+        """``ad_detail`` must prefetch ``user__trust_score`` to avoid N+1 on
+        trust-badge rendering (Spec trust display contract)."""
+        ad = MagicMock()
+        context_box: list[dict[str, Any]] = []
+
+        def fake_render(
+            request: Any,
+            template_name: str,
+            context: dict[str, Any] | None = None,
+            **kwargs: Any,
+        ) -> HttpResponse:
+            context_box.append(context if context is not None else {})
+            return HttpResponse(status=200)
+
+        with (
+            patch("apps.ads.views.listings.Ad") as mock_ad,
+            patch("apps.ads.views.listings.AnalyticsEvent") as mock_ae,
+            patch(
+                "apps.ads.views.listings.render",
+                side_effect=fake_render,
+            ),
+        ):
+            mock_ad.objects.select_related.return_value.prefetch_related.return_value.get.return_value = ad
+            mock_ae.objects.create.return_value = None
+
+            factory = RequestFactory()
+            request = factory.get(f"/ads/{ad.id}/")
+            request.user = MagicMock()
+            request.user.is_anonymous = False
+
+            ad_detail(request, ad.id)
+
+        mock_ad.objects.select_related.assert_called_once_with(
+            "category", "city", "user"
+        )
+        mock_ad.objects.select_related.return_value.prefetch_related.assert_called_once_with(
+            "images", "user__trust_score"
+        )
+
     def test_detail_context_contains_bot_username(self) -> None:
         """``ad_detail`` must pass ``bot_username`` matching ``settings.BOT_USERNAME``."""
         ad = MagicMock()

@@ -23,94 +23,9 @@ from apps.users.models import LoginToken, User
 from django.core.management import call_command
 from django.utils import timezone
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000001,
-        chat_id=900000001,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category():
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city():
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
-def _make_ad(seller, category, city, **kwargs) -> Ad:
-    """Create an Ad with required FK fields, overriding any kwargs.
-
-    DB CheckConstraints require timestamps (published_at, archived_at, etc.)
-    to be non-null for their corresponding statuses. To satisfy these at
-    UPDATE time (the row is first created with status=DRAFT, which has no
-    timestamp constraint), any status-specific timestamp not already
-    provided in kwargs is auto-filled with ``timezone.now()`` so the
-    ``QuerySet.update()`` does not violate the DB-level CheckConstraint.
-    """
-    _STATUS_TIMESTAMP = {
-        AdStatus.PUBLISHED: "published_at",
-        AdStatus.ARCHIVED: "archived_at",
-        AdStatus.REJECTED: "rejected_at",
-        AdStatus.ON_MODERATION_FAILED: "moderation_failed_at",
-        AdStatus.DELETED: "deleted_at",
-    }
-    timestamp_fields = {
-        "created_at",
-        "published_at",
-        "archived_at",
-        "moderation_failed_at",
-        "rejected_at",
-        "deleted_at",
-    }
-    timestamps = {k: v for k, v in kwargs.items() if k in timestamp_fields}
-    data = {
-        k: v for k, v in kwargs.items() if k not in timestamp_fields and k != "status"
-    }
-    defaults = {
-        "user": seller,
-        "title": "Valid Title",
-        "description": "Valid description text",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.DRAFT,
-    }
-    defaults.update(data)
-    ad = Ad.objects.create(**defaults)
-    update_data = {**timestamps}
-    if "status" in kwargs:
-        target_status = kwargs["status"]
-        ts_field = _STATUS_TIMESTAMP.get(target_status)
-        if ts_field and ts_field not in update_data:
-            update_data[ts_field] = timezone.now()
-        update_data["status"] = target_status
-    if update_data:
-        Ad.objects.filter(pk=ad.pk).update(**update_data)
-    ad.refresh_from_db()
-    return ad
 
 
 class TestArchiveSweep:
@@ -118,7 +33,7 @@ class TestArchiveSweep:
 
     def test_dry_run_does_not_mutate(self, seller, category, city):
 
-        stale = _make_ad(
+        stale = create_test_ad(
             seller,
             category,
             city,
@@ -131,14 +46,14 @@ class TestArchiveSweep:
 
     def test_archives_published_older_than_60_days(self, seller, category, city):
 
-        stale = _make_ad(
+        stale = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.PUBLISHED,
             published_at=timezone.now() - timedelta(days=90),
         )
-        fresh = _make_ad(
+        fresh = create_test_ad(
             seller,
             category,
             city,
@@ -154,7 +69,7 @@ class TestArchiveSweep:
 
     def test_idempotent_on_rerun(self, seller, category, city):
 
-        stale = _make_ad(
+        stale = create_test_ad(
             seller,
             category,
             city,
@@ -177,7 +92,7 @@ class TestDeleteSweep:
 
     def test_dry_run_does_not_delete(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -190,7 +105,7 @@ class TestDeleteSweep:
 
     def test_deletes_archived_older_than_120_days(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -198,7 +113,7 @@ class TestDeleteSweep:
             published_at=timezone.now() - timedelta(days=200),
         )
         AdImage.objects.create(ad=old, image="test-uuid.jpg")
-        recent = _make_ad(
+        recent = create_test_ad(
             seller,
             category,
             city,
@@ -211,7 +126,7 @@ class TestDeleteSweep:
 
     def test_cascades_ad_images(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -231,32 +146,35 @@ class TestSweepDrafts:
 
     def test_dry_run_does_not_delete(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.DRAFT,
-            created_at=timezone.now() - timedelta(minutes=90),
         )
+        Ad.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(minutes=90))
+        old.refresh_from_db()
         call_command("sweep_drafts", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
 
     def test_deletes_drafts_older_than_30_minutes(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.DRAFT,
-            created_at=timezone.now() - timedelta(minutes=90),
         )
-        recent = _make_ad(
+        Ad.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(minutes=90))
+        old.refresh_from_db()
+        recent = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.DRAFT,
-            created_at=timezone.now() - timedelta(minutes=5),
         )
+        Ad.objects.filter(pk=recent.pk).update(created_at=timezone.now() - timedelta(minutes=5))
+        recent.refresh_from_db()
         call_command("sweep_drafts")
         assert not Ad.objects.filter(pk=old.pk).exists()
         assert Ad.objects.filter(pk=recent.pk).exists()
@@ -264,13 +182,14 @@ class TestSweepDrafts:
     def test_does_not_touch_published_drafts(self, seller, category, city):
 
         # Published ads with old created_at must survive the draft sweep.
-        _make_ad(
+        ad = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.PUBLISHED,
-            created_at=timezone.now() - timedelta(days=10),
         )
+        Ad.objects.filter(pk=ad.pk).update(created_at=timezone.now() - timedelta(days=10))
+        ad.refresh_from_db()
         call_command("sweep_drafts")
         assert Ad.objects.filter(status=AdStatus.PUBLISHED).count() == 1
 
@@ -443,7 +362,7 @@ class TestPurgeFailedAds:
 
     def test_dry_run_does_not_delete(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -455,14 +374,14 @@ class TestPurgeFailedAds:
 
     def test_purges_failed_ads_older_than_7_days(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.ON_MODERATION_FAILED,
             moderation_failed_at=timezone.now() - timedelta(days=10),
         )
-        recent = _make_ad(
+        recent = create_test_ad(
             seller,
             category,
             city,
@@ -475,7 +394,7 @@ class TestPurgeFailedAds:
 
     def test_does_not_purge_other_statuses(self, seller, category, city):
 
-        rejected = _make_ad(
+        rejected = create_test_ad(
             seller,
             category,
             city,
@@ -494,7 +413,7 @@ class TestPurgeRejectedAds:
 
     def test_dry_run_does_not_delete(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -506,14 +425,14 @@ class TestPurgeRejectedAds:
 
     def test_purges_rejected_ads_older_than_90_days(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.REJECTED,
             rejected_at=timezone.now() - timedelta(days=120),
         )
-        recent = _make_ad(
+        recent = create_test_ad(
             seller,
             category,
             city,
@@ -526,7 +445,7 @@ class TestPurgeRejectedAds:
 
     def test_preserves_moderation_log_with_ad_set_null(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -553,7 +472,7 @@ class TestPurgeDeletedAds:
 
     def test_purge_deleted_ads_deletes_old_deleted(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -565,7 +484,7 @@ class TestPurgeDeletedAds:
 
     def test_purge_deleted_ads_preserves_recent(self, seller, category, city):
 
-        recent = _make_ad(
+        recent = create_test_ad(
             seller,
             category,
             city,
@@ -577,7 +496,7 @@ class TestPurgeDeletedAds:
 
     def test_purge_deleted_ads_skips_non_deleted(self, seller, category, city):
 
-        published = _make_ad(
+        published = create_test_ad(
             seller,
             category,
             city,
@@ -592,7 +511,7 @@ class TestPurgeDeletedAds:
 
     def test_purge_deleted_ads_dry_run(self, seller, category, city):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -604,7 +523,7 @@ class TestPurgeDeletedAds:
 
     def test_purge_deleted_ads_media_cleanup(self, seller, category, city, monkeypatch):
 
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,
@@ -728,7 +647,7 @@ class TestConcurrentSweep:
         inside transaction.atomic() cannot be rolled back, so a DB rollback
         would orphan DB rows pointing to already-deleted files.
         """
-        old = _make_ad(
+        old = create_test_ad(
             seller,
             category,
             city,

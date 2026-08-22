@@ -17,7 +17,6 @@ listings() (T-05):
 
 import pytest
 from django.test import Client
-from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -25,17 +24,9 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """A seller user who owns published ads."""
-    return User.objects.create(
-        telegram_id=940000600,
-        chat_id=940000600,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -46,11 +37,6 @@ def buyer() -> User:
         chat_id=940000601,
         password="y",
     )
-
-
-@pytest.fixture
-def category() -> Category:
-    return Category.objects.create(name="Транспорт", slug="transport")
 
 
 @pytest.fixture
@@ -73,28 +59,14 @@ def budva() -> City:
     )
 
 
-def _published_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
-    defaults = {
-        "user": seller,
-        "title": "Велосипед",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now(),
-    }
-    defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
-
-
 @pytest.fixture
 def podgorica_ad(seller: User, category: Category, podgorica: City) -> Ad:
-    return _published_ad(seller, category, podgorica)
+    return create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
 
 
 @pytest.fixture
 def budva_ad(seller: User, category: Category, budva: City) -> Ad:
-    return _published_ad(seller, category, budva)
+    return create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED)
 
 
 def _result_ids(response) -> list[int]:
@@ -216,9 +188,9 @@ class TestListingsPreferredCityReadback:
         # what page 2 shows. PER_PAGE is the view's constant 24.
         budva_ids: list[int] = []
         for _ in range(30):
-            budva_ids.append(_published_ad(seller, category, budva).id)
+            budva_ids.append(create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED).id)
         for _ in range(30):
-            _published_ad(seller, category, podgorica)
+            create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
 
         client.cookies["preferred_city"] = "budva"
 

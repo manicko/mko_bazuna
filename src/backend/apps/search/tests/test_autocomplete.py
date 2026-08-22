@@ -39,16 +39,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000020,
-        chat_id=900000020,
-        password="x",
-    )
-
-
-@pytest.fixture
 def buyer() -> User:
     """Create a registered buyer user."""
     return User.objects.create(
@@ -77,17 +67,6 @@ def inactive_category() -> Category:
     """Create an inactive category (should not appear in suggestions)."""
     return Category.objects.create(
         name="Устаревшее", slug="old", is_active=False
-    )
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
     )
 
 

@@ -6,13 +6,10 @@ Unit tests for validation rules without database dependencies.
 
 import pytest
 from django.core.cache import cache
-from django.utils import timezone
 
-from apps.ads.models import Ad, AdImage
+from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
-from apps.categories.models import Category
 from apps.core.enums import AdStatus
-from apps.locations.models import City
 from apps.moderation.models import ModeratorActionLog, ModerationCriteria
 from apps.moderation.services.auto_moderation import (
     _contains_banned_words,
@@ -22,7 +19,8 @@ from apps.moderation.services.auto_moderation import (
     _validate_title_length,
     check,
 )
-from apps.users.models import User
+
+from conftest import create_test_ad
 
 
 class TestValidateTitleLength:
@@ -178,35 +176,6 @@ def moderation_criteria():
     return criteria
 
 
-@pytest.fixture
-def user():
-    """Create a test user."""
-    return User.objects.create_user(
-        telegram_id=12345,
-        chat_id=12345,
-        username="testuser",
-        password="password",
-    )
-
-
-@pytest.fixture
-def category():
-    """Create a test category."""
-    return Category.objects.create(name="Category", slug="category")
-
-
-@pytest.fixture
-
-def city():
-    """Create a test city."""
-    return City.objects.create(
-        country_code="ME",
-        name="City",
-        region="Region",
-        slug="city",
-    )
-
-
 @pytest.mark.django_db
 @pytest.mark.slow
 @pytest.mark.integration
@@ -227,36 +196,15 @@ class TestCheckFunction:
         self.category = category
         self.city = city
 
-    def _create_ad(self, **kwargs) -> Ad:
-        """Create an Ad with defaults overridable by kwargs."""
-        defaults = {
-            "user": self.user,
-            "title": "Valid Title",
-            "description": "Valid description text here",
-            "price": 100,
-            "category": self.category,
-            "city": self.city,
-            "category_name": self.category.name,
-            "status": AdStatus.ON_MODERATION,
-        }
-        defaults.update(kwargs)
-        # Set status-specific timestamps to satisfy Ad check constraints
-        # (e.g. ck_ads_published_at_if_published, ck_ads_moderation_failed_at_if_failed).
-        status = defaults.get("status", AdStatus.ON_MODERATION)
-        if status == AdStatus.PUBLISHED and "published_at" not in defaults:
-            defaults["published_at"] = timezone.now()
-        elif status == AdStatus.REJECTED and "rejected_at" not in defaults:
-            defaults["rejected_at"] = timezone.now()
-        elif (
-            status == AdStatus.ON_MODERATION_FAILED
-            and "moderation_failed_at" not in defaults
-        ):
-            defaults["moderation_failed_at"] = timezone.now()
-        return Ad.objects.create(**defaults)
-
     def test_check_returns_passed_on_valid_ad(self):
         """Check returns (True, None) when all validations pass."""
-        ad = self._create_ad()
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Valid Title",
+            description="Valid description text here",
+        )
         AdImage.objects.create(ad=ad, image="test.jpg", position=0)
         AdImage.objects.create(ad=ad, image="test2.jpg", position=1)
 
@@ -266,8 +214,12 @@ class TestCheckFunction:
 
     def test_check_returns_seller_safe_error_on_fail(self):
         """Check returns (False, generic_error) on validation failure - no specific reason."""
-        ad = self._create_ad(
-            title="abc",  # Too short (min=5, max=100)
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="abc",
+            description="Valid description text here",
         )
 
         passed, error = check(ad)
@@ -287,8 +239,22 @@ class TestCheckFunction:
         """ON_MODERATION_FAILED ads do not count toward the active-ads limit (AD-003)."""
         # 1 PUBLISHED (active) + 1 ON_MODERATION_FAILED (should be excluded).
         # With max_ads=2 and the failed ad excluded, only 1 active remains -> under limit.
-        self._create_ad(title="Published Ad", status=AdStatus.PUBLISHED)
-        self._create_ad(title="Failed Ad", status=AdStatus.ON_MODERATION_FAILED)
+        create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Published Ad",
+            description="Valid description text here",
+            status=AdStatus.PUBLISHED,
+        )
+        create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Failed Ad",
+            description="Valid description text here",
+            status=AdStatus.ON_MODERATION_FAILED,
+        )
 
         # If ON_MODERATION_FAILED were counted, active count=2 and 2<2 would be False.
         assert _validate_max_ads_per_user(self.user.id, max_ads=2) is True

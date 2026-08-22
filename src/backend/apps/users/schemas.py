@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from apps.core.enums import ConsentChoice
+from apps.core.enums import ConsentChoice, CookieCategory
 
 
 class ConsentSubmission(BaseModel):
@@ -24,3 +24,15 @@ class ConsentSubmission(BaseModel):
     analytics: bool = False
     preferences: bool = False
     consent_version: str = Field(default="1.0", max_length=20)
+
+    def categories(self) -> dict[CookieCategory, bool]:
+        """Build the category map keyed by ``CookieCategory`` enum members.
+
+        The stored JSONB keys resolve to the enum's string values
+        (``"analytics"``, ``"preferences"``) so existing consumers and tests
+        that read the persisted dict are unaffected.
+        """
+        return {
+            CookieCategory.ANALYTICS: self.analytics,
+            CookieCategory.PREFERENCES: self.preferences,
+        }

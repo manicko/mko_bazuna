@@ -15,6 +15,9 @@ import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
+from apps.categories.models import Category
+from apps.locations.models import City
+from apps.users.models import User
 from django.conf import settings
 from django.db import connections
 from django.db.backends.signals import connection_created
@@ -98,6 +101,41 @@ def login_token_factory() -> Callable[..., Awaitable[tuple[str, Any]]]:
         return raw_token, token
 
     return _create
+
+
+@pytest.fixture
+def seller() -> User:
+    """Create a seller user for ad-fixture composition.
+
+    Uses telegram_id 900 000 100 to match the bot test-suite convention.
+    Note: the ``user`` fixture above also uses this ID — no single test
+    requests both.
+    """
+    return User.objects.create(
+        telegram_id=900000100,
+        chat_id=900000100,
+        password="x",
+    )
+
+
+@pytest.fixture
+def category() -> Category:
+    """Create a leaf category for ad fixtures."""
+    return Category.objects.create(
+        name="Test Category",
+        slug="test-category",
+    )
+
+
+@pytest.fixture
+def city() -> City:
+    """Create a city for ad fixtures."""
+    return City.objects.create(
+        country_code="ME",
+        name="Test City",
+        region="Test Region",
+        slug="test-city",
+    )
 
 
 # ---------------------------------------------------------------------------

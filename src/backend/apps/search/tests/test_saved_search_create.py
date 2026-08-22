@@ -30,21 +30,6 @@ def buyer() -> User:
     )
 
 
-@pytest.fixture
-def category() -> Category:
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
-def city() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
 def test_save_search_url_resolves():
     """search:save-search resolves to a view (CR17)."""
     url = reverse("search:save-search")

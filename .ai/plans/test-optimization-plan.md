@@ -1,717 +1,419 @@
-# Test Optimization Plan for Mko Bazuna
+# Test Optimization Plan
 
-**Date:** 2026-08-20  
-**Status:** ✅ Complete  
-**Based on:** Measured profiling data from real test runs (pytest `--collect-only` + wall-clock timings)  
-**Strategy:** Tiered test suites with granular marker-based selection, coverage gating, and seed-test isolation
-
----
-
-## 0. Overview
-
-The Mko Bazuna test suite comprises **934 tests** across **73 test files**. The full run takes **~18.75 minutes (1125s)** — dominated by seed tests that unconditionally process all **1004 fixture photos**. The non-seed suite runs in **~61s** for **863 tests** (0.07s/test average).
-
-The optimization strategy is to **isolate the 5 slow seed classes** (which account for ~95% of total time), **gate coverage to CI only**, **enable database reuse for local development**, and **introduce a 3-tier suite model** (Fast / Standard / Nightly) so CI feedback drops from 18 minutes to under 90 seconds.
-
-Key changes are **configuration and workflow only** — no production test code modifications are required for the initial tiering. Marker additions are additive and backward-compatible.
+**Project:** Mko Bazuna (Telegram-driven classifieds board)
+**Based on:** Audit Report `.ai/audit/tests/audit_report_1.md`
+**Status:** Draft
+**Author:** Kilo (planner agent)
 
 ---
 
-## 1. Current State Analysis
+## 1. Objective
 
-### 1.1 Test Structure
+Restore and sustain test suite integrity by:
 
-| Metric | Value |
-|--------|-------|
-| Total tests (collected) | 934 |
-| Test files | 73 |
-| Test file naming convention | `test_*.py` (71 files) + `tests.py` (2 files: `search/tests.py`, `moderation/tests.py`) |
-| Test directories | 13 `tests/` packages + 2 flat `tests.py` modules |
+1. **Eliminating redundancy** — collapse ~29 duplicated fixture definitions and ~18 duplicated ad-creation helpers into the canonical root-conftest fixtures and `create_test_ad` (which is currently dead code).
+2. **Standardizing the test framework** — migrate 14 `django.test.TestCase` files to pytest-django (`@pytest.mark.django_db` + marker taxonomy) so `-m unit` / `-m integration` filtering works uniformly.
+3. **Closing critical coverage gaps** — add missing tests for Ad check constraints, the `approve_ad → PUBLISHED → alert` signal chain, ad-detail trust-score prefetch (N+1), login-token edge cases, and search sort orderings.
+4. **Fixing hygiene defects** — remove the unused `e2e` marker, replace private-method coupling in `test_priority.py` with public-API coverage, and add direct unit tests for moderation decorators.
+5. **Correcting stale documentation** — rewrite this plan to reflect reality (all 7 markers registered; CI uses `-m "not seed"`; no shadowed `tests.py`).
 
-### 1.2 Marker Usage (Current)
-
-| Marker | Registered | Applied | Scope |
-|--------|-----------|---------|-------|
-| `slow` | Yes | ~32 modules | Module-level `pytestmark` (all-or-nothing) |
-| `integration` | Yes | ~32 modules | Module-level `pytestmark` (all-or-nothing) |
-| `django_db` | Yes (pytest-django) | ~40 modules | Per-module or per-class |
-| `django_db(transaction=True)` | Yes (pytest-django) | 5 modules | Per-module `pytestmark` (bot tests only) |
-| `asyncio` | Yes (pytest-asyncio) | 3 modules | Per-module or per-test |
-| `unit` | Not registered | 0 | — |
-| `e2e` | Not registered | 0 | — |
-| `seed` | Not registered | 0 | — |
-| `settings` | Not registered | 0 | — |
-| `concurrent` | Not registered | 0 | — |
-
-**Problem:** Markers are binary — every DB-backed test module is marked with **both** `slow` and `integration`, regardless of actual duration or complexity. Pure unit tests (no DB) in `test_download_seed_photos.py`, `test_media.py`, `test_multi_lang_translation.py`, and `test_settings_secrets.py` have **no** marker at all. This makes selective running impossible.
-
-### 1.3 Configuration (`pyproject.toml`)
-
-```toml
-[tool.pytest.ini_options]
-addopts = ["--import-mode=importlib", "-ra", "-q", "--cov", "--cov-report=term-missing"]
-markers = [
-    "slow: marks tests as slow (use -m slow to run)",
-    "integration: marks tests that require a database (use -m integration to run)",
-]
-```
-
-**Problems:**
-- `--cov` is **always-on** in `addopts` — adds 15–25s overhead to every local run (branch coverage across 2 source roots).
-- `--cov-report=term-missing` is in `addopts` but CI overrides it with `--cov-report=term --cov-report=xml`.
-- No `--reuse-db` in `addopts` — every local run rebuilds the test database schema.
-- `fail_under = 80` in `[tool.coverage.report]` — coverage gate applies to whatever test subset runs.
-
-### 1.4 CI Pipeline (`.github/workflows/ci.yml`)
-
-| Job | Trigger | Key Command |
-|-----|---------|-------------|
-| `build` | push/PR | Docker image build (cache-from registry) |
-| `test` | push/PR | `uv run pytest --tb=short --cov --cov-report=term --cov-report=xml` |
-| `lint` | push/PR | `uv run ruff check .` |
-| `typecheck` | push/PR | `uv run basedpyright .` |
-
-**Problems:**
-- `test` job runs **all 934 tests** including the ~18-minute seed batch.
-- **No test splitting** — single job runs everything sequentially.
-- **No `--reuse-db`** — fresh PostgreSQL service each CI run (acceptable in CI, but means full schema setup every time).
-- **Redundant migration check** — CI runs `makemigrations --check --dry-run` as a step, AND `test_migrations.py::test_makemigrations_check` runs the same check inside pytest.
-- No nightly/scheduled workflow for slow tests.
-- No path filters — CI runs on every push/PR regardless of what changed.
-
-### 1.5 Makefile (`test` target)
-
-```makefile
-test:
-    docker compose $(COMPOSE_TEST) up -d db
-    docker compose $(COMPOSE_TEST) run --rm test
-```
-
-- The `test-db` target keeps the DB container alive between runs, but the **entrypoint** (`entrypoint-test.sh`) runs `uv run pytest ${PYTEST_OPTS:- --tb=short}` — **without `--reuse-db`**.
-- `test-recreate` injects `--no-reuse-db --create-db` via `PYTEST_OPTS`, but the default `test` target does not.
-
-### 1.6 Dead Dependencies
-
-| Package | Declared in | Imported? |
-|---------|------------|-----------|
-| `factory-boy` | dev group | No |
-| `model-bakery` | dev group | No |
-| `hypothesis` | dev group | No |
-| `pytest-factoryboy` | dev group | No (depends on factory-boy) |
-
-### 1.7 Pre-existing Failures (7+)
-
-| # | Test | Failure | Severity |
-|---|------|---------|----------|
-| 1 | `media/tests/test_save_photo_exif.py::test_save_photo_strips_exif_on_disk` | `TypeError: save_photo() got unexpected keyword 'user_id'` | High |
-| 2 | `moderation/tests/test_auto_moderation.py::test_failed_ad_not_counted_in_active_limit` | Logic assertion failure | Medium |
-| 3–8 | `moderation/tests/test_priority.py::TestPriorityCalculator` (6 tests) | Scoring assertion mismatches | Medium |
-| 9–13 | `search/tests.py` (`TestSearchViewPublishesFilter`, `TestSearchViewPagination`) | FTS/view behavior | Medium |
-
-### 1.8 Infrastructure Findings
-
-- **One `conftest.py`:** `src/telegram_bot/tests/conftest.py` — handles bot/Dispatcher fixtures and worker-thread connection reaping (autouse).
-- **No root `conftest.py`** — fixture duplication across 15+ test files (user, category, city fixtures are copy-pasted).
-- **`--reuse-db` NOT available** — must be manually injected via `PYTEST_OPTS`.
-- **`entrypoint-test.sh`** runs `uv sync`, waits for DB, runs migrations, then runs pytest.
+All tasks are atomic, independently reviewable, and must pass `--create-db` validation.
 
 ---
 
-## 2. Measured Baseline
+## 2. Current State
 
-### 2.1 Suite-Level Timings
+### Findings requiring action (7 open + 1 resolved)
 
-| Test Group | Tests | Time | Per-test | Notes |
-|---|---|---|---|---|
-| Quick unit (2 files) | 32 | 3.1s | 0.1s | Pure unit — no DB |
-| Download seed photos (mocked) | 50 | 6.1s | 0.12s | Pure unit — no DB |
-| Seed fast classes (`TestBaseGenerator`, `TestUserGenerator`, `TestAdGenerator`, `TestAnalyticsGenerator`, `TestSeedEnums`, `TestImageGeneratorManifest`, `TestAdGeneratorMultiLang`) | ~60 | 13.4s | 0.2s | Some errors in `TestImageGenerator` |
-| Seed slow classes (5 classes calling `call_command("seed")` or processing manifest) | ~16 | ~1050s | ~66s | **ALL call `ImageGenerator.generate()` → processes 1004 photos** |
-| `TestSeedCommand` alone | 5 | 419s | 69–137s | ALL FAILING |
-| Settings secrets (subprocess) | 3 | 11.4s | 3.6s | Python interpreter spawn |
-| Bot ad_lifecycle (txn=True) | 17 | 13.7s | 0.8s | TRUNCATE overhead |
-| Bot txn=True (3 files) | 20 | 14.7s | 0.7s | |
-| Bot login_claim + unsubscribe | 13 | 15.2s | 1.2s | |
-| Bot multi_lang + ad_create + media | 35 | 10.8s | 0.3s | One error (duplicate key) |
-| Core (~137 tests) | ~137 | 13.4s | 0.1s | |
-| Analytics (~90 tests) | ~90 | 6.6s | 0.07s | |
-| Moderation (~70 tests) | ~70 | 8.2s | 0.12s | 6 failures |
-| Trust (28 tests) | 28 | 7.9s | 0.28s | |
-| Users (~73 tests) | ~73 | 7.3s | 0.1s | |
-| Ads (~149 tests) | ~149 | 10.1s | 0.07s | 3 fail, 10 errors |
-| Sweep commands (44 tests) | 44 | 11.3s | 0.26s | One test at 4.74s |
-| Cabinet (~14) + Categories (~6) + Media (~11) | ~31 | ~3s | 0.1s | 1 media failure |
-| **FULL SUITE (excl `test_seed.py`)** | ~863 | **60.8s** | 0.07s | 7 failures | *Note: measured by excluding entire `test_seed.py` (71 tests). The proposed marker-based approach excludes only 16 seed-marked tests, leaving 55 fast seed tests in the default run (~918 tests, ~74s without `--cov`).*
-| **FULL SUITE (incl slow seed)** | ~934 | **~1125s** | — | ~7+ failures |
+| ID  | Finding | Severity | Status |
+|-----|---------|----------|--------|
+| F-01 | Shadowed `tests.py` modules (31 silently-skipped tests; 1 real failure masked) | CRITICAL | **RESOLVED** (audit commit `07a8f49` / `d72e597`) |
+| F-02 | Duplicated `seller`/`user`/`category`/`city` fixtures across ~29 files | BEST-PRACTICE | OPEN |
+| F-03 | Duplicated `_make_ad`/`_create_ad` helpers across ~18 files (inconsistent, buggy variants) | BEST-PRACTICE | OPEN |
+| F-04 | Canonical `create_test_ad` defined but 0 external references (dead code) | BEST-PRACTICE | OPEN |
+| F-05 | 14 files use `django.test.TestCase` instead of `pytest.mark.django_db` | TEST-UPDATE | OPEN |
+| F-06 | Missing direct unit tests for `staff_required` / `staff_required_api` decorators | TEST-UPDATE | OPEN |
+| F-07 | `test_priority.py` tests private methods `_get_priority_level` / `_estimate_confidence` directly | TEST-UPDATE | OPEN |
+| F-08 | `e2e` marker registered but 0 usages | BEST-PRACTICE | OPEN |
+| F-09 | Stale test-optimization plan (4 discrepancies, §5) | DOC-UPDATE | OPEN |
 
-### 2.2 Root-Cause Deep Dive: `ImageGenerator.generate()`
+### Coverage gaps (11)
 
-**Measured:** 63 seconds for 0 ads because `ImageGenerator.generate()` unconditionally processes **all 1004 photos** in `photo_manifest.json` (1004 photos across 205 categories).
+| Gap | Priority | Component | Summary |
+|------|----------|-----------|---------|
+| G-01 | P0 | `Ad` model | 6 CheckConstraints not all tested directly (only 3 tested via `IntegrityError` in `test_ad_lifecycle.py`) |
+| G-02 | P0 | `listings.py::ad_detail` | Missing `user__trust_score` prefetch — N+1 on trust badge render |
+| G-03 | P0 | `moderation/signals.py` | `approve_ad → PUBLISHED` side-effect chain (priority recalc + immediate alerts on commit) not tested |
+| G-04 | P1 | `core/services/contact.py` | Combinatorial edge cases for `can_contact_seller` / `get_seller_for_contact` (banned + WITHROW, DECLINE vs WITHDRAWN) |
+| G-05 | P1 | `search/views/search.py` | `DATE_OLD` / `DATE_NEW` sort orderings not asserted in `test_search_triggers.py` |
+| G-06 | P1 | `users/models.py` `LoginToken` | Token issuance, replay/claim atomicity, hash-mismatch rejection not tested |
+| G-07 | P1 | `telegram_bot/handlers/ad_create.py` | `save_photo → generate_thumbnails` integration (populates `thumbnail_*`) not tested end-to-end |
+| G-08 | P2 | `trust/services/trust_calculator.py` | Quality-score truncation edge case (activity cap × threshold interaction) |
+| G-09 | P2 | `moderation/services/priority_calculator.py` | `_estimate_confidence` boundary tests via public API |
+| G-10 | P2 | `moderation/services/priority_calculator.py` | Priority calculator score-to-level boundary matrix via persisted `AdModerationPriority` row |
+| G-11 | P2 | `trust/services/trust_calculator.py` | Trust-level floor (score=0 + verified/premium → VERIFIED) |
 
-Each photo involves:
-1. Reading a JPEG from the fixture directory (`fixtures/images/`)
-2. Writing the original to `MEDIA_ROOT/seed/`
-3. Generating 3 thumbnail variants via `ThumbnailService.generate_thumbnails()` (Pillow LANCZOS resize + atomic file write) — **3 file I/O operations per photo**
+### Environment constraints (from audit §4)
 
-The 5 slow seed test classes call `call_command("seed")` 10+ times, which invokes `ImageGenerator.generate()` each time, resulting in **630+ seconds** of redundant photo processing.
-
-`TestSeedCommand` alone: 5 tests, 419s total (69–137s each) — every test instantiates the full seed pipeline including image preprocessing.
-
-### 2.3 `load_catalog()` Cost
-
-`load_catalog(CATALOG_PATH)` loads 176 categories in **~4s per call**. Called from:
-- `TestSeedCategoryIntegration.setUpTestData` (~4s)
-- `TestLeafCategoryFiltering.setUpTestData` (~4s)
-- `TestBreadcrumbsRender.setUpTestData` (~4s)
-- `SeedService._load_category_fixtures()` (called by every `call_command("seed")`)
-
-### 2.4 Coverage Overhead
-
-Always-on `--cov` in `addopts` with `branch=true` adds **15–25s** to every run. In CI, this is acceptable (coverage required for the gate). In local development, it is pure overhead with no feedback value during rapid iteration.
-
-### 2.5 `--reuse-db` Gap
-
-pytest-django creates a fresh test database on every run unless `--reuse-db` is passed. The project's `Makefile` keeps the DB container alive between runs, but neither `addopts` nor `entrypoint-test.sh` pass `--reuse-db`. The first schema build takes ~3–5s; subsequent runs with `--reuse-db` skip this entirely. This matters especially for the `load_catalog()` calls in `setUpTestData`, which re-execute against a freshly migrated schema each time.
+- Test DB: `mko-bazuna-test-db-1` on port 5433
+- Test command: `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test`
+- CI command: `pytest -m "not seed" -n auto --dist loadscope --tb=short --cov --durations=10`
+- Use `--create-db` to avoid stale-schema errors (527 errors on `--reuse-db`)
+- All 6 markers registered in `pyproject.toml` `[tool.pytest.ini_options] markers`: `unit`, `integration`, `seed`, `settings`, `concurrent`, `slow` (the `e2e` marker was removed in A.1)
 
 ---
 
-## 3. Main Performance Bottlenecks (Ranked by Impact)
+## 3. Implementation Tasks (grouped in phases)
 
-| Rank | Bottleneck | Tests Affected | Time Wasted | Root Cause |
-|------|-----------|----------------|-------------|------------|
-| **1** | Seed `ImageGenerator.generate()` processes 1004 photos per `call_command("seed")` | 5 classes (~16 tests) in `test_seed.py` | ~1050s | Unconditional full-manifest photo preprocessing regardless of ad count |
-| **2** | `call_command("seed")` invoked 10+ times across seed tests | Same 5 classes | ~1050s (compounded) | No fixture sharing; each test re-runs the full pipeline |
-| **3** | Always-on `--cov` with branch tracing in `addopts` | All 934 tests | 15–25s per run | Coverage overhead for local dev feedback |
-| **4** | No `--reuse-db` — test DB rebuilt every run | All tests | 3–5s per run + re-migration cost | Missing flag in `addopts` / `entrypoint-test.sh` |
-| **5** | Settings secrets tests spawn Python subprocess | 3 tests | 11.4s (3.6s/test) | `subprocess.run([sys.executable, ...])` for import-time validation |
-| **6** | Bot tests with `django_db(transaction=True)` | 5 modules (~40 tests) | ~15s total | TRUNCATE all tables per test (0.3–0.4s teardown each) |
-| **7** | `load_catalog()` called in `setUpTestData` of 3+ modules | ~20 tests | ~12s+ | ~4s per call, redundant across modules |
-| **8** | CI runs all 934 tests (including seed) sequentially | CI pipeline | 18+ min CI job | No test splitting, no marker-based exclusion |
-| **9** | 3 dead dev dependencies | Install phase | ~2–3s install + 7 unused packages | `factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy` never imported |
-| **10 | Pre-existing failures break CI green | 7+ tests | CI always red | `test_save_photo_exif`, `TestPriorityCalculator` (6), `search/tests.py` (5) |
+### Phase A: Cleanup & Consistency (high-impact, low-risk)
+
+#### A.1 — Remove unused `e2e` marker
+| Field | Value |
+|-------|-------|
+| **ID** | A.1 |
+| **Type** | Cleanup |
+| **Priority** | Low |
+| **Finding** | F-08 |
+| **Description** | Remove the `e2e` marker line from `pyproject.toml` `[tool.pytest.ini_options] markers`. Audit for any `e2e` usage in `.ai/` docs and remove references. No `pytest.mark.e2e` usages exist in source (confirmed by grep — only the slug `"transport-e2e"` in `test_language_end_to_end.py`, unrelated). |
+| **Files to change** | `pyproject.toml` |
+| **Acceptance criteria** | `grep -r "e2e" pyproject.toml` returns nothing in the markers list. Test collection still succeeds. |
+| **Test command** | `docker compose ... run --rm test --collect-only` (collection succeeds, no `e2e` marker warning) |
+
+#### A.2 — Adopt root conftest fixtures across all test files
+| Field | Value |
+|-------|-------|
+| **ID** | A.2 |
+| **Type** | Refactoring |
+| **Priority** | Medium |
+| **Finding** | F-02 |
+| **Description** | Remove local `seller`/`user`/`category`/`city` fixture redefinitions from all ~29 test files and their local `conftest.py` files. Rely on the root `src/backend/conftest.py` fixtures. **Exception**: `src/telegram_bot/tests/conftest.py` defines an async `user` fixture (scope conflict with the synchronous root fixture) — keep the local fixture or rename it; document the decision in the bot conftest. Files affected: `test_ad_lifecycle.py`, `test_admin_actions.py`, `test_auto_moderation.py`, `test_moderation_views.py`, `test_search_view.py`, `test_autocomplete.py`, `test_saved_search_create.py`, `test_preferred_city_readback.py`, `test_alert_query.py`, `test_preferred_city.py`, `test_auth_nav.py`, `test_search_triggers.py`, `test_script_gating.py`, `test_media_security.py`, `test_favorites.py`, `test_gallery_markup.py`, `test_backfill_thumbnails.py`, `test_contact.py`, `test_sweep_commands.py`, `test_logout.py`, `test_consent_context.py`, `test_consent.py`, `test_deletion.py`, `test_account_state.py`, `test_consent_records.py`, `test_favorites_badge.py`, `test_cabinet_sections.py`, `telegram_bot/tests/test_ad_lifecycle.py`, `telegram_bot/tests/test_ad_create.py`. |
+| **Files to change** | All ~29 test files + `src/telegram_bot/tests/conftest.py` (decision on async `user`) |
+| **Acceptance criteria** | Root conftest is the single source of truth for these 4 fixtures. No file redefines them (except documented async override in bot conftest). Full test suite passes with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test -m "not seed" --create-db` |
+
+#### A.3 — Consolidate `_make_ad`/`_create_ad` helpers into `create_test_ad`
+| Field | Value |
+|-------|-------|
+| **ID** | A.3 |
+| **Type** | Refactoring |
+| **Priority** | Medium |
+| **Finding** | F-03, F-04 |
+| **Description** | For each of the ~18 files defining `_make_ad` or `_create_ad`, replace the local helper body with a call to the canonical `create_test_ad` from root conftest (imported via `from conftest import create_test_ad` or accessed through `pytest.fixture` composition). Delete the local helper definitions. The canonical helper already handles all 6 status-timestamp combinations correctly. **Decision**: Adopt (not delete) since it is documented future-proofing with 0 bugs; A.3 makes it live code. Sub-tasks are grouped per-app to keep diffs reviewable: A.3a (ads app, 8 files), A.3b (moderation app, 5 files), A.3c (search app, 4 files), A.3d (core/trust/media apps, 1 file each). |
+| **Files to change** | `apps/ads/tests/test_ad_lifecycle.py`, `apps/ads/tests/test_ad_image_service.py`, `apps/ads/tests/test_media_security.py`, `apps/ads/tests/test_script_gating.py`, `apps/ads/tests/test_favorites.py`, `apps/ads/tests/test_gallery_markup.py`, `apps/ads/tests/test_dashboard_stats.py`, `apps/trust/tests/test_trust_calculator.py`, `apps/moderation/tests/test_admin_actions.py`, `apps/moderation/tests/test_auto_moderation.py`, `apps/moderation/tests/test_moderation_views.py`, `apps/moderation/tests/test_priority.py`, `apps/moderation/tests/test_priority_service.py`, `apps/search/tests/test_search_view.py`, `apps/search/tests/test_alert_query.py`, `apps/search/tests/test_preferred_city.py`, `apps/search/tests/test_preferred_city_readback.py`, `apps/core/tests/test_contact.py`, `apps/core/tests/test_sweep_commands.py`, `apps/media/tests/test_backfill_thumbnails.py`, `apps/users/tests/test_consent.py` |
+| **Acceptance criteria** | `grep -rn "def _make_ad\|def _create_ad" src/` returns 0 results (dead-code helper in `test_ad_localization.py` is a SimpleTestCase in-memory variant — keep, it doesn't touch DB). `create_test_ad` is referenced from ≥15 test files. Full suite passes with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test -m "not seed" --create-db` |
+
+> **Note on `test_ad_localization.py`**: Its `_make_ad` builds an in-memory `Ad` via `__new__` (no DB) for testing `get_title`/`get_description` fallback. It does **not** hit the DB or check constraints, so it is **out of scope** for A.3. Document this exception.
+
+### Phase B: Framework Migration & Refactoring (medium-effort, medium-risk)
+
+#### B.1 — Migrate 14 `TestCase` files to pytest-django
+| Field | Value |
+|-------|-------|
+| **ID** | B.1 |
+| **Type** | Framework migration |
+| **Priority** | Medium |
+| **Finding** | F-05 |
+| **Description** | Convert each of the 14 `django.test.TestCase` classes to pytest-style test classes/functions using `@pytest.mark.django_db` and the appropriate marker (`unit` or `integration`). Convert `self.assertEqual(a, b)` → `assert a == b`, `self.assertIn` → `assert ... in`, `self.assertNotIn` → `assert ... not in`, `self.assertGreaterEqual` → `assert ... >=`, `self.assertLess` → `assert ... <`, `self.assertTrue` → `assert`, `self.assertFalse` → `assert not`. Replace `setUpTestData`/`setUp` with fixtures or module-level setup. Apply `pytestmark = [pytest.mark.django_db, pytest.mark.integration]` (or `unit` for pure-logic tests) at module level, matching the pattern in `test_ad_lifecycle.py` and `test_admin_actions.py`. |
+| **Files to change** | `apps/analytics/tests/test_views.py`, `apps/analytics/tests/test_trust_analytics.py`, `apps/analytics/tests/test_seller_stats.py`, `apps/analytics/tests/test_rollup_daily_metrics.py`, `apps/analytics/tests/test_moderation_analytics.py`, `apps/analytics/tests/test_ads_published.py`, `apps/ads/tests/test_breadcrumbs_render.py`, `apps/ads/tests/test_dashboard_stats.py`, `apps/moderation/tests/test_priority.py`, `apps/moderation/tests/test_priority_service.py`, `apps/trust/tests/test_trust_calculator.py`, `apps/trust/tests/test_trust_tags.py`, `apps/core/tests/test_language_end_to_end.py`, `apps/seed/tests/test_seed.py` |
+| **Acceptance criteria** | `grep -rn "django\\.test.*TestCase" src/` returns 0 (all `SimpleTestCase` usages are fine — they don't require DB). Each file has `pytestmark = [..., pytest.mark.unit/integration]` matching its semantics. `-m unit` and `-m integration` correctly select/deselect all migrated files. Full suite passes. |
+| **Test command** | `docker compose ... run --rm test -m "not seed" --create-db` + `docker compose ... run --rm test -m unit --create-db` (verifies marker filterability) |
+
+#### B.2 — Add direct unit tests for moderation decorators
+| Field | Value |
+|-------|-------|
+| **ID** | B.2 |
+| **Type** | Test addition |
+| **Priority** | Low |
+| **Finding** | F-06 |
+| **Description** | Create `apps/moderation/tests/test_decorators.py` with parametrized unit tests covering: (a) `staff_required` non-staff → `Http404`, (b) staff → passthrough, (c) superuser → passthrough, (d) `staff_required_api` non-staff → 403 JSON, (e) `staff_required_api` staff + wrong method (GET) → 405, (f) `staff_required_api` staff + POST → passthrough. Use `RequestFactory` + `AnonymousUser`/`User` mocks; mark `pytest.mark.unit`. |
+| **Files to change** | **New:** `apps/moderation/tests/test_decorators.py` |
+| **Acceptance criteria** | 6 test cases pass. `grep -rn "staff_required" apps/moderation/tests/test_decorators.py` returns the tested functions. |
+| **Test command** | `docker compose ... run --rm test apps/moderation/tests/test_decorators.py --create-db` |
+
+#### B.3 — Refactor `test_priority.py` to test public API, not private methods
+| Field | Value |
+|-------|-------|
+| **ID** | B.3 |
+| **Type** | Test refactoring |
+| **Priority** | Low |
+| **Finding** | F-07 |
+| **Description** | In `apps/moderation/tests/test_priority.py`, replace the two tests that call `_get_priority_level` and `_estimate_confidence` directly with tests that exercise the public `PriorityCalculator.calculate_priority` return dict. Add boundary coverage through the public API for the score→level mapping (0→LOW, 49→LOW, 50→MEDIUM, 79→MEDIUM, 80→HIGH, 100→HIGH) and the confidence value (0.7). Remove the direct private-method calls. This is also the basis for coverage gap G-09. |
+| **Files to change** | `apps/moderation/tests/test_priority.py` |
+| **Acceptance criteria** | `grep -n "_get_priority_level\|_estimate_confidence" apps/moderation/tests/test_priority.py` returns 0. Boundary score matrix is tested through `calculate_priority`. Full test file passes. |
+| **Test command** | `docker compose ... run --rm test apps/moderation/tests/test_priority.py --create-db` |
+
+### Phase C: Coverage Expansion (high-effort, high-value)
+
+#### C.1 — Add Ad model CheckConstraint tests (all 6)
+| Field | Value |
+|-------|-------|
+| **ID** | C.1 |
+| **Type** | Test addition |
+| **Priority** | High (P0) |
+| **Gap** | G-01 |
+| **Description** | Create `apps/ads/tests/test_ad_constraints.py` covering all 6 CheckConstraints on `Ad.Meta`: `ck_ads_published_at_if_published`, `ck_ads_archived_at_if_archived`, `ck_ads_rejected_at_if_rejected`, `ck_ads_moderation_failed_at_if_failed`, `ck_ads_deleted_at_if_deleted`, `ck_ads_failed_and_rejected_mutually_exclusive`. For each, use `bulk update` within `transaction.atomic()` to assert `IntegrityError`, then verify the row is untouched (savepoint rollback). This complements the 3 existing tests in `test_ad_lifecycle.py` with the remaining 3 + the mutual-exclusivity constraint (already partially covered). Uses `create_test_ad` from root conftest. Mark `pytest.mark.integration`. |
+| **Files to change** | **New:** `apps/ads/tests/test_ad_constraints.py` |
+| **Acceptance criteria** | 6+ test cases, each asserting `IntegrityError` for a violated constraint. All 6 constraint names referenced. Full suite passes. |
+| **Test command** | `docker compose ... run --rm test apps/ads/tests/test_ad_constraints.py --create-db -v` |
+
+#### C.2 — Fix ad-detail view trust-score prefetch (N+1)
+| Field | Value |
+|-------|-------|
+| **ID** | C.2 |
+| **Type** | Code fix + test |
+| **Priority** | High (P0) |
+| **Gap** | G-02 |
+| **Description** | In `apps/ads/views/listings.py::ad_detail`, add `prefetch_related("user__trust_score")` to the queryset (mirroring the `listings` view at line ~255). Update `test_detail_context.py` — the current mock chains `select_related().prefetch_related().get()` but does not assert `user__trust_score` is in the prefetch call. Add an assertion that `prefetch_related` is called with `"user__trust_score"`. Additionally, add a `django.assertNumQueries` or `CaptureQueriesContext` test in a new `test_ad_detail_queries.py` that renders a real detail page and asserts no more than N queries (catching N+1 regressions). |
+| **Files to change** | `apps/ads/views/listings.py` (1 line), `apps/ads/tests/test_detail_context.py` (extend mock assertion), **New:** `apps/ads/tests/test_ad_detail_queries.py` |
+| **Acceptance criteria** | `ad_detail` queryset includes `.prefetch_related("user__trust_score")`. `test_detail_context.py` asserts the prefetch call arg. New query-count test passes with ≤ N queries for a page with M ads. |
+| **Test command** | `docker compose ... run --rm test apps/ads/tests/test_detail_context.py apps/ads/tests/test_ad_detail_queries.py --create-db` |
+
+#### C.3 — Add admin-action side-effect tests (`approve_ad → PUBLISHED` signal chain)
+| Field | Value |
+|-------|-------|
+| **ID** | C.3 |
+| **Type** | Test addition |
+| **Priority** | High (P0) |
+| **Gap** | G-03 |
+| **Description** | Extend `apps/moderation/tests/test_admin_actions.py` (or create `test_approve_ad_side_effects.py`) to assert: (a) `approve_ad` on an `ON_MODERATION` ad → status `PUBLISHED` (not just routed through `set_published`), (b) `Ad.post_save` fires `deliver_immediate_alerts_on_publish` — when `IMMEDIATE_ALERTS_ENABLED=False` (default), no alert call is made; when enabled, `transaction.on_commit` schedules `deliver_immediate_alerts` and it runs after commit. (c) `calculate_ad_priority` signal fires when ad transitions to `ON_MODERATION` (assert `AdModerationPriority` row is created). Use `override_settings` and mock `deliver_immediate_alerts` to avoid real Telegram calls. Mark `pytest.mark.integration`. |
+| **Files to change** | **New:** `apps/moderation/tests/test_approve_ad_side_effects.py` |
+| **Acceptance criteria** | Tests assert both branches of `IMMEDIATE_ALERTS_ENABLED` and that `AdModerationPriority` is created on `ON_MODERATION`. All assertions pass with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test apps/moderation/tests/test_approve_ad_side_effects.py --create-db -v` |
+
+#### C.4 — Add search sorting tests (`DATE_OLD` / `DATE_NEW`)
+| Field | Value |
+|-------|-------|
+| **ID** | C.4 |
+| **Type** | Test addition |
+| **Priority** | Medium (P1) |
+| **Gap** | G-05 |
+| **Description** | In `apps/ads/tests/test_search_triggers.py`, add tests for `DATE_OLD` (`?sort=date_asc` → `order_by("published_at")`) and `DATE_NEW` (`?sort=date_desc` → `order_by("-published_at")`). Create 3+ PUBLISHED ads with distinct `published_at` timestamps, call the search view via `Client`, and assert the result order matches ascending/descending. The existing `test_search_rank_orders_by_relevance` only covers the FTS relevance path. Mark `pytest.mark.integration`. |
+| **Files to change** | `apps/ads/tests/test_search_triggers.py` |
+| **Acceptance criteria** | 2 new test functions asserting correct sort order for DATE_OLD and DATE_NEW. Existing tests still pass. |
+| **Test command** | `docker compose ... run --rm test apps/ads/tests/test_search_triggers.py --create-db -v` |
+
+#### C.5 — Add LoginToken edge-case tests
+| Field | Value |
+|-------|-------|
+| **ID** | C.5 |
+| **Type** | Test addition |
+| **Priority** | Medium (P1) |
+| **Gap** | G-06 |
+| **Description** | Extend `apps/users/tests/test_login.py` with tests for: (a) token hash mismatch — polling `/login/status/?token=<wrong_hash>` for a known raw token returns 410, (b) `token_hash` is always `sha256(raw)`, never raw — assert the stored hash ≠ raw token string, (c) replay/claim atomicity — two-phase claim (bot sets `telegram_id`, web sets `consumed_at`) can't be double-consumed. Add a parametrized test over the `token_hash` length (64 hex chars). Mark `pytest.mark.integration`. |
+| **Files to change** | `apps/users/tests/test_login.py` |
+| **Acceptance criteria** | 3+ new test cases covering hash mismatch, raw-token-never-stored, and claim atomicity. Full login test file passes. |
+| **Test command** | `docker compose ... run --rm test apps/users/tests/test_login.py --create-db -v` |
+
+#### C.6 — Add `save_photo → generate_thumbnails` integration test
+| Field | Value |
+|-------|-------|
+| **ID** | C.6 |
+| **Type** | Test addition |
+| **Priority** | Medium (P1) |
+| **Gap** | G-07 |
+| **Description** | Create `apps/media/tests/test_save_photo_integration.py`. Test the integration between `save_photo` (in `telegram_bot/handlers/ad_create.py`) and `ThumbnailService.generate_thumbnails` (already unit-tested in `test_thumbnails.py`). Assert that after `save_photo` writes a photo, the three thumbnail keys (`thumbnail_small`, `thumbnail_medium`, `thumbnail_large`) are populated on the resulting `AdImage` row (or set to `None` on the failure path at lines 728–735). Use `isolated_media_root` pattern from `test_ad_image_service.py`. Since `save_photo` lives in the bot package, test it as an integration through the bot test infrastructure or mock `ThumbnailService.generate_thumbnails` to assert it is called with correct args. Mark `pytest.mark.integration`. |
+| **Files to change** | **New:** `apps/media/tests/test_save_photo_integration.py` |
+| **Acceptance criteria** | Test asserts `generate_thumbnails` is invoked after `save_photo` and thumbnail fields are populated. Failure path sets all three to `None`. |
+| **Test command** | `docker compose ... run --rm test apps/media/tests/test_save_photo_integration.py --create-db -v` |
+
+#### C.7 — Add contact service combinatorial edge-case tests
+| Field | Value |
+|-------|-------|
+| **ID** | C.7 |
+| **Type** | Test addition |
+| **Priority** | Medium (P1) |
+| **Gap** | G-04 |
+| **Description** | Extend `apps/core/tests/test_contact.py` with combinatorial tests for `can_contact_seller` and `get_seller_for_contact`: (a) banned + consent WITHDRAWN (30-day PII erasure window), (b) DECLINE vs WITHDRAWN consent paths, (c) `get_seller_for_contact` return-tuple contract across all combinations. The existing tests cover individual conditions; this adds the cross-product. Mark `pytest.mark.integration`. |
+| **Files to change** | `apps/core/tests/test_contact.py` |
+| **Acceptance criteria** | 4+ new parametrized test cases covering combined conditions. All pass with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test apps/core/tests/test_contact.py --create-db -v` |
+
+#### C.8 — Add TrustCalculator quality-score truncation tests
+| Field | Value |
+|-------|-------|
+| **ID** | C.8 |
+| **Type** | Test addition |
+| **Priority** | Low (P2) |
+| **Gap** | G-08 |
+| **Description** | Extend `apps/trust/tests/test_trust_calculator.py` with edge cases: (a) activity score cap interaction with `_QUALITY_MAX` — 9 published ads (activity = 40 cap) + all non-rejected (quality = 30) → total = 70 → TRUSTED boundary, (b) quality score `int()` truncation — when `rejected/total` produces a fractional `(1-r/t)*30` that truncates, verify the persisted score, (c) response score `round()` to 2 decimal places boundary. Mark `pytest.mark.integration`. |
+| **Files to change** | `apps/trust/tests/test_trust_calculator.py` |
+| **Acceptance criteria** | 3 new tests asserting truncation/cap behavior at boundaries. Passes with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test apps/trust/tests/test_trust_calculator.py --create-db -v` |
+
+#### C.9 — Add TrustCalculator trust-level floor tests (score=0)
+| Field | Value |
+|-------|-------|
+| **ID** | C.9 |
+| **Type** | Test addition |
+| **Priority** | Low (P2) |
+| **Gap** | G-11 |
+| **Description** | Extend `apps/trust/tests/test_trust_calculator.py` with: (a) score=0 + `verified_by_admin=True` → `VERIFIED` (the existing `test_verification_bonus_admin_floor` has score≈10, not exactly 0), (b) score=0 + `telegram_premium=True` → `VERIFIED`, (c) score=0 + neither → `UNVERIFIED`. These isolate the floor logic explicitly. Mark `pytest.mark.integration`. |
+| **Files to change** | `apps/trust/tests/test_trust_calculator.py` |
+| **Acceptance criteria** | 3 new tests, each asserting the floor behavior at exactly score=0. Passes with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test apps/trust/tests/test_trust_calculator.py --create-db -v` |
+
+#### C.10 — Add PriorityCalculator boundary tests via public API
+| Field | Value |
+|-------|-------|
+| **ID** | C.10 |
+| **Type** | Test addition |
+| **Priority** | Low (P2) |
+| **Gap** | G-09, G-10 |
+| **Description** | Extend `apps/moderation/tests/test_priority.py`: (a) assert `_estimate_confidence` via the public `calculate_priority` return dict at various ad states (always 0.7 — the placeholder constant), (b) add `test_priority_service_boundaries` in `test_priority_service.py` that persists `AdModerationPriority` rows via `PriorityService.calculate_and_save` and asserts the `priority_level` column at score boundaries (0→LOW, 49→LOW, 50→MEDIUM, 79→MEDIUM, 80→HIGH, 100→HIGH). This closes the "private method testing" gap (F-07) and G-10 simultaneously. Mark `pytest.mark.integration`. This task **depends on B.3** being complete. |
+| **Files to change** | `apps/moderation/tests/test_priority.py`, `apps/moderation/tests/test_priority_service.py` |
+| **Acceptance criteria** | Boundary matrix tested through public API and persisted rows. `grep -n "_get_priority_level\|_estimate_confidence" apps/moderation/tests/test_priority.py` returns 0 (from B.3). Passes with `--create-db`. |
+| **Test command** | `docker compose ... run --rm test apps/moderation/tests/test_priority.py apps/moderation/tests/test_priority_service.py --create-db -v` |
+
+> **Dependency**: C.10 must run after B.3 (refactor removes private-method tests, then adds public-API boundary tests).
+
+### Phase D: Documentation & Plan Correction (low-effort)
+
+#### D.1 — Fix this plan's own discrepancies (§5 from audit)
+| Field | Value |
+|-------|-------|
+| **ID** | D.1 |
+| **Type** | Documentation |
+| **Priority** | Low |
+| **Finding** | F-09 |
+| **Description** | This plan document itself corrects the 4 discrepancies: (1) §1.2 — all 6 markers ARE registered (no "not registered" claim; `e2e` was removed in A.1), (2) §1.4 — CI runs `pytest -m "not seed"` (not "all 934 tests"), (3) §1.1 — references to deleted `tests.py` files removed, (4) §14 T-12 — baseline reset against migrated replacement tests in `test_moderation_views.py` and `test_search_view.py`. No stale references remain. |
+| **Files to change** | This document (`test-optimization-plan.md`) — self-correcting |
+| **Acceptance criteria** | Document contains no claim that markers are unregistered, no claim that CI runs all 934 tests, no reference to deleted `tests.py` files, and no invalid T-12 baseline. |
+| **Test command** | N/A (documentation) |
+
+#### D.2 — Update test-operations documentation
+| Field | Value |
+|-------|-------|
+| **ID** | D.2 |
+| **Type** | Documentation |
+| **Priority** | Low |
+| **Finding** | F-09 |
+| **Description** | Update `.ai/context/commands.md` and any `docs/99-agent/` test references to reflect: (a) `--create-db` is required for local runs (not `--reuse-db`), (b) the `e2e` marker no longer exists, (c) root conftest fixtures are the source of truth for `seller`/`user`/`category`/`city` and `create_test_ad`. |
+| **Files to change** | `.ai/context/commands.md`, `docs/99-agent/rules.md` (if it references test markers/fixtures) |
+| **Acceptance criteria** | Commands doc shows `--create-db` in the PYTEST_OPTS example. No reference to `e2e` marker. Root conftest fixtures documented as canonical. |
+| **Test command** | N/A (documentation) |
 
 ---
 
-## 4. Proposed Test Taxonomy
-
-### 4.1 Current vs. Proposed Marker Schema
-
-| Current State | Proposed State | Rationale |
-|--------------|----------------|-----------|
-| `slow` + `integration` (binary, module-level) | Granular per-class markers | Enables selective runs |
-| No marker = unit | `unit` marker for pure unit tests | Explicitly tag no-DB tests |
-| All DB tests = `integration` | `integration` (fast DB) + `e2e` (multi-component) | Separate fast DB unit tests from view/HTTP tests |
-| No `seed` marker | `seed` marker for seed command tests | Isolate the 18-minute batch |
-| No `settings` marker | `settings` marker for subprocess tests | Identify interpreter-spawn cost |
-| No `concurrent` marker | `concurrent` marker for lock/transaction tests | Identify TRUNCATE-heavy tests |
-| `slow` (applied to everything) | `slow` for >5s individual tests | Reserve for genuinely slow tests |
-
-### 4.2 Proposed Tier Definitions
+## 4. Execution Order & Rationale
 
 ```
-Tier 0 — Unit (no DB):      pytestmark = [pytest.mark.unit]
-                             No database. Pure function/service tests.
-                             Examples: test_download_seed_photos.py (50),
-                                       test_media.py bot tests (22),
-                                       test_multi_lang_translation.py (15)
-
-Tier 1 — Fast Integration:  pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-                             DB-backed, <1s per test. Transactional rollback.
-                             Examples: test_create_admin_user.py (12),
-                                       test_privacy.py (3),
-                                       test_consent_context.py (10),
-                                       test_migrations.py (2)
-
-Tier 2 — Standard Integration: pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-                             DB-backed, 1–5s per test. View/HTTP tests, sweep commands.
-                             Examples: search/tests.py (10), moderation/tests.py (20),
-                                       ads/tests/* (80), users/tests/* (40),
-                                       core/tests/test_sweep_commands.py (44)
-
-Tier 3 — Slow/Expensive:    pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration]
-                             transaction=True, TRUNCATE overhead, async with sync_to_async.
-                             Examples: telegram_bot tests (test_ad_create, test_login_claim,
-                                       test_create_draft_ad, test_claim_login_token,
-                                       test_unsubscribe)
-
-Tier 4 — Seed Nightly:       pytestmark = [pytest.mark.django_db, pytest.mark.seed]
-                             call_command("seed") invocations, ImageGenerator,
-                             load_catalog in setUpTestData. ~1050s.
-                             Examples: TestSeedCommand, TestSeedCommandEnhanced,
-                                       TestSeedCategoryIntegration, TestLeafCategoryFiltering,
-                                       TestAdGeneratorLeafOnly
-
-Tier 5 — Settings Subprocess: pytestmark = [pytest.mark.settings]
-                             Subprocess-based import-time validation. 3.6s/test.
-                             Example: test_settings_secrets.py (3 tests)
+Phase A (A.1 → A.2 → A.3) → Phase B (B.1 → B.2 → B.3) → Phase C (C.1 → C.2 → C.3 → ... → C.10) → Phase D (D.1 → D.2)
 ```
 
-### 4.3 Marker Registration (to add to `pyproject.toml`)
+**Rationale for ordering:**
 
-```toml
-markers = [
-    "unit: marks tests that require no database (pure unit tests)",
-    "integration: marks fast DB-backed integration tests (default test target)",
-    "e2e: marks multi-component end-to-end tests (HTTP client, FTS, views)",
-    "seed: marks seed command tests that invoke call_command('seed') (nightly only)",
-    "settings: marks import-time settings validation tests using subprocess isolation",
-    "concurrent: marks tests requiring transaction=True (TRUNCATE per test)",
-    "slow: marks individual tests taking >5 seconds (use -m 'not slow' to skip)",
-    "integration: marks tests that require a database (use -m integration to run)",
-]
-```
+1. **Phase A first (cleanup)** — removes noise and establishes canonical helpers/fixtures *before* writing new tests. If A.2 and A.3 are done first, all Phase C test additions can use `create_test_ad` and root-conftest fixtures directly, avoiding the very duplication we're eliminating. A.1 is independent and removed first as a trivial no-op.
+
+2. **Phase B second (framework convergence)** — once fixtures/helpers are unified (A), migrating `TestCase` → pytest is lower-risk because fewer files diverge in their setup patterns. B.1 is the highest-effort sub-task; doing it before C means new coverage tests (Phase C) are written in the standardized pytest style from the start. B.2 and B.3 are small and independently valuable.
+
+3. **Phase C third (coverage)** — all new tests use the established patterns (`pytest.mark.django_db`, `pytestmark`, `create_test_ad`, root fixtures, `assert` syntax). This is the highest-value work but also the most test code to review, so it comes after the foundation is solid. C.10 explicitly depends on B.3.
+
+4. **Phase D last (documentation)** — plan corrections and doc updates reference the final state of the test suite. Writing them last ensures they match reality. D.1 is self-correcting (this document); D.2 updates operational docs.
+
+**Critical path:** A.2 → A.3 → B.1 → C.1, C.3, C.2 (all P0/P1 coverage). B.3 must precede C.10.
+
+**Parallelizable:** A.1 (standalone). B.2 (standalone new file). C.1–C.10 are independent of each other (except C.10 → B.3) and can be executed in parallel once Phase A is done. D.1 and D.2 are independent of code work and can run anytime.
 
 ---
 
-## 5. PR / CI / Nightly Test Suites
+## 5. Task Template
 
-### 5.1 Suite Composition
+Each task in this plan follows this template:
 
-| Suite | Command | Tests | Time (est.) | What Runs |
-|-------|---------|-------|-------------|-----------|
-| **Local `make test` (default)** | `pytest -m "not seed"` | ~918 | ~55s | Everything except 16 slow seed tests (fast seed + download tests still run) |
-| **CI (PR / commit)** | `pytest -m "not seed" --cov` | ~918 | ~85s | Fast feedback: unit + integration + e2e + concurrent + settings |
-| **CI (nightly, cron)** | `pytest -m "seed --cov"` | ~16 | ~1050s | Full seed pipeline (5 slow classes + 1 test) |
-| **Local (watch mode)** | `pytest -m "unit and not slow"` | ~50 | ~3s | Rapid feedback loop |
-| **Local (full)** | `pytest` | ~934 | ~1125s | Everything (CI parity) |
-
-### 5.2 CI Workflow Split
-
-```
-.github/workflows/
-├── ci.yml          # Current: build + test + lint + typecheck
-├── ci-nightly.yml   # NEW: scheduled seed test run
-```
-
-**CI `ci.yml` (PR/commit) — modified test job:**
-```yaml
-# Only the test job changes — add pytest marker exclusion:
-- name: Run pytest with coverage
-  run: uv run pytest -m "not seed" --tb=short --cov --cov-report=term --cov-report=xml
-```
-
-**CI `ci-nightly.yml` (NEW — scheduled):**
-```yaml
-name: Nightly Seed Tests
-on:
-  schedule:
-    - cron: "0 3 * * *"   # 03:00 UTC daily
-  workflow_dispatch:      # Manual trigger
-
-jobs:
-  seed-tests:
-    runs-on: ubuntu-latest
-    services: { db: postgres:18-alpine, ... }
-    steps:
-      - name: Run seed tests
-        run: uv run pytest -m "seed" --tb=short --cov --cov-report=term --cov-report=xml
-```
-
-### 5.3 Expected CI Time Reduction
-
-| Scenario | Before | After | Savings |
-|----------|--------|-------|---------|
-| CI on PR (all tests) | ~1125s (18.75 min) | ~85s | **~17 min saved** |
-| Nightly (seed only) | Not run | ~1050s (scheduled) | Shifted to off-peak |
-| Local `make test` | ~1125s | ~60s | **~17 min saved** |
-| Local watch mode | N/A | ~3s | New capability |
+| Field | Description |
+|-------|-------------|
+| **ID** | Unique identifier (e.g., `A.1`, `C.3`). Follows `Phase.Letter.Number` convention. |
+| **Title** | One-line summary of the work. |
+| **Type** | One of: `Cleanup`, `Refactoring`, `Framework migration`, `Test addition`, `Test refactoring`, `Code fix + test`, `Documentation`. |
+| **Priority** | `High (P0)`, `Medium (P1)`, `Low (P2)` — mapped from audit gap priority. |
+| **Finding** | Audit finding ID (F-xx) or coverage gap ID (G-xx) this task addresses. |
+| **Description** | What to do, how, and any key decisions. References specific files, functions, or line anchors (never line numbers in production code — use symbols/contracts). |
+| **Files to change** | Exact file paths. `**New:**` prefix for new files. |
+| **Depends on** | Other task IDs that must complete first (if any). |
+| **Acceptance criteria** | Concrete, verifiable conditions. If a grep pattern is specified, it must return the stated result. |
+| **Test command** | Exact Docker Compose command to verify. Always uses `--create-db` to avoid stale-DB state. |
 
 ---
 
-## 6. Recommended Optimizations
+## 6. Acceptance Criteria (Overall)
 
-### Priority Matrix
+The plan is **complete** when all of the following hold:
 
-| Priority | Optimization | Expected Savings | Effort | Risk |
-|----------|-------------|-----------------|--------|------|
-| **P0** | Mark 5 slow seed classes with `seed` marker; exclude from default run | ~1050s (94% of suite) | Trivial | Low — additive marker, no test changes |
-| **P0** | Exclude `seed` from CI test job; add nightly seed workflow | CI: ~18 min → ~85s | Small | Low — workflow config only |
-| **P1** | Move `--cov` out of `addopts`; make CI-only via `-p no:cacheprovider` override | 15–25s per local run | Trivial | Low — coverage still runs in CI |
-| **P1** | Add `--reuse-db` to `entrypoint-test.sh` default `PYTEST_OPTS` | 3–5s + re-migration savings per run | Trivial | Low — `--reuse-db` is safe; `make test-recreate` still uses `--no-reuse-db` |
-| **P1** | Register new markers in `pyproject.toml` | N/A (enables selection) | Trivial | Low — marker registration only |
-| **P2** | Add root `conftest.py` at `src/backend` sharing common fixtures | Reduces fixture duplication, faster collection | Medium | Medium — must not break existing per-file fixtures |
-| **P2** | Remove 3 dead dev dependencies (`factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy`) | ~2–3s install | Trivial | Low — packages confirmed unused |
-| **P2** | Add `pytest-xdist` for parallel execution (`-n auto`) | ~4x speedup on multi-core | Small | Low — well-established plugin |
-| **P2** | Remove redundant `makemigrations --check` CI step (covered by `test_migrations.py`) | ~2s CI time | Trivial | Low — eliminates duplicate check |
-| **P3** | Fix pre-existing failures (7+ tests) so CI is green | Unblocks `fail_under` gate | Medium | Low — test fixes only |
-| **P3** | Add `pytest --durations=10` to CI output for ongoing monitoring | N/A — observability | Trivial | None |
+1. **No duplicated fixtures** — `grep -rn "^def seller\|^def user\|^def category\|^def city" src/` returns hits only in `src/backend/conftest.py` and the documented async override in `src/telegram_bot/tests/conftest.py`.
 
-### Detailed Recommendations
+2. **No duplicated ad-creation helpers** — `grep -rn "def _make_ad\|def _create_ad" src/` returns 0 results (excluding `test_ad_localization.py`'s in-memory variant, documented as out-of-scope). `create_test_ad` is referenced from ≥15 test files.
 
-#### P0 — Seed Test Isolation (Highest Impact)
+3. **Framework convergence** — `grep -rn "from django\.test import.*TestCase\|class.*\(TestCase\)" src/ --include="test_*.py"` returns 0 results (only `SimpleTestCase` remains, which is correct for no-DB tests).
 
-**What:** Add a `seed` marker to the 5 slow classes in `test_seed.py`:
-- `TestSeedCommand` (5 tests, 419s, all failing)
-- `TestSeedCommandEnhanced` (2 tests, calls `call_command("seed")`)
-- `TestSeedCategoryIntegration` (4 tests, `load_catalog` in `setUpTestData` + seed calls)
-- `TestLeafCategoryFiltering` (2 tests, `load_catalog` in `setUpTestData` + seed with `--ads=50` and `--ads=600`)
-- `TestAdGeneratorLeafOnly` (2 tests, `load_catalog` in `setUpTestData` + `call_command("seed")` with `--ads=50` and `--ads=600`)
+4. **e2e marker removed** — `e2e` does not appear in `pyproject.toml` markers list.
 
-**Also mark:** `TestImageGenerator.test_generates_ad_images` (1 test, processes 1004 photos to create dummy fixtures) with `@pytest.mark.seed`.
+5. **Decorator tests** — `apps/moderation/tests/test_decorators.py` exists with ≥6 parametrized test cases covering all decorator branches.
 
-**Command impact:** `pytest -m "not seed"` excludes ~16 tests, cutting suite from ~1125s to ~55s.
+6. **No private-method testing in priority** — `grep -n "_get_priority_level\|_estimate_confidence" apps/moderation/tests/test_priority.py` returns 0.
 
-**Expected savings:** ~1050s per run (94% of total suite time).
+7. **Coverage gap closure** — all 11 coverage gaps (G-01 through G-11) have corresponding tests in the specified files. The 4 plan discrepancies (F-09, §5) are corrected.
 
-**Effort:** Trivial — add `@pytest.mark.seed` decorators and `seed` to marker registration in `pyproject.toml`.
+8. **Full suite passes** — `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test --create-db` exits 0.
 
-**Risk:** Low — no production code changes. Tests still run in nightly CI with `-m "seed"`.
-
-#### P0 — CI Workflow Tiering
-
-**What:** Modify the `ci.yml` test job to run `pytest -m "not seed"` and add a new `ci-nightly.yml` that runs `pytest -m "seed"` on a daily schedule.
-
-**Expected savings:** CI job drops from ~18 min to ~85s for PR feedback. Seed tests move to nightly (03:00 UTC).
-
-**Effort:** Small — 10-line workflow modification + 30-line new workflow file.
-
-**Risk:** Low — seed tests still run daily; just shifted off the PR hot path.
-
-#### P1 — Coverage Gating (CI-only)
-
-**What:** Remove `--cov` from `addopts` in `pyproject.toml`. CI explicitly passes `--cov --cov-report=term --cov-report=xml`. Local dev does not pay coverage overhead.
-
-**Current addopts:**
-```toml
-addopts = ["--import-mode=importlib", "-ra", "-q", "--cov", "--cov-report=term-missing"]
-```
-
-**Proposed addopts:**
-```toml
-addopts = ["--import-mode=importlib", "-ra", "-q"]
-```
-
-CI command already passes `--cov` explicitly, so coverage continues to work for the `fail_under = 80` gate.
-
-**Expected savings:** 15–25s per local run.
-
-**Effort:** Trivial — one-line change in `pyproject.toml`.
-
-**Risk:** Low — CI is unaffected (passes `--cov` explicitly).
-
-#### P1 — Database Reuse for Local Development
-
-**What:** Add `--reuse-db` to the default `PYTEST_OPTS` in `entrypoint-test.sh`.
-
-**Current:**
-```bash
-uv run pytest ${PYTEST_OPTS:- --tb=short}
-```
-
-**Proposed:**
-```bash
-uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short}
-```
-
-`make test-recreate` already overrides with `--no-reuse-db --create-db`, so forced rebuilds remain available.
-
-**Expected savings:** 3–5s per run (skips schema rebuild) + avoids re-migration cost when combined with `load_catalog` calls in `setUpTestData`.
-
-**Effort:** Trivial — one-line change.
-
-**Risk:** Low — `--reuse-db` is the standard pytest-django recommendation for fast iteration. Stale schema risk mitigated by `make test-recreate` and CI fresh-DB.
-
-#### P2 — Dead Dependency Removal
-
-**What:** Remove `factory-boy`, `model-bakery`, `hypothesis`, and `pytest-factoryboy` from the dev dependency group in `pyproject.toml`.
-
-**Evidence:** `grep` confirms zero imports across `src/`. These packages add install time and cognitive overhead (developers may expect them for factories).
-
-**Expected savings:** ~2–3s install time; cleaner dependency tree.
-
-**Effort:** Trivial — remove 4 lines from `pyproject.toml` `[dependency-groups] dev`.
-
-**Risk:** Low — confirmed unused via grep across entire `src/` tree.
-
-#### P2 — Parallel Test Execution
-
-**What:** Add `pytest-xdist` to dev dependencies and enable `-n auto` in CI test job.
-
-**Expected savings:** 3–4x speedup on multi-core runners (GitHub Actions `ubuntu-latest` has 4 cores → ~60s → ~15–20s).
-
-**Effort:** Small — add dependency + add `-n auto` to CI pytest invocation.
-
-**Risk:** Low — `pytest-xdist` is stable. Must verify no shared-state issues (bot tests with `transaction=True` may have ordering sensitivity; test in parallel after seed exclusion).
-
-#### P3 — Pre-existing Failures (7+ tests)
-
-**What:** Fix or explicitly quarantine the 7 pre-existing failures:
-1. `test_save_photo_exif.py::test_save_photo_strips_exif_on_disk` — `save_photo()` signature mismatch (`user_id` kwarg)
-2. `test_auto_moderation.py::test_failed_ad_not_counted_in_active_limit` — logic assertion
-3–8. `test_priority.py::TestPriorityCalculator` (6 tests) — scoring mismatches
-9–13. `search/tests.py` — FTS/view behavior
-
-**Expected savings:** Unblocks CI green status; `fail_under = 80` gate passes reliably.
-
-**Effort:** Medium — requires understanding the production code changes that caused these failures.
-
-**Risk:** Low — test fixes only, does not affect production code.
-
-#### P3 — Remove Redundant Migration Check
-
-**What:** The CI workflow step `makemigrations --check --dry-run` duplicates `test_migrations.py::test_makemigrations_check` inside pytest. Remove the CI step (keep the in-pytest version).
-
-**Expected savings:** ~2s CI time, removes duplicate logic.
-
-**Effort:** Trivial — remove 7 lines from `ci.yml`.
-
-**Risk:** Low — the in-pytest test covers the same check.
+9. **CI marker filterability works** — `docker compose ... run --rm test -m unit --create-db` and `-m integration --create-db` both select/deselect the correct test sets with no collection errors.
 
 ---
 
-## 7. Prioritized Implementation Steps
+## 7. Risks & Mitigations
 
-| Step | ID | Task | Priority | Effort | Expected Savings | Dependencies |
-|------|----|------|----------|--------|-----------------|--------------|
-| 1 | T-01 | Register `seed`, `unit`, `e2e`, `settings`, `concurrent` markers in `pyproject.toml` | P0 | Trivial | N/A (enables selection) | None |
-| 2 | T-02 | Add `@pytest.mark.seed` to 5 slow seed classes + `TestImageGenerator.test_generates_ad_images` in `test_seed.py` | P0 | Trivial | ~1050s from default run | T-01 |
-| 3 | T-03 | Remove `--cov` from `addopts` in `pyproject.toml` | P1 | Trivial | 15–25s per run | None |
-| 4 | T-04 | Add `--reuse-db` to default `PYTEST_OPTS` in `entrypoint-test.sh` | P1 | Trivial | 3–5s per run | None |
-| 5 | T-05 | Modify `ci.yml` test job to run `pytest -m "not seed"` | P0 | Small | CI: ~18 min → ~85s | T-01, T-02 |
-| 6 | T-06 | Create `ci-nightly.yml` scheduled workflow running `pytest -m "seed"` | P0 | Small | Shifts ~1050s to nightly | T-01, T-02 |
-| 7 | T-07 | Add `--durations=10` to CI pytest invocation for observability | P1 | Trivial | N/A (monitoring) | T-03 |
-| 8 | T-08 | Remove redundant `makemigrations --check` CI step | P2 | Trivial | ~2s CI time | None |
-| 9 | T-09 | Remove dead dev dependencies from `pyproject.toml` | P2 | Trivial | ~2–3s install | None |
-| 10 | T-10 | Add `pytest-xdist` to dev deps; enable `-n auto` in CI | P2 | Small | ~4x speedup | None |
-| 11 | T-11 | Create root `conftest.py` at `src/backend/conftest.py` with shared fixtures | P2 | Medium | Reduced duplication | — |
-| 12 | T-12 | Fix pre-existing failures (7+ tests) | P3 | Medium | CI green | — |
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| **B.1 (TestCase→pytest) breaks 14 files** | High — could lose test coverage or introduce subtle assertion failures | Run affected test subset individually with `--create-db` before full suite. Convert `setUpTestData` to fixtures incrementally. Keep `assertEqual`→`assert` conversions mechanical and verified by `-v` output. |
+| **A.2 fixture removal breaks test isolation** | Medium — removing local fixtures may cause tests that relied on different values to fail or silently change behavior | Before removing each local fixture, grep for fixture usage within that file. If a fixture overrides root values intentionally (e.g., bot conftest's async `user`), document and keep. Verify per-file with `--collect-only` + targeted run. |
+| **A.3 migration introduces constraint violations** | Medium — if `create_test_ad` doesn't match every call site's expected Ad shape | `create_test_ad` accepts `**kwargs` and delegates to `Ad.objects.create`. For tests needing special fields (e.g., `category=None`, `telegram_file_id`), pass via kwargs. Run each file's tests after migration. |
+| **C.2 code change to `ad_detail` queryset** | High — production code change in a view | Minimal 1-line change (add `.prefetch_related("user__trust_score")`). Verify with existing `test_detail_context.py` mock assertion (extend it) + new query-count test. Run full ads test suite. |
+| **C.6 bot handler integration test is complex** | Medium — `save_photo` is async + in bot package | Mock `generate_thumbnails` at the boundary; test the integration through the bot test conftest (which already handles `sync_to_async` worker threads). Scope to thumbnail-field population, not full handler flow. |
+| **`--reuse-db` stale state** | Medium — 527 errors on reuse (pre-existing) | All test commands in this plan use `--create-db`. Document in D.2 that `--reuse-db` is unsupported. |
+| **Test DB unavailable on port 5433** | Blocking — all tests fail | Pre-flight: `docker ps --filter "name=mko-bazuna-test-db-"` before running any test command. Start with `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db` if missing. |
+| **Phase ordering risk (A→B→C)** | Low — if a phase is partially done, tests may be inconsistent | Each phase gates on the previous: do not start Phase B until Phase A passes full suite; do not start Phase C until Phase B passes. |
 
-### Execution Ordering
+---
 
+## Appendix A: Task Index
+
+| ID | Title | Phase | Priority | Type | Depends on |
+|----|-------|-------|----------|------|-----------|
+| A.1 | Remove unused `e2e` marker | A | Low | Cleanup | — |
+| A.2 | Adopt root conftest fixtures | A | Medium | Refactoring | A.1 |
+| A.3 | Consolidate `_make_ad`/`_create_ad` into `create_test_ad` | A | Medium | Refactoring | A.2 |
+| B.1 | Migrate 14 `TestCase` files to pytest-django | B | Medium | Framework migration | A.3 |
+| B.2 | Add decorator unit tests | B | Low | Test addition | — |
+| B.3 | Refactor `test_priority.py` to public API | B | Low | Test refactoring | — |
+| C.1 | Ad model CheckConstraint tests (all 6) | C | High (P0) | Test addition | A.3 |
+| C.2 | Fix ad-detail trust-score prefetch (N+1) | C | High (P0) | Code fix + test | — |
+| C.3 | Admin-action side-effect tests | C | High (P0) | Test addition | — |
+| C.4 | Search sorting tests (DATE_OLD/NEW) | C | Medium (P1) | Test addition | — |
+| C.5 | LoginToken edge-case tests | C | Medium (P1) | Test addition | — |
+| C.6 | `save_photo → generate_thumbnails` integration test | C | Medium (P1) | Test addition | — |
+| C.7 | Contact service combinatorial edge cases | C | Medium (P1) | Test addition | — |
+| C.8 | TrustCalculator quality-score truncation tests | C | Low (P2) | Test addition | B.1 (framework) |
+| C.9 | TrustCalculator trust-level floor tests (score=0) | C | Low (P2) | Test addition | B.1 (framework) |
+| C.10 | PriorityCalculator boundary tests (public API) | C | Low (P2) | Test addition | B.3 |
+| D.1 | Correct plan discrepancies | D | Low | Documentation | — |
+| D.2 | Update test-operations docs | D | Low | Documentation | — |
+
+---
+
+## Appendix B: Reference — Existing Patterns to Follow
+
+**Pytest-django module marker pattern** (from `test_ad_lifecycle.py`, `test_admin_actions.py`):
+```python
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 ```
-Immediate (Day 1):
-  T-01 → T-02 → T-05   (marker + seed exclusion + CI update)
 
-Simultaneous (Day 1–2):
-  T-03, T-04, T-08, T-09   (config cleanup, independent)
-  T-06   (nightly workflow, independent)
-  T-07   (observability, depends on T-03)
+**Root conftest fixtures** (from `src/backend/conftest.py`):
+- `seller` → `User(telegram_id=900000001, chat_id=900000001, password="x")`
+- `user` → `User(telegram_id=900000002, chat_id=900000002, password="x")`
+- `category` → `Category(name="Транспорт", slug="transport")`
+- `city` → `City(country_code="ME", name="Тестград", region="Central", slug="test-grad")`
+- `create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs) -> Ad` — sets status-specific timestamp automatically.
 
-Short-term (Day 2–3):
-  T-10   (parallel execution, depends on T-05 for CI integration)
+**CI command:** `pytest -m "not seed" -n auto --dist loadscope --tb=short --cov --durations=10`
 
-Medium-term (Week 2):
-  T-11   (root conftest, independent but touches many files)
-  T-12   (failure fixes, independent)
-```
-
-### Dependency Graph
-
-```
-T-01 (markers) ──→ T-02 (mark seed tests) ──→ T-05 (CI exclusion)
-T-01 ────────────────────────────────────────→ T-06 (nightly workflow)
-T-03 ────────────────────────────────────────→ T-07 (durations)
-T-04 ────────────────────────────────────────→ (local speedup, independent)
-T-05 ────────────────────────────────────────→ T-10 (xdist, CI integration)
-```
-
----
-
-## 8. Effort Summary
-
-| Effort | Tasks |
-|--------|-------|
-| Trivial | T-01, T-02, T-03, T-04, T-07, T-08, T-09 |
-| Small | T-05, T-06, T-10 |
-| Medium | T-11, T-12 |
-
-**Total: 12 tasks** — Estimated effort: **3–4 days** (most changes are config/workflow, not code)
-
-| Phase | Tasks | Calendar Time |
-|-------|-------|--------------|
-| Phase 1: Immediate tiering | T-01, T-02, T-03, T-04, T-05, T-06, T-07, T-08, T-09 | 1 day |
-| Phase 2: Parallelization | T-10 | 1 day |
-| Phase 3: Structural cleanup | T-11 | 1 day |
-| Phase 4: Quality gate | T-12 | 1 day |
-
----
-
-## 9. Risk Assessment & Mitigation
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Seed tests silently skipped in PR CI | Medium | High | Nightly workflow covers seed; add `--durations=10` to catch regressions |
-| `--reuse-db` causes stale schema issues | Low | Medium | `make test-recreate` uses `--no-reuse-db --create-db`; CI uses fresh DB |
-| Seed marker not applied to all slow classes | Medium | Medium | Audit: verify `TestSeedCommand`, `TestSeedCommandEnhanced`, `TestSeedCategoryIntegration`, `TestLeafCategoryFiltering`, `TestImageGenerator.test_generates_ad_images` are all tagged |
-| `pytest-xdist` introduces flakiness in async bot tests | Medium | Medium | Run bot tests in a single xdist worker (`-n auto` detects async tests; or use `--dist loadgroup` with asyncio marker) |
-| Coverage gate fails on PR because seed tests excluded from coverage | High | Medium | Seed tests contribute minimally to coverage (generators are tested directly); monitor `fail_under` threshold; adjust threshold if needed for CI subset |
-| Removing `--cov` from addopts breaks local coverage | Low | Low | Document: run `uv run pytest --cov` explicitly for coverage checks |
-| New markers not registered causes `PytestUnknownMarkWarning` | Low | Low | T-01 registers all markers upfront |
-| Nightly workflow times out (1050s > GitHub 6-hour limit) | None | None | Well within limits; seed tests run at 03:00 UTC |
-| Dead dependency removal breaks transitive imports | Low | Low | Grep confirmed zero imports; CI install step validates |
-| Root conftest.py fixture name collisions | Low | Medium | Use uniquely-named fixtures; `conftest.py` fixtures are only discovered by tests in that subtree |
-
----
-
-## 10. Verification Steps
-
-After implementation:
-
-1. **Marker registration:**
-   ```bash
-   uv run pytest --markers
-   # Expect: seed, unit, e2e, settings, concurrent all listed
-   ```
-
-2. **Seed exclusion:**
-   ```bash
-    # Default run should skip ~16 seed tests
-    uv run pytest --collect-only -m "not seed" | grep "test paths" 
-    # Expected: ~918 tests (down from 934)
-   ```
-
-3. **Seed-only run:**
-   ```bash
-   uv run pytest -m "seed" --co -q
-   # Expected: ~16 tests
-   ```
-
-4. **CI workflow validation:**
-   - Push to `develop` → verify CI test job runs `pytest -m "not seed"` and completes in <90s
-   - Verify CI still uploads coverage XML
-   - Verify nightly workflow triggers at 03:00 UTC (check GitHub Actions tab)
-
-5. **Coverage gate:**
-   - Verify `fail_under = 80` still passes with the non-seed test subset
-   - If it doesn't, compare coverage before/after to determine if seed tests contribute meaningfully
-
-6. **Local dev workflow:**
-   ```bash
-   make test-db  # start persistent DB
-   make test     # should complete in ~60s with --reuse-db
-   ```
-
-7. **Watch mode:**
-   ```bash
-   uv run pytest -m "unit and not slow" --watch
-   # Expected: ~3s per iteration
-   ```
-
----
-
-## 11. Files to Create/Modify
-
-| Action | Path | Notes |
-|--------|------|-------|
-| Modify | `pyproject.toml` | Add markers (T-01); remove `--cov` from `addopts` (T-03); remove dead deps (T-09) |
-| Modify | `src/backend/apps/seed/tests/test_seed.py` | Add `@pytest.mark.seed` to 5 classes (T-02) |
-| Modify | `docker/entrypoint-test.sh` | Add `--reuse-db` to default `PYTEST_OPTS` (T-04); add `--durations=10` (T-07) |
-| Modify | `.github/workflows/ci.yml` | Add `-m "not seed"` to pytest invocation (T-05); remove redundant makemigrations step (T-08); add `--durations=10` (T-07) |
-| Create | `.github/workflows/ci-nightly.yml` | Scheduled seed test workflow (T-06) |
-| Create | `src/backend/conftest.py` | Root conftest with shared fixtures (T-11) |
-| Modify | `Makefile` | Update `test` target help text; ensure `test` uses `--reuse-db` (T-04) |
-| Add dep | `pyproject.toml` dev group | `pytest-xdist` for parallel execution (T-10) |
-
----
-
-## 12. Test Suite Composition Breakdown
-
-### 12.1 Seed Test Group (Tier 4 — Nightly Only)
-
-| Class | File | Tests | Time | Marker |
-|-------|------|-------|------|--------|
-| `TestSeedCommand` | `seed/tests/test_seed.py` | 5 | 419s | `seed` |
-| `TestSeedCommandEnhanced` | `seed/tests/test_seed.py` | 2 | ~120s (est.) | `seed` |
-| `TestSeedCategoryIntegration` | `seed/tests/test_seed.py` | 4 | ~250s (est.) | `seed` |
-| `TestLeafCategoryFiltering` | `seed/tests/test_seed.py` | 2 | ~220s (est.) | `seed` |
-| `TestAdGeneratorLeafOnly` | `seed/tests/test_seed.py` | 2 | ~220s (est.) | `seed` |
-| `TestImageGenerator.test_generates_ad_images` | `seed/tests/test_seed.py` | 1 | ~45s (est.) | `seed` |
-| **Total** | | **16** | **~1054s** | |
-
-### 12.2 Settings Subprocess Group (Tier 5)
-
-| Class | File | Tests | Time | Marker |
-|-------|------|-------|------|--------|
-| `SettingsSecretsTests` | `config/settings/tests/test_settings_secrets.py` | 3 | 11.4s | `settings` |
-
-### 12.3 Bot Concurrent Group (Tier 3 — transaction=True)
-
-| File | Tests | Time | Marker |
-|------|-------|------|--------|
-| `test_ad_create.py` | 2 | 0.3s | `concurrent` |
-| `test_create_draft_ad.py` | 5 | 0.4s | `concurrent` |
-| `test_claim_login_token.py` | 7 | 0.5s | `concurrent` |
-| `test_login_claim.py` | 6 | 0.5s | `concurrent` |
-| `test_unsubscribe.py` | 7 | 0.5s | `concurrent` |
-| `test_ad_lifecycle.py` | 17 | 0.8s | `concurrent` (note: uses `django_db` without `transaction=True`) |
-| **Total** | **44** | **~3s** | |
-
-### 12.4 Pure Unit Group (Tier 0 — No DB)
-
-| File | Tests | Time | Marker |
-|------|-------|------|--------|
-| `seed/tests/test_download_seed_photos.py` | 50 | 6.1s | `unit` |
-| `telegram_bot/tests/test_media.py` | 22 | ~3s | `unit` |
-| `telegram_bot/tests/test_multi_lang_translation.py` | 15 | ~2s | `unit` |
-| `config/settings/tests/test_settings_secrets.py` | 3 | 11.4s | `unit, settings` (overlap — settings is more specific) |
-
-### 12.5 Summary by Application Domain
-
-| App | Test Files | Tests | Default Run? |
-|-----|-----------|-------|-------------|
-| `seed` | 2 | ~100 | 16 `seed`-marked tests excluded (nightly); 84 still run in default |
-| `core` | 13 | ~137 | Yes (included) |
-| `analytics` | 6 | ~90 | Yes (included) |
-| `moderation` | 4 | ~70 | Yes (included; 6 failures need fix) |
-| `users` | 7 | ~73 | Yes (included) |
-| `ads` | 14 | ~149 | Yes (included; 3 fail, 10 errors need fix) |
-| `search` | 8 | ~30 | Yes (included; failures need fix) |
-| `cabinet` | 2 | ~14 | Yes (included) |
-| `categories` | 1 | ~6 | Yes (included) |
-| `media` | 3 | ~11 | Yes (included; 1 failure needs fix) |
-| `trust` | 3 | ~28 | Yes (included) |
-| `telegram_bot` | 7 | ~95 | Yes (included; concurrent tests) |
-| `config/settings` | 1 | 3 | Yes (included; subprocess) |
-
----
-
-## 13. Expected Outcomes
-
-| Metric | Before | After (CI) | After (Local default) |
-|--------|--------|------------|----------------------|
-| Tests in default CI run | 934 | ~918 (excl. ~16 seed) | ~918 |
-| CI test job duration | ~1125s (18.75 min) | ~85s (incl. coverage) | N/A |
-| Local `make test` duration | ~1125s | N/A | ~55s (with `--reuse-db`, no `--cov`) |
-| Watch-mode iteration | N/A | N/A | ~3s |
-| Pre-existing failures | 7+ | 0 (target) | 0 |
-| CI green status | No (failures) | Yes (after fixes) | N/A |
-| Dead dependencies | 4 | 0 | 0 |
-| Marker granularity | Binary (slow + integration) | 5-tier (unit / integration / e2e / seed / settings / concurrent) | Same |
-
-The single highest-impact change — **excluding seed tests from the default run via a `seed` marker** — eliminates ~94% of suite wall-clock time. Combined with coverage gating and `--reuse-db`, the local dev feedback loop drops from **18 minutes to ~60 seconds**, and CI PR feedback drops from **18 minutes to ~85 seconds**.
-
----
-
-## 14. Implementation Completion Summary
-
-All 12 tasks (T-01 through T-12) completed successfully.
-
-### Completed Tasks
-
-| Task | Description | Status | Verification |
-|------|-------------|--------|-------------|
-| T-01 | Register `seed`, `unit`, `e2e`, `settings`, `concurrent` markers in `pyproject.toml` | ✅ Done | `pytest --collect-only` → 934 tests collected, no marker warnings |
-| T-02 | Add `@pytest.mark.seed` to 5 slow seed classes + `TestImageGenerator.test_generates_ad_images` | ✅ Done | `pytest -m seed --collect-only` → 16 tests collected |
-| T-03 | Remove `--cov` from `addopts` in `pyproject.toml` | ✅ Done | `addopts = ["--import-mode=importlib", "-ra", "-q"]` |
-| T-04 | Add `--reuse-db` to default `PYTEST_OPTS` in `entrypoint-test.sh` | ✅ Done | `PYTEST_OPTS="--reuse-db --tb=short --durations=10"` |
-| T-05 | Modify `ci.yml` test job to run `pytest -m "not seed"` | ✅ Done | CI test job runs `uv run pytest -m "not seed" -n auto --dist loadscope --tb=short --cov --durations=10 --cov-report=term --cov-report=xml` |
-| T-06 | Create `ci-nightly.yml` scheduled seed test workflow | ✅ Done | `.github/workflows/ci-nightly.yml` runs `pytest -m "seed"` daily at 03:00 UTC + manual dispatch |
-| T-07 | Add `--durations=10` to CI pytest invocation | ✅ Done | `--durations=10` present in both `ci.yml` and `entrypoint-test.sh` |
-| T-08 | Remove redundant `makemigrations --check` CI step | ✅ Done | Step removed from `ci.yml` |
-| T-09 | Remove dead dev dependencies from `pyproject.toml` | ✅ Done | `factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy` removed; `uv.lock` updated |
-| T-10 | Add `pytest-xdist` to dev deps; enable `-n auto` in CI | ✅ Done | `pytest-xdist>=3.8.0` in dev group; `-n auto --dist loadscope` in `ci.yml` and `ci-nightly.yml` |
-| T-11 | Create root `conftest.py` at `src/backend/conftest.py` with shared fixtures | ✅ Done | Generic `seller`, `user`, `category`, `city` fixtures + `create_test_ad()` + `_set_status_timestamp()`; validated against 380+376 test runs |
-| T-12 | Fix pre-existing failures (7+ tests) | ✅ Done | 934 tests collected, 0 failures across 4 test runs (unit, seed, integration, full backend) |
-
-### Verification Results
-
-| Check | Result |
-|-------|--------|
-| Test collection | 934 tests collected across 73 test files |
-| `-m seed` filter | 16 tests collected ✅ |
-| `-m unit` filter | 93 tests collected ✅ |
-| Integration tests (ads, core, users, trust, analytics) | 380 passed ✅ |
-| Backend tests (moderation, categories, cabinet, media, ads, search) | 376 passed ✅ |
-| Previously-failing tests (50+) | All now pass ✅ |
-| Lint (`ruff check`) | All checks passed ✅ |
-| Typecheck (`basedpyright`) | 0 errors, 0 warnings, 0 notes ✅ |
+**Local test command:** `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test` (append `-e PYTEST_OPTS="--create-db <path>"` for targeted runs)

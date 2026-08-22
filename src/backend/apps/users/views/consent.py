@@ -30,7 +30,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from pydantic import ValidationError
 
-from apps.core.enums import ConsentChoice
+from apps.core.enums import ConsentChoice, CookieCategory
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
@@ -91,6 +91,10 @@ def _set_consent_cookies(
         CONSENT_TIMESTAMP_COOKIE,
         str(int(timezone.now().timestamp())),
     )
+    # T-06c / ePrivacy: when preferences consent is revoked, clear the
+    # preferred_city cookie so no personalization data outlives consent.
+    if not preferences:
+        response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)
 
 
 def _parse_submission(request: HttpRequest) -> ConsentSubmission | None:
@@ -152,7 +156,7 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
     record_consent_action(
         user=user,
         choice=ConsentChoice.ACCEPTED,
-        categories={"analytics": analytics, "preferences": preferences},
+        categories={CookieCategory.ANALYTICS: analytics, CookieCategory.PREFERENCES: preferences},
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )
@@ -200,7 +204,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
     record_consent_action(
         user=user,
         choice=ConsentChoice.DECLINED,
-        categories={"analytics": analytics, "preferences": preferences},
+        categories={CookieCategory.ANALYTICS: analytics, CookieCategory.PREFERENCES: preferences},
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )
@@ -239,7 +243,7 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
     record_consent_action(
         user=user,
         choice=ConsentChoice.WITHDRAWN,
-        categories={"analytics": False, "preferences": False},
+        categories={CookieCategory.ANALYTICS: False, CookieCategory.PREFERENCES: False},
         request=request,
     )
     logger.info(f"User {user.id} withdrew consent via web - soft-delete triggered")

@@ -9,8 +9,13 @@ All tests use the real ORM with monkeypatched criteria to avoid DB cache couplin
 
 import pytest
 from apps.ads.models import Ad, AdImage
+from apps.categories.models import Category
 from apps.core.enums import AdStatus
+from apps.locations.models import City
 from apps.moderation.services.auto_moderation import auto_moderate
+from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -18,42 +23,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def seller() -> object:
-    """Create a seller user for ad fixtures."""
-    from apps.users.models import User
-
-    return User.objects.create(
-        telegram_id=900000100,
-        chat_id=900000100,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> object:
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> object:
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
 
 
 @pytest.fixture
@@ -114,19 +83,17 @@ def banning_criteria(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_draft_ad(seller: object, category: object, city: object, **kwargs) -> Ad:
+def _make_draft_ad(
+    seller: User, category: Category, city: City, **kwargs
+) -> Ad:
     """Create an Ad in DRAFT status with required FK fields."""
-    defaults = {
-        "user": seller,
+    defaults: dict = {
         "title": "Valid Title",
         "description": "Valid description text for the ad.",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
         "status": AdStatus.DRAFT,
     }
     defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
+    return create_test_ad(seller, category, city, **defaults)
 
 
 def _transition_to_moderation(ad: Ad) -> None:

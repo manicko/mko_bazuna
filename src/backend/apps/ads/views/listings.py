@@ -60,7 +60,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     try:
         ad = (
             Ad.objects.select_related("category", "city", "user")
-            .prefetch_related("images")
+            .prefetch_related("images", "user__trust_score")
             .get(id=ad_id, status=AdStatus.PUBLISHED)
         )
     except Ad.DoesNotExist:

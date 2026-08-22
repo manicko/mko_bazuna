@@ -18,96 +18,10 @@ import pytest
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000100,
-        chat_id=900000100,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category():
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city():
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_ad(
-    seller: User,
-    category,
-    city,
-    *,
-    status: AdStatus = AdStatus.DRAFT,
-    **kwargs,
-) -> Ad:
-    """Create an Ad with the given status, setting the matching timestamp.
-
-    Each lifecycle status that has a dedicated timestamp constraint requires
-    that timestamp be populated on INSERT. This helper ensures test data
-    is constraint-consistent.
-    """
-    defaults: dict = {
-        "user": seller,
-        "title": "Test Ad",
-        "description": "Test description for moderation",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-    }
-    defaults.update(kwargs)
-
-    now = timezone.now()
-    if status == AdStatus.PUBLISHED:
-        defaults.setdefault("published_at", now)
-        defaults.setdefault("original_published_at", now)
-    elif status == AdStatus.ARCHIVED:
-        defaults.setdefault("archived_at", now)
-        defaults.setdefault("published_at", now)
-        defaults.setdefault("original_published_at", now)
-    elif status == AdStatus.REJECTED:
-        defaults.setdefault("rejected_at", now)
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        defaults.setdefault("moderation_failed_at", now)
-    elif status == AdStatus.DELETED:
-        defaults.setdefault("deleted_at", now)
-
-    return Ad.objects.create(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -120,13 +34,13 @@ class TestTransitionValidation:
 
     def test_invalid_transition_raises_error(self, seller, category, city):
         """DRAFT -> PUBLISHED (skipping ON_MODERATION) raises ValueError."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         with pytest.raises(ValueError, match="Invalid transition"):
             ad.transition_to(AdStatus.PUBLISHED)
 
     def test_terminal_state_blocks_transition(self, seller, category, city):
         """DELETED is a terminal state; no transitions allowed from it."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         ad.transition_to(AdStatus.DELETED)
         ad.refresh_from_db()
         assert ad.status == AdStatus.DELETED
@@ -137,7 +51,7 @@ class TestTransitionValidation:
 
     def test_valid_draft_to_on_moderation_succeeds(self, seller, category, city):
         """DRAFT -> ON_MODERATION is a valid transition."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         ad.transition_to(AdStatus.ON_MODERATION)
         ad.refresh_from_db()
         assert ad.status == AdStatus.ON_MODERATION
@@ -155,7 +69,7 @@ class TestTransitionMatrixEdges:
         self, seller, category, city
     ):
         """ON_MODERATION_FAILED -> REJECTED is allowed (new matrix edge)."""
-        ad = _make_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
         ad.transition_to(AdStatus.REJECTED)
         ad.refresh_from_db()
 
@@ -166,7 +80,7 @@ class TestTransitionMatrixEdges:
 
     def test_transition_to_reject_from_archived_raises(self, seller, category, city):
         """ARCHIVED -> REJECTED raises ValueError (not in matrix)."""
-        ad = _make_ad(seller, category, city, status=AdStatus.ARCHIVED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
 
         with pytest.raises(ValueError, match="Invalid transition"):
             ad.transition_to(AdStatus.REJECTED)
@@ -187,7 +101,7 @@ class TestCheckConstraints:
         self, seller, category, city
     ):
         """Bulk-update to PUBLISHED without published_at raises IntegrityError."""
-        ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
             with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
@@ -201,7 +115,7 @@ class TestCheckConstraints:
         self, seller, category, city
     ):
         """Bulk-update to ARCHIVED without archived_at raises IntegrityError."""
-        ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
             with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
@@ -214,7 +128,7 @@ class TestCheckConstraints:
         self, seller, category, city
     ):
         """Setting both moderation_failed_at and rejected_at raises IntegrityError."""
-        ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
 
         with pytest.raises(IntegrityError):
             with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]

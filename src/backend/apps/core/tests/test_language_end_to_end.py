@@ -16,7 +16,8 @@ with ``request.LANGUAGE_CODE`` at render time.
 
 from __future__ import annotations
 
-from django.test import TestCase
+import pytest
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils import translation
@@ -36,124 +37,141 @@ DESC_RU = "Русское описание"
 DESC_EN = "English desc"
 DESC_BS = "Bosnian opis"
 
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
-class LanguageEndToEndTests(TestCase):
+
+@pytest.fixture(autouse=True)
+def _locale_cleanup():
+    """Deactivate thread-local language state after each test."""
+    yield
+    translation.deactivate()
+
+
+@pytest.fixture(autouse=True)
+def _staticfiles_storage():
+    """Use non-cached staticfiles storage for deterministic template rendering."""
+    with override_settings(
+        STORAGES={
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            },
+        },
+    ):
+        yield
+
+
+@pytest.fixture
+def e2e_ad():
+    """Create a published multilingual ad for end-to-end language tests."""
+    seller = User.objects.create(
+        telegram_id=910000001,
+        chat_id=910000001,
+        password="x",
+    )
+    category = Category.objects.create(
+        name="Транспорт",
+        slug="transport-e2e",
+    )
+    city = City.objects.create(
+        country_code="ME",
+        name="Подграф",
+        region="Регион",
+        slug="podgraf-e2e",
+    )
+    ad = Ad.objects.create(
+        user=seller,
+        title=TITLE_RU,
+        title_en=TITLE_EN,
+        title_bs=TITLE_BS,
+        description=DESC_RU,
+        description_en=DESC_EN,
+        description_bs=DESC_BS,
+        category=category,
+        city=city,
+        category_name=category.name,
+        price=100,
+        status=AdStatus.PUBLISHED,
+        source=AdSource.SEED,
+        published_at=timezone.now(),
+    )
+    detail_url = reverse("ads:detail", kwargs={"ad_id": ad.id})
+    listings_url = reverse("ads:listings")
+    return {"ad": ad, "detail_url": detail_url, "listings_url": listings_url}
+
+
+class TestLanguageEndToEnd:
     """Real middleware + real view + real template + published seed Ad."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.seller = User.objects.create(
-            telegram_id=910000001,
-            chat_id=910000001,
-            password="x",
-        )
-        cls.category = Category.objects.create(
-            name="Транспорт",
-            slug="transport-e2e",
-        )
-        cls.city = City.objects.create(
-            country_code="ME",
-            name="Подграф",
-            region="Регион",
-            slug="podgraf-e2e",
-        )
-        cls.ad = Ad.objects.create(
-            user=cls.seller,
-            title=TITLE_RU,
-            title_en=TITLE_EN,
-            title_bs=TITLE_BS,
-            description=DESC_RU,
-            description_en=DESC_EN,
-            description_bs=DESC_BS,
-            category=cls.category,
-            city=cls.city,
-            category_name=cls.category.name,
-            price=100,
-            status=AdStatus.PUBLISHED,
-            source=AdSource.SEED,
-            published_at=timezone.now(),
-        )
-        cls.detail_url = reverse("ads:detail", kwargs={"ad_id": cls.ad.id})
-        cls.listings_url = reverse("ads:listings")
-
-    def setUp(self) -> None:
-        # ``process_request`` now calls ``translation.activate()``; clear the
-        # thread-local between tests so language state never leaks.
-        self.addCleanup(translation.deactivate)
-
-    # --- Resolution priority ---------------------------------------------
-
-    def test_lang_param_wins_over_accept_language(self) -> None:
+    def test_lang_param_wins_over_accept_language(self, e2e_ad) -> None:
         """``?lang=en`` wins over ``Accept-Language: ru`` on the first click."""
-        response = self.client.get(
-            self.detail_url + "?lang=en",
+        client = Client()
+        response = client.get(
+            e2e_ad["detail_url"] + "?lang=en",
             HTTP_ACCEPT_LANGUAGE="ru",
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_EN)
-        self.assertContains(response, DESC_EN)
-        self.assertNotContains(response, TITLE_RU)
-        self.assertEqual(translation.get_language(), "en")
+        assert response.status_code == 200
+        assert TITLE_EN.encode() in response.content
+        assert DESC_EN.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
+        assert translation.get_language() == "en"
 
-    def test_cookie_persists_language_without_param(self) -> None:
+    def test_cookie_persists_language_without_param(self, e2e_ad) -> None:
         """A stored ``lang_pref`` cookie drives rendering when no param is sent."""
-        self.client.cookies["lang_pref"] = "en"
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_EN)
-        self.assertNotContains(response, TITLE_RU)
+        client = Client()
+        client.cookies["lang_pref"] = "en"
+        response = client.get(e2e_ad["detail_url"])
+        assert response.status_code == 200
+        assert TITLE_EN.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
 
-    def test_lang_param_bs_renders_bosnian(self) -> None:
-        response = self.client.get(self.detail_url + "?lang=bs")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_BS)
-        self.assertContains(response, DESC_BS)
-        self.assertNotContains(response, TITLE_RU)
-        self.assertEqual(translation.get_language(), "bs")
+    def test_lang_param_bs_renders_bosnian(self, e2e_ad) -> None:
+        client = Client()
+        response = client.get(e2e_ad["detail_url"] + "?lang=bs")
+        assert response.status_code == 200
+        assert TITLE_BS.encode() in response.content
+        assert DESC_BS.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
+        assert translation.get_language() == "bs"
 
-    def test_default_no_signal_renders_russian(self) -> None:
+    def test_default_no_signal_renders_russian(self, e2e_ad) -> None:
         """No lang, no cookie, no Accept-Language -> Russian base."""
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_RU)
-        self.assertContains(response, DESC_RU)
-        self.assertNotContains(response, TITLE_EN)
-        self.assertNotContains(response, TITLE_BS)
-        self.assertEqual(translation.get_language(), "ru")
+        client = Client()
+        response = client.get(e2e_ad["detail_url"])
+        assert response.status_code == 200
+        assert TITLE_RU.encode() in response.content
+        assert DESC_RU.encode() in response.content
+        assert TITLE_EN.encode() not in response.content
+        assert TITLE_BS.encode() not in response.content
+        assert translation.get_language() == "ru"
 
-    # --- Invalid parameter handling --------------------------------------
-
-    def test_invalid_lang_falls_back_to_russian_and_does_not_persist(self) -> None:
+    def test_invalid_lang_falls_back_to_russian_and_does_not_persist(self, e2e_ad) -> None:
         """An unsupported ``?lang=fr`` falls back to ru and sets no cookie."""
-        response = self.client.get(self.detail_url + "?lang=fr")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_RU)
-        self.assertNotContains(response, TITLE_EN)
-        self.assertNotIn("lang_pref", response.cookies)
-        self.assertEqual(translation.get_language(), "ru")
+        client = Client()
+        response = client.get(e2e_ad["detail_url"] + "?lang=fr")
+        assert response.status_code == 200
+        assert TITLE_RU.encode() in response.content
+        assert TITLE_EN.encode() not in response.content
+        assert "lang_pref" not in response.cookies
+        assert translation.get_language() == "ru"
 
-    # --- Listing surface -------------------------------------------------
-
-    def test_listing_card_switches_language(self) -> None:
+    def test_listing_card_switches_language(self, e2e_ad) -> None:
         """The listing card renders the localized title too (F5)."""
-        self.client.cookies["lang_pref"] = "en"
-        response = self.client.get(self.listings_url + "?lang=en")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, TITLE_EN)
-        self.assertNotContains(response, TITLE_RU)
+        client = Client()
+        client.cookies["lang_pref"] = "en"
+        response = client.get(e2e_ad["listings_url"] + "?lang=en")
+        assert response.status_code == 200
+        assert TITLE_EN.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
 
-    # --- Response headers ------------------------------------------------
-
-    def test_vary_and_content_language_headers(self) -> None:
+    def test_vary_and_content_language_headers(self, e2e_ad) -> None:
         """LocaleMiddleware's header contract is preserved by the custom middleware."""
-        response = self.client.get(self.detail_url + "?lang=en")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get("Content-Language"), "en")
-        self.assertIn("Accept-Language", response.headers.get("Vary", ""))
+        client = Client()
+        response = client.get(e2e_ad["detail_url"] + "?lang=en")
+        assert response.status_code == 200
+        assert response.headers.get("Content-Language") == "en"
+        assert "Accept-Language" in response.headers.get("Vary", "")
 
-    # --- Thread-local ↔ request-attribute consistency --------------------
-
-    def test_thread_local_matches_request_language_code(self) -> None:
+    def test_thread_local_matches_request_language_code(self, e2e_ad) -> None:
         """``translation.get_language()`` == ``request.LANGUAGE_CODE`` == chosen X.
 
         The ``i18n`` context processor reads the thread-local while the custom
@@ -162,9 +180,10 @@ class LanguageEndToEndTests(TestCase):
         highlight (thread-local via ``{% get_current_language %}``) desyncs from
         the rendered ad text (``request.LANGUAGE_CODE``).
         """
-        response = self.client.get(self.detail_url + "?lang=bs")
-        self.assertEqual(response.status_code, 200)
+        client = Client()
+        response = client.get(e2e_ad["detail_url"] + "?lang=bs")
+        assert response.status_code == 200
         request_lang = response.context["LANGUAGE_CODE"]
-        self.assertEqual(translation.get_language(), "bs")
-        self.assertEqual(request_lang, "bs")
-        self.assertEqual(translation.get_language(), request_lang)
+        assert translation.get_language() == "bs"
+        assert request_lang == "bs"
+        assert translation.get_language() == request_lang

@@ -12,7 +12,6 @@ import pytest
 from django.conf import settings
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -20,45 +19,19 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """An ad owner."""
-    return User.objects.create(
-        telegram_id=930000020,
-        chat_id=930000020,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> Category:
-    """A leaf category."""
-    return Category.objects.create(name="Script Cat", slug="script-cat")
-
-
-@pytest.fixture
-def city() -> City:
-    """A city."""
-    return City.objects.create(
-        country_code="ME", name="Script City", region="X", slug="script-city"
-    )
 
 
 @pytest.fixture
 def ad(seller: User, category: Category, city: City) -> Ad:
     """A PUBLISHED ad with one image."""
-    ad = Ad.objects.create(
-        user=seller,
+    ad = create_test_ad(
+        seller, category, city,
         title="Script Ad",
         description="Description",
-        category=category,
-        city=city,
-        category_name=category.name,
         status=AdStatus.PUBLISHED,
-        published_at=timezone.now(),
     )
     AdImage.objects.create(ad=ad, image="key-0.jpg", position=0)
     return ad

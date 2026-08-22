@@ -6,22 +6,19 @@ Tests cover:
 - Signal: automatic priority calculation on Ad post_save
 - Queue view: authentication, filtering, empty state
 - Bulk API: authentication, actions, error handling
-
-Uses ``django.test.TestCase`` for DB-backed assertions.
 """
 
 from __future__ import annotations
 
 import json
 
-from django.test import TestCase
+import pytest
+from django.test import Client
 from django.urls import reverse
 
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import (
     AdPriorityLevel,
-    AdSource,
     AdStatus,
     BulkModerationAction,
     PriorityFilter,
@@ -31,8 +28,13 @@ from apps.moderation.models import AdModerationPriority, ModerationCriteria
 from apps.moderation.services.priority import PriorityService
 from apps.users.models import User
 
+from conftest import create_test_ad
+
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+
+
 # ---------------------------------------------------------------------------
-# Test helpers (reuse pattern from test_priority.py)
+# Test helpers
 # ---------------------------------------------------------------------------
 
 
@@ -45,7 +47,7 @@ def _make_user(telegram_id: int = 990030001, **overrides: object) -> User:
         "password": "x",
     }
     defaults.update(overrides)
-    return User.objects.create(**defaults)  # type: ignore[arg-type]
+    return User.objects.create(**defaults)
 
 
 def _make_staff_user(telegram_id: int = 990030002) -> User:
@@ -67,60 +69,8 @@ def _make_category(slug: str = "svc-test-cat") -> Category:
 def _make_city(slug: str = "svc-test-city") -> City:
     """Create a City with sensible defaults."""
     return City.objects.create(
-        country_code="ME",
-        name="Svc Test City",
-        region="Svc Test Region",
-        slug=slug,
+        country_code="ME", name="Svc Test City", region="Svc Test Region", slug=slug,
     )
-
-
-def _set_status_timestamp(data, now=None):
-    """Auto-populate timestamp fields matching the ad status."""
-    from django.utils import timezone
-
-    if now is None:
-        now = timezone.now()
-    status = data.get("status")
-    if status == AdStatus.PUBLISHED:
-        data.setdefault("published_at", now)
-        data.setdefault("original_published_at", now)
-    elif status == AdStatus.ARCHIVED:
-        data.setdefault("archived_at", now)
-        data.setdefault("published_at", now)
-        data.setdefault("original_published_at", now)
-    elif status == AdStatus.REJECTED:
-        data.setdefault("rejected_at", now)
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        data.setdefault("moderation_failed_at", now)
-    elif status == AdStatus.DELETED:
-        data.setdefault("deleted_at", now)
-    return data
-
-
-def _make_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Svc Test Ad",
-    description: str = "Svc test description",
-    status: AdStatus = AdStatus.ON_MODERATION,
-    **overrides: object,
-) -> Ad:
-    """Create an Ad with sensible defaults."""
-    defaults: dict = {
-        "user": user,
-        "title": title,
-        "description": description,
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-        "source": AdSource.TELEGRAM,
-    }
-    defaults.update(overrides)
-    _set_status_timestamp(defaults)
-    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
 
 
 def _banned_words_setup(*words: str) -> None:
@@ -131,198 +81,163 @@ def _banned_words_setup(*words: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def priority_seller(category, city):
+    """Provide a seller with category/city for priority service tests."""
+    return _make_user(telegram_id=990030010)
+
+
+# ---------------------------------------------------------------------------
 # PriorityService tests
 # ---------------------------------------------------------------------------
 
 
-class TestPriorityService(TestCase):
+class TestPriorityService:
     """Tests for PriorityService — calculate_and_save, get_queued_ads, get_priority_counts."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.service = PriorityService()
-        cls.category = _make_category()
-        cls.city = _make_city()
-        cls.user = _make_user(telegram_id=990030010)
-
-    # ── calculate_and_save ──────────────────────────────────────────────
-
-    def test_calculate_and_save_creates_priority_record(self) -> None:
+    def test_calculate_and_save_creates_priority_record(self, category, city) -> None:
         """calculate_and_save creates a new AdModerationPriority record."""
-        ad = _make_ad(self.user, self.category, self.city)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city)
+        service = PriorityService()
 
-        result = self.service.calculate_and_save(ad)
+        result = service.calculate_and_save(ad)
 
-        self.assertIsInstance(result, AdModerationPriority)
-        self.assertEqual(result.ad_id, ad.id)
-        self.assertEqual(result.priority_level, AdPriorityLevel.LOW.value)
-        self.assertEqual(result.base_score, 0)
+        assert isinstance(result, AdModerationPriority)
+        assert result.ad_id == ad.id
+        assert result.priority_level == AdPriorityLevel.LOW.value
+        assert result.base_score == 0
 
-    def test_calculate_and_save_updates_existing_record(self) -> None:
+    def test_calculate_and_save_updates_existing_record(self, category, city) -> None:
         """calculate_and_save updates an existing record instead of creating duplicate."""
-        ad = _make_ad(self.user, self.category, self.city)
-        first = self.service.calculate_and_save(ad)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city)
+        service = PriorityService()
 
-        # Second call should update, not create
-        second = self.service.calculate_and_save(ad)
+        first = service.calculate_and_save(ad)
+        second = service.calculate_and_save(ad)
 
-        self.assertEqual(first.id, second.id)
+        assert first.id == second.id
 
-    def test_calculate_and_save_with_banned_words(self) -> None:
+    def test_calculate_and_save_with_banned_words(self, category, city) -> None:
         """calculate_and_save correctly computes score with banned words."""
         _banned_words_setup("spam", "scam")
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam offer",
-        )
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city, title="spam offer")
+        service = PriorityService()
 
-        result = self.service.calculate_and_save(ad)
+        result = service.calculate_and_save(ad)
 
-        self.assertIn("banned_word", result.flags)
-        self.assertGreater(result.base_score, 0)
+        assert "banned_word" in result.flags
+        assert result.base_score > 0
 
-    # ── get_queued_ads ─────────────────────────────────────────────────
-
-    def test_get_queued_ads_returns_moderation_ads(self) -> None:
+    def test_get_queued_ads_returns_moderation_ads(self, category, city) -> None:
         """get_queued_ads returns ads with ON_MODERATION status."""
-        ad = _make_ad(self.user, self.category, self.city)
-        self.service.calculate_and_save(ad)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city)
+        service = PriorityService()
+        service.calculate_and_save(ad)
 
-        qs = self.service.get_queued_ads()
+        qs = service.get_queued_ads()
 
-        self.assertIn(ad, qs)
+        assert ad in qs
 
-    def test_get_queued_ads_excludes_published_ads(self) -> None:
+    def test_get_queued_ads_excludes_published_ads(self, category, city) -> None:
         """get_queued_ads excludes published ads."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            status=AdStatus.PUBLISHED,
-        )
-        self.service.calculate_and_save(ad)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
+        service = PriorityService()
+        service.calculate_and_save(ad)
 
-        qs = self.service.get_queued_ads()
+        qs = service.get_queued_ads()
 
-        self.assertNotIn(ad, qs)
+        assert ad not in qs
 
-    def test_get_queued_ads_excludes_archived_ads(self) -> None:
+    def test_get_queued_ads_excludes_archived_ads(self, category, city) -> None:
         """get_queued_ads excludes archived ads."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            status=AdStatus.ARCHIVED,
-        )
-        self.service.calculate_and_save(ad)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city, status=AdStatus.ARCHIVED)
+        service = PriorityService()
+        service.calculate_and_save(ad)
 
-        qs = self.service.get_queued_ads()
+        qs = service.get_queued_ads()
 
-        self.assertNotIn(ad, qs)
+        assert ad not in qs
 
-    def test_get_queued_ads_filters_by_priority(self) -> None:
+    def test_get_queued_ads_filters_by_priority(self, category, city) -> None:
         """get_queued_ads filters by priority level when filter is provided."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
-        self.service.calculate_and_save(high_ad)
+        user = _make_user(telegram_id=990030010)
+        service = PriorityService()
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Clean title",
-            description="Clean description",
-        )
-        self.service.calculate_and_save(low_ad)
+        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        service.calculate_and_save(high_ad)
 
-        high_qs = self.service.get_queued_ads(priority_filter=PriorityFilter.HIGH)
-        low_qs = self.service.get_queued_ads(priority_filter=PriorityFilter.LOW)
+        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        service.calculate_and_save(low_ad)
 
-        self.assertIn(high_ad, high_qs)
-        self.assertNotIn(low_ad, high_qs)
-        self.assertIn(low_ad, low_qs)
-        self.assertNotIn(high_ad, low_qs)
+        high_qs = service.get_queued_ads(priority_filter=PriorityFilter.HIGH)
+        low_qs = service.get_queued_ads(priority_filter=PriorityFilter.LOW)
 
-    def test_get_queued_ads_priority_filter_none_returns_all(self) -> None:
+        assert high_ad in high_qs
+        assert low_ad not in high_qs
+        assert low_ad in low_qs
+        assert high_ad not in low_qs
+
+    def test_get_queued_ads_priority_filter_none_returns_all(self, category, city) -> None:
         """get_queued_ads with priority_filter=None returns ads of every priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
-        self.service.calculate_and_save(high_ad)
+        user = _make_user(telegram_id=990030010)
+        service = PriorityService()
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Clean title",
-            description="Clean description",
-        )
-        self.service.calculate_and_save(low_ad)
+        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        service.calculate_and_save(high_ad)
 
-        qs = self.service.get_queued_ads(priority_filter=None)
+        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        service.calculate_and_save(low_ad)
 
-        self.assertIn(high_ad, qs)
-        self.assertIn(low_ad, qs)
+        qs = service.get_queued_ads(priority_filter=None)
 
-    # ── get_priority_counts ────────────────────────────────────────────
+        assert high_ad in qs
+        assert low_ad in qs
 
     def test_get_priority_counts_returns_zero_for_empty(self) -> None:
         """get_priority_counts returns all zeros when no priorities exist."""
-        counts = self.service.get_priority_counts()
+        service = PriorityService()
+        counts = service.get_priority_counts()
+        assert counts == {"high": 0, "medium": 0, "low": 0}
 
-        self.assertEqual(counts, {"high": 0, "medium": 0, "low": 0})
-
-    def test_get_priority_counts_counts_correctly(self) -> None:
+    def test_get_priority_counts_counts_correctly(self, category, city) -> None:
         """get_priority_counts returns correct counts per priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
-        self.service.calculate_and_save(high_ad)
+        user = _make_user(telegram_id=990030010)
+        service = PriorityService()
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Clean title",
-            description="Clean description",
-        )
-        self.service.calculate_and_save(low_ad)
+        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        service.calculate_and_save(high_ad)
 
-        counts = self.service.get_priority_counts()
+        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        service.calculate_and_save(low_ad)
 
-        self.assertEqual(counts["high"], 1)
-        self.assertEqual(counts["low"], 1)
-        self.assertEqual(counts["medium"], 0)
+        counts = service.get_priority_counts()
 
-    def test_get_priority_counts_excludes_non_moderation_ads(self) -> None:
+        assert counts["high"] == 1
+        assert counts["low"] == 1
+        assert counts["medium"] == 0
+
+    def test_get_priority_counts_excludes_non_moderation_ads(self, category, city) -> None:
         """get_priority_counts excludes ads that are not in moderation status."""
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap",
-            status=AdStatus.PUBLISHED,
-        )
-        self.service.calculate_and_save(high_ad)
+        user = _make_user(telegram_id=990030010)
+        ad = create_test_ad(user, category, city, title="spam scam cheap", status=AdStatus.PUBLISHED)
+        service = PriorityService()
+        service.calculate_and_save(ad)
 
-        counts = self.service.get_priority_counts()
-
-        self.assertEqual(counts, {"high": 0, "medium": 0, "low": 0})
+        counts = service.get_priority_counts()
+        assert counts == {"high": 0, "medium": 0, "low": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -330,56 +245,38 @@ class TestPriorityService(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestCalculateAdPrioritySignal(TestCase):
+class TestCalculateAdPrioritySignal:
     """Tests for the calculate_ad_priority signal on Ad post_save."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.category = _make_category()
-        cls.city = _make_city()
-        cls.user = _make_user(telegram_id=990030020)
-
-    def test_signal_creates_priority_on_moderation_status(self) -> None:
+    def test_signal_creates_priority_on_moderation_status(self, category, city) -> None:
         """Signal creates AdModerationPriority when ad is saved with ON_MODERATION status."""
-        ad = _make_ad(self.user, self.category, self.city)
+        user = _make_user(telegram_id=990030020)
+        ad = create_test_ad(user, category, city)
 
-        # Refresh from DB to get related objects
         ad.refresh_from_db()
+        assert hasattr(ad, "moderation_priority")
+        assert ad.moderation_priority.priority_level == AdPriorityLevel.LOW.value
 
-        self.assertTrue(hasattr(ad, "moderation_priority"))
-        self.assertEqual(
-            ad.moderation_priority.priority_level, AdPriorityLevel.LOW.value
-        )
-
-    def test_signal_does_not_create_priority_for_draft(self) -> None:
+    def test_signal_does_not_create_priority_for_draft(self, category, city) -> None:
         """Signal does NOT create priority for DRAFT ads."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            status=AdStatus.DRAFT,
-        )
+        user = _make_user(telegram_id=990030020)
+        ad = create_test_ad(user, category, city, status=AdStatus.DRAFT)
 
         ad.refresh_from_db()
+        assert not hasattr(ad, "moderation_priority")
 
-        self.assertFalse(hasattr(ad, "moderation_priority"))
-
-    def test_signal_does_not_create_priority_for_published(self) -> None:
+    def test_signal_does_not_create_priority_for_published(self, category, city) -> None:
         """Signal does NOT create priority for PUBLISHED ads."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            status=AdStatus.PUBLISHED,
-        )
+        user = _make_user(telegram_id=990030020)
+        ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
 
         ad.refresh_from_db()
+        assert not hasattr(ad, "moderation_priority")
 
-        self.assertFalse(hasattr(ad, "moderation_priority"))
-
-    def test_signal_does_not_recalculate_existing_priority(self) -> None:
+    def test_signal_does_not_recalculate_existing_priority(self, category, city) -> None:
         """Signal does NOT recalculate priority if record already exists."""
-        ad = _make_ad(self.user, self.category, self.city)
+        user = _make_user(telegram_id=990030020)
+        ad = create_test_ad(user, category, city)
         ad.refresh_from_db()
 
         # Save the same ad again
@@ -387,8 +284,7 @@ class TestCalculateAdPrioritySignal(TestCase):
         ad.save()
         ad.refresh_from_db()
 
-        # Priority should still exist and be the same
-        self.assertTrue(hasattr(ad, "moderation_priority"))
+        assert hasattr(ad, "moderation_priority")
 
 
 # ---------------------------------------------------------------------------
@@ -396,160 +292,137 @@ class TestCalculateAdPrioritySignal(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestModerationQueueView(TestCase):
+class TestModerationQueueView:
     """Tests for the moderation_queue view — auth, filtering, empty state."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.category = _make_category()
-        cls.city = _make_city()
-        cls.user = _make_user(telegram_id=990030030)
-        cls.staff_user = _make_staff_user(telegram_id=990030031)
-        cls.queue_url = reverse("moderation:queue")
+    @pytest.fixture(autouse=True)
+    def _setup(self, category, city):
+        self.user = _make_user(telegram_id=990030030)
+        self.staff_user = _make_staff_user(telegram_id=990030031)
+        self.queue_url = reverse("moderation:queue")
 
     def test_requires_staff(self) -> None:
         """Non-staff user gets 404."""
-        self.client.force_login(self.user)
-        response = self.client.get(self.queue_url)
-        self.assertEqual(response.status_code, 404)
+        client = Client()
+        client.force_login(self.user)
+        response = client.get(self.queue_url)
+        assert response.status_code == 404
 
     def test_requires_staff_unauthenticated(self) -> None:
         """Unauthenticated user gets 404 (redirected to login then 404)."""
-        response = self.client.get(self.queue_url)
-        # Django redirects to login, then staff check fails
-        self.assertIn(response.status_code, (302, 404))
+        client = Client()
+        response = client.get(self.queue_url)
+        assert response.status_code in (302, 404)
 
     def test_staff_user_can_access(self) -> None:
         """Staff user can access the queue page."""
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.queue_url)
-        self.assertEqual(response.status_code, 200)
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(self.queue_url)
+        assert response.status_code == 200
 
     def test_empty_queue_shows_message(self) -> None:
         """Empty queue shows 'No ads' message."""
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.queue_url)
-        self.assertContains(response, "No ads in the moderation queue")
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(self.queue_url)
+        assert response.status_code == 200
+        assert b"No ads in the moderation queue" in response.content
 
-    def test_queue_shows_ads(self) -> None:
+    def test_queue_shows_ads(self, category, city) -> None:
         """Queue page shows ads in moderation."""
-        ad = _make_ad(self.user, self.category, self.city)
+        ad = create_test_ad(self.user, category, city)
         PriorityService().calculate_and_save(ad)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.queue_url)
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(self.queue_url)
 
-        self.assertContains(response, str(ad.id))
-        self.assertContains(response, ad.title)
+        assert response.status_code == 200
+        assert str(ad.id).encode() in response.content
+        assert ad.title.encode() in response.content
 
-    def test_queue_filters_by_priority(self) -> None:
+    def test_queue_filters_by_priority(self, category, city) -> None:
         """Queue page filters by priority parameter."""
-        ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Low priority ad",
-        )
+        ad = create_test_ad(self.user, category, city, title="Low priority ad")
         PriorityService().calculate_and_save(ad)
 
-        self.client.force_login(self.staff_user)
+        client = Client()
+        client.force_login(self.staff_user)
 
         # Filter by high — should not show low priority ad
-        response = self.client.get(f"{self.queue_url}?priority=high")
-        self.assertNotContains(response, "Low priority ad")
+        response = client.get(f"{self.queue_url}?priority=high")
+        assert b"Low priority ad" not in response.content
 
         # Filter by low — should show it
-        response = self.client.get(f"{self.queue_url}?priority=low")
-        self.assertContains(response, "Low priority ad")
+        response = client.get(f"{self.queue_url}?priority=low")
+        assert b"Low priority ad" in response.content
 
-    def test_queue_priority_all_default(self) -> None:
+    def test_queue_priority_all_default(self, category, city) -> None:
         """Queue page with no priority param shows ads of every priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
+        client = Client()
+        client.force_login(self.staff_user)
+
+        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Low priority ad",
-        )
+        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
         PriorityService().calculate_and_save(low_ad)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.queue_url)
+        response = client.get(self.queue_url)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, str(high_ad.id))
-        self.assertContains(response, str(low_ad.id))
+        assert response.status_code == 200
+        assert str(high_ad.id).encode() in response.content
+        assert str(low_ad.id).encode() in response.content
 
-    def test_queue_priority_all_explicit(self) -> None:
+    def test_queue_priority_all_explicit(self, category, city) -> None:
         """Queue page with ?priority=all shows ads of every priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
+        client = Client()
+        client.force_login(self.staff_user)
+
+        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Low priority ad",
-        )
+        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
         PriorityService().calculate_and_save(low_ad)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(f"{self.queue_url}?priority=all")
+        response = client.get(f"{self.queue_url}?priority=all")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, str(high_ad.id))
-        self.assertContains(response, str(low_ad.id))
+        assert response.status_code == 200
+        assert str(high_ad.id).encode() in response.content
+        assert str(low_ad.id).encode() in response.content
 
-    def test_priority_filter_invalid_value_defaults_to_all(self) -> None:
+    def test_priority_filter_invalid_value_defaults_to_all(self, category, city) -> None:
         """An unrecognized priority value falls back to showing all ads."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        high_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="spam scam cheap fake counterfeit",
-        )
+        client = Client()
+        client.force_login(self.staff_user)
+
+        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = _make_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Low priority ad",
-        )
+        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
         PriorityService().calculate_and_save(low_ad)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(f"{self.queue_url}?priority=bogus")
+        response = client.get(f"{self.queue_url}?priority=bogus")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, str(high_ad.id))
-        self.assertContains(response, str(low_ad.id))
+        assert response.status_code == 200
+        assert str(high_ad.id).encode() in response.content
+        assert str(low_ad.id).encode() in response.content
 
-    def test_queue_shows_priority_counts(self) -> None:
+    def test_queue_shows_priority_counts(self, category, city) -> None:
         """Queue page displays priority counts in the filter links."""
-        ad = _make_ad(self.user, self.category, self.city)
+        ad = create_test_ad(self.user, category, city)
         PriorityService().calculate_and_save(ad)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.queue_url)
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(self.queue_url)
 
         # Should show total count = 1 (low)
-        self.assertContains(response, "All (1)")
+        assert b"All (1)" in response.content
 
 
 # ---------------------------------------------------------------------------
@@ -557,42 +430,43 @@ class TestModerationQueueView(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestBulkModerationActionView(TestCase):
+class TestBulkModerationActionView:
     """Tests for the bulk_moderation_action JSON API endpoint."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.category = _make_category()
-        cls.city = _make_city()
-        cls.user = _make_user(telegram_id=990030040)
-        cls.staff_user = _make_staff_user(telegram_id=990030041)
-        cls.bulk_url = reverse("moderation:bulk_action")
+    @pytest.fixture(autouse=True)
+    def _setup(self, category, city):
+        self.user = _make_user(telegram_id=990030040)
+        self.staff_user = _make_staff_user(telegram_id=990030041)
+        self.bulk_url = reverse("moderation:bulk_action")
 
     def test_requires_staff_forbidden(self) -> None:
         """Non-staff user gets 403."""
-        self.client.force_login(self.user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {"action": BulkModerationAction.APPROVE.value, "selected_items": []}
             ),
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 403)
+        assert response.status_code == 403
 
     def test_requires_post_method(self) -> None:
         """GET request returns 405."""
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.bulk_url)
-        self.assertEqual(response.status_code, 405)
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(self.bulk_url)
+        assert response.status_code == 405
 
-    def test_bulk_approve(self) -> None:
+    def test_bulk_approve(self, category, city) -> None:
         """Bulk approve action approves all selected ads."""
-        ad1 = _make_ad(self.user, self.category, self.city, title="Ad 1")
-        ad2 = _make_ad(self.user, self.category, self.city, title="Ad 2")
+        ad1 = create_test_ad(self.user, category, city, title="Ad 1")
+        ad2 = create_test_ad(self.user, category, city, title="Ad 2")
 
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {
@@ -603,24 +477,25 @@ class TestBulkModerationActionView(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         data = response.json()
-        self.assertEqual(data["completed"], 2)
-        self.assertEqual(data["errors"], [])
+        assert data["completed"] == 2
+        assert data["errors"] == []
 
         # Verify ads are now published
         ad1.refresh_from_db()
         ad2.refresh_from_db()
-        self.assertEqual(ad1.status, AdStatus.PUBLISHED)
-        self.assertEqual(ad2.status, AdStatus.PUBLISHED)
+        assert ad1.status == AdStatus.PUBLISHED
+        assert ad2.status == AdStatus.PUBLISHED
 
-    def test_bulk_reject(self) -> None:
+    def test_bulk_reject(self, category, city) -> None:
         """Bulk reject action rejects all selected ads with reason."""
-        ad1 = _make_ad(self.user, self.category, self.city, title="Ad 1")
-        ad2 = _make_ad(self.user, self.category, self.city, title="Ad 2")
+        ad1 = create_test_ad(self.user, category, city, title="Ad 1")
+        ad2 = create_test_ad(self.user, category, city, title="Ad 2")
 
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {
@@ -632,23 +507,24 @@ class TestBulkModerationActionView(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         data = response.json()
-        self.assertEqual(data["completed"], 2)
-        self.assertEqual(data["errors"], [])
+        assert data["completed"] == 2
+        assert data["errors"] == []
 
         # Verify ads are now rejected
         ad1.refresh_from_db()
         ad2.refresh_from_db()
-        self.assertEqual(ad1.status, AdStatus.REJECTED)
-        self.assertEqual(ad2.status, AdStatus.REJECTED)
+        assert ad1.status == AdStatus.REJECTED
+        assert ad2.status == AdStatus.REJECTED
 
-    def test_bulk_flag(self) -> None:
+    def test_bulk_flag(self, category, city) -> None:
         """Bulk flag action recalculates priority for selected ads."""
-        ad = _make_ad(self.user, self.category, self.city, title="Flagged ad")
+        ad = create_test_ad(self.user, category, city, title="Flagged ad")
 
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {"action": BulkModerationAction.FLAG.value, "selected_items": [ad.id]}
@@ -656,18 +532,19 @@ class TestBulkModerationActionView(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         data = response.json()
-        self.assertEqual(data["completed"], 1)
+        assert data["completed"] == 1
 
         # Verify priority record was created
         ad.refresh_from_db()
-        self.assertTrue(hasattr(ad, "moderation_priority"))
+        assert hasattr(ad, "moderation_priority")
 
-    def test_bulk_errors_reported(self) -> None:
+    def test_bulk_errors_reported(self, category, city) -> None:
         """Errors for individual items are reported without failing the whole batch."""
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {
@@ -678,73 +555,78 @@ class TestBulkModerationActionView(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         data = response.json()
-        self.assertEqual(data["completed"], 0)
-        self.assertEqual(len(data["errors"]), 1)
-        self.assertEqual(data["errors"][0]["id"], 99999)
+        assert data["completed"] == 0
+        assert len(data["errors"]) == 1
+        assert data["errors"][0]["id"] == 99999
 
     def test_unknown_action_returns_400(self) -> None:
         """Unknown action type is rejected with 400 before any item is processed."""
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps({"action": "unknown", "selected_items": [1]}),
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
         data = response.json()
-        self.assertEqual(data["error"], "Unknown action: unknown")
+        assert data["error"] == "Unknown action: unknown"
 
     # ── Finding 01: approve_ad enforces POST-only ─────────────────────────
 
-    def test_approve_ad_get_returns_405(self) -> None:
+    def test_approve_ad_get_returns_405(self, category, city) -> None:
         """GET to approve_ad endpoint returns 405 Method Not Allowed."""
-        ad = _make_ad(self.user, self.category, self.city)
+        ad = create_test_ad(self.user, category, city)
 
-        self.client.force_login(self.staff_user)
-        response = self.client.get(f"/moderation/approve/{ad.id}/")
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.get(f"/moderation/approve/{ad.id}/")
 
-        self.assertEqual(response.status_code, 405)
+        assert response.status_code == 405
         # Ad should remain in original status
         ad.refresh_from_db()
-        self.assertEqual(ad.status, AdStatus.ON_MODERATION)
+        assert ad.status == AdStatus.ON_MODERATION
 
     # ── Finding 02: bulk API guards against malformed JSON ─────────────────
 
     def test_malformed_json_body_returns_400(self) -> None:
         """POST with malformed JSON body returns 400 with error message."""
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data="not-json",
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
         data = response.json()
-        self.assertEqual(data["error"], "Invalid JSON in request body")
+        assert data["error"] == "Invalid JSON in request body"
 
     def test_empty_body_returns_400(self) -> None:
         """POST with empty body returns 400 with error message."""
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data="",
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
         data = response.json()
-        self.assertEqual(data["error"], "Invalid JSON in request body")
+        assert data["error"] == "Invalid JSON in request body"
 
     # ── Finding 14: bulk API sanitizes error messages ──────────────────────
 
     def test_error_messages_sanitized(self) -> None:
         """Error messages returned to client are sanitized, not raw exceptions."""
-        self.client.force_login(self.staff_user)
-        response = self.client.post(
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
             self.bulk_url,
             data=json.dumps(
                 {
@@ -755,9 +637,9 @@ class TestBulkModerationActionView(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         data = response.json()
-        self.assertEqual(data["completed"], 0)
-        self.assertEqual(len(data["errors"]), 1)
-        self.assertEqual(data["errors"][0]["id"], 99999)
-        self.assertEqual(data["errors"][0]["error"], "Processing failed")
+        assert data["completed"] == 0
+        assert len(data["errors"]) == 1
+        assert data["errors"][0]["id"] == 99999
+        assert data["errors"][0]["error"] == "Processing failed"

@@ -28,21 +28,6 @@ def buyer() -> User:
     )
 
 
-@pytest.fixture
-def category() -> Category:
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
-def city() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
 def _login(buyer: User) -> Client:
     client = Client()
     client.force_login(buyer)

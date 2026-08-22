@@ -11,26 +11,16 @@ from __future__ import annotations
 
 import pytest
 from apps.core.enums import ConsentChoice
-from apps.users.models import ConsentRecord, User
+from apps.users.models import ConsentRecord
 from django.test import Client
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def user() -> User:
-    """An authenticated user."""
-    return User.objects.create(
-        telegram_id=900000050,
-        chat_id=900000050,
-        password="x",
-    )
-
-
 class TestConsentRecords:
     """Consent actions create exactly one ConsentRecord each."""
 
-    def test_accept_creates_record(self, user: User) -> None:
+    def test_accept_creates_record(self, user) -> None:
         """Authenticated accept creates an ACCEPTED record with categories."""
         client = Client()
         client.force_login(user)
@@ -41,7 +31,7 @@ class TestConsentRecords:
         assert record.choice == ConsentChoice.ACCEPTED.value
         assert record.categories == {"analytics": True, "preferences": True}
 
-    def test_decline_creates_record(self, user: User) -> None:
+    def test_decline_creates_record(self, user) -> None:
         """Authenticated decline creates a DECLINED record."""
         client = Client()
         client.force_login(user)
@@ -51,7 +41,7 @@ class TestConsentRecords:
         assert record.choice == ConsentChoice.DECLINED.value
         assert record.categories == {"analytics": False, "preferences": True}
 
-    def test_withdraw_creates_record(self, user: User) -> None:
+    def test_withdraw_creates_record(self, user) -> None:
         """Authenticated withdraw creates a WITHDRAWN record."""
         client = Client()
         client.force_login(user)
@@ -72,7 +62,7 @@ class TestConsentRecords:
         assert record.consent_version == "1.0"
         assert response.cookies.get("consent_given") is not None
 
-    def test_ip_is_anonymized_and_ua_truncated(self, user: User) -> None:
+    def test_ip_is_anonymized_and_ua_truncated(self, user) -> None:
         """IP last octet zeroed; user agent truncated to 500 chars."""
         client = Client()
         client.force_login(user)

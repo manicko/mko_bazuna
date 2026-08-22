@@ -13,12 +13,16 @@ PostgreSQL-only).
 """
 
 import pytest
+from datetime import timedelta
+
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
-from apps.locations.models import City
 from django.contrib.postgres.search import SearchQuery, SearchRank
+from django.test import Client
 from django.utils import timezone
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -30,41 +34,14 @@ LOCALE_CONFIG = {
 }
 
 
-@pytest.fixture
-def category():
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
-def city():
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test_grad",
-    )
-
-
-@pytest.fixture
-def seller():
-    from apps.users.models import User
-
-    return User.objects.create(telegram_id=910000001, chat_id=910000001, password="x")
-
-
 def _create_published_ad(seller, category, city, **kwargs) -> Ad:
-    """Create a PUBLISHED ad, applying timestamp overrides via UPDATE."""
+    """Create a PUBLISHED ad using the shared create_test_ad helper."""
     defaults = {
-        "user": seller,
         "title": "Красный велосипед",
         "description": "Продается детский велосипед в хорошем состоянии",
-        "category": category,
-        "city": city,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now() - timezone.timedelta(days=1),
     }
     defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
+    return create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, **defaults)
 
 
 def _fts_match(ad: Ad, query: str, locale: str = "ru") -> bool:
@@ -203,3 +180,74 @@ class TestSearchVectorTrigger:
         assert not published_only.filter(pk=ad.pk).exists()
         # Vectors are still populated, but the view's status filter hides it.
         assert _fts_match(ad, "велосипед", locale="ru")
+
+
+# ---------------------------------------------------------------------------
+# Search view sort ordering (G-05)
+# ---------------------------------------------------------------------------
+
+
+class TestSearchViewSorting:
+    """Tests for ?sort=date_asc / date_desc ordering on the search view (G-05).
+
+    When no FTS query is present, ``/search/`` must respect the ``sort``
+    query parameter, mirroring ``listings.py``.  When a query *is* present,
+    FTS ranking (``order_by("-rank")``) takes priority — only the non-query
+    path is sorted here.
+    """
+
+    @staticmethod
+    def _make_ads(seller, category, city) -> dict[str, Ad]:
+        """Create 3 PUBLISHED ads with distinct ``published_at`` timestamps."""
+        now = timezone.now()
+        ad1 = _create_published_ad(
+            seller, category, city, title="Ad 1",
+            published_at=now - timedelta(hours=2),
+        )
+        ad2 = _create_published_ad(
+            seller, category, city, title="Ad 2",
+            published_at=now - timedelta(hours=1),
+        )
+        ad3 = _create_published_ad(
+            seller, category, city, title="Ad 3",
+            published_at=now,
+        )
+        return {"ad1": ad1, "ad2": ad2, "ad3": ad3}
+
+    @staticmethod
+    def _titles(page_obj) -> list[str]:
+        """Extract titles from the search view's ``page_obj``."""
+        return [a.title for a in page_obj]
+
+    def test_date_old_sorts_ascending(self, seller, category, city) -> None:
+        """``?sort=date_asc`` returns ads ordered by ``published_at`` ascending."""
+        self._make_ads(seller, category, city)
+
+        client = Client()
+        response = client.get("/search/?sort=date_asc")
+
+        assert response.status_code == 200
+        titles = self._titles(response.context["page_obj"])
+        assert titles == ["Ad 1", "Ad 2", "Ad 3"]
+
+    def test_date_new_sorts_descending(self, seller, category, city) -> None:
+        """``?sort=date_desc`` returns ads ordered by ``published_at`` descending."""
+        self._make_ads(seller, category, city)
+
+        client = Client()
+        response = client.get("/search/?sort=date_desc")
+
+        assert response.status_code == 200
+        titles = self._titles(response.context["page_obj"])
+        assert titles == ["Ad 3", "Ad 2", "Ad 1"]
+
+    def test_default_sort_is_date_new(self, seller, category, city) -> None:
+        """Without ``?sort=``, results default to newest-first (DATE_NEW)."""
+        self._make_ads(seller, category, city)
+
+        client = Client()
+        response = client.get("/search/")
+
+        assert response.status_code == 200
+        titles = self._titles(response.context["page_obj"])
+        assert titles == ["Ad 3", "Ad 2", "Ad 1"]

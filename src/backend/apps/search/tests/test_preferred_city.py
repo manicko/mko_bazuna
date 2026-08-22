@@ -12,28 +12,17 @@ buyers):
 """
 
 import pytest
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 from django.test import Client
-from django.utils import timezone
 
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_MAX_AGE
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for preferred-city persistence tests."""
-    return City.objects.create(
-        country_code="ME",
-        name="Подгорица",
-        region="Central",
-        slug="podgorica",
-    )
 
 
 @pytest.fixture
@@ -47,21 +36,6 @@ def buyer() -> User:
 
 
 @pytest.fixture
-def seller() -> User:
-    """Create a seller who owns published ads for read-back checks."""
-    return User.objects.create(
-        telegram_id=930000502,
-        chat_id=930000502,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> Category:
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
 def budva() -> City:
     return City.objects.create(
         country_code="ME",
@@ -69,20 +43,6 @@ def budva() -> City:
         region="Coastal",
         slug="budva",
     )
-
-
-def _published_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
-    defaults = {
-        "user": seller,
-        "title": "Велосипед",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now(),
-    }
-    defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
 
 
 class TestPreferredCityView:
@@ -184,8 +144,8 @@ class TestReset:
         self, seller: User, category: Category, city: City, budva: City
     ) -> None:
         """A clear for an anonymous buyer deletes the cookie; / then returns all-cities."""
-        podgorica_ad = _published_ad(seller, category, city)
-        budva_ad = _published_ad(seller, category, budva)
+        podgorica_ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        budva_ad = create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED)
 
         # Establish a preference via the cookie, then clear it.
         client = Client()
@@ -219,8 +179,8 @@ class TestReset:
         budva: City,
     ) -> None:
         """A clear for an authenticated buyer NULLs User.preferred_city (F-1/F-4)."""
-        podgorica_ad = _published_ad(seller, category, city)
-        budva_ad = _published_ad(seller, category, budva)
+        podgorica_ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        budva_ad = create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED)
 
         buyer.preferred_city = city
         buyer.save(update_fields=["preferred_city"])

@@ -8,115 +8,106 @@ trust scores, or UNVERIFIED sellers.
 
 from __future__ import annotations
 
+import pytest
 from django.template import Context, Template
-from django.test import TestCase
 
 from apps.core.enums import TrustLevel
 from apps.trust.models import SellerTrustScore, SellerVerification
 from apps.users.models import User
 
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-class TestRenderTrustBadge(TestCase):
+
+def _make_user(telegram_id: int, **overrides: object) -> User:
+    """Create a User with sensible defaults."""
+    defaults: dict = {
+        "telegram_id": telegram_id,
+        "chat_id": telegram_id,
+        "password": "x",
+    }
+    defaults.update(overrides)
+    return User.objects.create(**defaults)
+
+
+def _render(user) -> str:
+    """Render the template tag for the given user and return the HTML."""
+    template = Template(
+        "{% load trust_tags %}{% render_trust_badge user %}"
+    )
+    context = Context({"user": user, "request": None})
+    return template.render(context)
+
+
+@pytest.fixture
+def trust_users():
+    """Create users at each trust level for badge rendering tests."""
+    user = _make_user(990100001)
+    SellerTrustScore.objects.create(
+        user=user, trust_level=TrustLevel.UNVERIFIED, score=15,
+    )
+
+    verified_user = _make_user(990100002)
+    SellerVerification.objects.create(user=verified_user, verified_by_admin=True)
+    SellerTrustScore.objects.create(
+        user=verified_user, trust_level=TrustLevel.VERIFIED, score=35,
+    )
+
+    trusted_user = _make_user(990100003)
+    SellerTrustScore.objects.create(
+        user=trusted_user, trust_level=TrustLevel.TRUSTED, score=65,
+    )
+
+    pro_user = _make_user(990100004)
+    SellerTrustScore.objects.create(
+        user=pro_user, trust_level=TrustLevel.PRO, score=90,
+    )
+
+    return {
+        "user": user,
+        "verified_user": verified_user,
+        "trusted_user": trusted_user,
+        "pro_user": pro_user,
+    }
+
+
+class TestRenderTrustBadge:
     """Tests for the render_trust_badge template tag."""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user = User.objects.create(
-            telegram_id=990100001,
-            chat_id=990100001,
-            password="x",
-        )
-        cls.verified_user = User.objects.create(
-            telegram_id=990100002,
-            chat_id=990100002,
-            password="x",
-        )
-        SellerVerification.objects.create(
-            user=cls.verified_user,
-            verified_by_admin=True,
-        )
-        cls.trusted_user = User.objects.create(
-            telegram_id=990100003,
-            chat_id=990100003,
-            password="x",
-        )
-        cls.pro_user = User.objects.create(
-            telegram_id=990100004,
-            chat_id=990100004,
-            password="x",
-        )
-
-        # Create trust scores at each level
-        # UNVERIFIED: score < 31, no verification
-        SellerTrustScore.objects.create(
-            user=cls.user,
-            trust_level=TrustLevel.UNVERIFIED,
-            score=15,
-        )
-        # VERIFIED: score >= 31
-        SellerTrustScore.objects.create(
-            user=cls.verified_user,
-            trust_level=TrustLevel.VERIFIED,
-            score=35,
-        )
-        # TRUSTED: score >= 61
-        SellerTrustScore.objects.create(
-            user=cls.trusted_user,
-            trust_level=TrustLevel.TRUSTED,
-            score=65,
-        )
-        # PRO: score >= 86
-        SellerTrustScore.objects.create(
-            user=cls.pro_user,
-            trust_level=TrustLevel.PRO,
-            score=90,
-        )
-
-    def _render(self, user: User) -> str:
-        """Render the template tag for the given user and return the HTML."""
-        template = Template(
-            "{% load trust_tags %}{% render_trust_badge user %}"
-        )
-        context = Context({"user": user, "request": None})
-        return template.render(context)
 
     def test_no_badge_for_anonymous_user(self) -> None:
         """Anonymous user renders no badge."""
-        html = self._render(User(telegram_id=0, chat_id=0, password="x"))
-        self.assertEqual(html, "")
+        html = _render(User(telegram_id=0, chat_id=0, password="x"))
+        assert html == ""
 
     def test_no_badge_for_user_without_trust_score(self) -> None:
         """User without SellerTrustScore renders no badge."""
         no_score_user = User.objects.create(
-            telegram_id=990100005,
-            chat_id=990100005,
-            password="x",
+            telegram_id=990100005, chat_id=990100005, password="x",
         )
-        html = self._render(no_score_user)
-        self.assertEqual(html, "")
+        html = _render(no_score_user)
+        assert html == ""
 
-    def test_no_badge_for_unverified_level(self) -> None:
+    def test_no_badge_for_unverified_level(self, trust_users) -> None:
         """UNVERIFIED trust level renders no badge."""
-        html = self._render(self.user)
-        self.assertEqual(html, "")
+        html = _render(trust_users["user"])
+        assert html == ""
 
-    def test_verified_badge_rendered(self) -> None:
+    def test_verified_badge_rendered(self, trust_users) -> None:
         """VERIFIED trust level renders the verified badge."""
-        html = self._render(self.verified_user)
-        self.assertIn("Verified", html)
-        self.assertNotIn("Trusted", html)
-        self.assertNotIn("Pro", html)
+        html = _render(trust_users["verified_user"])
+        assert "Verified" in html
+        assert "Trusted" not in html
+        assert "Pro" not in html
 
-    def test_trusted_badge_rendered(self) -> None:
+    def test_trusted_badge_rendered(self, trust_users) -> None:
         """TRUSTED trust level renders the trusted badge."""
-        html = self._render(self.trusted_user)
-        self.assertIn("Trusted", html)
-        self.assertNotIn("Verified", html)
-        self.assertNotIn("Pro", html)
+        html = _render(trust_users["trusted_user"])
+        assert "Trusted" in html
+        assert "Verified" not in html
+        assert "Pro" not in html
 
-    def test_pro_badge_rendered(self) -> None:
+    def test_pro_badge_rendered(self, trust_users) -> None:
         """PRO trust level renders the pro badge."""
-        html = self._render(self.pro_user)
-        self.assertIn("Pro", html)
-        self.assertNotIn("Verified", html)
-        self.assertNotIn("Trusted", html)
+        html = _render(trust_users["pro_user"])
+        assert "Pro" in html
+        assert "Verified" not in html
+        assert "Trusted" not in html

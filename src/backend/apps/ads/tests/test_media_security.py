@@ -21,13 +21,14 @@ import pytest
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 from django.test import Client, override_settings
-from django.utils import timezone
 
 from telegram_bot.services.media import (
     delete_photo,
     generate_storage_key,
     strip_photo_exif,
 )
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -45,18 +46,6 @@ def isolated_media_root() -> Generator[Path]:
 
 
 @pytest.fixture
-def seller() -> object:
-    """Create a seller user for ad fixtures."""
-    from apps.users.models import User
-
-    return User.objects.create(
-        telegram_id=900000010,
-        chat_id=900000010,
-        password="x",
-    )
-
-
-@pytest.fixture
 def staff_user() -> object:
     """Create a staff user for moderator access tests."""
     from apps.users.models import User
@@ -66,30 +55,6 @@ def staff_user() -> object:
         chat_id=900000011,
         password="x",
         is_staff=True,
-    )
-
-
-@pytest.fixture
-def category() -> object:
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> object:
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
     )
 
 
@@ -141,24 +106,13 @@ def _create_ad_with_image(
     Returns:
         Tuple of (ad, ad_image, image_key).
     """
-    from apps.ads.models import Ad, AdImage
+    from apps.ads.models import AdImage
     from apps.core.enums import AdStatus
 
     actual_status = status or AdStatus.PUBLISHED
     key = image_key or generate_storage_key()
 
-    ad = Ad.objects.create(
-        user=seller,
-        title="Test Ad",
-        description="Test description",
-        category=category,
-        city=city,
-        category_name=category.name,
-        status=actual_status,
-        published_at=timezone.now() if actual_status == AdStatus.PUBLISHED else None,
-        archived_at=timezone.now() if actual_status == AdStatus.ARCHIVED else None,
-        deleted_at=timezone.now() if actual_status == AdStatus.DELETED else None,
-    )
+    ad = create_test_ad(seller, category, city, status=actual_status)
 
     ad_image = AdImage.objects.create(
         ad=ad,
@@ -454,24 +408,13 @@ class TestMediaGateThumbnailResolution:
 
         Returns the image_key used.
         """
-        from apps.ads.models import Ad, AdImage
+        from apps.ads.models import AdImage
         from apps.core.enums import AdStatus
 
         actual_status = status or AdStatus.PUBLISHED
         orig_key = image_key or generate_storage_key()
 
-        ad = Ad.objects.create(
-            user=seller,
-            title="Test Ad",
-            description="Test description",
-            category=category,
-            city=city,
-            category_name=category.name,
-            status=actual_status,
-            published_at=timezone.now()
-            if actual_status == AdStatus.PUBLISHED
-            else None,
-        )
+        ad = create_test_ad(seller, category, city, status=actual_status)
 
         kwargs = {thumbnail_field: thumbnail_key}
         AdImage.objects.create(ad=ad, image=orig_key, **kwargs)
@@ -573,20 +516,10 @@ class TestMediaGateThumbnailResolution:
         self, seller, category, city, isolated_media_root
     ):
         """When a key matches both image and thumbnail_small, image wins."""
-        from apps.ads.models import Ad, AdImage
-        from apps.core.enums import AdStatus
+        from apps.ads.models import AdImage
 
         conflicting_key = "conflict.jpg"
-        ad = Ad.objects.create(
-            user=seller,
-            title="Test Ad",
-            description="Test description",
-            category=category,
-            city=city,
-            category_name=category.name,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         # Create two AdImages — one with image=conflict.jpg, one with thumbnail_small=conflict.jpg
         AdImage.objects.create(ad=ad, image=conflicting_key)
         AdImage.objects.create(

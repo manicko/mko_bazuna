@@ -47,12 +47,17 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 
 ```powershell
 docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm `
-  -e PYTEST_OPTS="--reuse-db --create-db --tb=short -v src/backend/apps/ads/tests/test_ad_lifecycle.py" `
+  -e PYTEST_OPTS="--create-db --tb=short -v src/backend/apps/ads/tests/test_ad_lifecycle.py" `
   test
 ```
 
 > Do **not** use `--override-ini=addopts=` — it strips `--import-mode=importlib`
 > from `pyproject.toml`, which is required for the `src` layout. The `addopts`
 > are applied automatically; just append `-v` / a test path to `PYTEST_OPTS`.
+>
+> **Note on `--create-db`:** Always pass `--create-db`. It forces Django to check
+> for pending schema changes and rebuilds the test schema from scratch. The
+> `--reuse-db` flag is **not** used (it reuses stale schema and causes ~527
+> errors after any migration change; see plan risk §7).
 
 ---

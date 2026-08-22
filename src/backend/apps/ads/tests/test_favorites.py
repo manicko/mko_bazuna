@@ -23,17 +23,9 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user."""
-    return User.objects.create(
-        telegram_id=920000200,
-        chat_id=920000200,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -44,37 +36,6 @@ def buyer() -> User:
         chat_id=920000201,
         password="y",
     )
-
-
-@pytest.fixture
-def category() -> Category:
-    """Create a root category."""
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city."""
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
-def _published_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
-    defaults = {
-        "user": seller,
-        "title": "Красный велосипед",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now(),
-    }
-    defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +49,7 @@ class TestFavoriteToggle:
     def test_authenticated_toggle_adds_and_removes(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
         client.force_login(buyer)
 
@@ -109,7 +70,7 @@ class TestFavoriteToggle:
     def test_guest_tap_returns_login_prompt_no_302(
         self, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
 
         resp = client.post(f"/favorite/{ad.id}/")
@@ -135,7 +96,7 @@ class TestFavoriteToggle:
         native ``htmx:afterRequest`` listener, so a toggled heart must not
         carry the broken attribute.
         """
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
         client.force_login(buyer)
 
@@ -146,7 +107,7 @@ class TestFavoriteToggle:
     def test_non_published_ad_is_404(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(
+        ad = create_test_ad(
             seller,
             category,
             city,
@@ -170,8 +131,8 @@ class TestAnnotateFavorites:
     def test_annotates_initial_state(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        favorited = _published_ad(seller, category, city, title="Избранное")
-        not_favorited = _published_ad(seller, category, city, title="Другое")
+        favorited = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="Избранное")
+        not_favorited = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="Другое")
         AdFavorite.objects.create(user=buyer, ad=favorited)
 
         qs = Ad.objects.filter(pk__in=[favorited.pk, not_favorited.pk])
@@ -184,7 +145,7 @@ class TestAnnotateFavorites:
     def test_anonymous_is_all_false(
         self, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         qs = Ad.objects.filter(pk=ad.pk)
         annotated = annotate_favorites(qs, None)
         annotated_ad = annotated.get(pk=ad.pk)
@@ -206,7 +167,7 @@ class TestFavoritesList:
     def test_lists_favorited_ads(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         AdFavorite.objects.create(user=buyer, ad=ad)
 
         client = Client()
@@ -219,7 +180,7 @@ class TestFavoritesList:
     def test_empty_state(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        _published_ad(seller, category, city)  # another seller's ad, not favorited
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)  # another seller's ad, not favorited
         client = Client()
         client.force_login(buyer)
         resp = client.get("/cabinet/favorites/")

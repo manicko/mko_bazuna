@@ -163,8 +163,7 @@ console_output_style = "classic"
 markers = [
   "unit: marks tests that require no database (pure unit tests)",
   "integration: marks tests that require a database (use -m integration to run)",
-  "e2e: marks multi-component end-to-end tests (HTTP client, FTS, views)",
-  "seed: marks tests that invoke call_command('seed') or ImageGenerator (nightly only)",
+   "seed: marks tests that invoke call_command('seed') or ImageGenerator (nightly only)",
   "settings: marks import-time settings validation tests using subprocess isolation",
   "concurrent: marks tests requiring transaction=True (TRUNCATE per test)",
   "slow: marks tests that take >5 seconds individually (use -m 'not slow' to skip)",

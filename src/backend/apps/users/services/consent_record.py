@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from django.http import HttpRequest
 
-from apps.core.enums import ConsentChoice
+from apps.core.enums import ConsentChoice, CookieCategory
 from apps.users.models import ConsentRecord, User
 
 
@@ -31,7 +31,7 @@ def _anonymize_ip(ip: str | None) -> str | None:
 def record_consent_action(
     user: User | None,
     choice: ConsentChoice,
-    categories: dict[str, bool],
+    categories: dict[CookieCategory, bool],
     request: HttpRequest,
     consent_version: str = "1.0",
 ) -> ConsentRecord:
@@ -43,7 +43,7 @@ def record_consent_action(
     Args:
         user: The acting user, or ``None`` for anonymous visitors.
         choice: The ``ConsentChoice`` made (ACCEPTED / DECLINED / WITHDRAWN).
-        categories: Map of ``CookieCategory`` value to whether it was accepted.
+        categories: Map of ``CookieCategory`` to whether it was accepted.
         request: The HTTP request carrying the session, IP, and user agent.
         consent_version: Banner version the user was shown.
 

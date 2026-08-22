@@ -23,9 +23,12 @@ import pytest
 from PIL import Image
 from django.core.management import call_command
 from django.test import override_settings
-from django.utils import timezone
 
 from apps.ads.models import AdImage
+
+from telegram_bot.services.media import generate_storage_key
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -40,42 +43,6 @@ def isolated_media_root() -> Generator[Path]:
     """Create a temporary MEDIA_ROOT isolated from the real media volume."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
-
-
-@pytest.fixture
-def seller() -> object:
-    """Create a seller user for ad fixtures."""
-    from apps.users.models import User
-
-    return User.objects.create(
-        telegram_id=900000020,
-        chat_id=900000020,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> object:
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> object:
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
 
 
 # ---------------------------------------------------------------------------

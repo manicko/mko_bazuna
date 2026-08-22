@@ -13,13 +13,13 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
 import pytest
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 from django.test import Client
-from django.utils import timezone
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -27,16 +27,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000020,
-        chat_id=900000020,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -77,59 +67,6 @@ def other_category() -> Category:
     )
 
 
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _create_ad(
-    seller: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Test Ad",
-    status: AdStatus = AdStatus.PUBLISHED,
-) -> Ad:
-    """Create an ad with the given status.
-
-    Sets the status-specific timestamp required by the Ad check constraints
-    (e.g. ``moderation_failed_at`` for ``ON_MODERATION_FAILED``) to avoid
-    ``IntegrityError`` at INSERT time.
-    """
-    kwargs: dict[str, object] = {
-        "user": seller,
-        "title": title,
-        "description": "Test description for the ad",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-    }
-    # Set status-specific timestamps to satisfy Ad check constraints.
-    if status == AdStatus.PUBLISHED:
-        kwargs["published_at"] = timezone.now()
-    elif status == AdStatus.REJECTED:
-        kwargs["rejected_at"] = timezone.now()
-    elif status == AdStatus.ARCHIVED:
-        kwargs["archived_at"] = timezone.now()
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        kwargs["moderation_failed_at"] = timezone.now()
-    elif status == AdStatus.DELETED:
-        kwargs["deleted_at"] = timezone.now()
-    return Ad.objects.create(**kwargs)  # type: ignore[arg-type]
-
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -147,17 +84,17 @@ class TestSearchViewPublishesFilter:
     ) -> None:
         """No-query search returns only PUBLISHED ads, excluding DRAFT/ON_MODERATION/etc."""
         # Create one PUBLISHED ad and several non-PUBLISHED ads
-        _create_ad(seller, root_category, city, title="Published Ad", status=AdStatus.PUBLISHED)
-        _create_ad(seller, other_category, city, title="Draft Ad", status=AdStatus.DRAFT)
-        _create_ad(
+        create_test_ad(seller, root_category, city, title="Published Ad", status=AdStatus.PUBLISHED)
+        create_test_ad(seller, other_category, city, title="Draft Ad", status=AdStatus.DRAFT)
+        create_test_ad(
             seller,
             root_category,
             city,
             title="Moderation Ad",
             status=AdStatus.ON_MODERATION,
         )
-        _create_ad(seller, other_category, city, title="Rejected Ad", status=AdStatus.REJECTED)
-        _create_ad(seller, root_category, city, title="Archived Ad", status=AdStatus.ARCHIVED)
+        create_test_ad(seller, other_category, city, title="Rejected Ad", status=AdStatus.REJECTED)
+        create_test_ad(seller, root_category, city, title="Archived Ad", status=AdStatus.ARCHIVED)
 
         client = Client()
         response = client.get("/search/")
@@ -182,14 +119,14 @@ class TestSearchViewPublishesFilter:
         appear in the response — verified directly via the view's ``page_obj``
         rather than a model-level count.
         """
-        _create_ad(
+        create_test_ad(
             seller,
             root_category,
             city,
             title="Красный велосипед",
             status=AdStatus.PUBLISHED,
         )
-        _create_ad(
+        create_test_ad(
             seller,
             root_category,
             city,
@@ -216,14 +153,14 @@ class TestSearchViewPublishesFilter:
         city: City,
     ) -> None:
         """No-query search returns all PUBLISHED ads regardless of category."""
-        _create_ad(
+        create_test_ad(
             seller,
             root_category,
             city,
             title="Transport Ad",
             status=AdStatus.PUBLISHED,
         )
-        _create_ad(
+        create_test_ad(
             seller,
             other_category,
             city,
@@ -254,21 +191,21 @@ class TestSearchViewDescendantCategories:
         """A single-word query matching a category name returns ads from all descendants."""
         # Titles must contain the Russian word "Транспорт" so the per-language
         # FTS query (config=russian, vector=search_vector_ru) matches them.
-        ad_root = _create_ad(
+        ad_root = create_test_ad(
             seller,
             root_category,
             city,
             title="Транспорт — продажа прицепа",
             status=AdStatus.PUBLISHED,
         )
-        ad_child = _create_ad(
+        ad_child = create_test_ad(
             seller,
             child_category,
             city,
             title="Транспорт — детский велосипед",
             status=AdStatus.PUBLISHED,
         )
-        ad_grandchild = _create_ad(
+        ad_grandchild = create_test_ad(
             seller,
             grandchild_category,
             city,
@@ -276,7 +213,7 @@ class TestSearchViewDescendantCategories:
             status=AdStatus.PUBLISHED,
         )
         # Create ad in a non-descendant category (should NOT appear)
-        _create_ad(
+        create_test_ad(
             seller,
             other_category,
             city,
@@ -285,7 +222,7 @@ class TestSearchViewDescendantCategories:
         )
 
         # Also create a non-PUBLISHED ad in the descendant tree (should NOT appear)
-        _create_ad(
+        create_test_ad(
             seller,
             child_category,
             city,
@@ -319,7 +256,7 @@ class TestSearchViewDescendantCategories:
     ) -> None:
         """Non-PUBLISHED descendant ads are excluded even when category matches."""
         # Create a non-PUBLISHED ad in the descendant tree
-        _create_ad(
+        create_test_ad(
             seller,
             child_category,
             city,
@@ -347,7 +284,7 @@ class TestSearchViewPagination:
     ) -> None:
         """First page returns exactly 24 ads when there are 25+ published ads."""
         for i in range(25):
-            _create_ad(
+            create_test_ad(
                 seller,
                 root_category,
                 city,
@@ -374,7 +311,7 @@ class TestSearchViewPagination:
     ) -> None:
         """Second page returns remaining ads when there are 25+ published ads."""
         for i in range(25):
-            _create_ad(
+            create_test_ad(
                 seller,
                 root_category,
                 city,
@@ -401,7 +338,7 @@ class TestSearchViewPagination:
     ) -> None:
         """Page number beyond the last page returns the last page."""
         for i in range(25):
-            _create_ad(
+            create_test_ad(
                 seller,
                 root_category,
                 city,
@@ -424,7 +361,7 @@ class TestSearchViewPagination:
     ) -> None:
         """Invalid page number returns the first page."""
         for i in range(5):
-            _create_ad(
+            create_test_ad(
                 seller,
                 root_category,
                 city,

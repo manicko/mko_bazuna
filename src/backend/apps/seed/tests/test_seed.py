@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.utils import timezone
 
 from apps.ads.models import Ad
@@ -29,11 +29,11 @@ from apps.seed.paths import FIXTURES_IMAGES_DIR
 from apps.seed.services.seed_service import SeedService
 from apps.users.models import User
 
-
+pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ─── BaseGenerator tests ────────────────────────────────────────────────
 
 
-class TestBaseGenerator(TestCase):
+class TestBaseGenerator:
     """Tests for the BaseGenerator shared infrastructure."""
 
     def test_deterministic_faker_seed(self) -> None:
@@ -70,7 +70,7 @@ class TestBaseGenerator(TestCase):
 # ─── UserGenerator tests ────────────────────────────────────────────────
 
 
-class TestUserGenerator(TestCase):
+class TestUserGenerator:
     """Tests for UserGenerator."""
 
     def test_generates_correct_count(self) -> None:
@@ -126,14 +126,14 @@ class TestUserGenerator(TestCase):
 # ─── AdGenerator tests ──────────────────────────────────────────────────
 
 
-class TestAdGenerator(TestCase):
+class TestAdGenerator:
     """Tests for AdGenerator."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         """Create seed data for ad tests."""
         # Create users
-        cls.users = []
+        self.users = []
         for i in range(3):
             user = User.objects.create(
                 username=f"testuser{i}",
@@ -141,10 +141,10 @@ class TestAdGenerator(TestCase):
                 chat_id=1000 + i,
                 password="!",
             )
-            cls.users.append(user)
+            self.users.append(user)
 
         # Create categories
-        cls.categories = []
+        self.categories = []
         cat_data = [
             ("Недвижимость", "real-estate"),
             ("Автомобили", "cars"),
@@ -152,10 +152,10 @@ class TestAdGenerator(TestCase):
         ]
         for name, slug in cat_data:
             cat = Category.objects.create(name=name, slug=slug)
-            cls.categories.append(cat)
+            self.categories.append(cat)
 
         # Create cities
-        cls.cities = []
+        self.cities = []
         city_data = [
             ("Подгорица", "podgorica", "Central"),
             ("Будва", "budva", "Coastal"),
@@ -164,7 +164,7 @@ class TestAdGenerator(TestCase):
             city = City.objects.create(
                 name=name, slug=slug, region=region, country_code="ME"
             )
-            cls.cities.append(city)
+            self.cities.append(city)
 
     def test_generates_correct_count(self) -> None:
         """AdGenerator produces exactly M ads."""
@@ -245,11 +245,11 @@ class TestAdGenerator(TestCase):
 # ─── ImageGenerator tests ────────────────────────────────────────────────
 
 
-class TestImageGenerator(TestCase):
+class TestImageGenerator:
     """Tests for ImageGenerator."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         user = User.objects.create(
             username="imguser",
             telegram_id=9999,
@@ -260,7 +260,7 @@ class TestImageGenerator(TestCase):
         city = City.objects.create(
             name="Тест", slug="test-city", region="Test", country_code="ME"
         )
-        cls.ad = Ad.objects.create(
+        self.ad = Ad.objects.create(
             user=user,
             title="Test Ad",
             description="Test",
@@ -273,11 +273,11 @@ class TestImageGenerator(TestCase):
             published_at=timezone.now(),
         )
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         """Initialize tracking for dummy JPEG files created during tests."""
         self._created_files: list[Path] = []
 
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
         """Remove dummy JPEG files and temp media created during tests."""
         for path in self._created_files:
             path.unlink(missing_ok=True)
@@ -338,11 +338,11 @@ class TestImageGenerator(TestCase):
 # ─── AnalyticsGenerator tests ────────────────────────────────────────────
 
 
-class TestAnalyticsGenerator(TestCase):
+class TestAnalyticsGenerator:
     """Tests for AnalyticsGenerator."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         user = User.objects.create(
             username="anauser",
             telegram_id=8888,
@@ -353,7 +353,7 @@ class TestAnalyticsGenerator(TestCase):
         city = City.objects.create(
             name="Подгорица", slug="pg", region="Central", country_code="ME"
         )
-        cls.published_ad = Ad.objects.create(
+        self.published_ad = Ad.objects.create(
             user=user,
             title="Published Ad",
             description="Test",
@@ -365,7 +365,7 @@ class TestAnalyticsGenerator(TestCase):
             source=AdSource.SEED,
             published_at="2024-01-01 00:00:00+00",
         )
-        cls.draft_ad = Ad.objects.create(
+        self.draft_ad = Ad.objects.create(
             user=user,
             title="Draft Ad",
             description="Test",
@@ -443,11 +443,11 @@ class TestAnalyticsGenerator(TestCase):
 
 
 @pytest.mark.seed
-class TestSeedCommand(TestCase):
+class TestSeedCommand:
     """Tests for the seed management command."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         # Create prerequisite data (categories and cities)
         Category.objects.create(name="Тест", slug="test-seed")
         City.objects.create(
@@ -518,7 +518,7 @@ class TestSeedCommand(TestCase):
 # ─── Enum tests ──────────────────────────────────────────────────────────
 
 
-class TestSeedEnums(TestCase):
+class TestSeedEnums:
     """Tests for enum values added for seed support."""
 
     def test_ad_source_seed(self) -> None:
@@ -535,17 +535,17 @@ class TestSeedEnums(TestCase):
 # ─── ImageGenerator manifest-based tests ─────────────────────────────────
 
 
-class TestImageGeneratorManifest(TestCase):
+class TestImageGeneratorManifest:
     """Tests for ImageGenerator with manifest-based photo loading."""
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         """Create a temporary manifest for testing."""
         self.temp_dir = Path(tempfile.mkdtemp())
         self.fixtures_images_dir = (
             Path(__file__).resolve().parent.parent / "fixtures" / "images"
         )
 
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
         """Clean up temporary directory."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
@@ -663,11 +663,11 @@ class TestImageGeneratorManifest(TestCase):
 # ─── AdGenerator multi-language tests ────────────────────────────────────
 
 
-class TestAdGeneratorMultiLang(TestCase):
+class TestAdGeneratorMultiLang:
     """Tests for AdGenerator multi-language template support."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         """Create test users and cities required by AdGenerator.generate()."""
         for i in range(3):
             User.objects.create(
@@ -676,7 +676,7 @@ class TestAdGeneratorMultiLang(TestCase):
                 chat_id=3000 + i,
                 password="!",
             )
-        cls.users = list(User.objects.all())
+        self.users = list(User.objects.all())
 
         for i in range(2):
             City.objects.create(
@@ -685,7 +685,7 @@ class TestAdGeneratorMultiLang(TestCase):
                 region="Test",
                 country_code="ME",
             )
-        cls.cities = list(City.objects.all())
+        self.cities = list(City.objects.all())
 
     def test_word_lists_loaded(self) -> None:
         """Word lists contain expected keys with entries."""
@@ -858,11 +858,11 @@ class TestAdGeneratorMultiLang(TestCase):
 
 
 @pytest.mark.seed
-class TestSeedCommandEnhanced(TestCase):
+class TestSeedCommandEnhanced:
     """Tests for SeedCommand with new media cleanup and realistic photos."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         from apps.categories.models import Category
         from apps.locations.models import City
 
@@ -936,7 +936,7 @@ class TestSeedCommandEnhanced(TestCase):
 
 
 @pytest.mark.seed
-class TestSeedCategoryIntegration(TestCase):
+class TestSeedCategoryIntegration:
     """Integration tests verifying the full seed pipeline with the new category system.
 
     Tests that:
@@ -946,8 +946,8 @@ class TestSeedCategoryIntegration(TestCase):
     - Full seed command produces valid data end-to-end
     """
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         """Load categories via catalog builder and create prerequisite data."""
         from apps.categories.catalog.builder import load_catalog
 
@@ -1027,7 +1027,7 @@ class TestSeedCategoryIntegration(TestCase):
                 slug__in=["test-seed", "test-analytics", "test", "test-city"]
             )
         )
-        self.assertGreater(len(categories), 0, "No categories loaded from builder")
+        assert len(categories) > 0, "No categories loaded from builder"
 
         # Create users
         users = []
@@ -1041,7 +1041,7 @@ class TestSeedCategoryIntegration(TestCase):
             users.append(user)
 
         cities = list(City.objects.all())
-        self.assertGreater(len(cities), 0, "No cities available")
+        assert len(cities) > 0, "No cities available"
 
         gen = AdGenerator(
             {"faker_seed": 42, "status_distribution": {"published": 1.0}},
@@ -1050,26 +1050,25 @@ class TestSeedCategoryIntegration(TestCase):
             cities,
         )
         ads = gen.generate(10)
-        self.assertEqual(len(ads), 10)
+        assert len(ads) == 10
 
         for ad in ads:
             # All ads should reference categories from the builder
-            self.assertIsNotNone(ad.category)
+            assert ad.category is not None
             # Category slug should exist in the DB
-            self.assertTrue(
-                Category.objects.filter(slug=ad.category.slug).exists(),
-                f"Ad references unknown category slug: {ad.category.slug}",
-            )
+            assert (
+                Category.objects.filter(slug=ad.category.slug).exists()
+            ), f"Ad references unknown category slug: {ad.category.slug}"
             # Price may be None for free/negotiable ads (~20% of non-special
             # categories) per AdGenerator._generate_price() — only validate
             # the field when a price is actually set
             if ad.price is not None:
-                self.assertIsInstance(ad.price, int)
-                self.assertGreater(ad.price, 0)
+                assert isinstance(ad.price, int)
+                assert ad.price > 0
             # Multi-language fields should be populated
-            self.assertIsNotNone(ad.title)
-            self.assertIsNotNone(ad.title_en)
-            self.assertIsNotNone(ad.title_bs)
+            assert ad.title is not None
+            assert ad.title_en is not None
+            assert ad.title_bs is not None
 
     def test_photo_manifest_loading(self) -> None:
         """ImageGenerator loads the photo manifest (even if empty)."""
@@ -1078,8 +1077,8 @@ class TestSeedCategoryIntegration(TestCase):
             [],
         )
         # Manifest always exists (empty stub at minimum)
-        self.assertIsNotNone(gen.photo_pool)
-        self.assertIsNotNone(gen.default_pool)
+        assert gen.photo_pool is not None
+        assert gen.default_pool is not None
 
     def test_full_seed_with_builder_categories(self) -> None:
         """Full seed command produces ads with valid category references."""
@@ -1093,30 +1092,29 @@ class TestSeedCategoryIntegration(TestCase):
             stdout=out,
         )
         ads = Ad.objects.filter(source=AdSource.SEED)
-        self.assertEqual(ads.count(), 5)
+        assert ads.count() == 5
 
         for ad in ads:
             # All ads should reference categories from the builder
-            self.assertIsNotNone(ad.category)
-            self.assertTrue(
-                Category.objects.filter(slug=ad.category.slug).exists(),
-                f"Ad references unknown category slug: {ad.category.slug}",
-            )
+            assert ad.category is not None
+            assert (
+                Category.objects.filter(slug=ad.category.slug).exists()
+            ), f"Ad references unknown category slug: {ad.category.slug}"
             # Multi-language content
-            self.assertIsNotNone(ad.title_en)
-            self.assertIsNotNone(ad.title_bs)
-            self.assertEqual(ad.original_language, "ru")
+            assert ad.title_en is not None
+            assert ad.title_bs is not None
+            assert ad.original_language == "ru"
 
 
 # ─── Seed leaf-category coverage tests ──────────────────────────────────
 
 
 @pytest.mark.seed
-class TestLeafCategoryFiltering(TestCase):
+class TestLeafCategoryFiltering:
     """Verify that seed category loading returns only leaf categories."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         from apps.categories.catalog.builder import load_catalog
 
         CATALOG_PATH = (
@@ -1133,12 +1131,11 @@ class TestLeafCategoryFiltering(TestCase):
         categories = service._load_category_fixtures()
         # Every returned category should have no children.
         for cat in categories:
-            self.assertFalse(
-                cat.children.exists(),
-                f"Category {cat.slug} is not a leaf (has children)",
+            assert not cat.children.exists(), (
+                f"Category {cat.slug} is not a leaf (has children)"
             )
         # 171 leaf categories in the catalog (no test categories created here).
-        self.assertEqual(len(categories), 171)
+        assert len(categories) == 171
 
     def test_non_leaf_categories_excluded(self) -> None:
         """Non-leaf categories are not in the returned list."""
@@ -1146,19 +1143,19 @@ class TestLeafCategoryFiltering(TestCase):
         categories = service._load_category_fixtures()
         slug_set = {c.slug for c in categories}
         # These are known non-leaf (parent) categories.
-        self.assertNotIn("real-estate", slug_set)
-        self.assertNotIn("transport", slug_set)
-        self.assertNotIn("goods", slug_set)
-        self.assertNotIn("services-jobs", slug_set)
-        self.assertNotIn("business", slug_set)
+        assert "real-estate" not in slug_set
+        assert "transport" not in slug_set
+        assert "goods" not in slug_set
+        assert "services-jobs" not in slug_set
+        assert "business" not in slug_set
 
 
 @pytest.mark.seed
-class TestAdGeneratorLeafOnly(TestCase):
+class TestAdGeneratorLeafOnly:
     """Verify seed ads are only ever assigned to leaf categories."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
         from apps.categories.catalog.builder import load_catalog
 
         CATALOG_PATH = (
@@ -1187,9 +1184,8 @@ class TestAdGeneratorLeafOnly(TestCase):
         ads_in_non_leaf = Ad.objects.filter(
             source=AdSource.SEED, category_id__in=non_leaf_ids
         )
-        self.assertFalse(
-            ads_in_non_leaf.exists(),
-            f"Ads assigned to non-leaf categories: {list(ads_in_non_leaf.values_list('category__slug', flat=True))}",
+        assert not ads_in_non_leaf.exists(), (
+            f"Ads assigned to non-leaf categories: {list(ads_in_non_leaf.values_list('category__slug', flat=True))}"
         )
 
     def test_full_seed_coverage(self) -> None:
@@ -1213,8 +1209,6 @@ class TestAdGeneratorLeafOnly(TestCase):
             ).values_list("category__slug", flat=True)
         )
         coverage_pct = len(covered_slugs) / total_leaf * 100
-        self.assertGreaterEqual(
-            coverage_pct,
-            90.0,
-            f"Coverage {coverage_pct:.1f}% is below 90% threshold",
+        assert coverage_pct >= 90.0, (
+            f"Coverage {coverage_pct:.1f}% is below 90% threshold"
         )

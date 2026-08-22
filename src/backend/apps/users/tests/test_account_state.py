@@ -26,16 +26,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def user() -> User:
-    """Create a default user with all flags at their defaults."""
-    return User.objects.create(
-        telegram_id=900001000,
-        chat_id=900001000,
-        password="x",
-    )
-
-
 def _make_user(
     telegram_id: int,
     *,

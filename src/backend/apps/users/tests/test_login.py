@@ -201,6 +201,114 @@ class TestLoginStatus:
 
 
 # ---------------------------------------------------------------------------
+# LoginToken security edge cases (G-06)
+# ---------------------------------------------------------------------------
+
+
+class TestLoginTokenSecurity:
+    """Edge-case tests for LoginToken hashing, mismatch rejection, and atomicity."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        """Clear rate-limiter cache between tests."""
+        from django.core.cache import cache
+
+        cache.clear()
+        yield
+        cache.clear()
+
+    def test_token_hash_mismatch_returns_410(self) -> None:
+        """Polling with a *different* raw token (wrong hash) returns 410."""
+        # Issue a real token (creates a LoginToken row to prove mismatch detection).
+        client = Client()
+        assert client.get("/login/issue/").status_code == 200
+
+        # Poll with a tampered token — its SHA-256 hash won't match any row.
+        wrong_token = "wrong_token_32chars_abcde_abcdefghij"
+        response = client.get(f"/login/status/?token={wrong_token}")
+        assert response.status_code == 410
+
+    @pytest.mark.parametrize("field", ["token_hash"])
+    def test_stored_hash_is_sha256_not_raw(self, field: str) -> None:
+        """``token_hash`` is always ``sha256(raw)``, never the raw token string."""
+        client = Client()
+        response = client.get("/login/issue/")
+        raw_token: str = response.context["raw_token"]
+
+        expected_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        token = LoginToken.objects.get(token_hash=expected_hash)
+
+        # The stored value must equal the hash, not the raw token.
+        assert getattr(token, field) == expected_hash
+        assert getattr(token, field) != raw_token
+
+    @pytest.mark.parametrize("raw", ["a" * 32, "z" * 32, "0123456789abcdef" * 2])
+    def test_token_hash_length_is_64_hex(self, raw: str) -> None:
+        """SHA-256 hex digest is always 64 characters."""
+        token_hash = hashlib.sha256(raw.encode()).hexdigest()
+        assert len(token_hash) == 64
+        assert all(c in "0123456789abcdef" for c in token_hash)
+
+    def test_consumed_token_cannot_be_reused(self) -> None:
+        """A consumed token returns 410 on a second poll (claim atomicity)."""
+        telegram_id = 700000350
+        User.objects.create(
+            telegram_id=telegram_id,
+            chat_id=telegram_id,
+            username="atomic_user",
+        )
+
+        raw_token = "atomic_token_32chars_abcde_abcdefghij"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        client = Client()
+        # First poll — should consume and return 200.
+        first = client.get(f"/login/status/?token={raw_token}")
+        assert first.status_code == 200
+
+        # Second poll — token is now consumed → 410.
+        second = client.get(f"/login/status/?token={raw_token}")
+        assert second.status_code == 410
+
+    def test_bot_phase_claim_completes_when_user_exists(self) -> None:
+        """Phase 1 (bot set telegram_id + created user) → phase 2 (web poll) claims.
+
+        A token with ``telegram_id`` set (and a matching ``User``) but
+        ``consumed_at`` NULL is claimed on the first web poll: the response is
+        200 and ``consumed_at`` transitions from NULL to set (single-update
+        atomicity). This isolates the "telegram_id set, not yet consumed"
+        state before asserting the full session-establishment path elsewhere.
+        """
+        telegram_id = 700000360
+        User.objects.create(
+            telegram_id=telegram_id,
+            chat_id=telegram_id,
+            username="bot_phase_user",
+        )
+
+        raw_token = "bot_phase_32chars_abcde_abcdefghij"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        # Token has telegram_id set but consumed_at is NULL → first poll claims it.
+        client = Client()
+        response = client.get(f"/login/status/?token={raw_token}")
+        assert response.status_code == 200
+
+        token = LoginToken.objects.get(token_hash=token_hash)
+        assert token.consumed_at is not None
+
+
+# ---------------------------------------------------------------------------
 # preferred-city login reconciliation (AC-6 / R-08)
 # ---------------------------------------------------------------------------
 

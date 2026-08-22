@@ -22,8 +22,8 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
+from conftest import create_test_ad
 from django.test import Client
-from django.utils import timezone
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -54,79 +54,9 @@ def regular_user() -> User:
     )
 
 
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000042,
-        chat_id=900000042,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> Category:
-    """Create a leaf category for ad fixtures."""
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _create_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Test Ad",
-    status: AdStatus = AdStatus.ON_MODERATION,
-) -> Ad:
-    """Create an ad with the given status.
-
-    Sets the status-specific timestamp required by the Ad check constraints
-    (e.g. ``moderation_failed_at`` for ``ON_MODERATION_FAILED``) to avoid
-    ``IntegrityError`` at INSERT time. Previously this helper only set
-    ``published_at`` for PUBLISHED, causing
-    ``test_reject_failed_moderation_ad`` to fail with
-    ``ck_ads_moderation_failed_at_if_failed``.
-    """
-    kwargs: dict[str, object] = {
-        "user": user,
-        "title": title,
-        "description": "Test description for moderation",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-    }
-    if status == AdStatus.PUBLISHED:
-        kwargs["published_at"] = timezone.now()
-    elif status == AdStatus.REJECTED:
-        kwargs["rejected_at"] = timezone.now()
-    elif status == AdStatus.ARCHIVED:
-        kwargs["archived_at"] = timezone.now()
-        kwargs["published_at"] = timezone.now()
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        kwargs["moderation_failed_at"] = timezone.now()
-    elif status == AdStatus.DELETED:
-        kwargs["deleted_at"] = timezone.now()
-    return Ad.objects.create(**kwargs)  # type: ignore[arg-type]
 
 
 def _create_ad_with_image(
@@ -136,7 +66,7 @@ def _create_ad_with_image(
     **kwargs,
 ) -> tuple[Ad, AdImage]:
     """Create an ad with one image."""
-    ad = _create_ad(user, category, city, **kwargs)
+    ad = create_test_ad(user, category, city, **kwargs)
     ad_image = AdImage.objects.create(
         ad=ad,
         image="test-uuid-image-key.jpg",
@@ -159,7 +89,7 @@ class TestModerationStaffAccess:
         category: Category,
         city: City,
     ) -> Ad:
-        return _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        return create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
     def test_anonymous_user_gets_404(
         self,
@@ -249,7 +179,7 @@ class TestModerationReviewView:
         city: City,
     ) -> None:
         """Review page returns 404 for ads not in ON_MODERATION or ON_MODERATION_FAILED."""
-        ad = _create_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
         client = Client()
         client.force_login(staff_user)
@@ -306,7 +236,7 @@ class TestApproveAdView:
         city: City,
     ) -> None:
         """POST to approve_ad transitions ad from ON_MODERATION to PUBLISHED."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -328,7 +258,7 @@ class TestApproveAdView:
         city: City,
     ) -> None:
         """approve_ad creates a ModeratorActionLog entry."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -346,7 +276,7 @@ class TestApproveAdView:
             city: City,
     ) -> None:
         """GET to approve_ad returns 405 Method Not Allowed."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -366,7 +296,7 @@ class TestApproveAdView:
         city: City,
     ) -> None:
         """approve_ad returns 404 for ads not in ON_MODERATION status."""
-        ad = _create_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
         client = Client()
         client.force_login(staff_user)
@@ -392,7 +322,7 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """POST to reject_ad transitions ad from ON_MODERATION to REJECTED."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -417,7 +347,7 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """reject_ad works with only reason_category (reason_text is optional)."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -438,7 +368,7 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """reject_ad creates a ModeratorActionLog entry."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -458,7 +388,7 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """GET to reject_ad redirects rather than rejecting."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -480,7 +410,7 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """reject_ad works for ads in ON_MODERATION_FAILED status."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
 
         client = Client()
         client.force_login(staff_user)
@@ -510,7 +440,7 @@ class TestBanUserView:
         city: City,
     ) -> None:
         """POST to ban_user marks the seller as banned."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -533,7 +463,7 @@ class TestBanUserView:
         city: City,
     ) -> None:
         """ban_user creates a ModeratorActionLog entry for the ban."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -554,7 +484,7 @@ class TestBanUserView:
         city: City,
     ) -> None:
         """GET to ban_user redirects without banning."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
@@ -574,7 +504,7 @@ class TestBanUserView:
         city: City,
     ) -> None:
         """ban_user uses default reason when ban_reason is not provided."""
-        ad = _create_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)

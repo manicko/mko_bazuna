@@ -15,19 +15,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.users.models import User
-
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def user() -> User:
-    """Create an authenticated-capable user for logout tests."""
-    return User.objects.create(
-        telegram_id=910000001,
-        chat_id=910000001,
-        password="x",
-    )
 
 
 class TestLogoutContract:
@@ -37,14 +25,14 @@ class TestLogoutContract:
         """``consent:logout`` resolves to ``/logout/``."""
         assert reverse("consent:logout") == "/logout/"
 
-    def test_get_logout_returns_405(self, user: User) -> None:
+    def test_get_logout_returns_405(self, user) -> None:
         """A GET to /logout/ is rejected (POST-only)."""
         client = Client()
         client.force_login(user)
         response = client.get("/logout/")
         assert response.status_code == 405
 
-    def test_post_logout_flushes_session_and_redirects(self, user: User) -> None:
+    def test_post_logout_flushes_session_and_redirects(self, user) -> None:
         """A POST with a valid CSRF token logs out and redirects home."""
         client = Client()
         client.force_login(user)
@@ -56,14 +44,14 @@ class TestLogoutContract:
         # Session flushed by django.contrib.auth.logout
         assert "_auth_user_id" not in client.session
 
-    def test_post_logout_without_csrf_returns_403(self, user: User) -> None:
+    def test_post_logout_without_csrf_returns_403(self, user) -> None:
         """A POST /logout/ without a CSRF token is rejected (403)."""
         client = Client(enforce_csrf_checks=True)
         client.force_login(user)
         response = client.post("/logout/")
         assert response.status_code == 403
 
-    def test_logout_workflow_returns_anonymous(self, user: User) -> None:
+    def test_logout_workflow_returns_anonymous(self, user) -> None:
         """Login -> dashboard -> POST logout -> redirected -> anonymous again."""
         client = Client()
         client.force_login(user)

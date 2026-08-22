@@ -7,8 +7,6 @@ Tests the real can_contact_seller predicate using persisted User+Ad fixtures.
 from types import SimpleNamespace
 
 import pytest
-from telegram_bot.handlers.contact import CONTACT_PATTERN
-from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.core.services.contact import (
     _check_seller_contactable,
@@ -16,84 +14,11 @@ from apps.core.services.contact import (
     get_seller_for_contact,
     record_contact_response,
 )
-from apps.users.models import User
+from conftest import create_test_ad
 from django.utils import timezone
+from telegram_bot.handlers.contact import CONTACT_PATTERN
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    """Create a seller user for ad fixtures."""
-    return User.objects.create(
-        telegram_id=900000001,
-        chat_id=900000001,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category():
-    """Create a leaf category for ad fixtures."""
-    from apps.categories.models import Category
-
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city():
-    """Create a city for ad fixtures."""
-    from apps.locations.models import City
-
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
-def _set_status_timestamp(data, now=None):
-    """Auto-populate timestamp fields matching the ad status."""
-    from django.utils import timezone
-    from apps.core.enums import AdStatus
-
-    if now is None:
-        now = timezone.now()
-    status = data.get("status")
-    if status == AdStatus.PUBLISHED:
-        data.setdefault("published_at", now)
-        data.setdefault("original_published_at", now)
-    elif status == AdStatus.ARCHIVED:
-        data.setdefault("archived_at", now)
-        data.setdefault("published_at", now)
-        data.setdefault("original_published_at", now)
-    elif status == AdStatus.REJECTED:
-        data.setdefault("rejected_at", now)
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        data.setdefault("moderation_failed_at", now)
-    elif status == AdStatus.DELETED:
-        data.setdefault("deleted_at", now)
-    return data
-
-
-def _make_ad(seller, category, city, **kwargs) -> Ad:
-    """Create an Ad with required FK fields, overriding any kwargs."""
-    defaults = {
-        "user": seller,
-        "title": "Valid Title",
-        "description": "Valid description text",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
-    }
-    defaults.update(kwargs)
-    _set_status_timestamp(defaults)
-    return Ad.objects.create(**defaults)
 
 
 class TestCanContactSellerLogic:
@@ -101,27 +26,27 @@ class TestCanContactSellerLogic:
 
     def test_all_conditions_true_returns_true(self, seller, category, city):
         """All 5 R2 conditions true -> can_contact_seller returns True."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert can_contact_seller(ad) is True
 
     def test_archived_ad_returns_false(self, seller, category, city):
         """ARCHIVED/non-PUBLISHED ad -> can_contact_seller returns False."""
-        ad = _make_ad(seller, category, city, status=AdStatus.ARCHIVED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
         assert can_contact_seller(ad) is False
 
     def test_draft_ad_returns_false(self, seller, category, city):
         """DRAFT status -> can_contact_seller returns False."""
-        ad = _make_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         assert can_contact_seller(ad) is False
 
     def test_on_moderation_ad_returns_false(self, seller, category, city):
         """ON_MODERATION status -> can_contact_seller returns False."""
-        ad = _make_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
         assert can_contact_seller(ad) is False
 
     def test_rejected_ad_returns_false(self, seller, category, city):
         """REJECTED status -> can_contact_seller returns False."""
-        ad = _make_ad(seller, category, city, status=AdStatus.REJECTED)
+        ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
         assert can_contact_seller(ad) is False
 
     def test_telegram_id_none_returns_false(self):
@@ -156,21 +81,21 @@ class TestCanContactSellerLogic:
         """Seller is_deleted flag -> can_contact_seller returns False."""
         seller.is_deleted = True
         seller.save(update_fields=["is_deleted"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert can_contact_seller(ad) is False
 
     def test_seller_banned_returns_false(self, seller, category, city):
         """Seller is_banned flag -> can_contact_seller returns False."""
         seller.is_banned = True
         seller.save(update_fields=["is_banned"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert can_contact_seller(ad) is False
 
     def test_consent_revoked_returns_false(self, seller, category, city):
         """Seller consent_revoked_at set -> can_contact_seller returns False."""
         seller.consent_revoked_at = timezone.now()
         seller.save(update_fields=["consent_revoked_at"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert can_contact_seller(ad) is False
 
 
@@ -218,7 +143,7 @@ class TestCheckSellerContactable:
 
     def test_all_conditions_met_returns_true(self, seller, category, city):
         """All 6 conditions satisfied -> predicate returns True."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert _check_seller_contactable(ad, seller) is True
 
     @pytest.mark.parametrize(
@@ -227,7 +152,7 @@ class TestCheckSellerContactable:
     )
     def test_ad_not_published_returns_false(self, seller, category, city, status):
         """ad.status != PUBLISHED -> predicate returns False."""
-        ad = _make_ad(seller, category, city, status=status)
+        ad = create_test_ad(seller, category, city, status=status)
         assert _check_seller_contactable(ad, seller) is False
 
     def test_seller_is_none_returns_false(self):
@@ -250,21 +175,21 @@ class TestCheckSellerContactable:
         """seller.is_deleted -> predicate returns False."""
         seller.is_deleted = True
         seller.save(update_fields=["is_deleted"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert _check_seller_contactable(ad, seller) is False
 
     def test_seller_banned_returns_false(self, seller, category, city):
         """seller.is_banned -> predicate returns False."""
         seller.is_banned = True
         seller.save(update_fields=["is_banned"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert _check_seller_contactable(ad, seller) is False
 
     def test_consent_revoked_returns_false(self, seller, category, city):
         """seller.consent_revoked_at set -> predicate returns False."""
         seller.consent_revoked_at = timezone.now()
         seller.save(update_fields=["consent_revoked_at"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert _check_seller_contactable(ad, seller) is False
 
 
@@ -277,7 +202,7 @@ class TestGetSellerForContactIntegration:
 
     def test_returns_seller_when_contactable(self, seller, category, city):
         """Published ad + contactable seller -> (True, seller)."""
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert get_seller_for_contact(ad.id) == (True, seller)
 
     def test_returns_false_none_when_ad_not_found(self):
@@ -292,26 +217,130 @@ class TestGetSellerForContactIntegration:
         self, seller, category, city, status
     ):
         """Non-PUBLISHED ad -> (False, None)."""
-        ad = _make_ad(seller, category, city, status=status)
+        ad = create_test_ad(seller, category, city, status=status)
         assert get_seller_for_contact(ad.id) == (False, None)
 
     def test_returns_false_none_when_seller_deleted(self, seller, category, city):
         """Deleted seller -> (False, None)."""
         seller.is_deleted = True
         seller.save(update_fields=["is_deleted"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert get_seller_for_contact(ad.id) == (False, None)
 
     def test_returns_false_none_when_seller_banned(self, seller, category, city):
         """Banned seller -> (False, None)."""
         seller.is_banned = True
         seller.save(update_fields=["is_banned"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert get_seller_for_contact(ad.id) == (False, None)
 
-    def test_returns_false_none_when_consent_revoked(self, seller, category, city):
+    def test_returns_false_none_when_consent_revoked(
+        self, seller, category, city
+    ) -> None:
         """Consent revoked -> (False, None)."""
         seller.consent_revoked_at = timezone.now()
         seller.save(update_fields=["consent_revoked_at"])
-        ad = _make_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         assert get_seller_for_contact(ad.id) == (False, None)
+
+
+# ---------------------------------------------------------------------------
+# Combinatorial edge cases (G-04)
+# ---------------------------------------------------------------------------
+
+
+class TestContactCombinatorial:
+    """Cross-product tests for ``can_contact_seller`` and ``get_seller_for_contact``.
+
+    Verifies that:
+      (a) banned + consent WITHDRAWN both fail the predicate,
+      (b) DECLINE (``is_declined``) does NOT block contact — only WITHDRAWN
+          (``consent_revoked_at``) does,
+      (c) ``get_seller_for_contact`` returns the correct ``(bool, User|None)``
+          tuple across condition combinations.
+    """
+
+    @pytest.mark.parametrize(
+        ("is_banned", "is_deleted", "revoked", "is_declined", "expected"),
+        [
+            # Happy path: all conditions clear -> contactable.
+            (False, False, None, False, True),
+            # Single failing condition.
+            (True, False, None, False, False),
+            (False, True, None, False, False),
+            (False, False, timezone.now(), False, False),
+            # Combined failures.
+            (True, True, timezone.now(), False, False),
+            (True, False, timezone.now(), False, False),
+            # is_declined alone does NOT block contact (DISTINCT from consent_revoked_at).
+            (False, False, None, True, True),
+            # is_declined + consent_revoked → not contactable (revoked dominates).
+            (False, False, timezone.now(), True, False),
+            (True, False, timezone.now(), True, False),
+        ],
+        ids=[
+            "all_clear",
+            "banned",
+            "deleted",
+            "revoked",
+            "banned+deleted+revoked",
+            "banned+revoked",
+            "declined_only_contactable",
+            "declined+revoked",
+            "declined+banned+revoked",
+        ],
+    )
+    def test_can_contact_seller_cross_product(
+        self,
+        seller,
+        category,
+        city,
+        is_banned: bool,
+        is_deleted: bool,
+        revoked,
+        is_declined: bool,
+        expected: bool,
+    ) -> None:
+        """``can_contact_seller`` correctly evaluates the cross-product of R2 conditions."""
+        seller.is_banned = is_banned
+        seller.is_deleted = is_deleted
+        seller.is_declined = is_declined
+        if revoked is not None:
+            seller.consent_revoked_at = revoked
+        seller.save(
+            update_fields=["is_banned", "is_deleted", "is_declined", "consent_revoked_at"]
+        )
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        assert can_contact_seller(ad) is expected
+
+    @pytest.mark.parametrize(
+        ("is_banned", "revoked"),
+        [
+            (True, None),
+            (False, timezone.now()),
+            (True, timezone.now()),
+        ],
+        ids=["banned_only", "revoked_only", "banned_and_revoked"],
+    )
+    def test_get_seller_for_contact_return_tuple(
+        self, seller, category, city, is_banned: bool, revoked
+    ) -> None:
+        """``get_seller_for_contact`` returns ``(False, None)`` when any R2 condition fails."""
+        seller.is_banned = is_banned
+        if revoked is not None:
+            seller.consent_revoked_at = revoked
+        seller.save(update_fields=["is_banned", "consent_revoked_at"])
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        assert get_seller_for_contact(ad.id) == (False, None)
+
+    def test_contactable_seller_return_tuple_contract(
+        self, seller, category, city
+    ) -> None:
+        """When all conditions pass, ``get_seller_for_contact`` returns ``(True, seller)``."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        is_available, result_seller = get_seller_for_contact(ad.id)
+
+        assert is_available is True
+        assert result_seller == seller

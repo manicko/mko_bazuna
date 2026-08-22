@@ -12,24 +12,16 @@ import re
 
 import pytest
 from django.test import Client
-from django.utils import timezone
 
-from apps.ads.models import Ad, AdFavorite
+from apps.ads.models import AdFavorite
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture
-def seller() -> User:
-    return User.objects.create(
-        telegram_id=950000200,
-        chat_id=950000200,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -39,35 +31,6 @@ def buyer() -> User:
         chat_id=950000201,
         password="y",
     )
-
-
-@pytest.fixture
-def category() -> Category:
-    return Category.objects.create(name="Транспорт", slug="transport")
-
-
-@pytest.fixture
-def city() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="FBiH",
-        slug="test-grad",
-    )
-
-
-def _published_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
-    defaults = {
-        "user": seller,
-        "title": "Красный велосипед",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": AdStatus.PUBLISHED,
-        "published_at": timezone.now(),
-    }
-    defaults.update(kwargs)
-    return Ad.objects.create(**defaults)
 
 
 class TestFavoritesCountBadge:
@@ -83,10 +46,17 @@ class TestFavoritesCountBadge:
     def test_authenticated_returns_filled_heart_with_count(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(
+            seller, category, city,
+            title="Красный велосипед", status=AdStatus.PUBLISHED,
+        )
         AdFavorite.objects.create(user=buyer, ad=ad)
         AdFavorite.objects.create(
-            user=buyer, ad=_published_ad(seller, category, city, title="Второй")
+            user=buyer,
+            ad=create_test_ad(
+                seller, category, city,
+                title="Второй", status=AdStatus.PUBLISHED,
+            ),
         )
 
         client = Client()
@@ -100,7 +70,10 @@ class TestFavoritesCountBadge:
     def test_refreshes_after_toggle(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        ad = _published_ad(seller, category, city)
+        ad = create_test_ad(
+            seller, category, city,
+            title="Красный велосипед", status=AdStatus.PUBLISHED,
+        )
         client = Client()
         client.force_login(buyer)
 

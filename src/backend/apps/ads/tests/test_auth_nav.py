@@ -19,13 +19,14 @@ from collections.abc import Generator
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -36,16 +37,6 @@ def _clear_cache() -> Generator[None]:
     cache.clear()
     yield
     cache.clear()
-
-
-@pytest.fixture
-def user() -> User:
-    """Create a non-staff authenticated user."""
-    return User.objects.create(
-        telegram_id=920000001,
-        chat_id=920000001,
-        password="x",
-    )
 
 
 @pytest.fixture
@@ -60,37 +51,13 @@ def staff_user() -> User:
 
 
 @pytest.fixture
-def category() -> Category:
-    """Create a leaf category for ad fixtures."""
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
-@pytest.fixture
 def published_ad(user: User, category: Category, city: City) -> Ad:
     """Create a PUBLISHED ad for the authenticated seller."""
-    return Ad.objects.create(
-        user=user,
+    return create_test_ad(
+        user, category, city,
         title="Header Nav Ad",
         description="Header nav description",
-        category=category,
-        city=city,
-        category_name=category.name,
         status=AdStatus.PUBLISHED,
-        published_at=timezone.now(),
     )
 
 

@@ -19,16 +19,6 @@ from django.utils import timezone
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def user() -> User:
-    """Create a user for deletion tests."""
-    return User.objects.create(
-        telegram_id=900000001,
-        chat_id=900000001,
-        password="x",
-    )
-
-
 class TestWithdrawConsentInvalidatesTokens:
     """Tests for LoginToken invalidation on consent withdrawal."""
 
@@ -250,7 +240,7 @@ class TestWithdrawConsentAtomicity:
         # User NOT soft-deleted — PII and flags rolled back
         user.refresh_from_db()
         assert user.is_deleted is False
-        assert user.telegram_id == 900000001  # not nulled
+        assert user.telegram_id is not None  # not nulled (rolled back)
         assert user.consent_revoked_at is None
 
     def test_withdraw_returns_storage_keys(self, user: User, monkeypatch):

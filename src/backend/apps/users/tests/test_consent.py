@@ -12,7 +12,6 @@ import hashlib
 from datetime import timedelta
 
 import pytest
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, ConsentChoice
 from apps.locations.models import City
@@ -20,63 +19,9 @@ from apps.users.models import ConsentRecord, LoginToken, User
 from django.test import Client
 from django.utils import timezone
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def user() -> User:
-    """Create an authenticated user for consent tests."""
-    return User.objects.create(
-        telegram_id=900000030,
-        chat_id=900000030,
-        password="x",
-    )
-
-
-@pytest.fixture
-def category() -> Category:
-    """Create a leaf category for ad fixtures."""
-    return Category.objects.create(
-        name="Test Category",
-        slug="test-category",
-    )
-
-
-@pytest.fixture
-def city() -> City:
-    """Create a city for ad fixtures."""
-    return City.objects.create(
-        country_code="ME",
-        name="Test City",
-        region="Test Region",
-        slug="test-city",
-    )
-
-
-def _create_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Test Ad",
-    status: AdStatus = AdStatus.PUBLISHED,
-) -> Ad:
-    """Create an ad with the given status."""
-    return Ad.objects.create(
-        user=user,
-        title=title,
-        description="Test description",
-        category=category,
-        city=city,
-        category_name=category.name,
-        status=status,
-        published_at=timezone.now() if status == AdStatus.PUBLISHED else None,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +211,8 @@ class TestConsentWithdrawView:
     ) -> None:
         """consent_withdraw soft-deletes the user, nulls PII, and marks consent revoked."""
         # Create some ads
-        _create_ad(user, category, city, title="Ad 1", status=AdStatus.PUBLISHED)
-        _create_ad(user, category, city, title="Ad 2", status=AdStatus.ON_MODERATION)
+        create_test_ad(user, category, city, title="Ad 1", status=AdStatus.PUBLISHED)
+        create_test_ad(user, category, city, title="Ad 2", status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(user)
@@ -291,10 +236,12 @@ class TestConsentWithdrawView:
         city: City,
     ) -> None:
         """consent_withdraw soft-deletes all user ads."""
-        ad1 = _create_ad(
+        ad1 = create_test_ad(
             user, category, city, title="Published Ad", status=AdStatus.PUBLISHED
         )
-        ad2 = _create_ad(user, category, city, title="Draft Ad", status=AdStatus.DRAFT)
+        ad2 = create_test_ad(
+            user, category, city, title="Draft Ad", status=AdStatus.DRAFT
+        )
 
         client = Client()
         client.force_login(user)

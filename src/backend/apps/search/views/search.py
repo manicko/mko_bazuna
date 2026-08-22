@@ -145,6 +145,17 @@ def search(request: HttpRequest) -> HttpResponse:
             query,
             session=request.session,
         )
+    else:
+        # No FTS query: apply the requested sort ordering so buyers can
+        # browse by date or price even on an unfiltered /search/ page.
+        if current_sort == AdSort.DATE_OLD:
+            ads = ads.order_by("published_at")
+        elif current_sort == AdSort.PRICE_LOW:
+            ads = ads.order_by("price")
+        elif current_sort == AdSort.PRICE_HIGH:
+            ads = ads.order_by("-price")
+        else:  # DATE_NEW — default, newest first
+            ads = ads.order_by("-published_at")
 
     # Paginate results
     from apps.ads.views.favorite import annotate_favorites

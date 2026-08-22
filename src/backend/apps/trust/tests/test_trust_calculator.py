@@ -2,25 +2,25 @@
 Unit tests for TrustCalculator trust scoring service (TASK_043).
 
 Tests cover score calculation, verification bonuses, rejection rate impact,
-and trust level mapping. Uses ``django.test.TestCase`` for DB-backed assertions.
+and trust level mapping. Uses ``pytest.mark.django_db`` for DB-backed
+assertions.
 
 Requires a working PostgreSQL database per project spec.
 """
 
 from __future__ import annotations
 
-
-from django.test import TestCase
-from django.utils import timezone
-
+import pytest
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.locations.models import City
 from apps.trust.models import SellerTrustScore, SellerVerification
 from apps.trust.services.trust_calculator import TrustCalculator
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -57,38 +57,6 @@ def _make_city(slug: str = "trust-test-city") -> City:
     )
 
 
-def _make_ad(
-    user: User,
-    category: Category,
-    city: City,
-    *,
-    title: str = "Trust Test Ad",
-    status: AdStatus = AdStatus.PUBLISHED,
-    **overrides: object,
-) -> Ad:
-    """Create an Ad with sensible defaults for trust tests."""
-    defaults: dict = {
-        "user": user,
-        "title": title,
-        "description": "Trust test description",
-        "category": category,
-        "city": city,
-        "category_name": category.name,
-        "status": status,
-        "source": AdSource.TELEGRAM,
-    }
-    # DB CheckConstraints require status-specific timestamps to be non-null
-    now = timezone.now()
-    if status == AdStatus.PUBLISHED:
-        defaults["published_at"] = now
-    elif status == AdStatus.REJECTED:
-        defaults["rejected_at"] = now
-    elif status == AdStatus.ON_MODERATION_FAILED:
-        defaults["moderation_failed_at"] = now
-    defaults.update(overrides)
-    return Ad.objects.create(**defaults)  # type: ignore[arg-type]
-
-
 def _make_verification(
     user: User, *, verified_by_admin: bool = False
 ) -> SellerVerification:
@@ -118,25 +86,27 @@ def _make_event(
 # ---------------------------------------------------------------------------
 
 
-class TestTrustCalculator(TestCase):
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestTrustCalculator:
     """Comprehensive tests for TrustCalculator scoring algorithm."""
 
-    @classmethod
-    def setUpTestData(cls) -> None:
-        """Create shared fixtures for all test methods."""
-        cls.calculator = TrustCalculator()
+    @pytest.fixture(autouse=True)
+    def _setup_shared(self, db: None) -> None:
+        """Create shared fixtures for all test methods.
 
-        cls.category = _make_category()
-        cls.city = _make_city()
-
-        cls.user = _make_user(telegram_id=990010001)
-        cls.verified_user = _make_user(
+        ``db`` fixture grants DB access, then we populate shared state.
+        """
+        self.calculator = TrustCalculator()
+        self.category = _make_category()
+        self.city = _make_city()
+        self.user = _make_user(telegram_id=990010001)
+        self.verified_user = _make_user(
             telegram_id=990010002,
             username="verified_seller",
         )
-        _make_verification(cls.verified_user, verified_by_admin=True)
-
-        cls.premium_user = _make_user(
+        _make_verification(self.verified_user, verified_by_admin=True)
+        self.premium_user = _make_user(
             telegram_id=990010003,
             telegram_premium=True,
         )
@@ -154,12 +124,12 @@ class TestTrustCalculator(TestCase):
         empty_user = _make_user(telegram_id=990011001)
         score = self._score(empty_user)
 
-        self.assertEqual(score.score, 0)
-        self.assertEqual(score.ad_count_lifetime, 0)
-        self.assertEqual(score.ad_count_active, 0)
-        self.assertEqual(score.trust_level, TrustLevel.UNVERIFIED)
-        self.assertEqual(float(score.rejection_rate), 0.0)
-        self.assertEqual(float(score.contact_response_rate), 0.0)
+        assert score.score == 0
+        assert score.ad_count_lifetime == 0
+        assert score.ad_count_active == 0
+        assert score.trust_level == TrustLevel.UNVERIFIED
+        assert float(score.rejection_rate) == 0.0
+        assert float(score.contact_response_rate) == 0.0
 
     # ── test_score_with_published_ads ──────────────────────────────────
 
@@ -169,7 +139,7 @@ class TestTrustCalculator(TestCase):
 
         # Create 3 published ads → activity = 3 * 5 = 15
         for i in range(3):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -182,10 +152,10 @@ class TestTrustCalculator(TestCase):
         # 3 published ads on activity: 3 * 5 = 15
         # 3 non-draft, 0 rejected → quality: (1 - 0/3) * 30 = 30
         # total = 15 + 30 + 0 = 45
-        self.assertEqual(score.score, 45)
-        self.assertEqual(score.ad_count_lifetime, 3)
-        self.assertEqual(score.ad_count_active, 3)
-        self.assertEqual(score.trust_level, TrustLevel.VERIFIED)
+        assert score.score == 45
+        assert score.ad_count_lifetime == 3
+        assert score.ad_count_active == 3
+        assert score.trust_level == TrustLevel.VERIFIED
 
     def test_score_caps_at_activity_max(self) -> None:
         """Activity score is capped at 40 (8+ published ads)."""
@@ -193,7 +163,7 @@ class TestTrustCalculator(TestCase):
 
         # Create 10 published ads → activity = min(10 * 5, 40) = 40
         for i in range(10):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -206,10 +176,10 @@ class TestTrustCalculator(TestCase):
         # activity: 40 (capped)
         # quality: (1 - 0/10) * 30 = 30
         # total = 40 + 30 + 0 = 70
-        self.assertEqual(score.score, 70)
-        self.assertEqual(score.ad_count_lifetime, 10)
-        self.assertEqual(score.ad_count_active, 10)
-        self.assertEqual(score.trust_level, TrustLevel.TRUSTED)
+        assert score.score == 70
+        assert score.ad_count_lifetime == 10
+        assert score.ad_count_active == 10
+        assert score.trust_level == TrustLevel.TRUSTED
 
     # ── test_verification_bonus ────────────────────────────────────────
 
@@ -219,7 +189,7 @@ class TestTrustCalculator(TestCase):
         user = _make_user(telegram_id=990014001)
         _make_verification(user, verified_by_admin=True)
 
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -232,8 +202,8 @@ class TestTrustCalculator(TestCase):
         # activity: 1 * 5 = 5
         # quality: (1 - 0/1) * 30 = 30
         # total = 5 + 30 + 0 = 35 → naturally VERIFIED (>= 31)
-        self.assertGreaterEqual(score.score, 31)
-        self.assertEqual(score.trust_level, TrustLevel.VERIFIED)
+        assert score.score >= 31
+        assert score.trust_level == TrustLevel.VERIFIED
 
     def test_verification_bonus_admin_floor(self) -> None:
         """Admin-verified seller with very low score still gets VERIFIED."""
@@ -241,7 +211,7 @@ class TestTrustCalculator(TestCase):
         _make_verification(user, verified_by_admin=True)
 
         # Create 1 published and 5 rejected ads to drive quality down
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -249,7 +219,7 @@ class TestTrustCalculator(TestCase):
             status=AdStatus.PUBLISHED,
         )
         for i in range(5):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -262,8 +232,8 @@ class TestTrustCalculator(TestCase):
         # activity: 1 * 5 = 5
         # quality: (1 - 5/6) * 30 = (1 - 0.833) * 30 ≈ 5
         # total ≈ 10 → below VERIFIED threshold, but admin verification floors it
-        self.assertLess(score.score, 31)
-        self.assertEqual(score.trust_level, TrustLevel.VERIFIED)
+        assert score.score < 31
+        assert score.trust_level == TrustLevel.VERIFIED
 
     def test_verification_bonus_premium(self) -> None:
         """Telegram Premium seller with low score gets VERIFIED floor."""
@@ -273,7 +243,7 @@ class TestTrustCalculator(TestCase):
         )
 
         # Create 1 published and 5 rejected ads to drive quality down
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -281,7 +251,7 @@ class TestTrustCalculator(TestCase):
             status=AdStatus.PUBLISHED,
         )
         for i in range(5):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -291,8 +261,8 @@ class TestTrustCalculator(TestCase):
 
         score = self._score(user)
 
-        self.assertLess(score.score, 31)
-        self.assertEqual(score.trust_level, TrustLevel.VERIFIED)
+        assert score.score < 31
+        assert score.trust_level == TrustLevel.VERIFIED
 
     # ── test_rejection_penalty ─────────────────────────────────────────
 
@@ -302,7 +272,7 @@ class TestTrustCalculator(TestCase):
 
         # 2 published + 2 rejected = 4 non-draft ads
         for i in range(2):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -310,7 +280,7 @@ class TestTrustCalculator(TestCase):
                 status=AdStatus.PUBLISHED,
             )
         for i in range(2):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -319,7 +289,7 @@ class TestTrustCalculator(TestCase):
             )
 
         # DRAFT ads should NOT be counted in quality calculation
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -332,15 +302,15 @@ class TestTrustCalculator(TestCase):
         # activity: 2 * 5 = 10
         # quality: (1 - 2/4) * 30 = 15
         # total = 10 + 15 + 0 = 25
-        self.assertEqual(score.score, 25)
-        self.assertEqual(score.trust_level, TrustLevel.UNVERIFIED)
+        assert score.score == 25
+        assert score.trust_level == TrustLevel.UNVERIFIED
 
     def test_full_rejection_all_rejected(self) -> None:
         """Seller with all ads rejected gets quality score of zero."""
         user = _make_user(telegram_id=990017001)
 
         for i in range(3):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -353,21 +323,21 @@ class TestTrustCalculator(TestCase):
         # activity: 0 (no published ads)
         # quality: (1 - 3/3) * 30 = 0
         # total = 0
-        self.assertEqual(score.score, 0)
-        self.assertEqual(score.rejection_rate, 100.0)
+        assert score.score == 0
+        assert score.rejection_rate == 100.0
 
     def test_mixed_rejected_and_moderation_failed(self) -> None:
         """Both REJECTED and ON_MODERATION_FAILED count as rejected for quality."""
         user = _make_user(telegram_id=990018001)
 
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
             title="Published",
             status=AdStatus.PUBLISHED,
         )
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -380,7 +350,7 @@ class TestTrustCalculator(TestCase):
         # activity: 1 * 5 = 5
         # quality: (1 - 1/2) * 30 = 15
         # total = 20
-        self.assertEqual(score.score, 20)
+        assert score.score == 20
 
     # ── test_rejection_rate_persistence ────────────────────────────────
 
@@ -390,21 +360,21 @@ class TestTrustCalculator(TestCase):
 
         # 3 published, 1 rejected, 1 moderation_failed = 5 non-draft, 2 rejected
         for i in range(3):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
                 title=f"Published {i}",
                 status=AdStatus.PUBLISHED,
             )
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
             title="Rejected",
             status=AdStatus.REJECTED,
         )
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -415,7 +385,7 @@ class TestTrustCalculator(TestCase):
         score = self._score(user)
 
         # rejection rate: (2 / 5) * 100 = 40.0
-        self.assertEqual(float(score.rejection_rate), 40.0)
+        assert float(score.rejection_rate) == 40.0
 
     # ── test_trust_level_mapping ───────────────────────────────────────
 
@@ -424,7 +394,7 @@ class TestTrustCalculator(TestCase):
         user = _make_user(telegram_id=990020001)
 
         # Create 1 published, 5 rejected to keep score low
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -432,7 +402,7 @@ class TestTrustCalculator(TestCase):
             status=AdStatus.PUBLISHED,
         )
         for i in range(5):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -442,8 +412,8 @@ class TestTrustCalculator(TestCase):
 
         score = self._score(user)
 
-        self.assertLess(score.score, 31)
-        self.assertEqual(score.trust_level, TrustLevel.UNVERIFIED)
+        assert score.score < 31
+        assert score.trust_level == TrustLevel.UNVERIFIED
 
     def test_trust_level_verified_threshold(self) -> None:
         """Score at VERIFIED_THRESHOLD (31) maps to VERIFIED."""
@@ -459,7 +429,7 @@ class TestTrustCalculator(TestCase):
         # total = 15 + 18 = 33
 
         for i in range(3):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -467,7 +437,7 @@ class TestTrustCalculator(TestCase):
                 status=AdStatus.PUBLISHED,
             )
         for i in range(2):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -477,9 +447,9 @@ class TestTrustCalculator(TestCase):
 
         score = self._score(user)
 
-        self.assertEqual(score.trust_level, TrustLevel.VERIFIED)
-        self.assertGreaterEqual(score.score, 31)
-        self.assertLess(score.score, 61)
+        assert score.trust_level == TrustLevel.VERIFIED
+        assert score.score >= 31
+        assert score.score < 61
 
     def test_trust_level_trusted_threshold(self) -> None:
         """Score at TRUSTED_THRESHOLD (61) maps to TRUSTED."""
@@ -490,7 +460,7 @@ class TestTrustCalculator(TestCase):
         # 8 non-draft, 0 rejected → quality = 30
         # total = 70 (≥ 61, < 86)
         for i in range(8):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -500,9 +470,9 @@ class TestTrustCalculator(TestCase):
 
         score = self._score(user)
 
-        self.assertEqual(score.trust_level, TrustLevel.TRUSTED)
-        self.assertGreaterEqual(score.score, 61)
-        self.assertLess(score.score, 86)
+        assert score.trust_level == TrustLevel.TRUSTED
+        assert score.score >= 61
+        assert score.score < 86
 
     def test_trust_level_pro_threshold(self) -> None:
         """Score at PRO_THRESHOLD (86) maps to PRO."""
@@ -516,7 +486,7 @@ class TestTrustCalculator(TestCase):
         # Need response of at least 16 to hit 86
 
         for i in range(8):
-            _make_ad(
+            create_test_ad(
                 user,
                 self.category,
                 self.city,
@@ -525,7 +495,7 @@ class TestTrustCalculator(TestCase):
             )
 
         # Add a global contact-initiated event so response calc denominator > 0
-        contact_init_ad = _make_ad(
+        contact_init_ad = create_test_ad(
             _make_user(telegram_id=990023099),
             self.category,
             self.city,
@@ -540,8 +510,8 @@ class TestTrustCalculator(TestCase):
         score = self._score(user)
 
         # total = 40 + 30 + int(30) = 100
-        self.assertEqual(score.trust_level, TrustLevel.PRO)
-        self.assertGreaterEqual(score.score, 86)
+        assert score.trust_level == TrustLevel.PRO
+        assert score.score >= 86
 
     # ── test_response_score ────────────────────────────────────────────
 
@@ -549,7 +519,7 @@ class TestTrustCalculator(TestCase):
         """Response score is 0 when there are no contact-initiated events."""
         user = _make_user(telegram_id=990024001)
 
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -560,7 +530,7 @@ class TestTrustCalculator(TestCase):
         score = self._score(user)
 
         # No CONTACT_INITIATED events → response = 0.0
-        self.assertEqual(float(score.contact_response_rate), 0.0)
+        assert float(score.contact_response_rate) == 0.0
 
     def test_response_score_with_contacts(self) -> None:
         """Response score is proportional to user's responses vs total contacts."""
@@ -568,7 +538,7 @@ class TestTrustCalculator(TestCase):
         other_user = _make_user(telegram_id=990025099)
 
         # Create a shared ad to attach events to
-        shared_ad = _make_ad(
+        shared_ad = create_test_ad(
             other_user,
             self.category,
             self.city,
@@ -584,7 +554,7 @@ class TestTrustCalculator(TestCase):
         for _ in range(2):
             _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=user)
 
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -595,7 +565,7 @@ class TestTrustCalculator(TestCase):
         score = self._score(user)
 
         # response = (2 / 3) * 30 = 20.0
-        self.assertEqual(float(score.contact_response_rate), 20.0)
+        assert float(score.contact_response_rate) == 20.0
 
     # ── test_calculate_and_save_idempotent ─────────────────────────────
 
@@ -605,10 +575,10 @@ class TestTrustCalculator(TestCase):
 
         # First call — no ads
         score1 = self._score(user)
-        self.assertEqual(score1.score, 0)
+        assert score1.score == 0
 
         # Add ads and recalculate
-        _make_ad(
+        create_test_ad(
             user,
             self.category,
             self.city,
@@ -618,10 +588,10 @@ class TestTrustCalculator(TestCase):
         score2 = self._score(user)
 
         # Same row, updated values
-        self.assertEqual(score1.pk, score2.pk)
-        self.assertEqual(score2.score, 35)  # 5 + 30 + 0
-        self.assertEqual(score2.ad_count_lifetime, 1)
-        self.assertEqual(score2.ad_count_active, 1)
+        assert score1.pk == score2.pk
+        assert score2.score == 35  # 5 + 30 + 0
+        assert score2.ad_count_lifetime == 1
+        assert score2.ad_count_active == 1
 
     # ── test_calculate_and_save_records_trust_event ────────────────────────
 
@@ -634,7 +604,7 @@ class TestTrustCalculator(TestCase):
             event_type=AnalyticsEventType.TRUST_LEVEL_UPDATED,
             user_id=user.id,
         )
-        self.assertEqual(events.count(), 1)
+        assert events.count() == 1
 
     def test_calculate_and_save_records_on_update(self) -> None:
         """Calling calculate_and_save twice records two TRUST_LEVEL_UPDATED events."""
@@ -646,4 +616,113 @@ class TestTrustCalculator(TestCase):
             event_type=AnalyticsEventType.TRUST_LEVEL_UPDATED,
             user_id=user.id,
         )
-        self.assertEqual(events.count(), 2)
+        assert events.count() == 2
+
+
+# ---------------------------------------------------------------------------
+# Quality-score truncation edge cases (C.8, G-08)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestQualityScoreTruncation:
+    """Edge cases for ``int()``/``round()`` truncation in TrustCalculator scoring."""
+
+    def test_activity_cap_interaction_with_quality_max(
+        self, seller, category, city
+    ) -> None:
+        """9 published ads: activity caps at 40, quality=30 → total 70 → TRUSTED.
+
+        Exercises the ``min(count * 5, ACTIVITY_MAX)`` cap interacting with the
+        full ``QUALITY_MAX`` (zero rejections).
+        """
+        calculator = TrustCalculator()
+        for i in range(9):
+            create_test_ad(
+                seller, category, city, title=f"Ad {i}", status=AdStatus.PUBLISHED
+            )
+
+        score = calculator.calculate_and_save(seller)
+
+        # activity: min(9 * 5, 40) = 40; quality: (1 - 0/9) * 30 = 30; response: 0
+        assert score.score == 70
+        assert score.trust_level == TrustLevel.TRUSTED
+
+    def test_quality_score_int_truncation(self, seller, category, city) -> None:
+        """``int((1 - r/t) * 30)`` truncates: 3 published + 1 rejected -> 22 (not 22.5).
+
+        With 4 non-draft ads and 1 rejected, ``(1 - 1/4) * 30 = 22.5``; ``int()``
+        drops the fractional part to 22, proving the truncation boundary.
+        """
+        calculator = TrustCalculator()
+        for i in range(3):
+            create_test_ad(
+                seller, category, city, title=f"Good {i}", status=AdStatus.PUBLISHED
+            )
+        create_test_ad(
+            seller, category, city, title="Bad", status=AdStatus.REJECTED
+        )
+
+        score = calculator.calculate_and_save(seller)
+
+        # activity: 3 * 5 = 15; quality: int((1 - 1/4) * 30) = int(22.5) = 22; response: 0
+        assert score.score == 37
+        assert float(score.rejection_rate) == 25.0
+
+    def test_response_score_rounded_to_two_decimals(self, seller) -> None:
+        """``round((responses / total) * 30, 2)`` rounds to 2 decimals: 1/7 -> 4.29."""
+        calculator = TrustCalculator()
+
+        # 7 global CONTACT_INITIATED events (denominator for the ratio).
+        for _ in range(7):
+            _make_event(None, AnalyticsEventType.CONTACT_INITIATED)
+        # 1 response by the seller.
+        _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=seller)
+
+        score = calculator.calculate_and_save(seller)
+
+        assert float(score.contact_response_rate) == 4.29
+
+
+# ---------------------------------------------------------------------------
+# Trust-level floor at score=0 (C.9, G-11)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestTrustLevelFloor:
+    """Verify the VERIFIED floor at exactly score=0 (admin / Telegram Premium)."""
+
+    def test_score_zero_admin_verified_floors_to_verified(self) -> None:
+        """score=0 + admin-verified seller -> VERIFIED (floor, not UNVERIFIED)."""
+        calculator = TrustCalculator()
+        user = _make_user(telegram_id=990090001)
+        SellerVerification.objects.create(user=user, verified_by_admin=True)
+
+        score = calculator.calculate_and_save(user)
+
+        assert score.score == 0
+        assert score.trust_level == TrustLevel.VERIFIED
+
+    def test_score_zero_premium_floors_to_verified(self) -> None:
+        """score=0 + Telegram Premium seller -> VERIFIED (floor)."""
+        calculator = TrustCalculator()
+        user = _make_user(telegram_id=990090002, telegram_premium=True)
+
+        score = calculator.calculate_and_save(user)
+
+        assert score.score == 0
+        assert score.trust_level == TrustLevel.VERIFIED
+
+    def test_score_zero_no_verification_is_unverified(self) -> None:
+        """score=0 + no admin verification nor Premium -> UNVERIFIED."""
+        calculator = TrustCalculator()
+        user = _make_user(telegram_id=990090003)
+
+        score = calculator.calculate_and_save(user)
+
+        assert score.score == 0
+        assert score.trust_level == TrustLevel.UNVERIFIED
+
