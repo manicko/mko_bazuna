@@ -1,6 +1,7 @@
 {# Listings template for Mko Bazuna. XSS-safe via Django autoescape. HTMX-compatible MPA. Uses the shared Avito-style catalog header. #}
 {% load static %}
 {% load i18n %}
+{% load localized_content %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -29,6 +30,7 @@
                 {% include "search/partials/save_search_modal.html" %}
             </div>
         {% endif %}
+        {% include "ads/partials/filter_form.html" %}
         <!-- Dynamic content (ad grid, suggestions, pagination) -->
         <div id="ad-list">
             {% include "ads/partials/ad_list.html" %}

@@ -10,6 +10,7 @@ from typing import Any
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
+from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSource, AdStatus, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
@@ -433,6 +434,17 @@ class AdGenerator(BaseGenerator):
                     now - timedelta(days=30), now
                 )
 
+            # Resolve the category-constrained listing purpose (F4). Empty or
+            # unsaved-category lookup resolution is a no-op -> None.
+            if category.pk is not None:
+                resolved_purposes = CategoryLookupResolver.get_resolved_purposes(category)
+            else:
+                resolved_purposes = []
+            if resolved_purposes:
+                purpose = self._rng.choice(resolved_purposes)
+            else:
+                purpose = None
+
             ad = Ad(
                 user=user,
                 title=title,
@@ -451,6 +463,7 @@ class AdGenerator(BaseGenerator):
                 category_name=category.get_name("ru"),
                 status=status,
                 source=AdSource.SEED,
+                listing_purpose=purpose,
                 published_at=published_at,
                 archived_at=archived_at,
                 moderation_failed_at=moderation_failed_at,

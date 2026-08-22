@@ -23,6 +23,9 @@ from django.db.models import F
 from apps.core.utils.sanitize import sanitize_query_for_log
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.search_history import record_search_history
+from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.lookups.enums import LookupGroupCode
+from apps.lookups.models import LookupItem
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ def search(request: HttpRequest) -> HttpResponse:
     PER_PAGE = 24
 
     query = (request.GET.get("q") or "").strip()
-    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city")
+    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city", "user")
 
     # Category filter (by slug) — applies in addition to FTS
     current_category = request.GET.get("category")
@@ -91,6 +94,35 @@ def search(request: HttpRequest) -> HttpResponse:
         except ValueError:
             pass
 
+    # Listing purpose filter (F4) — single-select exact slug match
+    listing_purpose_slug = request.GET.get("listing_purpose")
+    if listing_purpose_slug:
+        ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
+
+    # Features filter (F5) — multi-select AND semantics via chained filters.
+    # Each chained ``.filter(features__slug=...)`` adds an EXISTS subquery;
+    # an ad must possess every selected feature.
+    feature_slugs = request.GET.getlist("features") or []
+    for fslug in feature_slugs:
+        ads = ads.filter(features__slug=fslug)
+
+    # Resolve category-constrained filter options (F4/F5). When a category is
+    # active, use the cached resolver; otherwise show the full active sets.
+    if breadcrumb_category:
+        resolved_purposes = CategoryLookupResolver.get_resolved_purposes(
+            breadcrumb_category
+        )
+        resolved_features = CategoryLookupResolver.get_resolved_features(
+            breadcrumb_category
+        )
+    else:
+        resolved_purposes = LookupItem.objects.filter(
+            group__code=LookupGroupCode.LISTING_PURPOSE, is_active=True
+        ).order_by("sort_order")
+        resolved_features = LookupItem.objects.filter(
+            group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
+        ).order_by("sort_order")
+
     # Resolve the current city/category filters to object ids so the
     # save-search modal can prefill its selects (FT-002).
     selected_city_id: int | None = None
@@ -129,7 +161,9 @@ def search(request: HttpRequest) -> HttpResponse:
         search_query = SearchQuery(query, search_type="websearch", config=config)
         ads = ads.annotate(
             rank=SearchRank(F(vector_field), search_query)
-        ).filter(**{vector_field: search_query}).order_by("-rank")
+        ).filter(**{vector_field: search_query}).order_by(
+            "-rank", "-published_at", "-id"
+        )
 
         # Record search event (analytics) after successful execution
         AnalyticsEvent.objects.create(
@@ -151,9 +185,9 @@ def search(request: HttpRequest) -> HttpResponse:
         if current_sort == AdSort.DATE_OLD:
             ads = ads.order_by("published_at")
         elif current_sort == AdSort.PRICE_LOW:
-            ads = ads.order_by("price_normalized_eur")
+            ads = ads.order_by(F("price_normalized_eur").asc(nulls_last=True))
         elif current_sort == AdSort.PRICE_HIGH:
-            ads = ads.order_by("-price_normalized_eur")
+            ads = ads.order_by(F("price_normalized_eur").desc(nulls_last=True))
         else:  # DATE_NEW — default, newest first
             ads = ads.order_by("-published_at")
 
@@ -179,6 +213,10 @@ def search(request: HttpRequest) -> HttpResponse:
         "current_sort": current_sort,
         "min_price": min_price,
         "max_price": max_price,
+        "current_listing_purpose": listing_purpose_slug,
+        "current_features": feature_slugs,
+        "resolved_purposes": resolved_purposes,
+        "resolved_features": resolved_features,
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,

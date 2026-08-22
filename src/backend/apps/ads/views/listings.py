@@ -32,8 +32,11 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidde
 from django.shortcuts import render
 
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import F, Q
 from django.conf import settings
+from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.lookups.enums import LookupGroupCode
+from apps.lookups.models import LookupItem
 
 
 
@@ -364,6 +367,45 @@ def listings(
 
 
 
+    # Listing purpose filter (F4) — single-select exact slug match
+    listing_purpose_slug = request.GET.get("listing_purpose")
+
+    if listing_purpose_slug:
+
+        ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
+
+
+
+    # Features filter (F5) — multi-select AND semantics via chained filters.
+    # Each chained ``.filter(features__slug=...)`` adds an EXISTS subquery;
+    # an ad must possess every selected feature.
+    feature_slugs = request.GET.getlist("features") or []
+
+    for fslug in feature_slugs:
+
+        ads = ads.filter(features__slug=fslug)
+
+
+
+    # Resolve category-constrained filter options (F4/F5). When a category is
+    # active, use the cached resolver; otherwise show the full active sets.
+    if breadcrumb_category:
+        resolved_purposes = CategoryLookupResolver.get_resolved_purposes(
+            breadcrumb_category
+        )
+        resolved_features = CategoryLookupResolver.get_resolved_features(
+            breadcrumb_category
+        )
+    else:
+        resolved_purposes = LookupItem.objects.filter(
+            group__code=LookupGroupCode.LISTING_PURPOSE, is_active=True
+        ).order_by("sort_order")
+        resolved_features = LookupItem.objects.filter(
+            group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
+        ).order_by("sort_order")
+
+
+
     # Sorting
 
     sort = request.GET.get("sort", AdSort.DATE_NEW)
@@ -374,11 +416,11 @@ def listings(
 
     elif sort == AdSort.PRICE_LOW:
 
-        ads = ads.order_by("price_normalized_eur")
+        ads = ads.order_by(F("price_normalized_eur").asc(nulls_last=True))
 
     elif sort == AdSort.PRICE_HIGH:
 
-        ads = ads.order_by("-price_normalized_eur")
+        ads = ads.order_by(F("price_normalized_eur").desc(nulls_last=True))
 
     else:  # date_desc (default)
 
@@ -433,6 +475,14 @@ def listings(
         "min_price": min_price,
 
         "max_price": max_price,
+
+        "current_listing_purpose": listing_purpose_slug,
+
+        "current_features": feature_slugs,
+
+        "resolved_purposes": resolved_purposes,
+
+        "resolved_features": resolved_features,
 
         "has_results": has_results,
 

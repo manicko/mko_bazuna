@@ -47,3 +47,21 @@ def get_description(ad, locale: str = "ru") -> str:
         Localized description string.
     """
     return ad.get_description(locale=locale)
+
+
+@register.filter
+def get_lookup_name(item, locale: str = "ru") -> str:
+    """
+    Return the localized name of a lookup item (purpose/feature).
+
+    Delegates to LookupItem.get_name(locale) with fallback chain:
+    locale → ru → slug.
+
+    Args:
+        item: The LookupItem instance.
+        locale: Language code (e.g. "ru", "bs", "en").
+
+    Returns:
+        Localized name string.
+    """
+    return item.get_name(locale=locale)

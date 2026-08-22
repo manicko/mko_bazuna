@@ -37,7 +37,7 @@ class LookupGroup(models.Model):
         verbose_name = "lookup group"
 
     def __str__(self) -> str:
-        return self.code
+        return str(self.code)
 
 
 class LookupItem(models.Model):
@@ -85,5 +85,15 @@ class LookupItem(models.Model):
         ordering = ["group", "sort_order"]
         verbose_name = "lookup item"
 
+    def get_name(self, locale: str = "ru") -> str:
+        """Return the localized name with fallback chain: locale → ru → slug."""
+        name_i18n = getattr(self, "name_i18n", None)
+        if name_i18n:
+            if locale in name_i18n:
+                return name_i18n[locale]
+            if "ru" in name_i18n:
+                return name_i18n["ru"]
+        return str(self.slug)
+
     def __str__(self) -> str:
-        return self.slug
+        return str(self.slug)

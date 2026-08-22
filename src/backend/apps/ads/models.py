@@ -262,6 +262,11 @@ class Ad(models.Model):
                 condition=Q(status=AdStatus.PUBLISHED),
             ),
             models.Index(
+                name="IX_ads_pub_purpose",
+                fields=["listing_purpose_id"],
+                condition=Q(status=AdStatus.PUBLISHED),
+            ),
+            models.Index(
                 name="IX_ads_user_status",
                 fields=["user_id", "status"],
             ),
@@ -618,6 +623,12 @@ class AdFeature(models.Model):
     class Meta:
         db_table = "ad_features"
         unique_together = [("ad", "feature")]
+        indexes = [
+            models.Index(
+                name="IX_ad_features_feature_id",
+                fields=["feature"],
+            ),
+        ]
         ordering = ["sort_order"]
 
     def __str__(self) -> str:

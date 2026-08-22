@@ -16,6 +16,7 @@ from django.db import transaction
 from apps.ads.models import Ad, AdImage
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.categories.models import Category
+from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSource, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.locations.models import City
@@ -109,6 +110,28 @@ class SeedService:
 
             # Fetch from DB to get PKs
             db_ads = list(Ad.objects.filter(source=AdSource.SEED))
+
+            # Step 4b: Populate each seeded ad's features M2M from the
+            # category-resolved feature set (F5). Uses a seeded RNG for
+            # deterministic, reproducible re-seeds.
+            t_start = time.time()
+            feature_rng = random.Random(self.config.get("faker_seed", 42) + 300)
+            feature_count = 0
+            for ad in db_ads:
+                if ad.category is None:
+                    continue
+                resolved_features = CategoryLookupResolver.get_resolved_features(
+                    ad.category
+                )
+                if resolved_features:
+                    sample = feature_rng.sample(
+                        resolved_features,
+                        k=feature_rng.randint(1, min(3, len(resolved_features))),
+                    )
+                    ad.features.set(sample)
+                    feature_count += 1
+            t_elapsed = time.time() - t_start
+            self._log_progress("AdFeature", feature_count, t_elapsed)
 
             # Step 5: Generate images
             t_start = time.time()
