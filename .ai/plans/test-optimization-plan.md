@@ -15,7 +15,7 @@ Restore and sustain test suite integrity by:
 2. **Standardizing the test framework** — migrate 14 `django.test.TestCase` files to pytest-django (`@pytest.mark.django_db` + marker taxonomy) so `-m unit` / `-m integration` filtering works uniformly.
 3. **Closing critical coverage gaps** — add missing tests for Ad check constraints, the `approve_ad → PUBLISHED → alert` signal chain, ad-detail trust-score prefetch (N+1), login-token edge cases, and search sort orderings.
 4. **Fixing hygiene defects** — remove the unused `e2e` marker, replace private-method coupling in `test_priority.py` with public-API coverage, and add direct unit tests for moderation decorators.
-5. **Correcting stale documentation** — rewrite this plan to reflect reality (all 7 markers registered; CI uses `-m "not seed"`; no shadowed `tests.py`).
+5. **Correcting stale documentation** — rewrite this plan to reflect reality (all 6 markers registered; CI uses `-m "not seed"`; no shadowed `tests.py`).
 
 All tasks are atomic, independently reviewable, and must pass `--create-db` validation.
 
@@ -23,7 +23,7 @@ All tasks are atomic, independently reviewable, and must pass `--create-db` vali
 
 ## 2. Current State
 
-### Findings requiring action (7 open + 1 resolved)
+### Findings requiring action (7 open + 2 resolved)
 
 | ID  | Finding | Severity | Status |
 |-----|---------|----------|--------|
@@ -34,7 +34,7 @@ All tasks are atomic, independently reviewable, and must pass `--create-db` vali
 | F-05 | 14 files use `django.test.TestCase` instead of `pytest.mark.django_db` | TEST-UPDATE | OPEN |
 | F-06 | Missing direct unit tests for `staff_required` / `staff_required_api` decorators | TEST-UPDATE | OPEN |
 | F-07 | `test_priority.py` tests private methods `_get_priority_level` / `_estimate_confidence` directly | TEST-UPDATE | OPEN |
-| F-08 | `e2e` marker registered but 0 usages | BEST-PRACTICE | OPEN |
+| F-08 | `e2e` marker registered but 0 usages | BEST-PRACTICE | **RESOLVED** (removed in A.1) |
 | F-09 | Stale test-optimization plan (4 discrepancies, §5) | DOC-UPDATE | OPEN |
 
 ### Coverage gaps (11)
@@ -266,6 +266,16 @@ All tasks are atomic, independently reviewable, and must pass `--create-db` vali
 | **Test command** | `docker compose ... run --rm test apps/moderation/tests/test_priority.py apps/moderation/tests/test_priority_service.py --create-db -v` |
 
 > **Dependency**: C.10 must run after B.3 (refactor removes private-method tests, then adds public-API boundary tests).
+>
+> **Implementation note (C.10)**: The exact boundary literals `49`, `50`, `79`
+> are **not reachable** through the public `calculate_priority` API — the
+> achievable content scores are `{0,20,40,60,80,100}` (banned_count×20 capped at
+> 100) and user scores `{0,15,25,40}`, so totals span only
+> `{0,15,20,25,40,60,80,100}`. The boundary test therefore lives in
+> `test_priority.py` (`TestPriorityServiceBoundaries.test_persisted_priority_level_at_boundaries`)
+> using the achievable values `40→LOW / 60→MEDIUM / 80→HIGH / 100→HIGH`, which
+> still bracket the `>=50 MEDIUM` and `>=80 HIGH` thresholds. Do not re-add
+> `49/50/79` — they cannot be produced through the public API.
 
 ### Phase D: Documentation & Plan Correction (low-effort)
 

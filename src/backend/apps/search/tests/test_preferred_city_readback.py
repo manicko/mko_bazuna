@@ -61,12 +61,16 @@ def budva() -> City:
 
 @pytest.fixture
 def podgorica_ad(seller: User, category: Category, podgorica: City) -> Ad:
-    return create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
+    return create_test_ad(
+        seller, category, podgorica, status=AdStatus.PUBLISHED, title="Велосипед"
+    )
 
 
 @pytest.fixture
 def budva_ad(seller: User, category: Category, budva: City) -> Ad:
-    return create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED)
+    return create_test_ad(
+        seller, category, budva, status=AdStatus.PUBLISHED, title="Велосипед"
+    )
 
 
 def _result_ids(response) -> list[int]:

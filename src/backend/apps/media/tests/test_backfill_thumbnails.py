@@ -80,22 +80,15 @@ def _create_adimage_with_original(
     Returns:
         The created AdImage instance.
     """
-    from apps.ads.models import Ad
     from apps.core.enums import AdStatus
-
-    from telegram_bot.services.media import generate_storage_key
 
     key = image_key or generate_storage_key()
 
-    ad = Ad.objects.create(
-        user=seller,
-        title="Test Ad",
-        description="Test description",
-        category=category,
-        city=city,
-        category_name=category.name,
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
         status=AdStatus.PUBLISHED,
-        published_at=timezone.now(),
     )
 
     kwargs = {}

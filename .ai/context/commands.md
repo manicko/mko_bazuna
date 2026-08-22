@@ -60,4 +60,26 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 > `--reuse-db` flag is **not** used (it reuses stale schema and causes ~527
 > errors after any migration change; see plan risk §7).
 
+### Test fixtures (canonical source of truth)
+
+The canonical fixtures live in `src/backend/conftest.py` and are the single
+source of truth for backend tests:
+
+- `seller` → `User(telegram_id=900000001, chat_id=900000001, password="x")`
+- `user` → `User(telegram_id=900000002, chat_id=900000002, password="x")`
+- `category` → `Category(name="Транспорт", slug="transport")`
+- `city` → `City(country_code="ME", name="Тестград", region="Central", slug="test-grad")`
+- `create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)`
+  → creates an `Ad` row with the status-specific timestamp set automatically
+  (satisfies the Ad check constraints). Pass `status=AdStatus.PUBLISHED` if
+  your test needs a published ad (the default is `ON_MODERATION`).
+
+Import the helper from any test file: `from conftest import create_test_ad`
+(`pyproject.toml` sets `pythonpath = ["src", "src/backend"]`).
+
+**Exception:** `src/telegram_bot/tests/conftest.py` redefines `seller` /
+`category` / `city` / `user` because bot tests live outside the `src/backend/`
+conftest-discovery hierarchy and `user` must be async. Do not move these
+fixtures into backend tests — see the explanatory comment in that file.
+
 ---

@@ -45,10 +45,20 @@ def budva() -> City:
     )
 
 
+@pytest.fixture
+def podgorica() -> City:
+    return City.objects.create(
+        country_code="ME",
+        name="Подгорица",
+        region="Central",
+        slug="podgorica",
+    )
+
+
 class TestPreferredCityView:
     """Preferred-city view contract."""
 
-    def test_post_with_valid_slug_sets_cookie(self, city: City) -> None:
+    def test_post_with_valid_slug_sets_cookie(self, podgorica: City) -> None:
         """A consented visitor's selection is persisted as a cookie."""
         client = Client()
         client.cookies["consent_preferences"] = "true"
@@ -62,7 +72,7 @@ class TestPreferredCityView:
         assert cookie["httponly"] is True
         assert cookie["samesite"] == "Lax"
 
-    def test_post_without_preferences_consent_sets_no_cookie(self, city: City) -> None:
+    def test_post_without_preferences_consent_sets_no_cookie(self, podgorica: City) -> None:
         """Without preferences consent the cookie is NOT set (T-06c / ePrivacy)."""
         client = Client()
         response = client.post("/api/preferred-city/", {"slug": "podgorica"})
@@ -71,7 +81,7 @@ class TestPreferredCityView:
         assert "preferred_city" not in response.cookies
 
     def test_post_with_valid_slug_persists_db_for_authenticated(
-        self, city: City, buyer: User
+        self, podgorica: City, buyer: User
     ) -> None:
         """Authenticated user selection persists ``User.preferred_city`` (R-11)."""
         client = Client()
@@ -83,9 +93,9 @@ class TestPreferredCityView:
         assert response.json() == {"ok": True}
 
         buyer.refresh_from_db()
-        assert buyer.preferred_city_id == city.id
+        assert buyer.preferred_city_id == podgorica.id
 
-    def test_post_with_valid_slug_cookie_only_for_anonymous(self, city: City) -> None:
+    def test_post_with_valid_slug_cookie_only_for_anonymous(self, podgorica: City) -> None:
         """A consented anonymous selection sets the cookie only (no DB write)."""
         client = Client()
         client.cookies["consent_preferences"] = "true"
@@ -111,7 +121,7 @@ class TestPreferredCityView:
 class TestHeaderCityBadge:
     """Header city badge rendering (AC-8)."""
 
-    def test_header_renders_badge_with_preferred_city(self, city: City) -> None:
+    def test_header_renders_badge_with_preferred_city(self, podgorica: City) -> None:
         """A resolved preferred city renders in the header badge + dropdown."""
         client = Client()
         client.cookies["preferred_city"] = "podgorica"

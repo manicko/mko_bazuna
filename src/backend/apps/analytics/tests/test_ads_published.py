@@ -19,7 +19,6 @@ from conftest import create_test_ad
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 # Use locmem cache so SellerStats cache tests are deterministic and isolated.
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

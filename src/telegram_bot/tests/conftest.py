@@ -62,6 +62,26 @@ def dp() -> Dispatcher:
 # ---------------------------------------------------------------------------
 # Django ORM fixtures
 # ---------------------------------------------------------------------------
+#
+# NOTE ON FIXTURE OVERRIDES (A.2): the ``seller`` / ``category`` / ``city`` /
+# ``user`` fixtures below intentionally REDEFINE the canonical fixtures from
+# ``src/backend/conftest.py`` rather than reusing them.
+#
+# Why this is necessary:
+#   1. pytest conftest discovery walks upward through each test file's
+#      directory ancestors. Bot tests live under ``src/telegram_bot/tests/``,
+#      whose ancestor chain (src/telegram_bot/ -> src/ -> project root) never
+#      passes through ``src/backend/``, so the root ``src/backend/conftest.py``
+#      fixtures are NOT discoverable by bot tests. They must be redefined here.
+#   2. ``user`` must be an ``@pytest_asyncio.fixture`` (async) to satisfy the
+#      bot test suite's ``@pytest_asyncio`` / ``sync_to_async`` running context,
+#      unlike the synchronous root ``user``.
+#   3. The bot fixtures use a different telegram_id (900000100) to avoid
+#      colliding with root fixture IDs (900000001/900000002) when both suites
+#      are exercised.
+# ``create_test_ad`` IS shared: it is imported from the backend conftest via
+# ``from conftest import create_test_ad`` (resolved through ``pythonpath``).
+# ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture
