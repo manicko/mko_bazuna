@@ -1,6 +1,6 @@
 # Makefile for Mko Bazuna Docker workflow
 
-.PHONY: help up down build restart test test-db test-down test-logs test-recreate \
+.PHONY: help up down build restart test test-all test-db test-down test-logs test-recreate \
         lint typecheck shell migrate makemigrations logs \
         backup restore prune-backups db-shell clean create-admin load-catalog seed
 
@@ -18,7 +18,7 @@ up down build restart lint typecheck shell makemigrations create-admin \
     load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-dev
 
-test test-db test-down test-logs test-recreate: \
+test test-all test-db test-down test-logs test-recreate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-test
 
 # ====================== Main Commands ======================
@@ -35,7 +35,8 @@ help:
 	@echo "  build          Rebuild images without cache"
 	@echo ""
 	@echo "Test Environment:"
-	@echo "  test           Run tests (auto-starts test DB on :5433, reuses DB via --reuse-db)"
+	@echo "  test           Run fast gate (skips nightly seed suite; reuses DB)"
+	@echo "  test-all       Run complete suite (includes nightly seed suite; reuses DB)"
 	@echo "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
 	@echo "  test-logs      Follow test environment logs"
@@ -78,9 +79,14 @@ restart:
 
 # ====================== Code Quality ======================
 
-# `test` ensures the long-running test DB is up (idempotent) before the one-shot
-# test container runs; the DB persists so --reuse-db survives across runs.
+# `test` runs the fast gate: excludes the nightly `seed` suite (~17-min bulk)
+# via the entrypoint PYTEST_SKIP_MARKERS=seed env var. DB persists via --reuse-db.
 test:
+	docker compose $(COMPOSE_TEST) up -d db
+	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_SKIP_MARKERS=seed test
+
+# Run the complete suite INCLUDING the nightly `seed` suite (~35min).
+test-all:
 	docker compose $(COMPOSE_TEST) up -d db
 	docker compose $(COMPOSE_TEST) run --rm test
 
@@ -97,8 +103,8 @@ test-db:
 	docker compose $(COMPOSE_TEST) up -d db
 
 # Stop and remove test containers/networks. Named volumes are preserved so the
-# cached schema (--reuse-db) survives between sessions. Use `make test-purge`
-# style `down -v` to wipe: docker compose $(COMPOSE_TEST) down -v
+# cached schema (--reuse-db) survives between sessions. Use `make test-down`
+# followed by `docker compose $(COMPOSE_TEST) down -v` to wipe volumes.
 test-down:
 	docker compose $(COMPOSE_TEST) down
 

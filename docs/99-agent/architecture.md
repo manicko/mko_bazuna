@@ -25,7 +25,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 | Task | Command |
 |------|---------|
-| Test | `uv run pytest <path>` |
+| Test (Docker) | `make test` (fast gate) · `make test-all` (full) · `make test-recreate` (fresh schema) |
 | Lint | `uv run ruff check <path>` |
 | Type check | `uv run basedpyright <path>` |
 | Add dependency | `uv add <package>` |

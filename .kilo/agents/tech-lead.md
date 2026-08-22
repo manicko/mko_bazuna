@@ -20,7 +20,7 @@ permission:
    task: allow
 
    edit:
-     "*": deny
+     "*": allow
      "*.md": allow
      "*.mdx": allow
      "*.yaml": allow

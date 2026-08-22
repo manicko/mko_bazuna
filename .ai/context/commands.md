@@ -37,11 +37,11 @@ docker ps --filter "name=mko-bazuna-test-db-" --filter "status=running"
 docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
 ```
 
-### Run all tests
+### Run all tests (full suite — includes nightly `seed`, ~35 min)
 
-```powershell
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test
-```
+This runs **everything** including the nightly `seed` suite (~35 min).
+For the fast gate that skips seed tests (~300s), use `make test` (see
+*Fast gate vs full suite vs fresh schema* below).
 
 ### Run a specific test / file / class
 
@@ -55,10 +55,36 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 > from `pyproject.toml`, which is required for the `src` layout. The `addopts`
 > are applied automatically; just append `-v` / a test path to `PYTEST_OPTS`.
 >
-> **Note on `--create-db`:** Always pass `--create-db`. It forces Django to check
-> for pending schema changes and rebuilds the test schema from scratch. The
-> `--reuse-db` flag is **not** used (it reuses stale schema and causes ~527
-> errors after any migration change; see plan risk §7).
+> **Note on `--reuse-db` vs `--create-db`:** The Docker test entrypoint
+> (`docker/entrypoint-test.sh`) defaults to `--reuse-db` — the test PG container
+> persists across runs via a named volume, so schema reuse is safe inside Docker.
+> `make test` / `make test-all` rely on this default. To force a fresh schema
+> (e.g. after migration changes or an interrupted SIGKILL'd run), use `make
+> test-recreate` (`--no-reuse-db --create-db`) or override `PYTEST_OPTS`.
+> **Do not** pass `--reuse-db` when running `uv run pytest` directly against a
+> local persistent DB — it reuses stale schema and causes ~527 errors; use
+> `--create-db` locally instead. CI may use `--reuse-db` (ephemeral service DB per run).
+
+### Fast gate vs full suite vs fresh schema
+
+| Command | What it does | When to use |
+|---|---|---|
+| `make test` | Fast gate: skips the nightly `seed` suite (~17 min) via `PYTEST_SKIP_MARKERS=seed`. Runs in ~300s. Auto-starts the test DB. | Default for dev iteration |
+| `make test-all` | Complete suite **including** the nightly `seed` tests (~35 min). | When changes touch seeding or image generation |
+| `make test-recreate` | Fast gate + fresh schema: overrides `PYTEST_OPTS="--no-reuse-db --create-db"` to drop the cached test DB. | After migration changes or interrupted run |
+
+**How the fast gate works:** `docker/entrypoint-test.sh` checks `PYTEST_SKIP_MARKERS` and appends `-m "not (seed)"` to the pytest invocation:
+
+```bash
+PYTEST_MARK_ARGS=()
+if [ -n "${PYTEST_SKIP_MARKERS:-}" ]; then
+    PYTEST_MARK_ARGS+=(-m "not (${PYTEST_SKIP_MARKERS})")
+fi
+uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short --durations=10} "${PYTEST_MARK_ARGS[@]}"
+```
+
+`make test` passes `--env PYTEST_SKIP_MARKERS=seed` to the Compose `test` service;
+`make test-all` omits it so seed tests run.
 
 ### Test fixtures (canonical source of truth)
 

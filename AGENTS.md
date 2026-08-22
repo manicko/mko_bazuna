@@ -11,7 +11,9 @@ A Telegram-driven classifieds board (Avito-like) with a Django website. Sellers 
 ## Quick Reference
 
 - **Package Manager:** `uv` (Python)
-- **Test:** `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test` (requires test DB; start with `... up -d db`, check with `docker ps --filter "name=mko-bazuna-test-db-"`)
+- **Test (fast gate):** `make test` — skips nightly `seed` suite (~300s); auto-starts test DB. Start DB only: `make test-db`.
+- **Test (full suite):** `make test-all` (~35 min, includes `seed`).
+- **Test (fresh schema):** `make test-recreate` (`--no-reuse-db --create-db`).
 - **Lint:** `uv run ruff check <path>`
 - **Typecheck:** `uv run basedpyright <path>`
 - **Add dep:** `uv add <package>`

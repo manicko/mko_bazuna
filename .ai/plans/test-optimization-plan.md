@@ -2,7 +2,7 @@
 
 **Project:** Mko Bazuna (Telegram-driven classifieds board)
 **Based on:** Audit Report `.ai/audit/tests/audit_report_1.md`
-**Status:** Draft
+**Status:** Implemented — Phase A–D complete (commits `b62612` + `3ddc0b2`). See `.ai/plans/test-suite-audit-plan.md` for the ongoing strategy/infra plan (Phase E).
 **Author:** Kilo (planner agent)
 
 ---
