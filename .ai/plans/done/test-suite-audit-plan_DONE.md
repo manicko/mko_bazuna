@@ -1,3 +1,18 @@
+# PLAN COMPLETED - 2026-08-22
+
+**Execution status:** All recommended non-gated items (Phase E E.1-E.4) are COMPLETE and committed in 6e6f1dc.
+
+| Item | Status |
+|---|--|
+| E.1 Commit parity + Makefile help | done |
+| E.2 CI reuse-db | done |
+| E.3 Remove dead deps | done |
+| E.4 Documentation reconciliation | done |
+| P2/P3/P4 reconciliations | resolved |
+
+**Gated / deferred:** Phase 2 marker reclassification (P1/P5), Task 3.3 CI job split, Task 4.2/E.6 coverage merge - require explicit decision to adopt per-subset CI targeting.
+
+
 # Test Suite Performance & Strategy Audit Plan
 
 **Project:** Mko Bazuna (Django 5.2 LTS, Python 3.14, PostgreSQL 18, aiogram 3.x, HTMX MPA)
