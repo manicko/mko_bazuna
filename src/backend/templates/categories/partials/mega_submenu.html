@@ -15,17 +15,18 @@
                 </a>
                 {% if child.get_children.exists %}
                 <button type="button"
-                        class="px-2 py-2 text-gray-400 hover:text-blue-600"
+                        class="p-3 text-gray-400 hover:text-blue-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
                         aria-expanded="false"
                         data-category-expand="{{ child.slug }}"
+                        aria-controls="menu-{{ child.id }}"
                         aria-label="{% trans "Expand" %} {{ child.get_name }}">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    <svg class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9l7 7 7-7"></path>
                     </svg>
                 </button>
                 {% endif %}
             </div>
-            <div class="hidden ml-4" data-category-submenu="{{ child.slug }}"></div>
+            <div id="menu-{{ child.id }}" class="hidden ml-4" data-category-submenu="{{ child.slug }}"></div>
         </li>
     {% endfor %}
 </ul>

@@ -151,3 +151,40 @@ class TestCatalogMenuAccordionTemplate(SimpleTestCase):
         )
         self.assertNotIn("get_ancestors|last", breadcrumb_content)
         self.assertIn('slice:"::-1"|first', breadcrumb_content)
+
+    def test_downward_caret_in_header(self) -> None:
+        """Expand buttons in header_catalog.html use a downward caret, not right-chevron."""
+        self.assertIn('d="M5 9l7 7 7-7"', self.header_content)
+        self.assertNotIn('d="M9 5l7 7-7 7"', self.header_content)
+
+    def test_downward_caret_in_submenu(self) -> None:
+        """Expand buttons in mega_submenu.html use a downward caret, not right-chevron."""
+        self.assertIn('d="M5 9l7 7 7-7"', self.submenu_content)
+        self.assertNotIn('d="M9 5l7 7-7 7"', self.submenu_content)
+
+    def test_expand_button_has_aria_controls(self) -> None:
+        """Each expand button has an aria-controls attribute referencing the submenu id."""
+        self.assertIn('aria-controls="menu-{{', self.header_content)
+        self.assertIn('aria-controls="menu-{{', self.submenu_content)
+
+    def test_submenu_container_has_id(self) -> None:
+        """Each submenu container div has an id matching its button's aria-controls."""
+        self.assertIn('id="menu-{{', self.header_content)
+        self.assertIn('id="menu-{{', self.submenu_content)
+
+    def test_expand_button_meets_44px_hit_area(self) -> None:
+        """Expand buttons meet the 44×44px minimum touch target."""
+        self.assertIn('min-w-[44px]', self.header_content)
+        self.assertIn('min-w-[44px]', self.submenu_content)
+        self.assertNotIn('px-2 py-2', self.header_content)
+        self.assertNotIn('px-2 py-2', self.submenu_content)
+
+    def test_svg_has_rotation_transition(self) -> None:
+        """Expand-button SVGs carry the rotation transition utility for smooth animation."""
+        self.assertIn('transition-transform', self.header_content)
+        self.assertIn('transition-transform', self.submenu_content)
+
+    def test_js_rotation_toggle_present(self) -> None:
+        """Inline JS toggles rotate-180 on the SVG when aria-expanded changes."""
+        self.assertIn("classList.add('rotate-180')", self.header_content)
+        self.assertIn("classList.remove('rotate-180')", self.header_content)
