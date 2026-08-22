@@ -17,15 +17,15 @@
       "patterns": {
         "ru": {
           "title": "Продаются щенки, {city}",
-          "description": "Продаются щенки. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Продаются щенки. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Puppies for sale, {city}",
-          "description": "Puppies for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Puppies for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Štenci na prodaju, {city}",
-          "description": "Štenci na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Štenci na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -53,15 +53,15 @@
       "patterns": {
         "ru": {
           "title": "Потерялась собака, {city}",
-          "description": "Потерялась собака в {city}. Порода: {feature}. Приметы: {condition}. Просьба сообщить за вознаграждение {price} BAM."
+          "description": "Потерялась собака в {city}. Порода: {feature}. Приметы: {condition}. Просьба сообщить за вознаграждение {price} EUR."
         },
         "en": {
           "title": "Lost dog, {city}",
-          "description": "Lost dog in {city}. Breed: {feature}. Markings: {condition}. Reward offered: {price} BAM."
+          "description": "Lost dog in {city}. Breed: {feature}. Markings: {condition}. Reward offered: {price} EUR."
         },
         "bs": {
           "title": "Izgubljen pas, {city}",
-          "description": "Izgubljen pas u {city}. Rasa: {feature}. Osobine: {condition}. Nagrada: {price} BAM."
+          "description": "Izgubljen pas u {city}. Rasa: {feature}. Osobine: {condition}. Nagrada: {price} EUR."
         }
       }
     },
@@ -71,15 +71,15 @@
       "patterns": {
         "ru": {
           "title": "Продаются котята, {city}",
-          "description": "Продаются котята. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Продаются котята. Порода: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Kittens for sale, {city}",
-          "description": "Kittens for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Kittens for sale. Breed: {feature}. Age: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Mačići na prodaju, {city}",
-          "description": "Mačići na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Mačići na prodaju. Rasa: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -125,15 +125,15 @@
       "patterns": {
         "ru": {
           "title": "Продаются птицы, {city}",
-          "description": "Продаются птицы. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Продаются птицы. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Birds for sale, {city}",
-          "description": "Birds for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Birds for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Ptice na prodaju, {city}",
-          "description": "Ptice na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Ptice na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -161,15 +161,15 @@
       "patterns": {
         "ru": {
           "title": "Продаются аквариумные рыбки, {city}",
-          "description": "Продаются аквариумные рыбки. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Продаются аквариумные рыбки. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Aquarium fish for sale, {city}",
-          "description": "Aquarium fish for sale. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Aquarium fish for sale. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Akvarijumske ribe na prodaju, {city}",
-          "description": "Akvarijumske ribe na prodaju. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Akvarijumske ribe na prodaju. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -179,15 +179,15 @@
       "patterns": {
         "ru": {
           "title": "Отдам рыбок с аквариумом, {city}",
-          "description": "Отдам аквариумных рыбок вместе с оборудованием. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Отдам аквариумных рыбок вместе с оборудованием. Вид: {feature}. Состояние: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Fish with aquarium for sale, {city}",
-          "description": "Selling aquarium fish with equipment. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Selling aquarium fish with equipment. Species: {feature}. Condition: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Ribe s akvarijumom na prodaju, {city}",
-          "description": "Prodajem akvarijumske ribe s opremom. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Prodajem akvarijumske ribe s opremom. Vrsta: {feature}. Stanje: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -197,15 +197,15 @@
       "patterns": {
         "ru": {
           "title": "Продаются домашние питомцы, {city}",
-          "description": "Продаются домашние животные. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} BAM."
+          "description": "Продаются домашние животные. Вид: {feature}. Возраст: {condition}. Город: {city}. Цена: {price} EUR."
         },
         "en": {
           "title": "Pets for sale, {city}",
-          "description": "Pets for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} BAM."
+          "description": "Pets for sale. Species: {feature}. Age: {condition}. City: {city}. Price: {price} EUR."
         },
         "bs": {
           "title": "Ljubimci na prodaju, {city}",
-          "description": "Ljubimci na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} BAM."
+          "description": "Ljubimci na prodaju. Vrsta: {feature}. Starost: {condition}. Grad: {city}. Cijena: {price} EUR."
         }
       }
     },
@@ -233,15 +233,15 @@
       "patterns": {
         "ru": {
           "title": "Продаю корм для животных {brand}",
-          "description": "Продаю корм {brand} для животных. Тип: {feature}. Состояние: {condition}. Срок годности: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю корм {brand} для животных. Тип: {feature}. Состояние: {condition}. Срок годности: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "Selling pet food {brand}",
-          "description": "Selling {brand} pet food. Type: {feature}. Condition: {condition}. Expiry: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} pet food. Type: {feature}. Condition: {condition}. Expiry: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "Prodajem hranu za ljubimce {brand}",
-          "description": "Prodajem hranu {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Rok trajanja: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem hranu {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Rok trajanja: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -251,15 +251,15 @@
       "patterns": {
         "ru": {
           "title": "{brand} корм, {item_age}",
-          "description": "Продаётся корм {brand}. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} BAM. {city}."
+          "description": "Продаётся корм {brand}. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "{brand} pet food, {item_age}",
-          "description": "{brand} pet food for sale. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} BAM. {city}."
+          "description": "{brand} pet food for sale. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "{brand} hrana za ljubimce, {item_age}",
-          "description": "{brand} hrana za ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} BAM. {city}."
+          "description": "{brand} hrana za ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -269,15 +269,15 @@
       "patterns": {
         "ru": {
           "title": "Продаю игрушки для животных {brand}",
-          "description": "Продаю игрушки {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю игрушки {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "Selling pet toys {brand}",
-          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "Prodajem igračke za ljubimce {brand}",
-          "description": "Prodajem igračke {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem igračke {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -287,15 +287,15 @@
       "patterns": {
         "ru": {
           "title": "{brand} игрушки для питомцев, {city}",
-          "description": "Продаю игрушки {brand} для животных. Вид: {feature}. Состояние: {condition}. Материал: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю игрушки {brand} для животных. Вид: {feature}. Состояние: {condition}. Материал: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "{brand} pet toys, {city}",
-          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Material: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} pet toys. Type: {feature}. Condition: {condition}. Material: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "{brand} igračke za ljubimce, {city}",
-          "description": "Prodajem igračke {brand} za životinje. Vrsta: {feature}. Stanje: {condition}. Materijal: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem igračke {brand} za životinje. Vrsta: {feature}. Stanje: {condition}. Materijal: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -305,15 +305,15 @@
       "patterns": {
         "ru": {
           "title": "Продаю аксессуары для животных {brand}",
-          "description": "Продаю аксессуары {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю аксессуары {brand} для питомцев. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "Selling pet accessories {brand}",
-          "description": "Selling {brand} pet accessories. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} pet accessories. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "Prodajam pribor za ljubimce {brand}",
-          "description": "Prodajam pribor {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajam pribor {brand} za ljubimce. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -323,15 +323,15 @@
       "patterns": {
         "ru": {
           "title": "{brand} аксессуары, {item_age}",
-          "description": "Продаются аксессуары {brand} для домашних животных. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM. {city}."
+          "description": "Продаются аксессуары {brand} для домашних животных. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "{brand} pet accessories, {item_age}",
-          "description": "{brand} pet accessories for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} BAM. {city}."
+          "description": "{brand} pet accessories for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "{brand} pribor za ljubimce, {item_age}",
-          "description": "{brand} pribor za kućne ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. {city}."
+          "description": "{brand} pribor za kućne ljubimce na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -341,15 +341,15 @@
       "patterns": {
         "ru": {
           "title": "Товары для собак и кошек {brand}",
-          "description": "Продаю товары {brand} для собак и кошек. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю товары {brand} для собак и кошек. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "Dog and cat supplies {brand}",
-          "description": "Selling {brand} supplies for dogs and cats. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} supplies for dogs and cats. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "Pribor za pse i mačke {brand}",
-          "description": "Prodajem pribor {brand} za pse i mačke. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem pribor {brand} za pse i mačke. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -359,15 +359,15 @@
       "patterns": {
         "ru": {
           "title": "{brand} для собак и кошек, {city}",
-          "description": "Продаются товары {brand} для собак и кошек. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} BAM. {city}."
+          "description": "Продаются товары {brand} для собак и кошек. Категория: {category}. Состояние: {condition}. Особенности: {feature}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "{brand} for dogs and cats, {city}",
-          "description": "{brand} supplies for dogs and cats for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} BAM. {city}."
+          "description": "{brand} supplies for dogs and cats for sale. Category: {category}. Condition: {condition}. Features: {feature}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "{brand} za pse i mačke, {city}",
-          "description": "{brand} pribor za pse i mačke na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} BAM. {city}."
+          "description": "{brand} pribor za pse i mačke na prodaju. Kategorija: {category}. Stanje: {condition}. Karakteristike: {feature}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -377,15 +377,15 @@
       "patterns": {
         "ru": {
           "title": "Продаю товары для птиц {brand}",
-          "description": "Продаю товары {brand} для птиц. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} BAM. {city}."
+          "description": "Продаю товары {brand} для птиц. Тип: {feature}. Состояние: {condition}. Возраст: {item_age}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "Selling bird supplies {brand}",
-          "description": "Selling {brand} bird supplies. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} bird supplies. Type: {feature}. Condition: {condition}. Age: {item_age}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "Prodajem pribor za ptice {brand}",
-          "description": "Prodajem pribor {brand} za ptice. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem pribor {brand} za ptice. Tip: {feature}. Stanje: {condition}. Starost: {item_age}. Cijena: {price} EUR. {city}."
         }
       }
     },
@@ -395,15 +395,15 @@
       "patterns": {
         "ru": {
           "title": "{brand} клетки и корма, {city}",
-          "description": "Продаю товары {brand} для птиц. Клетки, корма, аксессуары. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} BAM. {city}."
+          "description": "Продаю товары {brand} для птиц. Клетки, корма, аксессуары. Категория: {category}. Состояние: {condition}. Вид: {feature}. Цена: {price} EUR. {city}."
         },
         "en": {
           "title": "{brand} bird cages and food, {city}",
-          "description": "Selling {brand} bird supplies: cages, food, accessories. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} BAM. {city}."
+          "description": "Selling {brand} bird supplies: cages, food, accessories. Category: {category}. Condition: {condition}. Type: {feature}. Price: {price} EUR. {city}."
         },
         "bs": {
           "title": "{brand} kavezi i hrana za ptice, {city}",
-          "description": "Prodajem pribor {brand} za ptice: kaveze, hranu, pribor. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} BAM. {city}."
+          "description": "Prodajem pribor {brand} za ptice: kaveze, hranu, pribor. Kategorija: {category}. Stanje: {condition}. Vrsta: {feature}. Cijena: {price} EUR. {city}."
         }
       }
     }

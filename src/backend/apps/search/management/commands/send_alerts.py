@@ -11,6 +11,7 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from apps.ads.templatetags.price_tags import format_price_value
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId, AnalyticsEventType
 from apps.core.utils.advisory_lock import advisory_lock
@@ -186,7 +187,11 @@ class Command(BaseCommand):
         ]
 
         for ad in ads:
-            price_str = f" - {ad.price} BAM" if ad.price else ""
+            price_str = (
+                f" - {format_price_value(ad.price_amount, ad.price_currency)}"
+                if ad.price_amount is not None
+                else ""
+            )
             lines.append(
                 f"• {ad.title[:50]}\n"
                 f"  {price_str}\n"

@@ -9,15 +9,53 @@ Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
 """
 
 import logging
+from decimal import Decimal
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
+from apps.currencies.enums import CurrencyCode
+from apps.currencies.services.price_normalizer import PriceNormalizer
 from apps.moderation.services.auto_moderation import auto_moderate
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_price_change(
+    ad: Ad,
+    price_amount: Decimal | None,
+    price_currency: CurrencyCode | None,
+) -> Ad:
+    """Apply a price change and recompute ``price_normalized_eur``.
+
+    Sets the source-of-truth fields (``price_amount``/``price_currency``) and
+    recomputes the derived EUR-normalized value via ``PriceNormalizer`` (CR-05,
+    CR-07). When either the amount or currency is missing the normalized value
+    is cleared. Returns the ad so the caller can persist it.
+
+    Args:
+        ad: The ad to update.
+        price_amount: The new price amount (None clears the price).
+        price_currency: The new price currency (None clears currency).
+
+    Returns:
+        The updated ``ad`` instance.
+    """
+    ad.price_amount = price_amount
+    ad.price_currency = price_currency.value if price_currency else None
+    if price_amount is not None and price_currency is not None:
+        try:
+            ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
+                price_amount, price_currency
+            )
+        except Exception:
+            logger.exception("Failed to normalize price for ad %s", ad.pk)
+            ad.price_normalized_eur = None
+    else:
+        ad.price_normalized_eur = None
+    return ad
 
 
 def _text_fields_changed(request: HttpRequest, ad: Ad) -> bool:
@@ -81,15 +119,26 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     # Get form data - use empty string defaults to ensure non-None values
     new_title = (request.POST.get("title") or "").strip()
     new_description = (request.POST.get("description") or "").strip()
-    new_price = request.POST.get("price")
+    new_price_amount = request.POST.get("price_amount")
+    new_price_currency = request.POST.get("price_currency")
 
-    # Parse price
-    price_value = None
-    if new_price:
+    # Parse the price amount (empty string means "unset"; invalid -> unset).
+    price_amount_value = None
+    if new_price_amount not in (None, ""):
         try:
-            price_value = int(new_price)
+            price_amount_value = Decimal(new_price_amount)
+        except Exception:
+            price_amount_value = None
+
+    # Parse the currency; fall back to the ad's current currency when invalid.
+    price_currency_value: CurrencyCode | None = None
+    if new_price_currency:
+        try:
+            price_currency_value = CurrencyCode(new_price_currency)
         except ValueError:
-            pass
+            price_currency_value = (
+                CurrencyCode(ad.price_currency) if ad.price_currency else None
+            )
 
     # Determine edit type
     has_text_change = _text_fields_changed(request, ad)
@@ -98,9 +147,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         # Reactivation: update fields then run moderation check
         ad.title = new_title
         ad.description = new_description
-        if price_value is not None:
-            ad.price = price_value
-        ad.save(update_fields=["title", "description", "price"])
+        ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+        ad.save(
+            update_fields=["title", "description", "price_amount", "price_currency", "price_normalized_eur"]
+        )
 
         # Transition to ON_MODERATION (clears archived_at via transition_to)
         ad.transition_to(AdStatus.ON_MODERATION)
@@ -128,17 +178,26 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             # Text edit: go to moderation
             ad.title = new_title
             ad.description = new_description
-            if price_value is not None:
-                ad.price = price_value
-            ad.save(update_fields=["title", "description", "price", "updated_at"])
+            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+            ad.save(
+                update_fields=[
+                    "title", "description",
+                    "price_amount", "price_currency", "price_normalized_eur",
+                    "updated_at",
+                ]
+            )
 
             # Use transition_to for status change to ON_MODERATION
             ad.transition_to(AdStatus.ON_MODERATION)
             logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
         else:
-            # Price/photo only edit: stay published
-            ad.price = price_value
-            ad.save(update_fields=["price", "updated_at"])
+            # Price/photo only edit: stay published; recompute normalized price.
+            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+            ad.save(
+                update_fields=[
+                    "price_amount", "price_currency", "price_normalized_eur", "updated_at",
+                ]
+            )
             logger.info(f"Ad {ad_id} price/photo edited, stays PUBLISHED")
 
         return redirect("ads:dashboard")
@@ -147,9 +206,14 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         # Other statuses (ON_MODERATION, ON_MODERATION_FAILED): direct save
         ad.title = new_title
         ad.description = new_description
-        if price_value is not None:
-            ad.price = price_value
-        ad.save(update_fields=["title", "description", "price", "updated_at"])
+        ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+        ad.save(
+            update_fields=[
+                "title", "description",
+                "price_amount", "price_currency", "price_normalized_eur",
+                "updated_at",
+            ]
+        )
         logger.info(f"Ad {ad_id} edited in status {ad.status}")
 
         return redirect("ads:dashboard")

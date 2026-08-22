@@ -134,7 +134,7 @@ def auto_moderate(ad: Ad) -> bool:
         return False
 
     # Validate price required
-    if price_required and ad.price is None:
+    if price_required and ad.price_amount is None:
         _fail_moderation(ad)
         return False
 
@@ -303,7 +303,7 @@ def check(ad: Ad) -> tuple[bool, str | None]:
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate price required
-    if price_required and ad.price is None:
+    if price_required and ad.price_amount is None:
         return (False, "Your ad content does not meet our requirements. Please review and try again.")
 
     # Validate image count

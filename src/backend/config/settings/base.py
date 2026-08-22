@@ -95,6 +95,7 @@ INSTALLED_APPS = [
     "theme",
     # Local apps
     "apps.core",
+    "apps.currencies",
     "apps.users",
     "apps.ads",
     "apps.categories",

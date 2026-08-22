@@ -145,7 +145,7 @@ When filters are applied, display them as removable chips above results.
     {% endif %}
     {% if selected_price_min or selected_price_max %}
         <span class="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-            Price: {% if selected_price_min %}{{ selected_price_min }}{% endif %} - {% if selected_price_max %}{{ selected_price_max }}{% endif %} BAM
+            Price: {% if selected_price_min %}{{ selected_price_min }}{% endif %} - {% if selected_price_max %}{{ selected_price_max }}{% endif %} EUR
             <a href="?{% url_replace request 'price_min' '' 'price_max' '' %}" class="ml-2 text-purple-600 hover:text-purple-800">✕</a>
         </span>
     {% endif %}
@@ -230,6 +230,14 @@ City selection from closed preset list of Montenegro cities.
 
 Related user stories: US-B7
 
+### Default & precedence
+
+The city filter **defaults** to the buyer's preferred city (see
+[search-patterns.md > Preferred City](search-patterns.md#preferred-city-default--precedence)):
+authenticated users default to `User.preferred_city`; guests default to the consent-gated
+`preferred_city` cookie; otherwise "All cities" (country-wide). An explicit `city` value in
+the URL always overrides the default.
+
 ## Price Range Filter
 
 Price filtering with dual input fields.
@@ -238,7 +246,7 @@ Price filtering with dual input fields.
 
 ```html
 <div class="price-filter">
-    <label class="block text-sm font-medium mb-2">Price Range (BAM)</label>
+    <label class="block text-sm font-medium mb-2">Price Range (EUR)</label>
     <div class="flex gap-2">
         <input type="number" name="price_min" placeholder="Min" min="0"
                value="{{ request.GET.price_min }}"

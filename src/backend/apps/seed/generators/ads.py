@@ -11,6 +11,7 @@ from typing import Any
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus, LanguageLocale
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.seed.generators.base import BaseGenerator
 from apps.users.models import User
@@ -331,7 +332,7 @@ class AdGenerator(BaseGenerator):
             "{brand}": self._rng.choice(brands) if brands else "",
             "{feature}": self._rng.choice(features) if features else "",
             "{city}": self._rng.choice(cities) if cities else "",
-            "{price}": str(self._generate_price(category) or ""),
+            "{price}": str(self._generate_price(category)[0] or ""),
             "{rooms}": str(self.faker.random_int(1, 4)),
             "{area}": str(self.faker.random_int(30, 150)),
             "{item_age}": self._rng.choice(item_ages) if item_ages else "",
@@ -405,8 +406,8 @@ class AdGenerator(BaseGenerator):
             city = self._rng.choice(self.cities)
             status = self._weighted_status(statuses, weights)
 
-            # Generate price based on category
-            price = self._generate_price(category)
+            # Generate price based on category (seed ads use EUR, Assumption 8)
+            price_amount, price_currency = self._generate_price(category)
 
             # Build timestamps consistent with status
             published_at: datetime | None = None
@@ -441,7 +442,10 @@ class AdGenerator(BaseGenerator):
                 title_bs=title_bs,
                 description_bs=description_bs,
                 original_language=LanguageLocale.RUSSIAN.value,
-                price=price,
+                price_amount=price_amount,
+                price_currency=price_currency.value,
+                # Seed ads are EUR, so the normalized EUR value equals the amount.
+                price_normalized_eur=price_amount,
                 category=category,
                 city=city,
                 category_name=category.get_name("ru"),
@@ -491,8 +495,13 @@ class AdGenerator(BaseGenerator):
         """Select a status using weighted random selection."""
         return self._rng.choices(statuses, weights=weights, k=1)[0]
 
-    def _generate_price(self, category: Category) -> int | None:
-        """Generate a price appropriate for the category."""
+    def _generate_price(self, category: Category) -> tuple[int | None, CurrencyCode]:
+        """Generate a price (amount + EUR currency) appropriate for the category.
+
+        Seed ads default to **EUR** (spec Assumption 8), so the EUR-normalized
+        amount equals the original amount. Returns ``(None, CurrencyCode.EUR)``
+        for the ~20% of non-category items that are priced "free / negotiable".
+        """
         # Real estate: higher prices
         real_estate_slugs = {
             "apartments", "houses", "rooms", "garages", "land-plots",
@@ -508,15 +517,18 @@ class AdGenerator(BaseGenerator):
         }
 
         if category.slug in real_estate_slugs:
-            return self.faker.random_int(20000, 500000)
+            amount = self.faker.random_int(20000, 500000)
         elif category.slug in vehicle_slugs:
-            return self.faker.random_int(2000, 80000)
+            amount = self.faker.random_int(2000, 80000)
         elif category.slug == "phones":
-            return self.faker.random_int(100, 1500)
+            amount = self.faker.random_int(100, 1500)
         elif category.slug in {"computers", "laptops", "tablets", "cameras"}:
-            return self.faker.random_int(200, 3000)
+            amount = self.faker.random_int(200, 3000)
         else:
             # 20% chance of no price (free / negotiable)
             if self.faker.random_int(0, 99) < 20:
-                return None
-            return self.faker.random_int(10, 5000)
+                amount = None
+            else:
+                amount = self.faker.random_int(10, 5000)
+
+        return amount, CurrencyCode.EUR

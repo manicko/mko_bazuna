@@ -85,7 +85,7 @@ any → `DELETED`.
 
 ## Key tables
 
-`users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `ad_features`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`.
+`users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `ad_features`, `cities`, `ad_images`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`, `consent_records`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`
@@ -151,7 +151,7 @@ docs by zone ID.
 
 ## Deferred to post-MVP
 
-DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping, multi-currency.
+DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping.
 
 ## Phase 2 Features
 
@@ -170,6 +170,8 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Seed Content Fixtures** | Realistic bundled photos and multi-language ad templates for seed data | `ImageGenerator` manifest loading, `AdGenerator` template interpolation, `photo_manifest.json`, `ads_templates.json`, `word_lists.json` |
 | **Category & Lookup Architecture** | Universal reference data system with multi-parent category navigation, config-driven catalog builder, and inheritance-based lookup resolution | `apps.lookups` app (LookupGroup, LookupItem), `CategoryPath` multi-parent model, `CategoryLookupResolver` service, `categories.yaml` + `builder.py`, `FileHashService` for photo dedup |
 | **Seed-Category Integration Audit** | Audited and remediated seed module to be fully compatible with the canonical `categories.yaml` category system; removed old-slug references, orphaned fixtures, and dead code; documented the seed workflow | `apps.seed` code/test updates, `.ai/llm-tasks/seed-content-generation.md` rewrite, `scripts/seed-images-config.json` bump, `docs/seed-workflow.md` |
+| **Preferred City** | Persistent default-city selector in the catalog header with hybrid persistence (DB FK for authenticated users; consent-gated 1-year cookie for guests) and login reconciliation | `PreferredCityMiddleware`, `header_context`, `apps/search/views/preferred_city.py`, `User.preferred_city` FK |
+| **Consent & GDPR Compliance** | Consent banner, granular cookie consent, `/privacy/` policy page, `ConsentRecord` audit log, and Plausible/GLightbox script gating | `apps/users/views/consent.py`, `apps/users/context_processors.py` (`consent_state`), `consent_records` table, `core/urls.py` (`/privacy/`) |
 
 ## Commands
 

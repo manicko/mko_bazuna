@@ -7,6 +7,7 @@ Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 import os
 
 from apps.core.enums import AdSource, AdStatus
+from apps.currencies.enums import CurrencyCode
 from apps.lookups.enums import LookupGroupCode
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
@@ -78,10 +79,27 @@ class Ad(models.Model):
         null=True,
         help_text="Original language code of the ad (e.g. 'ru', 'en', 'bs')",
     )
-    price = models.PositiveIntegerField(
+    price_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
         blank=True,
         null=True,
-        help_text="Whole BAM units; multi-currency deferred (YAGNI)",
+        help_text="Seller's original price amount (source of truth)",
+    )
+    price_currency = models.CharField(
+        max_length=3,
+        choices=[(code.value, code.value) for code in CurrencyCode],
+        blank=True,
+        null=True,
+        default=CurrencyCode.EUR.value,
+        help_text="Currency of the original price amount",
+    )
+    price_normalized_eur = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        blank=True,
+        null=True,
+        help_text="Derived price normalized to EUR for cross-currency filter/sort; not user-editable",
     )
 
     # Foreign keys to reference data (task_023)
@@ -246,6 +264,11 @@ class Ad(models.Model):
             models.Index(
                 name="IX_ads_user_status",
                 fields=["user_id", "status"],
+            ),
+            models.Index(
+                name="IX_ads_price_normalized_eur",
+                fields=["price_normalized_eur"],
+                condition=Q(price_normalized_eur__isnull=False),
             ),
             models.Index(
                 name="IX_ads_archive_sweep",

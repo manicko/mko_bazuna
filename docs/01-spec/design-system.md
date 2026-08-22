@@ -203,15 +203,24 @@ Text inputs, number inputs, and textareas for data entry.
 
 <!-- Number Input (Price) -->
 <div class="mb-4">
-    <label for="price" class="block font-medium mb-2">Price (BAM)</label>
-    <input 
-        type="number" 
-        id="price" 
-        name="price"
-        min="0"
-        step="0.01"
-        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
+    <label for="price_amount" class="block font-medium mb-2">Price</label>
+    <div class="flex gap-2">
+        <input
+            type="number"
+            id="price_amount"
+            name="price_amount"
+            min="0"
+            step="0.01"
+            placeholder="Amount"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+        <select id="price_currency" name="price_currency" class="px-3 py-2 border border-gray-300 rounded-lg">
+            <option value="EUR">EUR</option>
+            <option value="RSD">RSD</option>
+            <option value="BAM">BAM</option>
+        </select>
+    </div>
+</div>
 </div>
 
 <!-- Textarea -->
@@ -349,22 +358,22 @@ Combined input + button for search functionality.
 Prominent price presentation with currency.
 
 ```html
-<!-- List Price -->
-<p class="text-blue-600 font-bold text-xl mb-2">450 BAM</p>
+<!-- List Price (rendered via shared format_price filter; EUR is default) -->
+<p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
 
 <!-- Detail Price -->
-<p class="text-blue-600 font-bold text-3xl mb-4">450 BAM</p>
+<p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
 
-<!-- Price Range -->
+<!-- Price Range (EUR-equivalent) -->
 <div class="flex items-baseline gap-2">
-    <span class="text-blue-600 font-bold text-xl">120 - 200 BAM</span>
+    <span class="text-blue-600 font-bold text-xl">120 - 200 EUR</span>
     <span class="text-sm text-gray-500">avg. price</span>
 </div>
 
 <!-- Price with Label -->
 <div>
     <span class="text-sm text-gray-500">Price</span>
-    <p class="text-blue-600 font-bold text-xl">450 BAM</p>
+    <p class="text-blue-600 font-bold text-xl">{{ ad|format_price }}</p>
 </div>
 ```
 
@@ -426,9 +435,9 @@ The primary display component for classified ads, optimized for quick scanning.
                 {{ ad.title }}
             </h2>
             
-            {% if ad.price %}
+            {% if ad.price_amount %}
                 <p class="text-blue-600 font-bold text-xl mb-2">
-                    {{ ad.price }} BAM
+                    {{ ad|format_price }}
                 </p>
             {% endif %}
             
@@ -575,7 +584,7 @@ Persistent filter controls for desktop browsing.
             
             <!-- Price Range -->
             <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Price Range (BAM)</h4>
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Price Range (EUR)</h4>
                 <div class="flex gap-2">
                     <input 
                         type="number" 

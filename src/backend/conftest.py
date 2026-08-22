@@ -14,6 +14,7 @@ satisfying the strict database check constraints (e.g.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -22,6 +23,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
 
@@ -81,7 +83,8 @@ def create_test_ad(
     title: str = "Test Ad",
     description: str = "Test description",
     status: AdStatus = AdStatus.ON_MODERATION,
-    price: int | None = 100,
+    price: int | Decimal | None = 100,
+    price_currency: CurrencyCode | str = CurrencyCode.EUR,
     source: AdSource = AdSource.TELEGRAM,
     **kwargs: Any,
 ) -> Ad:
@@ -91,12 +94,18 @@ def create_test_ad(
     ``moderation_failed_at``, or ``deleted_at`` based on the ``status``
     value, satisfying the strict database ``CheckConstraint`` rules on the
     ``Ad`` model. Callers can override any field via ``**kwargs``.
+
+    The ``price`` argument is the seller's original amount (in
+    ``price_currency``, default EUR); the EUR-normalized value is set equal to
+    it (EUR base rate 1.0). Pass ``price=None`` for an unpriced ad.
     """
     defaults: dict[str, Any] = {
         "user": user,
         "title": title,
         "description": description,
-        "price": price,
+        "price_amount": price,
+        "price_currency": CurrencyCode(price_currency).value,
+        "price_normalized_eur": price,
         "category": category,
         "city": city,
         "category_name": category.name,

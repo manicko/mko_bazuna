@@ -77,17 +77,17 @@ def search(request: HttpRequest) -> HttpResponse:
         except City.DoesNotExist:
             suggested_city = current_city
 
-    # Price range filter
+    # Price range filter (EUR-equivalent values, CR-10)
     min_price = request.GET.get("min_price")
     max_price = request.GET.get("max_price")
     if min_price:
         try:
-            ads = ads.filter(price__gte=int(min_price))
+            ads = ads.filter(price_normalized_eur__gte=int(min_price))
         except ValueError:
             pass
     if max_price:
         try:
-            ads = ads.filter(price__lte=int(max_price))
+            ads = ads.filter(price_normalized_eur__lte=int(max_price))
         except ValueError:
             pass
 
@@ -151,9 +151,9 @@ def search(request: HttpRequest) -> HttpResponse:
         if current_sort == AdSort.DATE_OLD:
             ads = ads.order_by("published_at")
         elif current_sort == AdSort.PRICE_LOW:
-            ads = ads.order_by("price")
+            ads = ads.order_by("price_normalized_eur")
         elif current_sort == AdSort.PRICE_HIGH:
-            ads = ads.order_by("-price")
+            ads = ads.order_by("-price_normalized_eur")
         else:  # DATE_NEW — default, newest first
             ads = ads.order_by("-published_at")
 

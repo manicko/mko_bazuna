@@ -107,7 +107,8 @@ class TestProcessPreviewLanguageDetection:
             "ad_id": ad.id,
             "title": "Valid Title",
             "description": "Valid description text for the ad.",
-            "price": 100,
+            "price_amount": 100,
+            "price_currency": "EUR",
             "photos": [],
             "user_id": seller_id,
         })
@@ -138,7 +139,8 @@ class TestProcessPreviewLanguageDetection:
             "ad_id": ad.id,
             "title": "Valid Title",
             "description": "Valid description text for the ad.",
-            "price": 100,
+            "price_amount": 100,
+            "price_currency": "EUR",
             "photos": [],
             "user_id": seller_id,
         })

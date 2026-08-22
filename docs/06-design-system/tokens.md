@@ -243,7 +243,7 @@ focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
     <img class="w-full h-48 object-cover rounded-t-lg">
     <div class="p-4">
         <h2 class="font-semibold text-lg mb-2 line-clamp-2">Title</h2>
-        <p class="text-blue-600 font-bold text-xl mb-2">Price BAM</p>
+        <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
         <p class="text-sm text-gray-600 line-clamp-3 mb-3">Description</p>
         <div class="flex justify-between text-xs text-gray-500">
             <span>Location</span><span>Category</span><time>Date</time>

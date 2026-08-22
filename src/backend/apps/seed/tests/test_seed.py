@@ -264,7 +264,9 @@ class TestImageGenerator:
             user=user,
             title="Test Ad",
             description="Test",
-            price=100,
+            price_amount=100,
+            price_currency="EUR",
+            price_normalized_eur=100,
             category=cat,
             city=city,
             category_name="Тест",
@@ -357,7 +359,9 @@ class TestAnalyticsGenerator:
             user=user,
             title="Published Ad",
             description="Test",
-            price=100,
+            price_amount=100,
+            price_currency="EUR",
+            price_normalized_eur=100,
             category=cat,
             city=city,
             category_name="Тест",
@@ -369,7 +373,9 @@ class TestAnalyticsGenerator:
             user=user,
             title="Draft Ad",
             description="Test",
-            price=100,
+            price_amount=100,
+            price_currency="EUR",
+            price_normalized_eur=100,
             category=cat,
             city=city,
             category_name="Тест",
@@ -730,15 +736,15 @@ class TestAdGeneratorMultiLang:
             "patterns": {
                 "ru": {
                     "title": "Продам {category} {condition}",
-                    "description": "Цена: {price} BAM. {feature}. Город: {city}.",
+                    "description": "Цена: {price} EUR. {feature}. Город: {city}.",
                 },
                 "en": {
                     "title": "{condition} {category} for sale",
-                    "description": "Price: {price} BAM. {feature}. City: {city}.",
+                    "description": "Price: {price} EUR. {feature}. City: {city}.",
                 },
                 "bs": {
                     "title": "{category} na prodaju - {condition}",
-                    "description": "Cijena: {price} BAM. {feature}. Grad: {city}.",
+                    "description": "Cijena: {price} EUR. {feature}. Grad: {city}.",
                 },
             }
         }
@@ -1062,9 +1068,12 @@ class TestSeedCategoryIntegration:
             # Price may be None for free/negotiable ads (~20% of non-special
             # categories) per AdGenerator._generate_price() — only validate
             # the field when a price is actually set
-            if ad.price is not None:
-                assert isinstance(ad.price, int)
-                assert ad.price > 0
+            if ad.price_amount is not None:
+                assert isinstance(ad.price_amount, int)
+                assert ad.price_amount > 0
+                # Seed ads use EUR, so the normalized value equals the amount.
+                assert ad.price_currency == "EUR"
+                assert ad.price_normalized_eur == ad.price_amount
             # Multi-language fields should be populated
             assert ad.title is not None
             assert ad.title_en is not None

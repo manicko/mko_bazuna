@@ -4,6 +4,7 @@
 {% load localized_content %}
 {% load i18n %}
 {% load trust_tags %}
+{% load price_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -49,8 +50,8 @@
                     {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
                 </div>
                 
-                {% if ad.price %}
-                    <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad.price }} BAM</p>
+                {% if ad.price_amount %}
+                    <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
                 {% endif %}
                 
                 <div class="mb-6">

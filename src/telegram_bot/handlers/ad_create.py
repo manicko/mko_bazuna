@@ -7,6 +7,7 @@ Implements step-by-step ad creation with Pydantic validation.
 import difflib
 import logging
 import os
+from decimal import Decimal
 
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
@@ -20,6 +21,8 @@ from apps.ads.services.images import AdImageService
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
 from apps.core.services.translation import translate_text
+from apps.currencies.enums import CurrencyCode
+from apps.currencies.services.price_normalizer import PriceNormalizer
 from apps.locations.models import City
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
@@ -323,31 +326,88 @@ async def process_description(message: types.Message, state: FSMContext) -> None
     await state.set_state(AdCreateForm.price)
     await message.answer(
         "Description saved.\n"
-        "Enter price in BAM (whole numbers) or send 'skip' if price not required."
+        "Now choose the price currency, or select 'Skip' if price is not required.",
+        reply_markup=build_currency_keyboard(),
     )
 
 
+def build_currency_keyboard() -> types.InlineKeyboardMarkup:
+    """Build the inline keyboard for currency selection (EUR first, PO-01)."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🇪🇺 EUR", callback_data="price_currency:EUR")
+    builder.button(text="🇷🇸 RSD", callback_data="price_currency:RSD")
+    builder.button(text="🇧🇦 BAM", callback_data="price_currency:BAM")
+    builder.button(text="⏭️ Skip", callback_data="price_skip")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
 # --- Price step ---
+@router.callback_query(AdCreateForm.price)
+async def process_price_currency(
+    callback: types.CallbackQuery, state: FSMContext
+) -> None:
+    """Process currency selection (or skip) from the price inline keyboard."""
+    if not callback.data or not callback.message:
+        return
+
+    if callback.data == "price_skip":
+        await state.update_data(price_amount=None)
+        await callback.answer()
+        await _move_from_price_to_photos(callback.message, state)
+        return
+
+    if callback.data.startswith("price_currency:"):
+        currency_value = callback.data.replace("price_currency:", "")
+        try:
+            currency = CurrencyCode(currency_value)
+        except ValueError:
+            await callback.answer("Invalid currency.", show_alert=True)
+            return
+        await state.update_data(price_currency=currency)
+        await callback.answer()
+        await callback.message.answer(
+            f"Currency: {currency.value}\n"
+            "Now enter the price amount as a number (or send 'skip' to leave price unset)."
+        )
+
+
 @router.message(AdCreateForm.price)
 async def process_price(message: types.Message, state: FSMContext) -> None:
-    """Process price input with Pydantic validation."""
+    """Process the numeric price amount input with Pydantic validation."""
+    data = await state.get_data()
+    currency: CurrencyCode | None = data.get("price_currency")
+    if currency is None:
+        await message.answer(
+            "Please choose a currency first, or select 'Skip'.",
+            reply_markup=build_currency_keyboard(),
+        )
+        return
+
     if not message.text:
-        await message.answer("Please send price or 'skip'.")
+        await message.answer("Please send the price amount or 'skip'.")
         return
 
     text = message.text.strip().lower()
 
     if text == "skip":
-        await state.update_data(price=None)
+        await state.update_data(price_amount=None)
     else:
         try:
-            price_value = int(text)
-            payload = PricePayload(price=price_value)
-            await state.update_data(price=payload.price)
+            price_value = Decimal(text)
+            payload = PricePayload(price_amount=price_value, price_currency=currency)
+            await state.update_data(price_amount=payload.price_amount)
         except (ValueError, Exception):
             await message.answer("Invalid price. Enter a number or 'skip'.")
             return
 
+    await _move_from_price_to_photos(message, state)
+
+
+async def _move_from_price_to_photos(
+    message: types.Message, state: FSMContext
+) -> None:
+    """Advance from the price step to the photo upload step."""
     await state.set_state(AdCreateForm.photos)
     await message.answer(
         "Price saved.\n"
@@ -430,7 +490,7 @@ async def show_preview(message: types.Message, data: dict) -> None:
         f"Ad Preview:\n\n"
         f"Title: {data.get('title', 'N/A')}\n"
         f"Description: {data.get('description', 'N/A')[:100]}...\n"
-        f"Price: {data.get('price', 'N/A')} BAM\n"
+        f"Price: {_format_preview_price(data)}\n"
         f"Category: {category.name if category else 'N/A'}\n"
         f"Purpose: {purpose_name}\n"
         f"Features: {feature_names}\n"
@@ -440,6 +500,16 @@ async def show_preview(message: types.Message, data: dict) -> None:
     await message.answer(
         preview_text + "Send 'confirm' to submit for moderation or 'cancel' to abort."
     )
+
+
+def _format_preview_price(data: dict) -> str:
+    """Format the selected price (amount + currency) for the preview."""
+    amount = data.get("price_amount")
+    if amount is None:
+        return "N/A"
+    currency = data.get("price_currency")
+    label = currency.value if currency else ""
+    return f"{amount} {label}".strip()
 
 
 @router.message(AdCreateForm.preview)
@@ -481,7 +551,8 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             ).value,
             category_id=data.get("category_id"),
             city_id=data.get("city_id"),
-            price=data.get("price"),
+            price_amount=data.get("price_amount"),
+            price_currency=data.get("price_currency"),
             photos=data.get("photos", []),
             user_id=data.get("user_id"),
             listing_purpose_id=data.get("listing_purpose_id"),
@@ -650,7 +721,8 @@ async def update_ad_and_moderate(
     desc_ru: str,
     category_id: int | None,
     city_id: int | None,
-    price: int | None,
+    price_amount: Decimal | None,
+    price_currency: CurrencyCode | None,
     photos: list,
     user_id: int | None,
     title_bs: str = "",
@@ -663,8 +735,10 @@ async def update_ad_and_moderate(
 ) -> tuple[bool, list[str]]:
     """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
 
-    Backward-compatible: new language fields default to empty strings.
-    Russian (title_ru/desc_ru) remains the base content stored in title/description columns.
+    ``price_amount``/``price_currency`` become the source of truth; when both
+    are present ``price_normalized_eur`` is computed via ``PriceNormalizer``
+    using the current rate (BR-03) before saving. When the price is skipped
+    both are left NULL.
     """
     from asgiref.sync import sync_to_async
     from apps.moderation.services.auto_moderation import auto_moderate
@@ -683,7 +757,35 @@ async def update_ad_and_moderate(
         ad.description = desc_ru
         ad.category_id = category_id
         ad.city_id = city_id
-        ad.price = price
+        ad.price_amount = price_amount
+
+        # Coerce the currency to a CurrencyCode member (FSM state may carry it
+        # as a member or as a plain ISO 4217 string). An invalid currency is
+        # treated as "no price" so we never crash or write bad data.
+        currency: CurrencyCode | None = None
+        if price_currency is not None:
+            try:
+                currency = (
+                    price_currency
+                    if isinstance(price_currency, CurrencyCode)
+                    else CurrencyCode(str(price_currency))
+                )
+            except ValueError:
+                logger.warning("Invalid price_currency %r for ad %s", price_currency, ad_id)
+
+        ad.price_currency = currency.value if currency else None
+
+        # Compute the derived EUR-normalized price (BR-03).
+        if price_amount is not None and currency is not None:
+            try:
+                ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
+                    price_amount, currency
+                )
+            except Exception:
+                logger.exception("Failed to normalize price for ad %s", ad_id)
+                ad.price_normalized_eur = None
+        else:
+            ad.price_normalized_eur = None
 
         # Store multi-language translations
         if title_bs:

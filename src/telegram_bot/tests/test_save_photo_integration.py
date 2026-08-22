@@ -29,6 +29,7 @@ from django.test import override_settings
 from PIL import Image
 
 from apps.categories.models import Category
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 
 
@@ -99,7 +100,8 @@ class TestSavePhotoThumbnailsIntegration:
                 desc_ru="Description",
                 category_id=category.id,
                 city_id=city.id,
-                price=100,
+                price_amount=100,
+                price_currency=CurrencyCode.EUR,
                 photos=photos,
                 user_id=user.id,
             )
@@ -149,7 +151,8 @@ class TestSavePhotoThumbnailsIntegration:
                 desc_ru="Description",
                 category_id=category.id,
                 city_id=city.id,
-                price=100,
+                price_amount=100,
+                price_currency=CurrencyCode.EUR,
                 photos=photos,
                 user_id=user.id,
             )

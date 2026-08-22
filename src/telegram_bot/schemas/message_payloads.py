@@ -4,9 +4,12 @@ Pydantic v2 DTOs for Telegram bot message payloads.
 All bot message payloads validated before ORM writes per rule 11.
 """
 
+from decimal import Decimal
 from typing import Annotated
 
 from pydantic import BaseModel, Field
+
+from apps.currencies.enums import CurrencyCode
 
 
 class TitlePayload(BaseModel):
@@ -30,12 +33,18 @@ class DescriptionPayload(BaseModel):
 
 
 class PricePayload(BaseModel):
-    """Validated price input from seller."""
+    """Validated price input from seller (amount + currency).
 
-    price: Annotated[
-        int | None,
-        Field(ge=0, description="Ad price in whole BAM units, nullable"),
-    ]
+    The amount is nullable (a price is optional and can be skipped with
+    ``Skip`` in the bot dialog). The currency defaults to EUR (the project's
+    default display currency).
+    """
+
+    price_amount: Annotated[
+        Decimal | None,
+        Field(ge=0, description="Ad price amount in the chosen currency, nullable"),
+    ] = None
+    price_currency: CurrencyCode = CurrencyCode.EUR
 
 
 class PhotoCountPayload(BaseModel):

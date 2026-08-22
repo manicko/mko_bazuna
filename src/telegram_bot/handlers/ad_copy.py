@@ -65,7 +65,8 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         listing_purpose_id=new_ad.listing_purpose_id,
         title=new_ad.title,
         description=new_ad.description,
-        price=new_ad.price,
+        price_amount=None,
+        price_currency=None,
     )
 
     await message.answer(

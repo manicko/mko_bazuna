@@ -344,7 +344,7 @@ def listings(
 
         try:
 
-            ads = ads.filter(price__gte=int(min_price))
+            ads = ads.filter(price_normalized_eur__gte=int(min_price))
 
         except ValueError:
 
@@ -356,7 +356,7 @@ def listings(
 
         try:
 
-            ads = ads.filter(price__lte=int(max_price))
+            ads = ads.filter(price_normalized_eur__lte=int(max_price))
 
         except ValueError:
 
@@ -374,11 +374,11 @@ def listings(
 
     elif sort == AdSort.PRICE_LOW:
 
-        ads = ads.order_by("price")
+        ads = ads.order_by("price_normalized_eur")
 
     elif sort == AdSort.PRICE_HIGH:
 
-        ads = ads.order_by("-price")
+        ads = ads.order_by("-price_normalized_eur")
 
     else:  # date_desc (default)
 

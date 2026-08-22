@@ -1,6 +1,7 @@
 {# Seller dashboard template for Mko Bazuna. Lists seller's ads grouped by status with edit/archive/reactivate actions. Requires authentication. #}
 {% load static %}
 {% load dict_tags %}
+{% load price_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -93,8 +94,8 @@
                                     </a>
                                 </h4>
 
-                                {% if ad.price %}
-                                    <p class="text-blue-600 font-bold mb-2">{{ ad.price }} BAM</p>
+                                {% if ad.price_amount %}
+                                    <p class="text-blue-600 font-bold mb-2">{{ ad|format_price }}</p>
                                 {% endif %}
 
                                 {% if seller_stats %}

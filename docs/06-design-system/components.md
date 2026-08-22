@@ -185,15 +185,23 @@ Text, number, and textarea inputs with validation states.
 
 ```html
 <div class="mb-4">
-    <label for="price" class="block font-medium mb-2">Price (BAM)</label>
-    <input 
-        type="number" 
-        id="price" 
-        name="price"
-        min="0"
-        step="0.01"
-        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
+    <label for="price_amount" class="block font-medium mb-2">Price</label>
+    <div class="flex gap-2">
+        <input
+            type="number"
+            id="price_amount"
+            name="price_amount"
+            min="0"
+            step="0.01"
+            placeholder="Amount"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+        <select id="price_currency" name="price_currency" class="px-3 py-2 border border-gray-300 rounded-lg">
+            <option value="EUR">EUR</option>
+            <option value="RSD">RSD</option>
+            <option value="BAM">BAM</option>
+        </select>
+    </div>
 </div>
 ```
 
@@ -329,16 +337,16 @@ Combined input and button for keyword search.
 Prominent price presentation with currency.
 
 ```html
-<!-- List price -->
-<p class="text-blue-600 font-bold text-xl mb-2">450 BAM</p>
+<!-- List price (rendered via shared format_price filter; EUR is default) -->
+<p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
 
 <!-- Detail price -->
-<p class="text-blue-600 font-bold text-3xl mb-4">450 BAM</p>
+<p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
 
 <!-- With label -->
 <div>
     <span class="text-sm text-gray-500">Price</span>
-    <p class="text-blue-600 font-bold text-xl">450 BAM</p>
+    <p class="text-blue-600 font-bold text-xl">{{ ad|format_price }}</p>
 </div>
 ```
 
@@ -376,9 +384,9 @@ Primary listing card for search results.
                 {{ ad.title }}
             </h2>
             
-            {% if ad.price %}
+            {% if ad.price_amount %}
                 <p class="text-blue-600 font-bold text-xl mb-2">
-                    {{ ad.price }} BAM
+                    {{ ad|format_price }}
                 </p>
             {% endif %}
             
@@ -440,8 +448,8 @@ keyed on `LANGUAGE_CODE`.
             {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
         </div>
 
-        {% if ad.price %}
-            <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad.price }} BAM</p>
+        {% if ad.price_amount %}
+            <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
         {% endif %}
 
         <div class="mb-6">
@@ -500,9 +508,12 @@ keyed on `LANGUAGE_CODE`.
 
 ### Shared Navigation Headers
 
-Two header variants share a global context processor (`apps.core.context_processors.header_context`)
-that injects `bot_username` and `root_categories`. Both are rendered as Django
-include fragments.
+Two header variants share a global context processor (`apps.core.context_processors.header_context`,
+see [architecture-structure.md](architecture-structure.md#middleware--context-processors))
+that injects `bot_username`, `root_categories`, `preferred_city_display`, `cities`, and
+`favorites_count`. Consent state (`consent_shown`, `consent_analytics`,
+`consent_preferences`) is provided by `apps.users.context_processors.consent_state`. Both
+headers are rendered as Django include fragments.
 
 | Header | Template | Used on |
 |--------|----------|---------|
@@ -511,44 +522,84 @@ include fragments.
 
 #### Catalog Header (`header_catalog.html`)
 
-Avito-style header with place-an-ad CTA, categories accordion dropdown, HTMX
-autocomplete search, and breadcrumbs. Full structure and behavior documented
-in [UI Patterns — Shared Navigation Headers](../01-spec/ui-patterns.md#shared-navigation-headers).
+Avito-style catalog header: place-an-ad CTA, preferred-city selector, "All Categories"
+accordion dropdown, HTMX autocomplete search, breadcrumbs, and auth/cabinet entry with a
+favorites badge. Submenus load via vanilla `fetch` (not HTMX); expand buttons render
+when `cat.get_children.exists`. Full behavior documented in
+[UI Patterns — Shared Navigation Headers](../01-spec/ui-patterns.md#shared-navigation-headers).
 
 ```html
 <header class="bg-white shadow-sm border-b">
-    <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <!-- mobile hamburger + brand -->
-        <div class="flex items-center gap-2">
-            <button type="button" class="lg:hidden" data-mobile-categories-toggle>…</button>
-            <a href="/">Mko Bazuna</a>
+    <div class="container mx-auto px-4 py-3">
+        <!-- Top row: hamburger + brand | favorites + auth + place-an-ad + language -->
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <button type="button" class="lg:hidden" data-mobile-categories-toggle>…</button>
+                <a href="/">Mko Bazuna</a>
+            </div>
+            <div class="flex items-center gap-2">
+                {% include "components/header_favorites_badge.html" %}
+                {% include "components/header_auth_entry.html" %}
+                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
+                   class="px-4 py-2 bg-blue-600 text-white rounded-lg" data-place-ad>+ Подать объявление</a>
+                {% include "components/language_switcher.html" %}
+            </div>
         </div>
-        <!-- place-an-ad CTA + language -->
-        <div class="flex items-center gap-3">
-            <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
-               class="px-4 py-2 bg-blue-600 text-white rounded-lg" data-place-ad>
-                + Подать объявление
-            </a>
-            {% include "components/language_switcher.html" %}
+
+        <!-- Search row: city selector + categories dropdown + autocomplete search -->
+        <div class="mt-3">
+            <div class="flex gap-2 items-stretch">
+                <!-- Preferred-city selector -->
+                <div class="relative" data-preferred-city-trigger>
+                    <button type="button" data-preferred-city-toggle aria-haspopup="listbox">
+                        📍 <span data-preferred-city-label>{{ preferred_city_display }}</span>
+                    </button>
+                    <div data-preferred-city-panel class="absolute z-[90] hidden">
+                        <button type="button" data-city-clear>Вся страна</button>
+                        {% for city in cities %}
+                        <button type="button" data-city-option="{{ city.slug }}">{{ city.get_name }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <!-- Categories accordion (submenus loaded via fetch, not HTMX) -->
+                <div class="relative hidden md:block" data-categories-trigger>
+                    <button type="button" data-categories-toggle>…</button>
+                    <div data-categories-panel class="absolute z-[90] hidden">
+                        {% for cat in root_categories %}
+                        <li data-category-slug="{{ cat.slug }}">
+                            <a href="{% url 'ads:listings_category' cat.slug %}">{{ cat.get_name }}</a>
+                            {% if cat.get_children.exists %}
+                            <button type="button" data-category-expand="{{ cat.slug }}">…</button>
+                            <div data-category-submenu="{{ cat.slug }}" class="hidden"></div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </div>
+                </div>
+                <form method="get" action="{% url 'search:search' %}" class="relative flex-1" data-search-form>
+                    <input type="search" name="q"
+                           hx-get="{% url 'search:autocomplete' %}"
+                           hx-trigger="input delay:300ms"
+                           hx-target="#autocomplete-dropdown" hx-swap="none" autocomplete="off">
+                    <ul id="autocomplete-dropdown" class="absolute z-20 hidden"></ul>
+                </form>
+            </div>
         </div>
+
+        {% include "components/breadcrumb.html" with breadcrumb_category=current_cat %}
     </div>
-    <!-- search + categories dropdown -->
-    <form method="get" action="{% url 'search:search' %}" class="relative flex-1" data-search-form>
-        <input type="search" name="q"
-               hx-get="{% url 'search:autocomplete' %}"
-               hx-trigger="input delay:300ms"
-               hx-target="#autocomplete-dropdown" hx-swap="none" autocomplete="off">
-        <ul id="autocomplete-dropdown" class="absolute z-20 hidden"></ul>
-    </form>
-    {% include "components/breadcrumb.html" with breadcrumb_category=current_cat %}
 </header>
 ```
 
 | Property | Value |
 |----------|-------|
 | Height (mobile) | `py-3` (~52px top row) |
+| City selector | `data-preferred-city-toggle`; POST `search:preferred_city` (cookie for guests, `User.preferred_city` on login) |
 | Search | HTMX autocomplete, 300ms delay |
-| Categories | Desktop accordion + mobile off-canvas |
+| Categories | Desktop accordion + mobile off-canvas; submenus via `GET /categories/<slug>/submenu/` (vanilla fetch → innerHTML) |
+| Expand buttons | rendered when `cat.get_children.exists` |
+| Auth entry | `header_auth_entry.html` (anonymous → login; authed → avatar dropdown) |
+| Favorites badge | `header_favorites_badge.html` (outline for anon, filled+count for authed) |
 | Breadcrumbs | `components/breadcrumb.html` |
 | Deep-link | `bot_username` context var |
 

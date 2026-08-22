@@ -80,11 +80,11 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
             )
             queryset = queryset.filter(category_id__in=descendant_ids)
 
-    # Apply price range filters
+    # Apply price range filters (min/max are EUR-equivalent, WR-04/PO-04)
     if saved_search.min_price is not None:
-        queryset = queryset.filter(price__gte=saved_search.min_price)
+        queryset = queryset.filter(price_normalized_eur__gte=saved_search.min_price)
     if saved_search.max_price is not None:
-        queryset = queryset.filter(price__lte=saved_search.max_price)
+        queryset = queryset.filter(price_normalized_eur__lte=saved_search.max_price)
 
     # Exclude ads already notified (efficient correlated NOT EXISTS subquery)
     notified_ads = SavedSearchNotification.objects.filter(
@@ -167,12 +167,12 @@ def _ad_matches_saved_search(ad: Ad, saved_search: SavedSearch) -> bool:
     if saved_search.city_id and saved_search.city_id != ad.city_id:
         return False
 
-    # Price range filter
+    # Price range filter (EUR-normalized value, WR-04/PO-04)
     if saved_search.min_price is not None:
-        if ad.price is None or ad.price < saved_search.min_price:
+        if ad.price_normalized_eur is None or ad.price_normalized_eur < saved_search.min_price:
             return False
     if saved_search.max_price is not None:
-        if ad.price is None or ad.price > saved_search.max_price:
+        if ad.price_normalized_eur is None or ad.price_normalized_eur > saved_search.max_price:
             return False
 
     # Category-subtree filter

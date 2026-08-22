@@ -1,4 +1,4 @@
----
+﻿---
 id: db-enums
 domain: database
 tags:
@@ -39,6 +39,19 @@ Origin of an ad. Phase 1 accepts ads only via the Telegram bot (decision B).
 | Value | Meaning |
 |-------|---------|
 | `TELEGRAM` | bot-only source in phase 1 |
+| `SEED` | generated demo/seed data |
+
+## CurrencyCode
+Supported ad listing currencies (project rule 10 — never plain strings). `EUR` is the
+default display currency (project launches in Montenegro). Rates are stored relative to
+EUR in the `exchange_rates` table; `Ad.price_currency` and `ExchangeRate.currency` store
+this enum's value (see [db-schema.md](db-schema.md)).
+
+| Value | Meaning |
+|-------|---------|
+| `EUR` | Euro (default) |
+| `RSD` | Serbian Dinar |
+| `BAM` | Bosnia and Herzegovina Convertible Mark |
 
 ## EventType
 Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-schema.md)).
@@ -172,3 +185,30 @@ Machine-readable codes for built-in lookup groups. Used in model field `limit_ch
 |-------|---------|
 | `LISTING_PURPOSE` | `listing_purpose` — what the seller wants to do (sell, buy, rent, etc.) |
 | `LISTING_FEATURE` | `listing_feature` — characteristics of the listing (new, used, urgent, etc.) |
+
+## ConsentChoice
+User's consent decision recorded in `consent_records.choice` (see [db-schema.md](db-schema.md)).
+Backs the GDPR/ePrivacy accept/decline/withdraw flow (decision F, zone R3).
+
+| Value | Meaning |
+|-------|---------|
+| `ACCEPTED` | user accepted all processing (cookie `consent_given=accepted`) |
+| `DECLINED` | user declined non-essential cookies (browse-only; no erasure) |
+| `WITHDRAWN` | user withdrew consent (sets `consent_revoked_at`; triggers soft-delete + 30-day PII erasure) |
+
+## CookieCategory
+Non-essential cookie categories offered by the consent banner (Plan 21 D-9). Used as the
+vocabulary for the `consent_analytics` / `consent_preferences` cookies and the
+`consent_records.categories` JSON payload. Only `Essential` cookies (sessionid, csrftoken)
+are always on.
+
+| Value | Meaning | Cookie |
+|-------|---------|--------|
+| `ESSENTIAL` | strictly necessary cookies (always on) | — |
+| `ANALYTICS` | anonymized traffic analytics (Plausible) | `consent_analytics` |
+| `PREFERENCES` | language + city settings | `consent_preferences` |
+
+> `CookieCategory` is defined in `apps/core/enums.py` (exported via `__all__`), but the
+> `categories` flags are still passed and stored as **plain string keys**
+> (`"analytics"`, `"preferences"`) in `ConsentSubmission` and `record_consent_action`.
+> The enum members are not referenced by runtime code.

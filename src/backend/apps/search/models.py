@@ -79,12 +79,12 @@ class SavedSearch(models.Model):
     min_price = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="Minimum price filter in BAM",
+        help_text="Minimum price filter, EUR-equivalent value (WR-04)",
     )
     max_price = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="Maximum price filter in BAM",
+        help_text="Maximum price filter, EUR-equivalent value (WR-04)",
     )
     is_active = models.BooleanField(
         default=True,

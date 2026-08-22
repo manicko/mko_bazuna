@@ -60,6 +60,7 @@ is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immedi
 is_declined (BOOL, default False)         # user declined consent (browse-only mode)
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 telegram_premium (BOOL, default False)    # Telegram Premium subscription status
+preferred_city_id (FK → cities.id, nullable, SET_NULL, related_name="+")  # default city for search/filter for authenticated users (plan 15); guests use a 1-year consent-gated cookie instead
 deleted_at (TIMESTAMP, nullable)
 consent_given_at (TIMESTAMP, nullable)    # US-A8 / decision F
 consent_revoked_at (TIMESTAMP, nullable)    # Phase 3: triggers immediate soft-delete cascade
@@ -88,6 +89,30 @@ Both check `expires_at > now()`; token compare via `hmac.compare_digest` (consta
 
 ---
 
+### consent_records (zone F / Plan 21)
+Audit log of consent decisions (accept / decline / withdraw). One row is **inserted** per
+decision epoch — withdrawal writes a NEW row (history is never overwritten). `consent_records.user_id`
+is nullable so **anonymous** buyers can consent via cookies only; authenticated users tie the
+record to their `users` row (SET NULL on erasure keeps the audit trail after account deletion).
+`choice` is backed by the `ConsentChoice` StrEnum (see [db-enums.md](db-enums.md)). The `categories`
+JSONB carries granular flags (`{"analytics": bool, "preferences": bool}`).
+```
+id (PK)
+user_id (FK → users.id, nullable, SET_NULL)   # NULL for anonymous/guest consent (cookie-only sessions)
+choice (StrEnum — ConsentChoice)              # see db-enums.md
+categories (JSONB)                            # {"analytics": bool, "preferences": bool}
+ip_address (INET, nullable)                   # anonymous records only (audit traceability)
+user_agent (TEXT, nullable)                   # anonymous records only
+consented_at (TIMESTAMP, default now)
+revoked_at (TIMESTAMP, nullable)             # set when choice = WITHDRAWN → triggers consent_hard_delete sweep + 30-day PII erasure
+db_table: consent_records
+```
+Index on `user_id` supports the `consent_hard_delete` sweep. `consent_hard_delete` reads
+`users.consent_revoked_at` (zone F) — the 30-day PII null + hard-delete of the row runs only
+after the full grace window.
+
+---
+
 ### ads (single table)
 ```
 id (PK)
@@ -101,7 +126,9 @@ description_ru (TEXT, nullable)                   # Explicit Russian description
 description_en (TEXT, nullable)                   # English translation for UI display
 description_bs (TEXT, nullable)                   # Bosnian translation for UI display
 original_language (VARCHAR(5), nullable)            # Source language code (e.g. 'ru', 'bs', 'en')
-price (INT, nullable)                             # whole BAM units; multi-currency deferred (currency column removed — YAGNI)
+price_amount (DECIMAL(10,2), nullable)            # seller's original price amount (source of truth)
+price_currency (VARCHAR(3), nullable)             # original currency (CurrencyCode StrEnum): EUR (default) / RSD / BAM
+price_normalized_eur (DECIMAL(12,4), nullable)    # derived EUR-normalized value for cross-currency filter/sort; not user-editable (indexed)
 category_id (FK → categories.id)
 listing_purpose_id (FK → lookup_items.id, nullable)  # resolved via CategoryLookupResolver; group=listing_purpose
 city_id (FK → cities.id)
@@ -217,7 +244,25 @@ slug (VARCHAR)
 ```
 City match is EXACT against the closed list; unrecognized city → "general / no city". Typos → `difflib.get_close_matches` "did you mean".
 
-> Zone D11: `currency` column removed; `price` is INT whole BAM units.
+> Multi-currency: `price_currency` is a `CurrencyCode` StrEnum (EUR / RSD / BAM,
+> EUR default — see [db-enums.md](db-enums.md)). The seller's original amount and
+> currency are the source of truth; `price_normalized_eur` enables cross-currency
+> filter/sort. Rates live in the `exchange_rates` table (below).
+
+### exchange_rates (single table)
+```
+id (PK)
+currency (VARCHAR(3), unique)                 # CurrencyCode StrEnum: EUR / RSD / BAM
+rate_to_eur (DECIMAL(14,8))                   # EUR per 1 unit of currency (EUR base = 1.0)
+effective_date (DATE)                         # audit trail for rate changes
+source (VARCHAR(50))                          # origin, e.g. 'manual_seed' or an official provider
+is_current (BOOL, default True)               # only current rows are used for normalization
+created_at / updated_at
+```
+Constraint: at most one `is_current=True` row per currency (partial unique index
+`uq_exchange_rate_current_per_currency`). `PriceNormalizer` reads the current rate
+(cached 5 min) to compute `price_normalized_eur`; `recompute_normalized_prices`
+re-derives it after rate changes.
 
 ### lookup_groups
 Reference data groups (e.g. `listing_purpose`, `listing_feature`). Managed through Django admin. System groups are protected from deletion.

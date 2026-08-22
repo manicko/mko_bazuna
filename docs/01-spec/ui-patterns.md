@@ -1,4 +1,4 @@
----
+﻿---
 id: ui-patterns
 domain: spec
 tags:
@@ -66,8 +66,8 @@ Ad cards follow a consistent visual hierarchy optimized for quick scanning:
         {% endif %}
         <div class="p-4">
             <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
-            {% if ad.price %}
-                <p class="text-blue-600 font-bold text-xl mb-2">{{ ad.price }} BAM</p>
+            {% if ad.price_amount %}
+                <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
             {% endif %}
             <div class="flex justify-between items-center text-xs text-gray-500">
                 <span>{{ ad.city.get_name|default:ad.city.name }}</span>
@@ -96,7 +96,8 @@ Price is the primary decision factor in classifieds. Visual treatment:
 ### Notes
 
 - Price shown only when set
-- Currency: BAM (Bosnia and Herzegovina Convertible Mark)
+- Currency: seller's original currency (EUR / RSD / BAM), rendered by the shared
+  `format_price` filter as `"{amount} {currency}"` (e.g. "500 BAM"); EUR is the default
 - Always uses `text-blue-600` class for prominence
 - Position: Second visual element after title
 
@@ -250,9 +251,41 @@ breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
             </div>
         </div>
 
-        <!-- Search row: "All Categories" dropdown + HTMX autocomplete search -->
+        <!-- Search row: city selector + "All Categories" dropdown + HTMX autocomplete search -->
         <div class="mt-3">
             <div class="flex gap-2 items-stretch">
+                <!-- Preferred-city selector (cookie + DB for auth users) -->
+                <div class="relative" data-preferred-city-trigger>
+                    <button type="button" data-preferred-city-toggle
+                            class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            aria-label="Preferred city">
+                        <span aria-hidden="true">📍</span>
+                        <span data-preferred-city-label>{{ preferred_city_display }}</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div data-preferred-city-panel
+                         class="absolute left-0 z-[90] mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg hidden">
+                        <ul class="py-1 max-h-96 overflow-y-auto">
+                            <li>
+                                <button type="button" data-city-clear
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    Вся страна
+                                </button>
+                            </li>
+                            {% for city in cities %}
+                            <li>
+                                <button type="button" data-city-option="{{ city.slug }}"
+                                        class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
+                                    {{ city.get_name }}
+                                </button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
                 <div class="relative hidden md:block" data-categories-trigger>
                     <button type="button" data-categories-toggle>…</button>
                     <div data-categories-panel class="absolute z-[90] hidden">
@@ -260,7 +293,7 @@ breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
                             <li data-category-slug="{{ cat.slug }}">
                                 <a href="{% url 'ads:listings_category' cat.slug %}"
                                    data-category-link="{{ cat.slug }}">{{ cat.get_name }}</a>
-                                {% if cat.get_children_count %}
+                                {% if cat.get_children.exists %}
                                     <button data-category-expand="{{ cat.slug }}">…</button>
                                     <div data-category-submenu="{{ cat.slug }}" class="hidden"></div>
                                 {% endif %}
@@ -294,10 +327,32 @@ breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
   `https://t.me/{{ bot_username }}?start=create_ad` in a new tab. Uses the
   `bot_username` context variable (never references `settings.BOT_USERNAME`
   directly).
+- **Preferred-city selector:** A `📍` button shows `preferred_city_display`
+  ("Вся страна" or the localized city name). Expanding it lists all Montenegro
+  cities from the `cities` context var; "Вся страна" clears the preference
+  (`POST search:preferred_city` with `action=clear`, or an empty `slug`). Selecting a city persists
+  it (`POST search:preferred_city` with the slug) and navigates to
+  `/city/<slug>/` (URL path then takes precedence over the stored preference).
+  For authenticated users the city is also written to `User.preferred_city`
+  on login reconciliation. The cookie is consent-gated (`consent_preferences`
+  required) — see [search-patterns.md](search-patterns.md#preferred-city-default--precedence).
 - **"All Categories" dropdown (desktop):** Lazy-loading accordion. The panel
   is rendered server-side with top-level `root_categories`; submenus are
-  fetched via `GET /categories/<slug>/submenu/` on first expand and injected
-  via HTMX swap.
+  fetched on first expand via `GET /categories/<slug>/submenu/` and injected
+  into the panel with vanilla JS (`container.innerHTML = html`). Expand buttons
+  render only when `cat.get_children.exists`. HTMX is used only for the
+  autocomplete search, not the category accordion.
+  - **Expand button icon:** Rotating downward caret (▼ → ▲) on expand, not `+`/`−`.
+    Per NN/g empirical study, the caret is the safest icon for in-place accordions;
+    the right-arrow is explicitly discouraged. See `.ai/research/25_main-menu-navigation_research.md`
+    and `.ai/problems/25_main-menu-navigation_spec.md` (Spec_025).
+  - **Expand button size:** 44x44px hit area (`min-w-[44px] min-h-[44px]`) with a
+    16x16px icon centered — meets project standard, WCAG 2.5.5 AA,
+    and Apple HIG 44pt.
+  - **State cue:** Chevron rotates 180° (`rotate-180` class on SVG) when
+    `aria-expanded="true"`; `aria-controls` links button to submenu container.
+  - **Locations:** Three identical patterns — desktop dropdown, mobile
+    off-canvas panel, and lazy-loaded `mega_submenu.html` partial.
 - **Mobile off-canvas:** Same category tree in a slide-over panel toggled by
   `data-mobile-categories-toggle`; closes on backdrop click or Escape.
 - **Search bar:** HTMX-powered autocomplete — `input delay:300ms` triggers
@@ -321,7 +376,13 @@ This corrects the previous Spec-14 R-05c which excluded auth nav.
 - **Mobile:** always visible top-right; category hamburger stays separate
 - **Dropdown:** vanilla JS toggle (no `hx-on`); closes on click-outside, Escape, HTMX configRequest
 
-See `24_catalog-header-auth-entry_spec.md` for full requirements.
+**Context variables** (from `apps.core.context_processors.header_context`, see
+[architecture-structure.md](architecture-structure.md#middleware--context-processors)):
+`bot_username`, `root_categories`, `preferred_city_display`, `cities`,
+`favorites_count` (None for anonymous → outline heart with no count).
+Consent state (`consent_shown`, `consent_analytics`, `consent_preferences`) is
+provided by `apps.users.context_processors.consent_state`. The behavior above is
+the complete requirement (canonical template: `components/header_catalog.html`).
 
 ### Auth Header (`header.html`)
 
@@ -393,6 +454,7 @@ Interactive elements must meet WCAG minimum touch target size:
 - Search button: `px-6 py-2 bg-blue-600` (40px height with padding)
 - Contact button: `px-6 py-3 bg-blue-600` (46px height, meets 44px minimum)
 - Consent banner buttons: `px-4 py-2` (36px height, needs review)
+- Category expand buttons: `p-3 min-w-[44px] min-h-[44px]` (44x44px, meets minimum)
 
 Related user stories: US-B8
 

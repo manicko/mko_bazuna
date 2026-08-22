@@ -21,6 +21,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apps.ads.models import Ad
+from apps.ads.templatetags.price_tags import format_price_value
 from apps.core.enums import AdStatus
 from apps.search.models import SavedSearch
 from apps.search.services.alert_query import (
@@ -101,7 +102,7 @@ def build_alert_message(ad: Ad, saved_search: SavedSearch) -> tuple[str, InlineK
     """
     title = ad.get_title("ru") or "Объявление"
     city_name = ad.city.get_name() if ad.city else "—"
-    price_str = f"{ad.price} BAM" if ad.price else "Цена не указана"
+    price_str = format_price_value(ad.price_amount, ad.price_currency) or "Цена не указана"
 
     lines = [
         f"<b>{title}</b>",
