@@ -4,6 +4,34 @@
 > **Confidence:** HIGH — all findings verified against project source code
 > **Date:** 2026-08-20
 > **Scope:** Consent banner implementation, cookie usage, cookie consent, privacy policy, and related GDPR/ePrivacy compliance for the Mko Bazuna classifieds platform.
+>
+> **Implementation Status (Plan 21 — consent-banner-compliance):** Resolved. All major
+> pre-launch defects from §2/§5/§6 are implemented by Plan 21 (`consent-banner-compliance`):
+>
+> - **D-ENUMS:** `ConsentChoice` (`ACCEPTED`/`DECLINED`/`WITHDRAWN`) and `CookieCategory`
+>   (`ESSENTIAL`/`ANALYTICS`/`PREFERENCES`) StrEnums added to `apps/core/enums.py`
+>   (re-exported via `__all__`). `ConsentChoice` backs the `consent_records.choice` audit column;
+>   `CookieCategory` exists as the category vocabulary but is **not** referenced at runtime
+>   (category flags use matching string keys).
+> - **D-audit:** accept/decline/withdraw each insert a new row in `consent_records` (never updated).
+> - **D-views (T-05, D2):** `consent_accept`/`consent_decline` are `@require_POST` and **anonymous-accessible**
+>   (no `@login_required`); `consent_withdraw` keeps `@login_required` + `@require_POST`. GET is rejected (CR4).
+> - **D-cookies (D-COOKIES):** the `consent_given` cookie now carries a structured value
+>   (`accepted`/`declined`/`withdrawn`) and **is read back** by `consent_state`
+>   (`request.COOKIES.get("consent_given")`) — it is no longer a dead write.
+> - **D4 (privacy):** `/privacy/` route exists (`apps.core.views.privacy_policy`,
+>   `apps/core/urls.py`) rendering public `templates/privacy.html` — the 404 is resolved.
+> - **D7 (script gating):** Plausible + GLightbox JS gate on `consent_analytics`
+>   (`{% if consent_analytics %}` in 11 templates). **Partial:** the GLightbox CSS `<link>`
+>   and the `/privacy/` Plausible snippet load unconditionally (non-executable fallback).
+> - **D9 (banner + guards):** `consent_state` context processor provides `consent_shown` /
+>   `consent_analytics` / `consent_preferences` to all templates; the
+>   `{% if not request.user.is_authenticated or not request.user.is_deleted %}` guard
+>   suppresses the banner for soft-deleted users.
+> - **Re-prompt:** consent re-prompted every 12 months (cookie `max_age = 31536000` / 1 year).
+>
+> Cookie table §1.6 updated below. The `preferred_city` consent-gating note above remains
+> in effect (satisfies the §5/Missing Components #4 recommendation without a blocking middleware).
 
 ---
 
@@ -49,7 +77,7 @@ Implements a cookie-consent style banner with:
 - `{% if not consent_shown %}` guard (line 6) - only renders if the context flag is not set
 - Accept button -> POST to `/consent/accept/`
 - Reject button -> POST to `/consent/decline/`
-- Link to `/privacy/` (line 108) - **returns 404, no route exists**
+    - Link to `/privacy/` (line 108) — **RESOLVED**: route exists (`apps.core.views.privacy_policy`, `apps/core/urls.py`) rendering public `templates/privacy.html` (Plan 21 D4).
 
 ### 1.5 Banner Placement (7 Templates)
 The banner is included (`{% include "components/consent_banner.html" %}`) in these templates:
@@ -76,15 +104,15 @@ The banner is included (`{% include "components/consent_banner.html" %}`) in the
 | `sessionid` | Django | `/` | Session (persistent cookie per spec H) | No |
 | `csrftoken` | Django | `/` | 1 year | No |
 | `lang_pref` | JS in `language_switcher.html` (line 76) | `/` | 1 year | No |
-| `preferred_city` | `set_preferred_city` view | `/` | 1 year | No |
+| `preferred_city` | `set_preferred_city` view | `/` | 1 year | Yes (set only when `consent_preferences` cookie is present) |
 
 ### 1.7 Frontend Scripts (External)
 
 | Script | Source | Essential? | Consent Required? |
 |--------|--------|------------|-------------------|
-| Plausible analytics | `https://<host>/js/script.js` | No (traffic analytics) | Yes (1st-party, non-essential) |
+| Plausible analytics | `https://<host>/js/script.js` | No (traffic analytics) | Yes (JS gated behind `consent_analytics`; the /privacy/ snippet loads unconditionally) |
 | HTMX | `unpkg.com/htmx.org@1.9.12` | Yes (MPA functionality) | Yes (functional, not consent) |
-| GLightbox | `cabinet_hub.html`, `detail.html` | No (image gallery) | Yes (non-essential) |
+| GLightbox | `cabinet_hub.html`, `detail.html` | No (image gallery) | Yes (JS gated behind `consent_analytics`; CSS `<link>` loads unconditionally) |
 
 **CSP:** `Content-Security-Policy-Report-Only` (report-only, **not enforced**) - allows `script-src 'self' 'unsafe-inline' https://unpkg.com https://*.plausible.io`. Violations logged to `/csp-report/`.
 
@@ -108,6 +136,10 @@ The bot checks `consent_revoked_at` and `is_declined` for permission gating, but
 ---
 
 ## 2. Defects & Compliance Gaps
+
+> **Resolution:** All defects below are resolved by Plan 21 (consent-banner-compliance)
+> except the `lang_pref` cookie (§2 MEDIUM), which remains open. See
+> `## Implementation Status` above and §3 Legal Requirements Checklist for current status.
 
 ### CRITICAL: Missing Privacy Policy
 - **File:** `src/backend/templates/components/consent_banner.html` (line 108)
@@ -151,9 +183,13 @@ The bot checks `consent_revoked_at` and `is_declined` for permission gating, but
 - **ePrivacy Directive:** The `lang_pref` cookie is a non-essential persistent cookie (1 year). Under strict ePrivacy interpretation, this requires prior consent unless classified as "strictly necessary" for a service explicitly requested by the user.
 - **Defense:** Could be argued as "functionality requested by the user" (language preference). Still, best practice is to set it only after consent.
 
-### LOW: `preferred_city` Cookie Set Without Consent
+### LOW: `preferred_city` Cookie Set Without Consent — RESOLVED
+
 - **File:** `src/backend/apps/search/views/preferred_city.py` (line 57)
   - `set_preferred_city` view sets a 1-year `preferred_city` cookie.
+- **Status:** Resolved. The cookie write is now consent-gated — it is only set
+  when `request.COOKIES["consent_preferences"] == "true"` (`preferred_city.py`).
+  See `## Implementation Status` above and §5 Missing Components #4.
 - **Similar to `lang_pref`:** Non-essential persistent cookie, arguable as user-requested functionality.
 
 ### LOW: Tests Reinforce Insecure Patterns
@@ -172,33 +208,33 @@ Based on GDPR (EU Regulation 2016/679) and ePrivacy Directive (2009/136/EC, as i
 
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
-| Lawful basis for processing | **Partially met** | Consent tracked via `consent_given_at`, `is_declined`, `consent_revoked_at` (model, line 88) |
-| Right to be informed | **Not met** | No privacy policy page (`/privacy/` returns 404) |
-| Right to withdraw | **Met** | `consent_withdraw` view (line 118) + `withdraw_consent()` service |
-| Right to erasure | **Met (30 days)** | `consent_hard_delete()` sweep with `ERASURE_RETENTION_DAYS=30` (spec decision F, line 85) |
-| Data minimization | **Met** | Only `telegram_id` + optional `username` collected (spec decision F, line 81) |
-| Purpose limitation | **Met (design)** | Consent covers "all PII processing including the bot" (spec decision K, line 99) |
+| Lawful basis for processing | **Met** | Consent tracked via `consent_given_at`, `is_declined`, `consent_revoked_at` (model); recorded in `consent_records` audit table |
+| Right to be informed | **Met** | `/privacy/` route exists (`apps.core.views.privacy_policy`) rendering a public privacy policy page; visible to buyers without login |
+| Right to withdraw | **Met** | `consent_withdraw` view (line 118) + `withdraw_consent()` service; POST + CSRF, auth-required |
+| Right to erasure | **Met (30 days)** | `consent_hard_delete()` sweep with `ERASURE_RETENTION_DAYS=30` (spec decision F); index `IX_users_erasure_sweep` |
+| Data minimization | **Met** | Only `telegram_id` + optional `username` collected |
+| Purpose limitation | **Met (design)** | Consent covers "all PII processing including the bot" (spec decision K) |
 
 ### ePrivacy Directive Requirements
 
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
-| Consent for non-essential cookies | **Not met** | `lang_pref` (1-year) and `preferred_city` (1-year) cookies set without consent |
-| Consent for non-essential scripts | **Not met** | Plausible analytics script loads unconditionally |
-| Consent for functional scripts | **Met** | HTMX is essential for MPA functionality - consent not required |
-| Clear consent information | **Not met** | No privacy policy to inform users which cookies/scripts are used |
+| Consent for non-essential cookies | **Met** | `preferred_city` set only when `consent_preferences` is present (D-COOKIES); `consent_analytics`/`consent_preferences` written on accept |
+| Consent for non-essential scripts | **Partial** | Plausible + GLightbox JS gated behind `consent_analytics` (11 templates); GLightbox CSS link + `/privacy/` snippet load unconditionally |
+| Consent for functional scripts | **Met** | HTMX is essential for MPA functionality — consent not required |
+| Clear consent information | **Met** | `/privacy/` policy page lists cookies/scripts (§1.6) and user rights |
 
 ### Spec Compliance Checklist
 
 | Spec Decision | Requirement | Status |
 |---------------|-------------|--------|
-| Decision F (line 83) | Privacy policy required from launch | **NOT MET** -- `/privacy/` returns 404 |
-| Decision F (line 84) | DECLINE != WITHDRAW | **MET** -- 3 distinct model fields |
+| Decision F (line 83) | Privacy policy required from launch | **MET** -- `/privacy/` route + `templates/privacy.html` (Plan 21 D4) |
+| Decision F (line 84) | DECLINE != WITHDRAW | **MET** -- 3 distinct model fields + `consent_records` audit log |
 | Decision F (line 85) | 30-day PII erasure after withdrawal | **MET** -- `consent_hard_delete` sweep |
-| Decision F (line 88-89) | PII masking in logs | **Met** -- `mask_telegram_id()` from `apps/core/utils/sanitize.py` |
-| Decision F (line 91) | Banner guard on all template sites | **PARTIAL** -- 2 of 7 templates have the guard |
+| Decision F (line 88-89) | PII masking in logs | **MET** -- `mask_telegram_id()` from `apps/core/utils/sanitize.py` |
+| Decision F (line 91) | Banner guard on all template sites | **MET** -- `consent_state` processor + guard in all sites |
 | Decision F (line 90) | Withdrawal UI (POST + CSRF + confirmation) | **MET** -- "Withdraw Data" button on seller dashboard |
-| Decision K (line 137) | Plausible cookieless, no consent needed | **Questionable** -- script loads unconditionally; Plausible may set cookies |
+| Decision K (line 137) | Plausible cookieless, no consent needed | **PARTIAL** -- JS gated behind `consent_analytics`; CSS/privacy snippet ungated |
 | Decision K (line 99) | Site banner covers bot too | **MET** -- bot checks same User model fields |
 
 ---
@@ -227,19 +263,20 @@ Based on GDPR (EU Regulation 2016/679) and ePrivacy Directive (2009/136/EC, as i
 
 | Risk | Likelihood | Impact | Priority |
 |------|------------|--------|----------|
-| No privacy policy (`/privacy/` = 404) | 100% | Non-compliance with GDPR Article 13 (right to be informed) + ePrivacy | **CRITICAL** |
-| Consent views accept GET | 100% | CSRF vulnerability, non-idempotent state changes | **CRITICAL** |
-| Dead `consent_given` cookie | 100% | Code confusion, maintenance burden, no functional impact | Medium |
-| Missing banner guards on 5 templates | 100% | Banner shows for deleted users on most pages | **HIGH** |
-| Missing `consent_shown` context on 4 views | 100% | Banner always shows regardless of prior consent | **HIGH** |
-| Plausible script loads without consent | 100% | Potential ePrivacy violation if Plausible sets cookies | Medium |
-| `lang_pref`/`preferred_city` cookies without consent | 100% | Potential ePrivacy violation (non-essential persistent cookies) | Low-Medium |
+| No privacy policy (`/privacy/` = 404) | 0% (was 100%) | Resolved — route + page implemented (Plan 21 D4) | Resolved |
+| Consent views accept GET | 0% (was 100%) | Resolved — `@require_POST` on accept/decline (anonymous); withdraw is auth+POST | Resolved |
+| Dead `consent_given` cookie | 0% (was 100%) | Resolved — cookie now read by `consent_state` with structured values | Resolved |
+| Missing banner guards on 5 templates | 0% (was 100%) | Resolved — `consent_state` processor + guard in all sites | Resolved |
+| Missing `consent_shown` context on 4 views | 0% (was 100%) | Resolved — `consent_state` context processor (universal) | Resolved |
+| Plausible script loads without consent | 0% (was 100%) | Partial — JS gated behind `consent_analytics`; privacy-page snippet ungated | Partial |
+| `lang_pref` cookie without consent | 100% | Non-essential persistent cookie set without consent; low risk (language preference) | Low-Medium |
+| `preferred_city` cookie without consent | 0% (was 100%) | Resolved — cookie is consent-gated | Resolved |
 
 ### Missing Components
 1. **Privacy policy page** -- Required by GDPR Article 13 and spec decision F. Must list cookies used, processing purposes, and user rights.
 2. **Cookie declaration** -- A table of all cookies/scripts and their purposes, linked from the privacy policy.
 3. **Script loading gate** -- Non-essential scripts (Plausible, GLightbox) should only load after consent.
-4. **Cookie consent middleware** -- To block non-essential cookies (e.g., `preferred_city`) before consent is given.
+4. **Cookie consent middleware** -- To block non-essential cookies (e.g., `preferred_city`) before consent is given. **(RESOLVED — implemented via SET-gating in `set_preferred_city`: the cookie is only written when `consent_preferences` is present, satisfying the requirement without a blocking middleware. See Implementation Status above.)**
 5. **`@require_POST` on consent views** -- Basic web security.
 6. **Template context consistency** -- Either use a context processor to universally provide `consent_shown`, or remove the per-view pattern.
 
@@ -272,7 +309,7 @@ Based on GDPR (EU Regulation 2016/679) and ePrivacy Directive (2009/136/EC, as i
 ### Post-Launch (Phase 2)
 
 1. **Cookie consent middleware** for non-essential cookies:
-   - Intercept `preferred_city` cookie set before consent -- either block it or downgrade to session-only.
+   - Intercept `preferred_city` cookie set before consent -- either block it or downgrade to session-only. **(RESOLVED — implemented via SET-gating: the cookie is only written when `consent_preferences` is present; see Implementation Status above.)**
    - `lang_pref` could be argued as strictly necessary (user explicitly switches language), but document this rationale.
 
 2. **Conditional script loading:**

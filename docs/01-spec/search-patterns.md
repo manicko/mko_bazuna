@@ -124,7 +124,39 @@ def get_city_suggestion(input_city: str, valid_cities: list[str]) -> str | None:
 
 Related user stories: US-B7
 
-## Sort Options
+## Preferred City Default & Precedence
+
+When a buyer visits a listing or search page **without** an explicit city in the URL
+(`?city=` query or `/city/<slug>/` path), the listings/search view applies the preferred
+city resolved by `PreferredCityMiddleware` as the default city filter (see
+[architecture-structure.md](architecture-structure.md#middleware--context-processors)).
+
+### Resolution priority
+
+1. **Authenticated buyer** with `User.preferred_city` set → database FK value (wins;
+   never overridden by the cookie).
+2. **Otherwise** → the `preferred_city` cookie (city slug), validated against the `City`
+   table. A stale/unknown slug is ignored (and the cookie deleted in `process_response`).
+3. **None** → country-wide ("Вся страна", no city filter applied).
+
+Explicit URL path (`/city/<slug>/`) and `city` query parameter **always take
+precedence** over the stored preference — the preference is only a fallback when no
+city is specified. Example: `listings.py` does `effective_city = preferred_city` when
+no path/query city is present; `search.py` does `current_city = explicit_city or request.preferred_city`.
+
+### Consent gating & login reconciliation
+
+- The `preferred_city` **cookie** is written only when the `consent_preferences` cookie
+  is present (source-gated in `set_preferred_city` — see Decision F). The authenticated
+  `User.preferred_city` FK is written regardless of cookie consent.
+- On login, a guest's `preferred_city` cookie is reconciled into `User.preferred_city`
+  (unless the user already has one) so the preference persists across devices/sessions.
+- Stale cookies (slug no longer in `cities`) are deleted in `process_response`.
+
+The header city button shows `preferred_city_display` ("Вся страна" or the localized city
+name), sourced from `header_context`.
+
+Related user stories: US-B3, US-B7. Source: `apps/core/middleware/preferred_city.py`.
 
 Buyers can sort search results by date (newest first) or price.
 

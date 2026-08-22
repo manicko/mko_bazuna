@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from apps.core.enums import AdStatus
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 from django.test import Client, override_settings

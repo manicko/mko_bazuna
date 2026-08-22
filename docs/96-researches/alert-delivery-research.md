@@ -17,6 +17,32 @@ at the moment an ad transitions to `PUBLISHED` (Decision_017, Q5 = B), replacing
 the daily-digest cadence as the primary path while retaining the daily command
 as a catch-all/backfill.
 
+## Implementation Status
+
+**Outcome: Implemented (Approach 1).** Near-real-time publish-time alert delivery is
+implemented:
+
+- `apps/moderation/signals.py:55` `deliver_immediate_alerts_on_publish` — a
+  `post_save` receiver on `Ad`, registered via `apps/moderation/apps.py` `ready()`.
+- Fires when `instance.status == AdStatus.PUBLISHED`; defers delivery via
+  `transaction.on_commit(...)` so `SavedSearchNotification` rows exist first.
+- `apps/search/services/immediate_alerts.py:42` `deliver_immediate_alerts(ad_id)`:
+  fetches the ad, runs `find_matching_saved_searches(ad)`
+  (`alert_query.py:132`, ad-centric matcher), records notifications
+  idempotently (`ignore_conflicts=True` under `uq_saved_search_ad`), then spawns a
+  daemon `threading.Thread` running `asyncio.run(_send_payloads(...))`.
+- Concurrency capped with `asyncio.Semaphore(_SEND_CONCURRENCY=10)`;
+  `TelegramBadRequest`/`TelegramForbiddenError` caught per send.
+- Gated by `settings.IMMEDIATE_ALERTS_ENABLED` (env-driven, default `false`)
+  (`config/settings/base.py:227`). Daily `send_alerts` (`send_alerts.py`) retained
+  as the catch-all/backfill (advisory lock ID 9; see `architecture-structure.md`).
+
+> **Deviation:** the signal fires on *any* save where `status == PUBLISHED`
+> (including a PUBLISHED->PUBLISHED re-save), not strictly a state transition.
+> Double delivery is prevented by the `SavedSearchNotification` idempotency
+> (`uq_saved_search_ad`). See
+> `.ai/audit/problems/17_doc-update-discrepancies-plan14-16.md` #5.
+
 ## Verified Facts
 
 1. **Single publish funnel.** All three publish paths (bot auto-publish via

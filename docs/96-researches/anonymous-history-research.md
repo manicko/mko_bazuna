@@ -15,6 +15,22 @@ RESEARCH-ONLY report — no code changed. Consensus: anonymous (logged-out) user
 get search history scoped to their browser session (Decision_017, Q6=A,
 US-B12), surfaced in the search autocomplete.
 
+## Implementation Status
+
+**Outcome: Implemented.** The recommended session-backed anonymous search history was
+implemented. `record_search_history` and `get_user_search_history`
+(`apps/search/services/search_history.py`) now branch on `user_id is None` -> the
+Django session path (deduplicated, capped at 50); authenticated users use the DB
+path. `search.py` and `autocomplete.py` pass `request.session` for anonymous users.
+Verified by the passing test suite (`test_preferred_city.py`, `test_autocomplete.py`,
+`test_search_history.py`).
+
+> **Note:** the "Verified Facts" below describe the codebase state at research time
+> (pre-implementation). Fact #1's "no-op for anonymous users" and the
+> `is_authenticated` gate on `search.py` (lines 20-23) are superseded by the
+> session-backed branch. The cabinet search-history section (Q7/A) is also
+> implemented as `/cabinet/search-history/` + POST clear endpoint.
+
 ## Verified Facts
 
 1. `record_search_history` is currently a **no-op for anonymous users**

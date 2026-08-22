@@ -27,7 +27,7 @@ src/
 │   ├── apps/                      # INSTALLED_APPS = ['apps.xxx']
 │   │   ├── core/                  # shared utils, abstract models, managers, signals
 │   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
-│   │   │   ├── middleware/           # language locale middleware
+│   │   │   ├── middleware/           # language locale + preferred city (LanguagePreMiddleware, PreferredCityMiddleware)
 │   │   │   ├── services/             # contact service
 │   │   │   ├── templatetags/         # contact_tags, localized_content
 │   │   │   ├── tests/                # sweep command tests, context processor tests
@@ -60,6 +60,7 @@ src/
 │   │   │   ├── apps.py
 │   │   │   ├── models.py
 │   │   │   ├── services/             # lookup_resolution (CategoryLookupResolver)
+│   │   │   ├── views.py              # category_submenu — GET /categories/<slug>/submenu/ (cached HTML fragment, tree-version invalidation)
 │   │   │   └── urls.py
 │   │   ├── lookups/               # universal lookup system (LookupGroup, LookupItem) — plan16
 │   │   │   ├── migrations/
@@ -148,6 +149,39 @@ src/
 ├── docker-compose.yml             # services: db + web + bot + nginx
 └── pyproject.toml
 ```
+
+## Middleware & context processors
+
+Request-time enrichment injected before view rendering. Middleware lives in
+`apps/core/middleware/`; context processors in `apps/core/context_processors.py`
+(`header_context`) and `apps/users/context_processors.py` (`consent_state`).
+
+### Middleware
+
+| Middleware | Location | Purpose |
+|---|---|---|
+| `LanguagePreMiddleware` | `apps/core/middleware/` | Reads `lang_pref` cookie / `?lang=X`; sets `request.LANGUAGE_CODE`. |
+| `PreferredCityMiddleware` | `apps/core/middleware/preferred_city.py` | Resolves `request.preferred_city` (effective city slug or `None`) as the default city filter. Priority: authenticated `User.preferred_city` FK (wins) → validated `preferred_city` cookie → `None`. Stale cookies deleted in `process_response`. Cookie name is the module constant `PREFERRED_CITY_COOKIE_NAME` (mirrors `LanguagePreMiddleware`, not a `StrEnum`). |
+| `CategoryMiddleware` | `apps/core/middleware/` | Category context for listings (plan 16). |
+
+Registration order: `PreferredCityMiddleware` runs **after** `AuthenticationMiddleware`
+(it reads `request.user`) and **before** category/locale middleware, so views see the
+resolved `request.preferred_city` as a default filter. Writes never happen here — the
+cookie/DB is written only by `set_preferred_city` (`apps/search/views/preferred_city.py`).
+
+### Context processors
+
+| Processor | Module | Variables | Consumed by |
+|---|---|---|---|
+| `header_context` | `apps/core/context_processors.py` | `bot_username`, `root_categories`, `preferred_city_display`, `cities`, `favorites_count` | Catalog header (`header_catalog.html`) |
+| `consent_state` | `apps/users/context_processors.py` | `consent_shown`, `consent_analytics`, `consent_preferences` | Consent banner + script gating (11 templates) |
+| `plausible_host` | `apps/core/context_processors.py` | `PLAUSIBLE_HOST` | Gated Plausible snippet (`{% if consent_analytics and PLAUSIBLE_HOST %}`) |
+| `language` | `apps/core/context_processors.py` | `LANGUAGE_CODE` | All templates |
+
+`favorites_count` is `None` for anonymous visitors (outline heart, no count); for
+authenticated sellers it is their favorite count. The header heart badge refreshes via
+the `favorite:toggled` custom event → `GET cabinet:favorites_count` (HTMX `outerHTML` swap);
+see [ui-patterns.md](ui-patterns.md).
 
 ## Deployment (Docker, phase 1)
 

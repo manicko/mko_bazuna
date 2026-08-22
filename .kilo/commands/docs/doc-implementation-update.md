@@ -1,7 +1,7 @@
 ---
 name: doc-implementation-update
 description: Update project documentation based on implemented significant functionality using multi-agent research
-agent: doc-specialist
+agent: docs-specialist
 alwaysApply: false
 ---
 

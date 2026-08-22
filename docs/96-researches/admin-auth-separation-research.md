@@ -21,6 +21,31 @@ extract a shared conditional header, set `LOGIN_URL` to the Telegram login flow)
 highest-leverage change that closes the existing gaps without architectural upheaval or new
 dependencies, and aligns with the project's "avoid overengineering" and "follow existing patterns" rules.
 
+## Implementation Status
+
+**Outcome: Implemented (Approach A).** All four gaps from the TL;DR are resolved in
+code (verified against the passing test suite — `test_logout.py`,
+`test_auth_nav.py`):
+
+- **POST-based `/logout/` view** (`apps/users/views/logout.py`): `@require_POST` +
+  `@never_cache`, calls Django `logout()` (flushes session), redirects to `/`.
+  Registered as `consent:logout` -> `/logout/` in `apps/users/urls.py`. GET -> 405.
+- **`LOGIN_URL = "/login/issue/"`** set in `config/settings/base.py:214`, so every
+  `@login_required` view (e.g. `ads:dashboard`, `ads:edit`, `consent:withdraw`)
+  redirects anonymous users to the real Telegram login flow instead of the
+  non-existent `/accounts/login/`.
+- **Shared auth-aware header** `components/header.html` (rendered on
+  cabinet/dashboard/login/privacy pages) plus `components/header_catalog.html`
+  (catalog/detail/home) which includes `components/header_auth_entry.html`
+  (avatar dropdown: Cabinet / My ads / Favorites / Admin(staff) / Settings /
+  Logout). Logout is a POST + CSRF form in both variants.
+
+> **Note:** the "Verified Facts", "Open Questions", and "Gaps" sections below
+> describe the state at research time (pre-implementation). Gap #1 (no `/logout/`
+> route), #2 (`LOGIN_URL` unset), #3 (GET logout links / CSRF), and #4 (no shared
+> header) are all **resolved**. See
+> `.ai/audit/problems/17_doc-update-discrepancies-plan14-16.md` for deviations.
+
 ---
 
 ## 1. Verified Facts

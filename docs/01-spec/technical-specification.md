@@ -88,7 +88,11 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
   - **PII logging:** All `telegram_id` values in logger calls and `stdout.write` output are masked via `mask_telegram_id()` (SHA-256 hash, non-reversible, `tg_` prefix) from `apps/core/utils/sanitize.py`. Raw telegram_id must never appear in logs.
   - **Withdrawal UI:** Authenticated sellers can withdraw consent via a "Withdraw Data" POST button on the seller dashboard (`/dashboard/`), beside the Logout link. Requires CSRF token + confirmation dialog. Triggers `consent_withdraw` view → `withdraw_consent()`.
-  - **Deleted-user banner guard:** No web-side middleware redirects soft-deleted users; the consent banner `{% include %}` is guarded by `{% if not request.user.is_authenticated or not request.user.is_deleted %}` in all 5 template sites (dashboard, detail, list, seller_dashboard, moderation_dashboard) to suppress rendering. `AnonymousUser` lacks `is_deleted`, so `is_authenticated` is checked first.
+   - **Deleted-user banner guard:** No web-side middleware redirects soft-deleted users; the consent banner `{% include %}` is guarded by `{% if not request.user.is_authenticated or not request.user.is_deleted %}` in all 5 template sites (dashboard, detail, list, seller_dashboard, moderation_dashboard) to suppress rendering. `AnonymousUser` lacks `is_deleted`, so `is_authenticated` is checked first.
+   - **Consent audit log:** all accept/decline/withdraw actions are inserted as a new row in the `consent_records` table (never updated) — see [db-schema.md](../02-database/db-schema.md). `choice` is the `ConsentChoice` StrEnum (`ACCEPTED` | `DECLINED` | `WITHDRAWN`); anonymous consent writes a row with `user_id = NULL` (cookie-only session). The 30-day PII erasure sweep reads `users.consent_revoked_at` after a WITHDRAW row.
+   - **Granular category consent:** the `consent_state` context processor (`apps/users/context_processors.py`) exposes `consent_shown`, `consent_analytics`, and `consent_preferences` to every template, backing the `{"analytics": bool, "preferences": bool}` flags written into `consent_records.categories`. Accept writes the `consent_analytics` / `consent_preferences` cookies; the legacy `consent_given` cookie now carries a structured value (`accepted` / `declined` / `withdrawn`) and IS read back by `consent_state` for backward compatibility — it is no longer a dead value.
+   - **Script gating (partial D7):** the Plausible snippet and the GLightbox JS + inline init render only when `consent_analytics` is set (`{% if consent_analytics %}` / `{% if consent_analytics and PLAUSIBLE_HOST %}` in 11 templates). The GLightbox CSS `<link>` and the `/privacy/` Plausible snippet load unconditionally (progressive-enhancement fallback; non-executable).
+   - **Consent endpoints:** `consent_accept` and `consent_decline` are **anonymous-accessible POST-only** endpoints (no `@login_required`, `@require_POST`); `consent_withdraw` requires an authenticated `POST` + CSRF. DECLINE ≠ WITHDRAW (decision F): decline sets `is_declined` (browse-only), withdraw sets `consent_revoked_at` (triggers the 30-day erasure path above).
 - Failed-check logs auto-purged after 7 days (separate sweep, zone D12).
 
 ### K. Consent banner & privacy behavior (zone R3, see O2)
@@ -98,6 +102,14 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - After accept, banner stays hidden on return.
 - Site banner consent covers all PII processing including the bot; **no separate bot confirmation** required.
 - Consent acceptance time recorded; withdrawal/deletion per decision F.
+- **Script gating (Plan 21 D7):** Plausible and GLightbox **JS** render only when
+  `consent_analytics` is set (`consent_state` context processor +
+  `{% if consent_analytics %}` / `{% if consent_analytics and PLAUSIBLE_HOST %}` in 11 templates).
+  **Partial:** the GLightbox CSS `<link>` and the `/privacy/` Plausible snippet load
+  unconditionally (non-executable progressive-enhancement fallback). Granular cookies
+  `consent_analytics` / `consent_preferences` are written on accept (read by `consent_state`);
+  `CookieCategory` exists in `apps/core/enums.py` as the category vocabulary but is not referenced
+  at runtime.
 
 ### G. Content language, search, city match (US-B2/B3/B7, US-B9)
 - **Three UI languages:** Russian (ru), Bosnian (bs-latin), and English (en). Language preference detected via `LanguagePreMiddleware` which reads `?lang=X` query parameter, `lang_pref` cookie, or `Accept-Language` header (priority order), defaulting to Russian.
@@ -110,6 +122,14 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **City match is exact** against the closed preset list. Unrecognized city → "general / no city", not searchable.
 - **City typos:** show "did you mean" suggestion via `difflib.get_close_matches` (no separate fuzzy lib needed for MVP).
 - **Empty results:** friendly "nothing found" with a suggestion to broaden filters.
+- **Preferred city (Plans 17/23):** `PreferredCityMiddleware`
+  (`apps/core/middleware/preferred_city.py`) resolves `request.preferred_city` as the
+  *default* city filter when no city is in the URL — priority: authenticated
+  `User.preferred_city` FK (wins) → consent-gated `preferred_city` cookie → `None`
+  (country-wide). Explicit `/city/<slug>/` path or `city` query param always wins.
+  On login, a guest's cookie is reconciled into `User.preferred_city` (unless already
+  set). The cookie is written only when `consent_preferences` is present. Default
+  display is "Вся страна".
 
 ### H. Telegram login behavior (US-S1)
 - Site "Login via Telegram" button opens a QR / code page.

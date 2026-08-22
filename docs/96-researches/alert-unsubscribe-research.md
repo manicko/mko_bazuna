@@ -18,6 +18,38 @@ Research the Mko Bazuna Telegram bot architecture to design saved-search alert
 unsubscribe functionality (inline callback button + deep-link `/start` fallback).
 This is a research-only report — no code changes were made.
 
+## Implementation Status
+
+**Outcome: Implemented.** Saved-search alert unsubscribe is implemented across the
+bot:
+
+- **Per-ad alert message builder** `build_alert_message` (`apps/search/services/immediate_alerts.py:90`):
+  the inline alert message includes the ad title/city/price, an **absolute ad
+  link** (`<a href="{SITE_URL}{reverse('ads:detail', args=[id])}">`,
+  `ads/models.py:461 get_absolute_url`), and an inline keyboard button
+  `callback_data=f"unsub:{token}"` (`UNSUB_CALLBACK_PREFIX = "unsub:"`).
+- **Opaque token:** `SavedSearch.unsubscribe_token` =
+  `secrets.token_urlsafe(24)` (32 URL-safe chars), stored in the DB, never derived
+  from the PK (`search/models.py:113-138`).
+- **Inline callback handler** `handle_unsubscribe_callback`
+  (`telegram_bot/handlers/alerts.py:105`) matches `F.data.startswith("unsub:")`,
+  looks up the `SavedSearch` by token, and enforces **ownership** by comparing
+  `saved_search.user.chat_id == callback.from_user.id` (stable `chat_id`).
+  Swaps the button to a re-enable (`unsub_on:`) variant. Symmetric
+  `handle_reenable_callback` re-enables.
+- **`/start unsub_<token>` deep-link branch** (`login.py:60` delegates to
+  `alerts.handle_unsubscribe_start`) matches
+  `UNSUB_DEEPLINK_PATTERN = r"^unsub_([A-Za-z0-9_-]{32})$"` and resolves via the
+  same `resolve_unsubscribe(token, chat_id)` ownership check. `alerts_router` is
+  registered in `telegram_bot/main.py:50` and the test conftest.
+
+> **Deviation:** the per-ad message + inline unsubscribe is present **only on the
+> publish-time (immediate) path**. The daily `send_alerts` digest sends a
+> consolidated plain-text summary with **no** absolute ad links and **no** inline
+> unsubscribe button. `/start unsub_<token>` and the inline button only disable
+> (re-enable is via the inline `unsub_on:` button + `/alerts`). See
+> `.ai/audit/problems/17_doc-update-discrepancies-plan14-16.md` #6.
+
 ## Scope of Investigation
 
 Five areas:

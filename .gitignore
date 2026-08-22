@@ -229,3 +229,5 @@ src/backend/apps/seed/fixtures/images/*.png
 
 # Seed-generated media (downloaded/generated images)
 media/seed/
+
+.playwright-mcp/*

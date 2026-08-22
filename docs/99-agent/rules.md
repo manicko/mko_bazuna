@@ -29,3 +29,13 @@ This file contains coding standards and rules for the Mko Bazuna project.
 - **Indentation:** 4-space indentation, never tabs.
 - **Code review:** Read full function/class before rewriting.
 - **Linting:** After edits run `uv run ruff check <path>` and `uv run basedpyright <path>`.
+
+### Testing Conventions
+
+- **Framework:** pytest-django. Test classes are plain `class TestX:` — do NOT use `django.test.TestCase` or `unittest.TestCase`.
+- **Markers:** Use `pytestmark = [pytest.mark.django_db, pytest.mark.integration]` at module level for DB-backed tests. Use `pytest.mark.unit` for DB-free tests. The `e2e` marker was removed — do not reference it.
+- **Fixtures:** Root `conftest.py` at `src/backend/conftest.py` provides canonical `seller`, `user`, `category`, `city` fixtures. Do NOT redefine these locally — import or use directly. Bot tests under `src/telegram_bot/` have a separate conftest and cannot resolve backend fixtures.
+- **Ad creation:** Use `from conftest import create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)` — it sets status-specific timestamps automatically. Add `status=AdStatus.PUBLISHED` explicitly if the test requires it.
+- **Backdating `created_at`:** `create_test_ad` cannot backdate `created_at` (auto_now_add=True). Use: `ad = create_test_ad(...)` then `Ad.objects.filter(pk=ad.pk).update(created_at=...)` then `ad.refresh_from_db()`.
+- **Assertions:** Use plain `assert` statements — do NOT use `self.assertEqual`, `self.assertTrue`, etc.
+- **`--create-db` required:** Local test runs must pass `--create-db` in `PYTEST_OPTS`. The `--reuse-db` flag is not used — it causes stale-schema errors (~527 errors on reuse). Root conftest at `src/backend/conftest.py` provides canonical fixtures and `create_test_ad`.

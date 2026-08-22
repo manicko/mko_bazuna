@@ -28,7 +28,15 @@ The city selector is embedded within the search form as a combobox between the m
 Location filter is a dropdown (select) in the search filter sidebar using Oblast (region) level granularity. Appropriate for automotive vertical.
 
 **Mko Bazuna current state:**
-The preferred_city cookie (30 days, HttpOnly, SameSite=Lax, secure=request.is_secure()) is SET but NEVER READ. No middleware, context processor, or view logic consumes the cookie. All city-filtering reads from URL path params (/city/<slug>/) only. The only cookie-reading precedent is LanguagePreMiddleware.
+The `preferred_city` cookie was SET but never read at research time. **Now implemented:** the cookie write (`POST /api/preferred-city/`) persists a default city for the buyer, and `PreferredCityMiddleware` (`apps/core/middleware/preferred_city.py`) reads it into `request.preferred_city`, consumed by `SearchView` and `ListingsView` as a fallback when no city is in the URL. `GET /city/<slug>/` (URL path) still takes precedence over the cookie. See §11.2 (updated cookie spec), §11.3 (read evidence), and §12.1 (critical gap resolved).
+
+> **Implementation Status:** Resolved. A `preferred_city` FK was added directly to the
+> `User` model (`apps/users/models.py`, migration `0003_user_preferred_city`),
+> persisted on login reconciliation from the guest cookie, and the cookie itself is
+> **1 year** (`365 * 24 * 60 * 60`, `apps/core/middleware/preferred_city.py:30`)
+> and **consent-gated** — set only when `request.COOKIES["consent_preferences"] == "true"`.
+> The original §11.2 value of 30 days and the "30-day cookie" plan text were superseded.
+> See `.ai/audit/problems/17_doc-update-discrepancies-plan14-16.md` #1-3.
 
 **Recommendation for Montenegro:**
 Implement a hybrid approach: Pattern B (visible city combobox in search form) as primary interaction, combined with a minimal Pattern A header badge. Critical first step: add city-reading middleware to close the cookie gap.
@@ -333,7 +341,7 @@ Autocomplete dropdown appears (city suggestions alongside category/popular)
   ->
 User clicks city suggestion [data-type="city"]
   ->
-POST /api/preferred-city/ -> sets preferred_city cookie (30d, HttpOnly, SameSite=Lax)
+POST /api/preferred-city/ -> sets preferred_city cookie (1y, consent-gated, HttpOnly, SameSite=Lax)
   ->
 Redirect to /city/<slug>/
   ->
@@ -350,7 +358,8 @@ File: src/backend/apps/search/views/preferred_city.py
 |---|---|
 | Cookie name | preferred_city (hardcoded string) |
 | Value | City slug (e.g., podgorica) |
-| max_age | 2592000 (30 days) |
+| max_age | 31536000 (365 days) |
+| consent_gated | True (set only when `consent_preferences` cookie present) |
 | httponly | True |
 | samesite | "Lax" |
 | secure | request.is_secure() |
@@ -366,25 +375,29 @@ current_city = request.GET.get("city")  # URL query param, NOT cookie
 city_slug = ...  # from URL path, NOT cookie
 ```
 
-No code anywhere reads request.COOKIES.get("preferred_city") or similar.
+No code anywhere read `request.COOKIES.get("preferred_city")` at research time. **Implemented:** `PreferredCityMiddleware` (`apps/core/middleware/preferred_city.py`) now reads the cookie into `request.preferred_city`, consumed by `SearchView` (`search.py:71`) and `ListingsView` (`ads/views/listings.py:323`) as a URL-path fallback; the authenticated `User.preferred_city` FK is reconciled from the cookie on login (`users/views/consent.py`).
 
 ### 11.4 Only cookie-reading precedent
 
 ```python
-# src/backend/core/middleware/language.py line 64
+# src/backend/apps/core/middleware/language.py line 64
 class LanguagePreMiddleware:
     """Read LANGUAGE_COOKIE_NAME and set request.LANGUAGE_CODE."""
 ```
 
-This proves the infrastructure exists. A PreferredCityMiddleware mirroring this pattern can be added.
+This proves the infrastructure exists. `PreferredCityMiddleware` has been added mirroring this pattern (`apps/core/middleware/preferred_city.py`), exposing `request.preferred_city` as the resolved city slug.
 
 ### 11.5 Header template
 
 File: src/backend/templates/components/header_catalog.html
 
-Current header: Logo + category menu (left), Search input with autocomplete (center), Language/login/profile/add-ad (right).
+Current header: Logo + hamburger menu (left); city selector + "All Categories" dropdown + search with autocomplete (center); place-an-ad CTA + favorites badge + auth/cabinet entry + language switcher (right).
 
-**No dedicated city button.** City selection only via autocomplete dropdown within search input.
+**Dedicated city button** (`data-preferred-city-toggle`) now shows the current
+`preferred_city_display` ("Вся страна" or the city name) and opens a dropdown of
+Montenegro cities; selecting a city persists the choice (cookie for guests,
+`User.preferred_city` FK for authenticated users) and navigates to `/city/<slug>/`.
+City selection is therefore NOT hidden in the autocomplete — it is always visible in the header.
 
 ### 11.6 URL structure
 
@@ -398,26 +411,31 @@ _suggest_city in the search view uses difflib.get_close_matches() for typo toler
 
 ## 12. Gap Analysis
 
-### 12.1 Critical gap: Cookie set but never consumed
+### 12.1 Critical gap: Cookie set but never consumed — RESOLVED
 
-| Aspect | Current | Expected |
+| Aspect | At research time | Implemented |
 |---|---|---|
-| Cookie write | Working (POST /api/preferred-city/) | Keep |
-| Cookie read | Nothing reads it | Add middleware |
-| Default city | Falls back to whole country | Read cookie -> set default |
-| Cross-session | Cookie exists but has no effect | Persist city across sessions |
+| Cookie write | POST `/api/preferred-city/` | Keep |
+| Cookie read | Nothing reads it | `PreferredCityMiddleware` reads it into `request.preferred_city` |
+| Default city | Falls back to whole country | Cookie (and `User.preferred_city` FK for auth users) sets default |
+| Cross-session | Cookie has no effect | Cookie persists across sessions (1 year); auth users persisted via FK reconciled on login |
+| Consent gating | Cookie set without consent | Set-gated on `consent_preferences` consent cookie |
 
-**Impact:** Returning user with preferred_city=podgorica cookie sees country-wide results when visiting homepage directly. Must re-select city via autocomplete every time.
+**Impact (at research time):** Returning user with `preferred_city=podgorica` saw country-wide results when visiting the homepage directly. Must re-select city via autocomplete every time. **Resolved:** the cookie is now read by middleware and applied as the default city filter (URL path `/city/<slug>/` still takes precedence).
 
-### 12.2 No persisted city indicator
+### 12.2 Persisted city indicator (header badge)
 
 | Platform | Header city indicator | Mko Bazuna |
 |---|---|---|
 | Avito.ru | Button with city name | None |
 | OLX.ua | None | None |
-| Mko Bazuna | - | None |
+| Mko Bazuna | - | **Implemented** (see §12.1) |
 
-No visual indicator of current city anywhere on the page.
+**Status: Resolved.** A header city badge (`components/header_catalog.html`,
+`{{ preferred_city_display }}`) now shows the current preferred city (or the
+country-wide default "Вся страна"), sourced from `PreferredCityMiddleware` via
+the `header_context` processor's `preferred_city_display` key.
+
 
 ### 12.3 City selection hidden in autocomplete
 
@@ -512,11 +530,11 @@ Default should be "Tshe tselo" (whole country), mirroring OLX's "All Ukraine". A
 
 | File | Key finding |
 |---|---|
-| src/backend/apps/search/views/preferred_city.py | Cookie SET: name="preferred_city", max_age=30d, httponly=True, samesite="Lax", secure=request.is_secure() |
+| src/backend/apps/search/views/preferred_city.py | Cookie SET: name="preferred_city", max_age=31536000 (1 year), httponly=True, samesite="Lax", secure=request.is_secure() |
 | src/backend/apps/search/views/search.py:70 | current_city = request.GET.get("city") - URL param only |
 | src/backend/apps/ads/views/listings.py:304 | Reads city_slug from URL path |
 | src/backend/apps/search/views/autocomplete.py:34 | Entity suggestions include matching category and city names |
-| src/backend/core/middleware/language.py:64 | Only cookie-reading precedent: LanguagePreMiddleware |
+| src/backend/apps/core/middleware/language.py:64 | Only cookie-reading precedent: LanguagePreMiddleware |
 | src/backend/templates/components/header_catalog.html | City click handler: POST /api/preferred-city/ -> redirect /city/<slug>/ |
 
 ---
