@@ -1,4 +1,4 @@
-﻿# Research Report — Preferred-City Cookie Read-Back
+# Research Report — Preferred-City Cookie Read-Back
 
 **Research task ID:** `ses_fe70eab92ffeDsgqQMfJ5z9gO1`
 **Spec:** `.ai/problems/16_preferred-city_spec.md`

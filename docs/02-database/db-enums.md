@@ -1,4 +1,4 @@
-﻿---
+---
 id: db-enums
 domain: database
 tags:

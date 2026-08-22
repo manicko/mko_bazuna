@@ -1,4 +1,4 @@
-﻿# City / Location Selection Patterns in Classifieds Platforms
+# City / Location Selection Patterns in Classifieds Platforms
 
 **Research report - 2026-08-19**
 **Project:** Mko Bazuna (Telegram-driven classifieds board with Django web front-end)

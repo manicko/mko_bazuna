@@ -1,4 +1,4 @@
-﻿---
+---
 id: ui-patterns
 domain: spec
 tags:

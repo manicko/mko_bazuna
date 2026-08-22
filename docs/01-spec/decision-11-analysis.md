@@ -1,4 +1,4 @@
-﻿---
+---
 id: decision-11-analysis
 domain: spec
 tags:
