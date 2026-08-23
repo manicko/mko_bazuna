@@ -25,6 +25,11 @@ services:
       - media_volume:/app/media
     ports:
       - "8000:8000"
+    # In dev, web waits for seed to complete so media/seed/ photos are populated
+    # before serving. Dev override merges with base depends_on (load_catalog, redis).
+    depends_on:
+      seed:
+        condition: service_completed_successfully
 
   bot:
     environment:
@@ -63,6 +68,8 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
       - REDIS_URL=
+      - SEED_ADS=30
+      - SEED_USERS=10
     volumes:
       - .:/app
       - ./docker/entrypoint-seed.sh:/app/entrypoint-seed.sh

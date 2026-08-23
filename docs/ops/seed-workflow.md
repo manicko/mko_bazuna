@@ -213,6 +213,60 @@ pitfalls:
   excludes `media/` but NOT `fixtures/images/*.jpg`), giving the seed command
   its "all resources bundled" guarantee.
 
+## Troubleshooting: Missing Photos
+
+After recreating Docker containers (`make clean && make up` or `make reset && make up`), photos may
+not appear on the site. This typically happens because:
+
+1. **JPEG fixtures are missing** — fixture JPEGs (`*.jpg`) are gitignored
+   (`src/backend/apps/seed/fixtures/images/*.jpg`). Fresh clones or `git clean -fdx` wipe them.
+2. **`media_volume` was destroyed** — `make clean` / `make reset` run `docker compose down -v`,
+   which removes the named volume containing seeded images.
+
+### Recovery Procedure
+
+1. **Verify JPEGs exist on disk:**
+   ```bash
+   ls -la src/backend/apps/seed/fixtures/images/*.jpg | head
+   ```
+   If the directory is empty or missing files, proceed to step 2.
+
+2. **Download fixture photos** (requires API keys in `scripts/seed-images-config.json`):
+   ```bash
+   uv run python scripts/download_seed_photos.py --all
+   ```
+
+3. **Validate the manifest** against files on disk:
+   ```bash
+   uv run python scripts/download_seed_photos.py --validate
+   ```
+   If files are missing, clean stale manifest entries:
+   ```bash
+   uv run python scripts/download_seed_photos.py --validate --fix=cleanup
+   ```
+
+4. **Re-run the seed** to copy fixtures into `media_volume`:
+   ```bash
+   make seed
+   ```
+   Or, if using compose directly:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm seed
+   ```
+
+5. **Verify media volume** inside the running `web` container:
+   ```bash
+   docker compose exec web ls -la /app/media/seed/ | head
+   ```
+   The directory should contain JPEG files referenced by `AdImage` rows.
+
+### Notes
+
+- Use `make down` (not `make clean`) to recreate containers **without** destroying `media_volume`.
+- In dev mode, `seed` runs automatically on `make up` and `web` waits for it (FR01, FR02).
+- The seed entrypoint (`/app/entrypoint-seed.sh`) now checks for fixture JPEGs and will refuse to
+  run if none are found.
+
 ### Rate Limits
 
 - Pexels free tier: ~200 requests/hour

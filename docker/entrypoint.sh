@@ -67,10 +67,14 @@ wait_for_redis() {
     exit 1
 }
 
-# Execute logic
-check_env_file
-fix_volume_permissions
-wait_for_db
-wait_for_redis
+# Execute logic — only when run directly, not when sourced by one-shot entrypoints.
+# When sourced (e.g., by entrypoint-seed.sh), only the setup function definitions above
+# are loaded; the caller invokes them explicitly before exec-ing its command.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    check_env_file
+    fix_volume_permissions
+    wait_for_db
+    wait_for_redis
 
-exec "$@"
+    exec "$@"
+fi

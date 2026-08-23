@@ -1,6 +1,6 @@
 # Makefile for Mko Bazuna Docker workflow
 
-.PHONY: help up down build restart test test-all test-db test-down test-logs test-recreate \
+.PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate \
         lint typecheck shell migrate makemigrations logs \
         backup restore prune-backups db-shell clean create-admin load-catalog seed
 
@@ -14,7 +14,7 @@ COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
 # simultaneously without colliding on service names, networks, or named volumes.
 # Each project gets its own `postgres_data` and `uv_cache` volumes.
 # Target-specific assignment (group syntax): the var is exported to the recipe shell.
-up down build restart lint typecheck shell makemigrations create-admin \
+up down reset build restart lint typecheck shell makemigrations create-admin \
     load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-dev
 
@@ -30,7 +30,8 @@ help:
 	@echo ""
 	@echo "Main:"
 	@echo "  up             Start dev environment (hot-reload)"
-	@echo "  down           Stop and remove containers"
+	@echo "  down           Stop and remove containers (preserves volumes/data)"
+	@echo "  reset          Stop and remove containers AND named volumes (destroy seed data)"
 	@echo "  restart        Restart web service"
 	@echo "  build          Rebuild images without cache"
 	@echo ""
@@ -64,12 +65,22 @@ help:
 	@echo "  backup         Create database backup"
 	@echo "  restore        Restore database (make restore BACKUP_FILE=...)"
 	@echo "  prune-backups  Delete old backups (7+ days)"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  down           Stop and remove containers (preserves volumes/data)"
+	@echo "  reset          Stop and remove containers AND named volumes (destroy seed data)"
+	@echo "  clean          Nuclear: remove containers, volumes, and local DB backups"
 
 up:
 	docker compose $(COMPOSE_FILES) up -d
 
 down:
+	# Stop and remove containers (preserves named volumes: postgres_data, media_volume)
 	docker compose $(COMPOSE_FILES) down
+
+reset:
+	# Stop and remove containers AND named volumes (destroys media_volume + postgres_data)
+	docker compose $(COMPOSE_FILES) down -v --remove-orphans
 
 build:
 	docker compose $(COMPOSE_FILES) build --no-cache
@@ -197,6 +208,7 @@ prune-backups:
 
 # ====================== Cleanup ======================
 
+# Nuclear: remove containers, volumes (incl. postgres_data, media_volume), and local DB backups
 clean:
 	docker compose $(COMPOSE_FILES) down -v --remove-orphans
 	rm -rf $(BACKUPS_DIR)/*.dump
