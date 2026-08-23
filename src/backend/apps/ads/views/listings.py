@@ -63,7 +63,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     try:
         ad = (
             Ad.objects.select_related("category", "city", "user")
-            .prefetch_related("images", "user__trust_score")
+            .prefetch_related("images", "features", "user__trust_score")
             .get(id=ad_id, status=AdStatus.PUBLISHED)
         )
     except Ad.DoesNotExist:
@@ -76,10 +76,23 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad_id=ad.id,
     )
 
+    # Category-aware feature adequacy validation (Spec_29 §7.2.5 / Q5).
+    # Only display features whose slug belongs to the ad's resolved feature set —
+    # the nearest-explicit-ancestor-wins MPTM walk via CategoryLookupResolver.
+    # This prevents showing a feature from one category (e.g. "credit") on an ad
+    # in a different category (e.g. real estate). The resolver is cached (300s).
+    resolved_feature_slugs = set(
+        CategoryLookupResolver.get_resolved_feature_codes(ad.category)
+    )
+    display_features = [
+        f for f in ad.features.all() if f.slug in resolved_feature_slugs
+    ]
+
     context = {
         "ad": ad,
         "breadcrumb_category": ad.category,
         "bot_username": settings.BOT_USERNAME,
+        "display_features": display_features,
         "is_favorited": (
             ad.favorites.filter(user_id=request.user.id).exists()
             if request.user.is_authenticated
@@ -255,7 +268,7 @@ def listings(
     ads = (
         Ad.objects.filter(status=AdStatus.PUBLISHED)
         .select_related("category", "city", "user")
-        .prefetch_related("user__trust_score")
+        .prefetch_related("features", "user__trust_score")
     )
 
 
@@ -485,6 +498,8 @@ def listings(
         "resolved_features": resolved_features,
 
         "has_results": has_results,
+
+        "show_filters": True,
 
     }
 

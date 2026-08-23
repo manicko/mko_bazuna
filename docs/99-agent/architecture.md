@@ -19,6 +19,12 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 - **Small modules and functions:** Modules, services, components, and functions must be small and focused on one thing.
 - **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start.
 - **Search:** Native PostgreSQL full-text search.
+- **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
+  `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
+  and re-derivable via the advisory-locked `recompute_normalized_prices` management command. Both
+  processes read rates from the shared DB. See
+  [`db-schema`](../../02-database/db-schema.md) ([`db-enums`](../../02-database/db-enums.md),
+  [`db-indexes`](../../02-database/db-indexes.md)).
 - **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via advisory lock. See [migration-workflow](../../ops/migration-workflow.md).
 
 ## Commands

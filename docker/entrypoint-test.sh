@@ -32,6 +32,10 @@ fi
 echo "Running migrations..."
 uv run python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
 
+# Compile translation files (.po -> .mo) so trans tags render during tests.
+echo "Compiling translations..."
+uv run python src/backend/manage.py compilemessages
+
 # Run pytest with short traceback format and duration reporting for slowness visibility.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override ALL pytest flags
 # (single-token flags only; multi-token values like -m "not seed" are fragile here

@@ -30,8 +30,8 @@
                 {% include "search/partials/save_search_modal.html" %}
             </div>
         {% endif %}
-        {% include "ads/partials/filter_form.html" %}
-        <!-- Dynamic content (ad grid, suggestions, pagination) -->
+        <!-- Dynamic content (filter form, sort control, ad grid, suggestions, pagination) -->
+        {% include "ads/partials/filter_sort.html" %}
         <div id="ad-list">
             {% include "ads/partials/ad_list.html" %}
         </div>

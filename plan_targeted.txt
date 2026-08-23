@@ -1,0 +1,55 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0
+django: version: 5.2.16, settings: config.settings.test (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: Faker-40.35.0, xdist-3.8.0, asyncio-1.4.0, cov-7.1.0, django-4.12.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 23 items
+
+src/backend/apps/ads/tests/test_ad_detail_queries.py ..
+src/backend/apps/ads/tests/test_i18n_pipeline.py .....
+src/backend/apps/ads/tests/test_detail_context.py .........
+src/backend/apps/ads/tests/test_listings_context.py .......
+
+=============================== warnings summary ===============================
+src/backend/apps/ads/tests/test_ad_detail_queries.py::TestAdDetailQueryCount::test_detail_renders_without_n_plus_1_on_trust_score
+src/backend/apps/ads/tests/test_ad_detail_queries.py::TestAdDetailQueryCount::test_detail_query_count_stable_with_trust_score
+  /opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /app/staticfiles/
+    mw_instance = middleware(adapted_handler)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_ad
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='130503911349552'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_bot_username
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='130503910345760'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='130503910357520'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_prefetch_includes_trust_score
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='130503908813392'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_purposes:<MagicMock name='Category.objects.get().id' id='130503907789856'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Category.objects.get().id' id='130503907789856'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_path_slugs_populate_current_category_and_city
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_purposes:<MagicMock name='Category.objects.get().id' id='130503911355600'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_path_slugs_populate_current_category_and_city
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Category.objects.get().id' id='130503911355600'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 23 passed, 10 warnings in 11.24s =======================
+TARGETED_EXIT=True

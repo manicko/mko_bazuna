@@ -3,7 +3,7 @@
 {% load localized_content %}
 
 <form method="get"
-      hx-get=""
+      hx-get="{{ request.path }}"
       hx-target="#ad-list"
       hx-swap="innerHTML"
       hx-push-url="true"
@@ -11,8 +11,6 @@
     {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
     {% if current_category %}<input type="hidden" name="category" value="{{ current_category }}">{% endif %}
     {% if current_city %}<input type="hidden" name="city" value="{{ current_city }}">{% endif %}
-    {% if min_price %}<input type="hidden" name="min_price" value="{{ min_price }}">{% endif %}
-    {% if max_price %}<input type="hidden" name="max_price" value="{{ max_price }}">{% endif %}
 
     <div class="flex flex-wrap gap-4 items-end">
         {% if resolved_purposes %}
@@ -29,34 +27,40 @@
                     {% endfor %}
                 </select>
             </div>
-        {% endif %}
+         {% endif %}
+
+        <div>
+            <label for="min_price" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Min price" %}</label>
+            <input type="number" name="min_price" id="min_price" min="0" step="0.01"
+                   value="{{ min_price }}"
+                   class="px-3 py-2 border rounded-lg text-sm bg-white w-28">
+        </div>
+        <div>
+            <label for="max_price" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Max price" %}</label>
+            <input type="number" name="max_price" id="max_price" min="0" step="0.01"
+                   value="{{ max_price }}"
+                   class="px-3 py-2 border rounded-lg text-sm bg-white w-28">
+        </div>
 
         {% if resolved_features %}
             <div>
-                <span class="block text-sm font-medium text-gray-700 mb-1">{% trans "Features" %}</span>
-                <div class="flex flex-wrap gap-3">
-                    {% for f in resolved_features %}
-                        <label class="flex items-center gap-1 text-sm text-gray-700">
-                            <input type="checkbox" name="features" value="{{ f.slug }}"
-                                   {% if f.slug in current_features %}checked{% endif %}>
-                            {{ f|get_lookup_name:LANGUAGE_CODE }}
-                        </label>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        {% if not query %}
-            <div>
-                <label for="sort" class="block text-sm font-medium text-gray-700 mb-1">
-                    {% trans "Sort" %}
-                </label>
-                <select name="sort" id="sort" class="px-3 py-2 border rounded-lg text-sm bg-white">
-                    <option value="date_desc" {% if current_sort == 'date_desc' %}selected{% endif %}>{% trans "Newest first" %}</option>
-                    <option value="date_asc" {% if current_sort == 'date_asc' %}selected{% endif %}>{% trans "Oldest first" %}</option>
-                    <option value="price_asc" {% if current_sort == 'price_asc' %}selected{% endif %}>{% trans "Price: low to high" %}</option>
-                    <option value="price_desc" {% if current_sort == 'price_desc' %}selected{% endif %}>{% trans "Price: high to low" %}</option>
-                </select>
+                <details class="w-full">
+                    <summary class="flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white cursor-pointer">
+                        <span>{% trans "Features" %}</span>
+                        {% if current_features %}
+                            <span class="text-xs text-gray-500">({{ current_features|length }} {% trans "selected" %})</span>
+                        {% endif %}
+                    </summary>
+                    <div class="mt-2 max-h-60 overflow-y-auto">
+                        {% for f in resolved_features %}
+                            <label class="flex items-center gap-1 text-sm text-gray-700">
+                                <input type="checkbox" name="features" value="{{ f.slug }}"
+                                       {% if f.slug in current_features %}checked{% endif %}>
+                                {{ f|get_lookup_name:LANGUAGE_CODE }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
             </div>
         {% endif %}
 

@@ -198,6 +198,9 @@ Implemented via **django-mptt>=0.18.0**. No denormalized `path`/`level` columns.
 > Zone D2: i18n names stored in `name_i18n` JSONB (`ru`/`bs`/`en`); UI uses `get_name(locale)` with
 > Russian fallback.
 
+Runtime resolution of inherited listing purposes/features and the YAML-driven catalog builder
+are documented in [db-categories.md](db-categories.md).
+
 ### category_paths
 Multi-parent navigation support. Each category can have zero or more alternative parent routes while keeping a single canonical MPTT parent. Alternative paths are navigation-only — they do not affect lookup inheritance or canonical category assignment.
 ```
@@ -346,6 +349,10 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 > Zone D5 / D6: seller input may be Montenegrin/Russian/English, but the bot MUST translate
 > title+description to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin/English
 > UI translates back on display.
+
+The implemented translation egress pipeline (publication-time Google Translate, circuit
+breaker, 500 ms timeout, LRU cache, no-PII boundary) is documented in
+[i18n-translation-egress.md](../96-researches/i18n-translation-egress.md).
 
 Category search works TWO ways: (1) FTS matches the category word via `category_name` in `search_vector`; (2) app-level fuzzy detect (`difflib`, as for cities) applies an explicit `category_id` filter when the query is a single word similar to a category name.
 

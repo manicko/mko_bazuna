@@ -1,0 +1,35 @@
+ Container mko-bazuna-test-test-run-c503d19cd95d Creating 
+ Container mko-bazuna-test-test-run-c503d19cd95d Created 
+=== uv sync ===
+ + regex==2026.7.19
+ + ruff==0.16.0
+=== pytest ===
+============================= test session starts ==============================
+platform linux -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0
+django: version: 5.2.16, settings: config.settings.test (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: Faker-40.35.0, xdist-3.8.0, asyncio-1.4.0, cov-7.1.0, django-4.12.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 43 items
+
+src/backend/apps/ads/tests/test_catalog_filters.py .............F.
+src/backend/apps/ads/tests/test_listings_sort.py ....
+src/backend/apps/ads/tests/test_ad_localization.py ........................
+
+=================================== FAILURES ===================================
+__ TestFilterUrlReset.test_pagination_links_have_push_url_in_rendered_output ___
+src/backend/apps/ads/tests/test_catalog_filters.py:377: in test_pagination_links_have_push_url_in_rendered_output
+    assert "Page navigation" in content
+E   assert 'Page navigation' in '\n\n\n\n\n\n\n\n    \n\n\n\n<form method="get"\n      hx-get="/"\n      hx-target="#ad-list"\n      hx-swap="innerHTM...g-gray-50">&raquo;&raquo;</a>\n            \n        </nav>\n    \n\n\n<!-- Empty state when no query and no ads -->\n'
+=============================== warnings summary ===============================
+src/backend/apps/ads/tests/test_catalog_filters.py: 12 warnings
+src/backend/apps/ads/tests/test_listings_sort.py: 4 warnings
+  /opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /app/staticfiles/
+    mw_instance = middleware(adapted_handler)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED src/backend/apps/ads/tests/test_catalog_filters.py::TestFilterUrlReset::test_pagination_links_have_push_url_in_rendered_output
+================== 1 failed, 42 passed, 16 warnings in 12.09s ==================
+

@@ -56,14 +56,21 @@ Create `SellerTrustScore` model (`apps/analytics/models/seller_trust.py`):
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| user | FK(users.User) UNIQUE | The seller being scored |
-| trust_level | VARCHAR(20) | Enum: `unverified`, `verified`, `trusted`, `pro` |
-| ad_count_lifetime | INT | Total published ads |
-| ad_count_active | INT | Currently published ads |
-| contact_response_rate | FLOAT | Estimated from response time proxy |
-| avg_ad_quality_score | FLOAT | Computed from moderation outcomes |
-| last_calculated_at | TIMESTAMP | Trust recalc timestamp |
-| calculation_version | INT | For future trust algo changes |
+| user | ONE_TO_ONE(users.User) | The seller being scored |
+| trust_level | VARCHAR(20) choices=`TrustLevel` | UNVERIFIED / VERIFIED / TRUSTED / PRO |
+| score | POSITIVE SMALL INT (default 0) | Overall trust score (0-100) |
+| ad_count_lifetime | POSITIVE INT (default 0) | Total published ads |
+| ad_count_active | POSITIVE INT (default 0) | Currently published ads |
+| rejection_rate | DECIMAL(5,2) (default 0.0) | Moderation rejection ratio |
+| contact_response_rate | DECIMAL(5,2) (default 0.0) | Estimated from response time proxy |
+| last_calculated | TIMESTAMP (auto_now) | Trust recalc timestamp |
+
+> **Status: Implemented.** Matches [db-schema.md §SellerTrustScore](../02-database/db-schema.md),
+> the single source of truth. The earlier plan listed `avg_ad_quality_score` and
+> `calculation_version`, replaced in code by `score` + `rejection_rate`; `last_calculated_at`
+> became `last_calculated`. Computed by
+> `apps.trust.services.trust_calculator.TrustCalculator` on ad publish, with a `VERIFIED`
+> floor for Telegram-Premium/admin-verified sellers.
 
 #### 1.2.2 TrustLevel Enum
 
@@ -87,21 +94,22 @@ Create `SellerVerification` model (`apps/users/models/verification.py`):
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| user | FK(users.User) UNIQUE | The verified user |
-| phone_number | VARCHAR(20) | Normalized phone (E.164 format) |
-| phone_verified_at | TIMESTAMP | Telegram phone verification proof |
-| telegram_premium | BOOL | Telegram Premium flag (trust signal) |
-| verified_by_admin | FK(users.User) | Admin who verified |
-| verified_at | TIMESTAMP | Admin verification timestamp |
-| verification_method | VARCHAR(20) | Enum: `telegram`, `admin_manual` |
+| user | ONE_TO_ONE(users.User) | The verified user |
+| phone_number | VARCHAR(20), nullable | Normalized phone (E.164 format) |
+| verified_by_admin | BOOL (default False) | Admin-verified flag |
+| verified_at | TIMESTAMP, nullable | Admin verification timestamp |
 
-**Note:** The `telegram_premium` field is defined in the `SellerVerification` model, NOT in the `User` model. The current `User` model (`apps/users/models.py`) does not contain a `telegram_premium` field. This is intentional: Telegram Premium status is tracked per-verification event in `SellerVerification` rather than as a permanent user attribute, since Telegram accounts can gain/lose Premium status over time.
+> **Note:** `telegram_premium` is **not** a `SellerVerification` column. It is a field on
+> `User` (see [db-schema.md > users](../02-database/db-schema.md),
+> `telegram_premium (BOOL, default False)`) and is consumed by the trust system as an
+> auto-verification signal (the `VERIFIED` trust-level floor in `TrustCalculator`).
+> `SellerVerification` tracks admin + phone verification only.
 
 #### 1.3.2 Verification Integration Points
 
 1. **Telegram Bot Handler** (`telegram_bot/handlers/profile.py`)
    - On `/start`, check `user.is_premium` (Phase 2 feature)
-   - Store `telegram_premium` flag in `SellerVerification`
+   - Record `telegram_premium` on `User` (populated from `user.is_premium` on bot `/start`)
    - Offer phone verification prompt for non-premium users
 
 2. **Admin Verification Flow** (`moderation/views/verification.py`)
@@ -150,12 +158,20 @@ Create `AdModerationPriority` model (`apps/moderation/models/priority.py`):
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| ad | FK(ads.Ad) UNIQUE | The ad needing review |
-| priority_score | INT | Computed risk score (0-100) |
-| priority_reason | TEXT | Reason for high priority |
-| flagged_by_system | BOOL | Auto-flagged vs reported |
-| flagged_at | TIMESTAMP | When flagged |
-| reviewed_at | TIMESTAMP | When marked for review |
+| ad | ONE_TO_ONE(ads.Ad), `related_name="moderation_priority"` | The ad needing review |
+| base_score | POSITIVE SMALL INT (default 0) | Computed risk score (0-100) |
+| priority_level | VARCHAR(10) choices=`AdPriorityLevel` | HIGH / MEDIUM / LOW |
+| flags | JSONB (default []) | Auto-flagging reason codes |
+| confidence_score | FLOAT (default 0.0) | Confidence in the computed score |
+| escalation_required | BOOL (default False) | Escalate to senior moderator |
+
+> **Status: Implemented.** Field set reflects the production schema in
+> [db-schema.md §AdModerationPriority](../02-database/db-schema.md) (the single source of
+> truth). The earlier plan listed `priority_score`, `priority_reason`, `flagged_by_system`,
+> `flagged_at`, and `reviewed_at`, which were consolidated into `base_score` + `flags` +
+> `confidence_score` + `escalation_required`. Computed by
+> `apps.moderation.services.priority_calculator.PriorityCalculator` (content risk + user
+> history) and persisted by `PriorityService`.
 
 #### 2.2.2 Priority Calculation Factors
 
@@ -221,6 +237,17 @@ graph LR
     F -->|Score > 50| G[Moderation Queue]
     F -->|Score <= 50| H[Auto Publish]
 ```
+
+> **Status: partial / aspirational.** The three trigger objects (`SuspiciousKeywordTrigger`,
+> `DuplicateDetectionTrigger`, `AnomalyDetectionTrigger`) and the auto-publish-by-priority branch
+> are **not** implemented as described. The implemented flow is a single synchronous
+> auto-moderation gate: the `ModerationCriteria` singleton is checked at submit (title/description
+> length, price-required, image count, banned words, `max_ads_per_user`, duplicate-title via
+> `difflib`); fail → `ON_MODERATION_FAILED`, pass → `PUBLISHED` directly.
+> `PriorityCalculator` runs in a `post_save` signal (`status==ON_MODERATION`) for **queue
+> triage ordering only** — it does not gate publishing. See
+> [db-schema.md §moderation_criteria](../02-database/db-schema.md) and
+> [technical-specification.md §A](../01-spec/technical-specification.md).
 
 ### 2.5 Moderation Analytics
 

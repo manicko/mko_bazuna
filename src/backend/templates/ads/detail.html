@@ -54,11 +54,21 @@
                     <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
                 {% endif %}
                 
-                <div class="mb-6">
-                    <p class="text-gray-700 whitespace-pre-wrap">{{ ad|get_description:LANGUAGE_CODE }}</p>
-                </div>
-                
-                <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
+                 <div class="mb-6">
+                     <p class="text-gray-700 whitespace-pre-wrap">{{ ad|get_description:LANGUAGE_CODE }}</p>
+                 </div>
+                 
+                 {% if display_features %}
+                 <div class="mb-6">
+                     <div class="flex flex-wrap gap-2">
+                         {% for f in display_features %}
+                         {% include "components/feature_tag.html" with feature=f only %}
+                         {% endfor %}
+                     </div>
+                 </div>
+                 {% endif %}
+                 
+                 <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
                     <div>
                         <span class="font-medium">{% trans "Location:" %}</span> 
                         {{ ad.city.get_name|default:ad.city.name }}

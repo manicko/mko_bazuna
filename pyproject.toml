@@ -205,4 +205,23 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.0",
     "coverage>=7.15.2",
+    "djlint>=1.44.2",
 ]
+
+# Django template linter configuration.
+# djlint's built-in H017 rule in v1.44.x is "void tags should be self closing"
+# — the older multi-line {# ... #} comment rule was removed. We enforce
+# multi-line comment detection via a custom rule (H901) defined in
+# .djlint_rules.yaml, which djlint auto-loads alongside pyproject.toml.
+#
+# Pre-existing style violations are suppressed via `ignore` (the correct djlint
+# config key; the ruff-style `extend-skip` is not a valid djlint option) so the
+# CI gate enforces only the multi-line comment check (H901):
+#   H019 — javascript: URLs (in ads/detail.html)
+#   H021 — inline styles (in admin/moderation/queue.html, components/header_catalog.html)
+#   H023 — entity references (in ad_list.html, breadcrumb.html, etc.)
+#   H030 — missing meta description (on standalone HTML documents)
+#   D018 — Django internal links should use {% url %} pattern (project-wide)
+[tool.djlint]
+profile = "django"
+ignore = "D018,H019,H021,H023,H030"

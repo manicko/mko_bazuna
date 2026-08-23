@@ -4,8 +4,10 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── ads
 │   │   ├── analytics
 │   │   ├── api
+│   │   ├── cabinet
 │   │   ├── categories
 │   │   ├── core
+│   │   ├── currencies
 │   │   ├── locations
 │   │   ├── lookups
 │   │   ├── media
@@ -13,7 +15,6 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── search
 │   │   ├── seed
 │   │   ├── trust
-│   │   ├── urls.py.bak
 │   │   └── users
 │   ├── collect_out_tmp.txt
 │   ├── config

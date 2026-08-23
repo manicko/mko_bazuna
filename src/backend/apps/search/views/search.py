@@ -51,7 +51,7 @@ def search(request: HttpRequest) -> HttpResponse:
     PER_PAGE = 24
 
     query = (request.GET.get("q") or "").strip()
-    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city", "user")
+    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city", "user").prefetch_related("features")
 
     # Category filter (by slug) — applies in addition to FTS
     current_category = request.GET.get("category")
@@ -225,6 +225,7 @@ def search(request: HttpRequest) -> HttpResponse:
         "categories": Category.objects.filter(is_active=True).order_by("name"),
         "selected_city": selected_city_id,
         "selected_category": selected_category_id,
+        "show_filters": True,
     }
 
     # HTMX partial rendering support

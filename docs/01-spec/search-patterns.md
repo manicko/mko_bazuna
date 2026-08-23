@@ -158,17 +158,26 @@ name), sourced from `header_context`.
 
 Related user stories: US-B3, US-B7. Source: `apps/core/middleware/preferred_city.py`.
 
-Buyers can sort search results by date (newest first) or price.
+Buyers can sort search results by date (newest/oldest first) or price (low/high). Price sorts
+operate on the EUR-normalized `price_normalized_eur` column, placing ads with no price (`NULL`)
+last; when a `q` full-text query is active, results rank by FTS relevance then `-published_at`, `-id`.
 
 ### Implementation
 
 ```python
-# apps/ads/enums.py
+# apps/core/enums.py
 class AdSort(StrEnum):
-    DATE_NEWEST = "date_newest"
-    PRICE_LOW = "price_low"
-    PRICE_HIGH = "price_high"
+    """Sort options for ad listings."""
+    DATE_NEW = "date_desc"
+    DATE_OLD = "date_asc"
+    PRICE_LOW = "price_asc"
+    PRICE_HIGH = "price_desc"
 ```
+
+- **FTS branch** (active `q`): `order_by("-rank", "-published_at", "-id")` — relevance first,
+  then newest, then a stable `id` tie-breaker.
+- **Price sort**: `models.F("price_normalized_eur").asc(nulls_last=True)` / `.desc(nulls_last=True)`.
+- Default sort when no `q` and no `sort` param: `date_desc` (newest first).
 
 ### Sort Selector UI
 
@@ -177,14 +186,40 @@ class AdSort(StrEnum):
     <span class="text-sm text-gray-600">Sort by:</span>
     <select name="sort" onchange="this.form.submit()"
             class="px-3 py-1 border rounded text-sm">
-        <option value="date_newest">Newest first</option>
-        <option value="price_low">Price: Low to High</option>
-        <option value="price_high">Price: High to Low</option>
+        <option value="date_desc">Newest first</option>
+        <option value="date_asc">Oldest first</option>
+        <option value="price_asc">Price: Low to High (EUR)</option>
+        <option value="price_desc">Price: High to Low (EUR)</option>
     </select>
 </div>
 ```
 
+> **Price units:** price inputs and price sorts are EUR-equivalent — they operate on
+> `price_normalized_eur`. An ad's *displayed* price still shows the seller's **original**
+> amount + currency via the `format_price` template filter. Price-range chips render the
+> `EUR` label. See [`filter-ui.md`](filter-ui.md) and [`db-schema.md`](../02-database/db-schema.md).
+
 Related user stories: US-B2
+
+## Listing Purpose & Features Filters
+
+Two additional filter dimensions apply to both listings and search, narrowing the result set before
+sorting/FTS ranking:
+
+- **`listing_purpose`** — single-select exact match on `Ad.listing_purpose__slug`.
+- **`features`** — multi-select with **AND** semantics: an ad must match *all* selected
+  `features__slug` values (chained `.filter()` = one `EXISTS` subquery per feature). Unrecognized
+  slugs match nothing (empty result set).
+
+Options are category-constrained: when a category is active, the dropdown/checkboxes resolve via
+`CategoryLookupResolver.get_resolved_purposes()` / `get_resolved_features()`; otherwise the full
+active lookup set is shown. The current selections (`current_listing_purpose` / `current_features`)
+drive the active-filter chips and are preserved across pagination URLs.
+
+Full UI markup (form controls, chips, clear-all, pagination URL preservation) lives in
+[`filter-ui.md`](filter-ui.md).
+
+Related user stories: US-B3, US-B6
 
 ## Empty State Patterns
 

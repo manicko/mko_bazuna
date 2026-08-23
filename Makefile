@@ -1,8 +1,8 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate \
-        lint typecheck shell migrate makemigrations logs \
-        backup restore prune-backups db-shell clean create-admin load-catalog seed
+          lint typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
+          backup restore prune-backups db-shell clean create-admin load-catalog seed
 
 # ====================== Settings ======================
 
@@ -14,7 +14,7 @@ COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
 # simultaneously without colliding on service names, networks, or named volumes.
 # Each project gets its own `postgres_data` and `uv_cache` volumes.
 # Target-specific assignment (group syntax): the var is exported to the recipe shell.
-up down reset build restart lint typecheck shell makemigrations create-admin \
+up down reset build restart lint typecheck lint-templates shell makemigrations create-admin \
     load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-dev
 
@@ -46,10 +46,13 @@ help:
 	@echo "Code Quality:"
 	@echo "  lint           Ruff"
 	@echo "  typecheck      Basedpyright"
+	@echo "  lint-templates Djlint"
 	@echo ""
 	@echo "Django:"
 	@echo "  migrate        Apply migrations"
 	@echo "  makemigrations Create migrations"
+	@echo "  makemessages     Extract translatable strings into .po files"
+	@echo "  compilemessages  Compile .po files into .mo files"
 	@echo "  create-admin   Create admin user manually"
 	@echo "  load-catalog   Load categories.yaml into DB (one-shot)"
 	@echo "  seed           Re-run seed manually (dev: also auto-runs on `make up`)"
@@ -107,6 +110,9 @@ lint:
 typecheck:
 	docker compose $(COMPOSE_FILES) run --rm web uv run basedpyright src/
 
+lint-templates:
+	docker compose $(COMPOSE_FILES) run --rm web uv run djlint src/backend/templates/
+
 # ====================== Test Environment ======================
 
 # Start only the long-running test PostgreSQL (port 5433). Idempotent.
@@ -136,6 +142,12 @@ migrate:
 
 makemigrations:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemigrations
+
+makemessages:
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemessages -l ru -l bs -l en --no-location
+
+compilemessages:
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py compilemessages
 
 create-admin:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py create_admin_user \

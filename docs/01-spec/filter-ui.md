@@ -45,6 +45,8 @@ Desktop users see persistent filter sidebar while browsing results.
 | City | High | Always visible |
 | Price Range | Medium | Collapsible on mobile |
 | Condition | Medium | Collapsible on mobile |
+| Listing Purpose | Medium | Collapsible on mobile |
+| Features | Medium | Collapsible on mobile |
 
 ### Implementation
 
@@ -78,6 +80,59 @@ Desktop users see persistent filter sidebar while browsing results.
         </div>
     </form>
 </aside>
+```
+
+related user stories: US-B3
+
+### Listing Purpose & Features Filters
+
+In addition to category/city/price, the catalog filter form
+(`templates/ads/partials/filter_form.html`) exposes two buyer dimensions driven by the
+`lookup_items` reference-data system. The form submits via `hx-get` to the results container
+(`#ad-list`) with `hx-push-url="true"` so the URL stays synchronized.
+
+- **`listing_purpose`** — single-select dropdown (`<select name="listing_purpose">`). Options are
+  resolved for the currently active category via `CategoryLookupResolver.get_resolved_purposes()`
+  (context: `resolved_purposes` / `current_listing_purpose`); when no category is selected, the
+  full active `listing_purpose` lookup set is shown. Unrecognized/missing slugs match nothing
+  (empty result set, same "no match" behavior as an unknown city slug).
+- **`features`** — multi-select checkboxes (`<input type="checkbox" name="features" ...>`,
+  one per feature, value = slug). Options resolve via
+  `CategoryLookupResolver.get_resolved_features()` (context: `resolved_features` /
+  `current_features`). Selection uses **AND semantics**: an ad must possess *all* selected
+  features. Each chained `.filter(features__slug=...)` adds an `EXISTS` subquery (not N+1).
+  Repeated `?features=` query params (HTML form convention) carry the multi-selection.
+
+```html
+<!-- Listing purpose (single select) -->
+<div class="mb-6">
+    <h3 class="font-semibold mb-3">Listing purpose</h3>
+    <select name="listing_purpose" class="w-full px-3 py-2 border rounded"
+            hx-get="{% url 'ads:list' %}" hx-target="#ad-results" hx-push-url="true">
+        <option value="">All purposes</option>
+        {% for purpose in resolved_purposes %}
+            <option value="{{ purpose.slug }}"
+                {% if current_listing_purpose == purpose.slug %}selected{% endif %}>
+                {{ purpose.get_name }}
+            </option>
+        {% endfor %}
+    </select>
+</div>
+
+<!-- Features (multi-select, AND semantics) -->
+<div class="mb-6">
+    <h3 class="font-semibold mb-3">Features</h3>
+    <div class="space-y-2">
+        {% for feature in resolved_features %}
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="features" value="{{ feature.slug }}"
+                       {% if feature.slug in current_features %}checked{% endif %}
+                       hx-get="{% url 'ads:list' %}" hx-target="#ad-results" hx-push-url="true">
+                <span>{{ feature.get_name }}</span>
+            </label>
+        {% endfor %}
+    </div>
+</div>
 ```
 
 Related user stories: US-B3
@@ -149,6 +204,18 @@ When filters are applied, display them as removable chips above results.
             <a href="?{% url_replace request 'price_min' '' 'price_max' '' %}" class="ml-2 text-purple-600 hover:text-purple-800">✕</a>
         </span>
     {% endif %}
+    {% if current_listing_purpose %}
+        <span class="inline-flex items-center px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+            Purpose: {{ current_listing_purpose_display }}
+            <a href="?{% url_replace request 'listing_purpose' '' %}" class="ml-2 text-indigo-600 hover:text-indigo-800">✕</a>
+        </span>
+    {% endif %}
+    {% for feature_slug in current_features %}
+        <span class="inline-flex items-center px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm">
+            Feature: {{ feature_display }}
+            <a href="?{% url_replace request 'features' feature_slug %}" class="ml-2 text-pink-600 hover:text-pink-800">✕</a>
+        </span>
+    {% endfor %}
 </div>
 ```
 
@@ -159,6 +226,8 @@ When filters are applied, display them as removable chips above results.
 | Category | `bg-blue-100` | `text-blue-800` | `text-blue-600` |
 | City | `bg-green-100` | `text-green-800` | `text-green-600` |
 | Price | `bg-purple-100` | `text-purple-800` | `text-purple-600` |
+| Listing Purpose | `bg-indigo-100` | `text-indigo-800` | `text-indigo-600` |
+| Features | `bg-pink-100` | `text-pink-800` | `text-pink-600` |
 
 Related user stories: US-B3
 
@@ -276,4 +345,29 @@ Option to reset all active filters at once.
 {% endif %}
 ```
 
-Related user stories: US-B3
+The clear-all link drops **all** filter parameters (`listing_purpose`, each `features` value,
+`category`, `city`, price range, `q`) and returns to page 1.
+
+## Pagination URL Preservation
+
+Every pagination link must preserve the **full** active filter set so a bookmarked or shared page
+two stays on the same result subset (no divergence from page 1). In addition to the existing
+`q`/`category`/`city`/`sort`/`min_price`/`max_price`/`page` parameters, pagination URLs carry:
+
+- `listing_purpose=<slug>` when a purpose is selected (dropped when none).
+- **Repeated** `features=<slug>` for each selected feature (one query-param per feature, not
+  comma-joined), preserving AND semantics across pages.
+
+The `sort` parameter is preserved in pagination URLs even while a `q` (full-text) query is active,
+so the user's sort preference is retained across result pages.
+
+```html
+<!-- Pagination links append the active listing_purpose + each feature -->
+<a href="?page=2&category={{ category_slug }}&city={{ city_slug }}&sort={{ current_sort }}
+   {% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}
+   {% for fslug in current_features %}&features={{ fslug }}{% endfor %}">
+   Next
+</a>
+```
+
+Related user stories: US-B3, US-B6

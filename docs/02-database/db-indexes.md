@@ -25,11 +25,17 @@ definitions live in [db-schema.md](db-schema.md); StrEnum types live in [db-enum
 models.Index(name='IX_ads_pub_listing',
     fields=['status', 'category_id', 'city_id', '-published_at'],
     condition=Q(status=AdStatus.PUBLISHED))                 # partial: ~99% of public reads
+models.Index(name='IX_ads_pub_purpose',
+    fields=['listing_purpose_id'],
+    condition=Q(status=AdStatus.PUBLISHED))                 # partial: catalog filter on listing_purpose (F4)
 models.Index(name='IX_ads_user_status', fields=['user_id', 'status'])
+models.Index(name='IX_ads_price_normalized_eur',
+    fields=['price_normalized_eur'],
+    condition=Q(price_normalized_eur__isnull=False))        # cross-currency price filter (BAM/RSD/EUR default); zone C7
 GinIndex(name='IX_ads_search_gin', fields=['search_vector'])          # legacy concatenated vector (to be dropped)
-GinIndex(name='IX_ads_search_gin_ru', fields=['search_vector_ru'])    # real GIN on Russian TSVECTOR
-GinIndex(name='IX_ads_search_gin_bs', fields=['search_vector_bs'])    # real GIN on Bosnian TSVECTOR
-GinIndex(name='IX_ads_search_gin_en', fields=['search_vector_en'])    # real GIN on English TSVECTOR
+GinIndex(name='IX_ads_search_gin_ru', fields=['search_vector_ru'])    # real Gin on Russian TSVECTOR
+GinIndex(name='IX_ads_search_gin_bs', fields=['search_vector_bs'])    # real Gin on Bosnian TSVECTOR
+GinIndex(name='IX_ads_search_gin_en', fields=['search_vector_en'])    # real Gin on English TSVECTOR
 models.Index(name='IX_ads_archive_sweep', fields=['status', 'published_at'],
     condition=Q(status=AdStatus.PUBLISHED))                 # archive @2mo
 models.Index(name='IX_ads_delete_sweep', fields=['status', 'published_at'],
@@ -39,7 +45,7 @@ models.Index(name='IX_ads_purge_failed', fields=['status', 'moderation_failed_at
 models.Index(name='IX_ads_rejected_sweep', fields=['status', 'rejected_at'],
     condition=Q(status=AdStatus.REJECTED))                 # REJECTED @90d (zone D4)
 ```
-Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `price` has no index (rare filter in phase 1; add only after EXPLAIN ANALYZE at 500k rows, zone C7).
+Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
 
 ## Indexes — users
 ```python
@@ -185,7 +191,7 @@ models.Index(name='IX_cat_listing_feature_reverse', fields=['feature'])  # rever
 ## Indexes — ad_features
 ```python
 # Unique constraint on (ad, feature) covers lookups by ad
-# No additional indexes needed — M2M lookups go through Ad.features
+models.Index(name='IX_ad_features_feature_id', fields=['feature'])    # reverse lookup for the features filter (F5)
 ```
 
 ## Indexes — ad_images

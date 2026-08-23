@@ -9,12 +9,15 @@ FROM python:3.14-slim AS builder
 
 # Install build dependencies for curl (for Tailwind CLI download in standalone mode)
 # Note: gcc and libpq-dev removed - psycopg[binary] provides pre-compiled PostgreSQL driver
+# gettext is required by the builder to run ``compilemessages`` (produces .mo files
+# at image-build time so the lean runtime image does not need a compiler).
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     coreutils \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned for reproducibility)
@@ -71,7 +74,8 @@ ENV ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 # Placeholder database URL for collectstatic (doesn't connect to DB but settings must be valid)
 ENV DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres
 RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify && \
-    uv run python src/backend/manage.py collectstatic --noinput
+    uv run python src/backend/manage.py collectstatic --noinput && \
+    uv run python src/backend/manage.py compilemessages
 
 
 ################################################################################

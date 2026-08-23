@@ -1,0 +1,4 @@
+- rule:
+    name: H901
+    message: "Django {# ... #} comment tags should not span multiple lines. Use the {% comment %}...{% endcomment %} block tag instead."
+    python_module: djlint_custom_rules

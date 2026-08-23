@@ -15,16 +15,18 @@ render pipeline is exercised (including the filter-form template).
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from django.test import Client
 from django.utils import timezone
+from django.utils.translation import override
 
 from apps.ads.models import Ad
 from apps.core.enums import AdSort, AdStatus
 from apps.lookups.models import LookupGroup, LookupItem
 
-from conftest import create_test_ad
+from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -287,3 +289,124 @@ class TestRelevanceTiebreaker:
         ids = list(a.id for a in response.context["page_obj"])
         assert ad_newer.id in ids and ad_older.id in ids
         assert ids.index(ad_newer.id) < ids.index(ad_older.id)
+
+
+class TestFilterUrlReset:
+    """Verify that filter URL state is reset/replaced, not accumulated (Plan 29).
+
+    Covers spec §5 acceptance criteria:
+    - AC-1: form submission produces URL with only active filters (no accumulation)
+    - AC-2: chip removal updates browser URL
+    - AC-3: "Clear all filters" updates URL
+    - AC-4: pagination links update URL
+    """
+
+    # ------------------------------------------------------------------ #
+    # Static template-source assertions (no DB needed)
+    # ------------------------------------------------------------------ #
+
+    def test_form_uses_request_path_not_empty(self) -> None:
+        """``filter_form.html`` must use ``hx-get="{{ request.path }}"``, not ``hx-get=""``."""
+        path = Path("src/backend/templates/ads/partials/filter_form.html").resolve()
+        content = path.read_text(encoding="utf-8")
+        assert 'hx-get="{{ request.path }}' in content
+        assert 'hx-get=""' not in content
+
+    def test_all_htmx_links_have_push_url(self) -> None:
+        """Every ``hx-get`` link in ``ad_list.html`` must also carry ``hx-push-url="true"``."""
+        path = Path("src/backend/templates/ads/partials/ad_list.html").resolve()
+        content = path.read_text(encoding="utf-8")
+        assert content.count("hx-get=") == 8
+        assert content.count('hx-push-url="true"') == 8
+
+    def test_clear_all_filters_has_push_url(self) -> None:
+        """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
+        path = Path("src/backend/templates/ads/partials/ad_list.html").resolve()
+        content = path.read_text(encoding="utf-8")
+        assert 'hx-push-url="true"' in content
+        assert 'hx-get="?page=1' in content
+
+    # ------------------------------------------------------------------ #
+    # Integration tests — HTMX rendered output
+    # ------------------------------------------------------------------ #
+
+    def test_form_renders_path_only_hx_get(
+        self, seller, category, city
+    ) -> None:
+        """HTMX request to ``/`` renders the form with ``hx-get="/"`` (path only)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/?features=delivery",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'hx-get="/"' in content
+        assert 'hx-get="/?features=delivery' not in content
+
+    def test_chip_link_has_push_url_in_rendered_output(
+        self, seller, category, city, feature_lookup
+    ) -> None:
+        """Feature chip removal links in the rendered output carry ``hx-push-url="true"``."""
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED
+        )
+        ad.features.add(feature_lookup["delivery"])
+        client = Client()
+        response = client.get(
+            "/?features=delivery",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'hx-push-url="true"' in content
+
+    def test_pagination_links_have_push_url_in_rendered_output(
+        self, seller, category, city
+    ) -> None:
+        """Pagination links in the rendered output carry ``hx-push-url="true"``."""
+        create_test_ads_bulk(
+            seller, category, city, count=25,
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        with override("en"):
+            response = client.get("/", headers={"HX-Request": "true"})
+            content = response.content.decode("utf-8")
+        assert response.status_code == 200
+        assert 'hx-push-url="true"' in content
+        assert "Page navigation" in content
+
+    # ------------------------------------------------------------------ #
+    # Behavioral test — no parameter accumulation
+    # ------------------------------------------------------------------ #
+
+    def test_form_submission_does_not_accumulate_params(
+        self, seller, category, city, feature_lookup
+    ) -> None:
+        """Requesting only ``features=delivery`` returns only delivery ads.
+
+        Confirms AND semantics: an ad with only the ``new`` feature is excluded,
+        proving unchecked params from a prior URL are not re-introduced.
+        """
+        ad_delivery = create_test_ad(
+            seller, category, city,
+            title="Delivery only",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_delivery.features.add(feature_lookup["delivery"])
+
+        ad_new = create_test_ad(
+            seller, category, city,
+            title="New only",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_new.features.add(feature_lookup["new"])
+
+        client = Client()
+        response = client.get("/?features=delivery")
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_delivery.id in ids
+        assert ad_new.id not in ids

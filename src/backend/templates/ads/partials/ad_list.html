@@ -1,8 +1,18 @@
-{# Partial template for ad list grid (HTMX fragment). Renders the ad cards grid, pagination, and status messages. XSS-safe via Django autoescape. #}
+{# Partial template for ad list grid (HTMX fragment). Renders the filter form (re-rendered on every HTMX navigation so DOM state never goes stale), active filter chips, ad cards grid, pagination, and status messages. XSS-safe via Django autoescape. #}
 {% load localized_content %}
 {% load i18n %}
 {% load trust_tags %}
 {% load price_tags %}
+
+{% comment %} The filter form lives inside the HTMX-swappable region so that every
+   navigation (form submit, "Clear all filters", chip removal, pagination)
+   re-renders it server-side — preventing stale checkbox/select state from
+   persisting and accumulating across filter sessions. Guarded by
+   show_filters so the favorites page (which also uses this partial)
+   is unaffected. {% endcomment %}
+{% if show_filters %}
+    {% include "ads/partials/filter_form.html" %}
+{% endif %}
 
 <!-- Did-you-mean suggestions -->
 {% if suggested_category %}
@@ -30,7 +40,7 @@
                 {% trans "Purpose:" %} {{ p|get_lookup_name:LANGUAGE_CODE }}
                 <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                    hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="ml-2 text-blue-600 hover:text-blue-800">&times;</a>
             </span>
         {% endif %}
@@ -41,14 +51,14 @@
                 {% trans "Feature:" %} {{ f|get_lookup_name:LANGUAGE_CODE }}
                 <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for keep in current_features %}{% if keep != f.slug %}&features={{ keep }}{% endif %}{% endfor %}"
                    hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for keep in current_features %}{% if keep != f.slug %}&features={{ keep }}{% endif %}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="ml-2 text-green-600 hover:text-green-800">&times;</a>
             </span>
         {% endif %}
     {% endfor %}
     <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}"
        hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}"
-       hx-target="#ad-list" hx-swap="innerHTML"
+       hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
        class="text-sm text-blue-600 hover:underline">{% trans "Clear all filters" %}</a>
 </div>
 {% endif %}
@@ -85,9 +95,22 @@
                             <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
                         {% endif %}
                         
-                        <p class="text-sm text-gray-600 line-clamp-3 mb-3">{{ ad|get_description:LANGUAGE_CODE }}</p>
-                        
-                        <div class="flex justify-between items-center text-xs text-gray-500">
+                         <p class="text-sm text-gray-600 line-clamp-3 mb-3">{{ ad|get_description:LANGUAGE_CODE }}</p>
+                         
+                         {% if ad.features.all %}
+                         <div class="flex flex-wrap gap-1 mt-2 mb-2">
+                             {% for f in ad.features.all|slice:":4" %}
+                             {% include "components/feature_tag.html" with feature=f only %}
+                             {% endfor %}
+                         </div>
+                         {% if ad.features.count > 4 %}
+                         <span class="inline-flex items-center px-2 py-1 text-xs text-gray-500">
+                             +{{ ad.features.count|add:"-4" }} {% trans "more" %}
+                         </span>
+                         {% endif %}
+                         {% endif %}
+
+                         <div class="flex justify-between items-center text-xs text-gray-500">
                             <span>{{ ad.city.get_name|default:ad.city.name }}</span>
                             <span>{{ ad.category.get_name|default:ad.category.name }}</span>
                             <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
@@ -106,11 +129,11 @@
             {% if page_obj.has_previous %}
                 <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                    hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&laquo;&laquo;</a>
                 <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                    hx-get="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&laquo;</a>
             {% endif %}
 
@@ -120,7 +143,7 @@
                 {% elif page_num > page_obj.number|add:"-3" and page_num < page_obj.number|add:"3" %}
                     <a href="?page={{ page_num }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                        hx-get="?page={{ page_num }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                       hx-target="#ad-list" hx-swap="innerHTML"
+                       hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                        class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">{{ page_num }}</a>
                 {% endif %}
             {% endfor %}
@@ -128,11 +151,11 @@
             {% if page_obj.has_next %}
                 <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                    hx-get="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&raquo;</a>
                 <a href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
                    hx-get="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-                   hx-target="#ad-list" hx-swap="innerHTML"
+                   hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
                    class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border hover:bg-gray-50">&raquo;&raquo;</a>
             {% endif %}
         </nav>

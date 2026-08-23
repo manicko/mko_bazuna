@@ -27,7 +27,7 @@ def favorites_list(request: HttpRequest) -> HttpResponse:
     ads = (
         Ad.objects.filter(favorites__user=request.user)
         .select_related("category", "city", "user")
-        .prefetch_related("images", "user__trust_score")
+        .prefetch_related("images", "features", "user__trust_score")
         .order_by("-favorites__created_at")
     )
     ads = annotate_favorites(ads, request.user.id)

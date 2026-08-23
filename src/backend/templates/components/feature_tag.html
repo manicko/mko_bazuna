@@ -1,0 +1,37 @@
+{% comment %}
+Feature Tag Component for Mko Bazuna.
+   Renders a single ad feature (LookupItem from ad.features.all()) as a static
+   tag with optional icon and color from the lookup item. Non-interactive
+   (descriptive, not actionable). Used on list cards and the detail page.
+
+   Usage: {% include "components/feature_tag.html" with feature=f only %}
+
+   Variables:
+     feature: A LookupItem instance (from ad.features.all())
+   Dependencies: localized_content (get_lookup_name filter), Tailwind CSS
+{% endcomment %}
+{% load localized_content i18n %}
+{% get_current_language as lang_code %}
+{% with name=feature|get_lookup_name:lang_code %}
+{% if feature.icon or feature.color %}
+    {% if feature.color %}
+        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
+              data-feature-id="{{ feature.id }}"
+              style="background-color: {{ feature.color }}20; color: {{ feature.color }};">
+            {% if feature.icon %}<span aria-hidden="true">{{ feature.icon }}</span>{% endif %}
+            <span>{{ name }}</span>
+        </span>
+    {% else %}
+        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full"
+              data-feature-id="{{ feature.id }}">
+            {% if feature.icon %}<span aria-hidden="true">{{ feature.icon }}</span>{% endif %}
+            <span>{{ name }}</span>
+        </span>
+    {% endif %}
+{% else %}
+    <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full"
+          data-feature-id="{{ feature.id }}">
+      <span>{{ name }}</span>
+    </span>
+{% endif %}
+{% endwith %}

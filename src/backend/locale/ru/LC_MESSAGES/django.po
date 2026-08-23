@@ -7,9 +7,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-27 17:15+0200\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"POT-Creation-Date: 2026-08-23 00:00+0200\n"
+"PO-Revision-Date: 2026-08-23 00:00+0200\n"
+"Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Russian <ru@li.org>\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
@@ -19,85 +19,121 @@ msgstr ""
 
 #: templates/ads/detail.html
 msgid "Photo"
-msgstr ""
+msgstr "Фото"
 
-#: templates/ads/detail.html
 msgid "for"
-msgstr ""
+msgstr "для"
 
-#: templates/ads/detail.html
 msgid "Location:"
-msgstr ""
+msgstr "Местоположение:"
 
-#: templates/ads/detail.html
 msgid "Category:"
-msgstr ""
+msgstr "Категория:"
 
-#: templates/ads/detail.html
 msgid "Published:"
-msgstr ""
+msgstr "Опубликовано:"
 
-#: templates/ads/detail.html
 msgid "Contact Seller"
-msgstr ""
+msgstr "Связаться с продавцом"
 
-#: templates/ads/detail.html
 msgid "Seller unavailable for contact"
-msgstr ""
+msgstr "Продавец недоступен для контакта"
 
-#: templates/ads/detail.html
 msgid "Back to listings"
-msgstr ""
+msgstr "Назад к объявлениям"
 
 #: templates/ads/list.html
 msgid "Search"
-msgstr ""
+msgstr "Поиск"
 
-#: templates/ads/list.html
 msgid "Search ads..."
-msgstr ""
+msgstr "Поиск объявлений..."
 
-#: templates/ads/list.html
 msgid "Category"
-msgstr ""
+msgstr "Категория"
 
-#: templates/ads/list.html
 msgid "Ads"
-msgstr ""
+msgstr "Объявления"
+
+msgid "Save search"
+msgstr "Сохранить поиск"
 
 #: templates/ads/partials/ad_list.html
 msgid "Did you mean:"
-msgstr ""
+msgstr "Вы хотели сказать:"
 
-#: templates/ads/partials/ad_list.html
 msgid "No image"
-msgstr ""
+msgstr "Нет изображения"
 
-#: templates/ads/partials/ad_list.html
+msgid "Purpose:"
+msgstr "Назначение:"
+
+msgid "Feature:"
+msgstr "Особенность:"
+
+msgid "Clear all filters"
+msgstr "Очистить все фильтры"
+
 msgid "Page navigation"
-msgstr ""
+msgstr "Навигация по страницам"
 
-#: templates/ads/partials/ad_list.html
 #, python-format
 msgid "No results found for \"%(query)s\""
-msgstr ""
+msgstr "Результаты не найдены для \"%(query)s\""
 
-#: templates/ads/partials/ad_list.html
 msgid "Try a different search term or browse all categories"
-msgstr ""
+msgstr "Попробуйте другой запрос или просмотрите все категории"
 
-#: templates/ads/partials/ad_list.html
 msgid "No ads available"
-msgstr ""
+msgstr "Нет доступных объявлений"
 
-#: templates/ads/partials/ad_list.html
 msgid "Check back later for new listings"
-msgstr ""
+msgstr "Загляните позже за новыми объявлениями"
 
-#: templates/ads/partials/ad_list.html
 msgid "No ads available yet"
-msgstr ""
+msgstr "Пока нет объявлений"
 
-#: templates/ads/partials/ad_list.html
 msgid "Be the first to create an ad via Telegram!"
-msgstr ""
+msgstr "Будьте первым, кто создаст объявление через Telegram!"
+
+msgid "more"
+msgstr "больше"
+
+#: templates/ads/partials/filter_form.html
+msgid "Listing purpose"
+msgstr "Назначение"
+
+msgid "Any"
+msgstr "Любое"
+
+msgid "Min price"
+msgstr "Мин. цена"
+
+msgid "Max price"
+msgstr "Макс. цена"
+
+msgid "Features"
+msgstr "Особенности"
+
+msgid "selected"
+msgstr "выбрано"
+
+msgid "Apply filters"
+msgstr "Применить фильтры"
+
+#: templates/ads/partials/filter_sort.html
+msgid "Sort"
+msgstr "Сортировка"
+
+msgid "Newest first"
+msgstr "Сначала новые"
+
+msgid "Oldest first"
+msgstr "Сначала старые"
+
+msgid "Price: low to high"
+msgstr "Цена: по возрастанию"
+
+msgid "Price: high to low"
+msgstr "Цена: по убыванию"
+

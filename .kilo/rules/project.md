@@ -40,8 +40,17 @@
 
 14. Keep documentation updated continuously
     Architecture decisions, setup instructions, and API usage must always stay current.
-
 15. **Small Modules and Functions**
-    Short, focused files and functions give higher ROI in maintenance — they are easier to edit, review, and less prone to corruption.
+    Short, focused files and functions give higher ROI in maintenance — they are
+    easier to edit, review, and less prone to corruption.
+
+16. **Internationalization is part of Definition of Done**
+    All user-visible strings must be wrapped in `{% trans %}` (templates) or
+    `gettext`/`gettext_lazy` (Python). Every `msgid` must have a non-empty
+    `msgstr` in the `ru` (primary) and `bs` `.po` files. `en` msgstr may be
+    empty (msgids are already English). Run `make makemessages` then
+    `make compilemessages` before committing. New code must pass
+    `test_i18n_completeness.py` (see `.ai/problems/08_multilingual-dev_spec.md`).
+    Database-based i18n (`feature_tag.html` via `get_lookup_name`) is exempt.
 
 

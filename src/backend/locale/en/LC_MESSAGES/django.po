@@ -7,9 +7,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-27 17:15+0200\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"POT-Creation-Date: 2026-08-23 00:00+0200\n"
+"PO-Revision-Date: 2026-08-23 00:00+0200\n"
+"Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
@@ -19,85 +19,121 @@ msgstr ""
 
 #: templates/ads/detail.html
 msgid "Photo"
-msgstr ""
+msgstr "Photo"
 
-#: templates/ads/detail.html
 msgid "for"
-msgstr ""
+msgstr "for"
 
-#: templates/ads/detail.html
 msgid "Location:"
-msgstr ""
+msgstr "Location:"
 
-#: templates/ads/detail.html
 msgid "Category:"
-msgstr ""
+msgstr "Category:"
 
-#: templates/ads/detail.html
 msgid "Published:"
-msgstr ""
+msgstr "Published:"
 
-#: templates/ads/detail.html
 msgid "Contact Seller"
-msgstr ""
+msgstr "Contact Seller"
 
-#: templates/ads/detail.html
 msgid "Seller unavailable for contact"
-msgstr ""
+msgstr "Seller unavailable for contact"
 
-#: templates/ads/detail.html
 msgid "Back to listings"
-msgstr ""
+msgstr "Back to listings"
 
 #: templates/ads/list.html
 msgid "Search"
-msgstr ""
+msgstr "Search"
 
-#: templates/ads/list.html
 msgid "Search ads..."
-msgstr ""
+msgstr "Search ads..."
 
-#: templates/ads/list.html
 msgid "Category"
-msgstr ""
+msgstr "Category"
 
-#: templates/ads/list.html
 msgid "Ads"
-msgstr ""
+msgstr "Ads"
+
+msgid "Save search"
+msgstr "Save search"
 
 #: templates/ads/partials/ad_list.html
 msgid "Did you mean:"
-msgstr ""
+msgstr "Did you mean:"
 
-#: templates/ads/partials/ad_list.html
 msgid "No image"
-msgstr ""
+msgstr "No image"
 
-#: templates/ads/partials/ad_list.html
+msgid "Purpose:"
+msgstr "Purpose:"
+
+msgid "Feature:"
+msgstr "Feature:"
+
+msgid "Clear all filters"
+msgstr "Clear all filters"
+
 msgid "Page navigation"
-msgstr ""
+msgstr "Page navigation"
 
-#: templates/ads/partials/ad_list.html
 #, python-format
 msgid "No results found for \"%(query)s\""
-msgstr ""
+msgstr "No results found for \"%(query)s\""
 
-#: templates/ads/partials/ad_list.html
 msgid "Try a different search term or browse all categories"
-msgstr ""
+msgstr "Try a different search term or browse all categories"
 
-#: templates/ads/partials/ad_list.html
 msgid "No ads available"
-msgstr ""
+msgstr "No ads available"
 
-#: templates/ads/partials/ad_list.html
 msgid "Check back later for new listings"
-msgstr ""
+msgstr "Check back later for new listings"
 
-#: templates/ads/partials/ad_list.html
 msgid "No ads available yet"
-msgstr ""
+msgstr "No ads available yet"
 
-#: templates/ads/partials/ad_list.html
 msgid "Be the first to create an ad via Telegram!"
-msgstr ""
+msgstr "Be the first to create an ad via Telegram!"
+
+msgid "more"
+msgstr "more"
+
+#: templates/ads/partials/filter_form.html
+msgid "Listing purpose"
+msgstr "Listing purpose"
+
+msgid "Any"
+msgstr "Any"
+
+msgid "Min price"
+msgstr "Min price"
+
+msgid "Max price"
+msgstr "Max price"
+
+msgid "Features"
+msgstr "Features"
+
+msgid "selected"
+msgstr "selected"
+
+msgid "Apply filters"
+msgstr "Apply filters"
+
+#: templates/ads/partials/filter_sort.html
+msgid "Sort"
+msgstr "Sort"
+
+msgid "Newest first"
+msgstr "Newest first"
+
+msgid "Oldest first"
+msgstr "Oldest first"
+
+msgid "Price: low to high"
+msgstr "Price: low to high"
+
+msgid "Price: high to low"
+msgstr "Price: high to low"
+

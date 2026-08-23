@@ -103,7 +103,7 @@ class TestAdDetailBotUsernameContext(SimpleTestCase):
             "category", "city", "user"
         )
         mock_ad.objects.select_related.return_value.prefetch_related.assert_called_once_with(
-            "images", "user__trust_score"
+            "images", "features", "user__trust_score"
         )
 
     def test_detail_context_contains_bot_username(self) -> None:

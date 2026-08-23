@@ -67,6 +67,15 @@ wait_for_redis() {
     exit 1
 }
 
+# Compile Django translation files (.po -> .mo) so {% trans %} tags render in
+# the active language. Non-fatal: a missing gettext or stale .po must never
+# prevent the container from starting (falls back to English msgids).
+compile_messages() {
+    echo "Compiling translations..."
+    /opt/venv/bin/python /app/src/backend/manage.py compilemessages 2>/dev/null \
+        || echo "WARNING: compilemessages failed (non-fatal, falling back to msgid strings)"
+}
+
 # Execute logic — only when run directly, not when sourced by one-shot entrypoints.
 # When sourced (e.g., by entrypoint-seed.sh), only the setup function definitions above
 # are loaded; the caller invokes them explicitly before exec-ing its command.
@@ -75,6 +84,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     fix_volume_permissions
     wait_for_db
     wait_for_redis
+    compile_messages
 
     exec "$@"
 fi

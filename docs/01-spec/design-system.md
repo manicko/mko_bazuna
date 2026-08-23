@@ -377,6 +377,11 @@ Prominent price presentation with currency.
 </div>
 ```
 
+> **Currency model:** `format_price` renders the seller's **original** `price_amount` +
+> `price_currency` (EUR/RSD/BAM). Price *filtering* and *sorting* use the EUR-normalized
+> `price_normalized_eur` column (see [`db-schema`](../02-database/db-schema.md)), so range
+> inputs and price-sort are EUR-equivalent while the displayed price keeps the original currency.
+
 ### Image Placeholder
 
 Fallback when no image is available.

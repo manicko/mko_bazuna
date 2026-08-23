@@ -80,12 +80,17 @@ Create in `apps/trust/models.py`:
 class SellerTrustScore(models.Model):
     user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="trust_score")
     trust_level = models.CharField(max_length=20, choices=[(l.value, l.value) for l in TrustLevel])
+    score = models.PositiveSmallIntegerField(default=0)
     ad_count_lifetime = models.PositiveIntegerField(default=0)
     ad_count_active = models.PositiveIntegerField(default=0)
+    rejection_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     contact_response_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    avg_ad_quality_score = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    updated_at = models.DateTimeField(auto_now=True)
+    last_calculated = models.DateTimeField(auto_now=True)
 ```
+
+> **Status: Implemented.** Field set matches [db-schema.md §SellerTrustScore](../02-database/db-schema.md).
+> The plan previously listed `avg_ad_quality_score` and `updated_at`; the implementation uses
+> `score` (overall 0–100) + `rejection_rate` and renames the timestamp to `last_calculated`.
 
 ### Task T4: SellerVerification Model
 **Semantic Anchor:** `@model.trust.seller_verification`
@@ -97,10 +102,13 @@ Create in `apps/trust/models.py`:
 class SellerVerification(models.Model):
     user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="verification")
     phone_number = models.CharField(max_length=20, blank=True, null=True)
-    telegram_premium = models.BooleanField(default=False)
     verified_by_admin = models.BooleanField(default=False)
     verified_at = models.DateTimeField(blank=True, null=True)
 ```
+
+> **Note:** `telegram_premium` is a field on `User` (not `SellerVerification`); it is set from
+> `user.is_premium` on bot `/start` and used as a trust auto-verification signal (the
+> `VERIFIED` trust-level floor). See [db-schema.md > users](../02-database/db-schema.md) and Task T2 above.
 
 ### Task T5: Trust Calculation Service
 **Semantic Anchor:** `@service.trust.calculate_scores`

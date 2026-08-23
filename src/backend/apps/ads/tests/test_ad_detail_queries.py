@@ -31,10 +31,11 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # prefetch.  The ad-detail view itself issues:
 #   1 SELECT (ad + select_related user/city/category)
 #   1 SELECT (prefetch images)
+#   1 SELECT (prefetch features)
 #   1 SELECT (prefetch user__trust_score)
 #   1 INSERT (AnalyticsEvent)
 #   + template/header queries
-_QUERY_BOUND = 15
+_QUERY_BOUND = 16
 
 
 class TestAdDetailQueryCount:
