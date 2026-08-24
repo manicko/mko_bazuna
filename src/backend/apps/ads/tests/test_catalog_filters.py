@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from django.test import Client
 from django.utils import timezone
-from django.utils.translation import override
+
 
 from apps.ads.models import Ad
 from apps.core.enums import AdSort, AdStatus
@@ -371,10 +371,11 @@ class TestFilterUrlReset:
             status=AdStatus.PUBLISHED,
         )
         client = Client()
-        with override("en"):
-            response = client.get("/", headers={"HX-Request": "true"})
-            content = response.content.decode("utf-8")
+        # Use Accept-Language en so the middleware activates English, making
+        # the ``{% trans "Page navigation" %}`` assertion deterministic.
+        response = client.get("/", headers={"HX-Request": "true", "Accept-Language": "en"})
         assert response.status_code == 200
+        content = response.content.decode("utf-8")
         assert 'hx-push-url="true"' in content
         assert "Page navigation" in content
 

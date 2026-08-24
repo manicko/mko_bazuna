@@ -197,7 +197,80 @@ preferred_city_display = _("Entire country")
 
 These must use `gettext_lazy` so the labels become translatable.
 
-### 3.4 Tests Asserting on Hardcoded Strings (To Update)
+#### 3.3.3 `apps/ads/views/dashboard.py:77-83` — `status_labels` dict
+
+Five hardcoded English status labels flow into `dashboard.html:76`
+(`{{ status_labels|get_item:status }}`):
+
+| Current label | Proposed msgid |
+|---|---|
+| `"Published"` | `"Published"` |
+| `"On Moderation"` | `"On Moderation"` |
+| `"Failed Moderation"` | `"Failed Moderation"` |
+| `"Archived"` | `"Archived"` |
+| `"Rejected"` | `"Rejected"` |
+
+These must be wrapped in `gettext_lazy` (module-level constants).
+
+#### 3.3.4 `apps/ads/views/edit.py:170` — inline error message
+
+```python
+{"ad": ad, "error": "Ad failed moderation checks"}
+```
+
+Rendered in `ads/edit.html`. Must be wrapped in `gettext`.
+
+#### 3.3.5 `HttpResponseForbidden` bodies (5 locations)
+
+These are HTTP response bodies rendered to the browser in production (403 pages):
+
+| File:Line | Current text |
+|---|---|
+| `apps/ads/views/delete.py:44` | `"You do not have permission to delete this ad."` |
+| `apps/ads/views/edit.py:105` | `"You do not have permission to edit this ad."` |
+| `apps/ads/views/edit.py:243` | `"You do not have permission to archive this ad."` |
+| `apps/ads/views/edit.py:274` | `"You do not have permission to reactivate this ad."` |
+| `apps/ads/views/listings.py:187` | `"Access denied"` |
+
+Each must be wrapped in `gettext` at the call site.
+
+> **Note on `Http404` messages** (6 occurrences in `listings.py`, `favorite.py`,
+> `categories/views.py`, `moderation/views/decorators.py`): These are **NOT**
+> user-facing in production — Django's default 404 handler logs the message and
+> renders a generic page. They do not require translation. This distinction was
+> verified by the research report (`.ai/.../python-hardcoded-string-detection-research.md`
+> §3.3).
+
+**Total genuine public-facing Python UI strings: 15** (1 Cyrillic + 14 English).
+Of these, only 5 were previously documented (§3.3.1–3.3.3); the remaining 10
+(§3.3.3–3.3.5) were newly discovered by automated AST scanning (see research
+report §3.3).
+
+### 3.4 Admin-Facing (Staff-Only) Strings — Q1 Scope
+
+A wide ring of "UI strings" exists in Django-admin code paths. These are **not
+public-facing** but would be flagged by a naive scanner. They require an
+admin-scope exclusion if the DoD applies to admin templates (see Q1):
+
+| File:Line | String | Context |
+|---|---|---|
+| `apps/ads/admin.py:31` | `"User (telegram_id)"` | `short_description` column header |
+| `apps/ads/admin.py:42` | `"Rejection Reason"` | `short_description` |
+| `apps/ads/admin.py:50` | `"Ad ID"` | `short_description` |
+| `apps/ads/admin.py:58` | `"Features"` | `short_description` |
+| `apps/ads/admin.py:115` | `"Reject selected ads"` | `@admin.action(description=...)` |
+| `apps/ads/admin.py:121` | `"Approve selected ads"` | `@admin.action(description=...)` |
+| `apps/ads/admin.py:127` | `"Ban users from selected ads"` | `@admin.action(description=...)` |
+| `apps/ads/admin.py:133` | `"Soft delete selected ads"` | `@admin.action(description=...)` |
+| `apps/ads/admin.py:145-147` | `"On Moderation"`, `"Failed"`, `"Rejected"` | `moderation_queues` context list |
+| `apps/moderation/models.py:75-79` | `"Moderation Criteria"` | `verbose_name` + `__str__` |
+
+> **Note:** `self.message_user` f-string messages like `f"Rejected {count} ad(s)."`
+> (admin.py:119-137) were **not** captured by a literal-string scan — interpolation
+> obscures literals, increasing false negatives for any scanner. This is further
+> documented in the research report §3.4.
+
+### 3.5 Tests Asserting on Hardcoded Strings (To Update)
 
 The following test files assert on the **current Russian text** that will move into `{% trans %}` blocks. After wrapping, the rendered output will still show Russian text if the ru `msgstr` is populated correctly — but these tests must explicitly set the test language to be robust:
 
@@ -207,6 +280,31 @@ The following test files assert on the **current Russian text** that will move i
 | `test_breadcrumbs_render.py` | 65 | `"Главная" in nav` |
 | `test_preferred_city.py` | 139, 147, 180 | `"Вся страна" in content` |
 | `test_context_processors.py` | 72, 110 | `"Вся страна"` |
+
+### 3.5 UI Element Localization Checklist
+
+Reference checklist for auditing templates (from multilingual DoD best practices).
+When auditing a template, verify each category:
+
+| UI element type | Examples in project | Action |
+|---|---|---|
+| Buttons | Submit, Cancel, Save, Delete | Wrap in `{% trans %}` |
+| Links | Navigation, "View all", pagination next/prev | Wrap in `{% trans %}` |
+| Titles / headings | H1, H2, card titles | Wrap in `{% trans %}` |
+| Placeholders | Search inputs, form fields | Wrap in `{% trans %}` |
+| Tooltips | `title="..."` attributes, hover hints | Wrap in `{% trans %}` |
+| Error messages | Form validation, 404, 500 | Wrap in `{% trans %}` |
+| Success messages | Flash, confirmation | Wrap in `{% trans %}` |
+| Filter text | Category names, price ranges | Wrap in `{% trans %}` |
+| Sort labels | "Price: low to high" | Wrap in `{% trans %}` |
+| Pagination text | "Page 1 of 10", prev/next | Wrap in `{% trans %}` |
+| Empty states | "No ads found", "Nothing here" | Wrap in `{% trans %}` |
+| Modals | Title, body text, buttons | Wrap in `{% trans %}` |
+| Auth text | Login, Login to Mko Bazuna | Wrap in `{% trans %}` |
+| System messages | Toast notifications, alerts | Wrap in `{% trans %}` |
+
+**Already covered by DB-based i18n (not gettext):** Category names, City names,
+Lookup Item names — use `name_i18n` JSON field, not `{% trans %}`.
 
 ## 4. Definition of Done (Multilingual)
 
@@ -247,6 +345,19 @@ The check runs in CI as part of the fast gate — it must NOT be a nightly/seed 
 1. A cheatsheet entry for i18n DoD is added to `.kilo/rules/commands.md` and `.kilo/rules/project.md`.
 2. The stale doc `docs/99-agent/i18n-translation-pipeline-gap-analysis.md` is updated to reflect the current operational state.
 
+### 4.6 Code Review Checklist (Mandatory — PR gate)
+
+When a PR touches user-visible strings, the reviewer must verify all of the following:
+
+- [ ] **Static UI strings wrapped** — every user-visible string (buttons, links, titles, placeholders, tooltips, error/success messages, filter/sort labels, pagination text, empty states, modal text, auth text, system messages) is wrapped in `{% trans "..." %}` (templates) or `gettext`/`gettext_lazy` (Python).
+- [ ] **No hardcoded UI text** — no raw `<button>Save</button>` patterns remain; brand names and machine-value attributes are the only exceptions.
+- [ ] **New strings extracted** — `makemessages -l ru -l en -l bs` was run and new `.po` entries appear for all 3 locales.
+- [ ] **Translations present** — `ru` and `bs` `msgstr` are non-empty for every new msgid. (`en` msgstr may be empty — see Q5.)
+- [ ] **Files compiled** — `.po` files committed; `.mo` files compile without errors.
+- [ ] **Existing tests updated** — tests asserting on UI text explicitly set `translation.activate("ru")` and assert on translated output.
+
+**Python-side note**: Fully automated detection of hardcoded strings in Python is impractical (see research report `docs/99-agent/python-hardcoded-string-detection-research.md`). Code review (this checklist) is the control mechanism for Python; automation (`test_i18n_completeness.py`) covers templates only. The report recommends two deterministic pytest guards (Guard 1: enum `.choices()` labels use `gettext_lazy`; Guard 2: no raw Cyrillic in context paths) as optional 0.5-day safety nets.
+
 ## 5. Automated Checking System (Specification)
 
 ### 5.1 Approach
@@ -279,13 +390,24 @@ The automated check must be implemented as **pytest tests** in a new file:
 
 **Known-OK exclusions for hardcoded text detection:**
 - Text inside `{# ... #}` comments.
-- Text inside `<script>` / `<style>` blocks (JS string literals must be addressed separately).
+- Text inside `<script>` / `<style>` blocks (JS string literals must be addressed separately in templates — see §3.1.1).
 - HTML tag names, attribute names, CSS class names.
 - `value` / `name` attributes (machine values, not user-visible).
 - `aria-label`, `role` attributes that are already English (standard WAI-ARIA).
 - Brand names (`Mko Bazuna`, `Mko Bazuna Admin`).
 - Currency codes (`EUR`, `RSD`, `BAM`).
 - The `feature_tag.html` template (uses database-based i18n, not gettext).
+
+**Detection scope limitation**: Automated detection covers **templates only**.
+Python-side hardcoded strings are audited via code review (see §4.6) — static
+analysis cannot reliably distinguish UI string literals from log messages or
+constant keys. Per the research report (`docs/99-agent/python-hardcoded-string-detection-research.md`
+§2–4): a naive AST scan of 193 production Python files yields 3,098 string
+literals (>99% false positives), and the dominant `context = {...}` → `render()`
+pattern defeats call-site scanning, requiring data-flow + type analysis that
+is disproportionate to the ~15 genuine strings found. Critically, `gettext` is
+imported in **zero** production files today — Python-side i18n adoption is
+minimal, keeping the audit surface small.
 
 ### 5.3 CI Integration
 
@@ -336,9 +458,9 @@ Should the new `test_i18n_completeness.py` use:
 - **(B)** The existing custom `_parse_po_entries` parser pattern (from `test_i18n_pipeline.py`) — no new dependency?
 
 ### Q5: en msgstr convention
-Django convention is that `msgid` is in English and `msgstr` for `en` is often left empty. Should we:
-- **(A)** Leave `en` msgstr empty (Django default)
-- **(B)** Populate `en` msgstr with a copy of msgid (explicit)?
+Django convention is that `msgid` is in English and `msgstr` for `en` is often left empty. However, a reference article on multilingual DoD takes a stricter stance, requiring explicit en translations as a DoD checklist item. Should we:
+- **(A)** Leave `en` msgstr empty (Django default) — `gettext` falls back to msgid, which is already English
+- **(B)** Populate `en` msgstr with a copy of msgid (explicit, matches the article's DoD)
 
 ### Q6: Inline JS string handling
 `header_catalog.html` has 5 inline JavaScript strings (lines 213, 217-220) that are dynamically injected into the autocomplete dropdown. The options are:
@@ -370,6 +492,7 @@ The `translation_service.py` (deep-translator → Google Translate) can bootstra
 7. **Fast gate coverage**: i18n completeness tests must pass in `make test` (~300s), not in `make test-all` only.
 8. **Database-based i18n is separate**: `feature_tag.html` uses `LookupItem.name_i18n` JSON field via `get_lookup_name` filter — this is a different i18n mechanism and is already handled. Not in scope for gettext DoD.
 9. **Badge aria-labels**: `aria-label="Pro seller"` etc. in badge templates are English and standards-compliant. Whether they need translation is a PO decision, but they are non-visible (screen readers only).
+10. **gettext not yet adopted in Python**: AST scan confirms `gettext`/`gettext_lazy` is imported in **zero** production Python files in `src/backend/`. Task 2 introduces it for the first time. The total population of hardcoded Python UI strings is only 15 (§3.3) — small enough that code review (§4.6) is the appropriate control rather than automated detection (see research report §5).
 
 ## 8. Implementation Tasks
 
@@ -393,10 +516,16 @@ The `translation_service.py` (deep-translator → Google Translate) can bootstra
 - **Dependencies**: Must complete before extraction.
 
 ### Task 2: Audit and Fix Python-Side Hardcoded Strings
-- **Files**:
+- **Files** (15 genuine strings total, per research §3.3):
   - `apps/core/context_processors.py:46` — `"Вся страна"` → `gettext("Entire country")`
   - `apps/core/enums.py:133-136` — `TimeRange.choices()` labels → `gettext_lazy`
-- **Action**: Import `gettext` / `gettext_lazy`, wrap all hardcoded user-facing literals.
+  - `apps/ads/views/dashboard.py:77-83` — `status_labels` (5 strings: "Published", "On Moderation", "Failed Moderation", "Archived", "Rejected") → `gettext_lazy`
+  - `apps/ads/views/edit.py:170` — `"Ad failed moderation checks"` → `gettext`
+  - `apps/ads/views/delete.py:44` — `HttpResponseForbidden("You do not have permission to delete this ad.")` → `gettext`
+  - `apps/ads/views/edit.py:105,243,274` — 3× `HttpResponseForbidden(...)` → `gettext`
+  - `apps/ads/views/listings.py:187` — `HttpResponseForbidden("Access denied")` → `gettext`
+- **Note**: `Http404(...)` messages are NOT user-facing in production — do not translate.
+- **Action**: Import `gettext` / `gettext_lazy`, wrap all hardcoded user-facing literals. This introduces gettext usage to production Python for the first time.
 
 ### Task 3: Extract Messages and Populate .po Files
 - **Action**: Run `python manage.py makemessages -l ru -l en -l bs` to refresh all .po files with newly-extracted strings.
@@ -449,6 +578,7 @@ The spec is successfully implemented when:
 | False positives in hardcoded-text detection (badge templates, admin templates) | Curate known-OK exclusion list; scope detection to public-facing templates only |
 | `polib` dependency adds build weight | Default to reusing existing `_parse_po_entries` pattern (no new dependency) unless PO prefers `polib` |
 | Admin templates (staff-only) may not need translation | Scope the DoD to public + seller-facing templates; admin templates gated by Q1 |
+| `gettext` is not used anywhere in production Python (0 imports found) | Task 2 introduces `gettext`/`gettext_lazy` for the first time — the 15 Python strings (§3.3.1–3.3.5) span context processors, enums, view contexts, and HTTP responses; ensure consistent import patterns across all call sites |
 
 ## 11. References
 
@@ -456,6 +586,7 @@ The spec is successfully implemented when:
 - **Spec format reference**: `.ai/problems/07_filter-sort-ui_consolidation_spec.md`
 - **Research (completeness checking)**: `docs/99-agent/translation-completeness-check-research.md`
 - **Research (DoD process)**: `docs/99-agent/i18n-definition-of-done-research.md`
+- **Research (Python hardcoded string detection — NOT automatable)**: `docs/99-agent/python-hardcoded-string-detection-research.md`
 - **Stale analysis**: `docs/99-agent/i18n-translation-pipeline-gap-analysis.md`
 - **Enum**: `src/backend/apps/core/enums.py:184` (`LanguageLocale`)
 - **TimeRange enum**: `src/backend/apps/core/enums.py:125-137`
