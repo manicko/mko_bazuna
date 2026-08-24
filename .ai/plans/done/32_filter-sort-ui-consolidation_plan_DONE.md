@@ -4,12 +4,12 @@ spec: .ai/problems/07_filter-sort-ui_consolidation_spec.md
 domain: implementation-plan
 spec_status: APPROVED
 priority: High
-status: Ready for implementation
+status: DONE
 date: 2026-08-23
 stack: Python 3.14 · Django 5.2 LTS · PostgreSQL 18 · HTMX 1.9.12 · vanilla JS · Tailwind CSS v4
 ---
 
-# Plan 32 — Filter/Sort UI Consolidation
+# Plan 32 — Filter/Sort UI Consolidation — DONE
 
 Transformation of **Spec 07** (`.ai/problems/07_filter-sort-ui_consolidation_spec.md`, APPROVED) into a
 dependency-aware implementation DAG.
