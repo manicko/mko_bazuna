@@ -370,7 +370,7 @@ Primary listing card for search results.
             <img 
                 src="{{ ad.images.first.image_url }}" 
                 alt="{{ ad.title }}"
-                class="w-full h-48 object-contain bg-gray-100 rounded-t-lg"
+                class="w-full h-48 object-contain bg-white rounded-t-lg"
                 loading="lazy"
             >
         {% else %}
@@ -408,7 +408,7 @@ Primary listing card for search results.
 
 | Property | Value |
 |----------|-------|
-| Image | `h-48` (192px), 16:9 ratio |
+| Image | `w-full h-48 object-contain bg-white rounded-t-lg` |
 | Padding | `p-4` |
 | Radius | `rounded-lg` (except image top) |
 | Shadow | `shadow` → `hover:shadow-md` |
@@ -512,6 +512,7 @@ keyed on `LANGUAGE_CODE`.
             loop: true,
             zoomable: true,
             closeOnOutsideClick: true,
+            navigation: { next: true, prev: true },
         });
     });
 </script>
@@ -519,8 +520,10 @@ keyed on `LANGUAGE_CODE`.
 
 | Property | Value |
 |----------|-------|
-| Gallery | GLightbox 3.3.1 (CDN) |
+| Gallery | Main image (`object-contain` + `bg-gray-100`) + horizontal thumbnail strip (`object-cover`) + GLightbox 3.3.1 overlay |
 | Gallery ID | `ad-gallery` (single gallery per ad) |
+| Main image | `object-contain`, `bg-gray-100` (`#detail-main-image`) |
+| Thumbnails | `object-cover` (`#detail-thumbs` buttons) |
 | Thumbnail | `image.thumbnail_large_url` (fallback: `image.image_url`) |
 | Lazy load | `loading="lazy"` on all images |
 | Title | `ad|get_title:LANGUAGE_CODE` |
