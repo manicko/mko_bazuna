@@ -175,6 +175,17 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Preferred City** | Persistent default-city selector in the catalog header with hybrid persistence (DB FK for authenticated users; consent-gated 1-year cookie for guests) and login reconciliation | `PreferredCityMiddleware`, `header_context`, `apps/search/views/preferred_city.py`, `User.preferred_city` FK |
 | **Consent & GDPR Compliance** | Consent banner, granular cookie consent, `/privacy/` policy page, `ConsentRecord` audit log, and Plausible/GLightbox script gating | `apps/users/views/consent.py`, `apps/users/context_processors.py` (`consent_state`), `consent_records` table, `core/urls.py` (`/privacy/`) |
 
+## Known Problems / Bug Specs
+
+Analytical specifications for identified bugs and gaps. Full details in `.ai/problems/`
+
+| Spec | Problem | Status |
+|------|---------|--------|
+| **09** | Category and City names not rendered in selected language (templates call `.get_name` without `LANGUAGE_CODE`; autocomplete uses raw `.name`; submenu cache key omits language) | [Complete](.ai/problems/09_category-city-i18n_rendering_spec.md) — plan 34 |
+| **10** | Image display: catalog grid images cropped/stretched via `object-cover`; detail page missing slider/thumbnail-strip gallery | [Approved](.ai/problems/10_image-display_spec.md) |
+| **11** | Non-idempotent seed on repeated `docker compose up`: orphaned seed users cause `IntegrityError`; generation phase not transactional | [Approved](.ai/problems/11_seed-dev-idempotency_spec.md) |
+| **35** | CI i18n pipeline gap: dedicated `i18n` CI job missing; `.mo` compilation not in CI test job | [Complete](.ai/problems/35_i18n-pipeline-ci-gap_plan.md) — plan 35 |
+
 ## Commands
 
 | Task | Command |
