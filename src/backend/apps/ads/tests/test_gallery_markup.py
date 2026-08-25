@@ -230,6 +230,26 @@ class TestGalleryMarkup:
         assert 'class="glightbox"' not in content
         assert "data-gallery=" not in content
 
+    def test_detail_no_template_comment_leakage(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """Multi-line template comments are stripped — no comment syntax or text
+        leaks into the rendered HTML.
+
+        Regression test: Django's ``tag_re`` does not use ``re.DOTALL``, so
+        ``{# ... #}`` comments must be single-line. Multi-line comments must use
+        ``{% comment %}...{% endcomment %}``. Using ``{# ... #}`` across
+        multiple lines causes the raw comment text to appear as visible content.
+        """
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        content = _gallery_html(ad)
+        assert "Hidden GLightbox anchors" not in content
+        assert "Minimal inline JS" not in content
+        assert "GLightbox groups by" not in content
+        assert "atomically so fullscreen" not in content
+        assert "{#" not in content
+        assert "#}" not in content
+
     def test_static_grid_renders_without_js(
         self, seller: User, category: Category, city: City
     ) -> None:

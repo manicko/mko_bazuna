@@ -25,12 +25,14 @@
 
     <main class="container mx-auto px-4 py-6">
         <article class="bg-white rounded-lg shadow overflow-hidden">
-            <!-- Photo gallery -->
+            <!-- Photo gallery + ad details: image left (photo width), text to the
+                 right on wide screens; text wraps below the image on narrow screens -->
+            <div class="flex flex-col lg:flex-row items-start gap-6">
             {% if ad.images.all %}
-            <div class="gallery p-4" data-detail-gallery>
+            <div class="gallery flex-shrink-0" data-detail-gallery>
                 {# Main image preview with prev/next arrow navigation #}
                 {% with primary=ad.images.first %}
-                <div class="relative mb-4">
+                <div class="relative w-max mx-auto mb-4">
                     <a id="detail-main-link"
                        href="{{ primary.image_url }}"
                        class="glightbox" data-gallery="ad-gallery"
@@ -39,7 +41,7 @@
                         <img id="detail-main-image"
                              src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
                              alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
-                             class="w-full max-h-96 object-contain bg-gray-100 rounded-lg"
+                             class="max-h-96 max-w-lg object-contain bg-gray-100 rounded-lg"
                              loading="lazy"
                              width="1280" height="960">
                     </a>
@@ -64,9 +66,9 @@
                 </div>
                 {% endwith %}
 
-                {# Hidden GLightbox anchors for all remaining images so the overlay
+                {% comment %} Hidden GLightbox anchors for all remaining images so the overlay
                    gallery group contains every image (GLightbox groups by
-                   data-gallery on .glightbox elements). #}
+                   data-gallery on .glightbox elements). {% endcomment %}
                 {% if ad.images.count > 1 %}
                 {% for image in ad.images.all %}{% if not forloop.first %}
                 <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
@@ -76,7 +78,7 @@
 
                 {# Horizontal thumbnail strip #}
                 <div id="detail-thumbs"
-                     class="flex gap-2 overflow-x-auto scroll-px-2 pb-1"
+                     class="flex justify-center gap-2 overflow-x-auto scroll-px-2 pb-1 max-w-lg mx-auto"
                      style="-webkit-overflow-scrolling: touch;"
                      data-detail-thumbs>
                     {% for image in ad.images.all %}
@@ -94,9 +96,9 @@
                 </div>
             </div>
 
-            {# Minimal inline JS for thumbnail strip + arrow navigation.
+            {% comment %} Minimal inline JS for thumbnail strip + arrow navigation.
                Updates both the main <img src> and the GLightbox anchor href
-               atomically so fullscreen always opens the correct image. #}
+               atomically so fullscreen always opens the correct image. {% endcomment %}
             <script>
             (function(){'use strict';
             var g=document.querySelector('[data-detail-gallery]');if(!g)return;
@@ -110,7 +112,7 @@
             </script>
             {% endif %}
 
-            <div class="p-6">
+            <div class="p-6 lg:pt-0 flex-1">
                 <div class="flex items-start justify-between gap-4">
                     <h1 class="text-3xl font-bold mb-4">{{ ad|get_title:LANGUAGE_CODE }}
                         {% render_trust_badge ad.user %}</h1>
@@ -150,6 +152,7 @@
                         </time>
                     </div>
                 </div>
+            </div>
             </div>
 
             <!-- Contact button - zone R2 conditions enforced -->
