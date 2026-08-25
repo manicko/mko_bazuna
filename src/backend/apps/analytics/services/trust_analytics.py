@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerVerification
 
 logger = logging.getLogger(__name__)
@@ -89,16 +89,24 @@ def get_trust_level(score: float) -> TrustLevel:
     return TrustLevel.UNVERIFIED
 
 
-def record_trust_event(user_id: int, event: AnalyticsEventType) -> None:
+def record_trust_event(
+    user_id: int,
+    event: AnalyticsEventType,
+    source: AdSource | None = None,
+) -> None:
     """Record a trust-related analytics event for a seller.
 
     Args:
         user_id: The seller's user ID.
         event: The type of trust event to record.
+        source: Origin of the event (e.g. ``AdSource.SEED`` for seed-generated
+            events so ``SeedService._clean()`` can identify them for deletion).
+            ``None`` (the default) is correct for production events.
     """
     AnalyticsEvent.objects.create(
         event_type=event,
         user_id=user_id,
+        source=source,
     )
     logger.info(
         "Trust event recorded: user=%s event=%s",

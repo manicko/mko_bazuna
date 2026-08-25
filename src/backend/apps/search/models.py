@@ -6,6 +6,7 @@ Tracks popular search queries with hit count and last seen timestamp.
 
 import secrets
 
+from apps.core.enums import AdSource
 from django.db import models
 
 
@@ -16,6 +17,17 @@ class PopularSearch(models.Model):
     query_normalized = models.CharField(max_length=200, db_index=True)
     hit_count = models.PositiveIntegerField(default=1)
     last_seen = models.DateTimeField(auto_now=True)
+
+    # Origin of record (null = production, 'seed' = seed-generated)
+    source = models.CharField(
+        max_length=20,
+        choices=[(s.value, s.value) for s in AdSource],
+        default=None,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Origin of record (null = production, 'seed' = seed-generated)",
+    )
 
     class Meta:
         db_table = "popular_searches"

@@ -8,7 +8,7 @@ from typing import Any
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType
 from apps.seed.generators.base import BaseGenerator
 
 logger = logging.getLogger(__name__)
@@ -107,6 +107,7 @@ class AnalyticsGenerator(BaseGenerator):
                         timestamp=event_time,
                         user=None,
                         ad=ad,
+                        source=AdSource.SEED,
                     )
                     events.append(event)
 
@@ -163,6 +164,7 @@ class AnalyticsGenerator(BaseGenerator):
                         timestamp=event_time,
                         user=None,
                         ad=ad,
+                        source=AdSource.SEED,
                     ))
 
                     # ~60% of initiations get a response from the seller
@@ -175,6 +177,7 @@ class AnalyticsGenerator(BaseGenerator):
                             timestamp=response_time,
                             user=ad.user,
                             ad=None,
+                            source=AdSource.SEED,
                         ))
 
         return events

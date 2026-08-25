@@ -8,6 +8,7 @@ from typing import Any
 
 from django.contrib.auth.hashers import make_password
 
+from apps.core.enums import AdSource
 from apps.seed.generators.base import BaseGenerator
 from apps.users.models import User
 
@@ -57,6 +58,7 @@ class UserGenerator(BaseGenerator):
                 consent_given_at=self.faker.date_time_this_decade(),
                 ads_auto_publish=True,
                 telegram_premium=False,
+                source=AdSource.SEED,
             )
             users.append(user)
         return users

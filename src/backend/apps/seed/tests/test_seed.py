@@ -520,6 +520,31 @@ class TestSeedCommand:
         count2 = Ad.objects.count()
         assert count2 == count1 == 5
 
+    def test_seed_recovers_from_orphaned_users(self) -> None:
+        """Seed must recover when orphaned User records (with source=SEED but no ads)
+        survive a previous interrupted run.
+
+        Simulates: seed created users but crashed before creating ads.
+        On re-seed, _clean() must find and delete them via the ``source`` field,
+        not the reverse-FK ``ads__source`` query.
+        """
+        # Step 1: Seed normally (creates users with source=SEED + ads)
+        call_command("seed", "--users=3", "--ads=5", "--force", "--analytics=False")
+        assert User.objects.filter(source=AdSource.SEED).count() == 3
+        assert Ad.objects.filter(source=AdSource.SEED).count() == 5
+
+        # Step 2: Simulate crash — delete all seed ads but leave orphaned users
+        Ad.objects.filter(source=AdSource.SEED).delete()
+        assert Ad.objects.filter(source=AdSource.SEED).count() == 0
+        assert User.objects.filter(source=AdSource.SEED).count() == 3  # orphans
+
+        # Step 3: Re-seed — _clean() must find orphaned users via `source` field
+        call_command("seed", "--users=3", "--ads=5", "--force", "--analytics=False")
+
+        # Step 4: Assert clean state — no duplicates, correct counts
+        assert User.objects.filter(source=AdSource.SEED).count() == 3
+        assert Ad.objects.filter(source=AdSource.SEED).count() == 5
+
 
 # ─── Enum tests ──────────────────────────────────────────────────────────
 

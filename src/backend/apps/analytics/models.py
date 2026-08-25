@@ -4,7 +4,7 @@ Analytics models for Mko Bazuna.
 AnalyticsEvent for product metrics.
 """
 
-from apps.core.enums import AnalyticsEventType
+from apps.core.enums import AdSource, AnalyticsEventType
 from django.db import models
 from django.utils import timezone
 
@@ -40,6 +40,17 @@ class AnalyticsEvent(models.Model):
         blank=True,
         related_name="analytics_events",
         help_text="Ad associated with this event (null for non-ad events)",
+    )
+
+    # Origin of event (null = production, 'seed' = seed-generated)
+    source = models.CharField(
+        max_length=20,
+        choices=[(s.value, s.value) for s in AdSource],
+        default=None,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Origin of event (null = production, 'seed' = seed-generated)",
     )
 
     class Meta:

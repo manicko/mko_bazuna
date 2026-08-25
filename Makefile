@@ -75,7 +75,8 @@ help:
 	@echo "  clean          Nuclear: remove containers, volumes, and local DB backups"
 
 up:
-	docker compose $(COMPOSE_FILES) up -d
+	docker compose $(COMPOSE_FILES) rm -sf migrate load_catalog create_admin seed
+	docker compose $(COMPOSE_FILES) up -d --wait
 
 down:
 	# Stop and remove containers (preserves named volumes: postgres_data, media_volume)

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from apps.ads.models import Ad
 from apps.analytics.services.trust_analytics import record_trust_event
-from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerTrustScore
 
 if TYPE_CHECKING:
@@ -38,11 +38,17 @@ class TrustCalculator:
     _TRUSTED_THRESHOLD = 61
     _VERIFIED_THRESHOLD = 31
 
-    def calculate_and_save(self, user: User) -> SellerTrustScore:
+    def calculate_and_save(
+        self,
+        user: User,
+        source: AdSource | None = None,
+    ) -> SellerTrustScore:
         """Calculate trust score and persist to SellerTrustScore model.
 
         Args:
             user: The seller user to compute score for.
+            source: Origin of the trust event (e.g. ``AdSource.SEED`` for
+                seed-generated events). ``None`` is correct for production.
 
         Returns:
             The created or updated SellerTrustScore instance.
@@ -85,7 +91,7 @@ class TrustCalculator:
                 ]
             )
             logger.info("Updated trust score for user %s", user.id)
-        record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
+        record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED, source=source)
 
         return trust_score
 

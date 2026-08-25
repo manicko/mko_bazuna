@@ -74,6 +74,7 @@ function Show-Help {
 # Start development environment
 function Invoke-Up {
     $env:COMPOSE_PROJECT_NAME = $DevProject
+    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml rm -sf migrate load_catalog create_admin seed
     docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
     # Also start the long-running test PostgreSQL (host :5433) so the test
     # environment's DB is ready for `test`/`test-db` immediately. Idempotent.

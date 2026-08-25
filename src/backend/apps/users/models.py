@@ -7,7 +7,7 @@ One user = one Telegram account. Authentication via atomic login tokens.
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from apps.core.enums import ConsentChoice, LanguageLocale
+from apps.core.enums import AdSource, ConsentChoice, LanguageLocale
 
 
 class User(AbstractUser):
@@ -104,6 +104,17 @@ class User(AbstractUser):
         default=LanguageLocale.RUSSIAN.value,
         choices=[(loc.value, loc.value) for loc in LanguageLocale],
         help_text="Telegram-reported language code for localized bot messages",
+    )
+
+    # Origin of record (null = real user, 'seed' = seed-generated)
+    source = models.CharField(
+        max_length=20,
+        choices=[(s.value, s.value) for s in AdSource],
+        default=None,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Origin of record (null = real user, 'seed' = seed-generated)",
     )
 
     # Use username field for Django admin authentication (telegram_id is BigInteger, not suitable as USERNAME_FIELD)
