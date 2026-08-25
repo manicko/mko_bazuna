@@ -3,6 +3,7 @@
    lazy-load its own submenu via HTMX. Wired client-side by
    components/header_catalog.html. {% endcomment %}
 {% load i18n %}
+{% load localized_content %}
 <ul class="py-1" role="menu">
     {% for child in children %}
         <li class="relative" data-category-slug="{{ child.slug }}" role="none">
@@ -11,7 +12,7 @@
                    class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors"
                    role="menuitem"
                    data-category-link="{{ child.slug }}">
-                    {{ child.get_name }}
+                    {{ child|get_category_name:LANGUAGE_CODE }}
                 </a>
                 {% if child.get_children.exists %}
                 <button type="button"
@@ -19,7 +20,7 @@
                         aria-expanded="false"
                         data-category-expand="{{ child.slug }}"
                         aria-controls="menu-{{ child.id }}"
-                        aria-label="{% trans "Expand" %} {{ child.get_name }}">
+                        aria-label="{% trans "Expand" %} {{ child|get_category_name:LANGUAGE_CODE }}">
                     <svg class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9l7 7 7-7"></path>
                     </svg>

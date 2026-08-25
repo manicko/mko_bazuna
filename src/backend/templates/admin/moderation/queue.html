@@ -1,39 +1,43 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 
 {% block content %}
-<h1>Moderation Queue</h1>
+<div class="flex items-center justify-between" style="margin-bottom: 1em;">
+    <h1>{% trans "Moderation Queue" %}</h1>
+    {% include "components/language_switcher.html" %}
+</div>
 
 <div class="priority-filters" style="margin-bottom: 1em;">
     <a href="?priority=all"
        class="{% if selected_priority == 'all' %}active{% endif %}"
        style="margin-right: 0.5em;{% if selected_priority == 'all' %}font-weight: bold;{% endif %}">
-        All ({{ priority_counts.high|add:priority_counts.medium|add:priority_counts.low }})
+        {% trans "All" %} ({{ priority_counts.high|add:priority_counts.medium|add:priority_counts.low }})
     </a>
     <a href="?priority=high"
        class="{% if selected_priority == 'high' %}active{% endif %}"
        style="margin-right: 0.5em;{% if selected_priority == 'high' %}font-weight: bold;{% endif %}">
-        High ({{ priority_counts.high }})
+        {% trans "High" %} ({{ priority_counts.high }})
     </a>
     <a href="?priority=medium"
        class="{% if selected_priority == 'medium' %}active{% endif %}"
        style="margin-right: 0.5em;{% if selected_priority == 'medium' %}font-weight: bold;{% endif %}">
-        Medium ({{ priority_counts.medium }})
+        {% trans "Medium" %} ({{ priority_counts.medium }})
     </a>
     <a href="?priority=low"
        {% if selected_priority == 'low' %}class="active" style="font-weight: bold;"{% endif %}>
-        Low ({{ priority_counts.low }})
+        {% trans "Low" %} ({{ priority_counts.low }})
     </a>
 </div>
 
 <table>
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Title</th>
-            <th>User</th>
-            <th>Score</th>
-            <th>Priority</th>
-            <th>Actions</th>
+            <th>{% trans "ID" %}</th>
+            <th>{% trans "Title" %}</th>
+            <th>{% trans "User" %}</th>
+            <th>{% trans "Score" %}</th>
+            <th>{% trans "Priority" %}</th>
+            <th>{% trans "Actions" %}</th>
         </tr>
     </thead>
     <tbody>
@@ -45,12 +49,12 @@
             <td>{{ ad.moderation_priority.base_score }}</td>
             <td>{{ ad.moderation_priority.priority_level }}</td>
             <td>
-                <a href="{% url 'admin:ads_ad_change' ad.id %}">Review</a>
+                <a href="{% url 'admin:ads_ad_change' ad.id %}">{% trans "Review" %}</a>
             </td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="6">No ads in the moderation queue.</td>
+            <td colspan="6">{% trans "No ads in the moderation queue." %}</td>
         </tr>
         {% endfor %}
     </tbody>

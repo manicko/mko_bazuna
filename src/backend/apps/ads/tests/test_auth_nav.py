@@ -19,6 +19,7 @@ from collections.abc import Generator
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -74,6 +75,7 @@ class TestAnonymousHeader:
 
     def test_home_renders_catalog_header(self) -> None:
         client = Client()
+        translation.activate("ru")
         response = client.get("/")
         assert response.status_code == 200
         content = response.content.decode()
@@ -86,6 +88,7 @@ class TestAnonymousHeader:
 
     def test_detail_renders_catalog_header(self, published_ad: Ad) -> None:
         client = Client()
+        translation.activate("ru")
         response = client.get(reverse("ads:detail", args=[published_ad.id]))
         assert response.status_code == 200
         content = response.content.decode()
@@ -97,6 +100,7 @@ class TestAnonymousHeader:
 
     def test_login_issue_renders_header(self) -> None:
         client = Client()
+        translation.activate("ru")
         response = client.get("/login/issue/")
         assert response.status_code == 200
         content = response.content.decode()
@@ -104,6 +108,7 @@ class TestAnonymousHeader:
 
     def test_login_required_redirects_to_login_issue(self) -> None:
         client = Client()
+        translation.activate("ru")
         response = client.get("/dashboard/")
         assert response.status_code == 302
         assert response.url.startswith("/login/issue/")
@@ -114,6 +119,7 @@ class TestAuthenticatedHeader:
 
     def test_seller_sees_dashboard_and_post_logout(self, user: User) -> None:
         client = Client()
+        translation.activate("ru")
         client.force_login(user)
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
@@ -129,6 +135,7 @@ class TestAuthenticatedHeader:
 
     def test_staff_sees_admin_link(self, staff_user: User) -> None:
         client = Client()
+        translation.activate("ru")
         client.force_login(staff_user)
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
@@ -138,6 +145,7 @@ class TestAuthenticatedHeader:
     def test_withdraw_form_preserved_on_dashboard(self, user: User) -> None:
         """The Withdraw Data form is preserved (relocated into <main>)."""
         client = Client()
+        translation.activate("ru")
         client.force_login(user)
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
@@ -148,6 +156,7 @@ class TestAuthenticatedHeader:
     def test_consent_banner_shown_for_active_user(self, user: User) -> None:
         """Unacted authenticated users still see the consent banner (CR9)."""
         client = Client()
+        translation.activate("ru")
         client.force_login(user)
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
@@ -157,6 +166,7 @@ class TestAuthenticatedHeader:
         """Authenticated users on the homepage see the avatar button + dropdown
         and the favorites heart badge in the catalog header (CR2, CR4, CR6)."""
         client = Client()
+        translation.activate("ru")
         client.force_login(user)
         response = client.get("/")
         assert response.status_code == 200

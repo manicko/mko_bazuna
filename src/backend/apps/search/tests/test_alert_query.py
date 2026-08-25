@@ -561,6 +561,86 @@ class TestDeliverImmediateAlerts:
         assert SavedSearchNotification.objects.count() == 0
 
 
+class TestBuildAlertMessageLocalization:
+    """Tests for build_alert_message locale handling (CR9)."""
+
+    def test_message_uses_user_language_bs(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """Alert message is rendered in the recipient's preferred language."""
+        from apps.search.services.immediate_alerts import build_alert_message
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам велосипед",
+            title_bs="Prodajem bicikl",
+            title_en="Selling bicycle",
+            description="Отличный велосипед",
+            description_bs="Odlican bicikl",
+            description_en="Great bicycle",
+            status=AdStatus.PUBLISHED,
+        )
+        city.name_i18n = {"ru": "Тестград", "bs": "Testgrad"}
+        city.save(update_fields=["name_i18n"])
+
+        saved_search = SavedSearch.objects.create(
+            user=buyer, query="", is_active=True
+        )
+
+        text, keyboard = build_alert_message(ad, saved_search, locale="bs")
+        assert "Prodajem bicikl" in text
+        assert "Testgrad" in text
+        # Russian text must not leak
+        assert "Продам велосипед" not in text
+        assert "Тестград" not in text
+
+    def test_message_uses_user_language_en(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """Alert message in English uses the English ad fields."""
+        from apps.search.services.immediate_alerts import build_alert_message
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам велосипед",
+            title_en="Selling bicycle",
+            description="Отличный велосипед",
+            description_en="Great bicycle",
+            status=AdStatus.PUBLISHED,
+        )
+        saved_search = SavedSearch.objects.create(
+            user=buyer, query="", is_active=True
+        )
+
+        text, keyboard = build_alert_message(ad, saved_search, locale="en")
+        assert "Selling bicycle" in text
+
+    def test_message_falls_back_to_russian(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """When the locale field is missing, the default fallback is Russian."""
+        from apps.search.services.immediate_alerts import build_alert_message
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам велосипед",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        saved_search = SavedSearch.objects.create(
+            user=buyer, query="", is_active=True
+        )
+
+        text, keyboard = build_alert_message(ad, saved_search)
+        assert "Продам велосипед" in text
+
+
 class TestImmediateAlertsGate:
     """IMMEDIATE_ALERTS_ENABLED=False (default) disables publish-time delivery."""
 

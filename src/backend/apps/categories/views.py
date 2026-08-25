@@ -21,9 +21,10 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
     """Return the HTMX partial submenu for a category's children.
 
     Renders the category's active children as an expandable nested list for the
-    header's "All Categories" dropdown. The fragment is cached keyed by
-    ``category:submenu:<tree_version>:<slug>`` so structural tree changes bump
-    the cached version and invalidate stale fragments.
+    header's "All Categories" dropdown.     The fragment is cached keyed by
+    ``category:submenu:<tree_version>:<slug>:<locale>`` so structural tree changes bump
+    the cached version and invalidate stale fragments, and the locale segment
+    prevents cross-language cache bleed.
 
     Returns 404 for an unknown or inactive category.
 
@@ -42,7 +43,7 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
     if category is None:
         raise Http404("Category not found")
 
-    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}"
+    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{request.LANGUAGE_CODE or 'ru'}"
     cached = cache.get(cache_key)
     if cached is not None:
         return HttpResponse(cached)

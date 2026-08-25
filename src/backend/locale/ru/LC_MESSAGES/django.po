@@ -1,13 +1,12 @@
 # Russian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# Automatically generated, 2026.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-23 00:00+0200\n"
+"POT-Creation-Date: 2026-08-24 03:14-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Russian <ru@li.org>\n"
@@ -15,14 +14,281 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
-#: templates/ads/detail.html
+msgid "Published"
+msgstr "Опубликовано"
+
+msgid "On Moderation"
+msgstr "На модерации"
+
+msgid "Failed Moderation"
+msgstr "Ошибка модерации"
+
+msgid "Archived"
+msgstr "В архиве"
+
+msgid "Rejected"
+msgstr "Отклонено"
+
+msgid "You do not have permission to delete this ad."
+msgstr "У вас нет прав на удаление этого объявления."
+
+msgid "You do not have permission to edit this ad."
+msgstr "У вас нет прав на редактирование этого объявления."
+
+msgid "Ad failed moderation checks"
+msgstr "Объявление не прошло проверку модерации"
+
+msgid "You do not have permission to archive this ad."
+msgstr "У вас нет прав на архивацию этого объявления."
+
+msgid "You do not have permission to reactivate this ad."
+msgstr "У вас нет прав на повторное активирование этого объявления."
+
+msgid "Access denied"
+msgstr "Доступ запрещён"
+
+msgid "Entire country"
+msgstr "Вся страна"
+
+msgid "Show all results"
+msgstr "Показать все результаты"
+
+msgid "Cities"
+msgstr "Города"
+
+msgid "Categories"
+msgstr "Категории"
+
+msgid "Popular queries"
+msgstr "Популярные запросы"
+
+msgid "History"
+msgstr "История"
+
+msgid "All Time"
+msgstr "За всё время"
+
+msgid "30 Days"
+msgstr "30 дней"
+
+msgid "7 Days"
+msgstr "7 дней"
+
+msgid "Moderation Queue"
+msgstr "Очередь модерации"
+
+msgid "All"
+msgstr "Все"
+
+msgid "High"
+msgstr "Высокий"
+
+msgid "Medium"
+msgstr "Средний"
+
+msgid "Low"
+msgstr "Низкий"
+
+msgid "ID"
+msgstr "ID"
+
+msgid "Title"
+msgstr "Заголовок"
+
+msgid "User"
+msgstr "Пользователь"
+
+msgid "Score"
+msgstr "Очки"
+
+msgid "Priority"
+msgstr "Приоритет"
+
+msgid "Actions"
+msgstr "Действия"
+
+msgid "Review"
+msgstr "Просмотр"
+
+msgid "No ads in the moderation queue."
+msgstr "Нет объявлений в очереди модерации."
+
+msgid "Moderate Ad"
+msgstr "Модерация объявления"
+
+msgid "Back to moderation queue"
+msgstr "Назад в очередь модерации"
+
+msgid "Category"
+msgstr "Категория"
+
+msgid "Location"
+msgstr "Местоположение"
+
+msgid "Telegram ID:"
+msgstr "Telegram ID:"
+
+msgid "Description"
+msgstr "Описание"
+
+#, python-format
+msgid "Photos (%(count)s)"
+msgstr "Фотографии (%(count)s)"
+
+#, python-format
+msgid "Photo %(counter)s"
+msgstr "Фотография %(counter)s"
+
+msgid "No photos"
+msgstr "Нет фотографий"
+
+msgid "Moderation Actions"
+msgstr "Действия модерации"
+
+msgid "Approve"
+msgstr "Одобрить"
+
+msgid "Reject"
+msgstr "Отклонить"
+
+msgid "Ban User"
+msgstr "Забанить пользователя"
+
+msgid "Failed Auto-Moderation"
+msgstr "Ошибка автомодерации"
+
+msgid ""
+"This ad failed automatic checks. You can approve, reject, or ban the user."
+msgstr "Это объявление не прошло автоматическую проверку. Вы можете одобрить, отклонить или забанить пользователя."
+
+#, python-format
+msgid "Reject Ad %(id)s"
+msgstr "Отклонить объявление %(id)s"
+
+msgid "Reject Reason (Layer-2 Checklist)"
+msgstr "Причина отклонения (чек-лист уровня 2)"
+
+msgid "Select a reason..."
+msgstr "Выберите причину..."
+
+msgid "Adult content"
+msgstr "Взрослый контент"
+
+msgid "Violence / Gore"
+msgstr "Насилие / Горе"
+
+msgid "Drugs / Weapons"
+msgstr "Наркотики / Оружие"
+
+msgid "Hate speech"
+msgstr "Ненавистная речь"
+
+msgid "Counterfeit goods"
+msgstr "Поддельные товары"
+
+msgid "Illegal goods"
+msgstr "Нелегальные товары"
+
+msgid "Spam / Scam"
+msgstr "Спам / Мошенничество"
+
+msgid "Off-topic"
+msgstr "Не по теме"
+
+msgid "Additional Details (optional)"
+msgstr "Дополнительные детали (необязательно)"
+
+msgid "Add more details about the rejection..."
+msgstr "Добавьте больше деталей о причине отклонения..."
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Reject Ad"
+msgstr "Отклонить объявление"
+
+#, python-format
+msgid "Ban User (Telegram ID: %(tid)s)"
+msgstr "Забанить пользователя (Telegram ID: %(tid)s)"
+
+msgid "Ban Reason"
+msgstr "Причина бана"
+
+msgid "Reason for banning this user..."
+msgstr "Причина банирования этого пользователя..."
+
 msgid "Photo"
 msgstr "Фото"
 
-msgid "for"
-msgstr "для"
+msgid "Your Ads"
+msgstr "Ваши объявления"
+
+msgid ""
+"Withdrawing consent permanently erases your Telegram ID, all ads, and "
+"prevents re-login. Are you sure?"
+msgstr "Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления и предотвращает повторный вход. Вы уверены?"
+
+msgid "Withdraw Data"
+msgstr "Удалить данные"
+
+msgid "Views"
+msgstr "Просмотры"
+
+msgid "Contacts"
+msgstr "Контакты"
+
+#, python-format
+msgid "%(counter)s view"
+msgid_plural "%(counter)s views"
+msgstr[0] "%(counter)s просмотр"
+msgstr[1] "%(counter)s просмотра"
+msgstr[2] "%(counter)s просмотров"
+
+#, python-format
+msgid "%(counter)s contact"
+msgid_plural "%(counter)s contacts"
+msgstr[0] "%(counter)s контакт"
+msgstr[1] "%(counter)s контакта"
+msgstr[2] "%(counter)s контактов"
+
+msgid "Edit"
+msgstr "Редактировать"
+
+msgid "Archive"
+msgstr "В архив"
+
+msgid "Reactivate"
+msgstr "Восстановить"
+
+msgid "Action required"
+msgstr "Требуется действие"
+
+msgid "Pending review"
+msgstr "Ожидает проверки"
+
+msgid "No ads yet"
+msgstr "Пока нет объявлений"
+
+msgid "Create an ad via Telegram bot"
+msgstr "Создайте объявление через Telegram-бота"
+
+msgid "Open image"
+msgstr "Открыть изображение"
+
+msgid "of"
+msgstr "из"
+
+msgid "Previous image"
+msgstr "Предыдущее изображение"
+
+msgid "Next image"
+msgstr "Следующее изображение"
+
+msgid "Select image"
+msgstr "Выбрать изображение"
 
 msgid "Location:"
 msgstr "Местоположение:"
@@ -42,15 +308,38 @@ msgstr "Продавец недоступен для контакта"
 msgid "Back to listings"
 msgstr "Назад к объявлениям"
 
-#: templates/ads/list.html
+msgid "Edit Ad"
+msgstr "Редактировать объявление"
+
+msgid "Price"
+msgstr "Цена"
+
+msgid "Amount"
+msgstr "Сумма"
+
+msgid "Current Photos"
+msgstr "Текущие фото"
+
+msgid "Add Photos"
+msgstr "Добавить фото"
+
+msgid "Select multiple files to add more photos"
+msgstr "Выберите несколько файлов, чтобы добавить больше фото"
+
+msgid ""
+"Editing text (title/description) will send this ad for re-moderation and "
+"temporarily hide it from public view. Price/photo changes will be published "
+"immediately."
+msgstr "Редактирование текста (заголовка/описания) отправит объявление на повторную модерацию и временно скроет его из публичного просмотра. Изменения цены/фото будут опубликованы немедленно."
+
+msgid "Save Changes"
+msgstr "Сохранить изменения"
+
+msgid "&larr; Back to Dashboard"
+msgstr "← Назад в панель управления"
+
 msgid "Search"
 msgstr "Поиск"
-
-msgid "Search ads..."
-msgstr "Поиск объявлений..."
-
-msgid "Category"
-msgstr "Категория"
 
 msgid "Ads"
 msgstr "Объявления"
@@ -58,12 +347,8 @@ msgstr "Объявления"
 msgid "Save search"
 msgstr "Сохранить поиск"
 
-#: templates/ads/partials/ad_list.html
 msgid "Did you mean:"
 msgstr "Вы хотели сказать:"
-
-msgid "No image"
-msgstr "Нет изображения"
 
 msgid "Purpose:"
 msgstr "Назначение:"
@@ -73,6 +358,12 @@ msgstr "Особенность:"
 
 msgid "Clear all filters"
 msgstr "Очистить все фильтры"
+
+msgid "No image"
+msgstr "Нет изображения"
+
+msgid "more"
+msgstr "больше"
 
 msgid "Page navigation"
 msgstr "Навигация по страницам"
@@ -96,12 +387,8 @@ msgstr "Пока нет объявлений"
 msgid "Be the first to create an ad via Telegram!"
 msgstr "Будьте первым, кто создаст объявление через Telegram!"
 
-msgid "more"
-msgstr "больше"
-
-#: templates/ads/partials/filter_form.html
 msgid "Listing purpose"
-msgstr "Назначение"
+msgstr "Назначение списка"
 
 msgid "Any"
 msgstr "Любое"
@@ -115,13 +402,9 @@ msgstr "Макс. цена"
 msgid "Features"
 msgstr "Особенности"
 
-msgid "selected"
-msgstr "выбрано"
-
 msgid "Apply filters"
 msgstr "Применить фильтры"
 
-#: templates/ads/partials/filter_sort.html
 msgid "Sort"
 msgstr "Сортировка"
 
@@ -137,3 +420,545 @@ msgstr "Цена: по возрастанию"
 msgid "Price: high to low"
 msgstr "Цена: по убыванию"
 
+msgid "Moderation Analytics"
+msgstr "Аналитика модерации"
+
+#, python-format
+msgid "Moderation Statistics (Last %(days)s Days)"
+msgstr "Статистика модерации (последние %(days)s дней)"
+
+msgid "Pending Review Queue"
+msgstr "Очередь на проверку"
+
+msgid "Review Queue"
+msgstr "Очередь проверки"
+
+msgid "Approved"
+msgstr "Одобрено"
+
+msgid "Flagged"
+msgstr "Отмечено"
+
+msgid "Avg Time to Moderate"
+msgstr "Среднее время модерации"
+
+msgid "Moderator Performance"
+msgstr "Эффективность модератора"
+
+msgid "Moderator ID"
+msgstr "ID модератора"
+
+msgid "Actions Taken"
+msgstr "Выполненные действия"
+
+msgid "Avg Time (hours)"
+msgstr "Среднее время (часы)"
+
+#, python-format
+msgid "Moderator #%(mid)s"
+msgstr "Модератор #%(mid)s"
+
+msgid "Top Rejection Reasons"
+msgstr "Причины отклонения"
+
+msgid "Reason"
+msgstr "Причина"
+
+msgid "Count"
+msgstr "Количество"
+
+msgid "Distribution"
+msgstr "Распределение"
+
+msgid "No rejection data available"
+msgstr "Нет данных о отклонениях"
+
+msgid "Rejection reasons will appear after moderators reject ads."
+msgstr "Причины отклонения появятся после того, как модераторы отклонят объявления."
+
+msgid "Trust Dashboard"
+msgstr "Панель доверия"
+
+msgid "Your Trust Profile"
+msgstr "Ваш профиль доверия"
+
+msgid "Trust Score"
+msgstr "Балл доверия"
+
+msgid "Unverified"
+msgstr "Не верифицировано"
+
+msgid "Score ranges from 0 to 100. Higher scores unlock trust badges."
+msgstr "Баллы диапазоне от 0 до 100. Более высокие баллы открывают значки доверия."
+
+msgid "Total Views (30d)"
+msgstr "Всего просмотров (30 дней)"
+
+msgid "Total Contacts (30d)"
+msgstr "Всего контактов (30 дней)"
+
+msgid "Days with Data"
+msgstr "Дней с данными"
+
+msgid "Daily Metrics (Last 30 Days)"
+msgstr "Ежедневные метрики (последние 30 дней)"
+
+msgid "Date"
+msgstr "Дата"
+
+msgid "Ad"
+msgstr "Объявление"
+
+msgid "No metrics data yet"
+msgstr "Пока нет метрик"
+
+msgid "Metrics will appear after ads receive views and contacts."
+msgstr "Метрики появятся после того, как объявления получат просмотры и контакты."
+
+msgid "Favorites"
+msgstr "Избранное"
+
+msgid "No favorites yet"
+msgstr "Пока нет избранного"
+
+msgid "Tap the heart on any ad to save it here."
+msgstr "Нажмите на сердечко на любом объявлении, чтобы сохранить его здесь."
+
+msgid "Cabinet"
+msgstr "Кабинет"
+
+msgid ""
+"Manage your favorites, saved-search alerts, and search history from this "
+"cabinet."
+msgstr "Управляйте избранным, оповещениями о сохранённых поисках и историей поиска из этого кабинета."
+
+msgid "On"
+msgstr "Вкл"
+
+msgid "Off"
+msgstr "Выкл"
+
+msgid "City:"
+msgstr "Город:"
+
+msgid "Price:"
+msgstr "Цена:"
+
+msgid "Disable"
+msgstr "Отключить"
+
+msgid "Enable"
+msgstr "Включить"
+
+msgid "Delete this saved search?"
+msgstr "Удалить этот сохранённый поиск?"
+
+msgid "Delete"
+msgstr "Удалить"
+
+msgid "Edit saved search"
+msgstr "Редактировать сохранённый поиск"
+
+msgid "Search query"
+msgstr "Поисковый запрос"
+
+msgid "City (optional)"
+msgstr "Город (необязательно)"
+
+msgid "Any city"
+msgstr "Любой город"
+
+msgid "Category (optional)"
+msgstr "Категория (необязательно)"
+
+msgid "Any category"
+msgstr "Любая категория"
+
+msgid "Min price (EUR)"
+msgstr "Мин. цена (EUR)"
+
+msgid "Max price (EUR)"
+msgstr "Макс. цена (EUR)"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Saved searches"
+msgstr "Сохранённые поиски"
+
+msgid "No saved searches yet"
+msgstr "Пока нет сохранённых поисков"
+
+msgid ""
+"Use the \"Save search\" button on search results to get Telegram alerts."
+msgstr "Используйте кнопку «Сохранить поиск» на странице результатов поиска, чтобы получать оповещения в Telegram."
+
+msgid "Search history"
+msgstr "История поиска"
+
+msgid "Clear your entire search history?"
+msgstr "Очистить всю историю поиска?"
+
+msgid "Clear history"
+msgstr "Очистить историю"
+
+msgid "No search history"
+msgstr "Нет истории поиска"
+
+msgid "Settings"
+msgstr "Настройки"
+
+msgid ""
+"Settings are not yet available. Language preference is managed on your "
+"profile."
+msgstr "Настройки ещё недоступны. Предпочтения языка управляются в вашем профиле."
+
+msgid "Expand"
+msgstr "Раскрыть"
+
+msgid "Pro"
+msgstr "Pro"
+
+msgid "Trusted"
+msgstr "Доверенный"
+
+msgid "Verified"
+msgstr "Верифицировано"
+
+msgid "Breadcrumb"
+msgstr "Хлебные крошки"
+
+msgid "Home"
+msgstr "Главная"
+
+msgid "Search results:"
+msgstr "Результаты поиска:"
+
+msgid "My ads"
+msgstr "Мои объявления"
+
+msgid ""
+"We use cookies to keep the service working, to measure traffic and to "
+"remember your preferences. Please choose which non-essential cookies you "
+"allow."
+msgstr "Мы используем файлы cookie для поддержания работы сервиса, измерения трафика и запоминания ваших предпочтений. Выберите, какие необязательные файлы cookie разрешить."
+
+msgid "session and CSRF protection cookies (always on)"
+msgstr "файлы cookie для сессий и защиты CSRF (всегда включены)"
+
+msgid "anonymized traffic analytics via Plausible"
+msgstr "анонимная аналитика трафика через Plausible"
+
+msgid "language and city selection"
+msgstr "выбор языка и города"
+
+msgid "Privacy details"
+msgstr "Подробности о конфиденциальности"
+
+msgid "Essential"
+msgstr "Необходимые"
+
+msgid "Analytics"
+msgstr "Аналитика"
+
+msgid "Preferences"
+msgstr "Предпочтения"
+
+msgid "Accept"
+msgstr "Принять"
+
+msgid "Reject non-essential"
+msgstr "Отклонить необязательные"
+
+msgid "Manage"
+msgstr "Управлять"
+
+msgid "Remove from favorites"
+msgstr "Убрать из избранного"
+
+msgid "Add to favorites"
+msgstr "Добавить в избранное"
+
+msgid "Mko Bazuna"
+msgstr "Mko Bazuna"
+
+msgid "Privacy Policy"
+msgstr "Политика конфиденциальности"
+
+msgid "Cookie settings"
+msgstr "Настройки cookie"
+
+msgid "Dashboard"
+msgstr "Панель управления"
+
+msgid "Admin"
+msgstr "Админ"
+
+msgid "Logout"
+msgstr "Выйти"
+
+msgid "Login"
+msgstr "Войти"
+
+msgid "Account menu"
+msgstr "Меню аккаунта"
+
+msgid "Account"
+msgstr "Аккаунт"
+
+msgid "Submit an ad"
+msgstr "Разместить объявление"
+
+msgid "Preferred city"
+msgstr "Предпочитаемый город"
+
+msgid "All categories"
+msgstr "Все категории"
+
+msgid "Search ads..."
+msgstr "Поиск объявлений..."
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "My favorites"
+msgstr "Моё избранное"
+
+msgid "Login to save favorites"
+msgstr "Войдите, чтобы сохранять избранное"
+
+msgid "Log in to save favorites"
+msgstr "Войдите, чтобы сохранять избранное"
+
+msgid "Log in to save"
+msgstr "Войти для сохранения"
+
+msgid ""
+"This policy explains how Mko Bazuna collects, processes, and protects your\n"
+"            data, including the cookies we set and the third parties we "
+"share data with.\n"
+"            Last updated: August 2026."
+msgstr "Эта политика объясняет, как Mko Bazuna собирает, обрабатывает и защищает ваши данные, включая файлы cookie, которые мы устанавливаем, и третьих сторон, с которыми мы делимся данными. Последнее обновление: август 2026 г."
+
+msgid "1. Controller"
+msgstr "1. Оператор"
+
+msgid ""
+"The data controller for this service is the operator of the Mko Bazuna "
+"classifieds board. You can contact us over Telegram at"
+msgstr "Оператор персональных данных для этой услуги — оператор доски объявлений Mko Bazuna. Вы можете связаться с нами через Telegram:"
+
+msgid "2. Processing Purposes and Legal Bases"
+msgstr "2. Цели обработки и правовые основания"
+
+msgid "Service delivery and authentication"
+msgstr "Доставка услуг и аутентификация"
+
+msgid "legal basis: performance of a contract / legitimate interest."
+msgstr "правовое основание: исполнение договора / законный интерес."
+
+msgid "Seller-buyer contact relay"
+msgstr "Передача контакта продавца-покупателю"
+
+msgid "via Telegram deep-links"
+msgstr "через deep-links Telegram"
+
+msgid "legal basis: your explicit initiation."
+msgstr "правовое основание: вашя явная инициатива."
+
+msgid "Traffic analytics"
+msgstr "Аналитика трафика"
+
+msgid "via Plausible (anonymized)"
+msgstr "через Plausible (анонимизированная)"
+
+msgid "legal basis: your consent (analytics category)."
+msgstr "правовое основание: ваше согласие (категория аналитики)."
+
+msgid "Personalization"
+msgstr "Персонализация"
+
+msgid "(language, city)"
+msgstr "(язык, город)"
+
+msgid "legal basis: your consent (preferences category)."
+msgstr "правовое основание: ваше согласие (категория предпочтений)."
+
+msgid "Language normalization"
+msgstr "Нормализация языка"
+
+msgid "of ad text via Google Translate"
+msgstr "текста объявлений через Google Translate"
+
+msgid "legal basis: best-effort, non-identifying content transfer."
+msgstr "правовое основание: максимально усиливающая, неидентифицирующая передача контента."
+
+msgid "3. Cookie Declaration"
+msgstr "3. Декларация файлов cookie"
+
+msgid ""
+"The table below lists the cookies this site sets and whether they are "
+"essential (required for the service to function) or consent-gated."
+msgstr "Таблица ниже перечисляет файлы cookie, которые устанавливает этот сайт, и являются ли они необходимыми (требуются для работы сервиса) или требующими согласия."
+
+msgid "Cookie"
+msgstr "Cookie"
+
+msgid "Purpose"
+msgstr "Назначение"
+
+msgid "Consent-Gated"
+msgstr "Требует согласия"
+
+msgid "Authentication session"
+msgstr "Сессия аутентификации"
+
+msgid "Yes"
+msgstr "Да"
+
+msgid "No"
+msgstr "Нет"
+
+msgid "Cross-Site Request Forgery protection"
+msgstr "Защита от подделки межсайтовых запросов (CSRF)"
+
+msgid "Consent state (accepted / declined / withdrawn)"
+msgstr "Состояние согласия (принято / отклонено / отозвано)"
+
+msgid "N/A (consent state itself)"
+msgstr "Н/Д (само состояние согласия)"
+
+msgid "Analytics consent state"
+msgstr "Состояние согласия на аналитику"
+
+msgid "Preferences consent state"
+msgstr "Состояние согласия на предпочтения"
+
+msgid "Preferred language (UI)"
+msgstr "Предпочитаемый язык (интерфейс)"
+
+msgid "Yes (preferences)"
+msgstr "Да (предпочтения)"
+
+msgid "Preferred city (catalog default)"
+msgstr "Предпочитаемый город (по умолчанию в каталоге)"
+
+msgid "4. Third-Party Disclosures"
+msgstr "4. Раскрытие данных третьим сторонам"
+
+msgid "Telegram"
+msgstr "Telegram"
+
+#, python-format
+msgid ""
+"authentication and seller-buyer contact relay via deep-links (<code>t.me/"
+"%(bot_username)s</code>). No ad content is shared; only the identifiers "
+"needed for the action."
+msgstr "аутентификация и передача контакта продавца-покупателю через deep-links (<code>t.me/%(bot_username)s</code>). Содержимое объявлений не передаётся; передаются только идентификаторы, необходимые для действия."
+
+msgid "Google Translate"
+msgstr "Google Translate"
+
+msgid ""
+"best-effort, non-identifying language normalization of ad text. No personal "
+"data (telegram_id, username, IP) is transmitted."
+msgstr "максимально усиливающая, неидентифицирующая нормализация языка текста объявлений. Персональные данные (telegram_id, имя пользователя, IP) не передаются."
+
+msgid "Plausible Analytics"
+msgstr "Plausible Analytics"
+
+msgid ""
+"cookieless, privacy-friendly traffic analytics. Loaded only after you accept "
+"the analytics category."
+msgstr "анализ трафика без файлов cookie, ориентированный на конфиденциальность. Загружается только после принятия категории аналитики."
+
+msgid "5. Your Rights"
+msgstr "5. Ваши права"
+
+msgid "Under GDPR you have the right to:"
+msgstr "Согласно GDPR у вас есть право:"
+
+msgid "Access and obtain a copy of your personal data."
+msgstr "Получить доступ и копию ваших персональных данных."
+
+msgid "Rectify inaccurate personal data."
+msgstr "Исправить неточные персональные данные."
+
+msgid ""
+"Erase your personal data (\"right to be forgotten\")."
+msgstr "Удалить ваши персональные данные (право на забвение)."
+
+msgid "Restrict or object to processing."
+msgstr "Ограничить или возразить против обработки."
+
+msgid "Data portability."
+msgstr "Переносимость данных."
+
+msgid "Withdraw consent at any time, as easily as you gave it."
+msgstr "Отозвать согласие в любое время, так же легко, как вы его дали."
+
+msgid "Lodge a complaint with a supervisory authority."
+msgstr "Подать жалобу в контролирующий орган."
+
+msgid "6. Erasure and Retention"
+msgstr "6. Удаление и хранение"
+
+msgid ""
+"When you withdraw consent, your account and its advertisements are\n"
+"                soft-deleted immediately. All personal data is permanently "
+"erased\n"
+"                within <strong>30 days</strong> of withdrawal. Consent state "
+"is otherwise\n"
+"                retained for 12 months, after which you are re-prompted."
+msgstr "При отзыве согласия ваш аккаунт и его объявления немедленно удаляются (soft-delete). Все персональные данные безвозвратно удаляются в течение 30 дней с момента отзыва. Состояние согласия иначе хранится 12 месяцев, после чего вы снова запрашиваете согласие."
+
+msgid "7. Manage Your Consent"
+msgstr "7. Управление вашим согласием"
+
+msgid "You can revisit and change your consent choices at any time. Use the"
+msgstr "Вы можете в любой момент пересмотреть и изменить ваши предпочтения согласия. Используйте"
+
+msgid "link to open the consent banner, or contact us on Telegram at"
+msgstr "ссылку, чтобы открыть баннер согласия, или свяжитесь с нами через Telegram:"
+
+msgid "Save search alert"
+msgstr "Сохранить оповещение по поиску"
+
+msgid "Save alert"
+msgstr "Сохранить оповещение"
+
+msgid "Search saved"
+msgstr "Поиск сохранён"
+
+msgid "You'll get a Telegram alert when new ads match this search."
+msgstr "Вы получите оповещение в Telegram, когда появятся новые объявления, соответствующие этому поиску."
+
+msgid "Login to Mko Bazuna"
+msgstr "Вход в Mko Bazuna"
+
+msgid "Tap the button below to open Telegram and authenticate."
+msgstr "Нажмите кнопку ниже, чтобы открыть Telegram и пройти аутентификацию."
+
+msgid "This link expires in 5 minutes."
+msgstr "Эта ссылка истекает через 5 минут."
+
+msgid "Login via Telegram"
+msgstr "Войти через Telegram"
+
+msgid "Waiting for Telegram confirmation..."
+msgstr "Ожидание подтверждения в Telegram..."
+
+msgid "Don't have Telegram?"
+msgstr "Нет Telegram?"
+
+msgid "Get it here"
+msgstr "Получить здесь"
+
+msgid "Login successful! Redirecting..."
+msgstr "Вход выполнен успешно! Перенаправление..."
+
+msgid "This login link is invalid, expired, or already used."
+msgstr "Эта ссылка для входа недействительна, истекла или уже использована."
+
+msgid "Error checking login status."
+msgstr "Ошибка проверки статуса входа."

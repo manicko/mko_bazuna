@@ -68,8 +68,9 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
             "source": SearchSuggestionSource.USER_HISTORY.value,
         })
 
-    # 2. Entity suggestions (categories + cities).
-    entity_suggestions = get_entity_suggestions(query)
+    # 2. Entity suggestions (categories + cities), localized to the
+    #    active UI language.
+    entity_suggestions = get_entity_suggestions(query, locale=request.LANGUAGE_CODE)
     suggestions.extend(entity_suggestions)
 
     # 3. Popular suggestions.

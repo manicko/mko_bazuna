@@ -96,14 +96,21 @@ class TestI18nPipeline(SimpleTestCase):
         assert not missing, f"Missing .po files for languages: {missing}"
 
     def test_no_empty_msgstr(self) -> None:
-        """Every non-header ``msgid`` has a non-empty ``msgstr``."""
+        """Every non-header ``msgid`` has a non-empty ``msgstr``.
+
+        The ``en`` locale is exempt — its ``msgid`` is already English, so
+        ``msgstr`` may remain empty.
+        """
         for po_path in _po_files():
+            locale_code = po_path.parent.parent.name
             text = po_path.read_text(encoding="utf-8")
             entries = _parse_po_entries(text)
             empty = [
                 msgid for msgid, msgstr in entries
                 if msgid and not msgstr.strip()
             ]
+            if locale_code == "en":
+                continue
             assert not empty, (
                 f"{po_path}: empty msgstr for msgids: {empty}"
             )

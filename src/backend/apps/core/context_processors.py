@@ -4,7 +4,10 @@ Context processors for Mko Bazuna.
 Makes configuration values available to all templates.
 """
 
+import json
+
 from django.conf import settings
+from django.utils.translation import gettext as _
 
 
 def plausible_host(request):
@@ -31,10 +34,14 @@ def header_context(request) -> dict:
     - ``root_categories``: ordered list of top-level active ``Category`` nodes
       (rendered server-side inside the header's "All Categories" dropdown).
     - ``preferred_city_display``: localized name of the effective preferred city
-      (from ``request.preferred_city``), or the country-wide label (``Вся страна``)
-      when none is set — shown by the header city button.
+      (from ``request.preferred_city``), or the country-wide label
+      (``gettext("Entire country")``) when none is set — shown by the header
+      city button.
     - ``cities``: ordered list of Montenegro ``City`` objects for the header
       city dropdown.
+    - ``catalog_js_labels``: JSON-encoded dict of translated strings consumed by
+      the inline JS in ``components/header_catalog.html`` (Q6=A — pre-translated
+      context variables, no Cyrillic literals in the ``<script>`` block).
 
     A single indexed MPTT query is acceptable for the MVP (no per-request
     profiling concern).
@@ -43,7 +50,7 @@ def header_context(request) -> dict:
     from apps.locations.models import City
 
     # Default label when no preferred city is set (Q-2 recommended default).
-    preferred_city_display = "Вся страна"
+    preferred_city_display = _("Entire country")
     preferred_city_slug = getattr(request, "preferred_city", None)
     if preferred_city_slug:
         city = City.objects.filter(slug=preferred_city_slug).first()
@@ -68,4 +75,13 @@ def header_context(request) -> dict:
         "preferred_city_display": preferred_city_display,
         "cities": list(City.objects.order_by("name")),
         "favorites_count": favorites_count,
+        "catalog_js_labels": json.dumps(
+            {
+                "show_all_results": _("Show all results"),
+                "cities": _("Cities"),
+                "categories": _("Categories"),
+                "popular_queries": _("Popular queries"),
+                "history": _("History"),
+            }
+        ),
     }

@@ -30,6 +30,7 @@ from apps.locations.models import City
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 
 from django.shortcuts import render
+from django.utils.translation import gettext as _
 
 from django.core.paginator import Paginator
 from django.db.models import F, Q
@@ -184,7 +185,7 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     # seed key can be attached to several ads, so check existence across all of
     # them rather than the status of a single (arbitrary) row.
     if not AdImage.objects.filter(key_q, ad__status=AdStatus.PUBLISHED).exists():
-        return HttpResponseForbidden("Access denied")
+        return HttpResponseForbidden(_("Access denied"))
 
     if settings.DEBUG:
         return _serve_image(image_key)

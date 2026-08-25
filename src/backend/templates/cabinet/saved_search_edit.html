@@ -2,6 +2,7 @@
    LANGUAGE_CODE on save. {% endcomment %}
 {% load static %}
 {% load i18n %}
+{% load localized_content %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,7 +36,7 @@
                     <option value="">{% trans "Any city" %}</option>
                     {% for city in cities %}
                     <option value="{{ city.id }}" {% if saved_search.city_id == city.id %}selected{% endif %}>
-                        {{ city.get_name }}
+                        {{ city|get_city_name:LANGUAGE_CODE }}
                     </option>
                     {% endfor %}
                 </select>
@@ -46,7 +47,7 @@
                     <option value="">{% trans "Any category" %}</option>
                     {% for category in categories %}
                     <option value="{{ category.id }}" {% if saved_search.category_id == category.id %}selected{% endif %}>
-                        {{ category.get_name }}
+                        {{ category|get_category_name:LANGUAGE_CODE }}
                     </option>
                     {% endfor %}
                 </select>

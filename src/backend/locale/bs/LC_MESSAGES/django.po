@@ -1,13 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# Automatically generated, 2026.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-23 00:00+0200\n"
+"POT-Creation-Date: 2026-08-24 03:14-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -15,14 +14,281 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
-#: templates/ads/detail.html
+msgid "Published"
+msgstr "Objavljeno"
+
+msgid "On Moderation"
+msgstr "Na moderaciji"
+
+msgid "Failed Moderation"
+msgstr "Greška moderacije"
+
+msgid "Archived"
+msgstr "Arhivirano"
+
+msgid "Rejected"
+msgstr "Odbijeno"
+
+msgid "You do not have permission to delete this ad."
+msgstr "Nemate dozvolu da obrišete ovaj oglas."
+
+msgid "You do not have permission to edit this ad."
+msgstr "Nemate dozvolu da uredite ovaj oglas."
+
+msgid "Ad failed moderation checks"
+msgstr "Oglas nije prošao provere moderacije"
+
+msgid "You do not have permission to archive this ad."
+msgstr "Nemate dozvolu da arhivirate ovaj oglas."
+
+msgid "You do not have permission to reactivate this ad."
+msgstr "Nemate dozvolu da ponovo aktivirate ovaj oglas."
+
+msgid "Access denied"
+msgstr "Pristup odbijen"
+
+msgid "Entire country"
+msgstr "Cijela zemlja"
+
+msgid "Show all results"
+msgstr "Prikaži sve rezultate"
+
+msgid "Cities"
+msgstr "Gradovi"
+
+msgid "Categories"
+msgstr "Kategorije"
+
+msgid "Popular queries"
+msgstr "Popularni upiti"
+
+msgid "History"
+msgstr "Istorija"
+
+msgid "All Time"
+msgstr "Cijeli vrijeme"
+
+msgid "30 Days"
+msgstr "30 dana"
+
+msgid "7 Days"
+msgstr "7 dana"
+
+msgid "Moderation Queue"
+msgstr "Red modulacije"
+
+msgid "All"
+msgstr "Svi"
+
+msgid "High"
+msgstr "Visok"
+
+msgid "Medium"
+msgstr "Srednji"
+
+msgid "Low"
+msgstr "Niski"
+
+msgid "ID"
+msgstr "ID"
+
+msgid "Title"
+msgstr "Naslov"
+
+msgid "User"
+msgstr "Korisnik"
+
+msgid "Score"
+msgstr "Bodovi"
+
+msgid "Priority"
+msgstr "Prioritet"
+
+msgid "Actions"
+msgstr "Akcije"
+
+msgid "Review"
+msgstr "Pregled"
+
+msgid "No ads in the moderation queue."
+msgstr "Nema oglasa u redu modulacije."
+
+msgid "Moderate Ad"
+msgstr "Moderiraj oglas"
+
+msgid "Back to moderation queue"
+msgstr "Natrag na red moderacije"
+
+msgid "Category"
+msgstr "Kategorija"
+
+msgid "Location"
+msgstr "Lokacija"
+
+msgid "Telegram ID:"
+msgstr "Telegram ID:"
+
+msgid "Description"
+msgstr "Opis"
+
+#, python-format
+msgid "Photos (%(count)s)"
+msgstr "Fotografije (%(count)s)"
+
+#, python-format
+msgid "Photo %(counter)s"
+msgstr "Fotografija %(counter)s"
+
+msgid "No photos"
+msgstr "Nema fotografija"
+
+msgid "Moderation Actions"
+msgstr "Akcije moderacije"
+
+msgid "Approve"
+msgstr "Odobri"
+
+msgid "Reject"
+msgstr "Odbij"
+
+msgid "Ban User"
+msgstr "Zabrani korisnika"
+
+msgid "Failed Auto-Moderation"
+msgstr "Greška automoderacije"
+
+msgid ""
+"This ad failed automatic checks. You can approve, reject, or ban the user."
+msgstr "Ovaj oglas nije prošao automatske provere. Možete odobriti, odbiti ili zabraniti korisnika."
+
+#, python-format
+msgid "Reject Ad %(id)s"
+msgstr "Odbij oglas %(id)s"
+
+msgid "Reject Reason (Layer-2 Checklist)"
+msgstr "Razlog odbijanja (kontrolni spisak nivoa 2)"
+
+msgid "Select a reason..."
+msgstr "Izaberite razlog..."
+
+msgid "Adult content"
+msgstr "Sadržaj za odrasle"
+
+msgid "Violence / Gore"
+msgstr "Nasilje / Krv"
+
+msgid "Drugs / Weapons"
+msgstr "Droge / Oruđe"
+
+msgid "Hate speech"
+msgstr "Mrznjava reč"
+
+msgid "Counterfeit goods"
+msgstr "Contrareturni proizvodi"
+
+msgid "Illegal goods"
+msgstr "Nedozvoljeni proizvodi"
+
+msgid "Spam / Scam"
+msgstr "Spam / Prevara"
+
+msgid "Off-topic"
+msgstr "Van teme"
+
+msgid "Additional Details (optional)"
+msgstr "Dodatni detalji (neobavezno)"
+
+msgid "Add more details about the rejection..."
+msgstr "Dodajte više detalja o odbijanju..."
+
+msgid "Cancel"
+msgstr "Otkaži"
+
+msgid "Reject Ad"
+msgstr "Odbij oglas"
+
+#, python-format
+msgid "Ban User (Telegram ID: %(tid)s)"
+msgstr "Zabrani korisnika (Telegram ID: %(tid)s)"
+
+msgid "Ban Reason"
+msgstr "Razlog zabrane"
+
+msgid "Reason for banning this user..."
+msgstr "Razlog zabrane ovom korisniku..."
+
 msgid "Photo"
 msgstr "Foto"
 
-msgid "for"
-msgstr "za"
+msgid "Your Ads"
+msgstr "Vaši oglasi"
+
+msgid ""
+"Withdrawing consent permanently erases your Telegram ID, all ads, and "
+"prevents re-login. Are you sure?"
+msgstr "Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate ponovni priključak. Da li ste sigurni?"
+
+msgid "Withdraw Data"
+msgstr "Povuci podatke"
+
+msgid "Views"
+msgstr "Pregledi"
+
+msgid "Contacts"
+msgstr "Kontakti"
+
+#, python-format
+msgid "%(counter)s view"
+msgid_plural "%(counter)s views"
+msgstr[0] "%(counter)s pregled"
+msgstr[1] "%(counter)s pregleda"
+msgstr[2] "%(counter)s pregleda"
+
+#, python-format
+msgid "%(counter)s contact"
+msgid_plural "%(counter)s contacts"
+msgstr[0] "%(counter)s kontakt"
+msgstr[1] "%(counter)s kontakta"
+msgstr[2] "%(counter)s kontakta"
+
+msgid "Edit"
+msgstr "Uredi"
+
+msgid "Archive"
+msgstr "Arhiviraj"
+
+msgid "Reactivate"
+msgstr "Ponovo aktiviraj"
+
+msgid "Action required"
+msgstr "Potrebna akcija"
+
+msgid "Pending review"
+msgstr "Na pregledu"
+
+msgid "No ads yet"
+msgstr "Još nema oglasa"
+
+msgid "Create an ad via Telegram bot"
+msgstr "Kreiraj oglas putem Telegram bota"
+
+msgid "Open image"
+msgstr "Otvori sliku"
+
+msgid "of"
+msgstr "od"
+
+msgid "Previous image"
+msgstr "Prethodna slika"
+
+msgid "Next image"
+msgstr "Slijedeća slika"
+
+msgid "Select image"
+msgstr "Odaberi sliku"
 
 msgid "Location:"
 msgstr "Lokacija:"
@@ -42,15 +308,38 @@ msgstr "Prodavac nije dostupan za kontakt"
 msgid "Back to listings"
 msgstr "Natrag na oglase"
 
-#: templates/ads/list.html
+msgid "Edit Ad"
+msgstr "Uredi oglas"
+
+msgid "Price"
+msgstr "Cijena"
+
+msgid "Amount"
+msgstr "Iznos"
+
+msgid "Current Photos"
+msgstr "Trenutne fotografije"
+
+msgid "Add Photos"
+msgstr "Dodaj fotografije"
+
+msgid "Select multiple files to add more photos"
+msgstr "Odaberite višestvene datoteke da dodate više fotografija"
+
+msgid ""
+"Editing text (title/description) will send this ad for re-moderation and "
+"temporarily hide it from public view. Price/photo changes will be published "
+"immediately."
+msgstr "Uređivanjem teksta (naslova/opisa) ovaj oglas će biti poslat na ponovnu moderaciju i privremeno skriven iz javnog pregleda. Promene cijene/fotografija će se odmah objaviti."
+
+msgid "Save Changes"
+msgstr "Sačuvaj promene"
+
+msgid "&larr; Back to Dashboard"
+msgstr "← Natrag na ploču"
+
 msgid "Search"
 msgstr "Pretraži"
-
-msgid "Search ads..."
-msgstr "Pretraži oglase..."
-
-msgid "Category"
-msgstr "Kategorija"
 
 msgid "Ads"
 msgstr "Oglasi"
@@ -58,12 +347,8 @@ msgstr "Oglasi"
 msgid "Save search"
 msgstr "Sačuvaj pretragu"
 
-#: templates/ads/partials/ad_list.html
 msgid "Did you mean:"
 msgstr "Da li ste mislili:"
-
-msgid "No image"
-msgstr "Nema slike"
 
 msgid "Purpose:"
 msgstr "Namjena:"
@@ -73,6 +358,12 @@ msgstr "Karakteristika:"
 
 msgid "Clear all filters"
 msgstr "Očisti sve filtere"
+
+msgid "No image"
+msgstr "Nema slike"
+
+msgid "more"
+msgstr "više"
 
 msgid "Page navigation"
 msgstr "Navigacija stranica"
@@ -96,10 +387,6 @@ msgstr "Još nema oglasa"
 msgid "Be the first to create an ad via Telegram!"
 msgstr "Budite prvi koji stvori oglas putem Telegrama!"
 
-msgid "more"
-msgstr "više"
-
-#: templates/ads/partials/filter_form.html
 msgid "Listing purpose"
 msgstr "Namjena"
 
@@ -115,13 +402,9 @@ msgstr "Maks. cijena"
 msgid "Features"
 msgstr "Karakteristike"
 
-msgid "selected"
-msgstr "odabrano"
-
 msgid "Apply filters"
 msgstr "Primijeni filtere"
 
-#: templates/ads/partials/filter_sort.html
 msgid "Sort"
 msgstr "Sortiranje"
 
@@ -137,3 +420,544 @@ msgstr "Cijena: najniža do najviše"
 msgid "Price: high to low"
 msgstr "Cijena: najviša do najniže"
 
+msgid "Moderation Analytics"
+msgstr "Analitika moderacije"
+
+#, python-format
+msgid "Moderation Statistics (Last %(days)s Days)"
+msgstr "Statistika moderacije (posljednjih %(days)s dana)"
+
+msgid "Pending Review Queue"
+msgstr "Red na pregled"
+
+msgid "Review Queue"
+msgstr "Red pregleda"
+
+msgid "Approved"
+msgstr "Odobreno"
+
+msgid "Flagged"
+msgstr "Označeno"
+
+msgid "Avg Time to Moderate"
+msgstr "Prosječno vrijeme moderacije"
+
+msgid "Moderator Performance"
+msgstr "Performanse moderatora"
+
+msgid "Moderator ID"
+msgstr "ID moderatora"
+
+msgid "Actions Taken"
+msgstr "Preduzete akcije"
+
+msgid "Avg Time (hours)"
+msgstr "Prosječno vrijeme (sati)"
+
+#, python-format
+msgid "Moderator #%(mid)s"
+msgstr "Moderator #%(mid)s"
+
+msgid "Top Rejection Reasons"
+msgstr "Glavni razlozi odbijanja"
+
+msgid "Reason"
+msgstr "Razlog"
+
+msgid "Count"
+msgstr "Broj"
+
+msgid "Distribution"
+msgstr "Distribucija"
+
+msgid "No rejection data available"
+msgstr "Nema dostupnih podataka o odbijanjima"
+
+msgid "Rejection reasons will appear after moderators reject ads."
+msgstr "Razlozi odbijanja će se pojaviti nakon što moderatori odbiju oglase."
+
+msgid "Trust Dashboard"
+msgstr "Ploča pouzdanja"
+
+msgid "Your Trust Profile"
+msgstr "Vaš profil pouzdanja"
+
+msgid "Trust Score"
+msgstr "Bod pouzdanja"
+
+msgid "Unverified"
+msgstr "Neverifikovano"
+
+msgid "Score ranges from 0 to 100. Higher scores unlock trust badges."
+msgstr "Bodovi se kreću od 0 do 100. Viši bodovi otključavaju značke pouzdanja."
+
+msgid "Total Views (30d)"
+msgstr "Ukupno pregleda (30 dana)"
+
+msgid "Total Contacts (30d)"
+msgstr "Ukupno kontakata (30 dana)"
+
+msgid "Days with Data"
+msgstr "Dana sa podacima"
+
+msgid "Daily Metrics (Last 30 Days)"
+msgstr "Dnevne metrike (posljednjih 30 dana)"
+
+msgid "Date"
+msgstr "Datum"
+
+msgid "Ad"
+msgstr "Oglas"
+
+msgid "No metrics data yet"
+msgstr "Još nema metrika"
+
+msgid "Metrics will appear after ads receive views and contacts."
+msgstr "Metrike će se pojaviti nakon što oglasi dobiju preglede i kontakte."
+
+msgid "Favorites"
+msgstr "Omiljeni"
+
+msgid "No favorites yet"
+msgstr "Još nema omiljenih"
+
+msgid "Tap the heart on any ad to save it here."
+msgstr "Dodirnite srce na bilo kojem oglasu da ga sačuvate ovde."
+
+msgid "Cabinet"
+msgstr "Kabinet"
+
+msgid ""
+"Manage your favorites, saved-search alerts, and search history from this "
+"cabinet."
+msgstr "Upravljajte omiljenim, obaveštenjima o sačuvanim pretragama i istorijom pretrage iz ovog kabineta."
+
+msgid "On"
+msgstr "Uključeno"
+
+msgid "Off"
+msgstr "Isključeno"
+
+msgid "City:"
+msgstr "Grad:"
+
+msgid "Price:"
+msgstr "Cijena:"
+
+msgid "Disable"
+msgstr "Onemogući"
+
+msgid "Enable"
+msgstr "Omogući"
+
+msgid "Delete this saved search?"
+msgstr "Obriši ovu sačuvanu pretragu?"
+
+msgid "Delete"
+msgstr "Obriši"
+
+msgid "Edit saved search"
+msgstr "Uredi sačuvanu pretragu"
+
+msgid "Search query"
+msgstr "Pretraživački upit"
+
+msgid "City (optional)"
+msgstr "Grad (neobavezno)"
+
+msgid "Any city"
+msgstr "Bilo koji grad"
+
+msgid "Category (optional)"
+msgstr "Kategorija (neobavezno)"
+
+msgid "Any category"
+msgstr "Bilo koja kategorija"
+
+msgid "Min price (EUR)"
+msgstr "Min. cijena (EUR)"
+
+msgid "Max price (EUR)"
+msgstr "Maks. cijena (EUR)"
+
+msgid "Save"
+msgstr "Sačuvaj"
+
+msgid "Saved searches"
+msgstr "Sačuvane pretrage"
+
+msgid "No saved searches yet"
+msgstr "Još nema sačuvanih pretraga"
+
+msgid ""
+"Use the \"Save search\" button on search results to get Telegram alerts."
+msgstr "Koristite dugme „Sačuvaj pretragu“ na rezultatima pretrage da biste dobili Telegram obaveštenja."
+
+msgid "Search history"
+msgstr "Istorija pretrage"
+
+msgid "Clear your entire search history?"
+msgstr "Obriši celu istoriju pretrage?"
+
+msgid "Clear history"
+msgstr "Obriši istoriju"
+
+msgid "No search history"
+msgstr "Nema istorije pretrage"
+
+msgid "Settings"
+msgstr "Postavke"
+
+msgid ""
+"Settings are not yet available. Language preference is managed on your "
+"profile."
+msgstr "Postavke još nisu dostupne. Preferencije jezika upravljaju se u vašem profilu."
+
+msgid "Expand"
+msgstr "Proširi"
+
+msgid "Pro"
+msgstr "Pro"
+
+msgid "Trusted"
+msgstr "Pouzdan"
+
+msgid "Verified"
+msgstr "Verifikovan"
+
+msgid "Breadcrumb"
+msgstr "Krsht"
+
+msgid "Home"
+msgstr "Početna"
+
+msgid "Search results:"
+msgstr "Rezultati pretrage:"
+
+msgid "My ads"
+msgstr "Moji oglasi"
+
+msgid ""
+"We use cookies to keep the service working, to measure traffic and to "
+"remember your preferences. Please choose which non-essential cookies you "
+"allow."
+msgstr "Koristimo kolačiće da bismo održali servis u funkciji, mjerili prometa i pamtili vaše postavke. Odaberite koje neobavezne kolačiće dozvoljavate."
+
+msgid "session and CSRF protection cookies (always on)"
+msgstr "kolačići za sesiju i CSRF zaštitu (uvijek uključeni)"
+
+msgid "anonymized traffic analytics via Plausible"
+msgstr "anonimizirana analitika prometa putem Plausible"
+
+msgid "language and city selection"
+msgstr "izbor jezika i grada"
+
+msgid "Privacy details"
+msgstr "Detalji o privatnosti"
+
+msgid "Essential"
+msgstr "Neophodni"
+
+msgid "Analytics"
+msgstr "Analitika"
+
+msgid "Preferences"
+msgstr "Postavke"
+
+msgid "Accept"
+msgstr "Prihvati"
+
+msgid "Reject non-essential"
+msgstr "Odbij neophodne"
+
+msgid "Manage"
+msgstr "Uprava"
+
+msgid "Remove from favorites"
+msgstr "Ukloni iz omiljenih"
+
+msgid "Add to favorites"
+msgstr "Dodaj u omiljene"
+
+msgid "Mko Bazuna"
+msgstr "Mko Bazuna"
+
+msgid "Privacy Policy"
+msgstr "Politika privatnosti"
+
+msgid "Cookie settings"
+msgstr "Postavke kolačića"
+
+msgid "Dashboard"
+msgstr "Ploča"
+
+msgid "Admin"
+msgstr "Admin"
+
+msgid "Logout"
+msgstr "Odjavi se"
+
+msgid "Login"
+msgstr "Prijava"
+
+msgid "Account menu"
+msgstr "Meni naloga"
+
+msgid "Account"
+msgstr "Nalog"
+
+msgid "Submit an ad"
+msgstr "Pošalji oglas"
+
+msgid "Preferred city"
+msgstr "Preferirani grad"
+
+msgid "All categories"
+msgstr "Sve kategorije"
+
+msgid "Search ads..."
+msgstr "Pretraži oglase..."
+
+msgid "Close"
+msgstr "Zatvorite"
+
+msgid "My favorites"
+msgstr "Moji omiljeni"
+
+msgid "Login to save favorites"
+msgstr "Prijavite se da sačuvate omiljene"
+
+msgid "Log in to save favorites"
+msgstr "Prijavite se da sačuvate omiljene"
+
+msgid "Log in to save"
+msgstr "Prijava za čuvanje"
+
+msgid ""
+"This policy explains how Mko Bazuna collects, processes, and protects your\n"
+"            data, including the cookies we set and the third parties we "
+"share data with.\n"
+"            Last updated: August 2026."
+msgstr "Ova politika objašnjava kako Mko Bazuna prikuplja, obrađuje i štiti vaše podatke, uključujući kolačiće koje postavljamo i treće strane sa kojima delimo podatke. Posljednje ažuriranje: august 2026."
+
+msgid "1. Controller"
+msgstr "1. Operater"
+
+msgid ""
+"The data controller for this service is the operator of the Mko Bazuna "
+"classifieds board. You can contact us over Telegram at"
+msgstr "Operativac podataka za ovu uslugu je operator Mko Bazuna oglasne table. Možete nas kontaktirati putem Telegrama na"
+
+msgid "2. Processing Purposes and Legal Bases"
+msgstr "2. Svrhe obrade i pravni oslovi"
+
+msgid "Service delivery and authentication"
+msgstr "Isporuka usluge i autentifikacija"
+
+msgid "legal basis: performance of a contract / legitimate interest."
+msgstr "pravni osnov: izvršenje ugovora / opravana interes"
+
+msgid "Seller-buyer contact relay"
+msgstr "Prenos kontakta prodavca-kupca"
+
+msgid "via Telegram deep-links"
+msgstr "putem Telegram deep-linkova"
+
+msgid "legal basis: your explicit initiation."
+msgstr "pravni osnov: vaša eksplicitna inicijativa."
+
+msgid "Traffic analytics"
+msgstr "Analitika saobraćaja"
+
+msgid "via Plausible (anonymized)"
+msgstr "putem Plausible (anonimizovano)"
+
+msgid "legal basis: your consent (analytics category)."
+msgstr "pravni osnov: vaš pristanak (kategorija analitike)."
+
+msgid "Personalization"
+msgstr "Personalizacija"
+
+msgid "(language, city)"
+msgstr "(jezik, grad)"
+
+msgid "legal basis: your consent (preferences category)."
+msgstr "pravni osnov: vaš pristanak (kategorija postavki)."
+
+msgid "Language normalization"
+msgstr "Normalizacija jezika"
+
+msgid "of ad text via Google Translate"
+msgstr "teksta oglasa putem Google Translate"
+
+msgid "legal basis: best-effort, non-identifying content transfer."
+msgstr "pravni osnov: naporan, neidentifikovajući transfer sadržaja."
+
+msgid "3. Cookie Declaration"
+msgstr "3. Deklaracija kolačića"
+
+msgid ""
+"The table below lists the cookies this site sets and whether they are "
+"essential (required for the service to function) or consent-gated."
+msgstr "Tabela ispod navodi kolačiće koje ovaj sajt postavlja i da li su neophodni (potrebni za funkcionisanje servisa) ili zahtevaju pristanak."
+
+msgid "Cookie"
+msgstr "Kolačić"
+
+msgid "Purpose"
+msgstr "Namjena"
+
+msgid "Consent-Gated"
+msgstr "Zahteva pristanak"
+
+msgid "Authentication session"
+msgstr "Sesija autentifikacije"
+
+msgid "Yes"
+msgstr "Da"
+
+msgid "No"
+msgstr "Ne"
+
+msgid "Cross-Site Request Forgery protection"
+msgstr "Zaštita od cross-site request forgery (CSRF)"
+
+msgid "Consent state (accepted / declined / withdrawn)"
+msgstr "Stanje pristanka (prihvaćen / odbijen / povučen)"
+
+msgid "N/A (consent state itself)"
+msgstr "N/A (samo stanje pristanka)"
+
+msgid "Analytics consent state"
+msgstr "Stanje pristanka na analitiku"
+
+msgid "Preferences consent state"
+msgstr "Stanje pristanka na postavke"
+
+msgid "Preferred language (UI)"
+msgstr "Preferirani jezik (interfejs)"
+
+msgid "Yes (preferences)"
+msgstr "Da (postavke)"
+
+msgid "Preferred city (catalog default)"
+msgstr "Preferirani grad (podrazumevano u katalogu)"
+
+msgid "4. Third-Party Disclosures"
+msgstr "4. Otkrivanje trećim stranama"
+
+msgid "Telegram"
+msgstr "Telegram"
+
+#, python-format
+msgid ""
+"authentication and seller-buyer contact relay via deep-links (<code>t.me/"
+"%(bot_username)s</code>). No ad content is shared; only the identifiers "
+"needed for the action."
+msgstr "autentifikacija i prenos kontakta prodavca-kupca putem deep-linkova (<code>t.me/%(bot_username)s</code>). Sadržaj oglasa se ne deli; samo identifikatori potrebni za akciju."
+
+msgid "Google Translate"
+msgstr "Google Translate"
+
+msgid ""
+"best-effort, non-identifying language normalization of ad text. No personal "
+"data (telegram_id, username, IP) is transmitted."
+msgstr "naporan, neidentifikovajući jezički normalizationni tekst oglasa. Lični podaci (telegram_id, korisničko ime, IP) se ne prenose."
+
+msgid "Plausible Analytics"
+msgstr "Plausible Analytics"
+
+msgid ""
+"cookieless, privacy-friendly traffic analytics. Loaded only after you accept "
+"the analytics category."
+msgstr "analitika saobraćaja bez kolačića, prijateljska privatnosti. Učitava se samo nakon što prihvatite kategoriju analitike."
+
+msgid "5. Your Rights"
+msgstr "5. Vaša prava"
+
+msgid "Under GDPR you have the right to:"
+msgstr "Prema GDPR-u imate pravo na:"
+
+msgid "Access and obtain a copy of your personal data."
+msgstr "Pristupiti i dobiti kopiju vaših ličnih podataka."
+
+msgid "Rectify inaccurate personal data."
+msgstr "Ispraviti netačne lične podatke."
+
+msgid "Erase your personal data (\"right to be forgotten\")."
+msgstr "Izbrisati vaše lične podatke (\"pravo na zaborav\")."
+
+msgid "Restrict or object to processing."
+msgstr "Ograničiti ili zameraći obradi."
+
+msgid "Data portability."
+msgstr "Prenosljivost podataka."
+
+msgid "Withdraw consent at any time, as easily as you gave it."
+msgstr "Povući pristanak u bilo koje vreme, jednostavno kao što ste ga dao."
+
+msgid "Lodge a complaint with a supervisory authority."
+msgstr "Podneti žalbu nadzornom organu."
+
+msgid "6. Erasure and Retention"
+msgstr "6. Brisanje i zadržavanje"
+
+msgid ""
+"When you withdraw consent, your account and its advertisements are\n"
+"                soft-deleted immediately. All personal data is permanently "
+"erased\n"
+"                within <strong>30 days</strong> of withdrawal. Consent state "
+"is otherwise\n"
+"                retained for 12 months, after which you are re-prompted."
+msgstr "Kada povučete pristanak, vaš nalog i njegove oglase odmah će biti obrisani (soft-delete). Svi lični podaci će biti trajno izbrisani u roku od 30 dana od povlačenja. Stanje pristanka će inače biti zadržano 12 meseci, nakon čega ćete biti ponovo upitani."
+
+msgid "7. Manage Your Consent"
+msgstr "7. Upravljajte vašim pristanakom"
+
+msgid "You can revisit and change your consent choices at any time. Use the"
+msgstr "Možete ponovo posetiti i promeniti vaše izbore pristanka u bilo koje vreme. Koristite"
+
+msgid "link to open the consent banner, or contact us on Telegram at"
+msgstr "link da otvorite banner pristanka, ili kontaktirajte nas putem Telegrama na"
+
+msgid "Save search alert"
+msgstr "Sačuvaj obaveštenje o pretrazi"
+
+msgid "Save alert"
+msgstr "Sačuvaj obaveštenje"
+
+msgid "Search saved"
+msgstr "Pretraga sačuvana"
+
+msgid "You'll get a Telegram alert when new ads match this search."
+msgstr "Dobivaćete Telegram obaveštenje kada nove oglase odgovaraju ovoj pretrazi."
+
+msgid "Login to Mko Bazuna"
+msgstr "Prijava na Mko Bazuna"
+
+msgid "Tap the button below to open Telegram and authenticate."
+msgstr "Dodirnite dugme ispod da biste otvorili Telegram i autentifikovali."
+
+msgid "This link expires in 5 minutes."
+msgstr "Ovaj link ističe za 5 minuta."
+
+msgid "Login via Telegram"
+msgstr "Prijava putem Telegrama"
+
+msgid "Waiting for Telegram confirmation..."
+msgstr "Čekanje na potvrdu Telegrama..."
+
+msgid "Don't have Telegram?"
+msgstr "Nemate Telegram?"
+
+msgid "Get it here"
+msgstr "Dobijite ga ovdje"
+
+msgid "Login successful! Redirecting..."
+msgstr "Prijava uspešna! Preusmeravanje..."
+
+msgid "This login link is invalid, expired, or already used."
+msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
+
+msgid "Error checking login status."
+msgstr "Greška pri proveri statusa prijave."

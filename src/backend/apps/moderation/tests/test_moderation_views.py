@@ -219,6 +219,40 @@ class TestModerationReviewView:
         assert ctx_ad.category is not None
         assert ctx_ad.city is not None
 
+    def test_review_renders_localized_category_name(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """Review page renders category/city names in the selected UI language."""
+        category.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
+        category.save(update_fields=["name_i18n"])
+        city.name_i18n = {"ru": "Тестград", "bs": "Testgrad"}
+        city.save(update_fields=["name_i18n"])
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+
+        # Bosnian render
+        response_bs = client.get(f"/moderation/review/{ad.id}/?lang=bs")
+        assert response_bs.status_code == 200
+        content_bs = response_bs.content.decode("utf-8")
+        assert "Prevoz" in content_bs
+        assert "Testgrad" in content_bs
+        assert "Транспорт" not in content_bs
+
+        # Russian render
+        response_ru = client.get(f"/moderation/review/{ad.id}/?lang=ru")
+        assert response_ru.status_code == 200
+        content_ru = response_ru.content.decode("utf-8")
+        assert "Транспорт" in content_ru
+        assert "Тестград" in content_ru
+        assert "Prevoz" not in content_ru
+
 
 # ---------------------------------------------------------------------------
 # Tests: approve_ad

@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
 
 from apps.ads.models import Ad
 from apps.categories.catalog.builder import load_catalog
@@ -59,6 +60,7 @@ class TestBreadcrumbsRender:
         """A root category (no ancestors) renders ``Главная > [name]`` with the
         current category as plain text (no self-link)."""
         client = Client()
+        translation.activate("ru")
         response = client.get("/category/business/")
         assert response.status_code == 200
         nav = _breadcrumb_nav(response.content.decode("utf-8"))
@@ -68,6 +70,7 @@ class TestBreadcrumbsRender:
     def test_breadcrumb_shows_ancestor_chain(self) -> None:
         """A child category renders its ancestor chain."""
         client = Client()
+        translation.activate("ru")
         response = client.get("/category/business-commercial-real-estate/")
         assert response.status_code == 200
         nav = _breadcrumb_nav(response.content.decode("utf-8"))
@@ -96,6 +99,7 @@ class TestBreadcrumbsRender:
             published_at="2024-01-01 00:00:00+00",
         )
         client = Client()
+        translation.activate("ru")
         response = client.get(reverse("ads:detail", args=[ad.id]))
         assert response.status_code == 200
         nav = _breadcrumb_nav(response.content.decode("utf-8"))
@@ -108,6 +112,7 @@ class TestBreadcrumbsRender:
         """The home page (no category) renders an empty/absent breadcrumb nav
         without crashing."""
         client = Client()
+        translation.activate("ru")
         response = client.get("/")
         assert response.status_code == 200
         nav = _breadcrumb_nav(response.content.decode("utf-8"))

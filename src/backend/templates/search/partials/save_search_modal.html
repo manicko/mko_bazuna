@@ -2,6 +2,7 @@
      Posts to search:save-search and replaces itself with a success fragment.
      The dangling search:list hx-get was removed (that route does not exist). -->
 {% load i18n %}
+{% load localized_content %}
 
 <div id="save-search-modal"
      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
@@ -30,7 +31,7 @@
                     {% for city in cities %}
                     <option value="{{ city.id }}"
                             {% if selected_city == city.id %}selected{% endif %}>
-                        {{ city.get_name }}
+                        {{ city|get_city_name:LANGUAGE_CODE }}
                     </option>
                     {% endfor %}
                 </select>
@@ -44,7 +45,7 @@
                     {% for category in categories %}
                     <option value="{{ category.id }}"
                             {% if selected_category == category.id %}selected{% endif %}>
-                        {{ category.get_name }}
+                        {{ category|get_category_name:LANGUAGE_CODE }}
                     </option>
                     {% endfor %}
                 </select>

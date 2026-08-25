@@ -6,6 +6,7 @@
    Context: bot_username + root_categories (context processor), query,
    breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
 {% load i18n %}
+{% load localized_content %}
 {% load static %}
 {% with current_cat=breadcrumb_category %}
 <header class="bg-white shadow-sm border-b">
@@ -20,16 +21,16 @@
                     </svg>
                 </button>
                 <h1 class="text-xl font-bold text-gray-800">
-                    <a href="/">Mko Bazuna</a>
+                    <a href="/">{% trans "Mko Bazuna" %}</a>
                 </h1>
             </div>
             <div class="relative flex items-center gap-2">
                 {% include "components/header_favorites_badge.html" %}
                 {% include "components/header_auth_entry.html" %}
-                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank" rel="noopener"
+                   <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank" rel="noopener"
                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                    data-place-ad>
-                    + Подать объявление
+                    + {% trans "Submit an ad" %}
                 </a>
                 {% include "components/language_switcher.html" %}
             </div>
@@ -56,14 +57,13 @@
                             <li>
                                 <button type="button" data-city-clear
                                         class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
-                                    Вся страна
-                                </button>
+                                    {% trans "Entire country" %}</button>
                             </li>
                             {% for city in cities %}
                             <li>
                                 <button type="button" data-city-option="{{ city.slug }}"
                                         class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
-                                    {{ city.get_name }}
+                                    {{ city|get_city_name:LANGUAGE_CODE }}
                                 </button>
                             </li>
                             {% endfor %}
@@ -76,7 +76,7 @@
                     <button type="button" data-categories-toggle
                             class="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 whitespace-nowrap hover:bg-gray-50 min-h-[44px]">
                         <span data-categories-label>
-                            {% if current_cat %}{{ current_cat.get_name }}{% else %}Все категории{% endif %}
+                            {% if current_cat %}{{ current_cat|get_category_name:LANGUAGE_CODE }}{% else %}{% trans "All categories" %}{% endif %}
                         </span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -90,13 +90,13 @@
                                     <a href="{% url 'ads:listings_category' cat.slug %}"
                                        data-category-link="{{ cat.slug }}"
                                        class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
-                                        {{ cat.get_name }}
+                                        {{ cat|get_category_name:LANGUAGE_CODE }}
                                     </a>
                                     {% if cat.get_children.exists %}
                                     <button type="button" data-category-expand="{{ cat.slug }}"
                                             aria-controls="menu-{{ cat.id }}"
                                             class="p-3 text-gray-400 hover:text-blue-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                                            aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat.get_name }}">
+                                            aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat|get_category_name:LANGUAGE_CODE }}">
                                         <svg class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9l7 7 7-7"></path>
                                         </svg>
@@ -116,7 +116,7 @@
                     <div class="relative">
                         <input type="search" id="search-input" name="q"
                                value="{{ query|default:'' }}"
-                               placeholder="Поиск по объявлениям..."
+                                placeholder="{% trans "Search ads..." %}"
                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                                hx-get="{% url 'search:autocomplete' %}"
                                hx-trigger="input delay:300ms"
@@ -127,7 +127,7 @@
                         <ul id="autocomplete-dropdown"
                             class="autocomplete-dropdown absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto hidden">
                         </ul>
-                        <button type="submit" class="hidden">Поиск</button>
+                        <button type="submit" class="hidden">{% trans "Search" %}</button>
                     </div>
                 </form>
             </div>
@@ -143,7 +143,7 @@
 <div data-mobile-categories-panel
      class="fixed inset-y-0 left-0 z-[90] w-72 bg-white shadow-lg transform -translate-x-full transition-transform lg:hidden">
     <div class="flex items-center justify-between px-4 py-3 border-b">
-        <span class="font-semibold text-gray-800">Категории</span>
+        <span class="font-semibold text-gray-800">{% trans "Categories" %}</span>
         <button type="button" data-mobile-categories-close class="p-2 text-gray-500 hover:text-gray-700" aria-label="{% trans "Close" %}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -157,13 +157,13 @@
                 <a href="{% url 'ads:listings_category' cat.slug %}"
                    data-category-link="{{ cat.slug }}"
                    class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
-                    {{ cat.get_name }}
+                    {{ cat|get_category_name:LANGUAGE_CODE }}
                 </a>
                 {% if cat.get_children.exists %}
                 <button type="button" data-category-expand="{{ cat.slug }}"
                         aria-controls="menu-{{ cat.id }}"
                         class="p-3 text-gray-400 hover:text-blue-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                        aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat.get_name }}">
+                        aria-expanded="false" aria-label="{% trans "Expand" %} {{ cat|get_category_name:LANGUAGE_CODE }}">
                     <svg class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9l7 7 7-7"></path>
                     </svg>
@@ -180,6 +180,9 @@
 <script>
 (function () {
     'use strict';
+
+    /* ── Translated labels from context (Q6=A) ─────────────────────────────── */
+    var labels = JSON.parse('{{ catalog_js_labels|escapejs }}');
 
     /* ── Autocomplete dropdown ─────────────────────────────────────────── */
     var dropdown = document.getElementById('autocomplete-dropdown');
@@ -210,14 +213,14 @@
             var html = '';
             var showAll = escapeHtml((json && json.query) || '');
             html += '<li class="px-4 pt-2 pb-1"><a href="{% url 'search:search' %}?q=' + encodeURIComponent(json ? json.query : '')
-                 + '" class="text-sm text-blue-600 hover:underline">Показать все результаты</a></li>';
+                 + '" class="text-sm text-blue-600 hover:underline">' + labels.show_all_results + '</a></li>';
             ['city', 'category', 'popular_search', 'user_history'].forEach(function (section) {
                 var matches = suggestions.filter(function (s) { return s.type === section || s.source === section; });
                 if (!matches.length) return;
-                if (section === 'city') html += sectionHeader('Города');
-                else if (section === 'category') html += sectionHeader('Категории');
-                else if (section === 'popular_search') html += sectionHeader('Популярные запросы');
-                else if (section === 'user_history') html += sectionHeader('История');
+                if (section === 'city') html += sectionHeader(labels.cities);
+                else if (section === 'category') html += sectionHeader(labels.categories);
+                else if (section === 'popular_search') html += sectionHeader(labels.popular_queries);
+                else if (section === 'user_history') html += sectionHeader(labels.history);
                 matches.forEach(function (s) {
                     var text = escapeHtml(s.text || '');
                     var sub = s.category_path ? '<span class="block text-xs text-gray-400">' + escapeHtml(s.category_path) + '</span>' : '';

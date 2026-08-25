@@ -56,8 +56,8 @@
             </span>
         {% endif %}
     {% endfor %}
-    <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}"
-       hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}"
+    <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+       hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
        hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
        class="text-sm text-blue-600 hover:underline">{% trans "Clear all filters" %}</a>
 </div>
@@ -77,7 +77,7 @@
                         <img 
                             src="{{ ad.images.first.thumbnail_small_url|default:ad.images.first.image_url }}" 
                             alt="{{ ad|get_title:LANGUAGE_CODE }}"
-                            class="w-full h-48 object-cover rounded-t-lg"
+                            class="w-full h-48 object-contain bg-white rounded-t-lg"
                             loading="lazy"
                             width="240" height="180"
                         >
@@ -111,8 +111,8 @@
                          {% endif %}
 
                          <div class="flex justify-between items-center text-xs text-gray-500">
-                            <span>{{ ad.city.get_name|default:ad.city.name }}</span>
-                            <span>{{ ad.category.get_name|default:ad.category.name }}</span>
+                            <span>{{ ad.city|get_city_name:LANGUAGE_CODE }}</span>
+                            <span>{{ ad.category|get_category_name:LANGUAGE_CODE }}</span>
                             <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
                                 {{ ad.published_at|date:'M d' }}
                             </time>

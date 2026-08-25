@@ -10,9 +10,9 @@ Usage:
 Dependencies:
   - Tailwind CSS (bg-blue-100, text-blue-800, etc.)
 {% endcomment %}
-
+{% load i18n %}
 <span
-    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+    class="inline-flex items-center px-2 py-1 text-xs font medium bg-gray-100 text-gray-800 rounded"
     aria-label="Verified seller"
     role="status"
 >
@@ -28,5 +28,5 @@ Dependencies:
             clip-rule="evenodd"
         />
     </svg>
-    <span>Verified</span>
+    <span>{% trans "Verified" %}</span>
 </span>

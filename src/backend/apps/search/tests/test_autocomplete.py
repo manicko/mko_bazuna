@@ -492,6 +492,60 @@ class TestEntitySuggestionsService:
             if r.get("type") != "category":
                 assert "category_path" not in r
 
+    def test_entity_suggestions_localized_bs(
+        self, root_category: Category, city: City
+    ) -> None:
+        """``locale='bs'`` returns Bosnian names from ``name_i18n``."""
+        root_category.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
+        root_category.save(update_fields=["name_i18n"])
+        city.name_i18n = {"ru": "Тестград", "bs": "Testgrad"}
+        city.save(update_fields=["name_i18n"])
+
+        results = get_entity_suggestions("тран", locale="bs")
+        cat = next((r for r in results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert cat["text"] == "Prevoz"
+        assert cat["category_path"] == "Prevoz"
+
+    def test_entity_suggestions_localized_en(
+        self, root_category: Category, city: City
+    ) -> None:
+        """``locale='en'`` returns English names from ``name_i18n``."""
+        root_category.name_i18n = {"ru": "Транспорт", "en": "Transport"}
+        root_category.save(update_fields=["name_i18n"])
+
+        results = get_entity_suggestions("тран", locale="en")
+        cat = next((r for r in results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert cat["text"] == "Transport"
+
+    def test_entity_suggestions_localized_falls_back_to_ru(
+        self, root_category: Category
+    ) -> None:
+        """Locale with no translation falls back to Russian name."""
+        root_category.name_i18n = {"ru": "Транспорт"}
+        root_category.save(update_fields=["name_i18n"])
+
+        results = get_entity_suggestions("тран", locale="bs")
+        cat = next((r for r in results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert cat["text"] == "Транспорт"
+
+    def test_entity_suggestions_localized_category_path_bs(
+        self, root_category: Category, child_category: Category
+    ) -> None:
+        """Category path is localized via the locale parameter."""
+        root_category.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
+        root_category.save(update_fields=["name_i18n"])
+        child_category.name_i18n = {"ru": "Велосипеды", "bs": "Bicikli"}
+        child_category.save(update_fields=["name_i18n"])
+
+        results = get_entity_suggestions("вел", locale="bs")
+        cat = next((r for r in results if r.get("type") == "category"), None)
+        assert cat is not None
+        assert cat["text"] == "Bicikli"
+        assert cat["category_path"] == "Prevoz > Bicikli"
+
 
 # ---------------------------------------------------------------------------
 # Rate limit service

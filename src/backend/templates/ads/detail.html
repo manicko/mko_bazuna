@@ -27,20 +27,87 @@
         <article class="bg-white rounded-lg shadow overflow-hidden">
             <!-- Photo gallery -->
             {% if ad.images.all %}
-                <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
+            <div class="gallery p-4" data-detail-gallery>
+                {# Main image preview with prev/next arrow navigation #}
+                {% with primary=ad.images.first %}
+                <div class="relative mb-4">
+                    <a id="detail-main-link"
+                       href="{{ primary.image_url }}"
+                       class="glightbox" data-gallery="ad-gallery"
+                       data-description="{{ primary.alt_text|default:'' }}"
+                       aria-label="{% trans "Open image" %} 1">
+                        <img id="detail-main-image"
+                             src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
+                             alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
+                             class="w-full max-h-96 object-contain bg-gray-100 rounded-lg"
+                             loading="lazy"
+                             width="1280" height="960">
+                    </a>
+                    {% if ad.images.count > 1 %}
+                    <button id="detail-prev" type="button"
+                            class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            aria-label="{% trans "Previous image" %}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <button id="detail-next" type="button"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            aria-label="{% trans "Next image" %}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                    {% endif %}
+                </div>
+                {% endwith %}
+
+                {# Hidden GLightbox anchors for all remaining images so the overlay
+                   gallery group contains every image (GLightbox groups by
+                   data-gallery on .glightbox elements). #}
+                {% if ad.images.count > 1 %}
+                {% for image in ad.images.all %}{% if not forloop.first %}
+                <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
+                   data-description="{{ image.alt_text|default:'' }}" style="display:none;"></a>
+                {% endif %}{% endfor %}
+                {% endif %}
+
+                {# Horizontal thumbnail strip #}
+                <div id="detail-thumbs"
+                     class="flex gap-2 overflow-x-auto scroll-px-2 pb-1"
+                     style="-webkit-overflow-scrolling: touch;"
+                     data-detail-thumbs>
                     {% for image in ad.images.all %}
-                        <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
-                           data-description="{{ image.alt_text|default:"" }}" aria-label="{% trans "Open image" %} {{ forloop.counter }}">
-                            <img
-                                src="{{ image.thumbnail_large_url|default:image.image_url }}"
-                                alt="{% trans "Photo" %} {{ forloop.counter }} {% trans "for" %} {{ ad|get_title:LANGUAGE_CODE }}"
-                                class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
-                                loading="lazy"
-                                width="1280" height="960"
-                            >
-                        </a>
+                    <button type="button"
+                            class="flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 border-transparent hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            data-index="{{ forloop.counter0 }}"
+                            data-full-url="{{ image.image_url }}"
+                            data-thumb-url="{{ image.thumbnail_large_url|default:image.image_url }}"
+                            aria-label="{% trans "Select image" %} {{ forloop.counter }}">
+                        <img src="{{ image.thumbnail_small_url|default:image.image_url }}"
+                             alt="{% trans "Photo" %} {{ forloop.counter }}"
+                             class="w-full h-full object-cover">
+                    </button>
                     {% endfor %}
                 </div>
+            </div>
+
+            {# Minimal inline JS for thumbnail strip + arrow navigation.
+               Updates both the main <img src> and the GLightbox anchor href
+               atomically so fullscreen always opens the correct image. #}
+            <script>
+            (function(){'use strict';
+            var g=document.querySelector('[data-detail-gallery]');if(!g)return;
+            var img=g.querySelector('#detail-main-image'),lnk=g.querySelector('#detail-main-link');
+            var thumbs=g.querySelectorAll('[data-detail-thumbs] button[data-index]');var i=0;
+            function update(n){i=n;var t=thumbs[n];if(!t)return;img.src=t.dataset.thumbUrl;img.alt=t.querySelector('img').alt;lnk.href=t.dataset.fullUrl;}
+            var p=g.querySelector('#detail-prev'),nx=g.querySelector('#detail-next');
+            if(p){p.onclick=function(){if(i>0)update(i-1);};}if(nx){nx.onclick=function(){if(i<thumbs.length-1)update(i+1);};}
+            thumbs.forEach(function(b){b.onclick=function(){update(Number(b.dataset.index));};});
+            })();
+            </script>
             {% endif %}
 
             <div class="p-6">
@@ -71,11 +138,11 @@
                  <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
                     <div>
                         <span class="font-medium">{% trans "Location:" %}</span> 
-                        {{ ad.city.get_name|default:ad.city.name }}
+                        {{ ad.city|get_city_name:LANGUAGE_CODE }}
                     </div>
                     <div>
                         <span class="font-medium">{% trans "Category:" %}</span> 
-                        {{ ad.category.get_name|default:ad.category.name }}
+                        {{ ad.category|get_category_name:LANGUAGE_CODE }}
                     </div>
                     <div>
                         <time datetime="{{ ad.published_at|date:'Y-m-d' }}">

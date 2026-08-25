@@ -2,6 +2,7 @@
    swapped in place by the enable/disable toggle; the delete form swaps the
    whole row out. Disable keeps the search saved (D9); delete removes it. {% endcomment %}
 {% load i18n %}
+{% load localized_content %}
 <div id="ss-row-{{ ss.id }}" class="bg-white rounded-lg shadow p-4 flex flex-col md:flex-row md:items-center gap-4">
     <div class="flex-1">
         <div class="flex items-center gap-2 mb-1">
@@ -14,8 +15,8 @@
         </div>
         <div class="text-sm text-gray-500 space-y-0.5">
             <div>
-                {% trans "City:" %} {{ ss.city.get_name|default:"—" }}
-                · {% trans "Category:" %} {{ ss.category.get_name|default:"—" }}
+                {% trans "City:" %} {{ ss.city|get_city_name:LANGUAGE_CODE|default:"—" }}
+                · {% trans "Category:" %} {{ ss.category|get_category_name:LANGUAGE_CODE|default:"—" }}
             </div>
             <div>
                 {% trans "Price:" %}

@@ -1,13 +1,12 @@
 # English translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# Automatically generated, 2026.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-23 00:00+0200\n"
+"POT-Creation-Date: 2026-08-24 03:14-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
@@ -17,123 +16,946 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: templates/ads/detail.html
-msgid "Photo"
-msgstr "Photo"
+msgid "Published"
+msgstr ""
 
-msgid "for"
-msgstr "for"
+msgid "On Moderation"
+msgstr ""
 
-msgid "Location:"
-msgstr "Location:"
+msgid "Failed Moderation"
+msgstr ""
 
-msgid "Category:"
-msgstr "Category:"
+msgid "Archived"
+msgstr ""
 
-msgid "Published:"
-msgstr "Published:"
+msgid "Rejected"
+msgstr ""
 
-msgid "Contact Seller"
-msgstr "Contact Seller"
+msgid "You do not have permission to delete this ad."
+msgstr ""
 
-msgid "Seller unavailable for contact"
-msgstr "Seller unavailable for contact"
+msgid "You do not have permission to edit this ad."
+msgstr ""
 
-msgid "Back to listings"
-msgstr "Back to listings"
+msgid "Ad failed moderation checks"
+msgstr ""
 
-#: templates/ads/list.html
-msgid "Search"
-msgstr "Search"
+msgid "You do not have permission to archive this ad."
+msgstr ""
 
-msgid "Search ads..."
-msgstr "Search ads..."
+msgid "You do not have permission to reactivate this ad."
+msgstr ""
+
+msgid "Access denied"
+msgstr ""
+
+msgid "Entire country"
+msgstr ""
+
+msgid "Show all results"
+msgstr ""
+
+msgid "Cities"
+msgstr ""
+
+msgid "Categories"
+msgstr ""
+
+msgid "Popular queries"
+msgstr ""
+
+msgid "History"
+msgstr ""
+
+msgid "All Time"
+msgstr ""
+
+msgid "30 Days"
+msgstr ""
+
+msgid "7 Days"
+msgstr ""
+
+msgid "Moderation Queue"
+msgstr ""
+
+msgid "All"
+msgstr ""
+
+msgid "High"
+msgstr ""
+
+msgid "Medium"
+msgstr ""
+
+msgid "Low"
+msgstr ""
+
+msgid "ID"
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "Score"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Review"
+msgstr ""
+
+msgid "No ads in the moderation queue."
+msgstr ""
+
+msgid "Moderate Ad"
+msgstr ""
+
+msgid "Back to moderation queue"
+msgstr ""
 
 msgid "Category"
-msgstr "Category"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Telegram ID:"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+#, python-format
+msgid "Photos (%(count)s)"
+msgstr ""
+
+#, python-format
+msgid "Photo %(counter)s"
+msgstr ""
+
+msgid "No photos"
+msgstr ""
+
+msgid "Moderation Actions"
+msgstr ""
+
+msgid "Approve"
+msgstr ""
+
+msgid "Reject"
+msgstr ""
+
+msgid "Ban User"
+msgstr ""
+
+msgid "Failed Auto-Moderation"
+msgstr ""
+
+msgid ""
+"This ad failed automatic checks. You can approve, reject, or ban the user."
+msgstr ""
+
+#, python-format
+msgid "Reject Ad %(id)s"
+msgstr ""
+
+msgid "Reject Reason (Layer-2 Checklist)"
+msgstr ""
+
+msgid "Select a reason..."
+msgstr ""
+
+msgid "Adult content"
+msgstr ""
+
+msgid "Violence / Gore"
+msgstr ""
+
+msgid "Drugs / Weapons"
+msgstr ""
+
+msgid "Hate speech"
+msgstr ""
+
+msgid "Counterfeit goods"
+msgstr ""
+
+msgid "Illegal goods"
+msgstr ""
+
+msgid "Spam / Scam"
+msgstr ""
+
+msgid "Off-topic"
+msgstr ""
+
+msgid "Additional Details (optional)"
+msgstr ""
+
+msgid "Add more details about the rejection..."
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Reject Ad"
+msgstr ""
+
+#, python-format
+msgid "Ban User (Telegram ID: %(tid)s)"
+msgstr ""
+
+msgid "Ban Reason"
+msgstr ""
+
+msgid "Reason for banning this user..."
+msgstr ""
+
+msgid "Photo"
+msgstr ""
+
+msgid "Your Ads"
+msgstr ""
+
+msgid ""
+"Withdrawing consent permanently erases your Telegram ID, all ads, and "
+"prevents re-login. Are you sure?"
+msgstr ""
+
+msgid "Withdraw Data"
+msgstr ""
+
+msgid "Views"
+msgstr ""
+
+msgid "Contacts"
+msgstr ""
+
+#, python-format
+msgid "%(counter)s view"
+msgid_plural "%(counter)s views"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(counter)s contact"
+msgid_plural "%(counter)s contacts"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Archive"
+msgstr ""
+
+msgid "Reactivate"
+msgstr ""
+
+msgid "Action required"
+msgstr ""
+
+msgid "Pending review"
+msgstr ""
+
+msgid "No ads yet"
+msgstr ""
+
+msgid "Create an ad via Telegram bot"
+msgstr ""
+
+msgid "Open image"
+msgstr ""
+
+msgid "of"
+msgstr ""
+
+msgid "Previous image"
+msgstr ""
+
+msgid "Next image"
+msgstr ""
+
+msgid "Select image"
+msgstr ""
+
+msgid "Location:"
+msgstr ""
+
+msgid "Category:"
+msgstr ""
+
+msgid "Published:"
+msgstr ""
+
+msgid "Contact Seller"
+msgstr ""
+
+msgid "Seller unavailable for contact"
+msgstr ""
+
+msgid "Back to listings"
+msgstr ""
+
+msgid "Edit Ad"
+msgstr ""
+
+msgid "Price"
+msgstr ""
+
+msgid "Amount"
+msgstr ""
+
+msgid "Current Photos"
+msgstr ""
+
+msgid "Add Photos"
+msgstr ""
+
+msgid "Select multiple files to add more photos"
+msgstr ""
+
+msgid ""
+"Editing text (title/description) will send this ad for re-moderation and "
+"temporarily hide it from public view. Price/photo changes will be published "
+"immediately."
+msgstr ""
+
+msgid "Save Changes"
+msgstr ""
+
+msgid "&larr; Back to Dashboard"
+msgstr ""
+
+msgid "Search"
+msgstr ""
 
 msgid "Ads"
-msgstr "Ads"
+msgstr ""
 
 msgid "Save search"
-msgstr "Save search"
+msgstr ""
 
-#: templates/ads/partials/ad_list.html
 msgid "Did you mean:"
-msgstr "Did you mean:"
-
-msgid "No image"
-msgstr "No image"
+msgstr ""
 
 msgid "Purpose:"
-msgstr "Purpose:"
+msgstr ""
 
 msgid "Feature:"
-msgstr "Feature:"
+msgstr ""
 
 msgid "Clear all filters"
-msgstr "Clear all filters"
+msgstr ""
+
+msgid "No image"
+msgstr ""
+
+msgid "more"
+msgstr ""
 
 msgid "Page navigation"
-msgstr "Page navigation"
+msgstr ""
 
 #, python-format
 msgid "No results found for \"%(query)s\""
-msgstr "No results found for \"%(query)s\""
+msgstr ""
 
 msgid "Try a different search term or browse all categories"
-msgstr "Try a different search term or browse all categories"
+msgstr ""
 
 msgid "No ads available"
-msgstr "No ads available"
+msgstr ""
 
 msgid "Check back later for new listings"
-msgstr "Check back later for new listings"
+msgstr ""
 
 msgid "No ads available yet"
-msgstr "No ads available yet"
+msgstr ""
 
 msgid "Be the first to create an ad via Telegram!"
-msgstr "Be the first to create an ad via Telegram!"
+msgstr ""
 
-msgid "more"
-msgstr "more"
-
-#: templates/ads/partials/filter_form.html
 msgid "Listing purpose"
-msgstr "Listing purpose"
+msgstr ""
 
 msgid "Any"
-msgstr "Any"
+msgstr ""
 
 msgid "Min price"
-msgstr "Min price"
+msgstr ""
 
 msgid "Max price"
-msgstr "Max price"
+msgstr ""
 
 msgid "Features"
-msgstr "Features"
-
-msgid "selected"
-msgstr "selected"
+msgstr ""
 
 msgid "Apply filters"
-msgstr "Apply filters"
+msgstr ""
 
-#: templates/ads/partials/filter_sort.html
 msgid "Sort"
-msgstr "Sort"
+msgstr ""
 
 msgid "Newest first"
-msgstr "Newest first"
+msgstr ""
 
 msgid "Oldest first"
-msgstr "Oldest first"
+msgstr ""
 
 msgid "Price: low to high"
-msgstr "Price: low to high"
+msgstr ""
 
 msgid "Price: high to low"
-msgstr "Price: high to low"
+msgstr ""
 
+msgid "Moderation Analytics"
+msgstr ""
+
+#, python-format
+msgid "Moderation Statistics (Last %(days)s Days)"
+msgstr ""
+
+msgid "Pending Review Queue"
+msgstr ""
+
+msgid "Review Queue"
+msgstr ""
+
+msgid "Approved"
+msgstr ""
+
+msgid "Flagged"
+msgstr ""
+
+msgid "Avg Time to Moderate"
+msgstr ""
+
+msgid "Moderator Performance"
+msgstr ""
+
+msgid "Moderator ID"
+msgstr ""
+
+msgid "Actions Taken"
+msgstr ""
+
+msgid "Avg Time (hours)"
+msgstr ""
+
+#, python-format
+msgid "Moderator #%(mid)s"
+msgstr ""
+
+msgid "Top Rejection Reasons"
+msgstr ""
+
+msgid "Reason"
+msgstr ""
+
+msgid "Count"
+msgstr ""
+
+msgid "Distribution"
+msgstr ""
+
+msgid "No rejection data available"
+msgstr ""
+
+msgid "Rejection reasons will appear after moderators reject ads."
+msgstr ""
+
+msgid "Trust Dashboard"
+msgstr ""
+
+msgid "Your Trust Profile"
+msgstr ""
+
+msgid "Trust Score"
+msgstr ""
+
+msgid "Unverified"
+msgstr ""
+
+msgid "Score ranges from 0 to 100. Higher scores unlock trust badges."
+msgstr ""
+
+msgid "Total Views (30d)"
+msgstr ""
+
+msgid "Total Contacts (30d)"
+msgstr ""
+
+msgid "Days with Data"
+msgstr ""
+
+msgid "Daily Metrics (Last 30 Days)"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "Ad"
+msgstr ""
+
+msgid "No metrics data yet"
+msgstr ""
+
+msgid "Metrics will appear after ads receive views and contacts."
+msgstr ""
+
+msgid "Favorites"
+msgstr ""
+
+msgid "No favorites yet"
+msgstr ""
+
+msgid "Tap the heart on any ad to save it here."
+msgstr ""
+
+msgid "Cabinet"
+msgstr ""
+
+msgid ""
+"Manage your favorites, saved-search alerts, and search history from this "
+"cabinet."
+msgstr ""
+
+msgid "On"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "City:"
+msgstr ""
+
+msgid "Price:"
+msgstr ""
+
+msgid "Disable"
+msgstr ""
+
+msgid "Enable"
+msgstr ""
+
+msgid "Delete this saved search?"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Edit saved search"
+msgstr ""
+
+msgid "Search query"
+msgstr ""
+
+msgid "City (optional)"
+msgstr ""
+
+msgid "Any city"
+msgstr ""
+
+msgid "Category (optional)"
+msgstr ""
+
+msgid "Any category"
+msgstr ""
+
+msgid "Min price (EUR)"
+msgstr ""
+
+msgid "Max price (EUR)"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Saved searches"
+msgstr ""
+
+msgid "No saved searches yet"
+msgstr ""
+
+msgid ""
+"Use the \"Save search\" button on search results to get Telegram alerts."
+msgstr ""
+
+msgid "Search history"
+msgstr ""
+
+msgid "Clear your entire search history?"
+msgstr ""
+
+msgid "Clear history"
+msgstr ""
+
+msgid "No search history"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid ""
+"Settings are not yet available. Language preference is managed on your "
+"profile."
+msgstr ""
+
+msgid "Expand"
+msgstr ""
+
+msgid "Pro"
+msgstr ""
+
+msgid "Trusted"
+msgstr ""
+
+msgid "Verified"
+msgstr ""
+
+msgid "Breadcrumb"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Search results:"
+msgstr ""
+
+msgid "My ads"
+msgstr ""
+
+msgid ""
+"We use cookies to keep the service working, to measure traffic and to "
+"remember your preferences. Please choose which non-essential cookies you "
+"allow."
+msgstr ""
+
+msgid "session and CSRF protection cookies (always on)"
+msgstr ""
+
+msgid "anonymized traffic analytics via Plausible"
+msgstr ""
+
+msgid "language and city selection"
+msgstr ""
+
+msgid "Privacy details"
+msgstr ""
+
+msgid "Essential"
+msgstr ""
+
+msgid "Analytics"
+msgstr ""
+
+msgid "Preferences"
+msgstr ""
+
+msgid "Accept"
+msgstr ""
+
+msgid "Reject non-essential"
+msgstr ""
+
+msgid "Manage"
+msgstr ""
+
+msgid "Remove from favorites"
+msgstr ""
+
+msgid "Add to favorites"
+msgstr ""
+
+msgid "Mko Bazuna"
+msgstr ""
+
+msgid "Privacy Policy"
+msgstr ""
+
+msgid "Cookie settings"
+msgstr ""
+
+msgid "Dashboard"
+msgstr ""
+
+msgid "Admin"
+msgstr ""
+
+msgid "Logout"
+msgstr ""
+
+msgid "Login"
+msgstr ""
+
+msgid "Account menu"
+msgstr ""
+
+msgid "Account"
+msgstr ""
+
+msgid "Submit an ad"
+msgstr ""
+
+msgid "Preferred city"
+msgstr ""
+
+msgid "All categories"
+msgstr ""
+
+msgid "Search ads..."
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "My favorites"
+msgstr ""
+
+msgid "Login to save favorites"
+msgstr ""
+
+msgid "Log in to save favorites"
+msgstr ""
+
+msgid "Log in to save"
+msgstr ""
+
+msgid ""
+"This policy explains how Mko Bazuna collects, processes, and protects your\n"
+"            data, including the cookies we set and the third parties we "
+"share data with.\n"
+"            Last updated: August 2026."
+msgstr ""
+
+msgid "1. Controller"
+msgstr ""
+
+msgid ""
+"The data controller for this service is the operator of the Mko Bazuna "
+"classifieds board. You can contact us over Telegram at"
+msgstr ""
+
+msgid "2. Processing Purposes and Legal Bases"
+msgstr ""
+
+msgid "Service delivery and authentication"
+msgstr ""
+
+msgid "legal basis: performance of a contract / legitimate interest."
+msgstr ""
+
+msgid "Seller-buyer contact relay"
+msgstr ""
+
+msgid "via Telegram deep-links"
+msgstr ""
+
+msgid "legal basis: your explicit initiation."
+msgstr ""
+
+msgid "Traffic analytics"
+msgstr ""
+
+msgid "via Plausible (anonymized)"
+msgstr ""
+
+msgid "legal basis: your consent (analytics category)."
+msgstr ""
+
+msgid "Personalization"
+msgstr ""
+
+msgid "(language, city)"
+msgstr ""
+
+msgid "legal basis: your consent (preferences category)."
+msgstr ""
+
+msgid "Language normalization"
+msgstr ""
+
+msgid "of ad text via Google Translate"
+msgstr ""
+
+msgid "legal basis: best-effort, non-identifying content transfer."
+msgstr ""
+
+msgid "3. Cookie Declaration"
+msgstr ""
+
+msgid ""
+"The table below lists the cookies this site sets and whether they are "
+"essential (required for the service to function) or consent-gated."
+msgstr ""
+
+msgid "Cookie"
+msgstr ""
+
+msgid "Purpose"
+msgstr ""
+
+msgid "Consent-Gated"
+msgstr ""
+
+msgid "Authentication session"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Cross-Site Request Forgery protection"
+msgstr ""
+
+msgid "Consent state (accepted / declined / withdrawn)"
+msgstr ""
+
+msgid "N/A (consent state itself)"
+msgstr ""
+
+msgid "Analytics consent state"
+msgstr ""
+
+msgid "Preferences consent state"
+msgstr ""
+
+msgid "Preferred language (UI)"
+msgstr ""
+
+msgid "Yes (preferences)"
+msgstr ""
+
+msgid "Preferred city (catalog default)"
+msgstr ""
+
+msgid "4. Third-Party Disclosures"
+msgstr ""
+
+msgid "Telegram"
+msgstr ""
+
+#, python-format
+msgid ""
+"authentication and seller-buyer contact relay via deep-links (<code>t.me/"
+"%(bot_username)s</code>). No ad content is shared; only the identifiers "
+"needed for the action."
+msgstr ""
+
+msgid "Google Translate"
+msgstr ""
+
+msgid ""
+"best-effort, non-identifying language normalization of ad text. No personal "
+"data (telegram_id, username, IP) is transmitted."
+msgstr ""
+
+msgid "Plausible Analytics"
+msgstr ""
+
+msgid ""
+"cookieless, privacy-friendly traffic analytics. Loaded only after you accept "
+"the analytics category."
+msgstr ""
+
+msgid "5. Your Rights"
+msgstr ""
+
+msgid "Under GDPR you have the right to:"
+msgstr ""
+
+msgid "Access and obtain a copy of your personal data."
+msgstr ""
+
+msgid "Rectify inaccurate personal data."
+msgstr ""
+
+msgid ""
+"Erase your personal data (\"right to be forgotten\")."
+msgstr ""
+
+msgid "Restrict or object to processing."
+msgstr ""
+
+msgid "Data portability."
+msgstr ""
+
+msgid "Withdraw consent at any time, as easily as you gave it."
+msgstr ""
+
+msgid "Lodge a complaint with a supervisory authority."
+msgstr ""
+
+msgid "6. Erasure and Retention"
+msgstr ""
+
+msgid ""
+"When you withdraw consent, your account and its advertisements are\n"
+"                soft-deleted immediately. All personal data is permanently "
+"erased\n"
+"                within <strong>30 days</strong> of withdrawal. Consent state "
+"is otherwise\n"
+"                retained for 12 months, after which you are re-prompted."
+msgstr ""
+
+msgid "7. Manage Your Consent"
+msgstr ""
+
+msgid "You can revisit and change your consent choices at any time. Use the"
+msgstr ""
+
+msgid "link to open the consent banner, or contact us on Telegram at"
+msgstr ""
+
+msgid "Save search alert"
+msgstr ""
+
+msgid "Save alert"
+msgstr ""
+
+msgid "Search saved"
+msgstr ""
+
+msgid "You'll get a Telegram alert when new ads match this search."
+msgstr ""
+
+msgid "Login to Mko Bazuna"
+msgstr ""
+
+msgid "Tap the button below to open Telegram and authenticate."
+msgstr ""
+
+msgid "This link expires in 5 minutes."
+msgstr ""
+
+msgid "Login via Telegram"
+msgstr ""
+
+msgid "Waiting for Telegram confirmation..."
+msgstr ""
+
+msgid "Don't have Telegram?"
+msgstr ""
+
+msgid "Get it here"
+msgstr ""
+
+msgid "Login successful! Redirecting..."
+msgstr ""
+
+msgid "This login link is invalid, expired, or already used."
+msgstr ""
+
+msgid "Error checking login status."
+msgstr ""

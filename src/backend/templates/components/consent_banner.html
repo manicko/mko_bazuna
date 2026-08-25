@@ -11,9 +11,9 @@
                     {% trans "We use cookies to keep the service working, to measure traffic and to remember your preferences. Please choose which non-essential cookies you allow." %}
                 </p>
                 <ul class="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
-                    <li><strong>Essential</strong> — {% trans "session and CSRF protection cookies (always on)" %}.</li>
-                    <li><strong>Analytics</strong> — {% trans "anonymized traffic analytics via Plausible" %}.</li>
-                    <li><strong>Preferences</strong> — {% trans "language and city selection" %}.</li>
+                    <li><strong>{% trans "Essential" %}</strong> — {% trans "session and CSRF protection cookies (always on)" %}.</li>
+                    <li><strong>{% trans "Analytics" %}</strong> — {% trans "anonymized traffic analytics via Plausible" %}.</li>
+                    <li><strong>{% trans "Preferences" %}</strong> — {% trans "language and city selection" %}.</li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-2">
                     <a href="{% url 'core:privacy' %}" class="underline hover:text-gray-800">{% trans "Privacy details" %}</a>
@@ -24,13 +24,13 @@
                 {# Granular category toggles #}
                 <div class="flex flex-wrap gap-3 text-xs text-gray-700">
                     <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" checked disabled> Essential
+                        <input type="checkbox" checked disabled> {% trans "Essential" %}
                     </label>
                     <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" id="consent-cat-analytics" checked> Analytics
+                        <input type="checkbox" id="consent-cat-analytics" checked> {% trans "Analytics" %}
                     </label>
                     <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" id="consent-cat-preferences" checked> Preferences
+                        <input type="checkbox" id="consent-cat-preferences" checked> {% trans "Preferences" %}
                     </label>
                 </div>
 

@@ -9,11 +9,12 @@ import logging
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
+from apps.core.enums import TimeRange
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.utils.translation import gettext_lazy as _
 from apps.analytics.services.seller_stats import SellerStats
-from apps.core.enums import TimeRange
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +76,11 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     context = {
         "ads_by_status": ads_by_status,
         "status_labels": {
-            AdStatus.PUBLISHED: "Published",
-            AdStatus.ON_MODERATION: "On Moderation",
-            AdStatus.ON_MODERATION_FAILED: "Failed Moderation",
-            AdStatus.ARCHIVED: "Archived",
-            AdStatus.REJECTED: "Rejected",
+            AdStatus.PUBLISHED: _("Published"),
+            AdStatus.ON_MODERATION: _("On Moderation"),
+            AdStatus.ON_MODERATION_FAILED: _("Failed Moderation"),
+            AdStatus.ARCHIVED: _("Archived"),
+            AdStatus.REJECTED: _("Rejected"),
         },
         "seller_stats": seller_stats,
         "per_ad_stats_dict": per_ad_stats_dict,

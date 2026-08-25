@@ -10,7 +10,7 @@ Usage:
 Dependencies:
   - Tailwind CSS (bg-green-100, text-green-800, etc.)
 {% endcomment %}
-
+{% load i18n %}
 <span
     class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded"
     aria-label="Trusted seller"
@@ -28,5 +28,5 @@ Dependencies:
             clip-rule="evenodd"
         />
     </svg>
-    <span>Trusted</span>
+    <span>{% trans "Trusted" %}</span>
 </span>

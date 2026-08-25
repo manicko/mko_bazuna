@@ -2,10 +2,12 @@
 Fragment-cache helpers for the category submenu endpoint.
 
 A monotonically increasing *tree version* is used so that category submenu
-fragments keyed by ``category:submenu:<tree_version>:<slug>`` are invalidated
-whenever the category tree changes structurally. This works uniformly on both
-the LocMemCache (dev/test) and Redis (production) backends without relying on
-backend-specific ``delete_pattern`` support.
+fragments keyed by ``category:submenu:<tree_version>:<slug>:<locale>`` are invalidated
+whenever the category tree changes structurally. The ``<locale>`` segment prevents
+cross-language cache bleed (a Russian-rendered submenu must not be served to a
+Bosnian visitor). This works uniformly on both the LocMemCache (dev/test) and
+Redis (production) backends without relying on backend-specific ``delete_pattern``
+support.
 """
 
 import logging

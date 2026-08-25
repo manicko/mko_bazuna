@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.http import HttpRequest
 from django.test import SimpleTestCase
+from django.utils import translation
 
 from apps.core.context_processors import header_context, language
 
@@ -68,6 +69,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
         """Without a preferred city the badge shows the country-wide label."""
         request = HttpRequest()
         request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
         result = self._call_header_context(request)
         assert result["context"]["preferred_city_display"] == "Вся страна"
         assert "cities" in result["context"]
@@ -87,6 +89,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
             request = HttpRequest()
             request.preferred_city = "podgorica"
             request.LANGUAGE_CODE = "ru"
+            translation.activate("ru")
             context = header_context(request)
 
         assert context["preferred_city_display"] == "Подгорица"
@@ -105,6 +108,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
             request = HttpRequest()
             request.preferred_city = "deleted-city"
             request.LANGUAGE_CODE = "ru"
+            translation.activate("ru")
             context = header_context(request)
 
         assert context["preferred_city_display"] == "Вся страна"
@@ -113,6 +117,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
         """Context exposes the ordered ``cities`` list for the dropdown."""
         request = HttpRequest()
         request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
         result = self._call_header_context(request)
         assert "cities" in result["context"]
 
@@ -120,6 +125,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
         """Anonymous (or missing) request user yields ``favorites_count=None``."""
         request = HttpRequest()
         request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
         result = self._call_header_context(request)
         assert result["context"]["favorites_count"] is None
 
@@ -131,6 +137,7 @@ class HeaderContextProcessorTests(SimpleTestCase):
 
         request = HttpRequest()
         request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
         request.user = user
         result = self._call_header_context(request)
 

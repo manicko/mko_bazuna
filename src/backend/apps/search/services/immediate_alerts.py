@@ -22,7 +22,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price_value
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, LanguageLocale
 from apps.search.models import SavedSearch
 from apps.search.services.alert_query import (
     find_matching_saved_searches,
@@ -30,6 +30,7 @@ from apps.search.services.alert_query import (
 )
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext as _, override as translation_override
 
 logger = logging.getLogger(__name__)
 
@@ -88,40 +89,50 @@ def deliver_immediate_alerts(ad_id: int) -> None:
     thread.start()
 
 
-def build_alert_message(ad: Ad, saved_search: SavedSearch) -> tuple[str, InlineKeyboardMarkup]:
+def build_alert_message(
+    ad: Ad, saved_search: SavedSearch, locale: str = LanguageLocale.RUSSIAN.value
+) -> tuple[str, InlineKeyboardMarkup]:
     """
     Build the per-ad Telegram alert message (CR9).
 
-    Shows title, city, and price, plus a ``[Посмотреть объявление]`` absolute
-    link (via ``settings.SITE_URL`` + ``Ad.get_absolute_url``) and a
-    ``[🔕 Отключить этот поиск]`` inline callback button carrying the search's
-    opaque ``unsubscribe_token``.
+    Shows title, city, and price in the recipient's preferred language, plus an
+    absolute ``[View ad]`` link (via ``settings.SITE_URL`` +
+    ``Ad.get_absolute_url``) and a ``[Disable this search]`` inline callback button
+    carrying the search's opaque ``unsubscribe_token``.
+
+    Args:
+        ad: The published ad.
+        saved_search: The saved search that matched.
+        locale: Language code for the recipient's preferred language.
 
     Returns:
         A tuple of (message_text, reply_markup).
     """
-    title = ad.get_title("ru") or "Объявление"
-    city_name = ad.city.get_name() if ad.city else "—"
-    price_str = format_price_value(ad.price_amount, ad.price_currency) or "Цена не указана"
+    with translation_override(locale):
+        title = ad.get_title(locale) or _("Ad")
+        city_name = ad.city.get_name(locale) if ad.city else "—"
+        price_str = format_price_value(ad.price_amount, ad.price_currency) or _("Price not specified")
+        view_ad_label = _("View ad")
+        disable_search_label = _("🔕 Disable this search")
 
-    lines = [
-        f"<b>{title}</b>",
-        f"📍 {city_name}",
-        f"💰 {price_str}",
-        "",
-        f"<a href=\"{ad.get_absolute_url()}\">Посмотреть объявление</a>",
-    ]
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🔕 Отключить этот поиск",
-                    callback_data=f"{UNSUB_CALLBACK_PREFIX}{saved_search.unsubscribe_token}",
-                ),
-            ],
+        lines = [
+            f"<b>{title}</b>",
+            f"📍 {city_name}",
+            f"💰 {price_str}",
+            "",
+            f'<a href="{ad.get_absolute_url()}">{view_ad_label}</a>',
         ]
-    )
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=disable_search_label,
+                        callback_data=f"{UNSUB_CALLBACK_PREFIX}{saved_search.unsubscribe_token}",
+                    ),
+                ],
+            ]
+        )
     return "\n".join(lines), keyboard
 
 
@@ -135,7 +146,8 @@ def _build_payload(ad: Ad, saved_search: SavedSearch) -> dict | None:
             saved_search.pk,
         )
         return None
-    text, reply_markup = build_alert_message(ad, saved_search)
+    locale = getattr(user, "telegram_language", None) or LanguageLocale.RUSSIAN.value
+    text, reply_markup = build_alert_message(ad, saved_search, locale=locale)
     return {
         "chat_id": user.chat_id,
         "text": text,

@@ -19,6 +19,7 @@ from apps.moderation.services.auto_moderation import auto_moderate
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         logger.warning(
             f"User {request.user.id} attempted to edit ad {ad_id} owned by {ad.user_id}"
         )
-        return HttpResponseForbidden("You do not have permission to edit this ad.")
+        return HttpResponseForbidden(_("You do not have permission to edit this ad."))
 
     if request.method == "GET":
         # Prefetch images for the edit template
@@ -167,7 +168,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             return render(
                 request,
                 "ads/edit.html",
-                {"ad": ad, "error": "Ad failed moderation checks"},
+                {"ad": ad, "error": _("Ad failed moderation checks")},
             )
 
     elif ad.status == AdStatus.PUBLISHED:
@@ -240,7 +241,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         logger.warning(
             f"User {request.user.id} attempted to archive ad {ad_id} owned by {ad.user_id}"
         )
-        return HttpResponseForbidden("You do not have permission to archive this ad.")
+        return HttpResponseForbidden(_("You do not have permission to archive this ad."))
 
     if ad.status == AdStatus.PUBLISHED:
         ad.transition_to(AdStatus.ARCHIVED)
@@ -271,7 +272,9 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
         logger.warning(
             f"User {request.user.id} attempted to reactivate ad {ad_id} owned by {ad.user_id}"
         )
-        return HttpResponseForbidden("You do not have permission to reactivate this ad.")
+        return HttpResponseForbidden(
+            _("You do not have permission to reactivate this ad.")
+        )
 
     if ad.status == AdStatus.ARCHIVED:
         # Update status to ON_MODERATION for re-check (transition_to clears archived_at)

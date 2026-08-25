@@ -1,12 +1,13 @@
 {# Login token issuance template for Mko Bazuna. Renders the Telegram deep-link for login authentication. User taps the button to open Telegram and complete login via bot. #}
 {% load static %}
+{% load i18n %}
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Mko Bazuna</title>
+    <title>{% trans "Login" %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
@@ -14,25 +15,25 @@
     <main class="container mx-auto px-4 py-6 max-w-md flex-1 flex items-center justify-center">
         <div class="bg-white rounded-lg shadow p-8 text-center">
             <h1 class="text-2xl font-bold text-gray-800 mb-4">
-                Login to Mko Bazuna
+                {% trans "Login to Mko Bazuna" %}
             </h1>
             <p class="text-gray-600 mb-6">
-                Tap the button below to open Telegram and authenticate.
-                This link expires in 5 minutes.
+                {% trans "Tap the button below to open Telegram and authenticate." %}
+                {% trans "This link expires in 5 minutes." %}
             </p>
             <a
                 href="{{ deep_link }}"
                 class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
             >
-                Login via Telegram
+                {% trans "Login via Telegram" %}
             </a>
             <p id="login-status" class="text-xs text-gray-400 mt-4 hidden">
-                Waiting for Telegram confirmation...
+                {% trans "Waiting for Telegram confirmation..." %}
             </p>
             <p class="text-xs text-gray-400 mt-4">
-                Don't have Telegram?
+                {% trans "Don't have Telegram?" %}
                 <a href="https://telegram.org" class="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">
-                    Get it here
+                    {% trans "Get it here" %}
                 </a>
             </p>
         </div>
@@ -52,18 +53,18 @@
                     .then(function (resp) {
                         if (resp.status === 200) {
                             clearInterval(interval);
-                            statusEl.textContent = "Login successful! Redirecting...";
+                            statusEl.textContent = "{% trans "Login successful! Redirecting..." %}";
                             window.location.href = "{% url 'ads:dashboard' %}";
                         } else if (resp.status === 204) {
-                            statusEl.textContent = "Waiting for Telegram confirmation...";
+                            statusEl.textContent = "{% trans "Waiting for Telegram confirmation..." %}";
                         } else if (resp.status === 410) {
                             clearInterval(interval);
-                            statusEl.textContent = "This login link is invalid, expired, or already used.";
+                            statusEl.textContent = "{% trans "This login link is invalid, expired, or already used." %}";
                         }
                     })
                     .catch(function () {
                         clearInterval(interval);
-                        statusEl.textContent = "Error checking login status.";
+                        statusEl.textContent = "{% trans "Error checking login status." %}";
                     });
             }, 3000);
         })();

@@ -65,3 +65,43 @@ def get_lookup_name(item, locale: str = "ru") -> str:
         Localized name string.
     """
     return item.get_name(locale=locale)
+
+
+@register.filter
+def get_category_name(category, locale: str = "ru") -> str:
+    """
+    Return the localized name of a Category.
+
+    Delegates to Category.get_name(locale) with fallback chain:
+    locale → ru → name.
+
+    Args:
+        category: The Category instance (or None).
+        locale: Language code (e.g. "ru", "bs", "en").
+
+    Returns:
+        Localized name string, or "" if category is None.
+    """
+    if category is None:
+        return ""
+    return category.get_name(locale=locale)
+
+
+@register.filter
+def get_city_name(city, locale: str = "ru") -> str:
+    """
+    Return the localized name of a City.
+
+    Delegates to City.get_name(locale) with fallback chain:
+    locale → ru → name.
+
+    Args:
+        city: The City instance (or None).
+        locale: Language code (e.g. "ru", "bs", "en").
+
+    Returns:
+        Localized name string, or "" if city is None.
+    """
+    if city is None:
+        return ""
+    return city.get_name(locale=locale)

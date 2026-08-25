@@ -15,6 +15,7 @@ from apps.core.enums import AdStatus
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
+from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
         logger.warning(
             f"User {request.user.id} attempted to delete ad {ad_id} owned by {ad.user_id}"
         )
-        return HttpResponseForbidden("You do not have permission to delete this ad.")
+        return HttpResponseForbidden(_("You do not have permission to delete this ad."))
 
     # Transition to DELETED (transition_to handles deleted_at timestamp)
     if ad.status != AdStatus.DELETED:

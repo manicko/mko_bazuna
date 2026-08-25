@@ -7,6 +7,9 @@ No inline string literals for constants anywhere in the codebase.
 
 from enum import IntEnum, StrEnum
 
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
+
 
 class AdSort(StrEnum):
     """Sort options for ad listings."""
@@ -127,12 +130,12 @@ class TimeRange(StrEnum):
     SEVEN_DAYS = "7_days"
 
     @classmethod
-    def choices(cls) -> list[tuple[str, str]]:
+    def choices(cls) -> list[tuple[str, str | Promise]]:
         """Return list of (value, label) tuples for template select options."""
         return [
-            (cls.ALL_TIME.value, "All Time"),
-            (cls.THIRTY_DAYS.value, "30 Days"),
-            (cls.SEVEN_DAYS.value, "7 Days"),
+            (cls.ALL_TIME.value, _("All Time")),
+            (cls.THIRTY_DAYS.value, _("30 Days")),
+            (cls.SEVEN_DAYS.value, _("7 Days")),
         ]
 
 

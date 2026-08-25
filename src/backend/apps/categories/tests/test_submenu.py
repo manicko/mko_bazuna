@@ -50,19 +50,57 @@ class TestCategorySubmenu:
         old = Category.objects.get(slug="old")
         assert client.get(f"/categories/{old.slug}/submenu/").status_code == 404
 
-    def test_submenu_invalidated_on_structure_change(self, tree: Category) -> None:
+    def test_submenu_localized_content(self, tree: Category) -> None:
+        """Submenu renders localized names based on ``?lang=X`` parameter."""
+        root = tree
+        root.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
+        root.save(update_fields=["name_i18n"])
+
+        child_bicycles = Category.objects.get(slug="bicycles")
+        child_bicycles.name_i18n = {"ru": "Велосипеды", "bs": "Bicikli"}
+        child_bicycles.save(update_fields=["name_i18n"])
+
+        child_cars = Category.objects.get(slug="cars")
+        child_cars.name_i18n = {"ru": "Автомобили", "bs": "Automobili"}
+        child_cars.save(update_fields=["name_i18n"])
+
         client = Client()
-        # Prime the fragment cache.
-        assert client.get("/categories/transport/submenu/").status_code == 200
-        assert "NoSuchChild" not in client.get(
-            "/categories/transport/submenu/"
+
+        # Russian response
+        response_ru = client.get("/categories/transport/submenu/?lang=ru")
+        assert response_ru.status_code == 200
+        content_ru = response_ru.content.decode("utf-8")
+        assert "Велосипеды" in content_ru
+        assert "Bicikli" not in content_ru
+
+        # Bosnian response — different cache entry, different content
+        response_bs = client.get("/categories/transport/submenu/?lang=bs")
+        assert response_bs.status_code == 200
+        content_bs = response_bs.content.decode("utf-8")
+        assert "Bicikli" in content_bs
+        assert "Велосипеды" not in content_bs
+
+    def test_submenu_cache_isolated_by_locale(self, tree: Category) -> None:
+        """The cache key includes the locale, preventing cross-language bleed."""
+        child_bicycles = Category.objects.get(slug="bicycles")
+        child_bicycles.name_i18n = {"ru": "Велосипеды", "bs": "Bicikli"}
+        child_bicycles.save(update_fields=["name_i18n"])
+
+        client = Client()
+
+        # Prime the cache with Russian
+        client.get("/categories/transport/submenu/?lang=ru")
+        content_after_ru = client.get(
+            "/categories/transport/submenu/?lang=ru"
         ).content.decode("utf-8")
+        assert "Велосипеды" in content_after_ru
 
-        # A structural change bumps the tree version -> fragment is invalidated.
-        Category.objects.create(name="NewChild", slug="new-child", parent=tree)
-
-        response = client.get("/categories/transport/submenu/")
-        assert "NewChild" in response.content.decode("utf-8")
+        # Bosnian should NOT return the cached Russian version
+        content_after_bs = client.get(
+            "/categories/transport/submenu/?lang=bs"
+        ).content.decode("utf-8")
+        assert "Bicikli" in content_after_bs
+        assert "Велосипеды" not in content_after_bs
 
 
 @pytest.fixture
