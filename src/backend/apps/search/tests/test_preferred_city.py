@@ -73,7 +73,9 @@ class TestPreferredCityView:
         assert cookie["httponly"] is True
         assert cookie["samesite"] == "Lax"
 
-    def test_post_without_preferences_consent_sets_no_cookie(self, podgorica: City) -> None:
+    def test_post_without_preferences_consent_sets_no_cookie(
+        self, podgorica: City
+    ) -> None:
         """Without preferences consent the cookie is NOT set (T-06c / ePrivacy)."""
         client = Client()
         response = client.post("/api/preferred-city/", {"slug": "podgorica"})
@@ -96,7 +98,9 @@ class TestPreferredCityView:
         buyer.refresh_from_db()
         assert buyer.preferred_city_id == podgorica.id
 
-    def test_post_with_valid_slug_cookie_only_for_anonymous(self, podgorica: City) -> None:
+    def test_post_with_valid_slug_cookie_only_for_anonymous(
+        self, podgorica: City
+    ) -> None:
         """A consented anonymous selection sets the cookie only (no DB write)."""
         client = Client()
         client.cookies["consent_preferences"] = "true"

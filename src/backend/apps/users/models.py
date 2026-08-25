@@ -4,7 +4,6 @@ User and LoginToken models for Mko Bazuna.
 One user = one Telegram account. Authentication via atomic login tokens.
 """
 
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 

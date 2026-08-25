@@ -58,7 +58,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     ads_by_status = {
         AdStatus.PUBLISHED: Ad.objects.filter(
             user_id=request.user.id, status=AdStatus.PUBLISHED
-        ).prefetch_related("images").select_related("category", "city"),
+        )
+        .prefetch_related("images")
+        .select_related("category", "city"),
         AdStatus.ON_MODERATION: Ad.objects.filter(
             user_id=request.user.id, status=AdStatus.ON_MODERATION
         ).select_related("category", "city"),
@@ -67,7 +69,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         ).select_related("category", "city"),
         AdStatus.ARCHIVED: Ad.objects.filter(
             user_id=request.user.id, status=AdStatus.ARCHIVED
-        ).prefetch_related("images").select_related("category", "city"),
+        )
+        .prefetch_related("images")
+        .select_related("category", "city"),
         AdStatus.REJECTED: Ad.objects.filter(
             user_id=request.user.id, status=AdStatus.REJECTED
         ).select_related("category", "city"),

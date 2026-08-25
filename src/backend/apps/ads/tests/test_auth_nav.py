@@ -55,7 +55,9 @@ def staff_user() -> User:
 def published_ad(user: User, category: Category, city: City) -> Ad:
     """Create a PUBLISHED ad for the authenticated seller."""
     return create_test_ad(
-        user, category, city,
+        user,
+        category,
+        city,
         title="Header Nav Ad",
         description="Header nav description",
         status=AdStatus.PUBLISHED,
@@ -162,7 +164,9 @@ class TestAuthenticatedHeader:
         assert response.status_code == 200
         assert b"consent-banner" in response.content
 
-    def test_authenticated_catalog_header_shows_dropdown_and_badge(self, user: User) -> None:
+    def test_authenticated_catalog_header_shows_dropdown_and_badge(
+        self, user: User
+    ) -> None:
         """Authenticated users on the homepage see the avatar button + dropdown
         and the favorites heart badge in the catalog header (CR2, CR4, CR6)."""
         client = Client()

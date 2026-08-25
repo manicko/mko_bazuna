@@ -33,7 +33,9 @@ def _category_path(category: Category, locale: str = "ru") -> str:
     )
 
 
-def get_entity_suggestions(prefix: str, limit: int = 5, locale: str = "ru") -> list[dict]:
+def get_entity_suggestions(
+    prefix: str, limit: int = 5, locale: str = "ru"
+) -> list[dict]:
     """
     Get matching category and city names for autocomplete.
 

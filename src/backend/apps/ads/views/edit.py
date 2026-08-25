@@ -150,7 +150,13 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad.description = new_description
         ad = _apply_price_change(ad, price_amount_value, price_currency_value)
         ad.save(
-            update_fields=["title", "description", "price_amount", "price_currency", "price_normalized_eur"]
+            update_fields=[
+                "title",
+                "description",
+                "price_amount",
+                "price_currency",
+                "price_normalized_eur",
+            ]
         )
 
         # Transition to ON_MODERATION (clears archived_at via transition_to)
@@ -182,8 +188,11 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             ad = _apply_price_change(ad, price_amount_value, price_currency_value)
             ad.save(
                 update_fields=[
-                    "title", "description",
-                    "price_amount", "price_currency", "price_normalized_eur",
+                    "title",
+                    "description",
+                    "price_amount",
+                    "price_currency",
+                    "price_normalized_eur",
                     "updated_at",
                 ]
             )
@@ -196,7 +205,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             ad = _apply_price_change(ad, price_amount_value, price_currency_value)
             ad.save(
                 update_fields=[
-                    "price_amount", "price_currency", "price_normalized_eur", "updated_at",
+                    "price_amount",
+                    "price_currency",
+                    "price_normalized_eur",
+                    "updated_at",
                 ]
             )
             logger.info(f"Ad {ad_id} price/photo edited, stays PUBLISHED")
@@ -210,8 +222,11 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad = _apply_price_change(ad, price_amount_value, price_currency_value)
         ad.save(
             update_fields=[
-                "title", "description",
-                "price_amount", "price_currency", "price_normalized_eur",
+                "title",
+                "description",
+                "price_amount",
+                "price_currency",
+                "price_normalized_eur",
                 "updated_at",
             ]
         )
@@ -241,7 +256,9 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         logger.warning(
             f"User {request.user.id} attempted to archive ad {ad_id} owned by {ad.user_id}"
         )
-        return HttpResponseForbidden(_("You do not have permission to archive this ad."))
+        return HttpResponseForbidden(
+            _("You do not have permission to archive this ad.")
+        )
 
     if ad.status == AdStatus.PUBLISHED:
         ad.transition_to(AdStatus.ARCHIVED)

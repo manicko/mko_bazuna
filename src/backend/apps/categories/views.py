@@ -48,9 +48,7 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
     if cached is not None:
         return HttpResponse(cached)
 
-    children = list(
-        category.get_children().filter(is_active=True).order_by("name")
-    )
+    children = list(category.get_children().filter(is_active=True).order_by("name"))
     html = render(
         request,
         "categories/partials/mega_submenu.html",

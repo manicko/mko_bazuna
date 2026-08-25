@@ -161,7 +161,9 @@ class TestModerationReviewView:
         city: City,
     ) -> None:
         """Staff users can view the moderation review page."""
-        ad, _ = _create_ad_with_image(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad, _ = _create_ad_with_image(
+            seller, category, city, status=AdStatus.ON_MODERATION
+        )
 
         client = Client()
         client.force_login(staff_user)
@@ -206,7 +208,9 @@ class TestModerationReviewView:
         city: City,
     ) -> None:
         """Review page includes user, category, city, and images in context."""
-        ad, ad_image = _create_ad_with_image(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad, ad_image = _create_ad_with_image(
+            seller, category, city, status=AdStatus.ON_MODERATION
+        )
 
         client = Client()
         client.force_login(staff_user)
@@ -303,11 +307,11 @@ class TestApproveAdView:
         assert log_entries.exists()
 
     def test_approve_requires_post(
-            self,
-            staff_user: User,
-            seller: User,
-            category: Category,
-            city: City,
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
     ) -> None:
         """GET to approve_ad returns 405 Method Not Allowed."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
@@ -444,7 +448,9 @@ class TestRejectAdView:
         city: City,
     ) -> None:
         """reject_ad works for ads in ON_MODERATION_FAILED status."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
 
         client = Client()
         client.force_login(staff_user)

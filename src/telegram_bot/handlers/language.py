@@ -35,9 +35,7 @@ async def cmd_language(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     user_id = data.get("user_id")
     if not user_id:
-        await message.answer(
-            "Please login first with /start login_<token>"
-        )
+        await message.answer("Please login first with /start login_<token>")
         return
 
     current_lang = await _get_user_language(user_id)
@@ -56,7 +54,7 @@ async def handle_language_callback(
     if not callback.data:
         return
 
-    lang_code = callback.data[len(LANG_CALLBACK_PREFIX):]
+    lang_code = callback.data[len(LANG_CALLBACK_PREFIX) :]
     try:
         locale = LanguageLocale(lang_code)
     except ValueError:
@@ -92,12 +90,14 @@ def build_language_keyboard(current: str = "") -> InlineKeyboardMarkup:
         text = labels.get(locale.value, locale.value)
         if locale.value == current:
             text = f"✅ {text}"
-        buttons.append([
-            InlineKeyboardButton(
-                text=text,
-                callback_data=f"{LANG_CALLBACK_PREFIX}{locale.value}",
-            )
-        ])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=f"{LANG_CALLBACK_PREFIX}{locale.value}",
+                )
+            ]
+        )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -114,9 +114,7 @@ def _get_user_language(user_id: int) -> str:
 @sync_to_async
 def _set_user_language(user_id: int, lang_code: str) -> None:
     """Persist the selected language on the user row."""
-    updated = User.objects.filter(id=user_id).update(
-        telegram_language=lang_code
-    )
+    updated = User.objects.filter(id=user_id).update(telegram_language=lang_code)
     logger.info(
         "telegram_language updated for user %s to %s (rows=%d)",
         user_id,

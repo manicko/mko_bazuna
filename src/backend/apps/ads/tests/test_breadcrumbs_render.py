@@ -35,7 +35,9 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 def _breadcrumb_nav(content: str) -> str:
     """Extract the inner HTML of the rendered ``<nav aria-label="Breadcrumb">``."""
     match = re.search(
-        r'<nav aria-label="(?:Хлебные крошки|Breadcrumb)"[^>]*>(.*?)</nav>', content, re.S
+        r'<nav aria-label="(?:Хлебные крошки|Breadcrumb)"[^>]*>(.*?)</nav>',
+        content,
+        re.S,
     )
     return match.group(1).strip() if match else ""
 
@@ -44,7 +46,10 @@ def _breadcrumb_nav(content: str) -> str:
 def _load_catalog():
     """Load the category catalog and create a city for breadcrumb tests."""
     catalog_path = (
-        Path(__file__).resolve().parents[2] / "categories" / "catalog" / "categories.yaml"
+        Path(__file__).resolve().parents[2]
+        / "categories"
+        / "catalog"
+        / "categories.yaml"
     )
     load_catalog(catalog_path)
     City.objects.create(

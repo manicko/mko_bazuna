@@ -10,8 +10,6 @@ HTMX-compatible MPA (no login required).
 
 """
 
-
-
 import logging
 
 from difflib import get_close_matches
@@ -40,11 +38,7 @@ from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
 
 
-
 logger = logging.getLogger(__name__)
-
-
-
 
 
 def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
@@ -102,9 +96,6 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     }
 
     return render(request, "ads/detail.html", context)
-
-
-
 
 
 def _serve_image(image_key: str) -> HttpResponse:
@@ -195,19 +186,11 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     return response
 
 
-
-
-
 def listings(
-
     request: HttpRequest,
-
     category_slug: str | None = None,
-
     city_slug: str | None = None,
-
 ) -> HttpResponse:
-
     """
 
     Public listings view for PUBLISHED ads.
@@ -262,8 +245,6 @@ def listings(
 
     PER_PAGE = 24
 
-
-
     # Start with only published ads
     # Prefetch trust scores to avoid N+1 in render_trust_badge template tag.
     ads = (
@@ -272,8 +253,6 @@ def listings(
         .prefetch_related("features", "user__trust_score")
     )
 
-
-
     # Category filter (subtree)
 
     suggested_category = None
@@ -281,9 +260,7 @@ def listings(
     breadcrumb_category = None
 
     if category_slug:
-
         try:
-
             category = Category.objects.get(slug=category_slug, is_active=True)
 
             breadcrumb_category = category
@@ -291,26 +268,20 @@ def listings(
             # Get all descendants including self
 
             descendant_ids = category.get_descendants(include_self=True).values_list(
-
                 "id", flat=True
-
             )
 
             ads = ads.filter(category_id__in=descendant_ids)
 
         except Category.DoesNotExist:
-
             # Category not found - no filter applied
 
             suggested_category = _suggest_category(category_slug)
 
     elif request.GET.get("category"):
-
         # Try to suggest category for invalid slug
 
         suggested_category = _suggest_category(request.GET.get("category", ""))
-
-
 
     # City filter with did-you-mean. Priority: URL path ``city_slug`` wins, then
     # an explicit ``?city=`` param is a real filter (F-5), then the
@@ -347,48 +318,31 @@ def listings(
                 # Second line of defense for a stale preference: no filter.
                 pass
 
-
-
     # Price range filter
 
     min_price = request.GET.get("min_price")
 
     max_price = request.GET.get("max_price")
 
-
-
     if min_price:
-
         try:
-
             ads = ads.filter(price_normalized_eur__gte=int(min_price))
 
         except ValueError:
-
             pass  # Invalid price, ignore filter
 
-
-
     if max_price:
-
         try:
-
             ads = ads.filter(price_normalized_eur__lte=int(max_price))
 
         except ValueError:
-
             pass  # Invalid price, ignore filter
-
-
 
     # Listing purpose filter (F4) — single-select exact slug match
     listing_purpose_slug = request.GET.get("listing_purpose")
 
     if listing_purpose_slug:
-
         ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
-
-
 
     # Features filter (F5) — multi-select AND semantics via chained filters.
     # Each chained ``.filter(features__slug=...)`` adds an EXISTS subquery;
@@ -396,10 +350,7 @@ def listings(
     feature_slugs = request.GET.getlist("features") or []
 
     for fslug in feature_slugs:
-
         ads = ads.filter(features__slug=fslug)
-
-
 
     # Resolve category-constrained filter options (F4/F5). When a category is
     # active, use the cached resolver; otherwise show the full active sets.
@@ -418,37 +369,29 @@ def listings(
             group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
         ).order_by("sort_order")
 
-
-
     # Sorting
 
     sort = request.GET.get("sort", AdSort.DATE_NEW)
 
     if sort == AdSort.DATE_OLD:
-
         ads = ads.order_by("published_at")
 
     elif sort == AdSort.PRICE_LOW:
-
         ads = ads.order_by(F("price_normalized_eur").asc(nulls_last=True))
 
     elif sort == AdSort.PRICE_HIGH:
-
         ads = ads.order_by(F("price_normalized_eur").desc(nulls_last=True))
 
     else:  # date_desc (default)
-
         ads = ads.order_by("-published_at")
-
-
 
     # Annotate favorite state for the card hearts (FT-001)
 
     from apps.ads.views.favorite import annotate_favorites
 
-    ads = annotate_favorites(ads, request.user.id if request.user.is_authenticated else None)
-
-
+    ads = annotate_favorites(
+        ads, request.user.id if request.user.is_authenticated else None
+    )
 
     # Paginate results
 
@@ -458,70 +401,40 @@ def listings(
 
     page_obj = paginator.get_page(page_number)
 
-
-
     total_count = int(paginator.count)
 
     has_results = total_count > 0
 
     if not has_results:
-
         logger.info("Empty listing results")
 
-
-
     context = {
-
         "page_obj": page_obj,
-
         "suggested_category": suggested_category,
-
         "suggested_city": suggested_city,
-
         "breadcrumb_category": breadcrumb_category,
-
         "current_category": category_slug,
-
         "current_city": effective_city,
-
         "current_sort": sort,
-
         "min_price": min_price,
-
         "max_price": max_price,
-
         "current_listing_purpose": listing_purpose_slug,
-
         "current_features": feature_slugs,
-
         "resolved_purposes": resolved_purposes,
-
         "resolved_features": resolved_features,
-
         "has_results": has_results,
-
         "show_filters": True,
-
     }
-
-
 
     # HTMX partial rendering support
 
     if request.headers.get("HX-Request"):
-
         return render(request, "ads/partials/ad_list.html", context)
-
-
 
     return render(request, "ads/list.html", context)
 
 
-
-
-
 def _suggest_category(slug: str) -> str | None:
-
     """
 
     Suggest similar category slug using difflib.
@@ -541,9 +454,7 @@ def _suggest_category(slug: str) -> str | None:
     """
 
     all_slugs = list(
-
         Category.objects.filter(is_active=True).values_list("slug", flat=True)
-
     )
 
     matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
@@ -551,11 +462,7 @@ def _suggest_category(slug: str) -> str | None:
     return matches[0] if matches else None
 
 
-
-
-
 def _suggest_city(slug: str) -> str | None:
-
     """
 
     Suggest similar city slug using difflib.

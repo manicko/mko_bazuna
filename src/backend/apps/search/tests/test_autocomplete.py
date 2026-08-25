@@ -65,9 +65,7 @@ def child_category(root_category: Category) -> Category:
 @pytest.fixture
 def inactive_category() -> Category:
     """Create an inactive category (should not appear in suggestions)."""
-    return Category.objects.create(
-        name="Устаревшее", slug="old", is_active=False
-    )
+    return Category.objects.create(name="Устаревшее", slug="old", is_active=False)
 
 
 @pytest.fixture
@@ -170,7 +168,9 @@ class TestAutocompleteEndpoint:
             if i < 30:
                 assert response.status_code == 200, f"Request {i} should be allowed"
             else:
-                assert response.status_code == 429, f"Request {i} should be rate limited"
+                assert response.status_code == 429, (
+                    f"Request {i} should be rate limited"
+                )
                 assert response.json()["error"] == "rate_limit"
 
     def test_autocomplete_deduplication(
@@ -244,9 +244,7 @@ class TestAutocompleteEndpoint:
     ) -> None:
         """SQL injection characters in query are stripped."""
         client = Client()
-        response = client.get(
-            "/api/search/autocomplete", {"q": "'; DROP TABLE--"}
-        )
+        response = client.get("/api/search/autocomplete", {"q": "'; DROP TABLE--"})
         assert response.status_code == 200
         assert response.json()["suggestions"] == []
 
@@ -329,7 +327,9 @@ class TestSearchHistoryService:
     def test_record_search_history_creates_entry(self, buyer: User) -> None:
         """Recording a search creates a SearchHistory entry."""
         record_search_history(buyer.id, "тест")
-        assert SearchHistory.objects.filter(user=buyer, query_normalized="тест").exists()
+        assert SearchHistory.objects.filter(
+            user=buyer, query_normalized="тест"
+        ).exists()
 
     def test_record_search_history_anonymous_without_session_is_noop(self) -> None:
         """Anonymous user with no session is a no-op."""

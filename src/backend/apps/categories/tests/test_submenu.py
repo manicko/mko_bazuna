@@ -22,9 +22,7 @@ def tree() -> Category:
     root = Category.objects.create(name="Транспорт", slug="transport")
     Category.objects.create(name="Велосипеды", slug="bicycles", parent=root)
     Category.objects.create(name="Автомобили", slug="cars", parent=root)
-    Category.objects.create(
-        name="Устаревшее", slug="old", parent=root, is_active=False
-    )
+    Category.objects.create(name="Устаревшее", slug="old", parent=root, is_active=False)
     return root
 
 
@@ -120,7 +118,9 @@ def catalog() -> None:
 class TestExpandButtons:
     """Expand buttons render only for categories that have children (RC-A)."""
 
-    def test_expand_button_present_for_category_with_children(self, catalog: None) -> None:
+    def test_expand_button_present_for_category_with_children(
+        self, catalog: None
+    ) -> None:
         client = Client()
         response = client.get("/categories/business/submenu/")
         assert response.status_code == 200

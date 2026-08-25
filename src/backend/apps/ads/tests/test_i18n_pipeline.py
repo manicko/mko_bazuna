@@ -28,6 +28,7 @@ pytestmark = [pytest.mark.unit]
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_po_entries(text: str) -> list[tuple[str, str]]:
     """Parse ``.po`` text into ``(msgid, msgstr)`` tuples.
 
@@ -53,10 +54,10 @@ def _parse_po_entries(text: str) -> list[tuple[str, str]]:
                 cur_msgid = []
                 cur_msgstr = []
             in_msgstr = False
-            cur_msgid = [_unescape(stripped[len("msgid "):])]
+            cur_msgid = [_unescape(stripped[len("msgid ") :])]
         elif stripped.startswith("msgstr "):
             in_msgstr = True
-            cur_msgstr = [_unescape(stripped[len("msgstr "):])]
+            cur_msgstr = [_unescape(stripped[len("msgstr ") :])]
         elif stripped.startswith('"') and in_msgstr:
             cur_msgstr.append(_unescape(stripped))
         elif stripped.startswith('"') and cur_msgid:
@@ -85,6 +86,7 @@ def _po_files() -> list[Path]:
 # Part A — i18n pipeline
 # ---------------------------------------------------------------------------
 
+
 class TestI18nPipeline(SimpleTestCase):
     """Guard the ``.po`` -> ``.mo`` cycle against regressions."""
 
@@ -105,15 +107,10 @@ class TestI18nPipeline(SimpleTestCase):
             locale_code = po_path.parent.parent.name
             text = po_path.read_text(encoding="utf-8")
             entries = _parse_po_entries(text)
-            empty = [
-                msgid for msgid, msgstr in entries
-                if msgid and not msgstr.strip()
-            ]
+            empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
             if locale_code == "en":
                 continue
-            assert not empty, (
-                f"{po_path}: empty msgstr for msgids: {empty}"
-            )
+            assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
 
     def test_mo_files_exist(self) -> None:
         """Compiled ``.mo`` files exist for every ``.po`` (compilemessages ran).
@@ -132,6 +129,7 @@ class TestI18nPipeline(SimpleTestCase):
 # Part B — component_tag filter
 # ---------------------------------------------------------------------------
 
+
 class TestComponentTagFilter(SimpleTestCase):
     """The ``component_tag`` filter renders a feature tag component."""
 
@@ -141,9 +139,7 @@ class TestComponentTagFilter(SimpleTestCase):
             slug="wifi",
             name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
         )
-        tpl = template.Template(
-            "{% load global_tags %}{{ feature|component_tag }}"
-        )
+        tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
         rendered = tpl.render(Context({"feature": feature}))
         assert "Wi-Fi" in rendered
 
@@ -154,8 +150,6 @@ class TestComponentTagFilter(SimpleTestCase):
             id=42,
             name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
         )
-        tpl = template.Template(
-            "{% load global_tags %}{{ feature|component_tag }}"
-        )
+        tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
         rendered = tpl.render(Context({"feature": feature}))
         assert 'data-feature-id="42"' in rendered

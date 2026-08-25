@@ -56,11 +56,15 @@ def deliver_immediate_alerts(ad_id: int) -> None:
     Args:
         ad_id: Primary key of the PUBLISHED ad.
     """
-    ad = Ad.objects.filter(
-        id=ad_id, status=AdStatus.PUBLISHED
-    ).select_related("city", "category").first()
+    ad = (
+        Ad.objects.filter(id=ad_id, status=AdStatus.PUBLISHED)
+        .select_related("city", "category")
+        .first()
+    )
     if ad is None:
-        logger.warning("Ad %s not found or not PUBLISHED - skipping immediate alerts", ad_id)
+        logger.warning(
+            "Ad %s not found or not PUBLISHED - skipping immediate alerts", ad_id
+        )
         return
 
     searches = find_matching_saved_searches(ad)
@@ -111,7 +115,9 @@ def build_alert_message(
     with translation_override(locale):
         title = ad.get_title(locale) or _("Ad")
         city_name = ad.city.get_name(locale) if ad.city else "—"
-        price_str = format_price_value(ad.price_amount, ad.price_currency) or _("Price not specified")
+        price_str = format_price_value(ad.price_amount, ad.price_currency) or _(
+            "Price not specified"
+        )
         view_ad_label = _("View ad")
         disable_search_label = _("🔕 Disable this search")
 

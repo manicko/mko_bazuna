@@ -67,6 +67,22 @@ def _consent_client() -> Client:
     return client
 
 
+def _gallery_html(ad: Ad) -> str:
+    """Render the detail page (no consent) in English and return decoded content.
+
+    English is used so `{% trans %}` strings (e.g. "Previous image") render as
+    their literal msgid, making the assertions independent of the default
+    ``LANGUAGE_CODE`` (``ru``). The language is selected via ``?lang=en``, which
+    the LanguagePreMiddleware resolves.
+    """
+    client = Client()
+    response = client.get(
+        reverse("ads:detail", args=[ad.id]) + "?lang=en"
+    )
+    assert response.status_code == 200
+    return response.content.decode()
+
+
 class TestGalleryMarkup:
     """Ad detail page renders the GLightbox gallery for published ads."""
 
@@ -76,7 +92,7 @@ class TestGalleryMarkup:
         """The GLightbox CSS link, JS script, and inline init are present."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         client = _consent_client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]))
         assert response.status_code == 200
         content = response.content.decode()
         assert "glightbox.min.css" in content
@@ -88,9 +104,7 @@ class TestGalleryMarkup:
     ) -> None:
         """The detail gallery has the slider structure: main image, arrows, thumbnails."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
-        client = Client()
-        response = client.get(reverse("ads:detail", args=[ad.id]))
-        content = response.content.decode()
+        content = _gallery_html(ad)
         # Main image img with primary thumbnail_large_url
         assert 'id="detail-main-image"' in content
         assert 'src="/media/key-0-large.jpg"' in content
@@ -116,13 +130,64 @@ class TestGalleryMarkup:
         assert 'data-thumb-url="/media/key-0-large.jpg"' in content
         assert 'data-thumb-url="/media/key-1-large.jpg"' in content
 
+    def test_detail_main_image_uses_object_contain(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """The main detail image uses object-contain (not object-cover)."""
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        content = _gallery_html(ad)
+        # Main image must use object-contain for aspect-ratio preservation
+        assert 'object-contain' in content
+        # The main image ID element must not use object-cover
+        main_img_match = re.search(
+            r'id="detail-main-image"[^>]*class="([^"]*)"', content
+        )
+        assert main_img_match is not None
+        main_img_class = main_img_match.group(1)
+        assert "object-contain" in main_img_class
+        assert "object-cover" not in main_img_class
+
+    def test_detail_thumbnails_use_object_cover(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """Thumbnail strip <img> elements use object-cover for uniform cropping."""
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        content = _gallery_html(ad)
+        # Each thumbnail <img> inside the strip uses object-cover
+        thumb_imgs = re.findall(r'<img[^>]*class="[^"]*object-cover[^"]*"[^>]*>', content)
+        assert len(thumb_imgs) >= 2, "Expected at least 2 thumbnail imgs with object-cover"
+
+    def test_detail_glightbox_href_sync(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """The GLightbox anchor #detail-main-link has href matching the first image."""
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        content = _gallery_html(ad)
+        match = re.search(
+            r'id="detail-main-link"[^>]*\bhref="([^"]+)"', content
+        )
+        assert match is not None, "detail-main-link anchor not found"
+        href = match.group(1)
+        assert href == "/media/key-0.jpg", f"Expected href '/media/key-0.jpg', got '{href}'"
+
+    def test_detail_prev_next_buttons_present(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """Prev/next buttons exist with aria-labels for single+ image ads."""
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        content = _gallery_html(ad)
+        assert 'id="detail-prev"' in content
+        assert 'id="detail-next"' in content
+        assert "Previous image" in content
+        assert "Next image" in content
+
     def test_glightbox_init_options_present(
         self, seller: User, category: Category, city: City
     ) -> None:
         """The GLightbox init exposes the expected interaction options."""
         ad = _create_published_ad(seller, category, city, image_positions=[0])
         client = _consent_client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]))
         content = response.content.decode()
         for option in [
             "touchNavigation",
@@ -138,9 +203,7 @@ class TestGalleryMarkup:
     ) -> None:
         """Thumbnail buttons render in AdImage.position order."""
         ad = _create_published_ad(seller, category, city, image_positions=[2, 0, 1])
-        client = Client()
-        response = client.get(reverse("ads:detail", args=[ad.id]))
-        content = response.content.decode()
+        content = _gallery_html(ad)
         indices = re.findall(r'data-index="(\d+)"', content)
         assert indices == ["0", "1", "2"]
         full_urls = re.findall(r'data-full-url="(/media/key-\d+\.jpg)"', content)
@@ -155,9 +218,7 @@ class TestGalleryMarkup:
     ) -> None:
         """An ad with one image renders exactly one GLightbox anchor."""
         ad = _create_published_ad(seller, category, city, image_positions=[0])
-        client = Client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
-        content = response.content.decode()
+        content = _gallery_html(ad)
         assert content.count('class="glightbox"') == 1
 
     def test_no_images_no_gallery_block(
@@ -165,19 +226,14 @@ class TestGalleryMarkup:
     ) -> None:
         """An ad with no images renders no gallery anchors."""
         ad = _create_published_ad(seller, category, city, image_positions=[])
-        client = Client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
-        assert response.status_code == 200
-        content = response.content.decode()
+        content = _gallery_html(ad)
         assert 'class="glightbox"' not in content
         assert "data-gallery=" not in content
 
-def test_static_grid_renders_without_js(
+    def test_static_grid_renders_without_js(
         self, seller: User, category: Category, city: City
     ) -> None:
         """No-JS fallback: the main image <img> keeps a valid src from primary thumbnail_large_url."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
-        client = Client()
-        response = client.get(reverse("ads:detail", args=[ad.id]))
-        content = response.content.decode()
+        content = _gallery_html(ad)
         assert 'src="/media/key-0-large.jpg"' in content
