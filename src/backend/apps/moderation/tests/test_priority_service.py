@@ -327,7 +327,7 @@ class TestModerationQueueView:
         client.force_login(self.staff_user)
         response = client.get(self.queue_url)
         assert response.status_code == 200
-        assert b"No ads in the moderation queue" in response.content
+        assert "Нет объявлений в очереди модерации".encode() in response.content
 
     def test_queue_shows_ads(self, category, city) -> None:
         """Queue page shows ads in moderation."""
@@ -422,7 +422,7 @@ class TestModerationQueueView:
         response = client.get(self.queue_url)
 
         # Should show total count = 1 (low)
-        assert b"All (1)" in response.content
+        assert "Все (1)".encode() in response.content
 
 
 # ---------------------------------------------------------------------------

@@ -39,9 +39,9 @@ class TestFavoritesCountBadge:
         assert resp.status_code == 200
         content = resp.content.decode()
         # Anonymous: outline heart, no count badge.
-        assert 'aria-label="Login to save favorites"' in content
+        assert 'aria-label="Войдите, чтобы сохранять избранное"' in content
         assert "data-favorites-badge" in content
-        assert "Login to save favorites" in content
+        assert "Войдите, чтобы сохранять избранное" in content
 
     def test_authenticated_returns_filled_heart_with_count(
         self, buyer: User, seller: User, category: Category, city: City
@@ -64,7 +64,7 @@ class TestFavoritesCountBadge:
         resp = client.get("/cabinet/favorites/count/")
         assert resp.status_code == 200
         content = resp.content.decode()
-        assert 'aria-label="My favorites"' in content
+        assert 'aria-label="Моё избранное"' in content
         assert re.search(r">\s*2\s*<", content) is not None
 
     def test_refreshes_after_toggle(

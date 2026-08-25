@@ -259,9 +259,9 @@ class TestDashboardHtmlRendering:
         response = dashboard_client.get("/dashboard/")
         html = response.content.decode()
         assert "time_range" in html
-        assert "All Time" in html
-        assert "30 Days" in html
-        assert "7 Days" in html
+        assert "За всё время" in html
+        assert "30 дней" in html
+        assert "7 дней" in html
 
     def test_html_contains_per_ad_stats(self, dashboard_client) -> None:
         """Dashboard HTML includes per-ad view and contact counts."""
@@ -269,9 +269,9 @@ class TestDashboardHtmlRendering:
         html = response.content.decode()
         assert "Ad Alpha" in html
         assert "Ad Beta" in html
-        assert "views" in html
-        assert "contact" in html
-        assert "1 contact" in html
+        assert "просмот" in html  # "просмотр" / "просмотра" / "просмотров"
+        assert "контакт" in html  # "контакт" / "контакта" / "контактов"
+        assert "1 контакт" in html  # ad_a has 1 contact → singular
 
     def test_html_contains_ad_titles(self, dashboard_client) -> None:
         """Dashboard HTML lists ad titles."""

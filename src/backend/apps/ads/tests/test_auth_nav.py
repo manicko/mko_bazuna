@@ -78,7 +78,7 @@ class TestAnonymousHeader:
         assert response.status_code == 200
         content = response.content.decode()
         # Place-an-ad CTA + search input from header_catalog.html.
-        assert "Подать объявление" in content
+        assert "Разместить объявление" in content
         assert 'id="search-input"' in content
         # Auth entry: anonymous visitors see the Login button in the catalog header.
         assert "/login/issue/" in content
@@ -89,7 +89,7 @@ class TestAnonymousHeader:
         response = client.get(reverse("ads:detail", args=[published_ad.id]))
         assert response.status_code == 200
         content = response.content.decode()
-        assert "Подать объявление" in content
+        assert "Разместить объявление" in content
         assert 'id="search-input"' in content
         # Auth entry: anonymous visitors see the Login button in the catalog header.
         assert "/login/issue/" in content
@@ -100,7 +100,7 @@ class TestAnonymousHeader:
         response = client.get("/login/issue/")
         assert response.status_code == 200
         content = response.content.decode()
-        assert ">Login<" in content
+        assert ">Войти<" in content
 
     def test_login_required_redirects_to_login_issue(self) -> None:
         client = Client()
@@ -120,7 +120,7 @@ class TestAuthenticatedHeader:
         content = response.content.decode()
         # Header Dashboard link
         assert 'href="/dashboard/"' in content
-        assert "Logout" in content
+        assert "Выйти" in content
         # Logout is a POST form with a CSRF token posting to /logout/
         assert 'action="/logout/"' in content
         assert "csrfmiddlewaretoken" in content
@@ -142,7 +142,7 @@ class TestAuthenticatedHeader:
         response = client.get(reverse("ads:dashboard"))
         assert response.status_code == 200
         content = response.content.decode()
-        assert "Withdraw Data" in content
+        assert "Удалить данные" in content
         assert 'action="/consent/withdraw/"' in content
 
     def test_consent_banner_shown_for_active_user(self, user: User) -> None:
@@ -171,4 +171,4 @@ class TestAuthenticatedHeader:
         # Non-staff sees no admin link.
         assert 'href="/admin/"' not in content
         # Favorites heart badge links to the cabinet favorites page.
-        assert 'aria-label="My favorites"' in content
+        assert 'aria-label="Моё избранное"' in content

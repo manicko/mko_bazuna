@@ -62,7 +62,7 @@ class TestCabinetHub:
     def test_settings_stub_renders(self, buyer: User) -> None:
         resp = _login(buyer).get("/cabinet/settings/")
         assert resp.status_code == 200
-        assert "Settings" in resp.content.decode()
+        assert "Настройки" in resp.content.decode()
 
 
 # ---------------------------------------------------------------------------
@@ -155,4 +155,4 @@ class TestSearchHistorySection:
         assert SearchHistory.objects.filter(user=buyer).count() == 0
 
         resp = client.get("/cabinet/search-history/")
-        assert "No search history" in resp.content.decode()
+        assert "Нет истории поиска" in resp.content.decode()

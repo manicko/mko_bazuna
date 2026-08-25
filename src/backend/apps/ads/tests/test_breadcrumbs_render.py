@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 def _breadcrumb_nav(content: str) -> str:
     """Extract the inner HTML of the rendered ``<nav aria-label="Breadcrumb">``."""
     match = re.search(
-        r'<nav aria-label="Breadcrumb"[^>]*>(.*?)</nav>', content, re.S
+        r'<nav aria-label="(?:Хлебные крошки|Breadcrumb)"[^>]*>(.*?)</nav>', content, re.S
     )
     return match.group(1).strip() if match else ""
 

@@ -77,7 +77,7 @@ class TestFavoriteToggle:
 
         # NO redirect (302) — a guest must get a fragment htmx can swap.
         assert resp.status_code == 200
-        assert "Log in to save" in resp.content.decode()
+        assert "Войти для сохранения" in resp.content.decode()
         # Nothing persisted, and the ad detail/login url is referenced.
         assert not AdFavorite.objects.filter(ad=ad).exists()
 
@@ -185,4 +185,4 @@ class TestFavoritesList:
         client.force_login(buyer)
         resp = client.get("/cabinet/favorites/")
         assert resp.status_code == 200
-        assert "No favorites yet" in resp.content.decode()
+        assert "Пока нет избранного" in resp.content.decode()

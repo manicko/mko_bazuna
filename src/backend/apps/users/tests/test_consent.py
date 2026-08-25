@@ -272,7 +272,7 @@ class TestConsentWithdrawView:
 
         assert response.status_code == 200
         # The Withdraw Data button is present in the response
-        assert b"Withdraw Data" in response.content
+        assert "Удалить данные".encode() in response.content
         # The form posts to the consent withdrawal endpoint
         assert b'action="/consent/withdraw/"' in response.content
 
