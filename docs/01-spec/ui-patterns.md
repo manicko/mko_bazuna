@@ -62,7 +62,7 @@ Ad cards follow a consistent visual hierarchy optimized for quick scanning:
     <a href="{% url 'ads:detail' ad.id %}" class="block">
         {% if ad.images.first %}
             <img src="{{ ad.images.first.image_url }}" alt="{{ ad.title }}"
-                 class="w-full h-48 object-cover rounded-t-lg">
+                 class="w-full h-48 object-contain bg-gray-100 rounded-t-lg">
         {% endif %}
         <div class="p-4">
             <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
@@ -70,8 +70,8 @@ Ad cards follow a consistent visual hierarchy optimized for quick scanning:
                 <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
             {% endif %}
             <div class="flex justify-between items-center text-xs text-gray-500">
-                <span>{{ ad.city.get_name|default:ad.city.name }}</span>
-                <span>{{ ad.category.get_name|default:ad.category.name }}</span>
+                <span>{{ ad.city|get_city_name:LANGUAGE_CODE }}</span>
+                <span>{{ ad.category|get_category_name:LANGUAGE_CODE }}</span>
                 <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
                     {{ ad.published_at|date:'M d' }}
                 </time>
@@ -148,23 +148,59 @@ Related user stories: US-B5
 
 ## Image Gallery for Ad Detail Page
 
-Ad detail pages display 1-5 Telegram photos. Each photo is wrapped in a GLightbox v3.3.1 anchor
-opening a fullscreen gallery (`components` loaded from the unpkg CDN, inline init). Images render in
-`AdImage.position` order (the `{% for image in ad.images.all %}` iteration uses the model default
-ordering). The static grid remains intact as a no-JS fallback (progressive enhancement).
+Ad detail pages display 1-5 Telegram photos using a **slider gallery** layout:
+a main image preview with prev/next arrow buttons, a horizontal thumbnail strip,
+and GLightbox v3.3.1 overlay for fullscreen fullscreen navigation. Images render
+in `AdImage.position` order (the `{% for image in ad.images.all %}` iteration uses
+the model default ordering).
 
 ### Implementation
 
 ```html
-<div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
-    {% for image in ad.images.all %}
-        <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
-           data-description="{{ image.alt_text|default:"" }}" aria-label="Open image {{ forloop.counter }}">
-            <img src="{{ image.thumbnail_large_url|default:image.image_url }}" alt="Photo {{ forloop.counter }}"
-                 class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg">
+<!-- Photo gallery -->
+{% if ad.images.all %}
+<div class="gallery p-4" data-detail-gallery>
+    {# Main image preview with prev/next arrow navigation #}
+    {% with primary=ad.images.first %}
+    <div class="relative mb-4">
+        <a id="detail-main-link"
+           href="{{ primary.image_url }}"
+           class="glightbox" data-gallery="ad-gallery"
+           aria-label="{% trans "Open image" %} 1">
+            <img id="detail-main-image"
+                 src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
+                 class="w-full max-h-96 object-contain bg-gray-100 rounded-lg"
+                 loading="lazy" width="1280" height="960">
         </a>
-    {% endfor %}
+        {% if ad.images.count > 1 %}
+        <button id="detail-prev" type="button" aria-label="{% trans "Previous image" %}">...</button>
+        <button id="detail-next" type="button" aria-label="{% trans "Next image" %}">...</button>
+        {% endif %}
+    </div>
+
+    {# Hidden GLightbox anchors for remaining images (for gallery grouping) #}
+    {% if ad.images.count > 1 %}
+    {% for image in ad.images.all %}{% if not forloop.first %}
+    <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
+       style="display:none;"></a>
+    {% endif %}{% endfor %}
+    {% endif %}
+
+    {# Horizontal thumbnail strip #}
+    <div id="detail-thumbs" class="flex gap-2 overflow-x-auto" data-detail-thumbs>
+        {% for image in ad.images.all %}
+        <button type="button"
+                data-index="{{ forloop.counter0 }}"
+                data-full-url="{{ image.image_url }}"
+                data-thumb-url="{{ image.thumbnail_large_url|default:image.image_url }}">
+            <img src="{{ image.thumbnail_small_url|default:image.image_url }}"
+                 alt="{% trans "Photo" %} {{ forloop.counter }}"
+                 class="w-full h-full object-cover">
+        </button>
+        {% endfor %}
+    </div>
 </div>
+{% endif %}
 ```
 
 The GLightbox CSS is loaded in `<head>`:
@@ -173,8 +209,7 @@ The GLightbox CSS is loaded in `<head>`:
 <link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
 ```
 
-The GLightbox JS and inline init are added before `</body>` (relying on the library's built-in
-counter and prev/next/zoom/swipe defaults — no custom counter option):
+The GLightbox JS and inline init are added before `</body>` (consent-gated):
 
 ```html
 <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
@@ -194,15 +229,23 @@ counter and prev/next/zoom/swipe defaults — no custom counter option):
 
 ### Behavior
 
-- Clicking any image opens the GLightbox overlay with the full `image.image_url`.
-- Prev/next arrows, dark backdrop, image counter, ESC/backdrop click to close, arrow-key/Tab
-  navigation, mobile swipe and pinch-zoom (per GLightbox defaults).
-- **Progressive enhancement:** with JavaScript disabled, the original static grid still renders with
-  valid thumbnails and working links — no broken markup.
-- **CSP:** CSP is report-only in this codebase; the unpkg CDN load and GLightbox inline styles are
-  already allowed (unpkg is also used for HTMX). No `script-src`/`style-src` settings were added.
+- **Slider controls:** Prev/next arrow buttons (`detail-prev`, `detail-next`)
+  navigate the thumbnail strip; clicking a thumbnail updates the main image.
+  For single images, arrow buttons are omitted.
+- **Thumbnail strip:** Horizontal scroll container with 44×44px touch targets;
+  each thumbnail has `data-index`, `data-full-url`, and `data-thumb-url`
+  attributes consumed by the inline JS.
+- **Fullscreen:** The main image is wrapped in a `.glightbox` anchor
+  (`data-gallery="ad-gallery"`). Additional images are rendered as hidden
+  `.glightbox` anchors so GLightbox's gallery grouping includes all images —
+  clicking the main image opens the overlay with prev/next navigation across
+  the full set.
+- **Progressive enhancement:** With JavaScript disabled, the main image
+  `<img>` still renders with a valid `src` (no broken markup).
+- **i18n:** Gallery captions and button `aria-label`s use `{% trans %}`
+  tags — "Open image", "Previous image", "Next image", "Select image".
 
-This supersedes the earlier phase-1 statement of "no lightbox/modal; static grid only".
+This supersedes the earlier static grid layout (single column / two-column split).
 
 Related user stories: US-S2
 
@@ -279,7 +322,7 @@ breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
                             <li>
                                 <button type="button" data-city-option="{{ city.slug }}"
                                         class="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 min-h-[44px]">
-                                    {{ city.get_name }}
+                                    {{ city|get_city_name:LANGUAGE_CODE }}
                                 </button>
                             </li>
                             {% endfor %}

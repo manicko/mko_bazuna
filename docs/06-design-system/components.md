@@ -370,7 +370,7 @@ Primary listing card for search results.
             <img 
                 src="{{ ad.images.first.image_url }}" 
                 alt="{{ ad.title }}"
-                class="w-full h-48 object-cover rounded-t-lg"
+                class="w-full h-48 object-contain bg-gray-100 rounded-t-lg"
                 loading="lazy"
             >
         {% else %}
@@ -395,8 +395,8 @@ Primary listing card for search results.
             </p>
             
             <div class="flex justify-between items-center text-xs text-gray-500">
-                <span>{{ ad.city.get_name|default:ad.city.name }}</span>
-                <span>{{ ad.category.get_name|default:ad.category.name }}</span>
+                <span>{{ ad.city|get_city_name:LANGUAGE_CODE }}</span>
+                <span>{{ ad.category|get_category_name:LANGUAGE_CODE }}</span>
                 <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
                     {{ ad.published_at|date:'M d' }}
                 </time>
@@ -423,19 +423,41 @@ keyed on `LANGUAGE_CODE`.
 
 ```html
 <article class="bg-white rounded-lg shadow overflow-hidden">
-    <!-- Photo gallery (GLightbox) -->
+    <!-- Photo gallery (GLightbox slider) -->
     {% if ad.images.all %}
-        <div class="grid grid-cols-1 {% if ad.images.count > 1 %}md:grid-cols-2{% endif %} gap-2 p-4">
+    <div class="gallery p-4" data-detail-gallery>
+        {% with primary=ad.images.first %}
+        <div class="relative mb-4">
+            <a id="detail-main-link" href="{{ primary.image_url }}" class="glightbox"
+               data-gallery="ad-gallery" aria-label="{% trans "Open image" %} 1">
+                <img id="detail-main-image"
+                     src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
+                     alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
+                     class="w-full max-h-96 object-contain bg-gray-100 rounded-lg"
+                     loading="lazy" width="1280" height="960">
+            </a>
+            {% if ad.images.count > 1 %}
+            <button id="detail-prev" type="button" aria-label="{% trans "Previous image" %}">…</button>
+            <button id="detail-next" type="button" aria-label="{% trans "Next image" %}">…</button>
+            {% endif %}
+        </div>
+        {% if ad.images.count > 1 %}
+        {% for image in ad.images.all %}{% if not forloop.first %}
+        <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery" style="display:none;"></a>
+        {% endif %}{% endfor %}
+        {% endif %}
+        <div id="detail-thumbs" class="flex gap-2 overflow-x-auto" data-detail-thumbs>
             {% for image in ad.images.all %}
-                <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
-                   data-description="{{ image.alt_text|default:"" }}">
-                    <img src="{{ image.thumbnail_large_url|default:image.image_url }}"
-                         alt="Photo {{ forloop.counter }} for {{ ad|get_title:LANGUAGE_CODE }}"
-                         class="w-full {% if ad.images.count == 1 %}max-h-96{% else %}h-64{% endif %} object-cover rounded-lg"
-                         loading="lazy" width="1280" height="960">
-                </a>
+            <button type="button" data-index="{{ forloop.counter0 }}"
+                    data-full-url="{{ image.image_url }}"
+                    data-thumb-url="{{ image.thumbnail_large_url|default:image.image_url }}">
+                <img src="{{ image.thumbnail_small_url|default:image.image_url }}"
+                     alt="{% trans "Photo" %} {{ forloop.counter }}"
+                     class="w-full h-full object-cover">
+            </button>
             {% endfor %}
         </div>
+    </div>
     {% endif %}
 
     <!-- Content -->
@@ -457,8 +479,8 @@ keyed on `LANGUAGE_CODE`.
         </div>
 
         <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
-            <div><span class="font-medium">Location:</span> {{ ad.city.get_name }}</div>
-            <div><span class="font-medium">Category:</span> {{ ad.category.get_name }}</div>
+            <div><span class="font-medium">Location:</span> {{ ad.city|get_city_name:LANGUAGE_CODE }}</div>
+            <div><span class="font-medium">Category:</span> {{ ad.category|get_category_name:LANGUAGE_CODE }}</div>
             <div><time datetime="{{ ad.published_at|date:'Y-m-d' }}">Published: {{ ad.published_at|date:'M d, Y' }}</time></div>
         </div>
     </div>

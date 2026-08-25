@@ -51,6 +51,10 @@ services:
     volumes:
       - .:/app
       - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
+      # The .:/app mount shadows the image's entrypoint.sh; mount the real one explicitly
+      # so the source'd functions (check_env_file, wait_for_db, wait_for_redis) are defined
+      # and the service does not fail with exit 127 ("command not found").
+      - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./.env.docker:/app/src/.env:ro
 
   migrate:
@@ -68,11 +72,14 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
       - REDIS_URL=
-      - SEED_ADS=30
       - SEED_USERS=10
     volumes:
       - .:/app
       - ./docker/entrypoint-seed.sh:/app/entrypoint-seed.sh
+      # The .:/app mount shadows the image's entrypoint.sh; mount the real one explicitly
+      # so the source'd functions (check_env_file, wait_for_db, wait_for_redis) are defined
+      # and the service does not fail with exit 127 ("command not found").
+      - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./.env.docker:/app/src/.env:ro
       - media_volume:/app/media
 

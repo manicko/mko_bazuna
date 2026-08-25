@@ -1072,10 +1072,15 @@ class TestSeedCategoryIntegration:
             ), f"Ad references unknown category slug: {ad.category.slug}"
             # Price may be None for free/negotiable ads (~20% of non-special
             # categories) per AdGenerator._generate_price() — only validate
-            # the field when a price is actually set
+            # the field when a price is actually set. Give-away listings
+            # (e.g. the charity category) are always free (price = 0).
             if ad.price_amount is not None:
                 assert isinstance(ad.price_amount, int)
-                assert ad.price_amount > 0
+                # 0 is valid for give-away / charity listings; positive for sale
+                if ad.listing_purpose is not None and str(ad.listing_purpose.slug) == "give-away":
+                    assert ad.price_amount == 0
+                else:
+                    assert ad.price_amount > 0
                 # Seed ads use EUR, so the normalized value equals the amount.
                 assert ad.price_currency == "EUR"
                 assert ad.price_normalized_eur == ad.price_amount
@@ -1083,6 +1088,58 @@ class TestSeedCategoryIntegration:
             assert ad.title is not None
             assert ad.title_en is not None
             assert ad.title_bs is not None
+
+    def test_give_away_ads_have_zero_price(self) -> None:
+        """Ads resolved to the give-away listing purpose (including the
+        charity category, whose only purpose is give-away) must have
+        price_amount == 0 instead of a random positive price."""
+        categories = list(
+            Category.objects.filter(children__isnull=True).exclude(
+                slug__in=["test-seed", "test-analytics", "test", "test-city"]
+            )
+        )
+        assert len(categories) > 0, "No categories loaded from builder"
+
+        users = [
+            User.objects.create(
+                username=f"gw-user{i}",
+                telegram_id=3000 + i,
+                chat_id=3000 + i,
+                password="!",
+            )
+            for i in range(3)
+        ]
+
+        cities = list(City.objects.all())
+        assert len(cities) > 0, "No cities available"
+
+        # Force all ads to published so we can persist and inspect them
+        gen = AdGenerator(
+            {"faker_seed": 42, "status_distribution": {"published": 1.0}},
+            users,
+            categories,
+            cities,
+        )
+        # Generate enough ads to be very likely to hit the charity category
+        ads = gen.generate(500)
+        Ad.objects.bulk_create(ads, batch_size=5000)
+
+        give_away_ads = [
+            ad for ad in ads
+            if ad.listing_purpose is not None
+            and str(ad.listing_purpose.slug) == "give-away"
+        ]
+        # charity alone has give-away as its only purpose; with 500 draws
+        # across ~171 leaf categories plus animals give-away, we should
+        # always get at least one.
+        assert len(give_away_ads) > 0, "No give-away purpose ads generated"
+        for ad in give_away_ads:
+            assert ad.price_amount == 0, (
+                f"give-away ad in category '{ad.category.slug}' has "
+                f"price_amount={ad.price_amount}, expected 0"
+            )
+            assert ad.price_normalized_eur == 0
+            assert ad.price_currency == "EUR"
 
     def test_photo_manifest_loading(self) -> None:
         """ImageGenerator loads the photo manifest (even if empty)."""

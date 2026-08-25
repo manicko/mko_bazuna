@@ -3,13 +3,14 @@ Moderation Analytics Dashboard template for Mko Bazuna.
 Staff-only view showing moderation statistics, queue status, performance, and rejection reasons.
 {% endcomment %}
 {% load static %}
+{% load i18n %}
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moderation Analytics - Mko Bazuna</title>
+    <title>{% trans "Moderation Analytics" %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
     {% if consent_analytics and PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
@@ -19,20 +20,20 @@ Staff-only view showing moderation statistics, queue status, performance, and re
     {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-4">Moderation Statistics (Last {{ days }} Days)</h2>
+        <h2 class="text-xl font-semibold mb-4">{% blocktrans with days=days %}Moderation Statistics (Last {{ days }} Days){% endblocktrans %}</h2>
 
         {# ── Queue Status ── #}
         <div class="bg-white rounded-lg shadow p-4 mb-6 border-l-4 {% if pending_queue_size > 0 %}border-yellow-400{% else %}border-green-400{% endif %}">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-500">Pending Review Queue</p>
+                    <p class="text-sm text-gray-500">{% trans "Pending Review Queue" %}</p>
                     <p class="text-2xl font-bold {% if pending_queue_size > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
                         {{ pending_queue_size }}
                     </p>
                 </div>
                 <a href="/admin/ads/ad/?status__exact=on_moderation"
                    class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                    Review Queue
+                    {% trans "Review Queue" %}
                 </a>
             </div>
         </div>
@@ -41,15 +42,15 @@ Staff-only view showing moderation statistics, queue status, performance, and re
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4 text-center">
                 <p class="text-2xl font-bold text-green-600">{{ stats.approved }}</p>
-                <p class="text-xs text-gray-500">Approved</p>
+                <p class="text-xs text-gray-500">{% trans "Approved" %}</p>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
                 <p class="text-2xl font-bold text-red-600">{{ stats.rejected }}</p>
-                <p class="text-xs text-gray-500">Rejected</p>
+                <p class="text-xs text-gray-500">{% trans "Rejected" %}</p>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
                 <p class="text-2xl font-bold text-yellow-600">{{ stats.flagged }}</p>
-                <p class="text-xs text-gray-500">Flagged</p>
+                <p class="text-xs text-gray-500">{% trans "Flagged" %}</p>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
                 <p class="text-2xl font-bold text-blue-600">
@@ -59,27 +60,27 @@ Staff-only view showing moderation statistics, queue status, performance, and re
                         —
                     {% endif %}
                 </p>
-                <p class="text-xs text-gray-500">Avg Time to Moderate</p>
+                <p class="text-xs text-gray-500">{% trans "Avg Time to Moderate" %}</p>
             </div>
         </div>
 
         {# ── Moderator Performance ── #}
         {% if moderator_performance %}
         <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <h3 class="text-lg font-semibold px-6 py-4 border-b">Moderator Performance</h3>
+            <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Moderator Performance" %}</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-gray-600">
                         <tr>
-                            <th class="text-left px-6 py-3">Moderator ID</th>
-                            <th class="text-right px-6 py-3">Actions Taken</th>
-                            <th class="text-right px-6 py-3">Avg Time (hours)</th>
+                            <th class="text-left px-6 py-3">{% trans "Moderator ID" %}</th>
+                            <th class="text-right px-6 py-3">{% trans "Actions Taken" %}</th>
+                            <th class="text-right px-6 py-3">{% trans "Avg Time (hours)" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         {% for mod in moderator_performance %}
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3">Moderator #{{ mod.moderator_id }}</td>
+                            <td class="px-6 py-3">{% blocktrans with mid=mod.moderator_id %}Moderator #{{ mid }}{% endblocktrans %}</td>
                             <td class="px-6 py-3 text-right font-medium">{{ mod.actions_taken }}</td>
                             <td class="px-6 py-3 text-right">
                                 {% if mod.avg_time_hours is not None %}
@@ -99,14 +100,14 @@ Staff-only view showing moderation statistics, queue status, performance, and re
         {# ── Rejection Reasons ── #}
         {% if rejection_reasons %}
         <div class="bg-white rounded-lg shadow overflow-hidden">
-            <h3 class="text-lg font-semibold px-6 py-4 border-b">Top Rejection Reasons</h3>
+            <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Top Rejection Reasons" %}</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-gray-600">
                         <tr>
-                            <th class="text-left px-6 py-3">Reason</th>
-                            <th class="text-right px-6 py-3">Count</th>
-                            <th class="w-1/2 px-6 py-3">Distribution</th>
+                            <th class="text-left px-6 py-3">{% trans "Reason" %}</th>
+                            <th class="text-right px-6 py-3">{% trans "Count" %}</th>
+                            <th class="w-1/2 px-6 py-3">{% trans "Distribution" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -129,8 +130,8 @@ Staff-only view showing moderation statistics, queue status, performance, and re
         </div>
         {% else %}
         <div class="text-center py-12 bg-white rounded-lg">
-            <p class="text-gray-600 text-lg">No rejection data available</p>
-            <p class="text-gray-500 mt-2">Rejection reasons will appear after moderators reject ads.</p>
+            <p class="text-gray-600 text-lg">{% trans "No rejection data available" %}</p>
+            <p class="text-gray-500 mt-2">{% trans "Rejection reasons will appear after moderators reject ads." %}</p>
         </div>
         {% endif %}
     </main>

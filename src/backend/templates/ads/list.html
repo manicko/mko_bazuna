@@ -31,7 +31,6 @@
             </div>
         {% endif %}
         <!-- Dynamic content (filter form, sort control, ad grid, suggestions, pagination) -->
-        {% include "ads/partials/filter_sort.html" %}
         <div id="ad-list">
             {% include "ads/partials/ad_list.html" %}
         </div>
@@ -41,5 +40,6 @@
     {% include "components/consent_banner.html" %}
     {% endif %}
     {% include "components/footer.html" %}
+    <script src="{% static 'theme/js/filter-dropdowns.js' %}"></script>
 </body>
 </html>

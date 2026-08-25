@@ -14,6 +14,7 @@ from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSource, AdStatus, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
+from apps.lookups.models import LookupItem
 from apps.seed.generators.base import BaseGenerator
 from apps.users.models import User
 
@@ -296,6 +297,7 @@ class AdGenerator(BaseGenerator):
         template: dict[str, Any],
         locale: str,
         category: Category,
+        price_amount: int | None = None,
     ) -> tuple[str, str]:
         """Fill template placeholders with word list values and Faker data.
 
@@ -304,6 +306,9 @@ class AdGenerator(BaseGenerator):
                       'title' and 'description'.
             locale: Language code ('ru', 'en', 'bs').
             category: Category instance for context-aware generation.
+            price_amount: Pre-computed price amount (see ``generate``) so the
+                      ``{price}`` placeholder is consistent with the ad's
+                      actual ``price_amount``. ``None`` or ``0`` renders empty.
 
         Returns:
             Tuple of (filled_title, filled_description).
@@ -333,7 +338,7 @@ class AdGenerator(BaseGenerator):
             "{brand}": self._rng.choice(brands) if brands else "",
             "{feature}": self._rng.choice(features) if features else "",
             "{city}": self._rng.choice(cities) if cities else "",
-            "{price}": str(self._generate_price(category)[0] or ""),
+            "{price}": str(price_amount or ""),
             "{rooms}": str(self.faker.random_int(1, 4)),
             "{area}": str(self.faker.random_int(30, 150)),
             "{item_age}": self._rng.choice(item_ages) if item_ages else "",
@@ -398,17 +403,32 @@ class AdGenerator(BaseGenerator):
                 }}
             )
 
-            # Fill templates for all languages
-            title, description = self._fill_template(template, "ru", category)
-            title_en, description_en = self._fill_template(template, "en", category)
-            title_bs, description_bs = self._fill_template(template, "bs", category)
-
             user = self._rng.choice(self.users)
             city = self._rng.choice(self.cities)
             status = self._weighted_status(statuses, weights)
 
-            # Generate price based on category (seed ads use EUR, Assumption 8)
-            price_amount, price_currency = self._generate_price(category)
+            # Resolve the category-constrained listing purpose (F4) BEFORE price
+            # generation: a "give-away" purpose (e.g. the charity category,
+            # which resolves to give-away exclusively) is always free (price 0).
+            # Empty / unsaved-category lookup resolution is a no-op -> None.
+            if category.pk is not None:
+                resolved_purposes = CategoryLookupResolver.get_resolved_purposes(category)
+            else:
+                resolved_purposes = []
+            if resolved_purposes:
+                purpose = self._rng.choice(resolved_purposes)
+            else:
+                purpose = None
+
+            # Generate price based on category + listing purpose (seed ads use
+            # EUR, Assumption 8). Give-away listings are always free (price 0).
+            price_amount, price_currency = self._generate_price(category, purpose)
+
+            # Fill templates for all languages. Reuse the generated price so the
+            # {price} placeholder matches the ad's actual price_amount.
+            title, description = self._fill_template(template, "ru", category, price_amount)
+            title_en, description_en = self._fill_template(template, "en", category, price_amount)
+            title_bs, description_bs = self._fill_template(template, "bs", category, price_amount)
 
             # Build timestamps consistent with status
             published_at: datetime | None = None
@@ -433,17 +453,6 @@ class AdGenerator(BaseGenerator):
                 moderation_failed_at = self._random_date(
                     now - timedelta(days=30), now
                 )
-
-            # Resolve the category-constrained listing purpose (F4). Empty or
-            # unsaved-category lookup resolution is a no-op -> None.
-            if category.pk is not None:
-                resolved_purposes = CategoryLookupResolver.get_resolved_purposes(category)
-            else:
-                resolved_purposes = []
-            if resolved_purposes:
-                purpose = self._rng.choice(resolved_purposes)
-            else:
-                purpose = None
 
             ad = Ad(
                 user=user,
@@ -508,13 +517,26 @@ class AdGenerator(BaseGenerator):
         """Select a status using weighted random selection."""
         return self._rng.choices(statuses, weights=weights, k=1)[0]
 
-    def _generate_price(self, category: Category) -> tuple[int | None, CurrencyCode]:
+    def _generate_price(
+        self,
+        category: Category,
+        listing_purpose: LookupItem | None = None,
+    ) -> tuple[int | None, CurrencyCode]:
         """Generate a price (amount + EUR currency) appropriate for the category.
 
         Seed ads default to **EUR** (spec Assumption 8), so the EUR-normalized
         amount equals the original amount. Returns ``(None, CurrencyCode.EUR)``
         for the ~20% of non-category items that are priced "free / negotiable".
+
+        Give-away listings (listing purpose slug ``give-away`` — including the
+        ``charity`` category, which resolves to ``give-away`` exclusively) are
+        always free: returns ``(0, CurrencyCode.EUR)`` (spec: ``price = 0``
+        triggers the Благотворительность path).
         """
+        # Give-away / charity ads are always free (price = 0)
+        if listing_purpose is not None and listing_purpose.slug == "give-away":
+            return 0, CurrencyCode.EUR
+
         # Real estate: higher prices
         real_estate_slugs = {
             "apartments", "houses", "rooms", "garages", "land-plots",

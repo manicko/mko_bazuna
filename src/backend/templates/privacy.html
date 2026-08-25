@@ -7,7 +7,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - Mko Bazuna</title>
+    <title>{% trans "Privacy Policy" %} - Mko Bazuna</title>
     <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
     {% if consent_analytics and PLAUSIBLE_HOST %}
     <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
@@ -17,93 +17,91 @@
     {% include "components/header.html" %}
 
     <main class="container mx-auto px-4 py-8 max-w-3xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">Privacy Policy</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">{% trans "Privacy Policy" %}</h1>
 
         <p class="text-sm text-gray-600 mb-8">
-            This policy explains how Mko Bazuna collects, processes, and protects your
+            {% blocktrans %}This policy explains how Mko Bazuna collects, processes, and protects your
             data, including the cookies we set and the third parties we share data with.
-            Last updated: August 2026.
+            Last updated: August 2026.{% endblocktrans %}
         </p>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">1. Controller</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "1. Controller" %}</h2>
             <p class="text-sm text-gray-700">
-                The data controller for this service is the operator of the Mko Bazuna
-                classifieds board. You can contact us over Telegram at
+                {% trans "The data controller for this service is the operator of the Mko Bazuna classifieds board. You can contact us over Telegram at" %}
                 <a href="https://t.me/{{ bot_username }}" class="text-blue-600 underline hover:text-blue-800"
                    target="_blank" rel="noopener noreferrer">@{{ bot_username }}</a>.
             </p>
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">2. Processing Purposes and Legal Bases</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "2. Processing Purposes and Legal Bases" %}</h2>
             <ul class="list-disc list-inside text-sm text-gray-700 space-y-2">
-                <li><strong>Service delivery and authentication</strong> — legal basis: performance of a contract / legitimate interest.</li>
-                <li><strong>Seller-buyer contact relay</strong> via Telegram deep-links — legal basis: your explicit initiation.</li>
-                <li><strong>Traffic analytics</strong> via Plausible (anonymized) — legal basis: your consent (analytics category).</li>
-                <li><strong>Personalization</strong> (language, city) — legal basis: your consent (preferences category).</li>
-                <li><strong>Language normalization</strong> of ad text via Google Translate — legal basis: best-effort, non-identifying content transfer.</li>
+                <li><strong>{% trans "Service delivery and authentication" %}</strong> — {% trans "legal basis: performance of a contract / legitimate interest." %}</li>
+                <li><strong>{% trans "Seller-buyer contact relay" %}</strong> {% trans "via Telegram deep-links" %} — {% trans "legal basis: your explicit initiation." %}</li>
+                <li><strong>{% trans "Traffic analytics" %}</strong> {% trans "via Plausible (anonymized)" %} — {% trans "legal basis: your consent (analytics category)." %}</li>
+                <li><strong>{% trans "Personalization" %}</strong> {% trans "(language, city)" %} — {% trans "legal basis: your consent (preferences category)." %}</li>
+                <li><strong>{% trans "Language normalization" %}</strong> {% trans "of ad text via Google Translate" %} — {% trans "legal basis: best-effort, non-identifying content transfer." %}</li>
             </ul>
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">3. Cookie Declaration</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "3. Cookie Declaration" %}</h2>
             <p class="text-sm text-gray-700 mb-4">
-                The table below lists the cookies this site sets and whether they are
-                essential (required for the service to function) or consent-gated.
+                {% trans "The table below lists the cookies this site sets and whether they are essential (required for the service to function) or consent-gated." %}
             </p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-gray-700 border border-gray-200">
                     <thead>
                         <tr class="bg-gray-100 text-left">
-                            <th class="px-4 py-2 border-b border-gray-200">Cookie</th>
-                            <th class="px-4 py-2 border-b border-gray-200">Purpose</th>
-                            <th class="px-4 py-2 border-b border-gray-200">Essential</th>
-                            <th class="px-4 py-2 border-b border-gray-200">Consent-Gated</th>
+                            <th class="px-4 py-2 border-b border-gray-200">{% trans "Cookie" %}</th>
+                            <th class="px-4 py-2 border-b border-gray-200">{% trans "Purpose" %}</th>
+                            <th class="px-4 py-2 border-b border-gray-200">{% trans "Essential" %}</th>
+                            <th class="px-4 py-2 border-b border-gray-200">{% trans "Consent-Gated" %}</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>sessionid</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Authentication session</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Authentication session" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>csrftoken</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Cross-Site Request Forgery protection</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Cross-Site Request Forgery protection" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>consent_given</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Consent state (accepted / declined / withdrawn)</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
-                            <td class="px-4 py-2 border-b border-gray-200">N/A (consent state itself)</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Consent state (accepted / declined / withdrawn)" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "N/A (consent state itself)" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>consent_analytics</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Analytics consent state</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Analytics consent state" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>consent_preferences</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Preferences consent state</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Preferences consent state" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>lang_pref</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Preferred language (UI)</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes (preferences)</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Preferred language (UI)" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes (preferences)" %}</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-2 border-b border-gray-200"><code>preferred_city</code></td>
-                            <td class="px-4 py-2 border-b border-gray-200">Preferred city (catalog default)</td>
-                            <td class="px-4 py-2 border-b border-gray-200">No</td>
-                            <td class="px-4 py-2 border-b border-gray-200">Yes (preferences)</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Preferred city (catalog default)" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "No" %}</td>
+                            <td class="px-4 py-2 border-b border-gray-200">{% trans "Yes (preferences)" %}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -111,47 +109,46 @@
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">4. Third-Party Disclosures</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "4. Third-Party Disclosures" %}</h2>
             <ul class="list-disc list-inside text-sm text-gray-700 space-y-2">
-                <li><strong>Telegram</strong> — authentication and seller-buyer contact relay via deep-links
-                    (<code>t.me/{{ bot_username }}</code>). No ad content is shared; only the identifiers needed for the action.</li>
-                <li><strong>Google Translate</strong> — best-effort, non-identifying language normalization of ad text. No personal data (telegram_id, username, IP) is transmitted.</li>
-                <li><strong>Plausible Analytics</strong> — cookieless, privacy-friendly traffic analytics. Loaded only after you accept the analytics category.</li>
+        <li><strong>{% trans "Telegram" %}</strong> — {% blocktrans %}authentication and seller-buyer contact relay via deep-links (<code>t.me/{{ bot_username }}</code>). No ad content is shared; only the identifiers needed for the action.{% endblocktrans %}
+                <li><strong>{% trans "Google Translate" %}</strong> — {% trans "best-effort, non-identifying language normalization of ad text. No personal data (telegram_id, username, IP) is transmitted." %}</li>
+                <li><strong>{% trans "Plausible Analytics" %}</strong> — {% trans "cookieless, privacy-friendly traffic analytics. Loaded only after you accept the analytics category." %}</li>
             </ul>
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">5. Your Rights</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "5. Your Rights" %}</h2>
             <p class="text-sm text-gray-700 mb-3">
-                Under GDPR you have the right to:
+                {% trans "Under GDPR you have the right to:" %}
             </p>
             <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Access and obtain a copy of your personal data.</li>
-                <li>Rectify inaccurate personal data.</li>
-                <li>Erase your personal data ("right to be forgotten").</li>
-                <li>Restrict or object to processing.</li>
-                <li>Data portability.</li>
-                <li>Withdraw consent at any time, as easily as you gave it.</li>
-                <li>Lodge a complaint with a supervisory authority.</li>
+                <li>{% trans "Access and obtain a copy of your personal data." %}</li>
+                <li>{% trans "Rectify inaccurate personal data." %}</li>
+                <li>{% trans 'Erase your personal data ("right to be forgotten").' %}</li>
+                <li>{% trans "Restrict or object to processing." %}</li>
+                <li>{% trans "Data portability." %}</li>
+                <li>{% trans "Withdraw consent at any time, as easily as you gave it." %}</li>
+                <li>{% trans "Lodge a complaint with a supervisory authority." %}</li>
             </ul>
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">6. Erasure and Retention</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "6. Erasure and Retention" %}</h2>
             <p class="text-sm text-gray-700">
-                When you withdraw consent, your account and its advertisements are
+                {% blocktrans %}When you withdraw consent, your account and its advertisements are
                 soft-deleted immediately. All personal data is permanently erased
                 within <strong>30 days</strong> of withdrawal. Consent state is otherwise
-                retained for 12 months, after which you are re-prompted.
+                retained for 12 months, after which you are re-prompted.{% endblocktrans %}
             </p>
         </section>
 
         <section class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">7. Manage Your Consent</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "7. Manage Your Consent" %}</h2>
             <p class="text-sm text-gray-700">
-                You can revisit and change your consent choices at any time. Use the
-                <a href="/?ref=preferences" class="text-blue-600 underline hover:text-blue-800">Cookie settings</a>
-                link to open the consent banner, or contact us on Telegram at
+                {% trans "You can revisit and change your consent choices at any time. Use the" %}
+                <a href="/?ref=preferences" class="text-blue-600 underline hover:text-blue-800">{% trans "Cookie settings" %}</a>
+                {% trans "link to open the consent banner, or contact us on Telegram at" %}
                 <a href="https://t.me/{{ bot_username }}" class="text-blue-600 underline hover:text-blue-800"
                    target="_blank" rel="noopener noreferrer">@{{ bot_username }}</a>.
             </p>

@@ -3,11 +3,12 @@ GLightbox gallery markup tests (TST-GAL-001 / spec 13).
 
 Verifies the ad-detail gallery wiring for PUBLISHED ads with images:
 - The GLightbox CSS link, JS script, and inline init are present on the page
-- Each image is wrapped in an `<a class="glightbox" data-gallery="ad-gallery">`
-  anchor whose `href` is the full image URL and whose thumbnail is used as src
-- Images render in `AdImage.position` order
+- The gallery uses a slider layout: main image (glightbox anchor), prev/next
+  arrow buttons, hidden glightbox anchors for remaining images, and a
+  horizontal thumbnail strip with data-index/data-full-url/data-thumb-url attrs
+- Thumbnail buttons render in AdImage.position order
 - Single-image and no-image branches are preserved
-- No-JS progressive enhancement: the static grid `<img>` still renders valid src
+- No-JS progressive enhancement: the main <img> keeps a valid src
 """
 
 import re
@@ -82,19 +83,38 @@ class TestGalleryMarkup:
         assert "glightbox.min.js" in content
         assert "GLightbox({" in content
 
-    def test_each_image_is_glightbox_anchor(
+    def test_detail_gallery_has_slider_structure(
         self, seller: User, category: Category, city: City
     ) -> None:
-        """Each image is wrapped in a GLightbox anchor with a thumbnail img."""
+        """The detail gallery has the slider structure: main image, arrows, thumbnails."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         client = Client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]))
         content = response.content.decode()
-        for pos in [0, 1]:
-            assert f'href="/media/key-{pos}.jpg"' in content
-            assert 'class="glightbox"' in content
-            assert 'data-gallery="ad-gallery"' in content
-            assert f'src="/media/key-{pos}-large.jpg"' in content
+        # Main image img with primary thumbnail_large_url
+        assert 'id="detail-main-image"' in content
+        assert 'src="/media/key-0-large.jpg"' in content
+        assert 'object-contain' in content
+        # Main image GLightbox anchor
+        assert 'id="detail-main-link"' in content
+        assert 'class="glightbox"' in content
+        assert 'data-gallery="ad-gallery"' in content
+        assert 'href="/media/key-0.jpg"' in content
+        # Prev/next arrow buttons
+        assert 'id="detail-prev"' in content
+        assert 'id="detail-next"' in content
+        assert 'Previous image' in content
+        assert 'Next image' in content
+        # Thumbnail strip
+        assert 'id="detail-thumbs"' in content
+        assert 'data-detail-thumbs' in content
+        # Thumbnail buttons with data attributes for all images
+        assert 'data-index="0"' in content
+        assert 'data-index="1"' in content
+        assert 'data-full-url="/media/key-0.jpg"' in content
+        assert 'data-full-url="/media/key-1.jpg"' in content
+        assert 'data-thumb-url="/media/key-0-large.jpg"' in content
+        assert 'data-thumb-url="/media/key-1-large.jpg"' in content
 
     def test_glightbox_init_options_present(
         self, seller: User, category: Category, city: City
@@ -116,14 +136,15 @@ class TestGalleryMarkup:
     def test_images_render_in_position_order(
         self, seller: User, category: Category, city: City
     ) -> None:
-        """Anchors appear in AdImage.position order within the gallery block."""
+        """Thumbnail buttons render in AdImage.position order."""
         ad = _create_published_ad(seller, category, city, image_positions=[2, 0, 1])
         client = Client()
         response = client.get(reverse("ads:detail", args=[ad.id]))
         content = response.content.decode()
-        # Collect the ordered full-image hrefs as rendered in the gallery.
-        hrefs = re.findall(r'href="(/media/key-\d+\.jpg)"', content)
-        assert hrefs == [
+        indices = re.findall(r'data-index="(\d+)"', content)
+        assert indices == ["0", "1", "2"]
+        full_urls = re.findall(r'data-full-url="(/media/key-\d+\.jpg)"', content)
+        assert full_urls == [
             "/media/key-0.jpg",
             "/media/key-1.jpg",
             "/media/key-2.jpg",
@@ -151,13 +172,12 @@ class TestGalleryMarkup:
         assert 'class="glightbox"' not in content
         assert "data-gallery=" not in content
 
-    def test_static_grid_renders_without_js(
+def test_static_grid_renders_without_js(
         self, seller: User, category: Category, city: City
     ) -> None:
-        """No-JS fallback: the static grid <img> elements keep valid src."""
+        """No-JS fallback: the main image <img> keeps a valid src from primary thumbnail_large_url."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         client = Client()
-        response =         client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]))
         content = response.content.decode()
         assert 'src="/media/key-0-large.jpg"' in content
-        assert 'src="/media/key-1-large.jpg"' in content
