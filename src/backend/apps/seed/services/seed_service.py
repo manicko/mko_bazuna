@@ -136,6 +136,27 @@ class SeedService:
                 t_elapsed = time.time() - t_start
                 self._log_progress("AdFeature", feature_count, t_elapsed)
 
+                # Step 4c: Assign listing condition (new/used) independently.
+                # Conditions are single-select and category-dependent (F9/F10).
+                # Categories without resolved conditions get condition=NULL.
+                # Uses a seeded RNG for deterministic, reproducible re-seeds.
+                t_start = time.time()
+                condition_rng = random.Random(self.config.get("faker_seed", 42) + 400)
+                condition_count = 0
+                for ad in db_ads:
+                    if ad.category is None:
+                        continue
+                    resolved_conditions = CategoryLookupResolver.get_resolved_conditions(
+                        ad.category
+                    )
+                    if resolved_conditions:
+                        chosen_condition = condition_rng.choice(resolved_conditions)
+                        ad.listing_condition = chosen_condition
+                        ad.save(update_fields=["listing_condition"])
+                        condition_count += 1
+                t_elapsed = time.time() - t_start
+                self._log_progress("AdCondition", condition_count, t_elapsed)
+
                 # Step 5: Generate images
                 t_start = time.time()
                 img_gen = ImageGenerator(self.config, db_ads)

@@ -138,6 +138,16 @@ class Ad(models.Model):
         related_name="featured_ads",
     )
 
+    listing_condition = models.ForeignKey(
+        "lookups.LookupItem",
+        on_delete=models.PROTECT,
+        limit_choices_to={"group__code": LookupGroupCode.LISTING_CONDITION},
+        related_name="condition_ads",
+        null=True,
+        blank=True,
+        help_text="Item condition (new/used). NULL for categories without condition.",
+    )
+
     # Denormalized category name (editable=False, trigger-synced)
     category_name = models.CharField(
         max_length=200,

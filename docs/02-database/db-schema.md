@@ -13,6 +13,7 @@ related:
   - architecture-structure
   - packages-list
   - spec-index
+  - i18n-spec
 ---
 
 ## Purpose
@@ -60,8 +61,9 @@ is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immedi
 is_declined (BOOL, default False)         # user declined consent (browse-only mode)
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 telegram_premium (BOOL, default False)    # Telegram Premium subscription status
-preferred_city_id (FK → cities.id, nullable, SET_NULL, related_name="+")  # default city for search/filter for authenticated users (plan 15); guests use a 1-year consent-gated cookie instead
-deleted_at (TIMESTAMP, nullable)
+  preferred_city_id (FK → cities.id, nullable, SET_NULL, related_name="+")  # default city for search/filter for authenticated users (plan 15); guests use a 1-year consent-gated cookie instead
+  telegram_language (VARCHAR(5), default 'ru', choices=LanguageLocale)     # Telegram-reported UI language; per-user locale for localized bot alerts (migration 0005)
+  deleted_at (TIMESTAMP, nullable)
 consent_given_at (TIMESTAMP, nullable)    # US-A8 / decision F
 consent_revoked_at (TIMESTAMP, nullable)    # Phase 3: triggers immediate soft-delete cascade
 created_at (TIMESTAMP)
@@ -429,7 +431,7 @@ category_id (FK → categories.id, SET_NULL, nullable)
 min_price (POSITIVE INT, nullable)
 max_price (POSITIVE INT, nullable)
 is_active (BOOL, default True)
-language (VARCHAR(5), nullable, default 'bs')   # LanguageLocale code; legacy rows backfilled to 'ru'
+language (VARCHAR(5), nullable, default 'bs')   # Saved-search query language: selects the per-language FTS vector (search_vector_ru/bs/en) for matching. Set from request.LANGUAGE_CODE at save time; does NOT control alert-message rendering (that uses User.telegram_language). Legacy rows backfilled to 'ru'
 created_at (TIMESTAMP)
 updated_at (TIMESTAMP, auto_now=True)          # last-modified (plan 16 / FND-001)
 last_notified_at (TIMESTAMP, nullable)          # last time this search produced a notification

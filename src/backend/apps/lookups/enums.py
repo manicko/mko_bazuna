@@ -16,3 +16,4 @@ class LookupGroupCode(StrEnum):
 
     LISTING_PURPOSE = "listing_purpose"
     LISTING_FEATURE = "listing_feature"
+    LISTING_CONDITION = "listing_condition"

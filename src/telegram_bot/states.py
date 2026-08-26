@@ -13,6 +13,7 @@ class AdCreateState(StrEnum):
 
     CATEGORY = "category"
     PURPOSE = "purpose"
+    CONDITION = "condition"
     FEATURES = "features"
     CITY = "city"
     TITLE = "title"

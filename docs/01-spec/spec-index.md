@@ -38,13 +38,13 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 
 - **Launch market:** Montenegro
 - **Content language:** Russian (base)
-- **UI:** Russian + Montenegrin (latin)
+- **UI:** Russian + Bosnian (latin)
 
 ## Stack
 
 - Python 3.14, Django 5.2 LTS (`>=5.2.16,<6.0`), PostgreSQL 18
 - django-mptt (categories), django-filter, django-tailwind + django-htmx (MPA), Pillow
-- aiogram 3.x (Telegram bot), deep-translator (Montenegrin→Russian at ad publication only; search is per-language FTS, no query-time translation)
+- aiogram 3.x (Telegram bot), deep-translator (Bosnian→Russian at ad publication only; search is per-language FTS, no query-time translation)
 - Search: native PostgreSQL FTS (per-language `search_vector_ru/bs/en` TSVECTOR + GIN)
 - Background jobs: Django management commands + cron (Celery deferred)
 - Deployment: Docker (db + web[gunicorn sync WSGI] + bot + nginx)
@@ -70,7 +70,7 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 - **Categories (D):** closed admin mptt tree; category-name search REQUIRED (denormalized `category_name` + per-language `search_vector_*` weight 'C' + `difflib` fuzzy → `category_id`). Search runs per-language FTS; no query-time translation.
 - **Photos (E):** 1–5 Telegram-compressed JPEG only; local `MEDIA_ROOT` via `FileSystemStorage`.
 - **Consent (F):** DECLINE (browse-only) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days).
-- **Language/search (G):** content stored Russian; Montenegrin query translated before FTS; exact city match + did-you-mean.
+- **Language/search (G):** content translated to Russian at ad publication (egress); buyers search per-language FTS vectors with no query-time translation; exact city match + did-you-mean.
 - **Consent banner (K):** buyers browse `PUBLISHED` ads before accepting; DECLINE blocks seller login only (no erasure, contact still works) ≠ WITHDRAW (`consent_revoked_at` + erasure). Banner covers bot too — no separate bot confirmation.
 - **Login (H):** QR deep-link `login_<token>` (32-char), `LoginToken` two-phase atomic claim, `hmac.compare_digest`.
 - **Lifecycle (J):** timers from `published_at` (reset on every PUBLISHED transition); text edits → `PUBLISHED→ON_MODERATION` + hide; archive@2mo, delete@4mo.
@@ -164,7 +164,7 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Search Autocomplete** | Hybrid autocomplete from user history, popular searches, and entity matching | `PopularSearch`, `SearchHistory`, `SavedSearch`, `AutocompleteView`, rate limiting |
 | **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
 | **Filter UI** | Sticky sidebar filters (desktop), slide-up drawer (mobile), removable filter chips, hierarchical category tree, closed-list city selector, and price range inputs with HTMX partial updates | [`filter-ui.md`](filter-ui.md), `CategoryFilterForm`, query params `category`/`city`/`price_min`/`price_max` |
-| **Catalog Filters & Sorting** | New buyer filter dimensions `listing_purpose` (single-select) and `features` (multi-select, AND semantics) with category-constrained option resolution; price filter/sort on `price_normalized_eur` with `NULLS LAST` and a `-rank, -published_at, -id` relevance tiebreaker | [`filter-ui.md`](filter-ui.md), [`search-patterns.md`](search-patterns.md), `Ad.listing_purpose`, `Ad.features`, `AdFeature`, `IX_ads_pub_purpose`, `IX_ad_features_feature_id`, query params `listing_purpose`/`features` |
+| **Catalog Filters & Sorting** | New buyer filter dimensions `listing_purpose` (single-select) and `features` (multi-select, OR semantics) with category-constrained option resolution; price filter/sort on `price_normalized_eur` with `NULLS LAST` and a `-rank, -published_at, -id` relevance tiebreaker | [`filter-ui.md`](filter-ui.md), [`search-patterns.md`](search-patterns.md), `Ad.listing_purpose`, `Ad.features`, `AdFeature`, `IX_ads_pub_purpose`, `IX_ad_features_feature_id`, query params `listing_purpose`/`features` |
 | **Multi-Currency Price Model** | Sellers set an original amount + currency (EUR/RSD/BAM); ads store `price_amount`, `price_currency`, and a derived `price_normalized_eur` (EUR) used for all cross-currency filter/sort. Current exchange rates live in `exchange_rates`; normalization is centralized in `PriceNormalizer` (cached current-rate lookup) and re-derivable via the `recompute_normalized_prices` command. Legacy `price` (BAM) backfilled ×0.512 on migration | `apps/currencies` app (`CurrencyCode`, `ExchangeRate`, `PriceNormalizer`, `recompute_normalized_prices`), `Ad.price_amount`/`price_currency`/`price_normalized_eur`, `IX_ads_price_normalized_eur`, [`db-schema.md`](../02-database/db-schema.md), [`db-enums.md`](../02-database/db-enums.md), [`db-indexes.md`](../02-database/db-indexes.md) |
 | **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
@@ -184,6 +184,7 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 | **09** | Category and City names not rendered in selected language (templates call `.get_name` without `LANGUAGE_CODE`; autocomplete uses raw `.name`; submenu cache key omits language) | [Complete](.ai/problems/09_category-city-i18n_rendering_spec.md) — plan 34 |
 | **10** | Image display: catalog grid images cropped/stretched via `object-cover`; detail page missing slider/thumbnail-strip gallery | [Approved](.ai/problems/10_image-display_spec.md) |
 | **11** | Non-idempotent seed on repeated `docker compose up`: orphaned seed users cause `IntegrityError`; generation phase not transactional | [Approved](.ai/problems/11_seed-dev-idempotency_spec.md) |
+| **12** | `new`/`used` modeled as mutually-exclusive `listing_feature` M2M entries; seed+bot can assign both simultaneously, creating invalid ads | [Approved](.ai/problems/12_new-used-condition-mutual-exclusivity_spec.md) — 6 PO decisions confirmed, DoR met, implementation in progress |
 | **35** | CI i18n pipeline gap: dedicated `i18n` CI job missing; `.mo` compilation not in CI test job | [Complete](.ai/problems/35_i18n-pipeline-ci-gap_plan.md) — plan 35 |
 
 ## Commands

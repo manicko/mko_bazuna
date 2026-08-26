@@ -28,8 +28,8 @@ Anyone browses ads with status \PUBLISHED\; no login required.
 
 ### US-B2 � Search
 Keyword search over title + description (\PUBLISHED\ only), response =2s. Sort by date (newest
-first) or price. A Montenegrin query is translated to Russian before FTS (results optionally tagged
-"translated from Russian"). Friendly empty state on no results. See decision G and [search-patterns.md](../01-spec/search-patterns.md).
+first) or price. Search runs per-language FTS vectors with no query-time translation.
+Friendly empty state on no results. See decision G and [search-patterns.md](../01-spec/search-patterns.md).
 
 ### US-B3 � Filter
 Filter by category/subcategory, city, and price range; filters combinable with no full page
@@ -55,8 +55,7 @@ saved in session. See decision D and [filter-ui.md](../01-spec/filter-ui.md) and
 Responsive layout across mobile, tablet, and desktop. See [ui-patterns.md](../01-spec/ui-patterns.md).
 
 ### US-B9 � Multilingual UI
-UI language switch (Russian / Montenegrin-latin), persisted across sessions. Switch translates the site
-shell only; ad content is stored in Russian and translated on display. See decision G and [search-patterns.md](../01-spec/search-patterns.md).
+UI language switch (Russian / Bosnian (latin) / English), persisted across sessions via `lang_pref` cookie. Switch translates the site shell only; ad content is translated to Russian at ad publication (egress) and searched via per-language FTS vectors (decision G). See [search-patterns.md](../01-spec/search-patterns.md).
 
 ### US-B10 — Search autocomplete
 As the buyer types in the search bar, a dropdown shows hybrid suggestions from three sources: the buyer's own search history, popular searches across all users, and matching category/city names. Suggestions are rate-limited (30 requests per minute per IP). Results are deduplicated and capped at 10. See decision O.

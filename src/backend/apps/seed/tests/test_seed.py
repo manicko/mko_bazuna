@@ -1398,3 +1398,44 @@ class TestSeedFilterCoverage:
         charity_ad = Ad.objects.filter(source=AdSource.SEED, category=charity).first()
         if charity_ad is not None:
             assert charity_ad.features.count() == 0
+
+    def test_seed_populates_condition(self, db: None) -> None:
+        """At least one seeded ad has a listing_condition (seed Step 4c assigns it).
+
+        Mirrors ``test_seed_populates_listing_purpose``: condition is a dedicated
+        single-select dimension, so at least one conditional-category ad must
+        carry ``new`` or ``used``.
+        """
+        self._run_seed()
+        assert Ad.objects.filter(
+            source=AdSource.SEED, listing_condition__isnull=False
+        ).exists()
+
+    def test_seed_filter_by_condition_returns_results(self, db: None) -> None:
+        """A condition present in seed data narrows /search/ to non-empty results."""
+        self._run_seed()
+        condition = (
+            Ad.objects.filter(source=AdSource.SEED, listing_condition__isnull=False)
+            .values_list("listing_condition__slug", flat=True)
+            .first()
+        )
+        assert condition is not None
+        client = Client()
+        response = client.get(f"/search/?condition={condition}")
+        assert response.status_code == 200
+        assert len(list(response.context["page_obj"])) > 0
+
+    def test_seed_no_ad_has_both_new_and_used_features(self, db: None) -> None:
+        """No seeded ad has both ``new`` and ``used`` as features (REQ-12.1).
+
+        Defence-by-test: ``new``/``used`` now live exclusively in the
+        ``listing_condition`` group, so they can never be sampled as features
+        by the seed service. This guards against a regression that re-introduces
+        them into the ``listing_feature`` group.
+        """
+        self._run_seed()
+        assert (
+            not Ad.objects.filter(source=AdSource.SEED, features__slug="new")
+            .filter(features__slug="used")
+            .exists()
+        )

@@ -11,6 +11,7 @@ related:
   - db-enums
   - db-indexes
   - technical-specification
+  - i18n-spec
 ---
 
 ## Purpose
@@ -49,7 +50,7 @@ The two active groups (see [db-enums.md > LookupGroupCode](db-enums.md)):
 | `LookupGroupCode` | Role |
 |---|---|
 | `LISTING_PURPOSE` | Listing purposes — single-select per ad (e.g. `sell`, `new`) |
-| `LISTING_FEATURE` | Listing features — multi-select, AND-semantics (e.g. `urgent`, `premium`) |
+| `LISTING_FEATURE` | Listing features — multi-select, OR-semantics (e.g. `urgent`, `premium`) |
 
 `apps.lookups.services.cache_service.LookupCacheService` caches `get_all_groups()`
 (`lookup:all_groups`, 1 h TTL, prefetched items) and `get_active_items(group_code)`
@@ -119,7 +120,7 @@ CLI: `management.commands.load_catalog` (`--config`, `--no-rewrite`).
 | Cache | Key pattern | TTL | Invalidated by |
 |---|---|---|---|
 | Tree version | `category:tree_version` (atomic counter) | — | Category / CategoryPath save+delete |
-| Submenu fragment | `category:submenu:<version>:<slug>` | 300 s | tree-version bump |
+| Submenu fragment | `category:submenu:<version>:<slug>:<locale>` | 300 s | tree-version bump; `:<locale>` segment prevents cross-language cache bleed |
 | Resolver result | `lookup:resolved_<purposes\|features>:<id>` | 300 s | category/binding/lookup-item changes |
 | Lookup group/item | `lookup:all_groups`, `lookup:active_items:<code>` | 3600 s | LookupGroup/LookupItem save+delete |
 
@@ -146,10 +147,15 @@ Signal handlers keep caches and tree state in sync (registered in each app's `ap
 - `Ad.listing_purpose` — FK to `LookupItem` (group=`LISTING_PURPOSE`); resolved via the resolver
   at publish time and referenced by the filter UI (single-select).
 - `Ad.features` — M2M to `LookupItem` (group=`LISTING_FEATURE`) through `AdFeature` (with
-  `sort_order`); an ad carries 0..N features, filtered with AND-semantics.
+   `sort_order`); an ad carries 0..N features, filtered with OR-semantics (an ad
+   matches if it has at least one of the selected features).
 - Buyer filters (see [filter-ui.md](../01-spec/filter-ui.md)) resolve options through the
   resolver, so a category subtree shows only the features/purposes defined by the nearest
   explicit ancestor along the active navigation path.
+- **Rendering:** feature tags are displayed via the `components/feature_tag.html` partial
+  (DB-based i18n via `get_lookup_name`); on the detail page, features are scoped to
+  category-appropriate items through the MPTT-ancestor resolver. See
+  [i18n-spec — Feature Tag Rendering](../01-spec/i18n-spec.md).
 
 ## Related documents
 - [db-schema.md — table definitions](db-schema.md)

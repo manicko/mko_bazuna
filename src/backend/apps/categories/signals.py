@@ -33,6 +33,8 @@ def bump_tree_version_on_structure_change(sender, instance, **kwargs):  # type: 
 @receiver(post_delete, sender="categories.CategoryListingPurpose")
 @receiver(post_save, sender="categories.CategoryListingFeature")
 @receiver(post_delete, sender="categories.CategoryListingFeature")
+@receiver(post_save, sender="categories.CategoryListingCondition")
+@receiver(post_delete, sender="categories.CategoryListingCondition")
 def invalidate_category_lookup_cache(sender, instance, **kwargs):  # type: ignore[no-untyped-def]
     """Invalidate resolved lookup caches when through-table bindings change."""
     from apps.categories.services.lookup_resolution import CategoryLookupResolver

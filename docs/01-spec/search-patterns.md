@@ -207,9 +207,10 @@ Two additional filter dimensions apply to both listings and search, narrowing th
 sorting/FTS ranking:
 
 - **`listing_purpose`** — single-select exact match on `Ad.listing_purpose__slug`.
-- **`features`** — multi-select with **AND** semantics: an ad must match *all* selected
-  `features__slug` values (chained `.filter()` = one `EXISTS` subquery per feature). Unrecognized
-  slugs match nothing (empty result set).
+- **`features`** — multi-select with **OR** semantics: an ad must match *any*
+  of the selected `features__slug` values (correlated `EXISTS` subquery over the
+  `AdFeature` through model with an `IN` clause — not a chaining `.filter()` per
+  feature). Unrecognized slugs match nothing (empty result set).
 
 Options are category-constrained: when a category is active, the dropdown/checkboxes resolve via
 `CategoryLookupResolver.get_resolved_purposes()` / `get_resolved_features()`; otherwise the full

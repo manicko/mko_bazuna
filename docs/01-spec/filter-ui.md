@@ -99,9 +99,12 @@ In addition to category/city/price, the catalog filter form
 - **`features`** — multi-select checkboxes (`<input type="checkbox" name="features" ...>`,
   one per feature, value = slug). Options resolve via
   `CategoryLookupResolver.get_resolved_features()` (context: `resolved_features` /
-  `current_features`). Selection uses **AND semantics**: an ad must possess *all* selected
-  features. Each chained `.filter(features__slug=...)` adds an `EXISTS` subquery (not N+1).
-  Repeated `?features=` query params (HTML form convention) carry the multi-selection.
+   `current_features`). Selection uses **OR semantics**: an ad must possess *at least
+   one* of the selected features. Filtering is done with a correlated `EXISTS`
+   subquery over the `AdFeature` through model (`ad_id = OuterRef('pk')` joined to
+   the selected slugs via `IN`), which yields OR semantics in a single subquery
+   without JOIN row-multiplication.
+   Repeated `?features=` query params (HTML form convention) carry the multi-selection.
 
 ```html
 <!-- Listing purpose (single select) -->
@@ -119,7 +122,7 @@ In addition to category/city/price, the catalog filter form
     </select>
 </div>
 
-<!-- Features (multi-select, AND semantics) -->
+<!-- Features (multi-select, OR semantics) -->
 <div class="mb-6">
     <h3 class="font-semibold mb-3">Features</h3>
     <div class="space-y-2">
@@ -356,7 +359,7 @@ two stays on the same result subset (no divergence from page 1). In addition to 
 
 - `listing_purpose=<slug>` when a purpose is selected (dropped when none).
 - **Repeated** `features=<slug>` for each selected feature (one query-param per feature, not
-  comma-joined), preserving AND semantics across pages.
+   comma-joined), preserving OR semantics across pages.
 
 The `sort` parameter is preserved in pagination URLs even while a `q` (full-text) query is active,
 so the user's sort preference is retained across result pages.

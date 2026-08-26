@@ -14,6 +14,7 @@ related:
   - user-stories-index
   - spec-index
   - filter-ui
+  - i18n-spec
 ---
 
 ## Purpose
@@ -129,7 +130,11 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   (country-wide). Explicit `/city/<slug>/` path or `city` query param always wins.
   On login, a guest's cookie is reconciled into `User.preferred_city` (unless already
   set). The cookie is written only when `consent_preferences` is present. Default
-  display is "Вся страна".
+   display is "Вся страна".
+
+> **Implementation spec:** Runtime language resolution, per-user `telegram_language`,
+> category/city name-localization filters, per-language FTS wiring, localized Telegram alerts,
+> and the CI completeness gate are detailed in [`i18n-spec.md`](i18n-spec.md).
 
 ### H. Telegram login behavior (US-S1)
 - Site "Login via Telegram" button opens a QR / code page.

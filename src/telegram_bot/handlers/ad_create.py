@@ -1,42 +1,74 @@
 """
+
 Ad creation FSM handler for Telegram bot.
 
+
 Implements step-by-step ad creation with Pydantic validation.
+
 """
 
 import difflib
+
 import logging
+
 import os
+
 from decimal import Decimal
 
+
 from aiogram import Bot, Router, types
+
 from aiogram.filters import Command
+
 from aiogram.fsm.context import FSMContext
+
 from aiogram.fsm.state import StatesGroup
+
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from django.conf import settings
 
+
 from apps.ads.models import Ad
+
 from apps.ads.services.images import AdImageService
+
 from apps.categories.models import Category
+
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
+
 from apps.core.services.translation import translate_text
+
 from apps.currencies.enums import CurrencyCode
+
 from apps.currencies.services.price_normalizer import PriceNormalizer
+
 from apps.locations.models import City
+
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
     PhotoCountPayload,
     PricePayload,
     TitlePayload,
 )
-from telegram_bot.services.media import generate_storage_key, validate_photo, strip_photo_exif, delete_photo
+
+from telegram_bot.services.media import (
+    generate_storage_key,
+    validate_photo,
+    strip_photo_exif,
+    delete_photo,
+)
+
 from telegram_bot.states import AdCreateState
+
 import asyncio
+
 
 from apps.media.services.thumbnails import ThumbnailService
 
+
 logger = logging.getLogger(__name__)
+
 
 router = Router()
 
@@ -45,31 +77,46 @@ class AdCreateForm(StatesGroup):
     """FSM states for ad creation."""
 
     category = AdCreateState.CATEGORY
+
     purpose = AdCreateState.PURPOSE
+
+    condition = AdCreateState.CONDITION
+
     features = AdCreateState.FEATURES
+
     city = AdCreateState.CITY
+
     title = AdCreateState.TITLE
+
     description = AdCreateState.DESCRIPTION
+
     price = AdCreateState.PRICE
+
     photos = AdCreateState.PHOTOS
+
     preview = AdCreateState.PREVIEW
 
 
 @router.message(Command("post"))
 async def cmd_post(message: types.Message, state: FSMContext) -> None:
     """Start the ad creation flow."""
+
     if not message.from_user:
         return
 
     data = await state.get_data()
+
     if "user_id" not in data:
         await message.answer("Please login first with /start login_<token>")
+
         return
 
     # Create draft ad
+
     ad = await create_draft_ad(user_id=data["user_id"])
 
     await state.set_state(AdCreateForm.category)
+
     await state.update_data(ad_id=ad.id)
 
     await message.answer(
@@ -81,31 +128,40 @@ async def cmd_post(message: types.Message, state: FSMContext) -> None:
 @router.message(Command("cancel"))
 async def cmd_cancel(message: types.Message, state: FSMContext) -> None:
     """Cancel ad creation."""
+
     data = await state.get_data()
 
     if "ad_id" in data:
         # Clean up photo files from FSM state before deleting the draft
+
         photos = data.get("photos", [])
+
         for photo in photos:
             await asyncio.to_thread(delete_photo, photo["storage_key"])
 
         await delete_draft(data["ad_id"])
 
     await state.clear()
+
     await message.answer("Ad creation cancelled.")
 
 
 # --- Category step ---
+
+
 @router.message(AdCreateForm.category)
 async def process_category(message: types.Message, state: FSMContext) -> None:
     """Process category selection."""
+
     if not message.text:
         await message.answer("Please send a category keyword or name.")
+
         return
 
     keyword = message.text.strip().lower()
 
     # Search categories by keyword
+
     categories = await search_categories(keyword)
 
     if not categories:
@@ -113,18 +169,24 @@ async def process_category(message: types.Message, state: FSMContext) -> None:
             "No categories found. Please try another keyword. "
             "Top-level categories: Товары, Услуги, Недвижимость"
         )
+
         return
 
     if len(categories) == 1:
         await state.update_data(category_id=categories[0].id)
+
         # Resolve listing purposes for this category
+
         await process_category_selected(message, state, categories[0])
+
         return
 
     # Show top 3-5 suggestions
+
     suggestions = categories[:5]
+
     suggestion_text = "\n".join(
-        f"{i+1}. {cat.name}" for i, cat in enumerate(suggestions)
+        f"{i + 1}. {cat.name}" for i, cat in enumerate(suggestions)
     )
 
     await message.answer(
@@ -137,34 +199,48 @@ async def process_category_selected(
     message: types.Message, state: FSMContext, category: Category
 ) -> None:
     """Handle category selection: resolve purposes and determine next step."""
+
     purposes = await get_resolved_purposes(category.id)
 
     if not purposes:
         # Fallback: no purposes configured — use sell as default
+
         default_purpose = await get_lookup_item_by_slug("sell")
+
         if default_purpose:
             await state.update_data(listing_purpose_id=default_purpose.id)
+
             await proceed_to_features_or_city(message, state, category.id)
+
         else:
             await message.answer(
                 "No listing purposes configured for this category. "
                 "Please contact support."
             )
+
         return
 
     if len(purposes) == 1:
         # Single purpose: auto-select, skip to features
+
         await state.update_data(listing_purpose_id=purposes[0].id)
+
         await proceed_to_features_or_city(message, state, category.id)
+
         return
 
     # Multiple purposes: show choice
+
     default_purpose = await get_default_purpose(category.id, purposes)
-    keyboard = build_purpose_keyboard(purposes, default_purpose.slug if default_purpose else None)
+
+    keyboard = build_purpose_keyboard(
+        purposes, default_purpose.slug if default_purpose else None
+    )
+
     await state.set_state(AdCreateForm.purpose)
+
     await message.answer(
-        f"Category: {category.name}\n"
-        "Select the purpose of your listing:",
+        f"Category: {category.name}\nSelect the purpose of your listing:",
         reply_markup=keyboard,
     )
 
@@ -172,104 +248,204 @@ async def process_category_selected(
 async def proceed_to_features_or_city(
     message: types.Message, state: FSMContext, category_id: int
 ) -> None:
-    """Resolve features and either show them or skip to city selection."""
+    """Resolve conditions, then features, and either show them or skip to city.
+
+
+    Condition is shown as a single-select step before features (PO-4).
+
+    After condition is selected, :func:`_show_features_or_city_step` handles
+
+    the feature multi-select or city fallback.
+
+    """
+
+    conditions = await get_resolved_conditions(category_id)
+
+    if conditions:
+        await state.set_state(AdCreateForm.condition)
+
+        await state.update_data(condition_id=None)
+
+        keyboard = build_condition_keyboard(conditions)
+
+        await message.answer(
+            "Select item condition:",
+            reply_markup=keyboard,
+        )
+
+        return
+
+    await _show_features_or_city_step(message, state, category_id)
+
+
+async def _show_features_or_city_step(
+    message: types.Message, state: FSMContext, category_id: int
+) -> None:
+    """Show features keyboard (excluding condition slugs) or skip to city."""
+
     features = await get_resolved_features(category_id)
 
     if features:
-        await state.set_state(AdCreateForm.features)
-        await state.update_data(feature_ids=[])
-        keyboard = build_feature_keyboard(features, set())
-        await message.answer(
-            "Select features for your listing (optional):\n"
-            "Tap to toggle, then tap Done.",
-            reply_markup=keyboard,
-        )
+        # Exclude new/used from features — they are now condition-specific
+
+        non_condition_features = [f for f in features if f.slug not in ("new", "used")]
+
+        if non_condition_features:
+            await state.set_state(AdCreateForm.features)
+
+            await state.update_data(feature_ids=[])
+
+            keyboard = build_feature_keyboard(non_condition_features, set())
+
+            await message.answer(
+                "Select features for your listing (optional):\n"
+                "Tap to toggle, then tap Done.",
+                reply_markup=keyboard,
+            )
+
+        else:
+            await state.set_state(AdCreateForm.city)
+
+            await message.answer("Now select a city. Send a city name.")
+
     else:
         # No features: skip to city
+
         await state.set_state(AdCreateForm.city)
-        await message.answer(
-            "Now select a city. Send a city name."
-        )
+
+        await message.answer("Now select a city. Send a city name.")
 
 
 # --- Purpose step ---
-@router.callback_query(AdCreateForm.purpose, lambda c: c.data and c.data.startswith("purpose:"))
+
+
+@router.callback_query(
+    AdCreateForm.purpose, lambda c: c.data and c.data.startswith("purpose:")
+)
 async def process_purpose(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Process purpose selection from inline keyboard."""
+
     if not callback.data or not callback.message:
         return
 
     slug = callback.data.replace("purpose:", "")
+
     purpose_item = await get_lookup_item_by_slug(slug)
+
     if not purpose_item:
         await callback.answer("Purpose not found.")
+
         return
 
     await state.update_data(listing_purpose_id=purpose_item.id)
+
+    data = await state.get_data()
+
+    await callback.answer()
+
+    await proceed_to_features_or_city(callback.message, state, data.get("category_id"))
+
+
+# --- Condition step ---
+
+
+@router.callback_query(
+    AdCreateForm.condition, lambda c: c.data and c.data.startswith("condition:")
+)
+async def process_condition(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process condition selection from inline keyboard."""
+    if not callback.data or not callback.message:
+        return
+
+    slug = callback.data.replace("condition:", "")
+    condition_item = await get_lookup_item_by_slug(slug)
+    if not condition_item:
+        await callback.answer("Condition not found.")
+        return
+
+    await state.update_data(condition_id=condition_item.id)
     data = await state.get_data()
     await callback.answer()
 
-    await proceed_to_features_or_city(
-        callback.message, state, data.get("category_id")
-    )
+    # Proceed to features (or city if no features)
+    await _show_features_or_city_step(callback.message, state, data.get("category_id"))
 
 
 # --- Features step ---
+
+
 @router.callback_query(AdCreateForm.features)
 async def process_features(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Process feature toggles from inline keyboard."""
+
     if not callback.data or not callback.message:
         return
 
     data = await state.get_data()
+
     selected_ids = set(data.get("feature_ids", []))
 
     if callback.data == "features_done":
         await state.update_data(feature_ids=list(selected_ids))
+
         await callback.answer()
+
         await state.set_state(AdCreateForm.city)
-        await callback.message.answer(
-            "Now select a city. Send a city name."
-        )
+
+        await callback.message.answer("Now select a city. Send a city name.")
+
         return
 
     if callback.data.startswith("feature:"):
         feature_id = int(callback.data.replace("feature:", ""))
+
         if feature_id in selected_ids:
             selected_ids.discard(feature_id)
+
         else:
             selected_ids.add(feature_id)
 
         await state.update_data(feature_ids=list(selected_ids))
 
         # Update keyboard with new selection state
+
         features = await get_resolved_features(data.get("category_id"))
+
         keyboard = build_feature_keyboard(features, selected_ids)
+
         await callback.message.edit_reply_markup(reply_markup=keyboard)
+
         await callback.answer()
 
 
 # --- City step ---
+
+
 @router.message(AdCreateForm.city)
 async def process_city(message: types.Message, state: FSMContext) -> None:
     """Process city selection."""
+
     if not message.text:
         await message.answer("Please send a city name.")
+
         return
 
     city_name = message.text.strip()
 
     # Exact match or did-you-mean
+
     city = await get_city_by_name(city_name)
 
     if not city:
         all_cities = await get_all_cities()
+
         close_matches = difflib.get_close_matches(
             city_name, [c.name for c in all_cities], n=3, cutoff=0.6
         )
 
         if close_matches:
             match = await get_city_by_name(close_matches[0])
+
             if match:
                 city = match
 
@@ -278,52 +454,71 @@ async def process_city(message: types.Message, state: FSMContext) -> None:
             "City not found. Please send an exact city name.\n"
             "Available cities: Podgorica, Nikšić, Bar, etc."
         )
+
         return
 
     await state.update_data(city_id=city.id)
+
     await state.set_state(AdCreateForm.title)
+
     await message.answer(
         f"City: {city.name}\nNow enter the ad title (5-200 characters)."
     )
 
 
 # --- Title step ---
+
+
 @router.message(AdCreateForm.title)
 async def process_title(message: types.Message, state: FSMContext) -> None:
     """Process title input with Pydantic validation."""
+
     if not message.text:
         await message.answer("Please send the ad title.")
+
         return
 
     try:
         payload = TitlePayload(title=message.text)
+
     except Exception as e:
         await message.answer(f"Invalid title: {e}")
+
         return
 
     await state.update_data(title=payload.title)
+
     await state.set_state(AdCreateForm.description)
+
     await message.answer(
         "Title saved.\nNow enter the ad description (10-2000 characters)."
     )
 
 
 # --- Description step ---
+
+
 @router.message(AdCreateForm.description)
 async def process_description(message: types.Message, state: FSMContext) -> None:
     """Process description input with Pydantic validation."""
+
     if not message.text:
         await message.answer("Please send the ad description.")
+
         return
 
     try:
         payload = DescriptionPayload(description=message.text)
+
     except Exception as e:
         await message.answer(f"Invalid description: {e}")
+
         return
 
     await state.update_data(description=payload.description)
+
     await state.set_state(AdCreateForm.price)
+
     await message.answer(
         "Description saved.\n"
         "Now choose the price currency, or select 'Skip' if price is not required.",
@@ -333,39 +528,58 @@ async def process_description(message: types.Message, state: FSMContext) -> None
 
 def build_currency_keyboard() -> types.InlineKeyboardMarkup:
     """Build the inline keyboard for currency selection (EUR first, PO-01)."""
+
     builder = InlineKeyboardBuilder()
+
     builder.button(text="🇪🇺 EUR", callback_data="price_currency:EUR")
+
     builder.button(text="🇷🇸 RSD", callback_data="price_currency:RSD")
+
     builder.button(text="🇧🇦 BAM", callback_data="price_currency:BAM")
+
     builder.button(text="⏭️ Skip", callback_data="price_skip")
+
     builder.adjust(2)
+
     return builder.as_markup()
 
 
 # --- Price step ---
+
+
 @router.callback_query(AdCreateForm.price)
 async def process_price_currency(
     callback: types.CallbackQuery, state: FSMContext
 ) -> None:
     """Process currency selection (or skip) from the price inline keyboard."""
+
     if not callback.data or not callback.message:
         return
 
     if callback.data == "price_skip":
         await state.update_data(price_amount=None)
+
         await callback.answer()
+
         await _move_from_price_to_photos(callback.message, state)
+
         return
 
     if callback.data.startswith("price_currency:"):
         currency_value = callback.data.replace("price_currency:", "")
+
         try:
             currency = CurrencyCode(currency_value)
+
         except ValueError:
             await callback.answer("Invalid currency.", show_alert=True)
+
             return
+
         await state.update_data(price_currency=currency)
+
         await callback.answer()
+
         await callback.message.answer(
             f"Currency: {currency.value}\n"
             "Now enter the price amount as a number (or send 'skip' to leave price unset)."
@@ -375,40 +589,50 @@ async def process_price_currency(
 @router.message(AdCreateForm.price)
 async def process_price(message: types.Message, state: FSMContext) -> None:
     """Process the numeric price amount input with Pydantic validation."""
+
     data = await state.get_data()
+
     currency: CurrencyCode | None = data.get("price_currency")
+
     if currency is None:
         await message.answer(
             "Please choose a currency first, or select 'Skip'.",
             reply_markup=build_currency_keyboard(),
         )
+
         return
 
     if not message.text:
         await message.answer("Please send the price amount or 'skip'.")
+
         return
 
     text = message.text.strip().lower()
 
     if text == "skip":
         await state.update_data(price_amount=None)
+
     else:
         try:
             price_value = Decimal(text)
+
             payload = PricePayload(price_amount=price_value, price_currency=currency)
+
             await state.update_data(price_amount=payload.price_amount)
+
         except (ValueError, Exception):
             await message.answer("Invalid price. Enter a number or 'skip'.")
+
             return
 
     await _move_from_price_to_photos(message, state)
 
 
-async def _move_from_price_to_photos(
-    message: types.Message, state: FSMContext
-) -> None:
+async def _move_from_price_to_photos(message: types.Message, state: FSMContext) -> None:
     """Advance from the price step to the photo upload step."""
+
     await state.set_state(AdCreateForm.photos)
+
     await message.answer(
         "Price saved.\n"
         "Send 1-5 photos (JPEG only). Each photo under ~2MB, max 2560x2560 pixels.\n"
@@ -417,56 +641,78 @@ async def _move_from_price_to_photos(
 
 
 # --- Photos step ---
+
+
 @router.message(AdCreateForm.photos)
 async def process_photos(message: types.Message, state: FSMContext) -> None:
     """Process photo uploads with validation."""
+
     data = await state.get_data()
+
     photos = data.get("photos", [])
 
     # Handle 'done' command
+
     if message.text and message.text.strip().lower() == "done":
         count = len(photos)
+
         try:
             PhotoCountPayload(photo_count=count)
+
         except Exception:
             await message.answer(f"Please send at least 1 photo (you have {count}).")
+
             return
 
         await state.set_state(AdCreateForm.preview)
+
         await show_preview(message, data)
+
         return
 
     # Validate photo exists
+
     if not message.photo:
-        await message.answer(
-            "Please send a photo (JPEG only) or 'done' to finish."
-        )
+        await message.answer("Please send a photo (JPEG only) or 'done' to finish.")
+
         return
 
     # Get largest photo
+
     photo = message.photo[-1]
 
     # Download photo bytes for validation
+
     photo_bytes = await download_photo(photo.file_id, message.bot)
 
     if not photo_bytes:
         await message.answer("Failed to download photo. Try again.")
+
         return
 
     # Validate photo
+
     is_valid, error = validate_photo(photo_bytes)
 
     if not is_valid:
         await message.answer(f"Invalid: {error}")
+
         return
 
     # Store photo
+
     storage_key = await save_photo(generate_storage_key(), photo_bytes)
 
     # Save to state
+
     photos.append(
-        {"storage_key": storage_key, "telegram_file_id": photo.file_id, "position": len(photos)}
+        {
+            "storage_key": storage_key,
+            "telegram_file_id": photo.file_id,
+            "position": len(photos),
+        }
     )
+
     await state.update_data(photos=photos)
 
     await message.answer(
@@ -475,16 +721,36 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
 
 
 # --- Preview step ---
+
+
 async def show_preview(message: types.Message, data: dict) -> None:
     """Show ad preview before submission."""
+
     category = await get_category(data.get("category_id"))
+
     city = await get_city(data.get("city_id"))
+
     purpose = await get_lookup_item(data.get("listing_purpose_id"))
-    purpose_name = purpose.name_i18n.get("ru", purpose.slug) if purpose and purpose.name_i18n else (purpose.slug if purpose else "N/A")
+
+    purpose_name = (
+        purpose.name_i18n.get("ru", purpose.slug)
+        if purpose and purpose.name_i18n
+        else (purpose.slug if purpose else "N/A")
+    )
+
+    condition = await get_lookup_item(data.get("condition_id"))
+
+    condition_name = (
+        condition.name_i18n.get("ru", condition.slug)
+        if condition and condition.name_i18n
+        else (condition.slug if condition else "N/A")
+    )
+
     feature_ids = data.get("feature_ids", [])
-    feature_names = ", ".join(
-        await get_feature_names(feature_ids)
-    ) if feature_ids else "None"
+
+    feature_names = (
+        ", ".join(await get_feature_names(feature_ids)) if feature_ids else "None"
+    )
 
     preview_text = (
         f"Ad Preview:\n\n"
@@ -493,6 +759,7 @@ async def show_preview(message: types.Message, data: dict) -> None:
         f"Price: {_format_preview_price(data)}\n"
         f"Category: {category.name if category else 'N/A'}\n"
         f"Purpose: {purpose_name}\n"
+        f"Condition: {condition_name}\n"
         f"Features: {feature_names}\n"
         f"City: {city.name if city else 'N/A'}\n"
     )
@@ -504,17 +771,23 @@ async def show_preview(message: types.Message, data: dict) -> None:
 
 def _format_preview_price(data: dict) -> str:
     """Format the selected price (amount + currency) for the preview."""
+
     amount = data.get("price_amount")
+
     if amount is None:
         return "N/A"
+
     currency = data.get("price_currency")
+
     label = currency.value if currency else ""
+
     return f"{amount} {label}".strip()
 
 
 @router.message(AdCreateForm.preview)
 async def process_preview(message: types.Message, state: FSMContext) -> None:
     """Process preview confirmation."""
+
     if not message.text:
         return
 
@@ -525,18 +798,23 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
 
     if text == "confirm":
         data = await state.get_data()
+
         original_title = data.get("title", "")
+
         original_desc = data.get("description", "")
 
         # Translate to all languages in parallel
+
         title_translations = await translate_all_languages(
             original_title, ["ru", "bs", "en"]
         )
+
         desc_translations = await translate_all_languages(
             original_desc, ["ru", "bs", "en"]
         )
 
         # Update ad with multi-language content and run moderation
+
         is_valid, errors = await update_ad_and_moderate(
             ad_id=data["ad_id"],
             title_ru=title_translations.get("ru", original_title),
@@ -557,32 +835,41 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             user_id=data.get("user_id"),
             listing_purpose_id=data.get("listing_purpose_id"),
             feature_ids=data.get("feature_ids"),
+            listing_condition_id=data.get("condition_id"),
         )
 
         if is_valid:
             await message.answer(
                 "Ad submitted for moderation! You'll be notified when it's published."
             )
+
         else:
             await message.answer(
                 "Ad failed moderation. Please check your content and try again."
             )
+
             await state.clear()
+
             return
 
     elif text == "cancel":
         await cmd_cancel(message, state)
+
     else:
         await message.answer("Send 'confirm' to submit or 'cancel' to abort.")
 
 
 # Helper functions using sync_to_async
+
+
 async def create_draft_ad(user_id: int) -> Ad:
     """Create a draft ad row."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _create() -> Ad:
+
         return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
 
     return await _create()
@@ -590,16 +877,20 @@ async def create_draft_ad(user_id: int) -> Ad:
 
 async def delete_draft(ad_id: int) -> None:
     """Delete a draft ad and clean up its photo files."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _delete() -> None:
+
         try:
             ad = Ad.objects.get(id=ad_id, status=AdStatus.DRAFT)
+
         except Ad.DoesNotExist:
             return
 
         # Delete physical photo files for any AdImage records
+
         for img in ad.images.all():
             delete_photo(img.image)
 
@@ -610,10 +901,12 @@ async def delete_draft(ad_id: int) -> None:
 
 async def search_categories(keyword: str):
     """Search categories by keyword."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _search():
+
         return list(
             Category.objects.filter(name__icontains=keyword, is_active=True)[:5]
         )
@@ -623,12 +916,15 @@ async def search_categories(keyword: str):
 
 async def get_city_by_name(name: str):
     """Get city by exact name."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
+
         try:
             return City.objects.get(name__iexact=name)
+
         except City.DoesNotExist:
             return None
 
@@ -637,10 +933,12 @@ async def get_city_by_name(name: str):
 
 async def get_all_cities():
     """Get all cities."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
+
         return list(City.objects.all())
 
     return await _get()
@@ -648,53 +946,76 @@ async def get_all_cities():
 
 async def download_photo(file_id: str, bot: Bot) -> bytes | None:
     """Download photo bytes from Telegram."""
+
     try:
         file = await bot.download(file_id)
+
         return file.read() if file else None
+
     except Exception as e:
         logger.error(f"Failed to download photo {file_id}: {e}")
+
         return None
 
 
 async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
     """Save photo to filesystem via thread executor to avoid blocking the event loop.
 
+
     Strips EXIF/metadata and re-encodes the image before persisting to disk.
+
     Uses ``os.open`` with ``O_CREAT|O_EXCL`` to guarantee atomic writes; on
+
     ``FileExistsError`` regenerates the storage key and retries.
 
+
     Returns:
+
         The final storage key used (may differ from the input on collision).
+
     """
 
     def _write(path: str, data: bytes) -> None:
+
         cleaned = strip_photo_exif(data)
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
+
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+
         try:
             os.write(fd, cleaned)
+
         finally:
             os.close(fd)
 
     key = storage_key
+
     while True:
         media_path = os.path.join(settings.MEDIA_ROOT, key)
+
         try:
             await asyncio.to_thread(_write, media_path, photo_bytes)
+
             return key
+
         except FileExistsError:
             logger.warning(f"Storage key collision: {key}, regenerating")
+
             key = generate_storage_key()
 
 
 async def get_category(category_id: int):
     """Get category by ID."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
+
         try:
             return Category.objects.get(id=category_id)
+
         except Category.DoesNotExist:
             return None
 
@@ -703,12 +1024,15 @@ async def get_category(category_id: int):
 
 async def get_city(city_id: int):
     """Get city by ID."""
+
     from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
+
         try:
             return City.objects.get(id=city_id)
+
         except City.DoesNotExist:
             return None
 
@@ -732,37 +1056,56 @@ async def update_ad_and_moderate(
     original_language: str | None = None,
     listing_purpose_id: int | None = None,
     feature_ids: list[int] | None = None,
+    listing_condition_id: int | None = None,
 ) -> tuple[bool, list[str]]:
     """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
 
+
     ``price_amount``/``price_currency`` become the source of truth; when both
+
     are present ``price_normalized_eur`` is computed via ``PriceNormalizer``
+
     using the current rate (BR-03) before saving. When the price is skipped
+
     both are left NULL.
+
     """
+
     from asgiref.sync import sync_to_async
+
     from apps.moderation.services.auto_moderation import auto_moderate
 
     @sync_to_async
     def _update_and_moderate() -> tuple[bool, list[str]]:
+
         from django.db import transaction
 
         try:
             ad = Ad.objects.get(id=ad_id)
+
         except Ad.DoesNotExist:
             return False, ["Ad not found"]
 
         # Update ad fields — Russian remains the base content
+
         ad.title = title_ru
+
         ad.description = desc_ru
+
         ad.category_id = category_id
+
         ad.city_id = city_id
+
         ad.price_amount = price_amount
 
         # Coerce the currency to a CurrencyCode member (FSM state may carry it
+
         # as a member or as a plain ISO 4217 string). An invalid currency is
+
         # treated as "no price" so we never crash or write bad data.
+
         currency: CurrencyCode | None = None
+
         if price_currency is not None:
             try:
                 currency = (
@@ -770,50 +1113,65 @@ async def update_ad_and_moderate(
                     if isinstance(price_currency, CurrencyCode)
                     else CurrencyCode(str(price_currency))
                 )
+
             except ValueError:
-                logger.warning("Invalid price_currency %r for ad %s", price_currency, ad_id)
+                logger.warning(
+                    "Invalid price_currency %r for ad %s", price_currency, ad_id
+                )
 
         ad.price_currency = currency.value if currency else None
 
         # Compute the derived EUR-normalized price (BR-03).
+
         if price_amount is not None and currency is not None:
             try:
                 ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
                     price_amount, currency
                 )
+
             except Exception:
                 logger.exception("Failed to normalize price for ad %s", ad_id)
+
                 ad.price_normalized_eur = None
+
         else:
             ad.price_normalized_eur = None
 
         # Store multi-language translations
+
         if title_bs:
             ad.title_bs = title_bs
+
         if desc_bs:
             ad.description_bs = desc_bs
+
         if title_en:
             ad.title_en = title_en
+
         if desc_en:
             ad.description_en = desc_en
+
         if original_language:
             ad.original_language = original_language
 
         # Save listing purpose
+
         if listing_purpose_id:
             ad.listing_purpose_id = listing_purpose_id
 
         # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
+
         # so a DB rollback does not leave filesystem and DB desynced.
+
         for photo in photos:
             try:
-                original_path = os.path.join(
-                    settings.MEDIA_ROOT, photo["storage_key"]
-                )
+                original_path = os.path.join(settings.MEDIA_ROOT, photo["storage_key"])
+
                 with open(original_path, "rb") as f:
                     photo_bytes = f.read()
 
                 thumbnail_service = ThumbnailService(settings.MEDIA_ROOT)
+
                 thumbnail_keys = thumbnail_service.generate_thumbnails(
                     photo_bytes, photo["storage_key"]
                 )
@@ -821,29 +1179,38 @@ async def update_ad_and_moderate(
                 photo["thumbnail_small"] = thumbnail_keys.get(
                     ThumbnailSizeStrEnum.SMALL
                 )
+
                 photo["thumbnail_medium"] = thumbnail_keys.get(
                     ThumbnailSizeStrEnum.MEDIUM
                 )
+
                 photo["thumbnail_large"] = thumbnail_keys.get(
                     ThumbnailSizeStrEnum.LARGE
                 )
+
             except Exception:
                 logger.exception(
                     "Failed to generate thumbnails for %s",
                     photo["storage_key"],
                 )
+
                 photo["thumbnail_small"] = None
+
                 photo["thumbnail_medium"] = None
+
                 photo["thumbnail_large"] = None
 
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            ad.listing_condition_id = listing_condition_id
             ad.save()
 
             # Save features (M2M via through model)
+
             if feature_ids is not None:
                 ad.features.set(feature_ids)
 
             # Create AdImage records with pre-generated thumbnails
+
             for photo in photos:
                 AdImageService.create_or_skip(
                     ad=ad,
@@ -856,56 +1223,85 @@ async def update_ad_and_moderate(
                 )
 
             # Transition DRAFT -> ON_MODERATION (state machine requires this step)
+
             ad.transition_to(AdStatus.ON_MODERATION)
 
         # Delegate to shared auto-moderation service
+
         # Handles: banned_words, duplicate_title, all validations,
+
         # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
+
         passed = auto_moderate(ad)
 
         if passed:
             return True, []
+
         else:
             return False, ["Ad failed moderation checks"]
 
     return await _update_and_moderate()
 
-async def translate_all_languages(text: str, target_locales: list[str]) -> dict[str, str]:
+
+async def translate_all_languages(
+    text: str, target_locales: list[str]
+) -> dict[str, str]:
     """Translate text to all target languages in parallel.
 
+
     Delegates to the shared translation service (apps.core.services.translation)
+
     which provides 500ms timeout, circuit breaker, and LRU cache.
 
+
     Args:
+
         text: Source text to translate.
+
         target_locales: List of target locale codes (e.g. ['ru', 'bs', 'en']).
 
+
     Returns:
+
         Dict mapping locale codes to translated text. Falls back to original
+
         text on failure (via the shared service's graceful fallback).
+
     """
+
     results = await asyncio.gather(
-        *[asyncio.to_thread(translate_text, text, "auto", loc)
-          for loc in target_locales]
+        *[
+            asyncio.to_thread(translate_text, text, "auto", loc)
+            for loc in target_locales
+        ]
     )
+
     return dict(zip(target_locales, results, strict=True))
 
 
 # --- Purpose / Feature helper functions ---
 
+
 async def get_resolved_purposes(category_id: int) -> list:
     """Get resolved listing purposes for a category."""
+
     from asgiref.sync import sync_to_async
+
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     @sync_to_async
     def _get():
+
         from apps.categories.models import Category
+
         try:
             cat = Category.objects.get(id=category_id)
+
         except Category.DoesNotExist:
             return []
+
         resolver = CategoryLookupResolver()
+
         return list(resolver.get_resolved_purposes(cat))
 
     return await _get()
@@ -913,35 +1309,66 @@ async def get_resolved_purposes(category_id: int) -> list:
 
 async def get_resolved_features(category_id: int) -> list:
     """Get resolved listing features for a category."""
+
+    from asgiref.sync import sync_to_async
+
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
+
+    @sync_to_async
+    def _get():
+
+        from apps.categories.models import Category
+
+        try:
+            cat = Category.objects.get(id=category_id)
+
+        except Category.DoesNotExist:
+            return []
+
+        resolver = CategoryLookupResolver()
+
+        return list(resolver.get_resolved_features(cat))
+
+    return await _get()
+
+
+async def get_resolved_conditions(category_id: int) -> list:
+    """Get resolved listing conditions for a category."""
     from asgiref.sync import sync_to_async
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     @sync_to_async
     def _get():
         from apps.categories.models import Category
+
         try:
             cat = Category.objects.get(id=category_id)
         except Category.DoesNotExist:
             return []
         resolver = CategoryLookupResolver()
-        return list(resolver.get_resolved_features(cat))
+        return list(resolver.get_resolved_conditions(cat))
 
     return await _get()
 
 
 async def get_default_purpose(category_id: int, purposes: list) -> object | None:
     """Get the default purpose for a category, if configured."""
+
     from asgiref.sync import sync_to_async
+
     from apps.categories.models import CategoryListingPurpose
 
     @sync_to_async
     def _get():
+
         try:
             clp = CategoryListingPurpose.objects.get(
                 category_id=category_id,
                 is_default=True,
             )
+
             return clp.listing_purpose
+
         except CategoryListingPurpose.DoesNotExist:
             return None
 
@@ -950,13 +1377,17 @@ async def get_default_purpose(category_id: int, purposes: list) -> object | None
 
 async def get_lookup_item_by_slug(slug: str):
     """Get a LookupItem by slug."""
+
     from asgiref.sync import sync_to_async
+
     from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():
+
         try:
             return LookupItem.objects.get(slug=slug)
+
         except LookupItem.DoesNotExist:
             return None
 
@@ -965,15 +1396,20 @@ async def get_lookup_item_by_slug(slug: str):
 
 async def get_lookup_item(item_id: int | None):
     """Get a LookupItem by ID."""
+
     if item_id is None:
         return None
+
     from asgiref.sync import sync_to_async
+
     from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():
+
         try:
             return LookupItem.objects.get(id=item_id)
+
         except LookupItem.DoesNotExist:
             return None
 
@@ -982,43 +1418,91 @@ async def get_lookup_item(item_id: int | None):
 
 async def get_feature_names(feature_ids: list[int]) -> list[str]:
     """Get feature names as localized strings."""
+
     from asgiref.sync import sync_to_async
+
     from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():
+
         items = LookupItem.objects.filter(id__in=feature_ids)
+
         names = []
+
         for item in items:
             if item.name_i18n and isinstance(item.name_i18n, dict):
                 names.append(item.name_i18n.get("ru", item.slug))
+
             else:
                 names.append(item.slug)
+
         return names
 
     return await _get()
 
 
-def build_purpose_keyboard(purposes: list, default_slug: str | None = None) -> types.InlineKeyboardMarkup:
+def build_purpose_keyboard(
+    purposes: list, default_slug: str | None = None
+) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for purpose selection."""
+
     builder = InlineKeyboardBuilder()
+
     for purpose in purposes:
-        text = purpose.name_i18n.get("ru", purpose.slug) if purpose.name_i18n else purpose.slug
+        text = (
+            purpose.name_i18n.get("ru", purpose.slug)
+            if purpose.name_i18n
+            else purpose.slug
+        )
+
         if purpose.slug == default_slug:
             text = f"✅ {text}"
+
         builder.button(text=text, callback_data=f"purpose:{purpose.slug}")
+
+    builder.adjust(2)
+
+    return builder.as_markup()
+
+
+def build_condition_keyboard(conditions: list) -> types.InlineKeyboardMarkup:
+    """Build inline keyboard for condition single-selection."""
+    builder = InlineKeyboardBuilder()
+    for condition in conditions:
+        text = (
+            condition.name_i18n.get("ru", condition.slug)
+            if condition.name_i18n
+            else condition.slug
+        )
+        builder.button(text=text, callback_data=f"condition:{condition.slug}")
     builder.adjust(2)
     return builder.as_markup()
 
 
-def build_feature_keyboard(features: list, selected_ids: set) -> types.InlineKeyboardMarkup:
+def build_feature_keyboard(
+    features: list, selected_ids: set
+) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for feature multi-selection."""
+
     builder = InlineKeyboardBuilder()
+
     for feature in features:
-        text = feature.name_i18n.get("ru", feature.slug) if feature.name_i18n else feature.slug
+        if feature.slug in ("new", "used"):
+            continue
+        text = (
+            feature.name_i18n.get("ru", feature.slug)
+            if feature.name_i18n
+            else feature.slug
+        )
+
         if feature.id in selected_ids:
             text = f"✅ {text}"
+
         builder.button(text=text, callback_data=f"feature:{feature.id}")
+
     builder.button(text="✔️ Done", callback_data="features_done")
+
     builder.adjust(2)
+
     return builder.as_markup()

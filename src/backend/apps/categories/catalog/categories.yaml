@@ -35,13 +35,14 @@ lookups:
       name_i18n: {ru: "Ищу работу", bs: "Tražim posao", en: "Job seek"}
       sort_order: 10
 
-  listing_feature:
+  listing_condition:
     - slug: new
       name_i18n: {ru: "Новый", bs: "Novo", en: "New"}
       sort_order: 1
     - slug: used
       name_i18n: {ru: "Б/У", bs: "Polovno", en: "Used"}
       sort_order: 2
+  listing_feature:
     - slug: delivery
       name_i18n: {ru: "Доставка есть", bs: "Dostava", en: "Delivery available"}
       sort_order: 3
@@ -147,7 +148,8 @@ categories:
     name: "Транспорт"
     name_i18n: {ru: "Транспорт", bs: "Transport", en: "Transport"}
     listing_purpose_override: [sell, rent]
-    listing_feature_override: [new, used, delivery, pickup, negotiable, credit, exchange, urgent, warranty]
+    listing_feature_override: [delivery, pickup, negotiable, credit, exchange, urgent, warranty]
+    listing_condition_override: [new, used]
     children:
       - slug: cars
         name: "Автомобили"
@@ -204,7 +206,8 @@ categories:
         name: "Запчасти и аксессуары"
         name_i18n: {ru: "Запчасти и аксессуары", bs: "Rezervni dijelovi", en: "Auto Parts"}
         listing_purpose_override: [sell]
-        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty, packaging, branded, import, local]
+        listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, warranty, packaging, branded, import, local]
+        listing_condition_override: [new, used]
         children:
           - slug: parts
             name: "Запчасти"
@@ -244,7 +247,8 @@ categories:
     name: "Товары"
     name_i18n: {ru: "Товары", bs: "Roba", en: "Goods"}
     listing_purpose_override: [sell]
-    listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, handmade, branded, custom, warranty, packaging, import, local, eco]
+    listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, handmade, branded, custom, warranty, packaging, import, local, eco]
+    listing_condition_override: [new, used]
     children:
       - slug: clothing-shoes-accessories
         name: "Одежда, обувь, аксессуары"
@@ -449,7 +453,8 @@ categories:
       - slug: pet-supplies
         name: "Товары для животных"
         name_i18n: {ru: "Товары для животных", bs: "Proizvodi za životinje", en: "Pet Supplies"}
-        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty, branded, import, local]
+        listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, warranty, branded, import, local]
+        listing_condition_override: [new, used]
         children:
           - slug: pet-food
             name: "Корм и сухой корм"
@@ -698,7 +703,8 @@ categories:
     name: "Бизнес"
     name_i18n: {ru: "Бизнес", bs: "Biznis", en: "Business"}
     listing_purpose_override: [sell, rent]
-    listing_feature_override: [new, used, delivery, pickup, negotiable, credit, installment, urgent, warranty, luxury]
+    listing_feature_override: [delivery, pickup, negotiable, credit, installment, urgent, warranty, luxury]
+    listing_condition_override: [new, used]
     children:
       - slug: ready-business
         name: "Готовый бизнес"
@@ -708,7 +714,8 @@ categories:
       - slug: business-equipment
         name: "Оборудование для бизнеса"
         name_i18n: {ru: "Оборудование для бизнеса", bs: "Poslovna oprema", en: "Business Equipment"}
-        listing_feature_override: [new, used, delivery, pickup, negotiable, exchange, urgent, warranty]
+        listing_feature_override: [delivery, pickup, negotiable, exchange, urgent, warranty]
+        listing_condition_override: [new, used]
         children:
           - slug: retail-equipment
             name: "Торговое оборудование"

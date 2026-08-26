@@ -19,6 +19,7 @@ For specific guidelines, see:
 - [Readme](../../README.md)
 - [Doc maintenance rules](../00-overview/doc-maintenance-rules.md)
 - [Technical specification](../01-spec/technical-specification.md)
+- [i18n specification](../01-spec/i18n-spec.md)
 - [DB schema](../02-database/db-schema.md)
 - [Architecture](../01-spec/architecture-structure.md)
 - [Packages](../03-packages/packages-list.md)

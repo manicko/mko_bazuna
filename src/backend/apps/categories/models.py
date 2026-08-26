@@ -180,3 +180,35 @@ class CategoryListingFeature(models.Model):
 
     def __str__(self) -> str:
         return f"{self.category.slug} -> {self.feature.slug}"
+
+class CategoryListingCondition(models.Model):
+    """M:N through table binding a Category to a listing condition LookupItem.
+
+    Defines which item conditions (new/used) are available for this category.
+    Conditions are single-select on the Ad (via ``Ad.listing_condition``),
+    but this through table controls which conditions a category exposes.
+    """
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE,
+        related_name="listing_conditions",
+    )
+    listing_condition = models.ForeignKey(
+        "lookups.LookupItem",
+        on_delete=models.CASCADE,
+        limit_choices_to={"group__code": LookupGroupCode.LISTING_CONDITION},
+        related_name="category_conditions",
+    )
+
+    class Meta:
+        db_table = "category_listing_conditions"
+        unique_together = [("category", "listing_condition")]
+        indexes = [
+            models.Index(fields=["category", "listing_condition"]),
+            models.Index(fields=["listing_condition"]),
+        ]
+        verbose_name_plural = "category listing conditions"
+
+    def __str__(self) -> str:
+        return f"{self.category.slug} -> {self.listing_condition.slug}"

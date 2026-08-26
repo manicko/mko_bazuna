@@ -344,13 +344,23 @@ def listings(
     if listing_purpose_slug:
         ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
 
-    # Features filter (F5) — multi-select AND semantics via chained filters.
-    # Each chained ``.filter(features__slug=...)`` adds an EXISTS subquery;
-    # an ad must possess every selected feature.
+    # Listing condition filter — single-select exact slug match
+    condition_slug = request.GET.get("condition")
+
+    if condition_slug:
+        ads = ads.filter(listing_condition__slug=condition_slug)
+
+    # Features filter (F5) — multi-select AND semantics.
+    # An ad matches only if it possesses ALL selected features. Django's
+    # filter() chains with AND, so each call to ``features__slug=<slug>``
+    # adds a JOIN constraint requiring that specific feature. ``distinct()``
+    # prevents duplicate rows from the multiple M2M JOINs.
     feature_slugs = request.GET.getlist("features") or []
 
-    for fslug in feature_slugs:
-        ads = ads.filter(features__slug=fslug)
+    if feature_slugs:
+        for slug in feature_slugs:
+            ads = ads.filter(features__slug=slug)
+        ads = ads.distinct()
 
     # Resolve category-constrained filter options (F4/F5). When a category is
     # active, use the cached resolver; otherwise show the full active sets.
@@ -361,12 +371,18 @@ def listings(
         resolved_features = CategoryLookupResolver.get_resolved_features(
             breadcrumb_category
         )
+        resolved_conditions = CategoryLookupResolver.get_resolved_conditions(
+            breadcrumb_category
+        )
     else:
         resolved_purposes = LookupItem.objects.filter(
             group__code=LookupGroupCode.LISTING_PURPOSE, is_active=True
         ).order_by("sort_order")
         resolved_features = LookupItem.objects.filter(
             group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
+        ).order_by("sort_order")
+        resolved_conditions = LookupItem.objects.filter(
+            group__code=LookupGroupCode.LISTING_CONDITION, is_active=True
         ).order_by("sort_order")
 
     # Sorting
@@ -420,8 +436,10 @@ def listings(
         "max_price": max_price,
         "current_listing_purpose": listing_purpose_slug,
         "current_features": feature_slugs,
+        "current_condition": condition_slug,
         "resolved_purposes": resolved_purposes,
         "resolved_features": resolved_features,
+        "resolved_conditions": resolved_conditions,
         "has_results": has_results,
         "show_filters": True,
     }

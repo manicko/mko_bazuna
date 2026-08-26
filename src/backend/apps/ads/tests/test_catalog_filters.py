@@ -52,21 +52,45 @@ def purpose_lookup() -> dict[str, LookupItem]:
 
 @pytest.fixture
 def feature_lookup() -> dict[str, LookupItem]:
-    """Create the ``listing_feature`` group with new/delivery items."""
+    """Create the ``listing_feature`` group with genuine multi-select features.
+
+    ``new``/``used`` are intentionally absent: they live in the
+    ``listing_condition`` group (see ``condition_lookup``) and are excluded
+    from the feature multi-select (Spec 12 / REQ-12.3).
+    """
     group = LookupGroup.objects.create(code="listing_feature", is_system=True)
-    new = LookupItem.objects.create(
-        group=group,
-        slug="new",
-        name_i18n={"ru": "Новый", "en": "New"},
-        is_active=True,
-    )
     delivery = LookupItem.objects.create(
         group=group,
         slug="delivery",
         name_i18n={"ru": "Доставка", "en": "Delivery"},
         is_active=True,
     )
-    return {"new": new, "delivery": delivery}
+    negotiable = LookupItem.objects.create(
+        group=group,
+        slug="negotiable",
+        name_i18n={"ru": "Торг уместен", "en": "Negotiable"},
+        is_active=True,
+    )
+    return {"delivery": delivery, "negotiable": negotiable}
+
+
+@pytest.fixture
+def condition_lookup() -> dict[str, LookupItem]:
+    """Create the ``listing_condition`` group with new/used items."""
+    group = LookupGroup.objects.create(code="listing_condition", is_system=True)
+    new = LookupItem.objects.create(
+        group=group,
+        slug="new",
+        name_i18n={"ru": "Новый", "en": "New"},
+        is_active=True,
+    )
+    used = LookupItem.objects.create(
+        group=group,
+        slug="used",
+        name_i18n={"ru": "Б/У", "en": "Used"},
+        is_active=True,
+    )
+    return {"new": new, "used": used}
 
 
 class TestListingPurposeFilter:
@@ -129,10 +153,129 @@ class TestListingPurposeFilter:
         assert ad_rent.id not in ids
 
 
+class TestListingConditionFilter:
+    """``?condition=<slug>`` single-select exact match for the new/used dimension.
+
+    Mirrors ``TestListingPurposeFilter``: condition is a dedicated single-select
+    dimension (Spec 12 / PO-4), never part of the ``features`` multi-select.
+    """
+
+    def test_listings_filters_by_condition(
+        self, seller, category, city, condition_lookup
+    ) -> None:
+        ad_new = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Brand new",
+            listing_condition=condition_lookup["new"],
+            status=AdStatus.PUBLISHED,
+        )
+        ad_used = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Used good",
+            listing_condition=condition_lookup["used"],
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/?condition=new")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_new.id in ids
+        assert ad_used.id not in ids
+
+    def test_search_filters_by_condition(
+        self, seller, category, city, condition_lookup
+    ) -> None:
+        ad_new = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Brand new",
+            listing_condition=condition_lookup["new"],
+            status=AdStatus.PUBLISHED,
+        )
+        ad_used = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Used good",
+            listing_condition=condition_lookup["used"],
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?condition=used")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_used.id in ids
+        assert ad_new.id not in ids
+
+    def test_condition_filter_excludes_ads_without_condition(
+        self, seller, category, city, condition_lookup
+    ) -> None:
+        ad_new = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Brand new",
+            listing_condition=condition_lookup["new"],
+            status=AdStatus.PUBLISHED,
+        )
+        ad_unconditioned = create_test_ad(
+            seller,
+            category,
+            city,
+            title="No condition set",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/?condition=new")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_new.id in ids
+        assert ad_unconditioned.id not in ids
+
+    def test_condition_filter_empty_shows_all(
+        self, seller, category, city, condition_lookup
+    ) -> None:
+        ad_new = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Brand new",
+            listing_condition=condition_lookup["new"],
+            status=AdStatus.PUBLISHED,
+        )
+        ad_used = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Used good",
+            listing_condition=condition_lookup["used"],
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_new.id in ids
+        assert ad_used.id in ids
+
+
 class TestFeaturesFilter:
     """``?features=...`` multi-select AND semantics (F5)."""
 
-    def _seed_ads(self, seller, category, city, feature_lookup) -> tuple[Ad, Ad]:
+    def _seed_ads(self, seller, category, city, feature_lookup) -> tuple[Ad, Ad, Ad]:
         ad_both = create_test_ad(
             seller,
             category,
@@ -140,42 +283,73 @@ class TestFeaturesFilter:
             title="Ad with both features",
             status=AdStatus.PUBLISHED,
         )
-        ad_both.features.add(feature_lookup["new"], feature_lookup["delivery"])
-        ad_new_only = create_test_ad(
+        ad_both.features.add(feature_lookup["delivery"], feature_lookup["negotiable"])
+        ad_delivery_only = create_test_ad(
             seller,
             category,
             city,
-            title="Ad with only new",
+            title="Ad with only delivery",
             status=AdStatus.PUBLISHED,
         )
-        ad_new_only.features.add(feature_lookup["new"])
-        return ad_both, ad_new_only
+        ad_delivery_only.features.add(feature_lookup["delivery"])
+        ad_none = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Ad with no features",
+            status=AdStatus.PUBLISHED,
+        )
+        return ad_both, ad_delivery_only, ad_none
 
     def test_all_selected_features_required(
         self, seller, category, city, feature_lookup
     ) -> None:
-        ad_both, ad_new_only = self._seed_ads(seller, category, city, feature_lookup)
+        ad_both, ad_delivery_only, ad_none = self._seed_ads(
+            seller, category, city, feature_lookup
+        )
 
         client = Client()
-        response = client.get("/search/?features=new&features=delivery")
+        response = client.get("/search/?features=delivery&features=negotiable")
 
         assert response.status_code == 200
         ids = {a.id for a in response.context["page_obj"]}
+        # AND semantics: an ad matches only if it has ALL selected features,
+        # so ad_both (delivery + negotiable) is included while the single-feature
+        # and featureless ads are excluded.
         assert ad_both.id in ids
-        assert ad_new_only.id not in ids
+        assert ad_delivery_only.id not in ids
+        assert ad_none.id not in ids
 
-    def test_single_feature_returns_all_matches(
+    def test_ads_missing_any_selected_feature_excluded(
         self, seller, category, city, feature_lookup
     ) -> None:
-        ad_both, ad_new_only = self._seed_ads(seller, category, city, feature_lookup)
+        ad_both, ad_delivery_only, ad_none = self._seed_ads(
+            seller, category, city, feature_lookup
+        )
 
         client = Client()
-        response = client.get("/search/?features=new")
+        response = client.get("/search/?features=delivery&features=negotiable")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_delivery_only.id not in ids
+        assert ad_none.id not in ids
+
+    def test_single_feature_filter_matches_all_with_that_feature(
+        self, seller, category, city, feature_lookup
+    ) -> None:
+        ad_both, ad_delivery_only, ad_none = self._seed_ads(
+            seller, category, city, feature_lookup
+        )
+
+        client = Client()
+        response = client.get("/search/?features=delivery")
 
         assert response.status_code == 200
         ids = {a.id for a in response.context["page_obj"]}
         assert ad_both.id in ids
-        assert ad_new_only.id in ids
+        assert ad_delivery_only.id in ids
+        assert ad_none.id not in ids
 
 
 class TestFilterAndSearchCombine:
@@ -192,7 +366,7 @@ class TestFilterAndSearchCombine:
             listing_purpose=purpose_lookup["sell"],
             status=AdStatus.PUBLISHED,
         )
-        ad_match.features.add(feature_lookup["new"])
+        ad_match.features.add(feature_lookup["delivery"])
         # Same text + purpose but missing the feature -> must be excluded.
         create_test_ad(
             seller,
@@ -205,7 +379,7 @@ class TestFilterAndSearchCombine:
 
         client = Client()
         response = client.get(
-            "/search/?q=красный телефон&listing_purpose=sell&features=new"
+            "/search/?q=красный телефон&listing_purpose=sell&features=delivery"
         )
 
         assert response.status_code == 200
@@ -316,8 +490,8 @@ class TestFilterUrlReset:
         """Every ``hx-get`` link in ``ad_list.html`` must also carry ``hx-push-url="true"``."""
         path = Path("src/backend/templates/ads/partials/ad_list.html").resolve()
         content = path.read_text(encoding="utf-8")
-        assert content.count("hx-get=") == 8
-        assert content.count('hx-push-url="true"') == 8
+        assert content.count("hx-get=") == 9
+        assert content.count('hx-push-url="true"') == 9
 
     def test_clear_all_filters_has_push_url(self) -> None:
         """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
@@ -388,8 +562,9 @@ class TestFilterUrlReset:
     ) -> None:
         """Requesting only ``features=delivery`` returns only delivery ads.
 
-        Confirms AND semantics: an ad with only the ``new`` feature is excluded,
-        proving unchecked params from a prior URL are not re-introduced.
+        An ad with only the ``new`` feature is excluded, proving unchecked params
+        from a prior URL are not re-introduced. (Single-select behaviour is
+        identical under AND/OR — only multi-select semantics changed.)
         """
         ad_delivery = create_test_ad(
             seller, category, city,
@@ -398,16 +573,16 @@ class TestFilterUrlReset:
         )
         ad_delivery.features.add(feature_lookup["delivery"])
 
-        ad_new = create_test_ad(
+        ad_negotiable = create_test_ad(
             seller, category, city,
-            title="New only",
+            title="Negotiable only",
             status=AdStatus.PUBLISHED,
         )
-        ad_new.features.add(feature_lookup["new"])
+        ad_negotiable.features.add(feature_lookup["negotiable"])
 
         client = Client()
         response = client.get("/?features=delivery")
         assert response.status_code == 200
         ids = {a.id for a in response.context["page_obj"]}
         assert ad_delivery.id in ids
-        assert ad_new.id not in ids
+        assert ad_negotiable.id not in ids
