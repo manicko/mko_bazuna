@@ -4,7 +4,16 @@ title: Automated Translation-Completeness Checking System — Research Report
 date: 2026-08-23
 project: Mko Bazuna (Django 5.2 LTS, HTMX MPA, Docker, PostgreSQL 18)
 confidence: HIGH (all findings verified against source code)
+stale: true
+stale_reason: Assessed pre-f661532; superseded by i18n-spec.md and i18n-translation-pipeline-gap-analysis.md
 ---
+
+> **⚠ Stale — pre-`f661532` state:** This report assessed the i18n state *before* commit
+> `f661532`. Its §0/§1.1/§1.2 verdicts ("64 of 100 strings missing from `.po`", "no `gettext` in
+> Python", "no CI gate") **no longer reflect** the implemented pipeline. See the authoritative
+> current description in [`i18n-spec.md`](../01-spec/i18n-spec.md) and
+> [`i18n-translation-pipeline-gap-analysis.md`](../99-agent/i18n-translation-pipeline-gap-analysis.md).
+> Retained for historical reference only.
 
 # Automated Translation-Completeness Checking System — Research Report
 

@@ -391,15 +391,21 @@ class TestFilterAndSearchCombine:
 class TestPriceNullSort:
     """``price_asc``/``price_desc`` place NULL ``price_normalized_eur`` last."""
 
-    def test_price_asc_places_nulls_last(
-        self, seller, category, city
-    ) -> None:
+    def test_price_asc_places_nulls_last(self, seller, category, city) -> None:
         priced = create_test_ad(
-            seller, category, city, title="Priced", price=100,
+            seller,
+            category,
+            city,
+            title="Priced",
+            price=100,
             status=AdStatus.PUBLISHED,
         )
         null = create_test_ad(
-            seller, category, city, title="No price", price=None,
+            seller,
+            category,
+            city,
+            title="No price",
+            price=None,
             status=AdStatus.PUBLISHED,
         )
 
@@ -411,15 +417,21 @@ class TestPriceNullSort:
         assert null.id in ids and priced.id in ids
         assert ids[-1] == null.id
 
-    def test_price_desc_places_nulls_last(
-        self, seller, category, city
-    ) -> None:
+    def test_price_desc_places_nulls_last(self, seller, category, city) -> None:
         priced = create_test_ad(
-            seller, category, city, title="Priced", price=100,
+            seller,
+            category,
+            city,
+            title="Priced",
+            price=100,
             status=AdStatus.PUBLISHED,
         )
         null = create_test_ad(
-            seller, category, city, title="No price", price=None,
+            seller,
+            category,
+            city,
+            title="No price",
+            price=None,
             status=AdStatus.PUBLISHED,
         )
 
@@ -435,9 +447,7 @@ class TestPriceNullSort:
 class TestRelevanceTiebreaker:
     """FTS results order by ``-rank, -published_at, -id``."""
 
-    def test_rank_tie_breaks_by_published_at(
-        self, seller, category, city
-    ) -> None:
+    def test_rank_tie_breaks_by_published_at(self, seller, category, city) -> None:
         now = timezone.now()
         ad_older = create_test_ad(
             seller,
@@ -504,9 +514,7 @@ class TestFilterUrlReset:
     # Integration tests — HTMX rendered output
     # ------------------------------------------------------------------ #
 
-    def test_form_renders_path_only_hx_get(
-        self, seller, category, city
-    ) -> None:
+    def test_form_renders_path_only_hx_get(self, seller, category, city) -> None:
         """HTMX request to ``/`` renders the form with ``hx-get="/"`` (path only)."""
         create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
@@ -523,9 +531,7 @@ class TestFilterUrlReset:
         self, seller, category, city, feature_lookup
     ) -> None:
         """Feature chip removal links in the rendered output carry ``hx-push-url="true"``."""
-        ad = create_test_ad(
-            seller, category, city, status=AdStatus.PUBLISHED
-        )
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         ad.features.add(feature_lookup["delivery"])
         client = Client()
         response = client.get(
@@ -541,13 +547,18 @@ class TestFilterUrlReset:
     ) -> None:
         """Pagination links in the rendered output carry ``hx-push-url="true"``."""
         create_test_ads_bulk(
-            seller, category, city, count=25,
+            seller,
+            category,
+            city,
+            count=25,
             status=AdStatus.PUBLISHED,
         )
         client = Client()
         # Use Accept-Language en so the middleware activates English, making
         # the ``{% trans "Page navigation" %}`` assertion deterministic.
-        response = client.get("/", headers={"HX-Request": "true", "Accept-Language": "en"})
+        response = client.get(
+            "/", headers={"HX-Request": "true", "Accept-Language": "en"}
+        )
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         assert 'hx-push-url="true"' in content
@@ -567,14 +578,18 @@ class TestFilterUrlReset:
         identical under AND/OR — only multi-select semantics changed.)
         """
         ad_delivery = create_test_ad(
-            seller, category, city,
+            seller,
+            category,
+            city,
             title="Delivery only",
             status=AdStatus.PUBLISHED,
         )
         ad_delivery.features.add(feature_lookup["delivery"])
 
         ad_negotiable = create_test_ad(
-            seller, category, city,
+            seller,
+            category,
+            city,
             title="Negotiable only",
             status=AdStatus.PUBLISHED,
         )

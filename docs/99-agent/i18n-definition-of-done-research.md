@@ -13,7 +13,20 @@ related:
   - rules
   - references
   - i18n-translation-pipeline-gap-analysis
+stale: true
+stale_reason: Assessed pre-f661532; superseded by i18n-spec.md as the authoritative current description
 ---
+
+> **Status — pre-implementation research (2026-08-23):** This report assesses the i18n state
+> *before* commit `f661532`. Its findings (the §1.1 current-state table, §1.2 "What is broken",
+> and the §9 bottom-line recommendations) described the gaps that `f661532` subsequently
+> **implemented** — namely the `i18n` CI job, Python-side `gettext` usage, `.po` extraction
+> completeness, the guard tests in `test_i18n_completeness.py`, and wrapping of the hardcoded
+> template strings. As a result the §1.1 verdicts reading "CI has an i18n gate = No",
+> "Python `gettext_lazy` usage = None", and "64 of 100 strings missing from `.po`" are
+> **no longer true**. This note is retained for the Definition-of-Done checklist (§5) and the
+> workflow recommendations (§6), which remain valid. For the authoritative, current
+> implementation architecture see [`../01-spec/i18n-spec.md`](../01-spec/i18n-spec.md).
 
 # Research Report: Multilingual i18n Definition of Done
 

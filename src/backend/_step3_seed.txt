@@ -1,0 +1,321 @@
+.................F........
+=================================== FAILURES ===================================
+E   AssertionError: Coverage 87.7% is below 90% threshold
+    assert 87.71929824561403 >= 90.0
+/app/src/backend/apps/seed/tests/test_seed.py:1451: AssertionError: Coverage 87.7% is below 90% threshold
+=============================== warnings summary ===============================
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_force_skips_prompt
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:37.619046) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_force_skips_prompt
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:46.748790) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_analytics
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:39.843698) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_analytics
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:48.958203) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_produces_seed_source
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:42.809900) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_produces_seed_source
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:51.904088) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:45.034551) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:54.113502) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:47.259203) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:56.322916) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:49.483854) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:44:58.532329) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:08:48.637629) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:51.708506) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:00.741743) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:08:50.273728) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:53.933157) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:02.951156) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:55:58.382460) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:07.369984) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_seed_produces_multi_language_ads
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:03.573314) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_seed_produces_multi_language_ads
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:12.525282) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_full_seed_with_builder_categories
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:18.404324) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_full_seed_with_builder_categories
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:27.254706) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:30.269132) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:39.038246) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:18.632788) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:16.881080) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-10-05 16:11:48.310012) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:33.976884) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:42.720602) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:21.359621) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:17.030066) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-10-05 16:11:51.890110) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2021-06-19 14:13:46.260157) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2025-10-13 02:13:48.160634) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2022-10-23 19:17:28.804595) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2026-05-14 16:33:24.894469) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2022-07-12 02:08:29.220668) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:43.617041) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:52.294728) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:28.449386) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:17.417430) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:48.066344) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:45:56.713555) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:31.721585) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:17.596213) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:52.515647) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:01.132382) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:34.993784) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:17.774997) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /app/staticfiles/
+    mw_instance = middleware(adapted_handler)
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:56:57.706500) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:06.287681) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:38.811350) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:17.983577) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:57:02.155803) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:10.706508) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:42.083549) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:18.162360) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:57:06.605106) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:15.125335) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:45.355748) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:18.341144) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:57:11.054409) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:19.544163) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:48.627947) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:18.519927) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-06 16:57:15.503712) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-11-24 08:46:23.962990) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-18 01:09:51.900147) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-13 09:31:18.698710) while time zone support is active.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 20 durations =============================
+12.98s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+9.45s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_zero_count
+8.78s call     src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+7.21s call     src/backend/apps/seed/tests/test_seed.py::TestImageGenerator::test_generates_ad_images
+5.97s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+5.74s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+3.93s call     src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+3.50s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_analytics
+3.50s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_produces_seed_source
+3.43s setup    src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+3.36s setup    src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+3.36s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_seed_produces_multi_language_ads
+3.34s setup    src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_builder_loads_all_leaf_slugs
+3.34s call     src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+3.20s setup    src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_give_away_ads_have_zero_price
+3.16s call     src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+3.14s call     src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_force_skips_prompt
+3.08s call     src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+3.07s setup    src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+3.05s setup    src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+=========================== short test summary info ============================
+FAILED apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+EXIT=1

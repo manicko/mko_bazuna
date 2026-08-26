@@ -24,9 +24,7 @@ def bump_tree_version_on_structure_change(sender, instance, **kwargs):  # type: 
     from apps.categories.cache import bump_tree_version
 
     bump_tree_version()
-    logger.debug(
-        "Bumped category tree version due to %s change", sender.__name__
-    )
+    logger.debug("Bumped category tree version due to %s change", sender.__name__)
 
 
 @receiver(post_save, sender="categories.CategoryListingPurpose")
@@ -59,6 +57,4 @@ def invalidate_on_lookup_item_change(sender, instance, **kwargs):  # type: ignor
 
     resolver = CategoryLookupResolver()
     resolver.invalidate_lookup_item(instance.id)
-    logger.debug(
-        "Invalidated lookup caches due to LookupItem %d change", instance.id
-    )
+    logger.debug("Invalidated lookup caches due to LookupItem %d change", instance.id)

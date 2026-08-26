@@ -1,0 +1,142 @@
+.....................................FEEEE..............................................................................EEEEEEEEEEEEEEEEEEEEE.................................................................
+==================================== ERRORS ====================================
+_ ERROR at setup of TestBreadcrumbEllipsisTemplate.test_breadcrumb_with_tag_no_last_ancestor _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/breadcrumb.html'
+_ ERROR at setup of TestBreadcrumbEllipsisTemplate.test_ellipsis_literal_present _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/breadcrumb.html'
+_ ERROR at setup of TestBreadcrumbEllipsisTemplate.test_ellipsis_truncation_branch_present _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/breadcrumb.html'
+__ ERROR at setup of TestBreadcrumbEllipsisTemplate.test_separator_preserved ___
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/breadcrumb.html'
+_ ERROR at setup of TestAutocompleteTemplate.test_autocomplete_dropdown_element_exists _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestAutocompleteTemplate.test_bot_username_comes_from_context _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestAutocompleteTemplate.test_catalog_header_included_in_pages _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+__ ERROR at setup of TestAutocompleteTemplate.test_inline_script_follows_htmx __
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestAutocompleteTemplate.test_no_settings_dot_access_in_template _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestAutocompleteTemplate.test_search_input_has_htmx_autocomplete_attributes _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_breadcrumb_uses_safe_last_element_access _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_children_exists_replaces_get_children_count_in_header _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_children_exists_replaces_get_children_count_in_submenu _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_closeBranch_function_present _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_collapseBranches_removed _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_collapseSiblings_function_present _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_downward_caret_in_header _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_downward_caret_in_submenu _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_expand_button_has_aria_controls _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_expand_button_meets_44px_hit_area _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_firstof_replaced_with_with_tag _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_js_rotation_toggle_present _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_submenu_container_carries_hidden_class _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_submenu_container_has_id _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+_ ERROR at setup of TestCatalogMenuAccordionTemplate.test_svg_has_rotation_transition _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/components/header_catalog.html'
+=================================== FAILURES ===================================
+E   FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/ads/detail.html'
+/usr/local/lib/python3.14/pathlib/__init__.py:771: FileNotFoundError: [Errno 2] No such file or directory: '/app/src/backend/src/backend/templates/ads/detail.html'
+=============================== warnings summary ===============================
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_ad
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='139887516945104'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_bot_username
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='139887516957872'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='139887515429792'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_prefetch_includes_trust_score
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='139887515933664'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_purposes:<MagicMock name='Category.objects.get().id' id='139887514996080'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Category.objects.get().id' id='139887514996080'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_conditions:<MagicMock name='Category.objects.get().id' id='139887514996080'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_path_slugs_populate_current_category_and_city
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_purposes:<MagicMock name='Category.objects.get().id' id='139887514472464'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_path_slugs_populate_current_category_and_city
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Category.objects.get().id' id='139887514472464'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_listings_context.py::TestListingsFilterContext::test_path_slugs_populate_current_category_and_city
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_conditions:<MagicMock name='Category.objects.get().id' id='139887514472464'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/core/tests/test_csp_report.py::CspReportViewTests::test_get_returns_405
+src/backend/apps/core/tests/test_csp_report.py::CspReportViewTests::test_post_invalid_json_returns_400
+src/backend/apps/core/tests/test_csp_report.py::CspReportViewTests::test_post_valid_report_returns_200
+  /opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /app/staticfiles/
+    mw_instance = middleware(adapted_handler)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 10 durations =============================
+0.54s call     src/backend/config/settings/tests/test_settings_secrets.py::SettingsSecretsTests::test_bot_token_required_in_production
+0.53s call     src/backend/apps/core/tests/test_csp_report.py::CspReportViewTests::test_get_returns_405
+0.48s call     src/backend/config/settings/tests/test_settings_secrets.py::SettingsSecretsTests::test_django_secret_key_required
+0.29s call     src/backend/config/settings/tests/test_settings_secrets.py::SettingsSecretsTests::test_bot_token_allowed_empty_in_debug
+0.25s call     src/backend/apps/ads/tests/test_i18n_completeness.py::TestI18nCompleteness::test_no_hardcoded_visible_text
+0.23s call     src/backend/apps/ads/tests/test_i18n_completeness.py::TestI18nCompleteness::test_no_raw_get_name_in_templates
+0.22s call     src/backend/apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_context_contains_ad
+0.16s call     src/backend/apps/ads/tests/test_i18n_pipeline.py::TestComponentTagFilter::test_component_tag_includes_feature_id
+0.15s call     src/backend/apps/core/tests/test_sweep_lock_structure.py::TestSweepLockStructure::test_all_sweeps_lock_inside_transaction
+0.08s setup    src/backend/apps/ads/tests/test_ad_localization.py::TestAdGetTitle::test_fallback_base_when_locale_and_ru_are_empty
+=========================== short test summary info ============================
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_breadcrumb_with_tag_no_last_ancestor
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_ellipsis_literal_present
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_ellipsis_truncation_branch_present
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_separator_preserved
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_autocomplete_dropdown_element_exists
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_bot_username_comes_from_context
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_catalog_header_included_in_pages
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_inline_script_follows_htmx
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_no_settings_dot_access_in_template
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_search_input_has_htmx_autocomplete_attributes
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_breadcrumb_uses_safe_last_element_access
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_children_exists_replaces_get_children_count_in_header
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_children_exists_replaces_get_children_count_in_submenu
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_closeBranch_function_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_collapseBranches_removed
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_collapseSiblings_function_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_downward_caret_in_header
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_downward_caret_in_submenu
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_expand_button_has_aria_controls
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_expand_button_meets_44px_hit_area
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_firstof_replaced_with_with_tag
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_js_rotation_toggle_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_submenu_container_carries_hidden_class
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_submenu_container_has_id
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_svg_has_rotation_transition
+FAILED apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_template_uses_bot_username_not_settings
+EXIT=1

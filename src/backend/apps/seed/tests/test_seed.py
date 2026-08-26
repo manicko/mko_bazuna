@@ -192,7 +192,14 @@ class TestAdGenerator:
     def test_status_distribution_default(self) -> None:
         """Default status distribution produces a mix of statuses."""
         gen = AdGenerator(
-            {"faker_seed": 42, "status_distribution": {"published": 0.6, "archived": 0.2, "draft": 0.2}},
+            {
+                "faker_seed": 42,
+                "status_distribution": {
+                    "published": 0.6,
+                    "archived": 0.2,
+                    "draft": 0.2,
+                },
+            },
             self.users,
             self.categories,
             self.cities,
@@ -632,9 +639,7 @@ class TestImageGeneratorManifest:
 
         manifest = self._create_patch()
 
-        with patch.object(
-            ImageGenerator, "_load_manifest", return_value=None
-        ):
+        with patch.object(ImageGenerator, "_load_manifest", return_value=None):
             # We test _load_manifest indirectly by checking the pools after init
             gen = ImageGenerator({"faker_seed": 42}, [])
             # Override with test data
@@ -776,9 +781,11 @@ class TestAdGeneratorMultiLang:
 
         from apps.categories.models import Category
 
-        cat = Category(name="Телефоны", slug="phones", name_i18n={
-            "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
-        })
+        cat = Category(
+            name="Телефоны",
+            slug="phones",
+            name_i18n={"ru": "Телефоны", "en": "Phones", "bs": "Telefoni"},
+        )
 
         # Fill template for ru
         title, desc = gen._fill_template(template, "ru", cat)
@@ -803,9 +810,11 @@ class TestAdGeneratorMultiLang:
         from apps.seed.generators.ads import AdGenerator
 
         # Create a basic test category
-        cat = Category(name="Телефоны", slug="phones", name_i18n={
-            "ru": "Телефоны", "en": "Phones", "bs": "Telefoni"
-        })
+        cat = Category(
+            name="Телефоны",
+            slug="phones",
+            name_i18n={"ru": "Телефоны", "en": "Phones", "bs": "Telefoni"},
+        )
 
         gen = AdGenerator(
             {
@@ -1005,52 +1014,182 @@ class TestSeedCategoryIntegration:
     def test_builder_loads_all_leaf_slugs(self) -> None:
         """Builder loads all 171 leaf category slugs from categories.yaml."""
         leaf_slugs_from_yaml = {
-            "ac-installation", "accessories", "accounting", "agricultural-machinery",
-            "agriculture", "anti-theft", "apartment-cleaning", "apartments",
-            "appliance-repair", "appliances", "arts", "audio-video",
-            "auto-accessories", "auto-audio-video", "auto-business-equipment",
-            "auto-equipment", "auto-tools", "bags-luggage", "bath-products",
-            "beauty-appliances", "beauty-equipment", "beauty-salons-spa",
-            "bed-linen", "bicycles", "birds", "boats-yachts", "books-magazines",
-            "boys", "business-accounting", "business-commercial-land",
-            "business-flex-space", "business-legal-services", "business-offices",
-            "business-property-valuation", "business-retail-spaces", "business-taxes",
-            "business-translations", "business-warehouses", "cameras", "campers",
-            "car-repair", "car-seats", "care-hygiene", "carpet-cleaning", "cars",
-            "catering", "cats", "charity", "cleaning-service", "clothing-repair",
-            "commercial-construction", "commercial-land", "commercial-vehicles",
-            "computers", "costume-jewelry", "courses-training", "delivery-courier",
-            "dog-walking", "dogs", "electrical", "event-planning", "feeding-products",
-            "fish-aquarium", "flex-space", "flooring-installation", "florist",
-            "food-equipment", "food-products", "freight", "furniture-interior",
-            "games-consoles-software", "garages", "girls", "gps-navigators",
-            "hair-care", "hair-care-services", "hair-styling", "hobby-bicycles",
-            "hobby-scooters", "home-food-service", "housekeeping", "houses",
-            "hunting-fishing", "industrial-equipment", "jewelry", "kids-furniture",
-            "kids-hygiene", "kids-scooters-bikes", "kitchen-dining", "land-plots",
-            "laptop-pc-repair", "laptops", "legal-services", "logistics-warehouse",
-            "makeup-manicure", "manicure", "massage", "medical-equipment",
-            "medical-products", "medicine", "men-clothing", "men-shoes", "motorboats",
-            "motorcycles-sub", "musical-instruments", "no-experience-jobs",
-            "office-cleaning", "office-equipment", "offices", "oils-chemicals",
-            "other-animals", "other-electronics", "other-real-estate",
-            "other-services", "parts", "pc-setup", "pedicure", "perfumes",
-            "personal-watercraft", "pet-accessories", "pet-birds", "pet-dogs-cats",
-            "pet-food", "pet-toys", "phone-repair", "phones", "photoshoots",
-            "plants", "plastering", "plumbing", "programming", "property-valuation",
-            "psychology", "ready-business", "repair-construction",
-            "residential-construction", "restaurants", "retail-equipment",
-            "retail-spaces", "roof-boxes-hitches", "rooms", "sailing-boats",
-            "school-supplies", "scooters", "scooters-scooters", "security",
-            "shoe-repair", "skincare", "sport-fitness", "sports-outdoors",
-            "strollers", "tablets", "tax-planning", "taxi", "terraces-balconies",
-            "tickets-travel", "tires-wheels", "tow-truck", "toys", "trading",
-            "trailers", "translations", "trucks-sub", "tutors", "warehouses",
-            "warehousing", "watches", "waterproofing", "web-development",
-            "women-clothing", "women-shoes",
+            "ac-installation",
+            "accessories",
+            "accounting",
+            "agricultural-machinery",
+            "agriculture",
+            "anti-theft",
+            "apartment-cleaning",
+            "apartments",
+            "appliance-repair",
+            "appliances",
+            "arts",
+            "audio-video",
+            "auto-accessories",
+            "auto-audio-video",
+            "auto-business-equipment",
+            "auto-equipment",
+            "auto-tools",
+            "bags-luggage",
+            "bath-products",
+            "beauty-appliances",
+            "beauty-equipment",
+            "beauty-salons-spa",
+            "bed-linen",
+            "bicycles",
+            "birds",
+            "boats-yachts",
+            "books-magazines",
+            "boys",
+            "business-accounting",
+            "business-commercial-land",
+            "business-flex-space",
+            "business-legal-services",
+            "business-offices",
+            "business-property-valuation",
+            "business-retail-spaces",
+            "business-taxes",
+            "business-translations",
+            "business-warehouses",
+            "cameras",
+            "campers",
+            "car-repair",
+            "car-seats",
+            "care-hygiene",
+            "carpet-cleaning",
+            "cars",
+            "catering",
+            "cats",
+            "charity",
+            "cleaning-service",
+            "clothing-repair",
+            "commercial-construction",
+            "commercial-land",
+            "commercial-vehicles",
+            "computers",
+            "costume-jewelry",
+            "courses-training",
+            "delivery-courier",
+            "dog-walking",
+            "dogs",
+            "electrical",
+            "event-planning",
+            "feeding-products",
+            "fish-aquarium",
+            "flex-space",
+            "flooring-installation",
+            "florist",
+            "food-equipment",
+            "food-products",
+            "freight",
+            "furniture-interior",
+            "games-consoles-software",
+            "garages",
+            "girls",
+            "gps-navigators",
+            "hair-care",
+            "hair-care-services",
+            "hair-styling",
+            "hobby-bicycles",
+            "hobby-scooters",
+            "home-food-service",
+            "housekeeping",
+            "houses",
+            "hunting-fishing",
+            "industrial-equipment",
+            "jewelry",
+            "kids-furniture",
+            "kids-hygiene",
+            "kids-scooters-bikes",
+            "kitchen-dining",
+            "land-plots",
+            "laptop-pc-repair",
+            "laptops",
+            "legal-services",
+            "logistics-warehouse",
+            "makeup-manicure",
+            "manicure",
+            "massage",
+            "medical-equipment",
+            "medical-products",
+            "medicine",
+            "men-clothing",
+            "men-shoes",
+            "motorboats",
+            "motorcycles-sub",
+            "musical-instruments",
+            "no-experience-jobs",
+            "office-cleaning",
+            "office-equipment",
+            "offices",
+            "oils-chemicals",
+            "other-animals",
+            "other-electronics",
+            "other-real-estate",
+            "other-services",
+            "parts",
+            "pc-setup",
+            "pedicure",
+            "perfumes",
+            "personal-watercraft",
+            "pet-accessories",
+            "pet-birds",
+            "pet-dogs-cats",
+            "pet-food",
+            "pet-toys",
+            "phone-repair",
+            "phones",
+            "photoshoots",
+            "plants",
+            "plastering",
+            "plumbing",
+            "programming",
+            "property-valuation",
+            "psychology",
+            "ready-business",
+            "repair-construction",
+            "residential-construction",
+            "restaurants",
+            "retail-equipment",
+            "retail-spaces",
+            "roof-boxes-hitches",
+            "rooms",
+            "sailing-boats",
+            "school-supplies",
+            "scooters",
+            "scooters-scooters",
+            "security",
+            "shoe-repair",
+            "skincare",
+            "sport-fitness",
+            "sports-outdoors",
+            "strollers",
+            "tablets",
+            "tax-planning",
+            "taxi",
+            "terraces-balconies",
+            "tickets-travel",
+            "tires-wheels",
+            "tow-truck",
+            "toys",
+            "trading",
+            "trailers",
+            "translations",
+            "trucks-sub",
+            "tutors",
+            "warehouses",
+            "warehousing",
+            "watches",
+            "waterproofing",
+            "web-development",
+            "women-clothing",
+            "women-shoes",
         }
         db_slugs = set(
-            Category.objects.exclude(slug__in=["test-seed", "test-analytics", "test", "test-city"]).values_list("slug", flat=True)
+            Category.objects.exclude(
+                slug__in=["test-seed", "test-analytics", "test", "test-city"]
+            ).values_list("slug", flat=True)
         )
         # At minimum, all leaf slugs from YAML should be present in DB
         missing = leaf_slugs_from_yaml - db_slugs
@@ -1092,9 +1231,9 @@ class TestSeedCategoryIntegration:
             # All ads should reference categories from the builder
             assert ad.category is not None
             # Category slug should exist in the DB
-            assert (
-                Category.objects.filter(slug=ad.category.slug).exists()
-            ), f"Ad references unknown category slug: {ad.category.slug}"
+            assert Category.objects.filter(slug=ad.category.slug).exists(), (
+                f"Ad references unknown category slug: {ad.category.slug}"
+            )
             # Price may be None for free/negotiable ads (~20% of non-special
             # categories) per AdGenerator._generate_price() — only validate
             # the field when a price is actually set. Give-away listings
@@ -1102,7 +1241,10 @@ class TestSeedCategoryIntegration:
             if ad.price_amount is not None:
                 assert isinstance(ad.price_amount, int)
                 # 0 is valid for give-away / charity listings; positive for sale
-                if ad.listing_purpose is not None and str(ad.listing_purpose.slug) == "give-away":
+                if (
+                    ad.listing_purpose is not None
+                    and str(ad.listing_purpose.slug) == "give-away"
+                ):
                     assert ad.price_amount == 0
                 else:
                     assert ad.price_amount > 0
@@ -1150,7 +1292,8 @@ class TestSeedCategoryIntegration:
         Ad.objects.bulk_create(ads, batch_size=5000)
 
         give_away_ads = [
-            ad for ad in ads
+            ad
+            for ad in ads
             if ad.listing_purpose is not None
             and str(ad.listing_purpose.slug) == "give-away"
         ]
@@ -1193,9 +1336,9 @@ class TestSeedCategoryIntegration:
         for ad in ads:
             # All ads should reference categories from the builder
             assert ad.category is not None
-            assert (
-                Category.objects.filter(slug=ad.category.slug).exists()
-            ), f"Ad references unknown category slug: {ad.category.slug}"
+            assert Category.objects.filter(slug=ad.category.slug).exists(), (
+                f"Ad references unknown category slug: {ad.category.slug}"
+            )
             # Multi-language content
             assert ad.title_en is not None
             assert ad.title_bs is not None
@@ -1357,9 +1500,11 @@ class TestSeedFilterCoverage:
     def test_seed_populates_features(self, db: None) -> None:
         """At least one seeded ad has one or more features (F5)."""
         self._run_seed()
-        assert Ad.objects.filter(
-            source=AdSource.SEED
-        ).filter(features__isnull=False).exists()
+        assert (
+            Ad.objects.filter(source=AdSource.SEED)
+            .filter(features__isnull=False)
+            .exists()
+        )
 
     def test_seed_filter_by_purpose_returns_results(self, db: None) -> None:
         """A purpose present in seed data narrows /search/ to non-empty results."""

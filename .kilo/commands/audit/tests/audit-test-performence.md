@@ -7,113 +7,148 @@ alwaysApply: false
 
 ---
 
-# Task: Test Suite Performance & Strategy Audit
+# Test Suite Performance & Strategy Audit
 
 ## Goal
 
-Analyze the test suite, identify performance bottlenecks, classify tests by purpose and cost, and design an efficient test execution strategy without reducing meaningful coverage.
+Analyze the test suite, identify performance bottlenecks, classify tests by risk and cost, and design an efficient execution strategy without reducing meaningful coverage.
 
-The orchestrator must delegate large-scale analysis to specialized agents and synthesize their structured reports.
+The orchestrator only synthesizes structured agent reports. All measurement, profiling, deep inspection, and research must be delegated to specialized agents.
 
 ---
 
 # Workflow
 
-## Step 1. Analyze the Current Test Suite
+## Step 1. Baseline Current State
 
-**Launch Agent:** `researcher`
+**Agent:** `researcher`
 
-**Goal:** Establish the current state and identify relevant test categories and infrastructure.
+Map test structure, configuration, fixtures, markers, coverage, dependencies, CI commands, and collection behavior.
 
-Inspect test configuration, structure, fixtures, markers, coverage rules, CI commands, and test dependencies.
-
-Return a concise structured report.
+Return a concise structured baseline report, including known slow paths and relevant infrastructure.
 
 ---
 
-## Step 2. Profile Test Performance
+## Step 2. Measure & Profile Execution
 
-**Goal:** Identify where execution time is spent.
+**Agent:** `test-engineer`
 
-**Launch Agent:** `test-engineer`
+Measure the representative CI test path. Report:
 
-Run the relevant test suite and report:
-
-* total tests and execution time;
-* slowest tests/groups;
-* expensive setup/fixtures;
-* database and external-service overhead;
-* other significant bottlenecks.
+* total tests and wall-clock time
+* collection vs execution time
+* slowest tests/groups
+* expensive fixtures/setup/teardown
+* DB, I/O, external-service, import, and coverage overhead
 
 Rank findings by impact.
 
----
-
-## Step 3. Design Test Classification
-
-**Goal:** Create a practical taxonomy for test selection.
-
-**Launch Agent:** `test-engineer`
-
-Define and evaluate categories such as:
-
-* unit / integration / API / E2E;
-* smoke / critical / regression;
-* fast / slow.
-
-Identify misclassified, redundant, or unnecessarily expensive tests.
+Every measurement must state command/scope and relevant environment or limitations. Do not infer performance problems without evidence.
 
 ---
 
-## Step 4. Design the Execution Strategy
+## Step 3. Root-Cause Analysis
 
-**Goal:** Minimize feedback time while preserving important coverage.
+**Agent:** `test-engineer`
 
-**Launch Agent:** `test-engineer`
+Using the baseline and measurement reports, investigate the highest-impact bottlenecks.
 
-Define:
+Check:
 
-* tests required for every PR/commit;
-* tests for full CI;
-* tests for nightly/release runs;
-* safe parallelization/sharding opportunities;
-* infrastructure or caching improvements.
+* fixture scope and repeated setup
+* real I/O and external dependencies
+* shared state and isolation
+* discovery/collection cost
+* parallelization safety
 
-Do not optimize for test count or coverage percentage alone; optimize for risk coverage and feedback speed.
+Return ranked root causes with evidence.
 
 ---
 
-## Step 5. Produce the Optimization Plan
+## Step 4. Test Taxonomy
 
-**Goal:** Provide a prioritized, actionable plan.
+**Agent:** `test-engineer`
 
-**Launch Agent:** `planner`
+Classify tests by:
 
-Synthesize the reports into:
+* unit / integration / API / E2E
+* smoke / critical / regression
+* fast / slow
 
-1. Main performance bottlenecks.
-2. Proposed test taxonomy.
-3. PR/CI/nightly test suites.
-4. Recommended optimizations.
-5. Prioritized implementation steps with expected impact.
+Flag misclassified, redundant, or unnecessarily expensive tests.
+
+Prioritize risk coverage over test count or coverage percentage alone.
+
+---
+
+## Step 5. Research Proven Optimizations
+
+**Agent:** `researcher`
+
+Research techniques applicable to the actual stack:
+
+* parallelization / sharding
+* test-impact or change-based selection
+* fixture scoping / caching
+* coverage efficiency
+* CI layering
+
+Return only evidence-backed, low-risk techniques relevant to observed bottlenecks.
+
+No generic recommendations without demonstrated applicability.
+
+---
+
+## Step 6. Design Execution Strategy
+
+**Agent:** `test-engineer`
+
+Using all previous reports, define:
+
+* PR/commit suite: fast + high-risk tests
+* full CI suite
+* nightly/release suite
+* safe parallelization/sharding
+* infrastructure and caching improvements
+
+Optimize for feedback speed and risk coverage while preserving critical business and regression coverage.
+
+---
+
+## Step 7. Produce Optimization Plan
+
+**Agent:** `planner`
+
+Synthesize all structured reports into:
+
+1. Bottlenecks and evidence
+2. Test taxonomy
+3. PR / CI / nightly suites
+4. Recommended optimizations and expected impact
+5. Prioritized implementation steps
+
+Where practical, define feedback-time targets and prioritize changes by impact, confidence, and effort.
+
+Output to `.ai/plans`.
 
 Do not modify tests or configuration unless explicitly requested.
-
-Output path: `.ai/plans`
 
 ---
 
 # Constraints
 
 * Base recommendations on measured evidence.
-* Do not remove slow tests solely because they are slow.
-* Do not replace meaningful integration tests with mocks without preserving equivalent coverage.
+* Never remove tests solely because they are slow.
+* Never replace meaningful integration coverage with mocks without equivalent coverage.
 * Preserve critical business and regression coverage.
-* Prefer simple, incremental improvements.
+* Prefer simple, incremental changes.
 * Avoid speculative optimization.
+* Validate parallelization safety before recommending it.
+* Downstream agents must use relevant previous reports and avoid duplicating expensive analysis.
+* The orchestrator only synthesizes; measurement and deep analysis remain with sub-agents.
 
 ---
 
 # Expected Result
 
-A concise, evidence-based plan that reduces test feedback time while maintaining meaningful test coverage and clearly defining which tests run at each CI stage.
+A concise, evidence-based plan that reduces test feedback time, preserves meaningful coverage, and clearly defines which tests run at each CI stage.

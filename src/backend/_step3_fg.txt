@@ -1,0 +1,59 @@
+bringing up nodes...
+bringing up nodes...
+
+.....................................F....................................F.......................................................................................................................................................................................................................................................................................F..F.....F..............................................................................................................................................................................................................................................................................F...................................................................................................................................................................F.EEEE..........................................................................uuuuu.uu..............................EE..E.EE.EE.EEEEEEEEEE.E....E.E.....E........................................................................
+============================= slowest 20 durations =============================
+9.27s setup    src/backend/apps/categories/tests/test_submenu.py::TestExpandButtons::test_expand_button_absent_for_leaf_category
+9.25s setup    src/backend/apps/categories/tests/test_submenu.py::TestExpandButtons::test_expand_button_present_for_category_with_children
+8.79s setup    src/backend/apps/ads/tests/test_breadcrumbs_render.py::TestBreadcrumbsRender::test_breadcrumb_empty_on_home
+8.39s call     src/backend/apps/seed/tests/test_seed.py::TestImageGenerator::test_image_keys_have_correct_format
+7.81s setup    src/backend/apps/ads/tests/test_breadcrumbs_render.py::TestBreadcrumbsRender::test_breadcrumb_on_ad_detail
+7.32s setup    src/backend/apps/ads/tests/test_breadcrumbs_render.py::TestBreadcrumbsRender::test_breadcrumb_shows_root_category
+6.09s setup    src/backend/apps/ads/tests/test_breadcrumbs_render.py::TestBreadcrumbsRender::test_breadcrumb_shows_ancestor_chain
+5.46s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_without_timestamp_raises[archived]
+4.85s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_without_timestamp_raises[published]
+4.44s call     src/backend/apps/ads/tests/test_breadcrumbs_render.py::TestBreadcrumbsRender::test_breadcrumb_shows_root_category
+3.56s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_with_timestamp_succeeds[published]
+3.56s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_without_timestamp_raises[deleted]
+3.14s call     src/backend/apps/ads/tests/test_ad_detail_queries.py::TestAdDetailQueryCount::test_detail_query_count_stable_with_trust_score
+3.13s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_with_timestamp_succeeds[archived]
+3.12s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestMutualExclusivityConstraint::test_set_both_failed_and_rejected_raises
+3.02s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_without_timestamp_raises[rejected]
+2.96s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestStatusTimestampConstraints::test_bulk_update_to_status_with_timestamp_succeeds[on_moderation_failed]
+2.86s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestMutualExclusivityConstraint::test_only_rejected_satisfies_constraint
+2.84s setup    src/backend/apps/ads/tests/test_ad_detail_queries.py::TestAdDetailQueryCount::test_detail_renders_without_n_plus_1_on_trust_score
+2.84s setup    src/backend/apps/ads/tests/test_ad_constraints.py::TestMutualExclusivityConstraint::test_add_rejected_to_failed_raises
+=========================== short test summary info ============================
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_ellipsis_literal_present
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_separator_preserved
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_ellipsis_truncation_branch_present
+ERROR apps/ads/tests/test_detail_context.py::TestBreadcrumbEllipsisTemplate::test_breadcrumb_with_tag_no_last_ancestor
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_bot_username_comes_from_context
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_autocomplete_dropdown_element_exists
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_catalog_header_included_in_pages
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_breadcrumb_uses_safe_last_element_access
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_no_settings_dot_access_in_template
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_search_input_has_htmx_autocomplete_attributes
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_closeBranch_function_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_collapseBranches_removed
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_downward_caret_in_submenu
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_firstof_replaced_with_with_tag
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_expand_button_meets_44px_hit_area
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_js_rotation_toggle_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_children_exists_replaces_get_children_count_in_header
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_submenu_container_has_id
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_children_exists_replaces_get_children_count_in_submenu
+ERROR apps/search/tests/test_autocomplete_template.py::TestAutocompleteTemplate::test_inline_script_follows_htmx
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_downward_caret_in_header
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_expand_button_has_aria_controls
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_collapseSiblings_function_present
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_svg_has_rotation_transition
+ERROR apps/search/tests/test_autocomplete_template.py::TestCatalogMenuAccordionTemplate::test_submenu_container_carries_hidden_class
+FAILED apps/ads/tests/test_catalog_filters.py::TestFilterUrlReset::test_clear_all_filters_has_push_url
+FAILED apps/ads/tests/test_catalog_filters.py::TestFilterUrlReset::test_form_uses_request_path_not_empty
+FAILED apps/currencies/tests/test_price_normalizer.py::TestPriceNormalizer::test_rsd_normalized_by_seeded_rate
+FAILED apps/currencies/tests/test_price_normalizer.py::TestPriceNormalizer::test_eur_preserves_amount
+FAILED apps/currencies/tests/test_recompute_command.py::TestRecomputeNormalizedPrices::test_recompute_corrects_stale_normalized_value
+FAILED apps/ads/tests/test_catalog_filters.py::TestFilterUrlReset::test_all_htmx_links_have_push_url
+FAILED apps/ads/tests/test_detail_context.py::TestAdDetailBotUsernameContext::test_detail_template_uses_bot_username_not_settings
+EXIT=1
