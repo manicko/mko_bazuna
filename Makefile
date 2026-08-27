@@ -133,8 +133,10 @@ test-logs:
 # Force a fresh test DB schema by ignoring the --reuse-db cache. The entrypoint
 # (entrypoint-test.sh) still runs uv sync + wait_for_db + migrate beforehand;
 # only pytest's DB-caching flags are overridden via PYTEST_OPTS.
+# Pre-start the DB (same as `make test`) so this target is self-contained.
 test-recreate:
-	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short" test
+	docker compose $(COMPOSE_TEST) up -d db
+	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
 
 # ====================== Django ======================
 

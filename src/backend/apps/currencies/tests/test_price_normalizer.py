@@ -25,22 +25,22 @@ def _clear_rate_cache():
 
 
 class TestPriceNormalizer:
-    def test_eur_preserves_amount(self) -> None:
+    def test_eur_preserves_amount(self, exchange_rates) -> None:
         """EUR is the base currency (rate 1.0), so the amount is preserved."""
         result = PriceNormalizer().normalize_to_eur(Decimal("100"), CurrencyCode.EUR)
         assert result == Decimal("100.0000")
 
-    def test_bam_normalized_by_seeded_rate(self) -> None:
+    def test_bam_normalized_by_seeded_rate(self, exchange_rates) -> None:
         """BAM uses the seeded rate (100 BAM = 51.20 EUR)."""
         result = PriceNormalizer().normalize_to_eur(Decimal("100"), CurrencyCode.BAM)
         assert result == Decimal("51.2000")
 
-    def test_rsd_normalized_by_seeded_rate(self) -> None:
+    def test_rsd_normalized_by_seeded_rate(self, exchange_rates) -> None:
         """RSD uses the seeded rate (1000 RSD = 10.50 EUR)."""
         result = PriceNormalizer().normalize_to_eur(Decimal("1000"), CurrencyCode.RSD)
         assert result == Decimal("10.5000")
 
-    def test_missing_rate_raises_domain_error(self) -> None:
+    def test_missing_rate_raises_domain_error(self, exchange_rates) -> None:
         """A currency without a current rate raises, never silently normalizes."""
         ExchangeRate.objects.filter(currency=CurrencyCode.EUR.value).update(
             is_current=False

@@ -39,7 +39,7 @@ def test_format_price_value_accepts_string_currency() -> None:
 
 def test_format_price_filter_renders_original_currency() -> None:
     """The template filter uses the ad's original amount + currency (PO-02)."""
-    ad = Ad(price_amount=Decimal("500"), price_currency="BAM")
+    ad = Ad(price_amount=Decimal("500"), price_currency=CurrencyCode.BAM)
     assert format_price(ad) == "500 BAM"
 
 

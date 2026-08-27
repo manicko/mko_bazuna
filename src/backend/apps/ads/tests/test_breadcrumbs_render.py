@@ -15,19 +15,23 @@ catalog loaded.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from django.db import transaction
 from django.test import Client
 from django.urls import reverse
 from django.utils import translation
+from pytest_django import DjangoDbBlocker
 
-from apps.ads.models import Ad
 from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus
 from apps.locations.models import City
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -42,20 +46,50 @@ def _breadcrumb_nav(content: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-@pytest.fixture(autouse=True)
-def _load_catalog():
-    """Load the category catalog and create a city for breadcrumb tests."""
+@pytest.fixture(autouse=True, scope="class")
+def _load_catalog(
+    django_db_setup: None, django_db_blocker: DjangoDbBlocker
+) -> Iterator[None]:
+    """Load the category catalog and a test city once per class.
+
+    ``load_catalog`` is idempotent (``update_or_create`` throughout) but
+    re-parses ``categories.yaml`` and walks the full category tree (~3.6s of
+    setup) on every call. Class scope runs it once instead of once per test.
+
+    The setup is wrapped in an ``atomic`` block that is rolled back at class
+    teardown via ``set_rollback``, so the catalog rows and the test city never
+    leak into sibling classes or sibling xdist workers. This matters because the
+    catalog contains ``slug: transport``, which collides with
+    ``test_submenu.py``'s ``tree`` fixture (``Category.objects.create``) if left
+    committed on the shared test database.
+
+    ``django_db_setup`` is declared as a fixture dependency to ensure the test
+    database is created and the connection settings are switched to the test DB
+    *before* this class-scoped fixture opens ``transaction.atomic()``. Without
+    it, pytest would set up this class-scoped fixture before the session-scoped
+    ``django_db_setup``, causing ``atomic()`` to connect to the production DB.
+    When ``create_test_db`` later calls ``connection.close()``, the connection
+    is in an atomic block so ``close()`` preserves a ``[BAD]`` psycopg object
+    instead of setting ``self.connection = None``, and subsequent
+    ``ensure_connection()`` calls become no-ops.
+    """
     catalog_path = (
         Path(__file__).resolve().parents[2]
         / "categories"
         / "catalog"
         / "categories.yaml"
     )
-    load_catalog(catalog_path)
-    City.objects.create(
-        name="Подгорица", slug="podgorica", region="Central", country_code="ME"
-    )
-    yield
+    with django_db_blocker.unblock():
+        with transaction.atomic():
+            load_catalog(catalog_path)
+            City.objects.create(
+                name="Подгорица",
+                slug="podgorica",
+                region="Central",
+                country_code="ME",
+            )
+            yield
+            transaction.set_rollback(True)
 
 
 class TestBreadcrumbsRender:
@@ -89,19 +123,17 @@ class TestBreadcrumbsRender:
         )
         city = City.objects.get(slug="podgorica")
         leaf = Category.objects.get(slug="business-offices")
-        ad = Ad.objects.create(
-            user=user,
+        ad = create_test_ad(
+            user,
+            leaf,
+            city,
             title="Test Ad",
             description="Test",
-            price_amount=100,
-            price_currency="EUR",
-            price_normalized_eur=100,
-            category=leaf,
-            city=city,
-            category_name="Офисы",
             status=AdStatus.PUBLISHED,
             source=AdSource.SEED,
+            price=100,
             published_at="2024-01-01 00:00:00+00",
+            category_name="Офисы",
         )
         client = Client()
         translation.activate("ru")

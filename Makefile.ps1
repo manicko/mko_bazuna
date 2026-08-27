@@ -117,7 +117,7 @@ function Invoke-TestLogs {
 # only pytest's caching flags are overridden via PYTEST_OPTS.
 function Invoke-TestRecreate {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short" test
+    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
 }
 
 # Run the fast test gate in the test container (auto-starts the test DB if not

@@ -191,7 +191,7 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 
 | Task | Command |
 |------|---------|
-| Tests | `uv run pytest <path>` |
+| Tests | `make test` |
 | Lint | `uv run ruff check <path>` |
 | Type check | `uv run basedpyright <path>` |
 | Add dep | `uv add <package>` |

@@ -14,7 +14,6 @@ from django.core.cache import cache
 from django.test import Client
 from django.utils import timezone
 
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, SearchSuggestionSource
 from apps.locations.models import City
@@ -29,6 +28,8 @@ from apps.search.services.search_history import (
     record_search_history,
 )
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -589,16 +590,7 @@ class TestSearchViewRecordsAutocompleteData:
         from apps.search.models import PopularSearch
 
         # Create a published ad so search has results
-        Ad.objects.create(
-            user=seller,
-            title="Велосипед для продажи",
-            description="Отличный велосипед",
-            category=root_category,
-            city=city,
-            category_name=root_category.name,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
+        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
 
         client = Client()
         # Make a search request - this should record the popular search
@@ -616,16 +608,7 @@ class TestSearchViewRecordsAutocompleteData:
         self, buyer: User, root_category: Category, city: City
     ) -> None:
         """Authenticated user's search is recorded in history."""
-        Ad.objects.create(
-            user=buyer,
-            title="Велосипед для продажи",
-            description="Отличный велосипед",
-            category=root_category,
-            city=city,
-            category_name=root_category.name,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
+        create_test_ad(buyer, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
 
         client = Client()
         client.force_login(buyer)
@@ -639,16 +622,7 @@ class TestSearchViewRecordsAutocompleteData:
         self, seller: User, root_category: Category, city: City
     ) -> None:
         """Anonymous user's search IS recorded in session history (not the DB)."""
-        Ad.objects.create(
-            user=seller,
-            title="Велосипед для продажи",
-            description="Отличный велосипед",
-            category=root_category,
-            city=city,
-            category_name=root_category.name,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
+        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
 
         client = Client()
         client.get("/search/?q=велосипед")
@@ -670,16 +644,7 @@ class TestSearchViewRecordsAutocompleteData:
         self, seller: User, root_category: Category, city: City
     ) -> None:
         """Search view exposes the resolved category for breadcrumbs (T-500)."""
-        Ad.objects.create(
-            user=seller,
-            title="Велосипед для продажи",
-            description="Отличный велосипед",
-            category=root_category,
-            city=city,
-            category_name=root_category.name,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
+        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
         client = Client()
         response = client.get("/search/", {"category": "transport"})
         assert response.status_code == 200

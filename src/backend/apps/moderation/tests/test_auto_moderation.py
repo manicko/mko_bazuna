@@ -1,7 +1,10 @@
 """
-Tests for auto-moderation service validation functions.
+Tests for auto-moderation service via public API (check() + auto_moderate()).
 
-Unit tests for validation rules without database dependencies.
+All tests exercise the public API rather than private validation helpers.
+Validation rules (title/description length, image count, banned words,
+max-ads-per-user) are tested through check(); side effects (status transitions,
+AnalyticsEvent creation) are tested through auto_moderate().
 """
 
 import pytest
@@ -9,153 +12,18 @@ from django.core.cache import cache
 
 from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdStatus
-from apps.moderation.models import ModeratorActionLog, ModerationCriteria
-from apps.moderation.services.auto_moderation import (
-    _contains_banned_words,
-    _validate_description_length,
-    _validate_image_count,
-    _validate_max_ads_per_user,
-    _validate_title_length,
-    check,
-)
+from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.moderation.models import ModerationCriteria, ModeratorActionLog
+from apps.moderation.services.auto_moderation import auto_moderate, check
 
 from conftest import create_test_ad
 
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-class TestValidateTitleLength:
-    """Tests for _validate_title_length function."""
+SELLER_SAFE_ERROR = (
+    "Your ad content does not meet our requirements. Please review and try again."
+)
 
-    def test_title_too_short_returns_false(self):
-        """Title below minimum length returns False."""
-        result = _validate_title_length("abc", min_len=5, max_len=100)
-        assert result is False
-
-    def test_title_too_long_returns_false(self):
-        """Title above maximum length returns False."""
-        title = "x" * 150
-        result = _validate_title_length(title, min_len=5, max_len=100)
-        assert result is False
-
-    def test_title_min_boundary_returns_true(self):
-        """Title at minimum length returns True."""
-        result = _validate_title_length("abcde", min_len=5, max_len=100)
-        assert result is True
-
-    def test_title_max_boundary_returns_true(self):
-        """Title at maximum length returns True."""
-        title = "x" * 100
-        result = _validate_title_length(title, min_len=5, max_len=100)
-        assert result is True
-
-    def test_title_within_range_returns_true(self):
-        """Title within valid range returns True."""
-        result = _validate_title_length("Valid Title", min_len=5, max_len=100)
-        assert result is True
-
-
-class TestValidateDescriptionLength:
-    """Tests for _validate_description_length function."""
-
-    def test_description_too_short_returns_false(self):
-        """Description below minimum length returns False."""
-        result = _validate_description_length("short", min_len=10, max_len=2000)
-        assert result is False
-
-    def test_description_too_long_returns_false(self):
-        """Description above maximum length returns False."""
-        desc = "x" * 2500
-        result = _validate_description_length(desc, min_len=10, max_len=2000)
-        assert result is False
-
-    def test_description_min_boundary_returns_true(self):
-        """Description at minimum length returns True."""
-        result = _validate_description_length("x" * 10, min_len=10, max_len=2000)
-        assert result is True
-
-    def test_description_max_boundary_returns_true(self):
-        """Description at maximum length returns True."""
-        desc = "x" * 2000
-        result = _validate_description_length(desc, min_len=10, max_len=2000)
-        assert result is True
-
-
-class TestValidateImageCount:
-    """Tests for _validate_image_count function."""
-
-    def test_no_images_returns_false(self):
-        """No images returns False when min_images=1."""
-
-        class MockImagesQuerySet:
-            def count(self):
-                return 0
-
-        class MockAd:
-            @property
-            def images(self):
-                return MockImagesQuerySet()
-
-        result = _validate_image_count(MockAd(), min_count=1, max_count=5)
-        assert result is False
-
-    def test_too_many_images_returns_false(self):
-        """Too many images returns False."""
-
-        class MockImagesQuerySet:
-            def count(self):
-                return 7
-
-        class MockAd:
-            @property
-            def images(self):
-                return MockImagesQuerySet()
-
-        result = _validate_image_count(MockAd(), min_count=1, max_count=5)
-        assert result is False
-
-    def test_valid_image_count_returns_true(self):
-        """Valid image count returns True."""
-
-        class MockImagesQuerySet:
-            def count(self):
-                return 3
-
-        class MockAd:
-            @property
-            def images(self):
-                return MockImagesQuerySet()
-
-        result = _validate_image_count(MockAd(), min_count=1, max_count=5)
-        assert result is True
-
-
-class TestContainsBannedWords:
-    """Tests for _contains_banned_words function."""
-
-    def test_banned_word_in_title_returns_true(self):
-        """Banned word in title returns True."""
-        result = _contains_banned_words("Spammy Title", "Description here", ("spam", "scam"))
-        assert result is True
-
-    def test_banned_word_in_description_returns_true(self):
-        """Banned word in description returns True."""
-        result = _contains_banned_words("Title here", "This is a scam", ("spam", "scam"))
-        assert result is True
-
-    def test_banned_word_case_insensitive_returns_true(self):
-        """Banned word matching is case-insensitive."""
-        result = _contains_banned_words("SPAM Title", "Description", ("spam", "scam"))
-        assert result is True
-
-    def test_no_banned_words_returns_false(self):
-        """No banned words returns False."""
-        result = _contains_banned_words("Normal Title", "Normal description", ("spam", "scam"))
-        assert result is False
-
-    def test_empty_banned_words_returns_false(self):
-        """Empty banned words tuple returns False."""
-        result = _contains_banned_words("Any Title", "Any description", ())
-        assert result is False
 
 @pytest.fixture
 def moderation_criteria():
@@ -176,44 +44,49 @@ def moderation_criteria():
     return criteria
 
 
-@pytest.mark.django_db
+def _create_valid_ad(user, category, city, **kwargs):
+    """Create an Ad that passes all default-criteria checks, with 2 images."""
+    defaults = {
+        "title": "Valid Title",
+        "description": "Valid description text here",
+    }
+    defaults.update(kwargs)
+    ad = create_test_ad(user, category, city, **defaults)
+    AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
+    AdImage.objects.create(ad=ad, image="img1.jpg", position=1)
+    return ad
+
+
+# ---------------------------------------------------------------------------
+# check() — return tuple and read-only semantics
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.slow
-@pytest.mark.integration
 class TestCheckFunction:
-    """Tests for check() function with ORM-backed fixtures."""
+    """Tests for check() return tuples and read-only semantics."""
 
     @pytest.fixture(autouse=True)
-    def _setup(
-        self,
-        moderation_criteria,
-        user,
-        category,
-        city,
-    ):
-        """Set up fixtures for each test."""
+    def _setup(self, moderation_criteria, user, category, city):
         self.criteria = moderation_criteria
         self.user = user
         self.category = category
         self.city = city
 
     def test_check_returns_passed_on_valid_ad(self):
-        """Check returns (True, None) when all validations pass."""
-        ad = create_test_ad(
-            self.user,
-            self.category,
-            self.city,
-            title="Valid Title",
-            description="Valid description text here",
-        )
-        AdImage.objects.create(ad=ad, image="test.jpg", position=0)
-        AdImage.objects.create(ad=ad, image="test2.jpg", position=1)
+        """check() returns (True, None) when all validations pass."""
+        ad = _create_valid_ad(self.user, self.category, self.city)
 
         passed, error = check(ad)
         assert passed is True
         assert error is None
 
     def test_check_returns_seller_safe_error_on_fail(self):
-        """Check returns (False, generic_error) on validation failure - no specific reason."""
+        """check() returns (False, generic_error) on validation failure.
+
+        The error message must be seller-safe: no specific reason, no field name.
+        check() must be read-only: no status transition or side-effects.
+        """
         ad = create_test_ad(
             self.user,
             self.category,
@@ -221,24 +94,64 @@ class TestCheckFunction:
             title="abc",
             description="Valid description text here",
         )
+        AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
 
         passed, error = check(ad)
         assert passed is False
-        assert error is not None
-        assert "does not meet our requirements" in error
-        # Ensure no specific reason is exposed
-        assert "too short" not in error.lower()
-        assert "title" not in error.lower() or "ad content" in error.lower()
+        assert error == SELLER_SAFE_ERROR
 
-        # check() must be read-only: no status transition or audit/analytics side-effects
-        assert ad.status != AdStatus.ON_MODERATION_FAILED
+        # check() must be read-only: no status transition or side-effects
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
         assert ModeratorActionLog.objects.count() == 0
         assert AnalyticsEvent.objects.count() == 0
 
+    def test_over_limit_user_fails_check(self):
+        """User exceeding max_ads_per_user fails check()."""
+        self.criteria.max_ads_per_user = 2
+        self.criteria.save()
+
+        # Two PUBLISHED ads already at the limit of 2.
+        create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="First Published Ad",
+            description="Valid description text here",
+            status=AdStatus.PUBLISHED,
+        )
+        create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Second Published Ad",
+            description="Valid description text here",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # New submission in ON_MODERATION — counted as active, pushing total to 3.
+        ad = _create_valid_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="New Submission Ad",
+        )
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
     def test_failed_ad_not_counted_in_active_limit(self):
-        """ON_MODERATION_FAILED ads do not count toward the active-ads limit (AD-003)."""
-        # 1 PUBLISHED (active) + 1 ON_MODERATION_FAILED (should be excluded).
-        # With max_ads=2 and the failed ad excluded, only 1 active remains -> under limit.
+        """ON_MODERATION_FAILED ads do not count toward the active-ads limit (AD-003).
+
+        With max_ads=2, a user with 1 PUBLISHED + 1 ON_MODERATION_FAILED has
+        only 1 active ad. check() on a new DRAFT ad (not counted) returns
+        (True, None). If ON_MODERATION_FAILED were counted, the active count
+        would be 2 and 2 < 2 would be False.
+        """
+        self.criteria.max_ads_per_user = 2
+        self.criteria.save()
+
         create_test_ad(
             self.user,
             self.category,
@@ -256,5 +169,326 @@ class TestCheckFunction:
             status=AdStatus.ON_MODERATION_FAILED,
         )
 
-        # If ON_MODERATION_FAILED were counted, active count=2 and 2<2 would be False.
-        assert _validate_max_ads_per_user(self.user.id, max_ads=2) is True
+        # New ad in DRAFT — not counted toward active (PUBLISHED + ON_MODERATION).
+        ad = _create_valid_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="New Valid Ad Title",
+            status=AdStatus.DRAFT,
+        )
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+
+# ---------------------------------------------------------------------------
+# check() — title length validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidateTitleLength:
+    """Tests for title length validation through check()."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, moderation_criteria, user, category, city):
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def test_title_too_short_returns_false(self):
+        """Title below minimum length causes check() to return (False, ...)."""
+        ad = _create_valid_ad(self.user, self.category, self.city, title="abc")
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_title_too_long_returns_false(self):
+        """Title above maximum length causes check() to return (False, ...)."""
+        ad = _create_valid_ad(self.user, self.category, self.city, title="x" * 150)
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_title_min_boundary_returns_true(self):
+        """Title at minimum length passes check()."""
+        ad = _create_valid_ad(self.user, self.category, self.city, title="abcde")
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+    def test_title_max_boundary_returns_true(self):
+        """Title at maximum length passes check()."""
+        ad = _create_valid_ad(self.user, self.category, self.city, title="x" * 100)
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+    def test_title_within_range_returns_true(self):
+        """Title within valid range passes check()."""
+        ad = _create_valid_ad(self.user, self.category, self.city, title="Valid Title")
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+
+# ---------------------------------------------------------------------------
+# check() — description length validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidateDescriptionLength:
+    """Tests for description length validation through check()."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, moderation_criteria, user, category, city):
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def test_description_too_short_returns_false(self):
+        """Description below minimum length causes check() to return (False, ...)."""
+        ad = _create_valid_ad(
+            self.user, self.category, self.city, description="short"
+        )
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_description_too_long_returns_false(self):
+        """Description above maximum length causes check() to return (False, ...)."""
+        ad = _create_valid_ad(
+            self.user, self.category, self.city, description="x" * 2500
+        )
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_description_min_boundary_returns_true(self):
+        """Description at minimum length passes check()."""
+        ad = _create_valid_ad(
+            self.user, self.category, self.city, description="x" * 10
+        )
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+    def test_description_max_boundary_returns_true(self):
+        """Description at maximum length passes check()."""
+        ad = _create_valid_ad(
+            self.user, self.category, self.city, description="x" * 2000
+        )
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+
+# ---------------------------------------------------------------------------
+# check() — image count validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidateImageCount:
+    """Tests for image count validation through check()."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, moderation_criteria, user, category, city):
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def test_no_images_returns_false(self):
+        """No images causes check() to return (False, ...)."""
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Valid Title",
+            description="Valid description text here",
+        )
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_too_many_images_returns_false(self):
+        """Too many images (>max_images) causes check() to return (False, ...)."""
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Valid Title",
+            description="Valid description text here",
+        )
+        for i in range(7):
+            AdImage.objects.create(ad=ad, image=f"img{i}.jpg", position=i)
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_valid_image_count_returns_true(self):
+        """Valid image count (within [min, max]) passes check()."""
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Valid Title",
+            description="Valid description text here",
+        )
+        for i in range(3):
+            AdImage.objects.create(ad=ad, image=f"img{i}.jpg", position=i)
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+
+# ---------------------------------------------------------------------------
+# check() — banned words validation
+# ---------------------------------------------------------------------------
+
+
+class TestContainsBannedWords:
+    """Tests for banned words validation through check()."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, moderation_criteria, user, category, city):
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def test_banned_word_in_title_returns_false(self):
+        """Banned word in title causes check() to return (False, ...)."""
+        self.criteria.banned_words = ["spam", "scam"]
+        self.criteria.save()
+        ad = _create_valid_ad(self.user, self.category, self.city, title="Spammy Title")
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_banned_word_in_description_returns_false(self):
+        """Banned word in description causes check() to return (False, ...)."""
+        self.criteria.banned_words = ["spam", "scam"]
+        self.criteria.save()
+        ad = _create_valid_ad(
+            self.user, self.category, self.city, description="This is a scam"
+        )
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_banned_word_case_insensitive_returns_false(self):
+        """Banned word matching is case-insensitive in check()."""
+        self.criteria.banned_words = ["spam", "scam"]
+        self.criteria.save()
+        ad = _create_valid_ad(self.user, self.category, self.city, title="SPAM Title")
+
+        passed, error = check(ad)
+        assert passed is False
+        assert error == SELLER_SAFE_ERROR
+
+    def test_no_banned_words_returns_true(self):
+        """Ad without banned words passes check()."""
+        self.criteria.banned_words = ["spam", "scam"]
+        self.criteria.save()
+        ad = _create_valid_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Clean Title",
+            description="Clean description here",
+        )
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+    def test_empty_banned_words_returns_true(self):
+        """Empty banned words list allows any content through check()."""
+        self.criteria.banned_words = []
+        self.criteria.save()
+        ad = _create_valid_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="Any Title With spam",
+            description="Any description",
+        )
+
+        passed, error = check(ad)
+        assert passed is True
+        assert error is None
+
+
+# ---------------------------------------------------------------------------
+# auto_moderate() — side effects: status transitions and AnalyticsEvent
+# ---------------------------------------------------------------------------
+
+
+class TestAutoModerateFunction:
+    """Tests for auto_moderate() side effects: status transitions and analytics."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, moderation_criteria, user, category, city):
+        self.criteria = moderation_criteria
+        self.user = user
+        self.category = category
+        self.city = city
+
+    def test_auto_moderate_pass_sets_published_and_analytics(self):
+        """auto_moderate() on a valid ad sets PUBLISHED + creates analytics events."""
+        ad = _create_valid_ad(self.user, self.category, self.city)
+
+        result = auto_moderate(ad)
+        assert result is True
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+
+        event_types = set(
+            AnalyticsEvent.objects.values_list("event_type", flat=True)
+        )
+        assert AnalyticsEventType.AD_PUBLISHED in event_types
+        assert AnalyticsEventType.MODERATION_APPROVED in event_types
+
+    def test_auto_moderate_fail_sets_failed_status_and_analytics(self):
+        """auto_moderate() on an invalid ad sets ON_MODERATION_FAILED + creates analytics."""
+        ad = create_test_ad(
+            self.user,
+            self.category,
+            self.city,
+            title="abc",
+            description="Valid description text here",
+        )
+        AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
+
+        result = auto_moderate(ad)
+        assert result is False
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert ad.moderation_failed_at is not None
+
+        event_types = set(
+            AnalyticsEvent.objects.values_list("event_type", flat=True)
+        )
+        assert AnalyticsEventType.MODERATION_REJECTED in event_types
+        assert len(event_types) == 1

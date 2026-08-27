@@ -109,14 +109,14 @@ manually (single-line PowerShell):
 
 ```pwsh
 docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm test
+docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed test
 ```
 
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
 2. Wait for PostgreSQL to be ready
 3. Run migrations via `migrate_locked.py` (advisory-locked, idempotent)
-4. Run `pytest --tb=short` (the entrypoint passes `--reuse-db --create-db` by default)
+4. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup`)
 5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
 ---

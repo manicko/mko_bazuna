@@ -22,11 +22,13 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils import translation
 
-from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 # Distinct, unambiguous seed values per locale: the strings do not overlap
 # across languages, so an assertion can never pass by coincidence.
@@ -78,22 +80,20 @@ def e2e_ad():
         region="Регион",
         slug="podgraf-e2e",
     )
-    ad = Ad.objects.create(
-        user=seller,
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
         title=TITLE_RU,
         title_en=TITLE_EN,
         title_bs=TITLE_BS,
         description=DESC_RU,
         description_en=DESC_EN,
         description_bs=DESC_BS,
-        category=category,
-        city=city,
-        category_name=category.name,
-        price_amount=100,
-        price_currency="EUR",
-        price_normalized_eur=100,
         status=AdStatus.PUBLISHED,
         source=AdSource.SEED,
+        price=100,
+        price_currency=CurrencyCode.EUR,
         published_at=timezone.now(),
     )
     detail_url = reverse("ads:detail", kwargs={"ad_id": ad.id})

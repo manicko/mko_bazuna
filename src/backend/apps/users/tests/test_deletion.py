@@ -16,6 +16,8 @@ from apps.users.services.deletion import (
 )
 from django.utils import timezone
 
+from conftest import create_test_ad
+
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
@@ -123,7 +125,6 @@ class TestWithdrawConsentSoftDeletesAds:
 
     def test_withdraw_soft_deletes_user_ads(self, user: User):
         """withdraw_consent soft-deletes all user ads."""
-        from apps.ads.models import Ad
         from apps.categories.models import Category
         from apps.core.enums import AdStatus
         from apps.locations.models import City
@@ -140,23 +141,21 @@ class TestWithdrawConsentSoftDeletesAds:
         )
 
         # Create user ads
-        ad1 = Ad.objects.create(
-            user=user,
+        ad1 = create_test_ad(
+            user,
+            category,
+            city,
             title="Ad 1",
             description="Description 1",
-            category=category,
-            city=city,
-            category_name=category.name,
             status=AdStatus.PUBLISHED,
             published_at=timezone.now(),
         )
-        ad2 = Ad.objects.create(
-            user=user,
+        ad2 = create_test_ad(
+            user,
+            category,
+            city,
             title="Ad 2",
             description="Description 2",
-            category=category,
-            city=city,
-            category_name=category.name,
             status=AdStatus.ON_MODERATION,
         )
 
@@ -245,7 +244,7 @@ class TestWithdrawConsentAtomicity:
 
     def test_withdraw_returns_storage_keys(self, user: User, monkeypatch):
         """withdraw_consent returns list[str] of DRAFT-ad storage keys."""
-        from apps.ads.models import Ad, AdImage
+        from apps.ads.models import AdImage
         from apps.categories.models import Category
         from apps.core.enums import AdStatus
         from apps.locations.models import City
@@ -258,13 +257,12 @@ class TestWithdrawConsentAtomicity:
             slug="test-city",
         )
 
-        draft_ad = Ad.objects.create(
-            user=user,
+        draft_ad = create_test_ad(
+            user,
+            category,
+            city,
             title="Draft Ad",
             description="Description",
-            category=category,
-            city=city,
-            category_name=category.name,
             status=AdStatus.DRAFT,
         )
         AdImage.objects.create(ad=draft_ad, image="test-draft-key.jpg")
@@ -305,7 +303,7 @@ class TestWithdrawConsentAtomicity:
 
     def test_soft_delete_user_ads_returns_keys_not_count(self, user: User, monkeypatch):
         """soft_delete_user_ads is DB-only: returns list[str], never calls delete_photo."""
-        from apps.ads.models import Ad, AdImage
+        from apps.ads.models import AdImage
         from apps.categories.models import Category
         from apps.core.enums import AdStatus
         from apps.locations.models import City
@@ -318,13 +316,12 @@ class TestWithdrawConsentAtomicity:
             slug="test-city",
         )
 
-        draft_ad = Ad.objects.create(
-            user=user,
+        draft_ad = create_test_ad(
+            user,
+            category,
+            city,
             title="Draft Ad",
             description="Description",
-            category=category,
-            city=city,
-            category_name=category.name,
             status=AdStatus.DRAFT,
         )
         AdImage.objects.create(ad=draft_ad, image="orphan-key.jpg")

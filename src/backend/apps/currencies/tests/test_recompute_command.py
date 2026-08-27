@@ -25,7 +25,7 @@ def _clear_rate_cache():
 
 class TestRecomputeNormalizedPrices:
     def test_recompute_corrects_stale_normalized_value(
-        self, seller, category, city
+        self, exchange_rates, seller, category, city
     ) -> None:
         """A stale EUR-normalized value is recomputed from the current rate.
 
@@ -47,7 +47,7 @@ class TestRecomputeNormalizedPrices:
         ad.refresh_from_db()
         assert ad.price_normalized_eur == Decimal("51.2000")
 
-    def test_dry_run_does_not_write(self, seller, category, city) -> None:
+    def test_dry_run_does_not_write(self, exchange_rates, seller, category, city) -> None:
         """``--dry-run`` reports without persisting any change."""
         ad = create_test_ad(
             seller,
@@ -64,7 +64,7 @@ class TestRecomputeNormalizedPrices:
         ad.refresh_from_db()
         assert ad.price_normalized_eur == Decimal("999")
 
-    def test_draft_ads_are_skipped(self, seller, category, city) -> None:
+    def test_draft_ads_are_skipped(self, exchange_rates, seller, category, city) -> None:
         """Draft ads (pre-submission) are excluded from recompute."""
         ad = create_test_ad(
             seller,

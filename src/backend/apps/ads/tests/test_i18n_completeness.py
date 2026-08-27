@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from django.test import SimpleTestCase
 
 
 pytestmark = [pytest.mark.unit]
@@ -143,170 +142,161 @@ _NON_TRANSLATABLE_TOKENS = frozenset({"EUR", "RSD", "BAM"})
 # ---------------------------------------------------------------------------
 
 
-class TestI18nCompleteness(SimpleTestCase):
-    """Guard the ``.po`` → ``.mo`` cycle and template extraction."""
+def test_no_hardcoded_visible_text() -> None:
+    """Visible text in public/seller templates must be translatable.
 
-    # -- 1. No hardcoded visible text ---------------------------------
+    Removes ``{% trans %}``/``{% blocktrans %}``/``{{ _("") }}`` blocks
+    (and their inner text), Django tags, HTML comments, and non-visible
+    elements, then checks for remaining bare text nodes.
+    """
+    for tpl_path in _collect_template_files():
+        content = tpl_path.read_text(encoding="utf-8")
+        cleaned = content
 
-    def test_no_hardcoded_visible_text(self) -> None:
-        """Visible text in public/seller templates must be translatable.
-
-        Removes ``{% trans %}``/``{% blocktrans %}``/``{{ _("") }}`` blocks
-        (and their inner text), Django tags, HTML comments, and non-visible
-        elements, then checks for remaining bare text nodes.
-        """
-        for tpl_path in _collect_template_files():
-            content = tpl_path.read_text(encoding="utf-8")
-            cleaned = content
-
-            # Remove <script>...</script>, <style>...</style>, <head>...</head>
-            for tag in _SKIP_TAGS:
-                cleaned = re.sub(
-                    rf"<{tag}\b[^>]*>.*?</{tag}>",
-                    "",
-                    cleaned,
-                    flags=re.DOTALL | re.IGNORECASE,
-                )
-                cleaned = re.sub(
-                    rf"<{tag}\b[^>]*/?>",
-                    "",
-                    cleaned,
-                    flags=re.IGNORECASE,
-                )
-
-            # Remove HTML comments
-            cleaned = re.sub(r"<!--.*?-->", "", cleaned, flags=re.DOTALL)
-
-            # Remove Django comments {# ... #}
-            cleaned = re.sub(r"\{#.*?#\}", "", cleaned, flags=re.DOTALL)
-
-            # Remove Django comment blocks {% comment %}...{% endcomment %}
+        # Remove <script>...</script>, <style>...</style>, <head>...</head>
+        for tag in _SKIP_TAGS:
             cleaned = re.sub(
-                r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}",
+                rf"<{tag}\b[^>]*>.*?</{tag}>",
                 "",
                 cleaned,
                 flags=re.DOTALL | re.IGNORECASE,
             )
-
-            # Remove trans-wrapped content BEFORE stripping Django tags, so
-            # bare text inside {% blocktrans %}...{% endblocktrans %} is not
-            # mistaken for hardcoded text after tag removal.
-            # Block-form trans (inline string literal only — no inner text):
             cleaned = re.sub(
-                r"{%\s*trans\s+[%\"'].*?%}",
+                rf"<{tag}\b[^>]*/?>",
                 "",
                 cleaned,
-                flags=re.DOTALL,
-            )
-            # Block-form trans with content between open/close tags:
-            cleaned = re.sub(
-                r"{%\s*trans\s*%}.*?{%\s*endtrans\s*%}",
-                "",
-                cleaned,
-                flags=re.DOTALL,
-            )
-            # Block-form blocktrans (with optional attributes like "with ..."):
-            cleaned = re.sub(
-                r"{%\s*blocktrans[^%]*%}.*?{%\s*endblocktrans\s*%}",
-                "",
-                cleaned,
-                flags=re.DOTALL,
-            )
-            # Inline gettext calls {{ _("..."), {{ _('...'), etc.
-            cleaned = re.sub(
-                r"{{\s*_\([\s\S]*?\)\s*}}",
-                "",
-                cleaned,
-                flags=re.DOTALL,
+                flags=re.IGNORECASE,
             )
 
-            # Remove all remaining Django template tags {% ... %} and {{ ... }}
-            cleaned = re.sub(r"{%.*?%}", "", cleaned, flags=re.DOTALL)
-            cleaned = re.sub(r"{{.*?}}", "", cleaned, flags=re.DOTALL)
+        # Remove HTML comments
+        cleaned = re.sub(r"<!--.*?-->", "", cleaned, flags=re.DOTALL)
 
-            # Now find remaining text nodes (text between > and <)
-            for match in _TEXT_NODE_RE.finditer(cleaned):
-                text = match.group(1)
-                stripped = text.strip()
-                if not stripped:
-                    continue
-                # Remove HTML entities (&copy;, &rsaquo;, &nbsp;, etc.)
-                stripped = re.sub(r"&[a-zA-Z]+;", "", stripped).strip()
-                if not stripped:
-                    continue
-                # Skip very short tokens (likely punctuation around dynamic vars)
-                if len(stripped) <= 2:
-                    continue
-                # Skip strings that are only punctuation/whitespace
-                if not re.search(r"[a-zA-Zа-яА-ЯёЁ]", stripped):
-                    continue
-                # Skip ISO currency codes and other non-translatable tokens
-                if stripped in _NON_TRANSLATABLE_TOKENS:
-                    continue
-                pytest.fail(
-                    f"{tpl_path.relative_to(settings.BASE_DIR)}: "
-                    f"hardcoded visible text not wrapped in gettext: "
-                    f"'{stripped}'"
-                )
+        # Remove Django comments {# ... #}
+        cleaned = re.sub(r"\{#.*?#\}", "", cleaned, flags=re.DOTALL)
 
-    # -- 2. Extraction completeness ------------------------------------
+        # Remove Django comment blocks {% comment %}...{% endcomment %}
+        cleaned = re.sub(
+            r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}",
+            "",
+            cleaned,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
 
-    def test_extraction_completeness(self) -> None:
-        """Every msgid in one `.po` file exists in all other `.po` files."""
-        all_msgids: set[str] = set()
-        by_lang: dict[str, set[str]] = {}
-        for po_path in _po_files():
-            lang = po_path.parent.parent.name
-            entries = _parse_po_entries(po_path.read_text(encoding="utf-8"))
-            msgids = {msgid for msgid, _ in entries if msgid}
-            by_lang[lang] = msgids
-            all_msgids.update(msgids)
+        # Remove trans-wrapped content BEFORE stripping Django tags, so
+        # bare text inside {% blocktrans %}...{% endblocktrans %} is not
+        # mistaken for hardcoded text after tag removal.
+        # Block-form trans (inline string literal only — no inner text):
+        cleaned = re.sub(
+            r"{%\s*trans\s+[%\"'].*?%}",
+            "",
+            cleaned,
+            flags=re.DOTALL,
+        )
+        # Block-form trans with content between open/close tags:
+        cleaned = re.sub(
+            r"{%\s*trans\s*%}.*?{%\s*endtrans\s*%}",
+            "",
+            cleaned,
+            flags=re.DOTALL,
+        )
+        # Block-form blocktrans (with optional attributes like "with ..."):
+        cleaned = re.sub(
+            r"{%\s*blocktrans[^%]*%}.*?{%\s*endblocktrans\s*%}",
+            "",
+            cleaned,
+            flags=re.DOTALL,
+        )
+        # Inline gettext calls {{ _("..."), {{ _('...'), etc.
+        cleaned = re.sub(
+            r"{{\s*_\([\s\S]*?\)\s*}}",
+            "",
+            cleaned,
+            flags=re.DOTALL,
+        )
 
-        if not all_msgids:
-            pytest.fail("No msgids found in any .po file")
+        # Remove all remaining Django template tags {% ... %} and {{ ... }}
+        cleaned = re.sub(r"{%.*?%}", "", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"{{.*?}}", "", cleaned, flags=re.DOTALL)
 
-        for lang, msgids in by_lang.items():
-            missing = all_msgids - msgids
-            assert not missing, (
-                f"{lang}: missing {len(missing)} msgids from other locales: "
-                f"{sorted(missing)[:5]}..."
-            )
-
-    # -- 3. No empty msgstr (en exempt) -------------------------------
-
-    def test_no_empty_msgstr(self) -> None:
-        """``ru`` and ``bs`` have no empty ``msgstr``; ``en`` is exempt."""
-        for po_path in _po_files():
-            locale_code = po_path.parent.parent.name
-            if locale_code == "en":
+        # Now find remaining text nodes (text between > and <)
+        for match in _TEXT_NODE_RE.finditer(cleaned):
+            text = match.group(1)
+            stripped = text.strip()
+            if not stripped:
                 continue
-            text = po_path.read_text(encoding="utf-8")
-            entries = _parse_po_entries(text)
-            empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
-            assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
+            # Remove HTML entities (&copy;, &rsaquo;, &nbsp;, etc.)
+            stripped = re.sub(r"&[a-zA-Z]+;", "", stripped).strip()
+            if not stripped:
+                continue
+            # Skip very short tokens (likely punctuation around dynamic vars)
+            if len(stripped) <= 2:
+                continue
+            # Skip strings that are only punctuation/whitespace
+            if not re.search(r"[a-zA-Zа-яА-ЯёЁ]", stripped):
+                continue
+            # Skip ISO currency codes and other non-translatable tokens
+            if stripped in _NON_TRANSLATABLE_TOKENS:
+                continue
+            pytest.fail(
+                f"{tpl_path.relative_to(settings.BASE_DIR)}: "
+                f"hardcoded visible text not wrapped in gettext: "
+                f"'{stripped}'"
+            )
 
-    # -- 5. No raw .get_name calls in templates -------------------------
 
-    def test_no_raw_get_name_in_templates(self) -> None:
-        """Templates must use ``|get_category_name:LANGUAGE_CODE`` or
-        ``|get_city_name:LANGUAGE_CODE`` filters instead of raw
-        ``{{ obj.get_name }}`` calls, which render in the default language
-        regardless of the active UI locale.
-        """
-        for tpl_path in _collect_template_files():
-            content = tpl_path.read_text(encoding="utf-8")
-            matches = re.findall(r"\{\{[^}]*\.get_name[^}]*\}\}", content)
-            if matches:
-                pytest.fail(
-                    f"{tpl_path.relative_to(settings.BASE_DIR)}: "
-                    f"raw .get_name call found; use get_category_name/get_city_name "
-                    f"filter with LANGUAGE_CODE instead: {matches}"
-                )
+def test_extraction_completeness() -> None:
+    """Every msgid in one `.po` file exists in all other `.po` files."""
+    all_msgids: set[str] = set()
+    by_lang: dict[str, set[str]] = {}
+    for po_path in _po_files():
+        lang = po_path.parent.parent.name
+        entries = _parse_po_entries(po_path.read_text(encoding="utf-8"))
+        msgids = {msgid for msgid, _ in entries if msgid}
+        by_lang[lang] = msgids
+        all_msgids.update(msgids)
 
-    # -- 4. .mo files compiled -----------------------------------------
+    if not all_msgids:
+        pytest.fail("No msgids found in any .po file")
 
-    def test_mo_compiled(self) -> None:
-        """Compiled ``.mo`` files exist for every ``.po``."""
-        for po_path in _po_files():
-            mo_path = po_path.with_suffix(".mo")
-            assert mo_path.exists(), f"Missing compiled file: {mo_path}"
+    for lang, msgids in by_lang.items():
+        missing = all_msgids - msgids
+        assert not missing, (
+            f"{lang}: missing {len(missing)} msgids from other locales: "
+            f"{sorted(missing)[:5]}..."
+        )
+
+
+def test_no_empty_msgstr() -> None:
+    """``ru`` and ``bs`` have no empty ``msgstr``; ``en`` is exempt."""
+    for po_path in _po_files():
+        locale_code = po_path.parent.parent.name
+        if locale_code == "en":
+            continue
+        text = po_path.read_text(encoding="utf-8")
+        entries = _parse_po_entries(text)
+        empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
+        assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
+
+
+def test_no_raw_get_name_in_templates() -> None:
+    """Templates must use ``|get_category_name:LANGUAGE_CODE`` or
+    ``|get_city_name:LANGUAGE_CODE`` filters instead of raw
+    ``{{ obj.get_name }}`` calls, which render in the default language
+    regardless of the active UI locale.
+    """
+    for tpl_path in _collect_template_files():
+        content = tpl_path.read_text(encoding="utf-8")
+        matches = re.findall(r"\{\{[^}]*\.get_name[^}]*\}\}", content)
+        if matches:
+            pytest.fail(
+                f"{tpl_path.relative_to(settings.BASE_DIR)}: "
+                f"raw .get_name call found; use get_category_name/get_city_name "
+                f"filter with LANGUAGE_CODE instead: {matches}"
+            )
+
+
+def test_mo_compiled() -> None:
+    """Compiled ``.mo`` files exist for every ``.po``."""
+    for po_path in _po_files():
+        mo_path = po_path.with_suffix(".mo")
+        assert mo_path.exists(), f"Missing compiled file: {mo_path}"

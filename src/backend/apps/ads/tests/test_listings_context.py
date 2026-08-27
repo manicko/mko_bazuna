@@ -24,7 +24,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse, HttpRequest
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory
 
 from apps.ads.views.listings import listings as listings_view
 from apps.core.enums import AdSort, AdStatus
@@ -32,7 +32,9 @@ from apps.core.enums import AdSort, AdStatus
 pytestmark = [pytest.mark.unit]
 
 # Canonical filter query from the vrf_002 spec.
-_SPEC_QUERY = "category=electronics&city=kyiv&min_price=100&max_price=500&sort=price_asc"
+_SPEC_QUERY = (
+    "category=electronics&city=kyiv&min_price=100&max_price=500&sort=price_asc"
+)
 
 
 class _EmptyQuerySet(list):
@@ -63,168 +65,172 @@ class _EmptyQuerySet(list):
         return self
 
 
-class TestListingsFilterContext(SimpleTestCase):
-    """vrf_002 — the tsk_002 filter context flows through ``listings()``."""
+def _run_listings(
+    query_string: str,
+    *,
+    category_slug: str | None = None,
+    city_slug: str | None = None,
+) -> tuple[HttpResponse, dict[str, object]]:
+    """Invoke ``listings()`` with all DB-touching dependencies mocked.
 
-    def _run_listings(
-        self,
-        query_string: str,
-        *,
-        category_slug: str | None = None,
-        city_slug: str | None = None,
-    ) -> tuple[HttpResponse, dict[str, object]]:
-        """Invoke ``listings()`` with all DB-touching dependencies mocked.
+    ``Ad``, ``Category`` and ``City`` managers and ``render`` are patched in
+    the view module. The mocked ``Ad`` queryset is an :class:`_EmptyQuerySet`
+    and the taxonomy lookups return empty suggestion pools, so nothing in the
+    view opens a database connection. ``render`` is stubbed to capture the
+    context dict that would otherwise be passed to the template.
+    """
+    context_box: list[dict[str, object]] = []
 
-        ``Ad``, ``Category`` and ``City`` managers and ``render`` are patched in
-        the view module. The mocked ``Ad`` queryset is an :class:`_EmptyQuerySet`
-        and the taxonomy lookups return empty suggestion pools, so nothing in the
-        view opens a database connection. ``render`` is stubbed to capture the
-        context dict that would otherwise be passed to the template.
-        """
-        context_box: list[dict[str, object]] = []
+    def fake_render(
+        request: HttpRequest,
+        template_name: str,
+        context: dict[str, object] | None = None,
+        **kwargs: object,
+    ) -> HttpResponse:
+        context_box.append(context if context is not None else {})
+        return HttpResponse(status=200)
 
-        def fake_render(
-            request: HttpRequest,
-            template_name: str,
-            context: dict[str, object] | None = None,
-            **kwargs: object,
-        ) -> HttpResponse:
-            context_box.append(context if context is not None else {})
-            return HttpResponse(status=200)
+    with (
+        patch("apps.ads.views.listings.Ad") as mock_ad,
+        patch("apps.ads.views.listings.Category") as mock_category,
+        patch("apps.ads.views.listings.City") as mock_city,
+        patch("apps.ads.views.listings.render", side_effect=fake_render),
+    ):
+        mock_ad.objects.filter.return_value = _EmptyQuerySet()
+        mock_category.objects.filter.return_value.values_list.return_value = []
+        mock_city.objects.values_list.return_value = []
 
-        with (
-            patch("apps.ads.views.listings.Ad") as mock_ad,
-            patch("apps.ads.views.listings.Category") as mock_category,
-            patch("apps.ads.views.listings.City") as mock_city,
-            patch("apps.ads.views.listings.render", side_effect=fake_render),
-        ):
-            mock_ad.objects.filter.return_value = _EmptyQuerySet()
-            mock_category.objects.filter.return_value.values_list.return_value = []
-            mock_city.objects.values_list.return_value = []
+        factory = RequestFactory()
+        url = f"/?{query_string}" if query_string else "/"
+        request = factory.get(url)
+        request.user = AnonymousUser()
 
-            factory = RequestFactory()
-            url = f"/?{query_string}" if query_string else "/"
-            request = factory.get(url)
-            request.user = AnonymousUser()
-
-            response = listings_view(
-                request,
-                category_slug=category_slug,
-                city_slug=city_slug,
-            )
-
-        return response, context_box[0]
-
-    # ── tsk_002 context keys (vrf_002) ──────────────────────────────────────
-
-    def test_context_contains_all_tsk002_keys(self) -> None:
-        """Every tsk_002 filter key is present in the render context."""
-        _, context = self._run_listings(_SPEC_QUERY)
-        expected_keys = {
-            "current_category",
-            "current_city",
-            "current_sort",
-            "min_price",
-            "max_price",
-            "suggested_category",
-            "suggested_city",
-        }
-        assert expected_keys <= set(context)
-
-    def test_context_contains_breadcrumb_category(self) -> None:
-        """T-500: the resolved category is exposed for header breadcrumbs."""
-        _, context = self._run_listings("", category_slug="electronics")
-        assert "breadcrumb_category" in context
-
-    def test_breadcrumb_category_is_none_without_category(self) -> None:
-        """Without a category path, ``breadcrumb_category`` is None."""
-        _, context = self._run_listings(_SPEC_QUERY)
-        assert context["breadcrumb_category"] is None
-
-    def test_query_params_map_to_context_values(self) -> None:
-        """GET filter params propagate to the matching context values.
-
-        ``current_category`` mirrors the URL *path* slug (absent here, so
-        ``None``); an explicit ``?city=`` is a real filter (F-5), so
-        ``current_city`` reflects the query param. With the empty mocked
-        taxonomy the city cannot be resolved, so the did-you-mean suggestion
-        resolves to ``None``.
-        """
-        _, context = self._run_listings(_SPEC_QUERY)
-
-        assert context["current_category"] is None
-        assert context["current_city"] == "kyiv"
-        assert context["current_sort"] == AdSort.PRICE_LOW
-        assert context["min_price"] == "100"
-        assert context["max_price"] == "500"
-        assert context["suggested_category"] is None
-        assert context["suggested_city"] is None
-
-    def test_empty_queryset_marks_no_results_with_page_obj(self) -> None:
-        """With no ads in the mocked queryset, ``has_results`` is False."""
-        response, context = self._run_listings(_SPEC_QUERY)
-
-        assert response.status_code == 200
-        assert context["has_results"] is False
-        assert "page_obj" in context
-
-    def test_path_slugs_populate_current_category_and_city(self) -> None:
-        """URL path slugs appear verbatim in ``current_category`` / ``current_city``.
-
-        When the slugs resolve, the did-you-mean suggestions stay ``None`` and
-        the default sort (``date_desc``) is applied.
-        """
-        response, context = self._run_listings(
-            "",
-            category_slug="electronics",
-            city_slug="kyiv",
+        response = listings_view(
+            request,
+            category_slug=category_slug,
+            city_slug=city_slug,
         )
 
-        assert response.status_code == 200
-        assert context["current_category"] == "electronics"
-        assert context["current_city"] == "kyiv"
-        assert context["current_sort"] == AdSort.DATE_NEW
-        assert context["min_price"] is None
-        assert context["max_price"] is None
-        assert context["suggested_category"] is None
-        assert context["suggested_city"] is None
-        assert context["has_results"] is False
+    return response, context_box[0]
 
-    def test_view_hits_mocked_orm_and_renders_list_template(self) -> None:
-        """``listings()`` queries the mocked ``Ad`` manager and renders list.html.
 
-        Proves the test stays DB-free: the only ``Ad.objects.filter`` call is the
-        initial ``status=PUBLISHED`` filter (subsequent chain calls run on the
-        in-memory empty queryset), and the non-HTMX branch renders the listings
-        template.
-        """
-        request = RequestFactory().get("/?category=electronics&city=kyiv")
-        request.user = AnonymousUser()
-        captured: dict[str, object] = {}
+# ── tsk_002 context keys (vrf_002) ──────────────────────────────────────
 
-        def fake_render(
-            request: HttpRequest,
-            template_name: str,
-            context: dict[str, object] | None = None,
-            **kwargs: object,
-        ) -> HttpResponse:
-            captured["template_name"] = template_name
-            captured["context"] = context if context is not None else {}
-            return HttpResponse(status=200)
 
-        with (
-            patch("apps.ads.views.listings.Ad") as mock_ad,
-            patch("apps.ads.views.listings.Category") as mock_category,
-            patch("apps.ads.views.listings.City") as mock_city,
-            patch("apps.ads.views.listings.render", side_effect=fake_render),
-        ):
-            mock_ad.objects.filter.return_value = _EmptyQuerySet()
-            mock_category.objects.filter.return_value.values_list.return_value = []
-            mock_city.objects.values_list.return_value = []
+def test_context_contains_all_tsk002_keys() -> None:
+    """Every tsk_002 filter key is present in the render context."""
+    _, context = _run_listings(_SPEC_QUERY)
+    expected_keys = {
+        "current_category",
+        "current_city",
+        "current_sort",
+        "min_price",
+        "max_price",
+        "suggested_category",
+        "suggested_city",
+    }
+    assert expected_keys <= set(context)
 
-            response = listings_view(request)
 
-        assert response.status_code == 200
-        mock_ad.objects.filter.assert_called_once_with(status=AdStatus.PUBLISHED)
-        assert captured["template_name"] == "ads/list.html"
-        assert captured["context"] is not None
+def test_context_contains_breadcrumb_category() -> None:
+    """T-500: the resolved category is exposed for header breadcrumbs."""
+    _, context = _run_listings("", category_slug="electronics")
+    assert "breadcrumb_category" in context
+
+
+def test_breadcrumb_category_is_none_without_category() -> None:
+    """Without a category path, ``breadcrumb_category`` is None."""
+    _, context = _run_listings(_SPEC_QUERY)
+    assert context["breadcrumb_category"] is None
+
+
+def test_query_params_map_to_context_values() -> None:
+    """GET filter params propagate to the matching context values.
+
+    ``current_category`` mirrors the URL *path* slug (absent here, so
+    ``None``); an explicit ``?city=`` is a real filter (F-5), so
+    ``current_city`` reflects the query param. With the empty mocked
+    taxonomy the city cannot be resolved, so the did-you-mean suggestion
+    resolves to ``None``.
+    """
+    _, context = _run_listings(_SPEC_QUERY)
+
+    assert context["current_category"] is None
+    assert context["current_city"] == "kyiv"
+    assert context["current_sort"] == AdSort.PRICE_LOW
+    assert context["min_price"] == "100"
+    assert context["max_price"] == "500"
+    assert context["suggested_category"] is None
+    assert context["suggested_city"] is None
+
+
+def test_empty_queryset_marks_no_results_with_page_obj() -> None:
+    """With no ads in the mocked queryset, ``has_results`` is False."""
+    response, context = _run_listings(_SPEC_QUERY)
+
+    assert response.status_code == 200
+    assert context["has_results"] is False
+    assert "page_obj" in context
+
+
+def test_path_slugs_populate_current_category_and_city() -> None:
+    """URL path slugs appear verbatim in ``current_category`` / ``current_city``.
+
+    When the slugs resolve, the did-you-mean suggestions stay ``None`` and
+    the default sort (``date_desc``) is applied.
+    """
+    response, context = _run_listings(
+        "",
+        category_slug="electronics",
+        city_slug="kyiv",
+    )
+
+    assert response.status_code == 200
+    assert context["current_category"] == "electronics"
+    assert context["current_city"] == "kyiv"
+    assert context["current_sort"] == AdSort.DATE_NEW
+    assert context["min_price"] is None
+    assert context["max_price"] is None
+    assert context["suggested_category"] is None
+    assert context["suggested_city"] is None
+    assert context["has_results"] is False
+
+
+def test_view_hits_mocked_orm_and_renders_list_template() -> None:
+    """``listings()`` queries the mocked ``Ad`` manager and renders list.html.
+
+    Proves the test stays DB-free: the only ``Ad.objects.filter`` call is the
+    initial ``status=PUBLISHED`` filter (subsequent chain calls run on the
+    in-memory empty queryset), and the non-HTMX branch renders the listings
+    template.
+    """
+    request = RequestFactory().get("/?category=electronics&city=kyiv")
+    request.user = AnonymousUser()
+    captured: dict[str, object] = {}
+
+    def fake_render(
+        request: HttpRequest,
+        template_name: str,
+        context: dict[str, object] | None = None,
+        **kwargs: object,
+    ) -> HttpResponse:
+        captured["template_name"] = template_name
+        captured["context"] = context if context is not None else {}
+        return HttpResponse(status=200)
+
+    with (
+        patch("apps.ads.views.listings.Ad") as mock_ad,
+        patch("apps.ads.views.listings.Category") as mock_category,
+        patch("apps.ads.views.listings.City") as mock_city,
+        patch("apps.ads.views.listings.render", side_effect=fake_render),
+    ):
+        mock_ad.objects.filter.return_value = _EmptyQuerySet()
+        mock_category.objects.filter.return_value.values_list.return_value = []
+        mock_city.objects.values_list.return_value = []
+
+        response = listings_view(request)
+
+    assert response.status_code == 200
+    mock_ad.objects.filter.assert_called_once_with(status=AdStatus.PUBLISHED)
+    assert captured["template_name"] == "ads/list.html"
+    assert captured["context"] is not None

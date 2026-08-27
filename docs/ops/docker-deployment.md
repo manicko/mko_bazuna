@@ -434,11 +434,11 @@ The `mko-bazuna-test_postgres_data` volume persists across `make test` / `make t
 The `entrypoint-test.sh` script runs:
 
 ```bash
-pytest --reuse-db --create-db --tb=short
+uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup
 ```
 
 - `--reuse-db` caches the `test_mko_bazuna` schema between runs (skips the ~1.5 s migration replay).
-- `--create-db` makes Django rebuild the schema whenever migrations diverge.
+- `--create-db` forces a full schema drop+rebuild; it is **not** in the entrypoint default. `make test-recreate` adds `--no-reuse-db --create-db -n auto --dist loadgroup` to bypass the cache when the schema is stale.
 - The test DB has its own named volume (`mko-bazuna-test_postgres_data`) because the test override
   does **not** override the base `volumes:` key — Compose prefixes it with the project name,
   yielding the persistent volume above.
@@ -448,7 +448,7 @@ pytest --reuse-db --create-db --tb=short
 To bypass the cache when the schema is stale:
 
 ```bash
-make test-recreate   # runs: pytest --no-reuse-db --create-db --tb=short
+make test-recreate   # runs: pytest --no-reuse-db --create-db --tb=short -n auto --dist loadgroup
 ```
 
 ### Fast iteration

@@ -18,7 +18,8 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus, AdvisoryLockId
+from apps.core.enums import AdSource, AdStatus, AdvisoryLockId, LanguageLocale
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
@@ -28,6 +29,8 @@ from apps.seed.generators.users import UserGenerator
 from apps.seed.paths import FIXTURES_IMAGES_DIR
 from apps.seed.services.seed_service import SeedService
 from apps.users.models import User
+
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ─── BaseGenerator tests ────────────────────────────────────────────────
@@ -267,19 +270,17 @@ class TestImageGenerator:
         city = City.objects.create(
             name="Тест", slug="test-city", region="Test", country_code="ME"
         )
-        self.ad = Ad.objects.create(
-            user=user,
+        self.ad = create_test_ad(
+            user,
+            cat,
+            city,
             title="Test Ad",
             description="Test",
-            price_amount=100,
-            price_currency="EUR",
-            price_normalized_eur=100,
-            category=cat,
-            city=city,
-            category_name="Тест",
             status=AdStatus.PUBLISHED,
             source=AdSource.SEED,
+            price=100,
             published_at=timezone.now(),
+            category_name="Тест",
         )
 
     def setup_method(self) -> None:
@@ -362,32 +363,28 @@ class TestAnalyticsGenerator:
         city = City.objects.create(
             name="Подгорица", slug="pg", region="Central", country_code="ME"
         )
-        self.published_ad = Ad.objects.create(
-            user=user,
+        self.published_ad = create_test_ad(
+            user,
+            cat,
+            city,
             title="Published Ad",
             description="Test",
-            price_amount=100,
-            price_currency="EUR",
-            price_normalized_eur=100,
-            category=cat,
-            city=city,
-            category_name="Тест",
             status=AdStatus.PUBLISHED,
             source=AdSource.SEED,
+            price=100,
             published_at="2024-01-01 00:00:00+00",
+            category_name="Тест",
         )
-        self.draft_ad = Ad.objects.create(
-            user=user,
+        self.draft_ad = create_test_ad(
+            user,
+            cat,
+            city,
             title="Draft Ad",
             description="Test",
-            price_amount=100,
-            price_currency="EUR",
-            price_normalized_eur=100,
-            category=cat,
-            city=city,
-            category_name="Тест",
             status=AdStatus.DRAFT,
             source=AdSource.SEED,
+            price=100,
+            category_name="Тест",
         )
 
     def test_events_created_for_published_ads(self) -> None:
@@ -835,7 +832,7 @@ class TestAdGeneratorMultiLang:
             assert ad.description_en is not None and len(ad.description_en) > 0
             assert ad.title_bs is not None and len(ad.title_bs) > 0
             assert ad.description_bs is not None and len(ad.description_bs) > 0
-            assert ad.original_language == "ru"
+            assert ad.original_language == LanguageLocale.RUSSIAN
 
     def test_original_language_set(self) -> None:
         """All generated ads have original_language='ru'."""
@@ -851,7 +848,7 @@ class TestAdGeneratorMultiLang:
         )
         ads = gen.generate(5)
         for ad in ads:
-            assert ad.original_language == "ru"
+            assert ad.original_language == LanguageLocale.RUSSIAN
 
     def test_deterministic_multi_language(self) -> None:
         """Same Faker seed produces same multi-language content."""
@@ -1249,7 +1246,7 @@ class TestSeedCategoryIntegration:
                 else:
                     assert ad.price_amount > 0
                 # Seed ads use EUR, so the normalized value equals the amount.
-                assert ad.price_currency == "EUR"
+                assert ad.price_currency == CurrencyCode.EUR
                 assert ad.price_normalized_eur == ad.price_amount
             # Multi-language fields should be populated
             assert ad.title is not None
@@ -1307,7 +1304,7 @@ class TestSeedCategoryIntegration:
                 f"price_amount={ad.price_amount}, expected 0"
             )
             assert ad.price_normalized_eur == 0
-            assert ad.price_currency == "EUR"
+            assert ad.price_currency == CurrencyCode.EUR
 
     def test_photo_manifest_loading(self) -> None:
         """ImageGenerator loads the photo manifest (even if empty)."""

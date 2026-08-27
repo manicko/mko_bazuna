@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import pytest
 from apps.core.enums import AdStatus
 from apps.core.services.contact import (
-    _check_seller_contactable,
     can_contact_seller,
     get_seller_for_contact,
     record_contact_response,
@@ -136,7 +135,8 @@ class TestContactResponseNoPii:
 
 
 class TestCheckSellerContactable:
-    """Direct unit tests for the _check_seller_contactable predicate (zone R2).
+    """Tests for the contactable predicate via the public ``can_contact_seller``
+    and ``get_seller_for_contact`` APIs (zone R2).
 
     Happy path plus each of the 6 conditions failing -> False.
     """
@@ -144,7 +144,8 @@ class TestCheckSellerContactable:
     def test_all_conditions_met_returns_true(self, seller, category, city):
         """All 6 conditions satisfied -> predicate returns True."""
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert _check_seller_contactable(ad, seller) is True
+        assert can_contact_seller(ad) is True
+        assert get_seller_for_contact(ad.id) == (True, seller)
 
     @pytest.mark.parametrize(
         "status",
@@ -153,44 +154,48 @@ class TestCheckSellerContactable:
     def test_ad_not_published_returns_false(self, seller, category, city, status):
         """ad.status != PUBLISHED -> predicate returns False."""
         ad = create_test_ad(seller, category, city, status=status)
-        assert _check_seller_contactable(ad, seller) is False
+        assert can_contact_seller(ad) is False
+        assert get_seller_for_contact(ad.id) == (False, None)
 
     def test_seller_is_none_returns_false(self):
         """seller is None -> predicate returns False (defensive)."""
-        ad = SimpleNamespace(status=AdStatus.PUBLISHED)
-        assert _check_seller_contactable(ad, None) is False
+        ad = SimpleNamespace(status=AdStatus.PUBLISHED, user=None)
+        assert can_contact_seller(ad) is False
 
     def test_telegram_id_none_returns_false(self):
         """seller with telegram_id is None -> predicate returns False."""
-        ad = SimpleNamespace(status=AdStatus.PUBLISHED)
         seller = SimpleNamespace(
             telegram_id=None,
             is_deleted=False,
             is_banned=False,
             consent_revoked_at=None,
         )
-        assert _check_seller_contactable(ad, seller) is False
+        ad = SimpleNamespace(status=AdStatus.PUBLISHED, user=seller)
+        assert can_contact_seller(ad) is False
 
     def test_seller_deleted_returns_false(self, seller, category, city):
         """seller.is_deleted -> predicate returns False."""
         seller.is_deleted = True
         seller.save(update_fields=["is_deleted"])
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert _check_seller_contactable(ad, seller) is False
+        assert can_contact_seller(ad) is False
+        assert get_seller_for_contact(ad.id) == (False, None)
 
     def test_seller_banned_returns_false(self, seller, category, city):
         """seller.is_banned -> predicate returns False."""
         seller.is_banned = True
         seller.save(update_fields=["is_banned"])
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert _check_seller_contactable(ad, seller) is False
+        assert can_contact_seller(ad) is False
+        assert get_seller_for_contact(ad.id) == (False, None)
 
     def test_consent_revoked_returns_false(self, seller, category, city):
         """seller.consent_revoked_at set -> predicate returns False."""
         seller.consent_revoked_at = timezone.now()
         seller.save(update_fields=["consent_revoked_at"])
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert _check_seller_contactable(ad, seller) is False
+        assert can_contact_seller(ad) is False
+        assert get_seller_for_contact(ad.id) == (False, None)
 
 
 class TestGetSellerForContactIntegration:

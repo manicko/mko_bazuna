@@ -32,7 +32,7 @@ Running `uv run pytest` locally will fail. Always:
 
 1. Check the test DB is running: `docker ps --filter "name=mko-bazuna-test-db-"`
 2. If not running, start it: `docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db`
-3. Run tests via the `test` Compose service (see `.ai/context/commands.md` for full commands).
+3. Run tests via the `test` Compose service (see `.kilo/rules/commands.md` for full commands).
 
 ## Detailed Instructions
 

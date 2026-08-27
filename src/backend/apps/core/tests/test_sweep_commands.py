@@ -17,7 +17,12 @@ from datetime import timedelta
 import pytest
 from apps.ads.models import Ad, AdImage
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdStatus, AdvisoryLockId
+from apps.core.enums import (
+    AdStatus,
+    AnalyticsEventType,
+    AdvisoryLockId,
+    ModeratorActionType,
+)
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import LoginToken, User
 from django.core.management import call_command
@@ -276,7 +281,7 @@ class TestConsentHardDelete:
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
         event = AnalyticsEvent.objects.create(
-            event_type="search_performed", user=seller
+            event_type=AnalyticsEventType.SEARCH_PERFORMED, user=seller
         )
         call_command("consent_hard_delete")
         event.refresh_from_db()
@@ -288,7 +293,7 @@ class TestConsentHardDelete:
         seller.save()
         log = ModeratorActionLog.objects.create(
             user=seller,
-            action_type="ban_account",
+            action_type=ModeratorActionType.BAN_ACCOUNT,
             reason="internal",
         )
         call_command("consent_hard_delete")
@@ -310,11 +315,11 @@ class TestConsentHardDelete:
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
         event = AnalyticsEvent.objects.create(
-            event_type="search_performed", user=seller
+            event_type=AnalyticsEventType.SEARCH_PERFORMED, user=seller
         )
         log = ModeratorActionLog.objects.create(
             user=seller,
-            action_type="ban_account",
+            action_type=ModeratorActionType.BAN_ACCOUNT,
             reason="internal",
         )
 
@@ -455,7 +460,7 @@ class TestPurgeRejectedAds:
         log = ModeratorActionLog.objects.create(
             ad=old,
             user=seller,
-            action_type="reject",
+            action_type=ModeratorActionType.REJECT,
             reason="internal",
         )
         call_command("purge_rejected_ads")

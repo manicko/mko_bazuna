@@ -701,17 +701,26 @@ All 12 tasks (T-01 through T-12) completed successfully.
 | T-09 | Remove dead dev dependencies from `pyproject.toml` | ✅ Done | `factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy` removed; `uv.lock` updated |
 | T-10 | Add `pytest-xdist` to dev deps; enable `-n auto` in CI | ✅ Done | `pytest-xdist>=3.8.0` in dev group; `-n auto --dist loadscope` in `ci.yml` and `ci-nightly.yml` |
 | T-11 | Create root `conftest.py` at `src/backend/conftest.py` with shared fixtures | ✅ Done | Generic `seller`, `user`, `category`, `city` fixtures + `create_test_ad()` + `_set_status_timestamp()`; validated against 380+376 test runs |
-| T-12 | Fix pre-existing failures (7+ tests) | ✅ Done | 934 tests collected, 0 failures across 4 test runs (unit, seed, integration, full backend) |
+| T-12 | Resolve pre-existing CI failures | ✅ Done | 1137 tests collected, 0 failures across 4 test runs (unit, seed, integration, full backend) — see note below |
 
 ### Verification Results
 
 | Check | Result |
 |-------|--------|
-| Test collection | 934 tests collected across 73 test files |
-| `-m seed` filter | 16 tests collected ✅ |
-| `-m unit` filter | 93 tests collected ✅ |
+| Test collection | 1137 tests collected across 90 test files |
+| `-m seed` filter | 26 tests collected ✅ |
+| `-m unit` filter | 235 tests collected ✅ |
 | Integration tests (ads, core, users, trust, analytics) | 380 passed ✅ |
 | Backend tests (moderation, categories, cabinet, media, ads, search) | 376 passed ✅ |
-| Previously-failing tests (50+) | All now pass ✅ |
+| Pre-existing CI failures | Resolved ✅ — 1 real failure, a test-helper bug (see note below) |
 | Lint (`ruff check`) | All checks passed ✅ |
 | Typecheck (`basedpyright`) | 0 errors, 0 warnings, 0 notes ✅ |
+
+> **Note — §14 T-12 baseline correction (verified against the current working tree):**
+> The figures above were first reported against the **934-test baseline** that predates **F-01** (shadowed `tests.py` deletion). Two corrections apply:
+>
+> - **The baseline silently excluded 31 `tests.py` tests.** `pyproject.toml` configures `python_files = ["tests.py", "test_*.py"]`; when an app had both a `tests.py` module and a `tests/` package, pytest collected the package and **silently skipped** the module. `apps/moderation/tests.py` (22 tests) and `apps/search/tests.py` (9 tests) — **31 tests total** — were therefore never executed during the original "934 collected, 0 failures" validation. They were deleted in [`07a8f49`](https://github.com/manicko/mko_bazuna/commit/07a8f49) ("Remove shadowed tests.py files in moderation and search apps") and migrated into `tests/` packages — `apps/moderation/tests/test_moderation_views.py` and `apps/search/tests/test_search_view.py` — in [`d72e597`](https://github.com/manicko/mko_bazuna/commit/d72e597), where the tests use the shared `create_test_ad()` helper that sets all status-specific timestamps.
+> - **The single real pre-existing failure was a test-helper bug, not a production-code bug.** The concrete CI blocker was `test_reject_failed_moderation_ad` (originally in `apps/moderation/tests.py`). It raised `IntegrityError: new row for relation "ads" violates check constraint "ck_ads_moderation_failed_at_if_failed"` because the old local `_create_ad` helper only set `published_at` for `PUBLISHED` status and omitted `moderation_failed_at` for `FAILED` status. The migrated test uses the shared `_set_status_timestamp()` helper (`src/backend/conftest.py`, lines 163–184) which sets `published_at`, `rejected_at`, `archived_at`, `moderation_failed_at`, or `deleted_at` based on `status`.
+> - **Current test inventory** (verified via `pytest --collect-only` with the project's real `pyproject.toml` config): **1137 tests across 90 test files** — **1111 non-seed** + **26 seed**; **235** are marked `@pytest.mark.unit`; **8** custom markers are registered (`unit`, `integration`, `seed`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group`; `e2e` was removed).
+> - **On the "50+" figure:** this is an unverified, inflated figure from the original plan. The actual concrete pre-existing failure that blocked CI-green was the single test-helper bug above; the 31 shadowed `tests.py` tests were **excluded from the baseline** rather than "passing". Per F-01's own verification, the migrated moderation+search suite passes (223 passed, 0 failed) after the helper fix. The per-category pass counts (380/376) and the "0 failures" conclusion were validated at the 934-test baseline; the previously-blocking failure is now resolved.
+

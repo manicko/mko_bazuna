@@ -16,7 +16,6 @@ import pytest
 from django import template
 from django.conf import settings
 from django.template import Context
-from django.test import SimpleTestCase
 
 from apps.lookups.models import LookupItem
 
@@ -87,69 +86,66 @@ def _po_files() -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
-class TestI18nPipeline(SimpleTestCase):
-    """Guard the ``.po`` -> ``.mo`` cycle against regressions."""
+def test_po_files_exist_for_all_languages() -> None:
+    """A ``django.po`` exists for every configured language."""
+    configured = {code for code, _ in settings.LANGUAGES}
+    on_disk = {p.parent.parent.name for p in _po_files()}
+    missing = configured - on_disk
+    assert not missing, f"Missing .po files for languages: {missing}"
 
-    def test_po_files_exist_for_all_languages(self) -> None:
-        """A ``django.po`` exists for every configured language."""
-        configured = {code for code, _ in settings.LANGUAGES}
-        on_disk = {p.parent.parent.name for p in _po_files()}
-        missing = configured - on_disk
-        assert not missing, f"Missing .po files for languages: {missing}"
 
-    def test_no_empty_msgstr(self) -> None:
-        """Every non-header ``msgid`` has a non-empty ``msgstr``.
+def test_no_empty_msgstr() -> None:
+    """Every non-header ``msgid`` has a non-empty ``msgstr``.
 
-        The ``en`` locale is exempt — its ``msgid`` is already English, so
-        ``msgstr`` may remain empty.
-        """
-        for po_path in _po_files():
-            locale_code = po_path.parent.parent.name
-            text = po_path.read_text(encoding="utf-8")
-            entries = _parse_po_entries(text)
-            empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
-            if locale_code == "en":
-                continue
-            assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
+    The ``en`` locale is exempt — its ``msgid`` is already English, so
+    ``msgstr`` may remain empty.
+    """
+    for po_path in _po_files():
+        locale_code = po_path.parent.parent.name
+        text = po_path.read_text(encoding="utf-8")
+        entries = _parse_po_entries(text)
+        empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
+        if locale_code == "en":
+            continue
+        assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
 
-    def test_mo_files_exist(self) -> None:
-        """Compiled ``.mo`` files exist for every ``.po`` (compilemessages ran).
 
-        The test entrypoint runs ``compilemessages`` before pytest, so ``.mo``
-        files are guaranteed to be present.  This test guards against accidental
-        deletion or misnamed ``.mo`` files that would break ``{% trans %}`` at
-        runtime.
-        """
-        for po_path in _po_files():
-            mo_path = po_path.with_suffix(".mo")
-            assert mo_path.exists(), f"Missing compiled file: {mo_path}"
+def test_mo_files_exist() -> None:
+    """Compiled ``.mo`` files exist for every ``.po`` (compilemessages ran).
+
+    The test entrypoint runs ``compilemessages`` before pytest, so ``.mo``
+    files are guaranteed to be present.  This test guards against accidental
+    deletion or misnamed ``.mo`` files that would break ``{% trans %}`` at
+    runtime.
+    """
+    for po_path in _po_files():
+        mo_path = po_path.with_suffix(".mo")
+        assert mo_path.exists(), f"Missing compiled file: {mo_path}"
 
 
 # ---------------------------------------------------------------------------
-# Part B — component_tag filter
+# Part B — component_tag Filter
 # ---------------------------------------------------------------------------
 
 
-class TestComponentTagFilter(SimpleTestCase):
-    """The ``component_tag`` filter renders a feature tag component."""
+def test_component_tag_renders_feature_name() -> None:
+    """``component_tag`` outputs a span containing the localized name."""
+    feature = LookupItem(
+        slug="wifi",
+        name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
+    )
+    tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
+    rendered = tpl.render(Context({"feature": feature}))
+    assert "Wi-Fi" in rendered
 
-    def test_component_tag_renders_feature_name(self) -> None:
-        """``component_tag`` outputs a span containing the localized name."""
-        feature = LookupItem(
-            slug="wifi",
-            name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
-        )
-        tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
-        rendered = tpl.render(Context({"feature": feature}))
-        assert "Wi-Fi" in rendered
 
-    def test_component_tag_includes_feature_id(self) -> None:
-        """The rendered tag carries a ``data-feature-id`` attribute."""
-        feature = LookupItem(
-            slug="wifi",
-            id=42,
-            name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
-        )
-        tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
-        rendered = tpl.render(Context({"feature": feature}))
-        assert 'data-feature-id="42"' in rendered
+def test_component_tag_includes_feature_id() -> None:
+    """The rendered tag carries a ``data-feature-id`` attribute."""
+    feature = LookupItem(
+        slug="wifi",
+        id=42,
+        name_i18n={"ru": "Wi-Fi", "en": "Wi-Fi"},
+    )
+    tpl = template.Template("{% load global_tags %}{{ feature|component_tag }}")
+    rendered = tpl.render(Context({"feature": feature}))
+    assert 'data-feature-id="42"' in rendered

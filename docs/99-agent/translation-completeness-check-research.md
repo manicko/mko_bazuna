@@ -422,7 +422,7 @@ dependencies or endpoints, and `escapejs` handles Cyrillic correctly. Group the
 | `docker/entrypoint-test.sh` | ✅ Compiles `.mo` before pytest | `entrypoint-test.sh:37` |
 | `.pre-commit-config.yaml` | ❌ Does not exist | — |
 | `.github/workflows/` | ❌ Does not exist | — |
-| `pytest` markers | ✅ `unit`, `integration`, `seed` | `pyproject.toml[tool.pytest.ini_options]` |
+| `pytest` markers | ✅ `unit`, `integration`, `seed`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group` | `pyproject.toml[tool.pytest.ini_options]` |
 
 ### E.2 Existing test placement conventions
 
@@ -807,7 +807,7 @@ repos:
 | `apps/core/middleware/language.py` | HIGH (read directly) | Custom middleware, `translation.activate(lang)` |
 | `djlint/rules.yaml` (45 rules) | HIGH (inspected via Python) | No translatable-text rule |
 | `src/backend/djlint_custom_rules.py` | HIGH (read directly) | Custom H901 rule pattern exists |
-| `pyproject.toml[tool.pytest.ini_options]` | HIGH (read directly) | Markers: unit, integration, seed |
+| `pyproject.toml[tool.pytest.ini_options]` | HIGH (read directly) | Markers: unit, integration, seed, settings, concurrent, slow, real_images, xdist_group |
 | Django `makemessages.add_arguments()` | HIGH (inspected via Python) | 13 flags, no `--check` |
 | Django `compilemessages.add_arguments()` | HIGH (inspected via Python) | 4 flags, no `--check` |
 | Template `{% trans %}` usage (126 matches) | HIGH (grep verified) | 100 unique msgids, 39 in .po |

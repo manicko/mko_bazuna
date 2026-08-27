@@ -33,7 +33,22 @@ This file contains coding standards and rules for the Mko Bazuna project.
 ### Testing Conventions
 
 - **Framework:** pytest-django. Test classes are plain `class TestX:` — do NOT use `django.test.TestCase` or `unittest.TestCase`.
-- **Markers:** Use `pytestmark = [pytest.mark.django_db, pytest.mark.integration]` at module level for DB-backed tests. Use `pytest.mark.unit` for DB-free tests. The `e2e` marker was removed — do not reference it.
+- **Markers:** Pytest-django + pytest-asyncio. Custom markers are registered in `pyproject.toml` under `[tool.pytest.ini_options].markers`. Use `pytestmark` at module level. The fast gate (`make test`) excludes **only** the `seed` marker (`-m "not (seed)"` via `PYTEST_SKIP_MARKERS=seed`); all other markers run in both the fast gate and the full suite (`make test-all` — the `slow` marker is **not** excluded by the fast gate).
+
+  | Marker | Scope / purpose |
+  |---|---|
+  | `unit` | Pure unit tests, no database — runs in the fast gate |
+  | `integration` | Tests that exercise the DB / Django `Client` stack |
+  | `seed` | Nightly-only; invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test`, included in `make test-all` |
+  | `settings` | Import-time settings validation in a subprocess (e.g. `config/settings/tests/test_settings_secrets.py`) |
+  | `concurrent` | Requires `transaction=True` (TRUNCATE per test) — bot tests mutating shared DB state |
+  | `slow` | Individually slow tests (>5 s); **not** excluded by the fast gate |
+  | `real_images` | Opts out of the no-op `ImageGenerator` stub in `apps/seed/tests/conftest.py` to use the real pipeline |
+  | `xdist_group("name")` | Pins tests to a single xdist worker via `--dist loadgroup` (e.g. `"bot_concurrent"`) |
+  | `django_db` (pytest-django) | DB-backed tests; use `transaction=True` when a test needs TRUNCATE isolation (bot tests) |
+  | `asyncio` (pytest-asyncio, strict mode) | Async Telegram bot handlers |
+
+  The `e2e` marker was removed — do not reference it.
 - **Fixtures:** Root `conftest.py` at `src/backend/conftest.py` provides canonical `seller`, `user`, `category`, `city` fixtures. Do NOT redefine these locally — import or use directly. Bot tests under `src/telegram_bot/` have a separate conftest and cannot resolve backend fixtures.
 - **Ad creation:** Use `from conftest import create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)` — it sets status-specific timestamps automatically. Add `status=AdStatus.PUBLISHED` explicitly if the test requires it.
 - **Backdating `created_at`:** `create_test_ad` cannot backdate `created_at` (auto_now_add=True). Use: `ad = create_test_ad(...)` then `Ad.objects.filter(pk=ad.pk).update(created_at=...)` then `ad.refresh_from_db()`.

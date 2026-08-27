@@ -130,7 +130,7 @@ docs/
 ## Commands
 | Task | Command |
 |------|---------|
-| Run tests | `uv run pytest <path>` |
+| Run tests | `make test` |
 | Lint | `uv run ruff check <path>` |
 | Type check | `uv run basedpyright <path>` |
 | Add dependency | `uv add <package>` |

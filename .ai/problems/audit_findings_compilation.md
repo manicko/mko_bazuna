@@ -150,7 +150,7 @@
 |---|---|
 | `apps/ads/tests/test_ad_image_service.py` | `from django.test import TestCase` |
 | `apps/media/tests/test_save_photo_exif.py` | `from django.test import TestCase` |
-| `apps/media/tests/test_media_security.py` | `from django.test import TestCase` |
+| `apps/ads/tests/test_media_security.py` | `from django.test import TestCase` |
 | `apps/moderation/tests/test_auto_moderation.py` | `from django.test import TestCase` (in `TestValidate*` classes) |
 | `apps/moderation/tests/test_priority_service.py` | `from django.test import TestCase` |
 | `apps/moderation/tests/test_priority.py` | `from django.test import TestCase` |
