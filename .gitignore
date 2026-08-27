@@ -231,3 +231,6 @@ src/backend/apps/seed/fixtures/images/*.png
 media/seed/
 
 .playwright-mcp/*
+
+# Gunicorn runtime (sockets, PID files, logs)
+.gunicorn/
