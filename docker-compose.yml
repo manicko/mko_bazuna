@@ -32,7 +32,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
+    command: bash -c "python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())' && python src/backend/manage.py setup_search_triggers && python src/backend/manage.py load_exchange_rates"
     depends_on:
       db:
         condition: service_healthy

@@ -29,6 +29,33 @@ from apps.users.models import User
 
 
 # ---------------------------------------------------------------------------
+# Schema restoration — pytest-django creates the test DB from model
+# introspection (MIGRATION_MODULES=None), so migration RunSQL/seed data that
+# creates triggers and currency rows is skipped. This autouse fixture runs
+# after django_db_setup and restores that schema/data so the test DB mirrors
+# production.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
+    """Restore trigger DDL + seed data that MIGRATION_MODULES=None skips.
+
+    Runs after pytest-django creates the test DB (via django_db_setup).
+    Temporarily unblocks the pytest-django DB access blocker so the commands
+    can run during session setup (even for unit-only tests that lack the
+    ``django_db`` marker).
+    Idempotent: safe to run even when migrations are active (after squash
+    without MIGRATION_MODULES).
+    """
+    from django.core.management import call_command
+
+    with django_db_blocker.unblock():
+        call_command("load_exchange_rates")
+        call_command("setup_search_triggers")
+
+
+# ---------------------------------------------------------------------------
 # Generic model fixtures (safe to override per-module)
 # ---------------------------------------------------------------------------
 
