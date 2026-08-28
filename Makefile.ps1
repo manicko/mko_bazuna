@@ -45,7 +45,7 @@ function Show-Help {
     Write-Host "  up             Start dev environment (web on :8000, hot-reload) + test DB on :5433"
     Write-Host "  down           Stop and remove containers"
     Write-Host "  build          Rebuild Docker images without cache"
-    Write-Host "  test           Run fast test gate: skips nightly 'seed' suite (~55s vs ~35min full); auto-starts test DB"
+    Write-Host "  test           Run fast test gate: skips nightly 'seed' suite (~90s vs ~35min full); auto-starts test DB"
     Write-Host "  test-all       Run complete suite (includes nightly 'seed' tests, ~35min)"
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"

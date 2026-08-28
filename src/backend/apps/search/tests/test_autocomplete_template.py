@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.unit]
 # Module-level template content (loaded once, like setUpClass)
 # ---------------------------------------------------------------------------
 
-_TEMPLATES_DIR = Path("src/backend/templates")
+_TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "templates"
 
 _HEADER_CATALOG_CONTENT = (
     (_TEMPLATES_DIR / "components/header_catalog.html")

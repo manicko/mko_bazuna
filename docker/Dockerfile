@@ -153,3 +153,16 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+
+
+################################################################################
+# STAGE 3: Test Runtime — dev dependencies for the test container.
+# Inherits the production venv from `runtime` and adds the [tool.uv] dev
+# dependency group (pytest, pytest-django, ruff, basedpyright) so
+# entrypoint-test.sh's `uv sync --group dev` is a fast audit (<2s) instead
+# of a cold install (25-29s). Production `runtime` stage stays --no-dev.
+################################################################################
+FROM runtime AS test-runtime
+ENV UV_COMPILE_BYTECODE=1
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --group dev

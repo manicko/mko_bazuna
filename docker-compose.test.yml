@@ -47,6 +47,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      target: test-runtime
     command: /app/entrypoint-test.sh
     init: true
     depends_on:

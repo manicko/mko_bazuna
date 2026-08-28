@@ -491,21 +491,21 @@ class TestFilterUrlReset:
 
     def test_form_uses_request_path_not_empty(self) -> None:
         """``filter_form.html`` must use ``hx-get="{{ request.path }}"``, not ``hx-get=""``."""
-        path = Path("src/backend/templates/ads/partials/filter_form.html").resolve()
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
         content = path.read_text(encoding="utf-8")
         assert 'hx-get="{{ request.path }}' in content
         assert 'hx-get=""' not in content
 
     def test_all_htmx_links_have_push_url(self) -> None:
         """Every ``hx-get`` link in ``ad_list.html`` must also carry ``hx-push-url="true"``."""
-        path = Path("src/backend/templates/ads/partials/ad_list.html").resolve()
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         content = path.read_text(encoding="utf-8")
         assert content.count("hx-get=") == 9
         assert content.count('hx-push-url="true"') == 9
 
     def test_clear_all_filters_has_push_url(self) -> None:
         """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
-        path = Path("src/backend/templates/ads/partials/ad_list.html").resolve()
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         content = path.read_text(encoding="utf-8")
         assert 'hx-push-url="true"' in content
         assert 'hx-get="?page=1' in content

@@ -134,8 +134,7 @@ def test_detail_template_uses_bot_username_not_settings() -> None:
     """The rendered template variable name is ``bot_username``, not
     ``settings.BOT_USERNAME``."""
     content = (
-        Path("src/backend/templates/ads/detail.html")
-        .resolve()
+        (Path(__file__).resolve().parents[3] / "templates/ads/detail.html")
         .read_text(encoding="utf-8")
     )
     assert "{{ bot_username }}" in content
@@ -147,8 +146,7 @@ def test_detail_template_uses_bot_username_not_settings() -> None:
 # ---------------------------------------------------------------------------
 
 _BREADCRUMB_CONTENT = (
-    Path("src/backend/templates/components/breadcrumb.html")
-    .resolve()
+    (Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html")
     .read_text(encoding="utf-8")
 )
 
