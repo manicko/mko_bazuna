@@ -237,3 +237,7 @@ media/seed/
 
 # PostgreSQL backup dumps — may contain PII from `make backup`
 backups/
+# Test profiling temp files (also dockerignored via F05)
+scripts/_tmp_pytest_run.txt
+scripts/_tmp_pytest_out.txt
+scripts/session_context.json

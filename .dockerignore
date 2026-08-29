@@ -67,3 +67,22 @@ scripts/seed-images-config.json
 
 # Local database backups — may contain PII from `make backup`
 backups/
+# Stray debug/profiling artifacts (git-tracked, but must not enter build context)
+cat_output.txt
+neq
+Continue
+cmp_css.py
+
+# Local pipx/pyenv user installs
+.local/
+
+# Test profiling temp files (git-tracked — also gitignored via F05)
+scripts/_tmp_pytest_run.txt
+scripts/_tmp_pytest_out.txt
+scripts/session_context.json
+
+# Playwright MCP browser/runtime artifacts
+.playwright-mcp/
+
+# Nginx configs — bind-mounted at runtime, never needed in build context
+docker/nginx/
