@@ -232,3 +232,40 @@ docker compose --project-name mko-bazuna-dev up -d db && \
 make test            # fast gate; "Compiling translations..." completes instantly; test_mo_files_exist green
 make compilemessages # <5 s
 ```
+
+---
+
+## 9. Post-Plan Additions (executed during implementation)
+
+During execution, a Researcher agent was launched to study modern practices for git-worktree handling in `compilemessages`. Findings (verified on disk) led to two additions beyond the original T1/T2 scope:
+
+### T1b / T2b — `--ignore=.kilo` (exclude git worktrees)
+
+**Rationale:** The repository has a git worktree at `.kilo/worktrees/accidental-bus/` (branch `accidental-bus`) containing its own `src/backend/locale/{ru,en,bs}/LC_MESSAGES/django.po`. The bind mount `.:/app` includes these worktree locale files. Without `--ignore=.kilo`, `compilemessages` compiles stale `.po` files from other branches.
+
+**Changes:** Added `--ignore=.kilo` to both `docker/entrypoint.sh` `compile_messages()` (T1) and the `Makefile` `compilemessages` target (T2), inserted immediately after `--ignore=.git` for consistency. Django's `--ignore` matches directory basenames at any depth via `is_ignored_path`, so `--ignore=.kilo` correctly prunes all worktree subdirectories.
+
+**Verification:** `make test` output confirmed only 3 `.po` files from `src/backend/locale/{ru,en,bs}` are compiled — zero `.kilo/` paths appear in the compile output.
+
+### T4 — `.kilo/` added to `.dockerignore` (build-time gap)
+
+**Rationale:** The Researcher found the Dockerfile's builder-stage `compilemessages` (`docker/Dockerfile:78`) runs without `--ignore` flags. The `COPY . .` at builder line 57 copies the entire build context (including `.kilo/` worktrees) because `.kilo/` was missing from `.dockerignore`. During `docker build`, stale worktree `.po` files would be compiled.
+
+**Change:** Added `.kilo/` to `.dockerignore` in the Git and CI section (after `.gitignore`). This excludes worktrees from the build context entirely — cleaner than adding `--ignore` flags to the Dockerfile, and also reduces build context size.
+
+**Scope note:** `.dockerignore` affects only `docker build`, not bind-mounted test/dev containers (which bypass `.dockerignore`). The runtime entrypoint.sh `--ignore=.kilo` handles the bind-mount case.
+
+### V1 — Verification Results
+
+| Check | Result |
+|---|---|
+| V1 startup timing | Sub-second — "Compiling translations..." → file output → next step, no hang |
+| V2 only project locales | Only `ru`, `en`, `bs` compiled (3 `.po` from `src/backend/locale/`) |
+| V4 `.venv` not walked | No `/app/.venv/` paths in output |
+| V4b `.kilo` not walked | No `/app/.kilo/` paths in output (after T1b/T2b) |
+| Regression (.mo contract) | `1102 passed, 1 skipped` — `test_mo_files_exist` green |
+| V6 non-fatal fallback | `|| echo "WARNING..."` fallback preserved in code |
+
+### T3 (optional) — Skipped
+
+T3 (volume shadow of `.venv`) is optional per the plan ("T1 + T2 alone fully resolve the hang"). With `--ignore=.venv` and `--ignore=.kilo` now in both entrypoint.sh and Makefile, the compilemessages walk is fully pruned. No defense-in-depth action required.

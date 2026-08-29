@@ -150,7 +150,9 @@ makemessages:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemessages -l ru -l bs -l en --no-location
 
 compilemessages:
-	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py compilemessages
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py compilemessages \
+		--ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+		--locale ru --locale bs --locale en
 
 create-admin:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py create_admin_user \

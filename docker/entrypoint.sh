@@ -72,7 +72,9 @@ wait_for_redis() {
 # prevent the container from starting (falls back to English msgids).
 compile_messages() {
     echo "Compiling translations..."
-    /opt/venv/bin/python /app/src/backend/manage.py compilemessages 2>/dev/null \
+    /opt/venv/bin/python /app/src/backend/manage.py compilemessages \
+        --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+        --locale ru --locale bs --locale en 2>/dev/null \
         || echo "WARNING: compilemessages failed (non-fatal, falling back to msgid strings)"
 }
 
