@@ -15,7 +15,7 @@ wait_for_db
 wait_for_redis
 
 # Verify fixture JPEGs exist before running seed (Git ignores *.jpg fixtures)
-FIXTURES_IMAGES_DIR=$(uv run python -c "from apps.seed.paths import FIXTURES_IMAGES_DIR; print(FIXTURES_IMAGES_DIR)" 2>/dev/null || echo "")
+FIXTURES_IMAGES_DIR=$(/opt/venv/bin/python -c "from apps.seed.paths import FIXTURES_IMAGES_DIR; print(FIXTURES_IMAGES_DIR)" 2>/dev/null || echo "")
 if [ -z "$FIXTURES_IMAGES_DIR" ]; then
     echo "ERROR: Cannot resolve FIXTURES_IMAGES_DIR — ensure Django app paths are importable" >&2
     exit 1
@@ -29,6 +29,6 @@ if [ "$JPEG_COUNT" -eq 0 ]; then
 fi
 echo "Found $JPEG_COUNT fixture image(s) in $FIXTURES_IMAGES_DIR — proceeding with seed" >&2
 
-exec uv run python src/backend/manage.py seed --force \
+exec /opt/venv/bin/python src/backend/manage.py seed --force \
     --users "${SEED_USERS:-10}" \
     --ads "${SEED_ADS:-600}"

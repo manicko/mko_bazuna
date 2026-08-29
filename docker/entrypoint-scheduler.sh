@@ -18,7 +18,7 @@ check_env_file
 
 echo "Scheduler starting (hourly + daily loop)..."
 
-exec uv run python -c "
+exec /opt/venv/bin/python -c "
 import time
 import subprocess
 import sys

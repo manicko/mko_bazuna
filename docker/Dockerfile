@@ -106,9 +106,7 @@ WORKDIR /app
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
 # Copy tailwindcss binary from builder (needed for dev mode CSS generation)
 COPY --from=builder /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
-# Copy uv binary from builder (needed for dev mode `uv run` commands and entrypoint scripts)
-COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
-COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
+# uv/uvx only needed in test-runtime for `uv sync`; runtime entrypoints use /opt/venv/bin/python directly
 
 # Copy source code (Django apps, config, telegram_bot)
 COPY --from=builder --chown=app:app /app/src /app/src
@@ -163,6 +161,8 @@ CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers
 # of a cold install (25-29s). Production `runtime` stage stays --no-dev.
 ################################################################################
 FROM runtime AS test-runtime
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=builder /usr/local/bin/uvx /usr/local/bin/uvx
 ENV UV_COMPILE_BYTECODE=1
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --group dev

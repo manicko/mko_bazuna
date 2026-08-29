@@ -14,4 +14,4 @@ fix_volume_permissions
 wait_for_db
 wait_for_redis
 
-exec uv run python src/backend/manage.py load_catalog --no-rewrite
+exec /opt/venv/bin/python src/backend/manage.py load_catalog --no-rewrite

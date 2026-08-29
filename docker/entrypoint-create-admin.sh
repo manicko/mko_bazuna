@@ -21,7 +21,7 @@ if [ -z "${ADMIN_PASSWORD}" ]; then
 fi
 
 # Run the create_admin_user command with environment variables
-exec uv run python src/backend/manage.py create_admin_user \
+exec /opt/venv/bin/python src/backend/manage.py create_admin_user \
     --username "${ADMIN_USERNAME:-admin}" \
     --password "${ADMIN_PASSWORD}" \
     --telegram-id "${ADMIN_TELEGRAM_ID:--1}"
