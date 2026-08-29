@@ -241,3 +241,8 @@ backups/
 scripts/_tmp_pytest_run.txt
 scripts/_tmp_pytest_out.txt
 scripts/session_context.json
+
+# Python tool cache directories (F12 — missing from .gitignore)
+.profile_default/
+.pdbrc
+.python-eggs/

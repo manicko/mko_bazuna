@@ -86,3 +86,42 @@ scripts/session_context.json
 
 # Nginx configs — bind-mounted at runtime, never needed in build context
 docker/nginx/
+
+# Compiled translations — stale .mo files may be baked in if compilemessages fails
+*.mo
+*.pot
+
+# Git config — irrelevant inside container
+.gitattributes
+
+# Python version pin — consumed by pyenv locally, base image provides Python
+.python-version
+
+# Python tool cache directories (defense-in-depth for local dev artifacts)
+.tox/
+.nox/
+.pyre/
+.pytype/
+__pypackages__/
+.profile_default/
+.pdbrc
+.python-eggs/
+
+# PyInstaller artifacts (defensive — may appear from builds)
+*.manifest
+*.spec
+
+# Test/coverage artifacts — test execution metadata should not be in images
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# Runtime state — PID files, Redis persistence, Gunicorn runtime state
+celerybeat-schedule
+celerybeat.pid
+*.rdb
+*.aof
+*.pid
+.gunicorn/
