@@ -61,3 +61,9 @@ docs/
 
 # Node.js (if present in context)
 node_modules/
+
+# Seed photo API keys — gitignored but must also be dockerignored
+scripts/seed-images-config.json
+
+# Local database backups — may contain PII from `make backup`
+backups/
