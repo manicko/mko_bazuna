@@ -85,7 +85,7 @@ any → `DELETED`.
 
 ## Key tables
 
-`users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `ad_features`, `cities`, `ad_images`, `exchange_rates`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`, `consent_records`.
+`users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `category_listing_conditions`, `ad_features`, `cities`, `ad_images`, `exchange_rates`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`, `consent_records`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
 - Search index: `GinIndex IX_ads_search_gin`
@@ -98,7 +98,7 @@ UI/UX patterns are documented in [`ui-patterns.md`](ui-patterns.md):
 - **Card-Based Ad Display:** Image, title, price, location hierarchy for quick scanning
 - **Price Display:** Prominent `text-blue-600` styling
 - **Contact Seller Button:** Deep-link to Telegram bot, anonymity-preserving
-- **Image Gallery:** 1-5 Telegram photos in responsive grid with GLightbox v3.3.1 fullscreen overlay
+- **Image Gallery:** Slider gallery (main image + horizontal thumbnail strip + arrow nav) with GLightbox v3.3.1 fullscreen overlay; consent-gated
 - **Shared Navigation Headers:** Two variants — catalog header (list/detail, now includes auth/cabinet entry + favorites badge) and auth header (dashboards)
 - **Touch Target Guidelines:** 44px minimum for interactive elements
 - **Progressive Disclosure:** Truncated descriptions, empty states, HTMX pagination
@@ -164,7 +164,7 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Search Autocomplete** | Hybrid autocomplete from user history, popular searches, and entity matching | `PopularSearch`, `SearchHistory`, `SavedSearch`, `AutocompleteView`, rate limiting |
 | **Saved Search Alerts** | Buyers save search queries and receive notifications when matching ads appear | `SavedSearch`, `SavedSearchNotification`, `AlertQueryService` |
 | **Filter UI** | Sticky sidebar filters (desktop), slide-up drawer (mobile), removable filter chips, hierarchical category tree, closed-list city selector, and price range inputs with HTMX partial updates | [`filter-ui.md`](filter-ui.md), `CategoryFilterForm`, query params `category`/`city`/`price_min`/`price_max` |
-| **Catalog Filters & Sorting** | New buyer filter dimensions `listing_purpose` (single-select) and `features` (multi-select, OR semantics) with category-constrained option resolution; price filter/sort on `price_normalized_eur` with `NULLS LAST` and a `-rank, -published_at, -id` relevance tiebreaker | [`filter-ui.md`](filter-ui.md), [`search-patterns.md`](search-patterns.md), `Ad.listing_purpose`, `Ad.features`, `AdFeature`, `IX_ads_pub_purpose`, `IX_ad_features_feature_id`, query params `listing_purpose`/`features` |
+| **Catalog Filters & Sorting** | Buyer filter dimensions: `listing_purpose` (single-select), `listing_condition` (single-select), `features` (multi-select, AND semantics) — all category-constrained via `CategoryLookupResolver`; price filter/sort on `price_normalized_eur` with `NULLS LAST` and a `-rank, -published_at, -id` relevance tiebreaker | [`filter-ui.md`](filter-ui.md), [`search-patterns.md`](search-patterns.md), `Ad.listing_purpose`, `Ad.listing_condition`, `Ad.features`, `AdFeature`, `IX_ads_pub_purpose`, `IX_ad_features_feature_id`, query params `listing_purpose`/`listing_condition`/`features` |
 | **Multi-Currency Price Model** | Sellers set an original amount + currency (EUR/RSD/BAM); ads store `price_amount`, `price_currency`, and a derived `price_normalized_eur` (EUR) used for all cross-currency filter/sort. Current exchange rates live in `exchange_rates`; normalization is centralized in `PriceNormalizer` (cached current-rate lookup) and re-derivable via the `recompute_normalized_prices` command. Legacy `price` (BAM) backfilled ×0.512 on migration | `apps/currencies` app (`CurrencyCode`, `ExchangeRate`, `PriceNormalizer`, `recompute_normalized_prices`), `Ad.price_amount`/`price_currency`/`price_normalized_eur`, `IX_ads_price_normalized_eur`, [`db-schema.md`](../02-database/db-schema.md), [`db-enums.md`](../02-database/db-enums.md), [`db-indexes.md`](../02-database/db-indexes.md) |
 | **Trust Signals** | Seller trust scoring, verification, and badge display | `SellerTrustScore`, `SellerVerification`, `TrustCalculator`, trust badges |
 | **Enhanced Moderation** | Priority-based moderation queue with scoring and analytics | `AdModerationPriority`, `PriorityCalculator`, `ModerationAnalytics` |
@@ -182,17 +182,23 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 | Spec | Problem | Status |
 |------|---------|--------|
 | **09** | Category and City names not rendered in selected language (templates call `.get_name` without `LANGUAGE_CODE`; autocomplete uses raw `.name`; submenu cache key omits language) | [Complete](.ai/problems/09_category-city-i18n_rendering_spec.md) — plan 34 |
-| **10** | Image display: catalog grid images cropped/stretched via `object-cover`; detail page missing slider/thumbnail-strip gallery | [Approved](.ai/problems/10_image-display_spec.md) |
-| **11** | Non-idempotent seed on repeated `docker compose up`: orphaned seed users cause `IntegrityError`; generation phase not transactional | [Approved](.ai/problems/11_seed-dev-idempotency_spec.md) |
-| **12** | `new`/`used` modeled as mutually-exclusive `listing_feature` M2M entries; seed+bot can assign both simultaneously, creating invalid ads | [Approved](.ai/problems/12_new-used-condition-mutual-exclusivity_spec.md) — 6 PO decisions confirmed, DoR met, implementation in progress |
+| **10** | Image display: catalog grid uses `object-contain` (was `object-cover`); detail page has slider/thumbnail-strip gallery with GLightbox | [Complete](.ai/problems/10_image-display_spec.md) |
+| **11** | Non-idempotent seed on repeated `docker compose up`: orphaned seed users cause `IntegrityError`; generation phase not transactional | [Complete](.ai/problems/11_seed-dev-idempotency_spec.md) |
+| **12** | `new`/`used` modeled as `listing_feature` M2M entries; seed+bot can assign both simultaneously | [Complete](.ai/problems/12_new-used-condition-mutual-exclusivity_spec.md) — 6 PO decisions confirmed, DoR met, implementation complete |
 | **14** | `compilemessages` hangs at Docker container startup: `entrypoint.sh` runs `compilemessages` from `/app` CWD, but the `.:/app` bind mount exposes the host `.venv` (6,225 dirs / 1,264 `.po` files); Django's `compilemessages` has no default ignore patterns (unlike `makemessages`), so it walks the entire `.venv` tree. Dev + test only; production unaffected. | [Approved](.ai/problems/14_compilemessages-docker-hang_spec.md) — fix: add `--ignore=.venv --ignore=.git --ignore=__pycache__ --ignore=*.pyc` to `compile_messages()` in `docker/entrypoint.sh` + `Makefile` `compilemessages` target |
-| **35** | CI i18n pipeline gap: dedicated `i18n` CI job missing; `.mo` compilation not in CI test job | [Complete](.ai/problems/35_i18n-pipeline-ci-gap_plan.md) — plan 35 |
+| **35** | CI i18n pipeline gap: dedicated `i18n` CI job missing; `.mo` compilation not in CI test job | [Complete](.ai/plans/done/35_i18n-pipeline-ci-gap_plan_DONE.md) — plan 35 |
 
 ## Commands
 
 | Task | Command |
 |------|---------|
 | Tests | `make test` |
+| Full suite (incl. seed) | `make test-all` |
+| Fresh schema | `make test-recreate` |
+| Clean stale test DBs | `make test-clean-db` |
 | Lint | `uv run ruff check <path>` |
+| Template lint | `uv run djlint src/backend/templates/` |
 | Type check | `uv run basedpyright <path>` |
+| i18n extract | `make makemessages` |
+| i18n compile | `make compilemessages` |
 | Add dep | `uv add <package>` |

@@ -58,7 +58,7 @@ does **not** match reality, and one consequence follows from it:
 - `src/backend/locale/{ru,en,bs}/LC_MESSAGES/django.{po,mo}` — `ru`/`bs` have
   0 empty `msgstr` (non-header); `en` follows Django convention (empty `msgstr`).
 - `.gitignore:55` — `*.mo` excluded from VCS.
-- `Makefile:146-150` — `makemessages` / `compilemessages` targets.
+- `Makefile:167-171` — `makemessages` / `compilemessages` targets.
 - `docker/Dockerfile:78`, `docker/entrypoint.sh:73-87`,
   `docker/entrypoint-test.sh:37` — `compilemessages` in build/runtime/test
   entrypoints.
@@ -86,7 +86,7 @@ does **not** match reality, and one consequence follows from it:
 | `.mo` compiled | Present on disk; gitignored | `.gitignore:55`; `ls locale/*/LC_MESSAGES/*.mo` |
 | Completeness tests | 4 tests in `test_i18n_completeness.py`; 3 in `test_i18n_pipeline.py`; all `@pytest.mark.unit` | `apps/ads/tests/test_i18n_completeness.py:30`; `apps/ads/tests/test_i18n_pipeline.py:24` |
 | CI workflow | 5 jobs: `build`, `test`, `lint`, `typecheck`, `lint-templates` — **no `i18n` job** | `.github/workflows/ci.yml` |
-| Makefile | `makemessages` / `compilemessages` targets present | `Makefile:146-150` |
+| Makefile | `makemessages` / `compilemessages` targets present | `Makefile:167-171` |
 | `catalog_js_labels` | Pre-translated context vars consumed by inline JS | `apps/core/context_processors.py:78-86`; `templates/components/header_catalog.html:184` |
 | `Http404` messages | Left untranslated (not user-facing) | `apps/ads/views/listings.py:71,119,160,174` |
 | `feature_tag.html` | DB-based i18n (`get_lookup_name`) — separate path | `templates/analytics/...` / `apps/lookups/models.py` |

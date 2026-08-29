@@ -201,21 +201,23 @@ class AdSort(StrEnum):
 
 Related user stories: US-B2
 
-## Listing Purpose & Features Filters
+## Listing Purpose, Condition & Features Filters
 
 Two additional filter dimensions apply to both listings and search, narrowing the result set before
 sorting/FTS ranking:
 
 - **`listing_purpose`** — single-select exact match on `Ad.listing_purpose__slug`.
-- **`features`** — multi-select with **OR** semantics: an ad must match *any*
+- **`listing_condition`** — single-select exact match on `Ad.listing_condition__slug`.
+- **`features`** — multi-select with **AND** semantics: an ad must match *all*
   of the selected `features__slug` values (correlated `EXISTS` subquery over the
   `AdFeature` through model with an `IN` clause — not a chaining `.filter()` per
   feature). Unrecognized slugs match nothing (empty result set).
 
 Options are category-constrained: when a category is active, the dropdown/checkboxes resolve via
-`CategoryLookupResolver.get_resolved_purposes()` / `get_resolved_features()`; otherwise the full
-active lookup set is shown. The current selections (`current_listing_purpose` / `current_features`)
-drive the active-filter chips and are preserved across pagination URLs.
+`CategoryLookupResolver.get_resolved_purposes()` / `get_resolved_conditions()` /
+`get_resolved_features()`; otherwise the full active lookup set is shown. The current selections
+(`current_listing_purpose` / `current_listing_condition` / `current_features`) drive the active-filter
+chips and are preserved across pagination URLs.
 
 Full UI markup (form controls, chips, clear-all, pagination URL preservation) lives in
 [`filter-ui.md`](filter-ui.md).

@@ -49,8 +49,9 @@ The two active groups (see [db-enums.md > LookupGroupCode](db-enums.md)):
 
 | `LookupGroupCode` | Role |
 |---|---|
-| `LISTING_PURPOSE` | Listing purposes — single-select per ad (e.g. `sell`, `new`) |
-| `LISTING_FEATURE` | Listing features — multi-select, OR-semantics (e.g. `urgent`, `premium`) |
+| `LISTING_PURPOSE` | Listing purposes — single-select per ad (e.g. `sell`, `buy`) |
+| `LISTING_CONDITION` | Listing condition — single-select per ad (e.g. `new`, `used`) (Plan 12) |
+| `LISTING_FEATURE` | Listing features — multi-select, AND-semantics (e.g. `urgent`, `premium`) |
 
 `apps.lookups.services.cache_service.LookupCacheService` caches `get_all_groups()`
 (`lookup:all_groups`, 1 h TTL, prefetched items) and `get_active_items(group_code)`
@@ -65,16 +66,18 @@ The two active groups (see [db-enums.md > LookupGroupCode](db-enums.md)):
 - **`CategoryPath`** — multi-parent navigation (alternative parent routes). `is_automatic`
   marks system-created paths (e.g. price=0 → Charity).
 - **`CategoryListingPurpose`** — binds a `LookupItem` (group=`LISTING_PURPOSE`) to a category,
-  with `is_default`; unique on `(category, purpose)`.
+   with `is_default`; unique on `(category, purpose)`.
 - **`CategoryListingFeature`** — binds a `LookupItem` (group=`LISTING_FEATURE`) to a category;
-  unique on `(category, feature)`.
+   unique on `(category, feature)`.
+- **`CategoryListingCondition`** — binds a `LookupItem` (group=`LISTING_CONDITION`) to a category;
+   unique on `(category, condition)`. Single-select per ad (Plan 12).
 
 These through-tables are the data source for the resolver. `Ad` references them via
 `listing_purpose` (single FK) and `features` (M2M through `AdFeature` with `sort_order`).
 `Ad.category_name` is a trigger-synced denormalization (see [db-schema.md](db-schema.md)).
 
 The catalog manifest (`categories/catalog/categories.yaml`) declares the 9 listing purposes,
-19 listing features, the multi-level category tree
+listing conditions (new, used, etc.), 19 listing features, the multi-level category tree
 (real-estate / transport / goods / animals / services-jobs / business / charity), and the
 multi-parent `category_paths`.
 
@@ -87,7 +90,7 @@ the closest ancestor that has them, issuing a single through-table query per res
 
 | Method | Behavior |
 |---|---|
-| `get_resolved_purposes(category)` / `get_resolved_features(category)` | Resolved bindings |
+| `get_resolved_purposes(category)` / `get_resolved_features(category)` / `get_resolved_conditions(category)` | Resolved bindings |
 | `get_resolved_*_codes(...)` | Same, returning codes only |
 
 **Caching:** results are memoized per category in the shared cache
@@ -121,7 +124,7 @@ CLI: `management.commands.load_catalog` (`--config`, `--no-rewrite`).
 |---|---|---|---|
 | Tree version | `category:tree_version` (atomic counter) | — | Category / CategoryPath save+delete |
 | Submenu fragment | `category:submenu:<version>:<slug>:<locale>` | 300 s | tree-version bump; `:<locale>` segment prevents cross-language cache bleed |
-| Resolver result | `lookup:resolved_<purposes\|features>:<id>` | 300 s | category/binding/lookup-item changes |
+| Resolver result | `lookup:resolved_<purposes\|features\|conditions>:<id>` | 300 s | category/binding/lookup-item changes |
 | Lookup group/item | `lookup:all_groups`, `lookup:active_items:<code>` | 3600 s | LookupGroup/LookupItem save+delete |
 
 The tree version (`apps.categories.cache`) is an atomically-incremented counter
@@ -146,12 +149,14 @@ Signal handlers keep caches and tree state in sync (registered in each app's `ap
 
 - `Ad.listing_purpose` — FK to `LookupItem` (group=`LISTING_PURPOSE`); resolved via the resolver
   at publish time and referenced by the filter UI (single-select).
+- `Ad.listing_condition` — FK to `LookupItem` (group=`LISTING_CONDITION`); single-select per ad
+  (Plan 12). Resolved via the resolver; referenced by the filter UI (single-select dropdown).
 - `Ad.features` — M2M to `LookupItem` (group=`LISTING_FEATURE`) through `AdFeature` (with
-   `sort_order`); an ad carries 0..N features, filtered with OR-semantics (an ad
-   matches if it has at least one of the selected features).
+   `sort_order`); an ad carries 0..N features, filtered with **AND-semantics** (an ad must possess
+   *all* selected features).
 - Buyer filters (see [filter-ui.md](../01-spec/filter-ui.md)) resolve options through the
-  resolver, so a category subtree shows only the features/purposes defined by the nearest
-  explicit ancestor along the active navigation path.
+  resolver, so a category subtree shows only the features/purposes/conditions defined by the
+  nearest explicit ancestor along the active navigation path.
 - **Rendering:** feature tags are displayed via the `components/feature_tag.html` partial
   (DB-based i18n via `get_lookup_name`); on the detail page, features are scoped to
   category-appropriate items through the MPTT-ancestor resolver. See

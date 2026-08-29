@@ -33,16 +33,18 @@ details live in sibling files: [db-indexes.md](db-indexes.md) and [db-enums.md](
 ### Top-level relationships
 ```
 users ── ads ──┬── categories
-               │      └── category_paths
-               │      └── category_listing_purposes ── lookup_items
-               │      └── category_listing_features ── lookup_items
-               ├── cities
-               ├── ad_images
-               └── ad_features ── lookup_items
+                │      └── category_paths
+                │      └── category_listing_purposes ── lookup_items
+                │      └── category_listing_features ── lookup_items
+                │      └── category_listing_conditions ── lookup_items
+                ├── cities
+                ├── ad_images
+                └── ad_features ── lookup_items
 
 lookups ── lookup_groups ── lookup_items
                 └── category_listing_purposes
                 └── category_listing_features
+                └── category_listing_conditions
                 └── ad_features
 ```
 (`category_attributes`/`ad_attribute_values` and `tags`/`ad_tags` are out of phase 1 scope.)
@@ -67,6 +69,7 @@ telegram_premium (BOOL, default False)    # Telegram Premium subscription status
 consent_given_at (TIMESTAMP, nullable)    # US-A8 / decision F
 consent_revoked_at (TIMESTAMP, nullable)    # Phase 3: triggers immediate soft-delete cascade
 created_at (TIMESTAMP)
+source (StrEnum: TELEGRAM | SEED, default TELEGRAM)  # account creation origin (bot login vs. seed-generated)
 ```
 
 > Account State Separation (O1/R4): Three independent states:
@@ -133,10 +136,11 @@ price_currency (VARCHAR(3), nullable)             # original currency (CurrencyC
 price_normalized_eur (DECIMAL(12,4), nullable)    # derived EUR-normalized value for cross-currency filter/sort; not user-editable (indexed)
 category_id (FK → categories.id)
 listing_purpose_id (FK → lookup_items.id, nullable)  # resolved via CategoryLookupResolver; group=listing_purpose
+listing_condition_id (FK → lookup_items.id, nullable)  # resolved via CategoryLookupResolver; group=listing_condition (Plan 12)
 city_id (FK → cities.id)
 category_name (VARCHAR, editable=False)             # zone D1 (hybrid C): denormalized RUSSIAN category name; trigger-synced; in search_vector (weight 'C')
 status (StrEnum — see AdStatus)                    # see db-enums.md
-source (StrEnum: TELEGRAM)                         # phase 1 = bot only (decision B)
+source (StrEnum: TELEGRAM | SEED)                   # TELEGRAM = bot source (decision B); SEED = seed-generated demo data
 created_at / updated_at
 published_at (TIMESTAMP, nullable)                 # drives archive/delete timers; UPDATED on every PUBLISHED transition (timer reset)
 original_published_at (TIMESTAMP, nullable)        # set once on FIRST publish; IMMUTABLE, audit only
@@ -238,6 +242,19 @@ db_table: category_listing_features
 ```
 Composite index: `(category_id, feature_id)`. Index: `feature_id`.
 
+### category_listing_conditions
+Binds listing conditions (LookupItem, group=listing_condition) to categories. Used by `CategoryLookupResolver`
+for inherited condition resolution. Single-select per ad (Plan 12).
+```
+id (PK)
+category_id (FK → categories.id)
+condition_id (FK → lookup_items.id, limit_choices_to: group=listing_condition)
+is_default (BOOL, default False)         # auto-selected when seller doesn't choose explicitly
+Unique: (category, condition)
+db_table: category_listing_conditions
+```
+Composite index: `(category_id, condition_id)`. Index: `condition_id`.
+
 ### cities
 ```
 id (PK)
@@ -332,6 +349,7 @@ event_type (StrEnum — see EventType in db-enums.md)
 timestamp (TIMESTAMP, default now)
 user_id (FK → users.id, nullable)    # SET NULL on erasure (zone R5)
 ad_id (FK → ads.id, nullable)        # CASCADE; null for non-ad events
+source (StrEnum: TELEGRAM | SEED, nullable, default NULL)  # event origin; 'SEED' marks seed-generated rows for cleanup
 ```
 Aggregated via ORM; admin/CLI `show_metrics` access.
 
@@ -483,7 +501,7 @@ query (VARCHAR(200), db_index=True)
 query_normalized (VARCHAR(200), db_index=True)
 hit_count (POSITIVE INT, default 1)
 last_seen (TIMESTAMP, auto_now=True)
-
+source (StrEnum: TELEGRAM | SEED, nullable, default NULL)  # 'SEED' marks seed-generated rows for cleanup
 db_table: popular_searches
 ```
 

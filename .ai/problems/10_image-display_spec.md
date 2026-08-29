@@ -2,7 +2,7 @@
 
 **Spec ID:** 10  
 **Created:** 2026-08-24  
-**Status:** Approved (PO decisions collected)  
+**Status:** Complete — implementation verified (glossary: catalog grid uses `object-contain` + `bg-white`; detail page has slider gallery with thumbnail strip, arrow nav, inline Vanilla JS, GLightbox fullscreen on click, consent-gated behind `consent_analytics`)  
 **Source:** Catalog grid images appear cropped/stretched due to `object-cover`; detail page lacks a thumbnail-strip slider.  
 **Spec index:** [docs/01-spec/spec-index.md](docs/01-spec/spec-index.md)  
 

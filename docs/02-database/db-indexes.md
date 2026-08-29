@@ -28,6 +28,9 @@ models.Index(name='IX_ads_pub_listing',
 models.Index(name='IX_ads_pub_purpose',
     fields=['listing_purpose_id'],
     condition=Q(status=AdStatus.PUBLISHED))                 # partial: catalog filter on listing_purpose (F4)
+models.Index(name='IX_ads_pub_condition',
+    fields=['listing_condition_id'],
+    condition=Q(status=AdStatus.PUBLISHED))                 # partial: catalog filter on listing_condition (Plan 12)
 models.Index(name='IX_ads_user_status', fields=['user_id', 'status'])
 models.Index(name='IX_ads_price_normalized_eur',
     fields=['price_normalized_eur'],
@@ -45,7 +48,7 @@ models.Index(name='IX_ads_purge_failed', fields=['status', 'moderation_failed_at
 models.Index(name='IX_ads_rejected_sweep', fields=['status', 'rejected_at'],
     condition=Q(status=AdStatus.REJECTED))                 # REJECTED @90d (zone D4)
 ```
-Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
+Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `listing_condition_id` by `IX_ads_pub_condition`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
 
 ## Indexes — users
 ```python
@@ -186,6 +189,12 @@ models.Index(name='IX_cat_listing_purpose_reverse', fields=['listing_purpose']) 
 ```python
 models.Index(name='IX_cat_listing_feature_composite', fields=['category', 'feature'])
 models.Index(name='IX_cat_listing_feature_reverse', fields=['feature'])  # reverse lookup on deactivation
+```
+
+## Indexes — category_listing_conditions
+```python
+models.Index(name='IX_cat_listing_condition_composite', fields=['category', 'condition'])
+models.Index(name='IX_cat_listing_condition_reverse', fields=['condition'])  # reverse lookup on deactivation
 ```
 
 ## Indexes — ad_features

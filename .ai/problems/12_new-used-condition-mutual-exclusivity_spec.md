@@ -2,7 +2,7 @@
 
 **Spec ID:** 12  
 **Created:** 2026-08-25  
-**Status:** Complete — PO decisions collected (A, B, no-data-preservation, select dropdown, separate ?condition= param, separate chip); implementation in progress.  
+**Status:** Complete — PO decisions collected (A, B, no-data-preservation, select dropdown, separate `?condition=` param, separate chip); implementation verified.
 **Source:** `.ai/problems/Problem_01.md` (Russian) — `new` and `used` are mutually exclusive states currently modeled as generic `LookupItem` M2M features (`listing_feature` group) via `AdFeature` through model; seed/service assigns both simultaneously, creating invalid ads.  
 **Spec index:** [docs/01-spec/spec-index.md](docs/01-spec/spec-index.md) · [db-schema.md](docs/02-database/db-schema.md) · [filter-ui.md](docs/01-spec/filter-ui.md)  
 **Research:** [.ai/reports/02_new-used-condition-research.md](.ai/reports/02_new-used-condition-research.md)

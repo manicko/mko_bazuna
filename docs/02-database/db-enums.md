@@ -34,7 +34,9 @@ Ad lifecycle status. The only buyer-visible status is `PUBLISHED`.
 Transitions are defined in [db-schema.md](db-schema.md).
 
 ## AdSource
-Origin of an ad. Phase 1 accepts ads only via the Telegram bot (decision B).
+Origin of an ad or event. Phase 1 accepts ads via the Telegram bot (TELEGRAM); SEED marks
+auto-generated demo data. The `source` field is also on `users`, `analytics_events`, and
+`PopularSearch` (added in Plan 11/12) to enable direct seed-data cleanup without reverse-FK traversal.
 
 | Value | Meaning |
 |-------|---------|
@@ -184,7 +186,8 @@ Machine-readable codes for built-in lookup groups. Used in model field `limit_ch
 | Value | Meaning |
 |-------|---------|
 | `LISTING_PURPOSE` | `listing_purpose` — what the seller wants to do (sell, buy, rent, etc.) |
-| `LISTING_FEATURE` | `listing_feature` — characteristics of the listing (new, used, urgent, etc.) |
+| `LISTING_CONDITION` | `listing_condition` — condition of the item (new, used, etc.); single-select per ad (Plan 12) |
+| `LISTING_FEATURE` | `listing_feature` — characteristics of the listing (urgent, etc.); multi-select, AND-semantics |
 
 ## ConsentChoice
 User's consent decision recorded in `consent_records.choice` (see [db-schema.md](db-schema.md)).

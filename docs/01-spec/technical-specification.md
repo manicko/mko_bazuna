@@ -211,7 +211,10 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   - `fixtures/word_lists.json` — per-language word lists for template variable interpolation.
   - `fixtures/images/` — ~90 bundled CC0 JPEGs (≤100KB each, EXIF stripped) + `photo_manifest.json`.
 - **Docker Compose integration:** One-shot `seed` service gated by `profiles: ["seed"]`. Follows `create_admin` pattern: `depends_on: migrate (completed)`, environment variables `SEED_USERS`/`SEED_ADS`, mounts `media_volume`. Run with `docker compose --profile seed run --rm seed`.
-- **AdSource:** Seed ads are tagged with `AdSource.SEED = "seed"` for identification and cleanup.
+- **AdSource:** Seed ads, users, analytics events, and popular searches are tagged with
+  `AdSource.SEED` via a `source` field on each model, enabling direct seed-data cleanup
+  (not reverse-FK traversal). Seed generation runs inside a single `transaction.atomic()`
+  block (crash = full rollback); advisory lock ID 110 prevents concurrent runs.
 - **Constraints:** Development-only (never run in production). Deterministic output via `Faker.seed_instance(42)`. No network dependencies at seed time (all resources bundled). Repo size increase ~9MB for photos (no Git LFS needed).
 
 ### S. Category & lookup architecture
@@ -219,10 +222,11 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 A universal reference data system for ad categories and variable attributes, replacing hardcoded fixtures with a config-driven catalog builder.
 
 **Multi-parent navigation** (`CategoryPath`): each category keeps exactly one canonical MPTT parent (unchanged) but can have zero or more alternative parent routes. Categories like "Bicycles" appear under both Transport and Sports & Hobbies through alternative paths. Alternative paths are navigation-only — they do not affect lookup inheritance or canonical category assignment. A special top-level category "Благотворительность" is auto-populated via system-created `CategoryPath` entries when `Ad.price = 0 | NULL`.
-
-**Universal lookup system** (`LookupGroup` + `LookupItem`): variable ad attributes (listing purpose, item condition, features) are managed through a unified lookup system. Two built-in lookup groups ship with the project:
+**Universal lookup system** (`LookupGroup` + `LookupItem`): variable ad attributes (listing purpose, item condition,
+features) are managed through a unified lookup system. Three built-in lookup groups ship with the project:
 - `listing_purpose` — what the seller wants to do (sell, buy, rent, exchange, etc.). Every ad must have exactly one purpose.
-- `listing_feature` — characteristics of the listing (new, used, urgent, with-delivery, etc.). An ad can have 0..N features.
+- `listing_condition` — condition of the item (new, used, etc.). Every ad must have exactly one condition (Plan 12).
+- `listing_feature` — characteristics of the listing (urgent, with-delivery, etc.). An ad can have 0..N features, filtered with AND-semantics.
 
 **Category-lookup bindings** (`CategoryListingPurpose` + `CategoryListingFeature`): M:N through tables that link lookup values to categories. Each category defines which purposes and features are applicable. Inherited via the nearest-explicit-ancestor-wins algorithm: purposes/features defined on a parent category inherit to all MPTT descendants; an explicit definition on a subcategory replaces (not merges) the inherited set.
 
@@ -238,16 +242,17 @@ A universal reference data system for ad categories and variable attributes, rep
 | `apps.lookups` app | `src/backend/apps/lookups/` | LookupGroup, LookupItem models + admin |
 | LookupGroupCode StrEnum | `apps/lookups/enums.py` | Machine-readable group codes |
 | CategoryPath model | `apps/categories/models.py` | Alternative parent routes |
-| Through models | `apps/categories/models.py` | CategoryListingPurpose, CategoryListingFeature |
+| Through models | `apps/categories/models.py` | CategoryListingPurpose, CategoryListingFeature, CategoryListingCondition |
 | CategoryLookupResolver | `apps/categories/services/lookup_resolution.py` | Inheritance resolution with caching |
 | LookupCacheService | `apps/lookups/services/cache_service.py` | Cache layer with signal-based invalidation |
 | Catalog builder | `apps/categories/catalog/builder.py` | YAML-to-DB loader with rename support |
 | Catalog YAML | `apps/categories/catalog/categories.yaml` | Canonical config for tree + lookups + paths |
-| Ad.listing_purpose | `apps/ads/models.py` | Required FK to LookupItem |
-| Ad.features | `apps/ads/models.py` | Optional M2M through AdFeature |
+  | Ad.listing_purpose | `apps/ads/models.py` | Required FK to LookupItem |
+  | Ad.listing_condition | `apps/ads/models.py` | Required FK to LookupItem (Plan 12) |
+  | Ad.features | `apps/ads/models.py` | Optional M2M through AdFeature (AND-semantics) |
 | FileHashService | `apps/media/services/hash_service.py` | SHA-256 computation for photo dedup |
 
-**Schema details:** see [db-schema.md](../02-database/db-schema.md) for `lookup_groups`, `lookup_items`, `category_paths`, `category_listing_purposes`, `category_listing_features`, and `ad_features` tables.
+**Schema details:** see [db-schema.md](../02-database/db-schema.md) for `lookup_groups`, `lookup_items`, `category_paths`, `category_listing_purposes`, `category_listing_features`, `category_listing_conditions`, and `ad_features` tables.
 **Enum details:** see [db-enums.md](../02-database/db-enums.md) for `LookupGroupCode`.
 **Index details:** see [db-indexes.md](../02-database/db-indexes.md) for new indexes on through tables and `ad_images.sha256`.
 

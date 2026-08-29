@@ -25,7 +25,8 @@ Document filter UI patterns for the Mko Bazuna classifieds board. Filters suppor
 
 ## Sticky Sidebar Filters (Desktop)
 
-Desktop users see persistent filter sidebar while browsing results.
+Desktop users see persistent filter sidebar while browsing results, containing category, city,
+price range, listing condition, listing purpose, and features controls.
 
 ### Layout Structure
 
@@ -87,7 +88,7 @@ related user stories: US-B3
 ### Listing Purpose & Features Filters
 
 In addition to category/city/price, the catalog filter form
-(`templates/ads/partials/filter_form.html`) exposes two buyer dimensions driven by the
+(`templates/ads/partials/filter_form.html`) exposes three buyer dimensions driven by the
 `lookup_items` reference-data system. The form submits via `hx-get` to the results container
 (`#ad-list`) with `hx-push-url="true"` so the URL stays synchronized.
 
@@ -99,12 +100,12 @@ In addition to category/city/price, the catalog filter form
 - **`features`** — multi-select checkboxes (`<input type="checkbox" name="features" ...>`,
   one per feature, value = slug). Options resolve via
   `CategoryLookupResolver.get_resolved_features()` (context: `resolved_features` /
-   `current_features`). Selection uses **OR semantics**: an ad must possess *at least
-   one* of the selected features. Filtering is done with a correlated `EXISTS`
-   subquery over the `AdFeature` through model (`ad_id = OuterRef('pk')` joined to
-   the selected slugs via `IN`), which yields OR semantics in a single subquery
-   without JOIN row-multiplication.
-   Repeated `?features=` query params (HTML form convention) carry the multi-selection.
+  `current_features`). Selection uses **AND-semantics**: an ad must possess *all*
+  of the selected features. Filtering is done by annotating each ad with a count of
+  matching feature through-rows and filtering `count = len(selected_slugs)`, which
+  yields AND-semantics (an ad must match every selected feature) without JOIN
+  row-multiplication.
+  Repeated `?features=` query params (HTML form convention) carry the multi-selection.
 
 ```html
 <!-- Listing purpose (single select) -->
@@ -122,7 +123,7 @@ In addition to category/city/price, the catalog filter form
     </select>
 </div>
 
-<!-- Features (multi-select, OR semantics) -->
+<!-- Features (multi-select, AND-semantics) -->
 <div class="mb-6">
     <h3 class="font-semibold mb-3">Features</h3>
     <div class="space-y-2">
@@ -135,6 +136,33 @@ In addition to category/city/price, the catalog filter form
             </label>
         {% endfor %}
     </div>
+</div>
+```
+
+#### Listing Condition Filter
+
+- **`listing_condition`** — single-select dropdown (`<select name="listing_condition">`). Options
+  are resolved for the currently active category via
+  `CategoryLookupResolver.get_resolved_conditions()` (context: `resolved_conditions` /
+  `current_listing_condition`); when no category is selected, the full active `listing_condition`
+  lookup set is shown. Unrecognized/missing slugs match nothing (same "no match" behavior as an
+  unknown city slug). This dimension was introduced in Plan 12 to separate `new`/`used` from the
+  multi-select `features` group (Plan 12).
+
+```html
+<!-- Listing condition (single select) -->
+<div class="mb-6">
+    <h3 class="font-semibold mb-3">Condition</h3>
+    <select name="listing_condition" class="w-full px-3 py-2 border rounded"
+            hx-get="{% url 'ads:list' %}" hx-target="#ad-results" hx-push-url="true">
+        <option value="">All conditions</option>
+        {% for condition in resolved_conditions %}
+            <option value="{{ condition.slug }}"
+                {% if current_listing_condition == condition.slug %}selected{% endif %}
+                {{ condition.get_name }}
+            </option>
+        {% endfor %}
+    </select>
 </div>
 ```
 
@@ -213,6 +241,12 @@ When filters are applied, display them as removable chips above results.
             <a href="?{% url_replace request 'listing_purpose' '' %}" class="ml-2 text-indigo-600 hover:text-indigo-800">✕</a>
         </span>
     {% endif %}
+    {% if current_listing_condition %}
+        <span class="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm">
+            Condition: {{ current_listing_condition_display }}
+            <a href="?{% url_replace request 'listing_condition' '' %}" class="ml-2 text-amber-600 hover:text-amber-800">✕</a>
+        </span>
+    {% endif %}
     {% for feature_slug in current_features %}
         <span class="inline-flex items-center px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm">
             Feature: {{ feature_display }}
@@ -230,6 +264,7 @@ When filters are applied, display them as removable chips above results.
 | City | `bg-green-100` | `text-green-800` | `text-green-600` |
 | Price | `bg-purple-100` | `text-purple-800` | `text-purple-600` |
 | Listing Purpose | `bg-indigo-100` | `text-indigo-800` | `text-indigo-600` |
+| Condition | `bg-amber-100` | `text-amber-800` | `text-amber-600` |
 | Features | `bg-pink-100` | `text-pink-800` | `text-pink-600` |
 
 Related user stories: US-B3
@@ -348,8 +383,8 @@ Option to reset all active filters at once.
 {% endif %}
 ```
 
-The clear-all link drops **all** filter parameters (`listing_purpose`, each `features` value,
-`category`, `city`, price range, `q`) and returns to page 1.
+The clear-all link drops **all** filter parameters (`listing_purpose`, `listing_condition`,
+`features`, `category`, `city`, price range, `q`) and returns to page 1.
 
 ## Pagination URL Preservation
 
@@ -358,16 +393,18 @@ two stays on the same result subset (no divergence from page 1). In addition to 
 `q`/`category`/`city`/`sort`/`min_price`/`max_price`/`page` parameters, pagination URLs carry:
 
 - `listing_purpose=<slug>` when a purpose is selected (dropped when none).
+- `listing_condition=<slug>` when a condition is selected (dropped when none).
 - **Repeated** `features=<slug>` for each selected feature (one query-param per feature, not
-   comma-joined), preserving OR semantics across pages.
+   comma-joined), preserving AND-semantics across pages.
 
 The `sort` parameter is preserved in pagination URLs even while a `q` (full-text) query is active,
 so the user's sort preference is retained across result pages.
 
 ```html
-<!-- Pagination links append the active listing_purpose + each feature -->
+<!-- Pagination links append the active listing_purpose + listing_condition + each feature -->
 <a href="?page=2&category={{ category_slug }}&city={{ city_slug }}&sort={{ current_sort }}
    {% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}
+   {% if current_listing_condition %}&listing_condition={{ current_listing_condition }}{% endif %}
    {% for fslug in current_features %}&features={{ fslug }}{% endfor %}">
    Next
 </a>

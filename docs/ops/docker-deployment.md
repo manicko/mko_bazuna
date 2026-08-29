@@ -383,8 +383,9 @@ directly unless you have set `COMPOSE_PROJECT_NAME` explicitly (see
 | `make test` | Run tests (auto-starts test DB on :5433; uses `--reuse-db`) |
 | `make test-db` | Start long-running test PostgreSQL (port 5433, persistent) |
 | `make test-down` | Stop test environment (preserves DB for `--reuse-db`) |
+| `make test-clean-db` | Drop stale test databases (`test_mko_bazuna*` + `gw*` shards) from the persistent test PG volume |
 | `make test-logs` | Follow test environment logs |
-| `make test-recreate` | Drop and rebuild test DB schema (`--no-reuse-db --create-db`) |
+| `make test-recreate` | Drop and rebuild test DB schema (`--no-reuse-db --create-db`) — runs `test-clean-db` first |
 
 ## Test Environment
 
@@ -425,7 +426,8 @@ make test-down
 | `make test-db` | Start only the test PostgreSQL on port `5433` (`restart: unless-stopped`, persistent volume). Idempotent. |
 | `make test` | Start the test DB if not running, then run the one-shot `test` container (migrate + pytest). |
 | `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives between sessions. |
-| `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). |
+| `make test-clean-db` | Drop stale `test_mko_bazuna*` and `gw*` databases (from crashed xdist workers) from the persistent test PG volume. Pre-flight for `test-recreate`. |
+| `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). Runs `test-clean-db` first to clear stuck connections. |
 | `make test-logs` | Follow logs from the test project (db + test run output). |
 
 ### `--reuse-db` strategy

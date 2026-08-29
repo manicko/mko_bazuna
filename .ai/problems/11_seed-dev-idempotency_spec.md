@@ -2,7 +2,7 @@
 
 **Spec ID:** 11  
 **Created:** 2026-08-25  
-**Status:** Approved — all PO decisions collected (§7)  
+**Status:** Complete — implementation verified (User/AnalyticsEvent/PopularSearch `source` fields added; `_clean()` uses direct `source` filtering; generation phase wrapped in `transaction.atomic()`; advisory lock ID 110 retained; `docker compose rm -sf` before `make up`)  
 **PO decisions:** Q1=A, Q2=A+C, Q3=A, Q4=A, Q5=A  
 **Spec index:** [docs/01-spec/spec-index.md](docs/01-spec/spec-index.md)  
 

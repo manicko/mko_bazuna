@@ -17,13 +17,16 @@ The seed module generates realistic demo data for the Mko Bazuna classifieds boa
 The seed workflow runs in this order:
 
 ```
-1. Clean existing seed data
-2. Load categories (via catalog builder from categories.yaml)
-3. Load cities (from cities.json fixture)
-4. Generate users
-5. Generate ads (with template interpolation)
-6. Generate images (from photo manifest)
-7. Generate analytics (optional, enabled by default)
+1. Acquire session-scoped advisory lock (ID 110) — prevents concurrent seeds
+2. Clean existing seed data (source-field filter, transactional, FK-safe order)
+3. Load categories (via catalog builder from categories.yaml)
+4. Load cities (from cities.json fixture)
+5. Generate users, ads, images, and analytics — ALL inside one transaction.atomic()
+   block (crash = full rollback to post-clean state)
+   ├─ Generate users (source = AdSource.SEED)
+   ├─ Generate ads with template interpolation (source = AdSource.SEED)
+   ├─ Generate images (from photo manifest)
+   └─ Generate analytics (optional, enabled by default; source = AdSource.SEED)
 ```
 
 ## Running the Seed Command
@@ -56,17 +59,31 @@ python manage.py seed --users=10 --ads=30 --force --status-distribution='{"publi
 
 ### What Gets Seeded
 
-- **Users:** Telegram users with unique `telegram_id`, random names, some with `username=None`
-- **Ads:** Multi-language ads (ru, en, bs) with template-filled content, appropriate prices, and random statuses
+- **Users:** Telegram users with unique `telegram_id`, random names, some with `username=None`, `source=AdSource.SEED`
+- **Ads:** Multi-language ads (ru/en/bs) with template-filled content, appropriate prices, and random statuses, `source=AdSource.SEED`
 - **Images:** 1-3 photos per ad from the category-tagged photo manifest
-- **Analytics:** `AD_VIEWED` events and `DailyAdMetrics` for published ads
+- **Analytics:** `AD_VIEWED` events and `DailyAdMetrics` for published ads, `source=AdSource.SEED`
+- **PopularSearch:** Seed-generated popular searches, tagged with `source=AdSource.SEED`
 
 ### Cleanup
 
-The seed command automatically:
-- Deletes all existing seed data (identified by `Ad.source = 'seed'`)
-- Cleans the `MEDIA_ROOT/seed/` directory
-- Re-loads categories via the builder (idempotent)
+The seed command automatically cleans seed data using **direct `source`-field filtering**
+(not reverse-FK traversal), ensuring orphaned seed users (with zero ads) are also removed:
+
+- Cleans seed tables in FK-safe order: `DailyAdMetrics` → `AnalyticsEvent` → `AdImage` → `Ad` → `User` → `PopularSearch`
+- All seed rows identified by `source = AdSource.SEED` (`source` field exists on `User`, `Ad`, `AnalyticsEvent`, and `PopularSearch`)
+- `MEDIA_ROOT/seed/` directory wiped via `shutil.rmtree`
+- Categories re-loaded via the catalog builder (idempotent `update_or_create` by slug)
+- Advisory lock (ID 110) prevents concurrent seed runs
+
+All cleanup + generation runs inside a single `transaction.atomic()` block — a mid-generation
+crash rolls back to the post-clean state (no half-seeded data).
+
+### Dev Workflow (`make up`)
+
+`make up` forces re-runs of one-shot services (migrate, load_catalog, create_admin, seed)
+by running `docker compose rm -sf` before `up`, so every `make up` produces a fresh seed
+even if the image hasn't changed.
 
 ## Category Loading
 

@@ -119,6 +119,10 @@ The one-shot `test` container will:
 4. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup`)
 5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
+> **Stale databases:** If you see `database is being accessed by other users` or schema errors,
+> run `make test-clean-db` first to drop stale `test_mko_bazuna*` and `gw*` databases from
+> crashed xdist workers, then `make test-recreate` for a fresh schema.
+
 ---
 
 ## Step 7 — Run Lint and Type Check

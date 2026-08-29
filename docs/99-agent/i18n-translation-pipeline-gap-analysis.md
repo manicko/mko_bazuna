@@ -37,7 +37,8 @@ catalogs, and the new automated completeness checks are all in place.
 | `compilemessages` in Dockerfile builder | `docker/Dockerfile:78` | ✅ Compiles `.mo` at image build |
 | `compilemessages` in entrypoint | `docker/entrypoint.sh:73-87` | ✅ Compiles for dev bind-mounts |
 | `compilemessages` in test entrypoint | `docker/entrypoint-test.sh:37` | ✅ Compiles for test bind-mounts |
-| Makefile targets | `Makefile:146-150` | ✅ `makemessages` and `compilemessages` targets |
+| **T-01** `compilemessages` in CI test job | `.github/workflows/ci.yml` (`build` and `i18n` jobs) | ✅ CI `build` job runs `compilemessages` before pytest; dedicated `i18n` job runs `compilemessages` then completeness tests |
+| Makefile targets | `Makefile:167-173` | ✅ `makemessages` (line 167) and `compilemessages` (line 170) targets |
 | `i18n` context processor | `config/settings/base.py:138` | ✅ `django.template.context_processors.i18n` |
 | Template context processor | `apps/core/context_processors.py` | ✅ Exposes `LANGUAGE_CODE`, `LANGUAGES`, `catalog_js_labels` |
 | JSON-based ad content i18n | `apps/ads/models.py` (`get_title`/`get_description`) | ✅ `title_i18n` JSONB → fallback chain |
@@ -84,6 +85,9 @@ run as part of CI:
 
 **Implementation details:**
 - All four tests are marked `@pytest.mark.unit` (fast gate, no database).
+- The dedicated CI `i18n` job (`Plan 35`) runs `compilemessages` before
+  `pytest src/backend/apps/ads/tests/test_i18n_completeness.py test_i18n_pipeline.py -v`,
+  ensuring `.mo` files are present for both the completeness and pipeline tests.
 - No new third-party dependencies: reuses the existing custom `_parse_po_entries`
   parser (no `polib`).
 - Template-text scanning uses stdlib `re` regex — strips skip tags (`<script>`,
@@ -100,10 +104,14 @@ run as part of CI:
 
 ### 1.5 CI integration
 
-A dedicated `i18n` job was added to `.github/workflows/ci.yml`, running parallel
-to the existing `build`, `test`, `lint`, `typecheck`, and `lint-templates` jobs.
-It runs `compilemessages` before invoking the completeness test suite, ensuring
-`.mo` files (gitignored) are present in CI.
+A dedicated `i18n` job was added to `.github/workflows/ci.yml` (Plan 35), running parallel
+to the existing `build`, `test`, `lint`, `typecheck`, and `lint-templates` jobs. It runs
+`compilemessages` before invoking the completeness test suite, ensuring `.mo` files
+(gitignored) are present in CI.
+
+**T-01:** The CI `build` job (which runs the test suite with coverage) also runs
+`compilemessages` as a pre-test step, so `.mo` files are present for rendering tests
+that load translated strings.
 
 ---
 

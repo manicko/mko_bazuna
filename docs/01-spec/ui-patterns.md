@@ -62,7 +62,7 @@ Ad cards follow a consistent visual hierarchy optimized for quick scanning:
     <a href="{% url 'ads:detail' ad.id %}" class="block">
         {% if ad.images.first %}
             <img src="{{ ad.images.first.image_url }}" alt="{{ ad.title }}"
-                 class="w-full h-48 object-contain bg-gray-100 rounded-t-lg">
+                 class="w-full h-48 object-contain bg-white rounded-t-lg">
         {% endif %}
         <div class="p-4">
             <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
@@ -209,22 +209,35 @@ The GLightbox CSS is loaded in `<head>`:
 <link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
 ```
 
-The GLightbox JS and inline init are added before `</body>` (consent-gated):
+The GLightbox JS, thumbnail-switching logic, and inline init are added before `</body>`
+(consent-gated behind `consent_analytics`):
 
 ```html
+{% if consent_analytics %}
 <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
 <script>
+  // Minimal inline JS for thumbnail-strip + arrow navigation (≤10 lines)
   document.addEventListener('DOMContentLoaded', function () {
-    GLightbox({
-      selector: '.glightbox',
-      touchNavigation: true,
-      loop: true,
-      zoomable: true,
-      closeOnOutsideClick: true,
-      navigation: { next: true, prev: true },
-    });
+    var gallery = document.querySelector('[data-detail-gallery]');
+    if (!gallery) return;
+    var mainImg = gallery.querySelector('#detail-main-image');
+    var mainLink = gallery.querySelector('#detail-main-link');
+    var thumbs = gallery.querySelectorAll('[data-detail-thumbs] button[data-index]');
+    var idx = 0;
+    function updateMain(i) {
+      var t = thumbs[i]; if (!t) return;
+      idx = i;
+      mainImg.src = t.dataset.thumbUrl;
+      mainImg.alt = '{% trans "Photo" %} ' + (i + 1) + ' {% trans "of" %} ' + thumbs.length;
+      mainLink.href = t.dataset.fullUrl;
+    }
+    thumbs.forEach(function (b, i) { b.addEventListener('click', function () { updateMain(i); }); });
+    gallery.querySelector('#detail-prev')?.addEventListener('click', function () { updateMain((idx - 1 + thumbs.length) % thumbs.length); });
+    gallery.querySelector('#detail-next')?.addEventListener('click', function () { updateMain((idx + 1) % thumbs.length); });
+    GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true, zoomable: true, closeOnOutsideClick: true, navigation: { next: true, prev: true } });
   });
 </script>
+{% endif %}
 ```
 
 ### Behavior
@@ -244,6 +257,10 @@ The GLightbox JS and inline init are added before `</body>` (consent-gated):
   `<img>` still renders with a valid `src` (no broken markup).
 - **i18n:** Gallery captions and button `aria-label`s use `{% trans %}`
   tags — "Open image", "Previous image", "Next image", "Select image".
+- **Consent gating:** GLightbox CSS loads unconditionally (progressive-enhancement
+  fallback); the GLightbox JS, thumbnail-switching logic, and inline init render only
+  when `consent_analytics` is set (`{% if consent_analytics %}`). Without consent, the
+  main image `<a>` still functions as a plain link to the full-size image.
 
 This supersedes the earlier static grid layout (single column / two-column split).
 

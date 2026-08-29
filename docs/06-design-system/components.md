@@ -416,10 +416,12 @@ Primary listing card for search results.
 
 ### Ad Card (Detail View)
 
-Full-width single ad display. Photo gallery uses **GLightbox 3.3.1** (CDN)
-for a lightbox gallery experience; individual images are not linked to separate
-pages. Content is localized via `get_title`/`get_description` template filters
-keyed on `LANGUAGE_CODE`.
+Full-width single ad display. Photo gallery uses a **slider gallery** pattern
+(main image + horizontal thumbnail strip + arrow nav) with **GLightbox v3.3.1**
+(CDN) for fullscreen overlay. GLightbox JS is consent-gated behind
+`consent_analytics`; without consent the main image anchor still links to the
+full-size photo as a plain fallback. Content is localized via
+`get_title`/`get_description` template filters keyed on `LANGUAGE_CODE`.
 
 ```html
 <article class="bg-white rounded-lg shadow overflow-hidden">
@@ -502,21 +504,32 @@ keyed on `LANGUAGE_CODE`.
     </div>
 </article>
 
-<!-- GLightbox init -->
-<script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        GLightbox({
-            selector: '.glightbox',
-            touchNavigation: true,
-            loop: true,
-            zoomable: true,
-            closeOnOutsideClick: true,
-            navigation: { next: true, prev: true },
-        });
-    });
-</script>
-```
+     <!-- GLightbox init (consent-gated) + thumbnail-switching inline JS -->
+     {% if consent_analytics %}
+     <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
+     <script>
+         document.addEventListener('DOMContentLoaded', function () {
+             var gallery = document.querySelector('[data-detail-gallery]');
+             if (!gallery) return;
+             var mainImg = gallery.querySelector('#detail-main-image');
+             var mainLink = gallery.querySelector('#detail-main-link');
+             var thumbs = gallery.querySelectorAll('[data-detail-thumbs] button[data-index]');
+             var idx = 0;
+             function updateMain(i) {
+                 var t = thumbs[i]; if (!t) return;
+                 idx = i;
+                 mainImg.src = t.dataset.thumbUrl;
+                 mainImg.alt = '{% trans "Photo" %} ' + (i + 1) + ' {% trans "of" %} ' + thumbs.length;
+                 mainLink.href = t.dataset.fullUrl;
+             }
+             thumbs.forEach(function (b, i) { b.addEventListener('click', function () { updateMain(i); }); });
+             gallery.querySelector('#detail-prev')?.addEventListener('click', function () { updateMain((idx - 1 + thumbs.length) % thumbs.length); });
+             gallery.querySelector('#detail-next')?.addEventListener('click', function () { updateMain((idx + 1) % thumbs.length); });
+             GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true, zoomable: true, closeOnOutsideClick: true, navigation: { next: true, prev: true } });
+         });
+     </script>
+     {% endif %}
+     ```
 
 | Property | Value |
 |----------|-------|
