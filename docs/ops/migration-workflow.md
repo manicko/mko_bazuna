@@ -168,30 +168,34 @@ disposable database.
 
 | App                | Current migrations | Exceeds 8? |
 |--------------------|--------------------|------------|
-| `ads`              | 10 | **Yes** |
-| `analytics`        | 4  | No  |
-| `categories`       | 5  | No  |
-| `core`             | 1  | No  |
-| `locations`        | 2  | No  |
-| `lookups`          | 1  | No  |
-| `moderation`       | 4  | No  |
-| `search`           | 4  | No  |
-| `trust`            | 2  | No  |
-| `users`            | 3  | No  |
-| **Total**          | **36** | — |
+| `ads`              | 1 | No  |
+| `analytics`        | 1 | No  |
+| `categories`       | 1 | No  |
+| `core`             | 0 | No  |
+| `currencies`       | 1 | No  |
+| `locations`        | 1 | No  |
+| `lookups`          | 1 | No  |
+| `moderation`       | 1 | No  |
+| `search`           | 1 | No  |
+| `trust`            | 1 | No  |
+| `users`            | 1 | No  |
+| **Total**          | **10** | — |
 
 The threshold is **8 files per app** (PO decision Q6; variable `CONSOLIDATE_THRESHOLD ?= 8`).
-Today `ads` is the only app above the threshold. After the one-time initial reset described below,
-every app returns to **1 `0001_initial.py`**.
+After the one-time initial reset, every app has returned to **1 `0001_initial.py`** (0 for `core`).
+No app currently exceeds the threshold.
 
 ### One-time initial reset
 
 Per Q1-B / Q2-B, the launch step is a single wipe-and-regenerate:
 
 1. Delete every `0*.py` migration file across all apps (keep only `__init__.py`).
-2. `make makemigrations` → produces one `0001_initial.py` per app (10 total).
-3. On a fresh dev DB, `make migrate` succeeds and `django_migrations` is clean.
-4. `make makemigrations` again (with `--check --dry-run`) confirms no pending drift.
+   Done via `python scripts/consolidate_migrations.py --force --apps-dir src/backend/apps`.
+2. `makemigrations` → produced one `0001_initial.py` per app (10 total; `core` has 0).
+3. `squash_rehydrate_runsql` injected trigger DDL (`RunSQL` ops) into
+   `ads/0001_initial.py` for the search-vector triggers.
+4. On a fresh dev DB, `make migrate` succeeds and `django_migrations` is clean.
+5. `makemigrations --check --dry-run` confirms no pending drift.
 
 ### Recurring consolidation
 
@@ -300,21 +304,22 @@ The canonical app list (10 apps) and their current migration inventory, as verif
 
 | App | Migration count | Latest file | Exceeds 8? | Note |
 |-----|-----------------|-------------|------------|------|
-| `ads` | 10 | `0010_backfill_listing_purpose.py` | **Yes** | Top-heavy; includes the extracted `0006_backfill_translations` |
-| `analytics` | 4 | `0004_analytics_event_fk_set_null_and_index.py` | No | |
-| `categories` | 5 | `0005_load_catalog.py` | No | Contains the live-import offender (fixed post-refactor) |
-| `core` | 1 | `0001_verify_lifecycle_indexes.py` | No | Schema-only; seed indexes only |
-| `locations` | 2 | `0002_seed_cities.py` | No | |
+| `ads` | 1 | `0001_initial.py` | No | Squashed; trigger DDL re-injected via `squash_rehydrate_runsql` |
+| `analytics` | 1 | `0001_initial.py` | No | |
+| `categories` | 1 | `0001_initial.py` | No | |
+| `core` | 0 | — | No | No migration files (schema via model introspection) |
+| `currencies` | 1 | `0001_initial.py` | No | `load_exchange_rates` command replaces seed `RunPython` |
+| `locations` | 1 | `0001_initial.py` | No | |
 | `lookups` | 1 | `0001_initial.py` | No | Reference data (LookupGroup/LookupItem) |
-| `moderation` | 4 | `0004_ad_moderation_priority_default.py` | No | |
-| `search` | 4 | `0004_fix_index_name_too_long.py` | No | FTS triggers + indexes |
-| `trust` | 2 | `0002_trust_level_default.py` | No | |
-| `users` | 3 | `0003_user_telegram_premium.py` | No | |
-| **Total** | **36** | — | — | |
+| `moderation` | 1 | `0001_initial.py` | No | |
+| `search` | 1 | `0001_initial.py` | No | FTS triggers + indexes; DDL in `RunSQL` |
+| `trust` | 1 | `0001_initial.py` | No | |
+| `users` | 1 | `0001_initial.py` | No | |
+| **Total** | **10** | — | — | |
 
-**Post-consolidation goal:** 1 `0001_initial.py` per app (10 files total), `0006_backfill_translations`
-removed from the migration tree and replaced by the `backfill_translations` command, and `0005_load_catalog`
-rewritten to use `apps.get_model()`.
+**Post-consolidation state:** 1 `0001_initial.py` per app (10 files total), `backfill_translations`
+available as a management command (replacing the extracted `0006_backfill_translations` migration), and
+catalog loading via `load_catalog` using `apps.get_model()`.
 
 The seed data pipeline that depends on migrations is documented separately in
 [the seed data workflow](seed-workflow.md) — categories are loaded via the catalog builder and cities

@@ -49,3 +49,30 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
+
+# Skip migration replay during test DB creation for faster --create-db.
+# pytest-django uses create_test_db() (model introspection) instead of
+# replaying migration files. The autouse fixture in conftest.py restores
+# the 4 trigger DDL objects + 3 currency seed rows that
+# MIGRATION_MODULES=None cannot regenerate.
+#
+# NOTE: We disable migrations for ALL apps (including Django built-ins like
+# auth, contenttypes, admin, sessions) using the DisableMigrations class below.
+# This is required because the custom apps have a densely connected cross-app
+# FK dependency graph rooted at auth (via users). If only SOME custom apps
+# are set to None, syncdb (which runs before migrations) will try to create
+# FK constraints from syncdb apps to migrated apps before those tables exist,
+# causing "relation <table> does not exist" errors.
+# Disabling all migrations puts everything in syncdb mode — Django creates
+# all tables first, then applies deferred FK constraints, so all tables
+# exist before any constraint is created. The DisableMigrations class is the
+# standard Django pattern for this (see Django docs on testing with models).
+class DisableMigrations:
+    def __contains__(self, item):
+        return True
+
+    def __getitem__(self, item):
+        return None
+
+
+MIGRATION_MODULES = DisableMigrations()

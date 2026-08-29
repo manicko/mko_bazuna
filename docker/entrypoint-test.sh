@@ -14,6 +14,10 @@ set -e
 # flag still prevents the project package itself from being installed.
 unset UV_NO_INSTALL_PROJECT
 uv sync --frozen --no-install-project --group dev
+# Install extracted DDL + seed data (idempotent). Runs on mko_bazuna;
+# test_mko_bazuna is handled by the autouse fixture in conftest.py (T4e).
+uv run python src/backend/manage.py load_exchange_rates || true
+uv run python src/backend/manage.py setup_search_triggers || true
 # Run pytest with short traceback format and duration reporting for slowness visibility.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override ALL pytest flags
 # (single-token flags only; multi-token values like -m "not seed" are fragile here

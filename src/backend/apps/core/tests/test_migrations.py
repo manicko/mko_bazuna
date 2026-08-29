@@ -10,13 +10,21 @@ import logging
 from io import StringIO
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 logger = logging.getLogger(__name__)
 
+_MIGRATIONS_DISABLED = bool(getattr(settings, "MIGRATION_MODULES", {}))
 
+
+@pytest.mark.skipif(
+    _MIGRATIONS_DISABLED,
+    reason="MIGRATION_MODULES=None disables migration replay; "
+    "makemigrations --check is not applicable when apps have no migrations",
+)
 def test_makemigrations_check() -> None:
     """
     Assert that makemigrations --check --dry-run produces no pending migrations.

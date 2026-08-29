@@ -185,6 +185,7 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 | **10** | Image display: catalog grid images cropped/stretched via `object-cover`; detail page missing slider/thumbnail-strip gallery | [Approved](.ai/problems/10_image-display_spec.md) |
 | **11** | Non-idempotent seed on repeated `docker compose up`: orphaned seed users cause `IntegrityError`; generation phase not transactional | [Approved](.ai/problems/11_seed-dev-idempotency_spec.md) |
 | **12** | `new`/`used` modeled as mutually-exclusive `listing_feature` M2M entries; seed+bot can assign both simultaneously, creating invalid ads | [Approved](.ai/problems/12_new-used-condition-mutual-exclusivity_spec.md) — 6 PO decisions confirmed, DoR met, implementation in progress |
+| **14** | `compilemessages` hangs at Docker container startup: `entrypoint.sh` runs `compilemessages` from `/app` CWD, but the `.:/app` bind mount exposes the host `.venv` (6,225 dirs / 1,264 `.po` files); Django's `compilemessages` has no default ignore patterns (unlike `makemessages`), so it walks the entire `.venv` tree. Dev + test only; production unaffected. | [Approved](.ai/problems/14_compilemessages-docker-hang_spec.md) — fix: add `--ignore=.venv --ignore=.git --ignore=__pycache__ --ignore=*.pyc` to `compile_messages()` in `docker/entrypoint.sh` + `Makefile` `compilemessages` target |
 | **35** | CI i18n pipeline gap: dedicated `i18n` CI job missing; `.mo` compilation not in CI test job | [Complete](.ai/problems/35_i18n-pipeline-ci-gap_plan.md) — plan 35 |
 
 ## Commands
