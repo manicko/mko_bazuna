@@ -75,7 +75,12 @@ ENV ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 ENV DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres
 RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify && \
     uv run python src/backend/manage.py collectstatic --noinput && \
-    uv run python src/backend/manage.py compilemessages
+    uv run python src/backend/manage.py compilemessages \
+        --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+        --ignore=.mypy_cache --ignore=.ruff_cache --ignore=.pytest_cache --ignore=node_modules \
+        --ignore=.tox --ignore=.nox --ignore=__pypackages__ --ignore=.uv --ignore=.cache \
+        --ignore=.local --ignore=.playwright-mcp --ignore=.coverage --ignore=.hypothesis \
+        --locale ru --locale bs --locale en
 
 
 ################################################################################

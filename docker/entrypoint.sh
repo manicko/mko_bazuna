@@ -74,6 +74,9 @@ compile_messages() {
     echo "Compiling translations..."
     /opt/venv/bin/python /app/src/backend/manage.py compilemessages \
         --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+        --ignore=.mypy_cache --ignore=.ruff_cache --ignore=.pytest_cache --ignore=node_modules \
+        --ignore=.tox --ignore=.nox --ignore=__pypackages__ --ignore=.uv --ignore=.cache \
+        --ignore=.local --ignore=.playwright-mcp --ignore=.coverage --ignore=.hypothesis \
         --locale ru --locale bs --locale en 2>/dev/null \
         || echo "WARNING: compilemessages failed (non-fatal, falling back to msgid strings)"
 }
