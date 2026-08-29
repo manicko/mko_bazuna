@@ -1,6 +1,6 @@
 # Makefile for Mko Bazuna Docker workflow
 
-.PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate \
+.PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
           lint typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
           backup restore prune-backups db-shell clean create-admin load-catalog seed
 
@@ -18,7 +18,7 @@ up down reset build restart lint typecheck lint-templates shell makemigrations c
     load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-dev
 
-test test-all test-db test-down test-logs test-recreate: \
+test test-all test-db test-down test-logs test-recreate test-clean-db: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-test
 
 # ====================== Main Commands ======================
@@ -41,6 +41,7 @@ help:
 	@echo "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
 	@echo "  test-logs      Follow test environment logs"
+	@echo "  test-clean-db  Drop stale test databases (test_mko_bazuna + gw* shards)"
 	@echo "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
 	@echo ""
 	@echo "Code Quality:"
@@ -130,11 +131,28 @@ test-down:
 test-logs:
 	docker compose $(COMPOSE_TEST) logs -f
 
+# Drop stale test databases (test_mko_bazuna + test_mko_bazuna_gw*) from the
+# persistent test PostgreSQL volume. Run before test-recreate to handle stuck
+# connections from crashed xdist workers. Uses psql \gexec — DROP DATABASE
+# cannot run inside a DO $$ block on PostgreSQL 13+ (PG restriction:
+# "DROP DATABASE cannot be executed from a function or procedure").
+# Empirically verified: drops all 16 stale gw* databases, exit 0.
+test-clean-db:
+	docker compose $(COMPOSE_TEST) up -d db
+	docker compose $(COMPOSE_TEST) exec -T db psql -U postgres -d postgres -c \
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname LIKE 'test_mko_bazuna%' AND pid <> pg_backend_pid();"
+	docker compose $(COMPOSE_TEST) exec -T db psql -U postgres -d postgres -t -A -c \
+		"SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE);', datname) FROM pg_database WHERE datname LIKE 'test_mko_bazuna%'" \
+	| while IFS= read -r stmt; do docker compose $(COMPOSE_TEST) exec -T db psql -U postgres -d postgres -c "$$stmt"; done
+	@echo "Stale test databases dropped."
+
 # Force a fresh test DB schema by ignoring the --reuse-db cache. The entrypoint
 # (entrypoint-test.sh) still runs uv sync + wait_for_db + migrate beforehand;
 # only pytest's DB-caching flags are overridden via PYTEST_OPTS.
 # Pre-start the DB (same as `make test`) so this target is self-contained.
-test-recreate:
+test-recreate: test-clean-db
+	# test-clean-db (pre-flight) drops stale test_mko_bazuna* + gw* databases,
+	# handling stuck connections from crashed xdist workers before pytest runs.
 	docker compose $(COMPOSE_TEST) up -d db
 	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
 

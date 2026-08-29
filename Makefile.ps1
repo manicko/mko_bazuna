@@ -50,6 +50,7 @@ function Show-Help {
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
     Write-Host "  test-logs      Follow test environment logs"
+    Write-Host "  test-clean-db  Drop stale test databases (test_mko_bazuna + gw* shards)"
     Write-Host "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
     Write-Host "  lint           Run ruff linter inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
@@ -112,10 +113,33 @@ function Invoke-TestLogs {
     docker compose -f docker-compose.yml -f docker-compose.test.yml logs -f
 }
 
+# Drop stale test databases (test_mko_bazuna + gw* shards) from the persistent
+# test PostgreSQL volume. Uses psql format() to generate DROP DATABASE statements
+# and executes each via `psql -c` (psql \gexec is not available for piped input
+# in PowerShell the same way as bash). Run before Invoke-TestRecreate to handle
+# stuck connections from crashed xdist workers.
+function Invoke-TestCleanDb {
+    $env:COMPOSE_PROJECT_NAME = $TestProject
+    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+    # Terminate active connections to test databases (exclude this session)
+    docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname LIKE 'test_mko_bazuna%' AND pid <> pg_backend_pid();"
+    # Generate DROP DATABASE IF EXISTS ... WITH (FORCE); statements and execute each
+    docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -t -A -c "SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE);', datname) FROM pg_database WHERE datname LIKE 'test_mko_bazuna%'" | ForEach-Object {
+        $stmt = $_.Trim()
+        if ($stmt) {
+            docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c $stmt
+        }
+    }
+    Write-Host "Stale test databases dropped." -ForegroundColor Green
+}
+
 # Drop and rebuild the test DB schema (ignores the --reuse-db cache).
 # The entrypoint-test.sh pipeline (uv sync + wait + migrate + pytest) still runs;
 # only pytest's caching flags are overridden via PYTEST_OPTS.
 function Invoke-TestRecreate {
+    # Pre-flight: drop stale test_mko_bazuna + gw* databases (handles stuck
+    # connections from crashed xdist workers before pytest spawns new ones).
+    Invoke-TestCleanDb
     $env:COMPOSE_PROJECT_NAME = $TestProject
     docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
 }
@@ -338,6 +362,7 @@ switch ($Target.ToLower()) {
     "test-db" { Invoke-TestDb }
     "test-down" { Invoke-TestDown }
     "test-logs" { Invoke-TestLogs }
+    "test-clean-db" { Invoke-TestCleanDb }
     "test-recreate" { Invoke-TestRecreate }
     "test" { Invoke-Test }
     "test-all" { Invoke-TestAll }

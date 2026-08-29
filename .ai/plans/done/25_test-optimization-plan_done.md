@@ -30,18 +30,20 @@ Key changes are **configuration and workflow only** — no production test code 
 
 ### 1.2 Marker Usage (Current)
 
-| Marker | Registered | Applied | Scope |
+| Marker | Registered (pyproject.toml:163-172) | Applied | Scope |
 |--------|-----------|---------|-------|
+| `unit` | Yes | 235 tests | Pure unit tests, no database |
+| `integration` | Yes | ~700 tests | DB-backed integration tests (fast + standard) |
+| `seed` | Yes | ~16 tests (5 classes) | Nightly-only; invokes `call_command('seed')` / `ImageGenerator` |
+| `settings` | Yes | 3 tests | Import-time validation via subprocess isolation |
+| `concurrent` | Yes | ~44 tests (6 bot modules) | `transaction=True` (TRUNCATE per test) |
 | `slow` | Yes | ~32 modules | Module-level `pytestmark` (all-or-nothing) |
-| `integration` | Yes | ~32 modules | Module-level `pytestmark` (all-or-nothing) |
-| `django_db` | Yes (pytest-django) | ~40 modules | Per-module or per-class |
+| `real_images` | Yes | opt-in | Opts out of the no-op `ImageGenerator` stub to use the real pipeline |
+| `xdist_group` | Yes (pytest-xdist built-in) | 6 bot modules | Pins tests to a single xdist worker via `--dist loadgroup`; **not project taxonomy** — re-registration is redundant |
+| end-to-end | **Removed** | 0 | Per `docs/99-agent/rules.md:51`: "The end-to-end marker was removed — do not reference it." |
+| `django_db` (pytest-django) | Yes (pytest-django) | ~40 modules | Per-module or per-class |
 | `django_db(transaction=True)` | Yes (pytest-django) | 5 modules | Per-module `pytestmark` (bot tests only) |
-| `asyncio` | Yes (pytest-asyncio) | 3 modules | Per-module or per-test |
-| `unit` | Not registered | 0 | — |
-| `e2e` | Not registered | 0 | — |
-| `seed` | Not registered | 0 | — |
-| `settings` | Not registered | 0 | — |
-| `concurrent` | Not registered | 0 | — |
+| `asyncio` (pytest-asyncio) | Yes (pytest-asyncio) | 3 modules | Per-module or per-test |
 
 **Problem:** Markers are binary — every DB-backed test module is marked with **both** `slow` and `integration`, regardless of actual duration or complexity. Pure unit tests (no DB) in `test_download_seed_photos.py`, `test_media.py`, `test_multi_lang_translation.py`, and `test_settings_secrets.py` have **no** marker at all. This makes selective running impossible.
 
@@ -49,12 +51,14 @@ Key changes are **configuration and workflow only** — no production test code 
 
 ```toml
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib", "-ra", "-q", "--cov", "--cov-report=term-missing"]
+addopts = ["--import-mode=importlib", "-ra", "-q"]
 markers = [
     "slow: marks tests as slow (use -m slow to run)",
     "integration: marks tests that require a database (use -m integration to run)",
 ]
 ```
+
+> `--cov` is **not** in `addopts` — it is CI-only (passed on the command line in `ci.yml:91` and `ci-nightly.yml:73`). `--reuse-db` is applied via the default `PYTEST_OPTS` in `entrypoint-test.sh:41`, not via `addopts`.
 
 **Problems:**
 - `--cov` is **always-on** in `addopts` — adds 15–25s overhead to every local run (branch coverage across 2 source roots).
@@ -67,16 +71,16 @@ markers = [
 | Job | Trigger | Key Command |
 |-----|---------|-------------|
 | `build` | push/PR | Docker image build (cache-from registry) |
-| `test` | push/PR | `uv run pytest --tb=short --cov --cov-report=term --cov-report=xml` |
+| `test` | push/PR | `uv run pytest -m "not seed" -n auto --dist loadgroup --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db` (see [ci.yml:91](.github/workflows/ci.yml)) |
 | `lint` | push/PR | `uv run ruff check .` |
 | `typecheck` | push/PR | `uv run basedpyright .` |
 
 **Problems:**
-- `test` job runs **all 934 tests** including the ~18-minute seed batch.
-- **No test splitting** — single job runs everything sequentially.
-- **No `--reuse-db`** — fresh PostgreSQL service each CI run (acceptable in CI, but means full schema setup every time).
+- `test` job runs the **non-seed tier only** (~1111 tests); the ~18-minute seed batch (`@pytest.mark.seed`, ~16 tests) runs daily in `ci-nightly.yml` at 03:00 UTC (no xdist, serial).
+- **Test splitting enabled** — CI uses `-n auto` (pytest-xdist, all cores) with `--dist loadgroup` so bot tests sharing FSM state via `xdist_group("bot_concurrent")` are pinned to one worker.
+- **`--reuse-db` is used in CI** — ephemeral PostgreSQL service is destroyed after each CI run; `--reuse-db` is safe because the service is fresh. Local dev uses `--reuse-db` by default (see `entrypoint-test.sh:41`); `make test-recreate` overrides with `--no-reuse-db --create-db`.
 - **Redundant migration check** — CI runs `makemigrations --check --dry-run` as a step, AND `test_migrations.py::test_makemigrations_check` runs the same check inside pytest.
-- No nightly/scheduled workflow for slow tests.
+- **Nightly workflow exists** — `ci-nightly.yml` runs `@pytest.mark.seed` daily at 03:00 UTC (no xdist; serial run).
 - No path filters — CI runs on every push/PR regardless of what changed.
 
 ### 1.5 Makefile (`test` target)
@@ -186,7 +190,7 @@ pytest-django creates a fresh test database on every run unless `--reuse-db` is 
 | **5** | Settings secrets tests spawn Python subprocess | 3 tests | 11.4s (3.6s/test) | `subprocess.run([sys.executable, ...])` for import-time validation |
 | **6** | Bot tests with `django_db(transaction=True)` | 5 modules (~40 tests) | ~15s total | TRUNCATE all tables per test (0.3–0.4s teardown each) |
 | **7** | `load_catalog()` called in `setUpTestData` of 3+ modules | ~20 tests | ~12s+ | ~4s per call, redundant across modules |
-| **8** | CI runs all 934 tests (including seed) sequentially | CI pipeline | 18+ min CI job | No test splitting, no marker-based exclusion |
+| **8** | CI runs non-seed tier (~1111 tests) + nightly seed | CI pipeline | ~85s (PR gate) | Resolved: xdist loadgroup + -m "not seed" |
 | **9** | 3 dead dev dependencies | Install phase | ~2–3s install + 7 unused packages | `factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy` never imported |
 | **10 | Pre-existing failures break CI green | 7+ tests | CI always red | `test_save_photo_exif`, `TestPriorityCalculator` (6), `search/tests.py` (5) |
 
@@ -200,7 +204,7 @@ pytest-django creates a fresh test database on every run unless `--reuse-db` is 
 |--------------|----------------|-----------|
 | `slow` + `integration` (binary, module-level) | Granular per-class markers | Enables selective runs |
 | No marker = unit | `unit` marker for pure unit tests | Explicitly tag no-DB tests |
-| All DB tests = `integration` | `integration` (fast DB) + `e2e` (multi-component) | Separate fast DB unit tests from view/HTTP tests |
+| All DB tests = `integration` | `integration` (fast DB); no end-to-end tier (removed) | Separate by seed/settings/concurrent markers instead |
 | No `seed` marker | `seed` marker for seed command tests | Isolate the 18-minute batch |
 | No `settings` marker | `settings` marker for subprocess tests | Identify interpreter-spawn cost |
 | No `concurrent` marker | `concurrent` marker for lock/transaction tests | Identify TRUNCATE-heavy tests |
@@ -252,7 +256,6 @@ Tier 5 — Settings Subprocess: pytestmark = [pytest.mark.settings]
 markers = [
     "unit: marks tests that require no database (pure unit tests)",
     "integration: marks fast DB-backed integration tests (default test target)",
-    "e2e: marks multi-component end-to-end tests (HTTP client, FTS, views)",
     "seed: marks seed command tests that invoke call_command('seed') (nightly only)",
     "settings: marks import-time settings validation tests using subprocess isolation",
     "concurrent: marks tests requiring transaction=True (TRUNCATE per test)",
@@ -270,7 +273,7 @@ markers = [
 | Suite | Command | Tests | Time (est.) | What Runs |
 |-------|---------|-------|-------------|-----------|
 | **Local `make test` (default)** | `pytest -m "not seed"` | ~918 | ~55s | Everything except 16 slow seed tests (fast seed + download tests still run) |
-| **CI (PR / commit)** | `pytest -m "not seed" --cov` | ~918 | ~85s | Fast feedback: unit + integration + e2e + concurrent + settings |
+| **CI (PR / commit)** | `pytest -m "not seed" -n auto --dist loadgroup --cov --reuse-db` | ~1111 | ~85s | Fast feedback: unit + integration + concurrent + settings (no end-to-end tier) |
 | **CI (nightly, cron)** | `pytest -m "seed --cov"` | ~16 | ~1050s | Full seed pipeline (5 slow classes + 1 test) |
 | **Local (watch mode)** | `pytest -m "unit and not slow"` | ~50 | ~3s | Rapid feedback loop |
 | **Local (full)** | `pytest` | ~934 | ~1125s | Everything (CI parity) |
@@ -463,7 +466,7 @@ uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short}
 
 | Step | ID | Task | Priority | Effort | Expected Savings | Dependencies |
 |------|----|------|----------|--------|-----------------|--------------|
-| 1 | T-01 | Register `seed`, `unit`, `e2e`, `settings`, `concurrent` markers in `pyproject.toml` | P0 | Trivial | N/A (enables selection) | None |
+| 1 | T-01 | Register `seed`, `unit`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group` markers in `pyproject.toml` (end-to-end marker removed per rules.md:51) | P0 | Trivial | N/A (enables selection) | None |
 | 2 | T-02 | Add `@pytest.mark.seed` to 5 slow seed classes + `TestImageGenerator.test_generates_ad_images` in `test_seed.py` | P0 | Trivial | ~1050s from default run | T-01 |
 | 3 | T-03 | Remove `--cov` from `addopts` in `pyproject.toml` | P1 | Trivial | 15–25s per run | None |
 | 4 | T-04 | Add `--reuse-db` to default `PYTEST_OPTS` in `entrypoint-test.sh` | P1 | Trivial | 3–5s per run | None |
@@ -550,7 +553,7 @@ After implementation:
 1. **Marker registration:**
    ```bash
    uv run pytest --markers
-   # Expect: seed, unit, e2e, settings, concurrent all listed
+   # Expect: seed, unit, settings, concurrent, slow, real_images, xdist_group all listed; NO end-to-end marker (removed)
    ```
 
 2. **Seed exclusion:**
@@ -676,7 +679,7 @@ After implementation:
 | Pre-existing failures | 7+ | 0 (target) | 0 |
 | CI green status | No (failures) | Yes (after fixes) | N/A |
 | Dead dependencies | 4 | 0 | 0 |
-| Marker granularity | Binary (slow + integration) | 5-tier (unit / integration / e2e / seed / settings / concurrent) | Same |
+| Marker granularity | Binary (slow + integration) | 8 registered (unit / integration / seed / settings / concurrent / slow / real_images / xdist_group; end-to-end marker removed) | Same |
 
 The single highest-impact change — **excluding seed tests from the default run via a `seed` marker** — eliminates ~94% of suite wall-clock time. Combined with coverage gating and `--reuse-db`, the local dev feedback loop drops from **18 minutes to ~60 seconds**, and CI PR feedback drops from **18 minutes to ~85 seconds**.
 
@@ -690,16 +693,16 @@ All 12 tasks (T-01 through T-12) completed successfully.
 
 | Task | Description | Status | Verification |
 |------|-------------|--------|-------------|
-| T-01 | Register `seed`, `unit`, `e2e`, `settings`, `concurrent` markers in `pyproject.toml` | ✅ Done | `pytest --collect-only` → 934 tests collected, no marker warnings |
+| T-01 | Register `seed`, `unit`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group` markers in `pyproject.toml` (end-to-end marker removed per rules.md:51) | ✅ Done | `pytest --collect-only` → 1137 tests collected; 8 markers registered, no end-to-end marker |
 | T-02 | Add `@pytest.mark.seed` to 5 slow seed classes + `TestImageGenerator.test_generates_ad_images` | ✅ Done | `pytest -m seed --collect-only` → 16 tests collected |
 | T-03 | Remove `--cov` from `addopts` in `pyproject.toml` | ✅ Done | `addopts = ["--import-mode=importlib", "-ra", "-q"]` |
 | T-04 | Add `--reuse-db` to default `PYTEST_OPTS` in `entrypoint-test.sh` | ✅ Done | `PYTEST_OPTS="--reuse-db --tb=short --durations=10"` |
-| T-05 | Modify `ci.yml` test job to run `pytest -m "not seed"` | ✅ Done | CI test job runs `uv run pytest -m "not seed" -n auto --dist loadscope --tb=short --cov --durations=10 --cov-report=term --cov-report=xml` |
+| T-05 | Modify `ci.yml` test job to run `pytest -m "not seed"` | ✅ Done | CI test job runs `uv run pytest -m "not seed" -n auto --dist loadgroup --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db` (see [ci.yml:91](.github/workflows/ci.yml)) |
 | T-06 | Create `ci-nightly.yml` scheduled seed test workflow | ✅ Done | `.github/workflows/ci-nightly.yml` runs `pytest -m "seed"` daily at 03:00 UTC + manual dispatch |
 | T-07 | Add `--durations=10` to CI pytest invocation | ✅ Done | `--durations=10` present in both `ci.yml` and `entrypoint-test.sh` |
 | T-08 | Remove redundant `makemigrations --check` CI step | ✅ Done | Step removed from `ci.yml` |
 | T-09 | Remove dead dev dependencies from `pyproject.toml` | ✅ Done | `factory-boy`, `model-bakery`, `hypothesis`, `pytest-factoryboy` removed; `uv.lock` updated |
-| T-10 | Add `pytest-xdist` to dev deps; enable `-n auto` in CI | ✅ Done | `pytest-xdist>=3.8.0` in dev group; `-n auto --dist loadscope` in `ci.yml` and `ci-nightly.yml` |
+| T-10 | Add `pytest-xdist` to dev deps; enable `-n auto` in CI | ✅ Done | `pytest-xdist>=3.8.0` in dev group; `-n auto --dist loadgroup` in `ci.yml` (PR gate); `ci-nightly.yml:73` runs seed **serially** (no `-n`, no `--dist`) |
 | T-11 | Create root `conftest.py` at `src/backend/conftest.py` with shared fixtures | ✅ Done | Generic `seller`, `user`, `category`, `city` fixtures + `create_test_ad()` + `_set_status_timestamp()`; validated against 380+376 test runs |
 | T-12 | Resolve pre-existing CI failures | ✅ Done | 1137 tests collected, 0 failures across 4 test runs (unit, seed, integration, full backend) — see note below |
 
@@ -721,6 +724,6 @@ All 12 tasks (T-01 through T-12) completed successfully.
 >
 > - **The baseline silently excluded 31 `tests.py` tests.** `pyproject.toml` configures `python_files = ["tests.py", "test_*.py"]`; when an app had both a `tests.py` module and a `tests/` package, pytest collected the package and **silently skipped** the module. `apps/moderation/tests.py` (22 tests) and `apps/search/tests.py` (9 tests) — **31 tests total** — were therefore never executed during the original "934 collected, 0 failures" validation. They were deleted in [`07a8f49`](https://github.com/manicko/mko_bazuna/commit/07a8f49) ("Remove shadowed tests.py files in moderation and search apps") and migrated into `tests/` packages — `apps/moderation/tests/test_moderation_views.py` and `apps/search/tests/test_search_view.py` — in [`d72e597`](https://github.com/manicko/mko_bazuna/commit/d72e597), where the tests use the shared `create_test_ad()` helper that sets all status-specific timestamps.
 > - **The single real pre-existing failure was a test-helper bug, not a production-code bug.** The concrete CI blocker was `test_reject_failed_moderation_ad` (originally in `apps/moderation/tests.py`). It raised `IntegrityError: new row for relation "ads" violates check constraint "ck_ads_moderation_failed_at_if_failed"` because the old local `_create_ad` helper only set `published_at` for `PUBLISHED` status and omitted `moderation_failed_at` for `FAILED` status. The migrated test uses the shared `_set_status_timestamp()` helper (`src/backend/conftest.py`, lines 163–184) which sets `published_at`, `rejected_at`, `archived_at`, `moderation_failed_at`, or `deleted_at` based on `status`.
-> - **Current test inventory** (verified via `pytest --collect-only` with the project's real `pyproject.toml` config): **1137 tests across 90 test files** — **1111 non-seed** + **26 seed**; **235** are marked `@pytest.mark.unit`; **8** custom markers are registered (`unit`, `integration`, `seed`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group`; `e2e` was removed).
+> - **Current test inventory** (verified via `pytest --collect-only` with the project's real `pyproject.toml` config): **1137 tests across 90 test files** — **1111 non-seed** + **26 seed**; **235** are marked `@pytest.mark.unit`; **8** custom markers are registered (`unit`, `integration`, `seed`, `settings`, `concurrent`, `slow`, `real_images`, `xdist_group`; the end-to-end marker was removed).
 > - **On the "50+" figure:** this is an unverified, inflated figure from the original plan. The actual concrete pre-existing failure that blocked CI-green was the single test-helper bug above; the 31 shadowed `tests.py` tests were **excluded from the baseline** rather than "passing". Per F-01's own verification, the migrated moderation+search suite passes (223 passed, 0 failed) after the helper fix. The per-category pass counts (380/376) and the "0 failures" conclusion were validated at the 934-test baseline; the previously-blocking failure is now resolved.
 
