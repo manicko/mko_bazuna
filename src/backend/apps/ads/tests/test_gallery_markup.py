@@ -122,6 +122,9 @@ class TestGalleryMarkup:
         # Thumbnail strip
         assert 'id="detail-thumbs"' in content
         assert 'data-detail-thumbs' in content
+        # AC1: the main-image container has an aspect-ratio utility to prevent
+        # cumulative-layout-shift before the image finishes loading
+        assert 'aspect-' in content, "Gallery container must have an aspect-ratio class"
         # Thumbnail buttons with data attributes for all images
         assert 'data-index="0"' in content
         assert 'data-index="1"' in content

@@ -32,18 +32,19 @@
             <div class="gallery flex-shrink-0" data-detail-gallery>
                 {# Main image preview with prev/next arrow navigation #}
                 {% with primary=ad.images.first %}
-                <div class="relative w-max mx-auto mb-4">
+                <div class="relative w-full max-w-lg aspect-[4/3] mx-auto mb-4">
                     <a id="detail-main-link"
                        href="{{ primary.image_url }}"
                        class="glightbox" data-gallery="ad-gallery"
                        data-description="{{ primary.alt_text|default:'' }}"
                        aria-label="{% trans "Open image" %} 1">
-                        <img id="detail-main-image"
-                             src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
-                             alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
-                             class="max-h-96 max-w-lg object-contain bg-gray-100 rounded-lg"
-                             loading="lazy"
-                             width="1280" height="960">
+                         <img id="detail-main-image"
+                              src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
+                              alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
+                              class="w-full h-full object-contain object-center bg-gray-100 rounded-lg"
+                              fetchpriority="high"
+                              loading="eager"
+                              width="1280" height="960">
                     </a>
                     {% if ad.images.count > 1 %}
                     <button id="detail-prev" type="button"

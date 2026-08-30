@@ -1,3 +1,4 @@
 /* Tailwind input stylesheet */
 @import "tailwindcss";
-@source "src/backend/templates/**/*.html";
+@source "../../../backend/templates/**/*.html";
+@source "../../../theme/static/theme/js/**/*.js";
