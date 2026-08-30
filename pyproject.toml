@@ -43,6 +43,14 @@ Issues = "https://github.com/manicko/mko_bazuna/issues"
 [tool.setuptools]
 platforms = ["Linux", "Windows"]
 include-package-data = true
+# djlint_custom_rules is a top-level module (not a package) discovered by djlint
+# via .djlint_rules.yaml (python_module: djlint_custom_rules). It must be listed
+# explicitly so the editable install exposes it on sys.path for `uv run djlint`
+# outside Docker, where PYTHONPATH is not set.
+py-modules = ["djlint_custom_rules"]
+
+[tool.setuptools.package-dir]
+"" = "src/backend"  # root namespace dir so setuptools finds py-modules above
 
 # Project is NOT installed in the image; import roots are provided via
 # ENV PYTHONPATH=/app/src:/app/src/backend (see docker/Dockerfile).
