@@ -195,3 +195,56 @@ def test_js_rotation_toggle_present() -> None:
     """Inline JS toggles rotate-180 on the SVG when aria-expanded changes."""
     assert "classList.add('rotate-180')" in _HEADER_CATALOG_CONTENT
     assert "classList.remove('rotate-180')" in _HEADER_CATALOG_CONTENT
+
+
+# ---------------------------------------------------------------------------
+# HTMX 1.9.12 -> 2.0.10 migration regression guards
+# ---------------------------------------------------------------------------
+
+
+def test_header_favorites_badge_uses_htmx_ajax_not_get() -> None:
+    """Guard the ``htmx.get`` -> ``htmx.ajax('GET', ...)`` migration at
+    ``header_catalog.html:536`` (audit §5.1 #2 / §9 HIGH).
+
+    ``htmx.get`` is not a real HTMX API in any version (1.9.12 or 2.0.10 —
+    verified against the library source), so the header favorites-badge
+    refresh listener must call ``htmx.ajax('GET', ...)`` against the
+    ``cabinet:favorites_count`` endpoint and keep its ``favorite:toggled``
+    dispatch plus ``htmx:afterRequest`` listener. Compare with the reference
+    implementation at ``cabinet/favorites.html:47``.
+    """
+    assert "htmx.get" not in _HEADER_CATALOG_CONTENT
+    assert "htmx.ajax('GET'" in _HEADER_CATALOG_CONTENT
+    assert "cabinet:favorites_count" in _HEADER_CATALOG_CONTENT
+    assert "favorite:toggled" in _HEADER_CATALOG_CONTENT
+    assert "htmx:afterRequest" in _HEADER_CATALOG_CONTENT, (
+        "header_catalog.html must retain its htmx:afterRequest listener"
+    )
+
+
+def test_htmx_cdn_pins_2_0_10_with_sri() -> None:
+    """Every HTMX-loading template must pin HTMX 2.0.10 via jsDelivr with an
+    SRI integrity hash and ``crossorigin`` (audit §4 / §14).
+
+    The old ``unpkg.com/htmx.org@1.9.12`` tag must be replaced with the
+    jsDelivr ``@2.0.10`` tag because the library is upgraded to HTMX 2.0.10;
+    the API surface this codebase uses is preserved in 2.0 (only the
+    non-existent ``htmx.get`` call site is corrected, per the guard above).
+    """
+    htmx_templates = [
+        "ads/list.html",
+        "ads/detail.html",
+        "cabinet/hub.html",
+        "cabinet/saved_searches.html",
+        "cabinet/favorites.html",
+    ]
+    for rel in htmx_templates:
+        content = _read_template(rel)
+        assert "htmx.org@2.0.10" in content, rel
+        assert "cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" in content, rel
+        assert (
+            "sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+            in content
+        ), rel
+        assert 'crossorigin="anonymous"' in content, rel
+        assert "unpkg.com/htmx.org@1.9.12" not in content, rel

@@ -533,7 +533,7 @@
         if (typeof htmx === 'undefined') return;
         var badge = document.querySelector('[data-favorites-badge]');
         if (!badge) return;
-        htmx.get('{% url "cabinet:favorites_count" %}', {
+        htmx.ajax('GET', '{% url "cabinet:favorites_count" %}', {
             target: badge,
             swap: 'outerHTML'
         });
