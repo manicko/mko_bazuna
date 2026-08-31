@@ -72,6 +72,9 @@ cat_output.txt
 neq
 Continue
 cmp_css.py
+# Captured test-output logs and scratch scripts (session scratch; not needed at runtime)
+_step3_*.txt
+tmp_*.py
 
 # Local pipx/pyenv user installs
 .local/

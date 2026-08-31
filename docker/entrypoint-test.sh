@@ -16,6 +16,9 @@ unset UV_NO_INSTALL_PROJECT
 uv sync --frozen --no-install-project --group dev
 # Install extracted DDL + seed data (idempotent). Runs on mko_bazuna;
 # test_mko_bazuna is handled by the autouse fixture in conftest.py (T4e).
+# With DisableMigrations (tests use --run-syncdb), migrate creates tables
+# for unmigrated apps (currencies). Required before load_exchange_rates.
+uv run python src/backend/manage.py migrate --run-syncdb || { echo "::error::migrate --run-syncdb failed" >&2; }
 uv run python src/backend/manage.py load_exchange_rates || true
 uv run python src/backend/manage.py setup_search_triggers || true
 # Run pytest with short traceback format and duration reporting for slowness visibility.
@@ -28,8 +31,8 @@ uv run python src/backend/manage.py setup_search_triggers || true
 # seed suite while `make test-all` runs everything. Complements PYTEST_OPTS.
 # --reuse-db (default) skips test DB schema rebuild on subsequent runs; the DB
 # container persists between runs via the named postgres_data volume. Use
-# `make test-recreate` to force a fresh schema (--no-reuse-db --create-db), e.g.
-# after migration changes or an interrupted (SIGKILL'd) run.
+# `make test-recreate` to force a fresh schema (--create-db), e.g. after
+# migration changes or an interrupted (SIGKILL'd) run.
 PYTEST_MARK_ARGS=()
 if [ -n "${PYTEST_SKIP_MARKERS:-}" ]; then
     PYTEST_MARK_ARGS+=(-m "not (${PYTEST_SKIP_MARKERS})")

@@ -42,7 +42,7 @@ help:
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
 	@echo "  test-logs      Follow test environment logs"
 	@echo "  test-clean-db  Drop stale test databases (test_mko_bazuna + gw* shards)"
-	@echo "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
+	@echo "  test-recreate  Drop and rebuild test DB schema (--create-db)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint           Ruff"
@@ -154,7 +154,7 @@ test-recreate: test-clean-db
 	# test-clean-db (pre-flight) drops stale test_mko_bazuna* + gw* databases,
 	# handling stuck connections from crashed xdist workers before pytest runs.
 	docker compose $(COMPOSE_TEST) up -d db
-	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
+	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --dist loadgroup" test
 
 # ====================== Django ======================
 
