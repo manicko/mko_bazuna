@@ -475,6 +475,150 @@ class TestRelevanceTiebreaker:
         assert ids.index(ad_newer.id) < ids.index(ad_older.id)
 
 
+class TestFtsSortOrder:
+    """FTS search results honor ``?sort=`` with relevance-first default (PO-2=A).
+
+    The ``-rank`` annotation is always kept as a secondary tiebreaker so that
+    within a chosen sort direction, more relevant ads still float to the top.
+    """
+
+    def test_fts_price_asc_orders_by_price(self, seller, category, city) -> None:
+        ad_50 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=50,
+            status=AdStatus.PUBLISHED,
+        )
+        ad_200 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=200,
+            status=AdStatus.PUBLISHED,
+        )
+        ad_100 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=100,
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ids == [ad_50.id, ad_100.id, ad_200.id]
+
+    def test_fts_price_desc_orders_by_price(self, seller, category, city) -> None:
+        ad_50 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=50,
+            status=AdStatus.PUBLISHED,
+        )
+        ad_200 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=200,
+            status=AdStatus.PUBLISHED,
+        )
+        ad_100 = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=100,
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            f"/search/?q=велосипед&sort={AdSort.PRICE_HIGH}",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ids == [ad_200.id, ad_100.id, ad_50.id]
+
+    def test_fts_price_asc_nulls_last(self, seller, category, city) -> None:
+        ad_priced = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=100,
+            status=AdStatus.PUBLISHED,
+        )
+        ad_null = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=None,
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ad_priced.id in ids
+        assert ad_null.id in ids
+        # NULL price must sort last (nulls_last=True), not first.
+        assert ids[-1] == ad_null.id
+
+    def test_fts_default_sort_is_relevance(self, seller, category, city) -> None:
+        now = timezone.now()
+        ad_older = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=now - timedelta(days=1),
+        )
+        ad_newer = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=now,
+        )
+
+        client = Client()
+        response = client.get(
+            "/search/?q=велосипед",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ad_newer.id in ids
+        assert ad_older.id in ids
+        # Relevance-first default: equal rank breaks by -published_at, so the
+        # newer ad appears before the older one (unchanged behavior).
+        assert ids.index(ad_newer.id) < ids.index(ad_older.id)
+
+
 class TestFilterUrlReset:
     """Verify that filter URL state is reset/replaced, not accumulated (Plan 29).
 
@@ -503,12 +647,35 @@ class TestFilterUrlReset:
         assert content.count("hx-get=") == 9
         assert content.count('hx-push-url="true"') == 9
 
+    def test_lang_param_in_all_htmx_urls(self) -> None:
+        """Every ``hx-get`` URL in ``ad_list.html`` preserves ``LANGUAGE_CODE`` as ``&lang=``."""
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        content = path.read_text(encoding="utf-8")
+        # 9 links × 2 attrs (href + hx-get) = 18 occurrences
+        assert content.count("LANGUAGE_CODE") >= 18
+
     def test_clear_all_filters_has_push_url(self) -> None:
         """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
         path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         content = path.read_text(encoding="utf-8")
         assert 'hx-push-url="true"' in content
         assert 'hx-get="?page=1' in content
+
+    def test_sort_dropdown_is_not_gated_on_query(self) -> None:
+        """The sort ``<select>`` must always render, even on search results (PO-2)."""
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
+        content = path.read_text(encoding="utf-8")
+        assert "{% if not query %}" not in content
+
+    def test_price_inputs_use_default_filter(self) -> None:
+        """Min/max price inputs use ``|default:''`` so ``None`` renders as empty, not ``"None"``."""
+        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
+        content = path.read_text(encoding="utf-8")
+        assert 'value="{{ min_price|default:\'\' }}"' in content
+        assert 'value="{{ max_price|default:\'\' }}"' in content
+        # The raw "{{ min_price }}" / "{{ max_price }}" without the filter must not appear.
+        assert 'value="{{ min_price }}"' not in content
+        assert 'value="{{ max_price }}"' not in content
 
     # ------------------------------------------------------------------ #
     # Integration tests — HTMX rendered output
@@ -564,6 +731,26 @@ class TestFilterUrlReset:
         assert 'hx-push-url="true"' in content
         assert "Page navigation" in content
 
+    def test_lang_param_preserved_in_rendered_output(
+        self, seller, category, city
+    ) -> None:
+        """HTMX request with ``?lang=en`` renders URLs containing ``&lang=en``."""
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            count=25,
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        response = client.get(
+            "/?lang=en",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "&lang=en" in content
+
     # ------------------------------------------------------------------ #
     # Behavioral test — no parameter accumulation
     # ------------------------------------------------------------------ #
@@ -601,3 +788,20 @@ class TestFilterUrlReset:
         ids = {a.id for a in response.context["page_obj"]}
         assert ad_delivery.id in ids
         assert ad_negotiable.id not in ids
+
+
+class TestSortOnSearchResults:
+    """The sort dropdown renders on ``/search/?q=`` results (T4, PO-2)."""
+
+    def test_sort_dropdown_visible_on_search_results(
+        self, seller, category, city
+    ) -> None:
+        create_test_ad(
+            seller, category, city, title="Транспорт велосипед", status=AdStatus.PUBLISHED
+        )
+        client = Client()
+        response = client.get(
+            "/search/?q=транспорт", headers={"HX-Request": "true"}
+        )
+        assert response.status_code == 200
+        assert "<select name=\"sort\"" in response.content.decode("utf-8")

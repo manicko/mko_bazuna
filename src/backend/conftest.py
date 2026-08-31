@@ -46,11 +46,18 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
     can run during session setup (even for unit-only tests that lack the
     ``django_db`` marker).
     Idempotent: safe to run even when migrations are active (after squash
-    without MIGRATION_MODULES).
+    without MIGRATION_MODULES). migrate --run-syncdb is also idempotent and
+    ensures tables for unmigrated apps (e.g. currencies) exist even on --reuse-db.
     """
     from django.core.management import call_command
 
     with django_db_blocker.unblock():
+        # Ensure tables for unmigrated apps exist. With MIGRATION_MODULES=
+        # DisableMigrations (test settings), app tables are only created via
+        # syncdb during django_db_setup. However, if the test DB was reused
+        # (--reuse-db) with a stale state, the currencies table may be absent.
+        # migrate --run-syncdb is idempotent and recreates any missing tables.
+        call_command("migrate", "--run-syncdb")
         call_command("load_exchange_rates")
         call_command("setup_search_triggers")
 

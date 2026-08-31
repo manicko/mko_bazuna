@@ -1,44 +1,42 @@
 {% comment %} Cabinet Favorites section (CAB-002). Reuses the shared ad-card partial.
    Removing a favorite (heart toggle) re-fetches the list fragment so the card
-   disappears without a full page reload. {% endcomment %}
+disappears without a full page reload. {% endcomment %}
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Favorites" %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-</head>
-<body class="bg-gray-50 min-h-screen"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% include "components/header.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-4">❤️ {% trans "Favorites" %}</h2>
-
-        {% include "components/cabinet_nav.html" %}
-
-        <div id="favorites-list">
-            {% if page_obj %}
-                {% include "ads/partials/ad_list.html" %}
-            {% else %}
-                <div class="text-center py-12 bg-white rounded-lg">
-                    <p class="text-gray-600 text-lg">{% trans "No favorites yet" %}</p>
-                    <p class="text-gray-500 mt-2">
-                        {% trans "Tap the heart on any ad to save it here." %}
-                    </p>
-                </div>
-            {% endif %}
-        </div>
-    </main>
-
-    <script>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Favorites" %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen"
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        {% include "components/header.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <h2 class="text-xl font-semibold mb-4">❤️ {% trans "Favorites" %}</h2>
+            {% include "components/cabinet_nav.html" %}
+            <div id="favorites-list">
+                {% if page_obj %}
+                    {% include "ads/partials/ad_list.html" %}
+                {% else %}
+                    <div class="text-center py-12 bg-white rounded-lg">
+                        <p class="text-gray-600 text-lg">{% trans "No favorites yet" %}</p>
+                        <p class="text-gray-500 mt-2">{% trans "Tap the heart on any ad to save it here." %}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+        <script>
         // After a favorite is toggled, re-fetch the list fragment so removing a
         // favorite drops its card from the page without a full reload.
         document.body.addEventListener('favorite:toggled', function () {
@@ -46,6 +44,6 @@
             const url = '{% url 'cabinet:favorites' %}';
             htmx.ajax('GET', url, { target: '#favorites-list', swap: 'innerHTML' });
         });
-    </script>
-</body>
+        </script>
+    </body>
 </html>

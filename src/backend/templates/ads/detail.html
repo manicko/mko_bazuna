@@ -5,102 +5,111 @@
 {% load i18n %}
 {% load trust_tags %}
 {% load price_tags %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ ad|get_title:LANGUAGE_CODE }} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    <link rel="stylesheet" href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-</head>
-<body class="bg-gray-50 min-h-screen"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% include "components/header_catalog.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <article class="bg-white rounded-lg shadow overflow-hidden">
-            <!-- Photo gallery + ad details: image left (photo width), text to the
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ ad|get_title:LANGUAGE_CODE }} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        <link rel="stylesheet"
+              href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen"
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        {% include "components/header_catalog.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <article class="bg-white rounded-lg shadow overflow-hidden">
+                <!-- Photo gallery + ad details: image left (photo width), text to the
                  right on wide screens; text wraps below the image on narrow screens -->
-            <div class="flex flex-col lg:flex-row items-start gap-6">
-            {% if ad.images.all %}
-            <div class="gallery flex-shrink-0" data-detail-gallery>
-                {# Main image preview with prev/next arrow navigation #}
-                {% with primary=ad.images.first %}
-                <div class="relative w-full max-w-lg aspect-[4/3] mx-auto mb-4">
-                    <a id="detail-main-link"
-                       href="{{ primary.image_url }}"
-                       class="glightbox" data-gallery="ad-gallery"
-                       data-description="{{ primary.alt_text|default:'' }}"
-                       aria-label="{% trans "Open image" %} 1">
-                         <img id="detail-main-image"
-                              src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
-                              alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
-                              class="w-full h-full object-contain object-center bg-gray-100 rounded-lg"
-                              fetchpriority="high"
-                              loading="eager"
-                              width="1280" height="960">
-                    </a>
-                    {% if ad.images.count > 1 %}
-                    <button id="detail-prev" type="button"
-                            class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            aria-label="{% trans "Previous image" %}">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 19l-7-7 7-7"></path>
-                        </svg>
-                    </button>
-                    <button id="detail-next" type="button"
-                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            aria-label="{% trans "Next image" %}">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
-                    {% endif %}
-                </div>
-                {% endwith %}
-
-                {% comment %} Hidden GLightbox anchors for all remaining images so the overlay
+                <div class="flex flex-col lg:flex-row items-start gap-6">
+                    {% if ad.images.all %}
+                        <div class="gallery flex-shrink-0" data-detail-gallery>
+                            {# Main image preview with prev/next arrow navigation #}
+                            {% with primary=ad.images.first %}
+                                <div class="relative w-full max-w-lg aspect-[4/3] mx-auto mb-4">
+                                    <a id="detail-main-link"
+                                       href="{{ primary.image_url }}"
+                                       class="glightbox"
+                                       data-gallery="ad-gallery"
+                                       data-description="{{ primary.alt_text|default:'' }}"
+                                       aria-label="{% trans "Open image" %} 1">
+                                        <img id="detail-main-image"
+                                             src="{{ primary.thumbnail_large_url|default:primary.image_url }}"
+                                             alt="{% trans "Photo" %} {% trans "of" %} {{ ad|get_title:LANGUAGE_CODE }}"
+                                             class="w-full h-full object-contain object-center bg-gray-100 rounded-lg"
+                                             fetchpriority="high"
+                                             loading="eager"
+                                             width="1280"
+                                             height="960">
+                                    </a>
+                                    {% if ad.images.count > 1 %}
+                                        <button id="detail-prev"
+                                                type="button"
+                                                class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="{% trans "Previous image" %}">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <button id="detail-next"
+                                                type="button"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1 shadow hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                aria-label="{% trans "Next image" %}">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            {% endwith %}
+                            {% comment %} Hidden GLightbox anchors for all remaining images so the overlay
                    gallery group contains every image (GLightbox groups by
-                   data-gallery on .glightbox elements). {% endcomment %}
-                {% if ad.images.count > 1 %}
-                {% for image in ad.images.all %}{% if not forloop.first %}
-                <a href="{{ image.image_url }}" class="glightbox" data-gallery="ad-gallery"
-                   data-description="{{ image.alt_text|default:'' }}" style="display:none;"></a>
-                {% endif %}{% endfor %}
-                {% endif %}
-
-                {# Horizontal thumbnail strip #}
-                <div id="detail-thumbs"
-                     class="flex justify-center gap-2 overflow-x-auto scroll-px-2 pb-1 max-w-lg mx-auto"
-                     style="-webkit-overflow-scrolling: touch;"
-                     data-detail-thumbs>
-                    {% for image in ad.images.all %}
-                    <button type="button"
-                            class="flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 border-transparent hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            data-index="{{ forloop.counter0 }}"
-                            data-full-url="{{ image.image_url }}"
-                            data-thumb-url="{{ image.thumbnail_large_url|default:image.image_url }}"
-                            aria-label="{% trans "Select image" %} {{ forloop.counter }}">
-                        <img src="{{ image.thumbnail_small_url|default:image.image_url }}"
-                             alt="{% trans "Photo" %} {{ forloop.counter }}"
-                             class="w-full h-full object-cover">
-                    </button>
-                    {% endfor %}
-                </div>
-            </div>
-
-            {% comment %} Minimal inline JS for thumbnail strip + arrow navigation.
-               Updates both the main <img src> and the GLightbox anchor href
-               atomically so fullscreen always opens the correct image. {% endcomment %}
-            <script>
+                            data-gallery on .glightbox elements). {% endcomment %}
+                            {% if ad.images.count > 1 %}
+                                {% for image in ad.images.all %}
+                                    {% if not forloop.first %}
+                                        <a href="{{ image.image_url }}"
+                                           class="glightbox"
+                                           data-gallery="ad-gallery"
+                                           data-description="{{ image.alt_text|default:'' }}"
+                                           style="display:none"></a>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            {# Horizontal thumbnail strip #}
+                            <div id="detail-thumbs"
+                                 class="flex justify-center gap-2 overflow-x-auto scroll-px-2 pb-1 max-w-lg mx-auto"
+                                 style="-webkit-overflow-scrolling: touch"
+                                 data-detail-thumbs>
+                                {% for image in ad.images.all %}
+                                    <button type="button"
+                                            class="flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 border-transparent hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            data-index="{{ forloop.counter0 }}"
+                                            data-full-url="{{ image.image_url }}"
+                                            data-thumb-url="{{ image.thumbnail_large_url|default:image.image_url }}"
+                                            aria-label="{% trans "Select image" %} {{ forloop.counter }}">
+                                        <img src="{{ image.thumbnail_small_url|default:image.image_url }}"
+                                             alt="{% trans "Photo" %} {{ forloop.counter }}"
+                                             class="w-full h-full object-cover">
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% comment %} Minimal inline JS for thumbnail strip + arrow navigation.
+               Updates both the main 
+<img src>
+ and the GLightbox anchor href
+                        atomically so fullscreen always opens the correct image. {% endcomment %}
+                        <script>
             (function(){'use strict';
             var g=document.querySelector('[data-detail-gallery]');if(!g)return;
             var img=g.querySelector('#detail-main-image'),lnk=g.querySelector('#detail-main-link');
@@ -110,90 +119,75 @@
             if(p){p.onclick=function(){if(i>0)update(i-1);};}if(nx){nx.onclick=function(){if(i<thumbs.length-1)update(i+1);};}
             thumbs.forEach(function(b){b.onclick=function(){update(Number(b.dataset.index));};});
             })();
-            </script>
-            {% endif %}
-
-            <div class="p-6 lg:pt-0 flex-1">
-                <div class="flex items-start justify-between gap-4">
-                    <h1 class="text-3xl font-bold mb-4">{{ ad|get_title:LANGUAGE_CODE }}
-                        {% render_trust_badge ad.user %}</h1>
-                    {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
+                        </script>
+                    {% endif %}
+                    <div class="p-6 lg:pt-0 flex-1">
+                        <div class="flex items-start justify-between gap-4">
+                            <h1 class="text-3xl font-bold mb-4">
+                                {{ ad|get_title:LANGUAGE_CODE }}
+                                {% render_trust_badge ad.user %}
+                            </h1>
+                            {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
+                        </div>
+                        {% if ad.price_amount %}
+                            <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
+                        {% endif %}
+                        <div class="mb-6">
+                            <p class="text-gray-700 whitespace-pre-wrap">{{ ad|get_description:LANGUAGE_CODE }}</p>
+                        </div>
+                        {% if display_features %}
+                            <div class="mb-6">
+                                <div class="flex flex-wrap gap-2">
+                                    {% for f in display_features %}
+                                        {% include "components/feature_tag.html" with feature=f only %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
+                            <div>
+                                <span class="font-medium">{% trans "Location:" %}</span>
+                                {{ ad.city|get_city_name:LANGUAGE_CODE }}
+                            </div>
+                            <div>
+                                <span class="font-medium">{% trans "Category:" %}</span>
+                                {{ ad.category|get_category_name:LANGUAGE_CODE }}
+                            </div>
+                            <div>
+                                <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
+                                    {% trans "Published:" %} {{ ad.published_at|date:'M d, Y' }}
+                                </time>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
-                {% if ad.price_amount %}
-                    <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
-                {% endif %}
-                
-                 <div class="mb-6">
-                     <p class="text-gray-700 whitespace-pre-wrap">{{ ad|get_description:LANGUAGE_CODE }}</p>
-                 </div>
-                 
-                 {% if display_features %}
-                 <div class="mb-6">
-                     <div class="flex flex-wrap gap-2">
-                         {% for f in display_features %}
-                         {% include "components/feature_tag.html" with feature=f only %}
-                         {% endfor %}
-                     </div>
-                 </div>
-                 {% endif %}
-                 
-                 <div class="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
-                    <div>
-                        <span class="font-medium">{% trans "Location:" %}</span> 
-                        {{ ad.city|get_city_name:LANGUAGE_CODE }}
-                    </div>
-                    <div>
-                        <span class="font-medium">{% trans "Category:" %}</span> 
-                        {{ ad.category|get_category_name:LANGUAGE_CODE }}
-                    </div>
-                    <div>
-                        <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
-                            {% trans "Published:" %} {{ ad.published_at|date:'M d, Y' }}
-                        </time>
-                    </div>
+                <!-- Contact button - zone R2 conditions enforced -->
+                <div class="p-6 border-t bg-gray-50">
+                    {% if ad|can_contact %}
+                        <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
+                           class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                            {% trans "Contact Seller" %}
+                        </a>
+                    {% else %}
+                        <button type="button"
+                                class="px-6 py-3 bg-gray-400 text-white rounded-lg font-medium cursor-not-allowed"
+                                disabled>{% trans "Contact Seller" %}</button>
+                        <p class="text-xs text-gray-500 mt-2">{% trans "Seller unavailable for contact" %}</p>
+                    {% endif %}
                 </div>
+            </article>
+            <div class="mt-6">
+                <a href="javascript:history.back()"
+                   class="text-blue-600 hover:underline">&larr; {% trans "Back to listings" %}</a>
             </div>
-            </div>
-
-            <!-- Contact button - zone R2 conditions enforced -->
-            <div class="p-6 border-t bg-gray-50">
-                {% if ad|can_contact %}
-                    <a 
-                        href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
-                        class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                    >
-                        {% trans "Contact Seller" %}
-                    </a>
-                {% else %}
-                    <button 
-                        type="button" 
-                        class="px-6 py-3 bg-gray-400 text-white rounded-lg font-medium cursor-not-allowed"
-                        disabled
-                    >
-                        {% trans "Contact Seller" %}
-                    </button>
-                    <p class="text-xs text-gray-500 mt-2">
-                        {% trans "Seller unavailable for contact" %}
-                    </p>
-                {% endif %}
-            </div>
-        </article>
-
-        <div class="mt-6">
-            <a href="javascript:history.back()" class="text-blue-600 hover:underline">
-                &larr; {% trans "Back to listings" %}
-            </a>
-        </div>
-    </main>
-
-    {% if not request.user.is_authenticated or not request.user.is_deleted %}
-    {% include "components/consent_banner.html" %}
-    {% endif %}
-
-    {% if consent_analytics %}
-    <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js" defer></script>
-    <script>
+        </main>
+        {% if not request.user.is_authenticated or not request.user.is_deleted %}
+            {% include "components/consent_banner.html" %}
+        {% endif %}
+        {% if consent_analytics %}
+            <script src="https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js"
+                    defer></script>
+            <script>
       document.addEventListener('DOMContentLoaded', function () {
         GLightbox({
           selector: '.glightbox',
@@ -204,8 +198,8 @@
           navigation: { next: true, prev: true },
         });
       });
-    </script>
-    {% endif %}
-    {% include "components/footer.html" %}
-</body>
+            </script>
+        {% endif %}
+        {% include "components/footer.html" %}
+    </body>
 </html>

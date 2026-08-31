@@ -3,246 +3,206 @@
 {% load price_tags %}
 {% load i18n %}
 {% load localized_content %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Moderate Ad" %} {{ ad.id }} - Mko Bazuna Admin</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <a href="/admin/">Mko Bazuna Admin</a>
-            </h1>
-            {% include "components/language_switcher.html" %}
-        </div>
-    </header>
-
-    <main class="container mx-auto px-4 py-6">
-        <div class="mb-4">
-            <a href="../" class="text-blue-600 hover:underline">&larr; {% trans "Back to moderation queue" %}</a>
-        </div>
-
-        <article class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="p-6">
-                <div class="flex justify-between items-start mb-4">
-                    <h1 class="text-2xl font-bold">{{ ad.title }}</h1>
-                    <span class="px-3 py-1 text-sm font-semibold rounded-full 
-                        {% if ad.status == 'on_moderation' %}bg-yellow-100 text-yellow-800
-                        {% elif ad.status == 'on_moderation_failed' %}bg-red-100 text-red-800
-                        {% elif ad.status == 'rejected' %}bg-gray-100 text-gray-800{% endif %}">
-                        {{ ad.get_status_display }}
-                    </span>
-                </div>
-
-                {% if ad.price_amount %}
-                    <p class="text-blue-600 font-bold text-2xl mb-4">{{ ad|format_price }}</p>
-                {% endif %}
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div>
-                        <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "Category" %}</h3>
-                        <p>{{ ad.category|get_category_name:LANGUAGE_CODE }}</p>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Moderate Ad" %} {{ ad.id }} - Mko Bazuna Admin</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        <header class="bg-white shadow-sm border-b">
+            <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <a href="/admin/">Mko Bazuna Admin</a>
+                </h1>
+                {% include "components/language_switcher.html" %}
+            </div>
+        </header>
+        <main class="container mx-auto px-4 py-6">
+            <div class="mb-4">
+                <a href="../" class="text-blue-600 hover:underline">&larr; {% trans "Back to moderation queue" %}</a>
+            </div>
+            <article class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <h1 class="text-2xl font-bold">{{ ad.title }}</h1>
+                        <span class="px-3 py-1 text-sm font-semibold rounded-full {% if ad.status == 'on_moderation' %}bg-yellow-100 text-yellow-800 {% elif ad.status == 'on_moderation_failed' %}bg-red-100 text-red-800 {% elif ad.status == 'rejected' %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ ad.get_status_display }}
+                        </span>
                     </div>
-                    <div>
-                        <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "Location" %}</h3>
-                        <p>{{ ad.city|get_city_name:LANGUAGE_CODE }}</p>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "User" %}</h3>
-                        <p>{% trans "Telegram ID:" %} {{ ad.user.telegram_id }}</p>
-                    </div>
-                </div>
-
-                <div class="mb-6">
-                    <h3 class="font-semibold text-sm text-gray-600 mb-2">{% trans "Description" %}</h3>
-                    <div class="prose max-w-none">
-                        <p class="text-gray-700 whitespace-pre-wrap">{{ ad.description }}</p>
-                    </div>
-                </div>
-
-                <div class="mb-6">
-                    <h3 class="font-semibold text-sm text-gray-600 mb-2">{% blocktrans with count=ad.images.count %}Photos ({{ count }}){% endblocktrans %}</h3>
-                    {% if ad.images.all %}
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                            {% for image in ad.images.all %}
-                                <div class="aspect-square">
-                                    <img 
-                                        src="{{ image.image_url }}" 
-                                        alt="{% blocktrans with counter=forloop.counter %}Photo {{ counter }}{% endblocktrans %}"
-                                        loading="lazy"
-                                        class="w-full h-full object-cover rounded-lg cursor-pointer"
-                                        onclick="openLightbox('{{ image.image_url }}', {{ forloop.counter }})"
-                                    >
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-gray-500">{% trans "No photos" %}</p>
+                    {% if ad.price_amount %}
+                        <p class="text-blue-600 font-bold text-2xl mb-4">{{ ad|format_price }}</p>
                     {% endif %}
-                </div>
-
-                {% if ad.status == 'on_moderation' %}
-                    <div class="border-t pt-6">
-                        <h3 class="font-semibold mb-3">{% trans "Moderation Actions" %}</h3>
-                        
-                        <form method="post" action="../approve/{{ ad.id }}/" class="inline">
-                            {% csrf_token %}
-                            <button 
-                                type="submit"
-                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2"
-                            >
-                                {% trans "Approve" %}
-                            </button>
-                        </form>
-
-                        <button 
-                            type="button"
-                            onclick="openRejectModal()"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2"
-                        >
-                            {% trans "Reject" %}
-                        </button>
-
-                        <button 
-                            type="button"
-                            onclick="openBanModal()"
-                            class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
-                        >
-                            {% trans "Ban User" %}
-                        </button>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div>
+                            <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "Category" %}</h3>
+                            <p>{{ ad.category|get_category_name:LANGUAGE_CODE }}</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "Location" %}</h3>
+                            <p>{{ ad.city|get_city_name:LANGUAGE_CODE }}</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-sm text-gray-600 mb-1">{% trans "User" %}</h3>
+                            <p>{% trans "Telegram ID:" %} {{ ad.user.telegram_id }}</p>
+                        </div>
                     </div>
-                {% elif ad.status == 'on_moderation_failed' %}
-                    <div class="border-t pt-6">
-                        <h3 class="font-semibold mb-3">{% trans "Failed Auto-Moderation" %}</h3>
-                        <p class="text-gray-600 mb-4">{% trans "This ad failed automatic checks. You can approve, reject, or ban the user." %}</p>
-                        
-                        <form method="post" action="../approve/{{ ad.id }}/" class="inline">
-                            {% csrf_token %}
-                            <button 
-                                type="submit"
-                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2"
-                            >
-                                {% trans "Approve" %}
-                            </button>
-                        </form>
-
-                        <button 
-                            type="button"
-                            onclick="openRejectModal()"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2"
-                        >
-                            {% trans "Reject" %}
-                        </button>
-
-                        <button 
-                            type="button"
-                            onclick="openBanModal()"
-                            class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
-                        >
-                            {% trans "Ban User" %}
-                        </button>
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-sm text-gray-600 mb-2">{% trans "Description" %}</h3>
+                        <div class="prose max-w-none">
+                            <p class="text-gray-700 whitespace-pre-wrap">{{ ad.description }}</p>
+                        </div>
                     </div>
-                {% endif %}
-            </div>
-        </article>
-
-        <!-- Reject Modal -->
-        <div id="rejectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg max-w-lg w-full mx-4">
-                <div class="p-6">
-                    <h3 class="text-lg font-bold mb-4">{% blocktrans with id=ad.id %}Reject Ad {{ id }}{% endblocktrans %}</h3>
-                    <form method="post" action="../reject/{{ ad.id }}/">
-                        {% csrf_token %}
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">{% trans "Reject Reason (Layer-2 Checklist)" %}</label>
-                            <select name="reason_category" class="w-full px-3 py-2 border rounded-lg mb-2" required>
-                                <option value="">{% trans "Select a reason..." %}</option>
-                                <option value="adult_content">{% trans "Adult content" %}</option>
-                                <option value="violence_gore">{% trans "Violence / Gore" %}</option>
-                                <option value="drugs_weapons">{% trans "Drugs / Weapons" %}</option>
-                                <option value="hate_speech">{% trans "Hate speech" %}</option>
-                                <option value="counterfeit_goods">{% trans "Counterfeit goods" %}</option>
-                                <option value="illegal_goods">{% trans "Illegal goods" %}</option>
-                                <option value="spam_scam">{% trans "Spam / Scam" %}</option>
-                                <option value="off_topic">{% trans "Off-topic" %}</option>
-                            </select>
-                        </div>
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">{% trans "Additional Details (optional)" %}</label>
-                            <textarea 
-                                name="reason_text" 
-                                rows="3" 
-                                class="w-full px-3 py-2 border rounded-lg"
-                                placeholder="{% trans "Add more details about the rejection..." %}"
-                            ></textarea>
-                        </div>
-                        <div class="flex justify-end gap-2">
-                            <button 
-                                type="button" 
-                                onclick="closeRejectModal()"
-                                class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
-                            >
-                                {% trans "Cancel" %}
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-sm text-gray-600 mb-2">{% blocktrans with count=ad.images.count %}Photos ({{ count }}){% endblocktrans %}</h3>
+                        {% if ad.images.all %}
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {% for image in ad.images.all %}
+                                    <div class="aspect-square">
+                                        <img src="{{ image.image_url }}"
+                                             alt="{% blocktrans with counter=forloop.counter %}Photo {{ counter }}{% endblocktrans %}"
+                                             loading="lazy"
+                                             class="w-full h-full object-cover rounded-lg cursor-pointer"
+                                             onclick="openLightbox('{{ image.image_url }}', {{ forloop.counter }})">
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500">{% trans "No photos" %}</p>
+                        {% endif %}
+                    </div>
+                    {% if ad.status == 'on_moderation' %}
+                        <div class="border-t pt-6">
+                            <h3 class="font-semibold mb-3">{% trans "Moderation Actions" %}</h3>
+                            <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2">
+                                    {% trans "Approve" %}
+                                </button>
+                            </form>
+                            <button type="button"
+                                    onclick="openRejectModal()"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2">
+                                {% trans "Reject" %}
                             </button>
-                            <button 
-                                type="submit"
-                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            >
-                                {% trans "Reject Ad" %}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ban User Modal -->
-        <div id="banModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg max-w-lg w-full mx-4">
-                <div class="p-6">
-                    <h3 class="text-lg font-bold mb-4">{% blocktrans with tid=ad.user.telegram_id %}Ban User (Telegram ID: {{ tid }}){% endblocktrans %}</h3>
-                    <form method="post" action="../ban/{{ ad.id }}/">
-                        {% csrf_token %}
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">{% trans "Ban Reason" %}</label>
-                            <textarea 
-                                name="ban_reason" 
-                                rows="3" 
-                                class="w-full px-3 py-2 border rounded-lg"
-                                placeholder="{% trans "Reason for banning this user..." %}"
-                                required
-                            ></textarea>
-                        </div>
-                        <div class="flex justify-end gap-2">
-                            <button 
-                                type="button" 
-                                onclick="closeBanModal()"
-                                class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
-                            >
-                                {% trans "Cancel" %}
-                            </button>
-                            <button 
-                                type="submit"
-                                class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-                            >
+                            <button type="button"
+                                    onclick="openBanModal()"
+                                    class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium">
                                 {% trans "Ban User" %}
                             </button>
                         </div>
-                    </form>
+                    {% elif ad.status == 'on_moderation_failed' %}
+                        <div class="border-t pt-6">
+                            <h3 class="font-semibold mb-3">{% trans "Failed Auto-Moderation" %}</h3>
+                            <p class="text-gray-600 mb-4">{% trans "This ad failed automatic checks. You can approve, reject, or ban the user." %}</p>
+                            <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2">
+                                    {% trans "Approve" %}
+                                </button>
+                            </form>
+                            <button type="button"
+                                    onclick="openRejectModal()"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium mr-2">
+                                {% trans "Reject" %}
+                            </button>
+                            <button type="button"
+                                    onclick="openBanModal()"
+                                    class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium">
+                                {% trans "Ban User" %}
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+            <!-- Reject Modal -->
+            <div id="rejectModal"
+                 class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg max-w-lg w-full mx-4">
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold mb-4">{% blocktrans with id=ad.id %}Reject Ad {{ id }}{% endblocktrans %}</h3>
+                        <form method="post" action="../reject/{{ ad.id }}/">
+                            {% csrf_token %}
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">{% trans "Reject Reason (Layer-2 Checklist)" %}</label>
+                                <select name="reason_category"
+                                        class="w-full px-3 py-2 border rounded-lg mb-2"
+                                        required>
+                                    <option value="">{% trans "Select a reason..." %}</option>
+                                    <option value="adult_content">{% trans "Adult content" %}</option>
+                                    <option value="violence_gore">{% trans "Violence / Gore" %}</option>
+                                    <option value="drugs_weapons">{% trans "Drugs / Weapons" %}</option>
+                                    <option value="hate_speech">{% trans "Hate speech" %}</option>
+                                    <option value="counterfeit_goods">{% trans "Counterfeit goods" %}</option>
+                                    <option value="illegal_goods">{% trans "Illegal goods" %}</option>
+                                    <option value="spam_scam">{% trans "Spam / Scam" %}</option>
+                                    <option value="off_topic">{% trans "Off-topic" %}</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">{% trans "Additional Details (optional)" %}</label>
+                                <textarea name="reason_text"
+                                          rows="3"
+                                          class="w-full px-3 py-2 border rounded-lg"
+                                          placeholder="{% trans "Add more details about the rejection..." %}"></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button type="button"
+                                        onclick="closeRejectModal()"
+                                        class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+                                    {% trans "Cancel" %}
+                                </button>
+                                <button type="submit"
+                                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                                    {% trans "Reject Ad" %}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
-    </main>
-
-    <script>
+            <!-- Ban User Modal -->
+            <div id="banModal"
+                 class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg max-w-lg w-full mx-4">
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold mb-4">{% blocktrans with tid=ad.user.telegram_id %}Ban User (Telegram ID: {{ tid }}){% endblocktrans %}</h3>
+                        <form method="post" action="../ban/{{ ad.id }}/">
+                            {% csrf_token %}
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">{% trans "Ban Reason" %}</label>
+                                <textarea name="ban_reason"
+                                          rows="3"
+                                          class="w-full px-3 py-2 border rounded-lg"
+                                          placeholder="{% trans "Reason for banning this user..." %}"
+                                          required></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button type="button"
+                                        onclick="closeBanModal()"
+                                        class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+                                    {% trans "Cancel" %}
+                                </button>
+                                <button type="submit"
+                                        class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+                                    {% trans "Ban User" %}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <script>
         function openRejectModal() {
             document.getElementById('rejectModal').classList.remove('hidden');
         }
@@ -258,6 +218,6 @@
         function openLightbox(url, index) {
             alert('{% trans "Photo" %} ' + index + ': ' + url);
         }
-    </script>
-</body>
+        </script>
+    </body>
 </html>

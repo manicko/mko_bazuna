@@ -1,36 +1,34 @@
 {% comment %} Cabinet settings stub (CAB-001 / CR16). No full settings UI; language
-   preference stays on the profile (D11). {% endcomment %}
+preference stays on the profile (D11). {% endcomment %}
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Settings" %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-</head>
-<body class="bg-gray-50 min-h-screen">
-    {% include "components/header.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-4">{% trans "Settings" %}</h2>
-
-        {% include "components/cabinet_nav.html" %}
-
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-600">
-                {% trans "Settings are not yet available. Language preference is managed on your profile." %}
-            </p>
-        </div>
-    </main>
-
-    {% if not request.user.is_authenticated or not request.user.is_deleted %}
-    {% include "components/consent_banner.html" %}
-    {% endif %}
-    {% include "components/footer.html" %}
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Settings" %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        {% include "components/header.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <h2 class="text-xl font-semibold mb-4">{% trans "Settings" %}</h2>
+            {% include "components/cabinet_nav.html" %}
+            <div class="bg-white rounded-lg shadow p-6">
+                <p class="text-gray-600">
+                    {% trans "Settings are not yet available. Language preference is managed on your profile." %}
+                </p>
+            </div>
+        </main>
+        {% if not request.user.is_authenticated or not request.user.is_deleted %}
+            {% include "components/consent_banner.html" %}
+        {% endif %}
+        {% include "components/footer.html" %}
+    </body>
 </html>

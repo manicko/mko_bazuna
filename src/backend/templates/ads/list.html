@@ -2,44 +2,43 @@
 {% load static %}
 {% load i18n %}
 {% load localized_content %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if query %}{% trans "Search" %}: {{ query }}{% elif current_category %}{% trans "Category" %}{% else %}{% trans "Ads" %}{% endif %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-</head>
-<body class="bg-gray-50 min-h-screen"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% include "components/header_catalog.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        {% if request.user.is_authenticated and cities %}
-            <div class="mb-4 flex justify-end">
-                <button type="button"
-                        onclick="var m=document.getElementById('save-search-modal'); if(m) m.classList.remove('hidden');"
-                        class="px-4 py-2 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm font-medium">
-                    🔔 {% trans "Save search" %}
-                </button>
-                {% include "search/partials/save_search_modal.html" %}
-            </div>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% if query %}{% trans "Search" %}: {{ query }}{% elif current_category %}{% trans "Category" %}{% else %}{% trans "Ads" %}{% endif %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
         {% endif %}
-        <!-- Dynamic content (filter form, sort control, ad grid, suggestions, pagination) -->
-        <div id="ad-list">
-            {% include "ads/partials/ad_list.html" %}
-        </div>
-    </main>
-
-    {% if not request.user.is_authenticated or not request.user.is_deleted %}
-    {% include "components/consent_banner.html" %}
-    {% endif %}
-    {% include "components/footer.html" %}
-    <script src="{% static 'theme/js/filter-dropdowns.js' %}"></script>
-</body>
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen"
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        {% include "components/header_catalog.html" %}
+        <main class="container mx-auto px-4 py-6">
+            {% if request.user.is_authenticated and cities %}
+                <div class="mb-4 flex justify-end">
+                    <button type="button"
+                            onclick="var m=document.getElementById('save-search-modal'); if(m) m.classList.remove('hidden');"
+                            class="px-4 py-2 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm font-medium">
+                        🔔 {% trans "Save search" %}
+                    </button>
+                    {% include "search/partials/save_search_modal.html" %}
+                </div>
+            {% endif %}
+            <!-- Dynamic content (filter form, sort control, ad grid, suggestions, pagination) -->
+            <div id="ad-list">{% include "ads/partials/ad_list.html" %}</div>
+        </main>
+        {% if not request.user.is_authenticated or not request.user.is_deleted %}
+            {% include "components/consent_banner.html" %}
+        {% endif %}
+        {% include "components/footer.html" %}
+        <script src="{% static 'theme/js/filter-dropdowns.js' %}"></script>
+    </body>
 </html>

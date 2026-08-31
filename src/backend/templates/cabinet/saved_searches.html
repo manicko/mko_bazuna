@@ -1,41 +1,40 @@
 {% comment %} Cabinet Saved-Search management section (CAB-003). Enable/disable keeps
-   the search saved (D9); delete removes the row. {% endcomment %}
+the search saved (D9); delete removes the row. {% endcomment %}
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Saved searches" %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    {% include "components/header.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-4">🔔 {% trans "Saved searches" %}</h2>
-
-        {% include "components/cabinet_nav.html" %}
-
-        {% if saved_searches %}
-            <div class="space-y-3">
-                {% for ss in saved_searches %}
-                    {% include "cabinet/partials/saved_search_row.html" with ss=ss %}
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-12 bg-white rounded-lg">
-                <p class="text-gray-600 text-lg">{% trans "No saved searches yet" %}</p>
-                <p class="text-gray-500 mt-2">
-                    {% trans 'Use the "Save search" button on search results to get Telegram alerts.' %}
-                </p>
-            </div>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Saved searches" %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
         {% endif %}
-    </main>
-</body>
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        {% include "components/header.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <h2 class="text-xl font-semibold mb-4">🔔 {% trans "Saved searches" %}</h2>
+            {% include "components/cabinet_nav.html" %}
+            {% if saved_searches %}
+                <div class="space-y-3">
+                    {% for ss in saved_searches %}
+                        {% include "cabinet/partials/saved_search_row.html" with ss=ss %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-12 bg-white rounded-lg">
+                    <p class="text-gray-600 text-lg">{% trans "No saved searches yet" %}</p>
+                    <p class="text-gray-500 mt-2">{% trans 'Use the "Save search" button on search results to get Telegram alerts.' %}</p>
+                </div>
+            {% endif %}
+        </main>
+    </body>
 </html>

@@ -1,84 +1,85 @@
 {# Consent banner component for Mko Bazuna. Implements decision F/K consent states (zone R3) with granular categories (Essential / Analytics / Preferences) per ePrivacy Art. 5(3) and EDPB guidance. Shown only when the user has not acted (`consent_shown` is False). Accept and Decline are offered at equal visual prominence (PO-02 / TR-07). #}
 {% load static %}
 {% load i18n %}
-
 {% if not consent_shown %}
-<div id="consent-banner" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
-    <div class="container mx-auto px-4 py-4">
-        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            <div class="text-sm text-gray-700">
-                <p>
-                    {% trans "We use cookies to keep the service working, to measure traffic and to remember your preferences. Please choose which non-essential cookies you allow." %}
-                </p>
-                <ul class="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
-                    <li><strong>{% trans "Essential" %}</strong> — {% trans "session and CSRF protection cookies (always on)" %}.</li>
-                    <li><strong>{% trans "Analytics" %}</strong> — {% trans "anonymized traffic analytics via Plausible" %}.</li>
-                    <li><strong>{% trans "Preferences" %}</strong> — {% trans "language and city selection" %}.</li>
-                </ul>
-                <p class="text-xs text-gray-500 mt-2">
-                    <a href="{% url 'core:privacy' %}" class="underline hover:text-gray-800">{% trans "Privacy details" %}</a>
-                </p>
-            </div>
-
-            <div class="flex flex-col gap-2 w-full lg:w-auto">
-                {# Granular category toggles #}
-                <div class="flex flex-wrap gap-3 text-xs text-gray-700">
-                    <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" checked disabled> {% trans "Essential" %}
-                    </label>
-                    <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" id="consent-cat-analytics" checked> {% trans "Analytics" %}
-                    </label>
-                    <label class="inline-flex items-center gap-1">
-                        <input type="checkbox" id="consent-cat-preferences" checked> {% trans "Preferences" %}
-                    </label>
+    <div id="consent-banner"
+         class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div class="text-sm text-gray-700">
+                    <p>
+                        {% trans "We use cookies to keep the service working, to measure traffic and to remember your preferences. Please choose which non-essential cookies you allow." %}
+                    </p>
+                    <ul class="text-xs text-gray-600 mt-2 space-y-1 list-disc list-inside">
+                        <li><strong>{% trans "Essential" %}</strong> — {% trans "session and CSRF protection cookies (always on)" %}.</li>
+                        <li><strong>{% trans "Analytics" %}</strong> — {% trans "anonymized traffic analytics via Plausible" %}.</li>
+                        <li><strong>{% trans "Preferences" %}</strong> — {% trans "language and city selection" %}.</li>
+                    </ul>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <a href="{% url 'core:privacy' %}" class="underline hover:text-gray-800">{% trans "Privacy details" %}</a>
+                    </p>
                 </div>
-
-                <div class="flex flex-wrap gap-2">
-                    {# Accept all #}
-                    <form method="post" action="{% url 'consent:accept' %}" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="choice" value="accepted">
-                        <input type="hidden" name="analytics" id="consent-analytics-val" value="true">
-                        <input type="hidden" name="preferences" id="consent-preferences-val" value="true">
-                        <input type="hidden" name="consent_version" value="1.0">
-                        <button
-                            type="submit"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
-                        >
-                            {% trans "Accept" %}
-                        </button>
-                    </form>
-
-                    {# Reject non-essential cookies #}
-                    <form method="post" action="{% url 'consent:decline' %}" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="choice" value="declined">
-                        <input type="hidden" name="analytics" value="false">
-                        <input type="hidden" name="preferences" id="consent-decline-preferences-val" value="true">
-                        <input type="hidden" name="consent_version" value="1.0">
-                        <button
-                            type="submit"
-                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm"
-                        >
-                            {% trans "Reject non-essential" %}
-                        </button>
-                    </form>
-
-                    {# Open preference center #}
-                    <a
-                        href="?ref=preferences"
-                        class="px-4 py-2 text-sm text-gray-600 rounded-lg border border-gray-300 hover:bg-gray-100 font-medium"
-                    >
-                        {% trans "Manage" %}
-                    </a>
+                <div class="flex flex-col gap-2 w-full lg:w-auto">
+                    {# Granular category toggles #}
+                    <div class="flex flex-wrap gap-3 text-xs text-gray-700">
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" checked disabled>
+                            {% trans "Essential" %}
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" id="consent-cat-analytics" checked>
+                            {% trans "Analytics" %}
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" id="consent-cat-preferences" checked>
+                            {% trans "Preferences" %}
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        {# Accept all #}
+                        <form method="post" action="{% url 'consent:accept' %}" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="choice" value="accepted">
+                            <input type="hidden"
+                                   name="analytics"
+                                   id="consent-analytics-val"
+                                   value="true">
+                            <input type="hidden"
+                                   name="preferences"
+                                   id="consent-preferences-val"
+                                   value="true">
+                            <input type="hidden" name="consent_version" value="1.0">
+                            <button type="submit"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+                                {% trans "Accept" %}
+                            </button>
+                        </form>
+                        {# Reject non-essential cookies #}
+                        <form method="post" action="{% url 'consent:decline' %}" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="choice" value="declined">
+                            <input type="hidden" name="analytics" value="false">
+                            <input type="hidden"
+                                   name="preferences"
+                                   id="consent-decline-preferences-val"
+                                   value="true">
+                            <input type="hidden" name="consent_version" value="1.0">
+                            <button type="submit"
+                                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm">
+                                {% trans "Reject non-essential" %}
+                            </button>
+                        </form>
+                        {# Open preference center #}
+                        <a href="?ref=preferences"
+                           class="px-4 py-2 text-sm text-gray-600 rounded-lg border border-gray-300 hover:bg-gray-100 font-medium">
+                            {% trans "Manage" %}
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
-<script>
+    <script>
 (function () {
     'use strict';
     var banner = document.getElementById('consent-banner');
@@ -100,5 +101,5 @@
     analyticsCheck.addEventListener('change', sync);
     preferencesCheck.addEventListener('change', sync);
 })();
-</script>
+    </script>
 {% endif %}

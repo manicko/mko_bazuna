@@ -4,141 +4,137 @@ Staff-only view showing moderation statistics, queue status, performance, and re
 {% endcomment %}
 {% load static %}
 {% load i18n %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Moderation Analytics" %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-</head>
-<body class="bg-gray-50 min-h-screen">
-    {% include "components/header.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-4">{% blocktrans with days=days %}Moderation Statistics (Last {{ days }} Days){% endblocktrans %}</h2>
-
-        {# ── Queue Status ── #}
-        <div class="bg-white rounded-lg shadow p-4 mb-6 border-l-4 {% if pending_queue_size > 0 %}border-yellow-400{% else %}border-green-400{% endif %}">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-500">{% trans "Pending Review Queue" %}</p>
-                    <p class="text-2xl font-bold {% if pending_queue_size > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
-                        {{ pending_queue_size }}
-                    </p>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Moderation Analytics" %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        {% include "components/header.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <h2 class="text-xl font-semibold mb-4">{% blocktrans with days=days %}Moderation Statistics (Last {{ days }} Days){% endblocktrans %}</h2>
+            {# ── Queue Status ── #}
+            <div class="bg-white rounded-lg shadow p-4 mb-6 border-l-4 {% if pending_queue_size > 0 %}border-yellow-400{% else %}border-green-400{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">{% trans "Pending Review Queue" %}</p>
+                        <p class="text-2xl font-bold {% if pending_queue_size > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            {{ pending_queue_size }}
+                        </p>
+                    </div>
+                    <a href="/admin/ads/ad/?status__exact=on_moderation"
+                       class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                        {% trans "Review Queue" %}
+                    </a>
                 </div>
-                <a href="/admin/ads/ad/?status__exact=on_moderation"
-                   class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                    {% trans "Review Queue" %}
-                </a>
             </div>
-        </div>
-
-        {# ── Action Summary Cards ── #}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white rounded-lg shadow p-4 text-center">
-                <p class="text-2xl font-bold text-green-600">{{ stats.approved }}</p>
-                <p class="text-xs text-gray-500">{% trans "Approved" %}</p>
+            {# ── Action Summary Cards ── #}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <p class="text-2xl font-bold text-green-600">{{ stats.approved }}</p>
+                    <p class="text-xs text-gray-500">{% trans "Approved" %}</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <p class="text-2xl font-bold text-red-600">{{ stats.rejected }}</p>
+                    <p class="text-xs text-gray-500">{% trans "Rejected" %}</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <p class="text-2xl font-bold text-yellow-600">{{ stats.flagged }}</p>
+                    <p class="text-xs text-gray-500">{% trans "Flagged" %}</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <p class="text-2xl font-bold text-blue-600">
+                        {% if stats.avg_time_to_moderate is not None %}
+                            {{ stats.avg_time_to_moderate }}h
+                        {% else %}
+                            —
+                        {% endif %}
+                    </p>
+                    <p class="text-xs text-gray-500">{% trans "Avg Time to Moderate" %}</p>
+                </div>
             </div>
-            <div class="bg-white rounded-lg shadow p-4 text-center">
-                <p class="text-2xl font-bold text-red-600">{{ stats.rejected }}</p>
-                <p class="text-xs text-gray-500">{% trans "Rejected" %}</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-4 text-center">
-                <p class="text-2xl font-bold text-yellow-600">{{ stats.flagged }}</p>
-                <p class="text-xs text-gray-500">{% trans "Flagged" %}</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-4 text-center">
-                <p class="text-2xl font-bold text-blue-600">
-                    {% if stats.avg_time_to_moderate is not None %}
-                        {{ stats.avg_time_to_moderate }}h
-                    {% else %}
-                        —
-                    {% endif %}
-                </p>
-                <p class="text-xs text-gray-500">{% trans "Avg Time to Moderate" %}</p>
-            </div>
-        </div>
-
-        {# ── Moderator Performance ── #}
-        {% if moderator_performance %}
-        <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Moderator Performance" %}</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600">
-                        <tr>
-                            <th class="text-left px-6 py-3">{% trans "Moderator ID" %}</th>
-                            <th class="text-right px-6 py-3">{% trans "Actions Taken" %}</th>
-                            <th class="text-right px-6 py-3">{% trans "Avg Time (hours)" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% for mod in moderator_performance %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3">{% blocktrans with mid=mod.moderator_id %}Moderator #{{ mid }}{% endblocktrans %}</td>
-                            <td class="px-6 py-3 text-right font-medium">{{ mod.actions_taken }}</td>
-                            <td class="px-6 py-3 text-right">
-                                {% if mod.avg_time_hours is not None %}
-                                    {{ mod.avg_time_hours }}
-                                {% else %}
-                                    <span class="text-gray-400">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+            {# ── Moderator Performance ── #}
+            {% if moderator_performance %}
+                <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+                    <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Moderator Performance" %}</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="text-left px-6 py-3">{% trans "Moderator ID" %}</th>
+                                    <th class="text-right px-6 py-3">{% trans "Actions Taken" %}</th>
+                                    <th class="text-right px-6 py-3">{% trans "Avg Time (hours)" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% for mod in moderator_performance %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-3">{% blocktrans with mid=mod.moderator_id %}Moderator #{{ mid }}{% endblocktrans %}</td>
+                                        <td class="px-6 py-3 text-right font-medium">{{ mod.actions_taken }}</td>
+                                        <td class="px-6 py-3 text-right">
+                                            {% if mod.avg_time_hours is not None %}
+                                                {{ mod.avg_time_hours }}
+                                            {% else %}
+                                                <span class="text-gray-400">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+            {# ── Rejection Reasons ── #}
+            {% if rejection_reasons %}
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Top Rejection Reasons" %}</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="text-left px-6 py-3">{% trans "Reason" %}</th>
+                                    <th class="text-right px-6 py-3">{% trans "Count" %}</th>
+                                    <th class="w-1/2 px-6 py-3">{% trans "Distribution" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% with total=rejection_reasons.values|dictsortreversed:0|first %}
+                                    {% for reason, count in rejection_reasons.items %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-3">{{ reason }}</td>
+                                            <td class="px-6 py-3 text-right font-medium">{{ count }}</td>
+                                            <td class="px-6 py-3">
+                                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                                    <div class="bg-red-500 h-2.5 rounded-full"
+                                                         style="width: {% widthratio count total 100 %}%"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endwith %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-12 bg-white rounded-lg">
+                    <p class="text-gray-600 text-lg">{% trans "No rejection data available" %}</p>
+                    <p class="text-gray-500 mt-2">{% trans "Rejection reasons will appear after moderators reject ads." %}</p>
+                </div>
+            {% endif %}
+        </main>
+        {% if not request.user.is_authenticated or not request.user.is_deleted %}
+            {% include "components/consent_banner.html" %}
         {% endif %}
-
-        {# ── Rejection Reasons ── #}
-        {% if rejection_reasons %}
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <h3 class="text-lg font-semibold px-6 py-4 border-b">{% trans "Top Rejection Reasons" %}</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600">
-                        <tr>
-                            <th class="text-left px-6 py-3">{% trans "Reason" %}</th>
-                            <th class="text-right px-6 py-3">{% trans "Count" %}</th>
-                            <th class="w-1/2 px-6 py-3">{% trans "Distribution" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% with total=rejection_reasons.values|dictsortreversed:0|first %}
-                        {% for reason, count in rejection_reasons.items %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-3">{{ reason }}</td>
-                            <td class="px-6 py-3 text-right font-medium">{{ count }}</td>
-                            <td class="px-6 py-3">
-                                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div class="bg-red-500 h-2.5 rounded-full" style="width: {% widthratio count total 100 %}%"></div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% endwith %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% else %}
-        <div class="text-center py-12 bg-white rounded-lg">
-            <p class="text-gray-600 text-lg">{% trans "No rejection data available" %}</p>
-            <p class="text-gray-500 mt-2">{% trans "Rejection reasons will appear after moderators reject ads." %}</p>
-        </div>
-        {% endif %}
-    </main>
-
-    {% if not request.user.is_authenticated or not request.user.is_deleted %}
-    {% include "components/consent_banner.html" %}
-    {% endif %}
-    {% include "components/footer.html" %}
-</body>
+        {% include "components/footer.html" %}
+    </body>
 </html>

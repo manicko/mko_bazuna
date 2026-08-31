@@ -8,47 +8,37 @@ Dependencies:
   - {{ LANGUAGE_CODE }} from context processor (apps.core.context_processors.language)
   - lang_pref cookie parsed by LanguagePreMiddleware (apps.core.middleware.language)
 {% endcomment %}
-
 {% load i18n %}
-
 <div class="relative inline-block" id="lang-switcher">
     {# Toggle button showing current language code #}
-    <button
-        type="button"
-        class="flex items-center gap-1 px-3 py-1 text-sm rounded hover:bg-gray-100 transition-colors"
-        aria-haspopup="true"
-        aria-expanded="false"
-        data-lang-switcher-toggle
-    >
+    <button type="button"
+            class="flex items-center gap-1 px-3 py-1 text-sm rounded hover:bg-gray-100 transition-colors"
+            aria-haspopup="true"
+            aria-expanded="false"
+            data-lang-switcher-toggle>
         <span class="font-medium">{{ LANGUAGE_CODE|upper }}</span>
-        <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-4 h-4 transition-transform"
+             fill="none"
+             stroke="currentColor"
+             viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
     </button>
-
     {# Dropdown menu #}
-    <div
-        class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
-        data-lang-switcher-menu
-    >
+    <div class="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-md shadow-lg z-50 hidden"
+         data-lang-switcher-menu>
         {% get_current_language as current_lang_code %}
         {% get_available_languages as available_languages %}
         {% get_language_info_list for available_languages as languages %}
-
         {% for language in languages %}
-            <a
-                href="?lang={{ language.code }}"
-                class="block px-4 py-2 text-sm transition-colors{% if language.code == current_lang_code %} bg-gray-100 text-gray-900 font-medium cursor-default{% else %} text-gray-700 hover:bg-gray-50 hover:text-gray-900{% endif %}"
-                data-lang="{{ language.code }}"
-                data-lang-switcher-link
-                {% if language.code == current_lang_code %}aria-current="true"{% endif %}
-            >
-                {{ language.name_local }}
-            </a>
+            <a href="?lang={{ language.code }}"
+               class="block px-4 py-2 text-sm transition-colors{% if language.code == current_lang_code %} bg-gray-100 text-gray-900 font-medium cursor-default{% else %} text-gray-700 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+               data-lang="{{ language.code }}"
+               data-lang-switcher-link
+               {% if language.code == current_lang_code %}aria-current="true"{% endif %}>{{ language.name_local }}</a>
         {% endfor %}
     </div>
 </div>
-
 <script>
 (function() {
     'use strict';

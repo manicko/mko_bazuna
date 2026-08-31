@@ -20,11 +20,11 @@
     }
   },
   "popular_searches": [
-    {"query": "iPhone", "hit_count": 150},
-    {"query": "car", "hit_count": 120},
-    {"query": "apartment", "hit_count": 90},
-    {"query": "sofa", "hit_count": 80},
-    {"query": "bike", "hit_count": 60}
+    {"query": "айфон", "hit_count": 150},
+    {"query": "автомобиль", "hit_count": 120},
+    {"query": "квартира", "hit_count": 90},
+    {"query": "диван", "hit_count": 80},
+    {"query": "велосипед", "hit_count": 60}
   ],
   "photo_manifest_version": 1,
   "template_version": 2

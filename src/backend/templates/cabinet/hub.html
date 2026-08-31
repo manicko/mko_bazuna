@@ -3,36 +3,36 @@
 {% load i18n %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% trans "Cabinet" %} - Mko Bazuna</title>
-    <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
-    {% if consent_analytics and PLAUSIBLE_HOST %}
-    <script defer data-domain="{{ PLAUSIBLE_HOST }}" src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-</head>
-<body class="bg-gray-50 min-h-screen"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% include "components/header.html" %}
-
-    <main class="container mx-auto px-4 py-6">
-        <h2 class="text-xl font-semibold mb-2">{% trans "Cabinet" %}</h2>
-        <p class="text-sm text-gray-500 mb-4">{{ request.user.username|default:request.user.email }}</p>
-
-        {% include "components/cabinet_nav.html" %}
-
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-700">
-                {% trans "Manage your favorites, saved-search alerts, and search history from this cabinet." %}
-            </p>
-        </div>
-    </main>
-
-    {% if not request.user.is_authenticated or not request.user.is_deleted %}
-    {% include "components/consent_banner.html" %}
-    {% endif %}
-    {% include "components/footer.html" %}
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% trans "Cabinet" %} - Mko Bazuna</title>
+        <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
+        {% if consent_analytics and PLAUSIBLE_HOST %}
+            <script defer
+                    data-domain="{{ PLAUSIBLE_HOST }}"
+                    src="https://{{ PLAUSIBLE_HOST }}/js/script.js"></script>
+        {% endif %}
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen"
+          hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        {% include "components/header.html" %}
+        <main class="container mx-auto px-4 py-6">
+            <h2 class="text-xl font-semibold mb-2">{% trans "Cabinet" %}</h2>
+            <p class="text-sm text-gray-500 mb-4">{{ request.user.username|default:request.user.email }}</p>
+            {% include "components/cabinet_nav.html" %}
+            <div class="bg-white rounded-lg shadow p-6">
+                <p class="text-gray-700">
+                    {% trans "Manage your favorites, saved-search alerts, and search history from this cabinet." %}
+                </p>
+            </div>
+        </main>
+        {% if not request.user.is_authenticated or not request.user.is_deleted %}
+            {% include "components/consent_banner.html" %}
+        {% endif %}
+        {% include "components/footer.html" %}
+    </body>
 </html>

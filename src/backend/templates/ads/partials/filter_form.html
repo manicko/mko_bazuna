@@ -1,7 +1,6 @@
 {# Filter form for listings/search. HTMX GET that targets the results container #ad-list. Preserves existing filters via hidden inputs. XSS-safe via Django autoescape. #}
 {% load i18n %}
 {% load localized_content %}
-
 <form method="get"
       hx-get="{{ request.path }}"
       hx-target="#ad-list"
@@ -11,53 +10,61 @@
     {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
     {% if current_category %}<input type="hidden" name="category" value="{{ current_category }}">{% endif %}
     {% if current_city %}<input type="hidden" name="city" value="{{ current_city }}">{% endif %}
-
     <div class="flex flex-wrap gap-4 items-end">
         {% if resolved_purposes %}
             <div>
-                <label for="listing_purpose" class="block text-sm font-medium text-gray-700 mb-1">
-                    {% trans "Listing purpose" %}
-                </label>
-                <select name="listing_purpose" id="listing_purpose" class="px-3 py-2 border rounded-lg text-sm bg-white">
+                <label for="listing_purpose"
+                       class="block text-sm font-medium text-gray-700 mb-1">{% trans "Listing purpose" %}</label>
+                <select name="listing_purpose"
+                        id="listing_purpose"
+                        class="px-3 py-2 border rounded-lg text-sm bg-white">
                     <option value="">{% trans "Any" %}</option>
                     {% for p in resolved_purposes %}
-                        <option value="{{ p.slug }}" {% if current_listing_purpose == p.slug %}selected{% endif %}>
+                        <option value="{{ p.slug }}"
+                                {% if current_listing_purpose == p.slug %}selected{% endif %}>
                             {{ p|get_lookup_name:LANGUAGE_CODE }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
-         {% endif %}
-
+        {% endif %}
         {% if resolved_conditions %}
             <div>
-                <label for="listing_condition" class="block text-sm font-medium text-gray-700 mb-1">
-                    {% trans "Condition" %}
-                </label>
-                <select name="condition" id="listing_condition" class="px-3 py-2 border rounded-lg text-sm bg-white">
+                <label for="listing_condition"
+                       class="block text-sm font-medium text-gray-700 mb-1">{% trans "Condition" %}</label>
+                <select name="condition"
+                        id="listing_condition"
+                        class="px-3 py-2 border rounded-lg text-sm bg-white">
                     <option value="">{% trans "Any" %}</option>
                     {% for c in resolved_conditions %}
-                        <option value="{{ c.slug }}" {% if current_condition == c.slug %}selected{% endif %}>
+                        <option value="{{ c.slug }}"
+                                {% if current_condition == c.slug %}selected{% endif %}>
                             {{ c|get_lookup_name:LANGUAGE_CODE }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
         {% endif %}
-
-         <div>
+        <div>
             <label for="min_price" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Min price" %}</label>
-            <input type="number" name="min_price" id="min_price" min="0" step="0.01"
-                   value="{{ min_price }}"
+            <input type="number"
+                   name="min_price"
+                   id="min_price"
+                   min="0"
+                   step="0.01"
+                   value="{{ min_price|default:'' }}"
                    class="px-3 py-2 border rounded-lg text-sm bg-white w-28">
         </div>
         <div>
             <label for="max_price" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Max price" %}</label>
-            <input type="number" name="max_price" id="max_price" min="0" step="0.01"
-                   value="{{ max_price }}"
+            <input type="number"
+                   name="max_price"
+                   id="max_price"
+                   min="0"
+                   step="0.01"
+                   value="{{ max_price|default:'' }}"
                    class="px-3 py-2 border rounded-lg text-sm bg-white w-28">
         </div>
-
         {% if resolved_features %}
             <div data-filter-trigger class="relative">
                 <button type="button"
@@ -69,7 +76,10 @@
                     {% if current_features %}
                         <span class="text-xs text-gray-500">({{ current_features|length }})</span>
                     {% endif %}
-                    <svg class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 transition-transform duration-150"
+                         fill="none"
+                         stroke="currentColor"
+                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </button>
@@ -91,37 +101,35 @@
                 </div>
             </div>
         {% endif %}
-
         {% if resolved_purposes or resolved_features or resolved_conditions %}
             <div>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
                     {% trans "Apply filters" %}
                 </button>
             </div>
         {% endif %}
-
-        {% if not query %}
         <div class="flex items-end gap-2">
-            <label for="sort" class="block text-sm font-medium text-gray-700 mb-1">
-                {% trans "Sort" %}
-            </label>
-            <select name="sort" id="sort"
+            <label for="sort" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Sort" %}</label>
+            <select name="sort"
+                    id="sort"
                     class="px-3 py-2 border rounded-lg text-sm bg-white"
                     onchange="this.form.requestSubmit()">
-                <option value="date_desc" {% if current_sort == 'date_desc' or not current_sort %}selected{% endif %}>
+                <option value="date_desc"
+                        {% if current_sort == 'date_desc' or not current_sort %}selected{% endif %}>
                     {% trans "Newest first" %}
                 </option>
-                <option value="date_asc" {% if current_sort == 'date_asc' %}selected{% endif %}>
-                    {% trans "Oldest first" %}
-                </option>
-                <option value="price_asc" {% if current_sort == 'price_asc' %}selected{% endif %}>
+                <option value="date_asc"
+                        {% if current_sort == 'date_asc' %}selected{% endif %}>{% trans "Oldest first" %}</option>
+                <option value="price_asc"
+                        {% if current_sort == 'price_asc' %}selected{% endif %}>
                     {% trans "Price: low to high" %}
                 </option>
-                <option value="price_desc" {% if current_sort == 'price_desc' %}selected{% endif %}>
+                <option value="price_desc"
+                        {% if current_sort == 'price_desc' %}selected{% endif %}>
                     {% trans "Price: high to low" %}
                 </option>
             </select>
         </div>
-        {% endif %}
     </div>
 </form>

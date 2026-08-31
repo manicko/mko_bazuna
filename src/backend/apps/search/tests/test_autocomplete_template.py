@@ -64,6 +64,23 @@ def test_search_input_has_htmx_autocomplete_attributes() -> None:
     assert 'autocomplete="off"' in _HEADER_CATALOG_CONTENT
 
 
+def test_header_search_form_has_no_csrf_token() -> None:
+    """The GET search form must not carry ``{% csrf_token %}`` — a CSRF token on
+    a GET form leaks into the URL query string as ``csrfmiddlewaretoken``
+    (Spec B1, R1). The whole ``header_catalog`` template must be free of the
+    ``csrfmiddlewaretoken`` literal so no GET form can leak it."""
+    assert "csrfmiddlewaretoken" not in _HEADER_CATALOG_CONTENT
+
+
+def test_search_clear_button_is_wired_to_history_back() -> None:
+    """A clear-search button is rendered when ``query`` is truthy and navigates
+    back via ``window.history.back()`` (Spec B2, R2; PO-1=A)."""
+    assert "data-search-clear" in _HEADER_CATALOG_CONTENT
+    assert "window.history.back()" in _HEADER_CATALOG_CONTENT, (
+        "Clear-search button must restore the pre-search history entry"
+    )
+
+
 def test_autocomplete_dropdown_element_exists() -> None:
     """The dropdown ``<ul>`` element is rendered after the input."""
     assert '<ul id="autocomplete-dropdown"' in _HEADER_CATALOG_CONTENT
@@ -87,6 +104,24 @@ def test_no_settings_dot_access_in_template() -> None:
 def test_bot_username_comes_from_context() -> None:
     """The place-an-ad deep-link uses the ``bot_username`` context var."""
     assert "{{ bot_username }}" in _HEADER_CATALOG_CONTENT
+
+
+def test_header_search_form_preserves_category_context() -> None:
+    """The search form carries a hidden ``category`` input bound to the
+    ``current_category`` context variable so scope is preserved when searching
+    from a category page (Spec B3, R3)."""
+    assert 'name="category"' in _HEADER_CATALOG_CONTENT
+    assert "current_category" in _HEADER_CATALOG_CONTENT
+    assert "value=\"{{ current_category }}\"" in _HEADER_CATALOG_CONTENT
+
+
+def test_header_search_form_preserves_city_context() -> None:
+    """The search form carries a hidden ``city`` input bound to the
+    ``current_city`` context variable so scope is preserved when searching
+    from a city page (Spec B3, R3)."""
+    assert 'name="city"' in _HEADER_CATALOG_CONTENT
+    assert "current_city" in _HEADER_CATALOG_CONTENT
+    assert "value=\"{{ current_city }}\"" in _HEADER_CATALOG_CONTENT
 
 
 def test_catalog_header_included_in_pages() -> None:

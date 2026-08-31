@@ -175,11 +175,31 @@ def search(request: HttpRequest) -> HttpResponse:
 
         # FTS search on the locale's per-language vector
         search_query = SearchQuery(query, search_type="websearch", config=config)
-        ads = ads.annotate(
-            rank=SearchRank(F(vector_field), search_query)
-        ).filter(**{vector_field: search_query}).order_by(
-            "-rank", "-published_at", "-id"
+        ads = ads.annotate(rank=SearchRank(F(vector_field), search_query)).filter(
+            **{vector_field: search_query}
         )
+
+        # Sort FTS results by the requested key, keeping relevance (-rank) as
+        # a secondary tiebreaker so buyers still see relevant results first
+        # within their chosen sort (PO-2=A).
+        if current_sort == AdSort.PRICE_LOW:
+            ads = ads.order_by(
+                F("price_normalized_eur").asc(nulls_last=True),
+                "-rank",
+                "-published_at",
+                "-id",
+            )
+        elif current_sort == AdSort.PRICE_HIGH:
+            ads = ads.order_by(
+                F("price_normalized_eur").desc(nulls_last=True),
+                "-rank",
+                "-published_at",
+                "-id",
+            )
+        elif current_sort == AdSort.DATE_OLD:
+            ads = ads.order_by("published_at", "-rank", "-id")
+        else:  # DATE_NEW — relevance-first default: -rank, -published_at, -id
+            ads = ads.order_by("-rank", "-published_at", "-id")
 
         # Record search event (analytics) after successful execution
         AnalyticsEvent.objects.create(
