@@ -273,6 +273,39 @@ class TestSearchViewDescendantCategories:
         assert len(ads_in_page) == 0
 
 
+class TestSearchViewCitySuggestion:
+    """Search view provides did-you-mean city suggestions (Block 8 V5)."""
+
+    def test_invalid_city_slug_suggests_similar(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """An invalid ``?city=`` slug triggers a did-you-mean suggestion via difflib."""
+        # Create a city with slug "budva" so the typo "budav" has a close match.
+        City.objects.create(
+            country_code="ME",
+            name="Будва",
+            region="Coastal",
+            slug="budva",
+        )
+        # Create an ad in the real city so the listing page has content
+        create_test_ad(
+            seller, root_category, city, title="Телефон", status=AdStatus.PUBLISHED
+        )
+
+        client = Client()
+        # "budav" is a typo close to "budva" — difflib should suggest it
+        response = client.get("/search/?city=budav")
+
+        assert response.status_code == 200
+        # The view should pass a suggestion to the template
+        assert response.context["suggested_city"] is not None
+        # The suggestion should be a valid city slug (not the raw typo)
+        assert response.context["suggested_city"] != "budav"
+
+
 class TestSearchViewPagination:
     """Search results are paginated (24 per page)."""
 

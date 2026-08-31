@@ -72,7 +72,7 @@ def get_entity_suggestions(
         {
             "text": cat.get_name(locale),
             "source": SearchSuggestionSource.CATEGORY.value,
-            "type": "category",
+            "type": SearchSuggestionSource.CATEGORY.value,
             "slug": cat.slug,
             "category_path": _category_path(cat, locale),
         }
@@ -83,7 +83,7 @@ def get_entity_suggestions(
         {
             "text": city.get_name(locale),
             "source": SearchSuggestionSource.CITY.value,
-            "type": "city",
+            "type": SearchSuggestionSource.CITY.value,
             "slug": city.slug,
         }
         for city in cities

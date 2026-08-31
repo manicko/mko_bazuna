@@ -14,8 +14,9 @@ from django.core.cache import cache
 from django.test import Client
 from django.utils import timezone
 
+from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, SearchSuggestionSource
+from apps.core.enums import AdStatus, AnalyticsEventType, SearchSuggestionSource
 from apps.locations.models import City
 from apps.search.models import PopularSearch, SearchHistory
 from apps.search.services.entity_suggestions import get_entity_suggestions
@@ -132,6 +133,7 @@ class TestAutocompleteEndpoint:
         for suggestion in data["suggestions"]:
             assert "text" in suggestion
             assert "source" in suggestion
+            assert "type" in suggestion
             assert suggestion["source"] in [
                 SearchSuggestionSource.USER_HISTORY.value,
                 SearchSuggestionSource.POPULAR_SEARCH.value,
@@ -196,6 +198,30 @@ class TestAutocompleteEndpoint:
         # "телефоны" should appear only once
         texts = [s["text"] for s in suggestions]
         assert texts.count("телефоны") == 1
+
+    def test_autocomplete_user_history_has_type_field(
+        self, buyer: User, root_category: Category
+    ) -> None:
+        """User-history suggestions carry ``type == source == 'user_history'``."""
+        SearchHistory.objects.create(
+            user=buyer, query="телефоны", query_normalized="телефоны"
+        )
+
+        client = Client()
+        client.force_login(buyer)
+        response = client.get("/api/search/autocomplete", {"q": "тел"})
+
+        assert response.status_code == 200
+        user_history_suggestions = [
+            s
+            for s in response.json()["suggestions"]
+            if s["source"] == SearchSuggestionSource.USER_HISTORY.value
+        ]
+        assert len(user_history_suggestions) == 1
+        assert (
+            user_history_suggestions[0]["type"]
+            == SearchSuggestionSource.USER_HISTORY.value
+        )
 
     def test_autocomplete_anonymous_user_returns_popular_and_entities(
         self, root_category: Category, city: City
@@ -410,6 +436,49 @@ class TestSearchHistoryService:
         for i in range(55):
             record_search_history(buyer.id, f"query{i}")
         assert SearchHistory.objects.filter(user=buyer).count() == 50
+
+    def test_get_user_search_history_with_prefix_db(self, buyer: User) -> None:
+        """Prefix filter limits DB-backed history to queries starting with prefix."""
+        record_search_history(buyer.id, "велосипед")
+        record_search_history(buyer.id, "автомобиль")
+        record_search_history(buyer.id, "велосипедный")
+
+        results = get_user_search_history(buyer.id, prefix="ве")
+
+        assert "велосипед" in results
+        assert "велосипедный" in results
+        assert "автомобиль" not in results
+
+    def test_get_user_search_history_prefix_case_insensitive(self, buyer: User) -> None:
+        """Prefix matching against DB history is case-insensitive."""
+        record_search_history(buyer.id, "Велосипед")
+
+        results = get_user_search_history(buyer.id, prefix="ве")
+
+        assert "Велосипед" in results
+
+    def test_get_user_search_history_prefix_session(self) -> None:
+        """Prefix filter works for anonymous session-backed history."""
+        from django.contrib.sessions.backends.db import SessionStore
+
+        session = SessionStore()
+        record_search_history(None, "велосипед", session=session)
+        record_search_history(None, "автомобиль", session=session)
+
+        results = get_user_search_history(None, prefix="ве", session=session)
+
+        assert "велосипед" in results
+        assert "автомобиль" not in results
+
+    def test_get_user_search_history_no_prefix_returns_all(self, buyer: User) -> None:
+        """Without a prefix, all history is returned (unchanged behavior)."""
+        record_search_history(buyer.id, "велосипед")
+        record_search_history(buyer.id, "автомобиль")
+
+        results = get_user_search_history(buyer.id)
+
+        assert "велосипед" in results
+        assert "автомобиль" in results
 
 
 # ---------------------------------------------------------------------------
@@ -649,3 +718,22 @@ class TestSearchViewRecordsAutocompleteData:
         response = client.get("/search/", {"category": "transport"})
         assert response.status_code == 200
         assert response.context["breadcrumb_category"] == root_category
+
+    def test_search_records_analytics_event(
+        self, seller: User, root_category: Category, city: City
+    ) -> None:
+        """Searching with a query creates an AnalyticsEvent (SEARCH_PERFORMED)."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        client = Client()
+        client.get("/search/?q=велосипед")
+        assert AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.SEARCH_PERFORMED
+        ).exists()

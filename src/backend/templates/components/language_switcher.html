@@ -9,6 +9,7 @@ Dependencies:
   - lang_pref cookie parsed by LanguagePreMiddleware (apps.core.middleware.language)
 {% endcomment %}
 {% load i18n %}
+{% load dict_tags %}
 <div class="relative inline-block" id="lang-switcher">
     {# Toggle button showing current language code #}
     <button type="button"
@@ -31,7 +32,7 @@ Dependencies:
         {% get_available_languages as available_languages %}
         {% get_language_info_list for available_languages as languages %}
         {% for language in languages %}
-            <a href="?lang={{ language.code }}"
+            <a href="?{% query_replace request lang=language.code %}"
                class="block px-4 py-2 text-sm transition-colors{% if language.code == current_lang_code %} bg-gray-100 text-gray-900 font-medium cursor-default{% else %} text-gray-700 hover:bg-gray-50 hover:text-gray-900{% endif %}"
                data-lang="{{ language.code }}"
                data-lang-switcher-link

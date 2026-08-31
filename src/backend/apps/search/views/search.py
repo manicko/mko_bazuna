@@ -9,6 +9,7 @@ One-word queries trigger fuzzy category detection.
 
 import logging
 import re
+from difflib import get_close_matches
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
@@ -24,6 +25,7 @@ from apps.core.utils.sanitize import sanitize_query_for_log
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.search_history import record_search_history
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
 
@@ -78,7 +80,7 @@ def search(request: HttpRequest) -> HttpResponse:
             city = City.objects.get(slug=current_city)
             ads = ads.filter(city_id=city.id)
         except City.DoesNotExist:
-            suggested_city = current_city
+            suggested_city = suggest_city(current_city)
 
     # Price range filter (EUR-equivalent values, CR-10)
     min_price = request.GET.get("min_price")
@@ -325,8 +327,6 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     Returns:
         Matching Category or None
     """
-    from difflib import get_close_matches
-
     active = list(Category.objects.filter(is_active=True))
     all_names = [category.get_name(locale.value) for category in active]
     matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
@@ -336,3 +336,4 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
             if category.get_name(locale.value) == matched_name:
                 return category
     return None
+

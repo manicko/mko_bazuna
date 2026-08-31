@@ -58,7 +58,7 @@ def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
         limit: Maximum number of suggestions to return (default 5).
 
     Returns:
-        A list of dicts, each with keys ``text``, ``source``, and
+        A list of dicts, each with keys ``text``, ``source``, ``type``, and
         ``hit_count``.
     """
     normalized_prefix = prefix.strip().lower()
@@ -74,6 +74,7 @@ def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
         {
             "text": obj.query,
             "source": SearchSuggestionSource.POPULAR_SEARCH.value,
+            "type": SearchSuggestionSource.POPULAR_SEARCH.value,
             "hit_count": obj.hit_count,
         }
         for obj in qs

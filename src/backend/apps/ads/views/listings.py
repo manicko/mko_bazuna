@@ -34,6 +34,7 @@ from django.core.paginator import Paginator
 from django.db.models import F, Q
 from django.conf import settings
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
 
@@ -296,7 +297,7 @@ def listings(
             ads = ads.filter(city_id=city.id)
         except City.DoesNotExist:
             # City not found - provide did-you-mean suggestions
-            suggested_city = _suggest_city(city_slug)
+            suggested_city = suggest_city(city_slug)
             # Show all ads but provide city suggestions
     elif request.GET.get("city"):
         effective_city = request.GET["city"]
@@ -305,7 +306,7 @@ def listings(
             ads = ads.filter(city_id=city.id)
         except City.DoesNotExist:
             # Invalid slug: did-you-mean banner, no filter (F-6).
-            suggested_city = _suggest_city(effective_city)
+            suggested_city = suggest_city(effective_city)
     else:
         # Default fallback to the preferred city (middleware-validated slug).
         preferred_city = getattr(request, "preferred_city", None)
@@ -474,32 +475,6 @@ def _suggest_category(slug: str) -> str | None:
     all_slugs = list(
         Category.objects.filter(is_active=True).values_list("slug", flat=True)
     )
-
-    matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
-
-    return matches[0] if matches else None
-
-
-def _suggest_city(slug: str) -> str | None:
-    """
-
-    Suggest similar city slug using difflib.
-
-
-
-    Args:
-
-        slug: The slug to find suggestions for
-
-
-
-    Returns:
-
-        Suggested slug or None
-
-    """
-
-    all_slugs = list(City.objects.values_list("slug", flat=True))
 
     matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
 

@@ -41,3 +41,30 @@ def get_item(dictionary: Any, key: Any) -> Any:
         return dictionary.get(key)
     except (AttributeError, TypeError):
         return None
+
+
+@register.simple_tag
+def query_replace(request: Any, **kwargs: Any) -> str:
+    """Copy ``request.GET``, apply keyword overrides, return a urlencoded string.
+
+    Each keyword argument sets (or replaces) the corresponding query parameter.
+    Useful in templates for building navigation links that preserve the current
+    query string while changing or adding selected parameters.
+
+    Usage in templates::
+
+        {% load dict_tags %}
+        <a href="?{% query_replace request lang=language.code %}">
+
+    Args:
+        request: The current ``HttpRequest`` (available via the ``request``
+            context processor).
+        **kwargs: Parameter name/value pairs to set on the resulting query.
+
+    Returns:
+        A URL-encoded query string (without the leading ``?``).
+    """
+    query = request.GET.copy()
+    for key, value in kwargs.items():
+        query[key] = value
+    return query.urlencode()

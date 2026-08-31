@@ -92,6 +92,7 @@ def get_user_search_history(
     user_id: int | None,
     limit: int = 5,
     session: Any = None,
+    prefix: str | None = None,
 ) -> list[str]:
     """
     Return the most recent search queries for a user.
@@ -101,10 +102,14 @@ def get_user_search_history(
     capped). When ``user_id`` is None and no session history exists, an empty
     list is returned.
 
+    When ``prefix`` is provided, results are filtered so that only queries
+    starting with the prefix (case-insensitive) are returned.
+
     Args:
         user_id: The user's primary key, or None for anonymous users.
         limit: Maximum number of entries to return (default 5).
         session: Optional Django session for anonymous session-scoped history.
+        prefix: Optional prefix to filter queries by (case-insensitive).
 
     Returns:
         A list of query strings, most recent first.
@@ -112,13 +117,18 @@ def get_user_search_history(
     if user_id is None:
         if session is not None:
             entries = session.get(_SESSION_KEY) or []
+            if prefix:
+                entries = [
+                    e
+                    for e in entries
+                    if e.get("query", "").lower().startswith(prefix.lower())
+                ]
             return [e["query"] for e in entries[:limit]]
         return []
 
-    qs = (
-        SearchHistory.objects.filter(user_id=user_id)
-        .order_by("-created_at")
-        .values_list("query", flat=True)[:limit]
-    )
+    qs = SearchHistory.objects.filter(user_id=user_id).order_by("-created_at")
+    if prefix:
+        qs = qs.filter(query__istartswith=prefix)
 
+    qs = qs.values_list("query", flat=True)[:limit]
     return list(qs)

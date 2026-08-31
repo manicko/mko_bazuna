@@ -61,12 +61,17 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
 
     # 1. User search history (highest priority, shown first).
     user_id = request.user.id if request.user.is_authenticated else None
-    user_history = get_user_search_history(user_id, session=request.session)
+    user_history = get_user_search_history(
+        user_id, prefix=query, session=request.session
+    )
     for item in user_history:
-        suggestions.append({
-            "text": item,
-            "source": SearchSuggestionSource.USER_HISTORY.value,
-        })
+        suggestions.append(
+            {
+                "text": item,
+                "source": SearchSuggestionSource.USER_HISTORY.value,
+                "type": SearchSuggestionSource.USER_HISTORY.value,
+            }
+        )
 
     # 2. Entity suggestions (categories + cities), localized to the
     #    active UI language.
