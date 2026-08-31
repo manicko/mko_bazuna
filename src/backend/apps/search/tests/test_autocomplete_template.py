@@ -139,9 +139,15 @@ def test_catalog_header_included_in_pages() -> None:
 
 def test_submenu_container_carries_hidden_class() -> None:
     """The lazy-loaded submenu container must start hidden so the accordion
-    can detect ``isOpen`` correctly (Spec_020 R-01a)."""
-    assert 'class="hidden ml-4" data-category-submenu="' in _SUBMENU_CONTENT, (
+    can detect ``isOpen`` correctly (Spec_020 R-01a).
+
+    Checks the ``hidden`` class and ``data-category-submenu`` attribute
+    independently so the assertion is robust to djlint line-wrapping."""
+    assert 'class="hidden ml-4"' in _SUBMENU_CONTENT, (
         "mega_submenu.html submenu container must carry the hidden class"
+    )
+    assert 'data-category-submenu=' in _SUBMENU_CONTENT, (
+        "mega_submenu.html submenu container must carry the data-category-submenu attribute"
     )
 
 
