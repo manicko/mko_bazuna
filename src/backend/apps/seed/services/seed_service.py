@@ -230,7 +230,7 @@ class SeedService:
         because ``User.objects.filter(ads__source=...)`` missed them.
         Categories and Cities are NOT deleted (they are static fixtures).
         """
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             # Direct source filters — no longer dependent on Ad FK traversal.
             # Deletion order is FK-safe: children before parents.
             # 1. DailyAdMetrics (FK to Ad, CASCADE)

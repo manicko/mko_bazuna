@@ -80,7 +80,7 @@ def _load_catalog(
         / "categories.yaml"
     )
     with django_db_blocker.unblock():
-        with transaction.atomic():
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
             load_catalog(catalog_path)
             City.objects.create(
                 name="Подгорица",
