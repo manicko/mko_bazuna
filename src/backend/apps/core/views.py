@@ -58,7 +58,8 @@ def csp_report(request: HttpRequest) -> JsonResponse:
     """
     if request.method != "POST":
         return JsonResponse(
-            {"status": "error", "error": "POST required"}, status=405,
+            {"status": "error", "error": "POST required"},
+            status=405,
         )
     try:
         report = json.loads(request.body)

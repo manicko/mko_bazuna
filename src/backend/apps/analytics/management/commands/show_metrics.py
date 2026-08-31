@@ -42,11 +42,12 @@ class Command(BaseCommand):
 
         # Aggregate by event type
         self.stdout.write("\nEvents by type:")
-        type_aggregates = AnalyticsEvent.objects.filter(
-            timestamp__gte=cutoff_date
-        ).values("event_type").annotate(
-            count=Count("id")
-        ).order_by("-count")
+        type_aggregates = (
+            AnalyticsEvent.objects.filter(timestamp__gte=cutoff_date)
+            .values("event_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
 
         for item in type_aggregates:
             event_type = item["event_type"]
@@ -56,13 +57,13 @@ class Command(BaseCommand):
         # Aggregate by date
         self.stdout.write("\nEvents by date (last 7 days):")
         seven_days_ago = timezone.now() - timedelta(days=7)
-        date_aggregates = AnalyticsEvent.objects.filter(
-            timestamp__gte=seven_days_ago
-        ).annotate(
-            date=TruncDate("timestamp")
-        ).values("date").annotate(
-            count=Count("id")
-        ).order_by("date")
+        date_aggregates = (
+            AnalyticsEvent.objects.filter(timestamp__gte=seven_days_ago)
+            .annotate(date=TruncDate("timestamp"))
+            .values("date")
+            .annotate(count=Count("id"))
+            .order_by("date")
+        )
 
         if not date_aggregates:
             self.stdout.write("  No events in the last 7 days")

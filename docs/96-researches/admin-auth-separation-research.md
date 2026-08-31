@@ -82,16 +82,16 @@ Django 5.2 `LogoutView` source (`.venv/Lib/site-packages/django/contrib/auth/vie
 
 ```python
 class LogoutView(RedirectURLMixin, TemplateView):
-    http_method_names = ["post", "options"]   # <-- NO "get"
+    http_method_names = ["post", "options"]  # <-- NO "get"
     template_name = "registration/logged_out.html"
 
-    @method_decorator(csrf_protect)           # <-- CSRF required on every request
+    @method_decorator(csrf_protect)  # <-- CSRF required on every request
     @method_decorator(never_cache)
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        auth_logout(request)                   # <-- calls request.session.flush()
+        auth_logout(request)  # <-- calls request.session.flush()
         redirect_to = self.get_success_url()
         ...
 ```
@@ -370,7 +370,7 @@ for same-site navigations but not for `<img>`-based attacks on the same site.
 
 2. **Register the URL** in `apps/users/urls.py`:
    ```python
-   path("logout/", logout_view, name="logout"),
+   (path("logout/", logout_view, name="logout"),)
    ```
    - Replaces the dead `<a href="/logout/">` links with a named URL
      `{% url 'consent:logout' %}`.
@@ -519,6 +519,7 @@ overrides, and careful audit of the login_status race conditions.
    ```python
    from django.contrib import admin
 
+
    class MkoBazunaAdminSite(admin.AdminSite):
        site_header = "Mko Bazuna Administration"
        site_title = "Mko Bazuna Admin"
@@ -614,6 +615,7 @@ Approach A.
 
 ```python
 """Logout view for Mko Bazuna sellers."""
+
 import logging
 from django.contrib.auth import logout as auth_logout
 from django.http import HttpRequest, HttpResponse
@@ -649,14 +651,20 @@ Why this instead of `LogoutView.as_view()`:
 **Step 2 — URL registration** (`apps/users/urls.py`):
 
 ```python
-from apps.users.views.consent import consent_accept, consent_decline, login_issue, login_status, consent_withdraw
+from apps.users.views.consent import (
+    consent_accept,
+    consent_decline,
+    login_issue,
+    login_status,
+    consent_withdraw,
+)
 from apps.users.views.logout import logout_view
 from django.urls import path
 
 urlpatterns = [
     path("logout/", logout_view, name="logout"),
     path("consent/accept/", consent_accept, name="accept"),
-    ...
+    ...,
 ]
 ```
 

@@ -63,7 +63,9 @@ class SellerStats:
         ads_published: int = user_ads.filter(status=AdStatus.PUBLISHED).count()
 
         # Build time-range filter for event queries
-        cutoff = timezone.now()  # fallback for ALL_TIME (unused when time_filter is empty)
+        cutoff = (
+            timezone.now()
+        )  # fallback for ALL_TIME (unused when time_filter is empty)
         time_filter = Q()
         if time_range in (TimeRange.THIRTY_DAYS, TimeRange.SEVEN_DAYS):
             days = 30 if time_range == TimeRange.THIRTY_DAYS else 7

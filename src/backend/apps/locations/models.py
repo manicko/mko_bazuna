@@ -4,7 +4,6 @@ City model for Mko Bazuna.
 Location reference data with i18n name support.
 """
 
-
 from django.db import models
 
 

@@ -123,9 +123,13 @@ def seller_with_ads(seller, category, city):
     )
 
     # Noise: other seller's events
-    _make_event(other_ad, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(hours=1))
     _make_event(
-        other_ad, AnalyticsEventType.CONTACT_INITIATED, timestamp=now - timedelta(hours=1)
+        other_ad, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(hours=1)
+    )
+    _make_event(
+        other_ad,
+        AnalyticsEventType.CONTACT_INITIATED,
+        timestamp=now - timedelta(hours=1),
     )
 
     # Noise: non-ad event for primary seller
@@ -210,7 +214,9 @@ class TestSellerStats:
         """Seller with no analytics events returns zeroed stats."""
         empty_user = _make_user(telegram_id=990001003)
         # One ad but zero events
-        create_test_ad(empty_user, category, city, title="Lonely Ad", status=AdStatus.PUBLISHED)
+        create_test_ad(
+            empty_user, category, city, title="Lonely Ad", status=AdStatus.PUBLISHED
+        )
 
         stats = SellerStats(user_id=empty_user.id).get_stats(TimeRange.ALL_TIME)
 

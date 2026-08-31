@@ -67,9 +67,7 @@ class TestTranslateAllLanguages:
         """Each locale receives the correct translation via parallel dispatch."""
         with patch(_TRANSLATE_PATH) as mock_translate:
             mock_translate.side_effect = lambda text, src, tgt: f"{text}-{tgt}"
-            result = await translate_all_languages(
-                "Hello", ["ru", "bs", "en"]
-            )
+            result = await translate_all_languages("Hello", ["ru", "bs", "en"])
 
         assert result["ru"] == "Hello-ru"
         assert result["bs"] == "Hello-bs"
@@ -83,9 +81,7 @@ class TestTranslateAllLanguages:
         """Returns original text when translation raises an exception."""
         with patch(_TRANSLATE_PATH) as mock_translate:
             mock_translate.side_effect = RuntimeError("Translation failed")
-            result = await translate_all_languages(
-                "Original text", ["ru", "bs"]
-            )
+            result = await translate_all_languages("Original text", ["ru", "bs"])
 
         assert result["ru"] == "Original text"
         assert result["bs"] == "Original text"
@@ -100,9 +96,7 @@ class TestTranslateAllLanguages:
 
         with patch(_TRANSLATE_PATH) as mock_translate:
             mock_translate.side_effect = _side_effect
-            result = await translate_all_languages(
-                "Hello", ["ru", "bs", "en"]
-            )
+            result = await translate_all_languages("Hello", ["ru", "bs", "en"])
 
         assert result["ru"] == "Hello-ru"
         assert result["bs"] == "Hello"  # fallback

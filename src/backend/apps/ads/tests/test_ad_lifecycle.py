@@ -69,7 +69,9 @@ class TestTransitionMatrixEdges:
         self, seller, category, city
     ):
         """ON_MODERATION_FAILED -> REJECTED is allowed (new matrix edge)."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
         ad.transition_to(AdStatus.REJECTED)
         ad.refresh_from_db()
 
@@ -124,9 +126,7 @@ class TestCheckConstraints:
         ad.refresh_from_db()
         assert ad.status == AdStatus.DRAFT
 
-    def test_checkconstraint_mutual_exclusivity(
-        self, seller, category, city
-    ):
+    def test_checkconstraint_mutual_exclusivity(self, seller, category, city):
         """Setting both moderation_failed_at and rejected_at raises IntegrityError."""
         ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
 

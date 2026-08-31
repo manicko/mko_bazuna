@@ -65,6 +65,7 @@ class AnalyticsEvent(models.Model):
     def __str__(self) -> str:
         return f"{self.event_type} at {self.timestamp}"
 
+
 class DailyAdMetrics(models.Model):
     """Daily aggregated metrics per ad for efficient dashboard queries."""
 
@@ -118,4 +119,6 @@ class DailyAdMetrics(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.ad_id} / {self.date} — v:{self.views_count} c:{self.contacts_count}"
+        return (
+            f"{self.ad_id} / {self.date} — v:{self.views_count} c:{self.contacts_count}"
+        )

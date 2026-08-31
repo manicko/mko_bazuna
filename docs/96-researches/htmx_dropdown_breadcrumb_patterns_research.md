@@ -83,11 +83,17 @@ Header renders only top-level (`Category.objects.root_nodes()`); subcategories a
 def category_submenu(request, category_slug):
     cat = get_object_or_404(Category, slug=category_slug)
     # descendants incl. self → active only, 2 levels for the panel
-    children = cat.get_children() if cat.level == 0 else cat.get_descendants(
-        include_self=False
-    )[:2]
+    children = (
+        cat.get_children()
+        if cat.level == 0
+        else cat.get_descendants(include_self=False)[:2]
+    )
     # render partial fragment
-    return render(request, "categories/partials/mega_submenu.html", {"cat": cat, "children": children})
+    return render(
+        request,
+        "categories/partials/mega_submenu.html",
+        {"cat": cat, "children": children},
+    )
 ```
 
 **Fragment:**

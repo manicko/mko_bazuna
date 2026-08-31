@@ -86,9 +86,7 @@ def banning_criteria(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_draft_ad(
-    seller: User, category: Category, city: City, **kwargs
-) -> Ad:
+def _make_draft_ad(seller: User, category: Category, city: City, **kwargs) -> Ad:
     """Create an Ad in DRAFT status with required FK fields."""
     defaults: dict = {
         "title": "Valid Title",
@@ -133,7 +131,9 @@ class TestDraftCreation:
 class TestDraftToPublished:
     """DRAFT -> ON_MODERATION -> PUBLISHED via auto_moderate."""
 
-    def test_auto_moderate_publishes_valid_ad(self, seller, category, city, permissive_criteria):
+    def test_auto_moderate_publishes_valid_ad(
+        self, seller, category, city, permissive_criteria
+    ):
         """A valid ad transitions DRAFT -> ON_MODERATION -> PUBLISHED via auto_moderate."""
         # Arrange: create draft ad and transition to ON_MODERATION
         ad = _make_draft_ad(seller, category, city)
@@ -149,7 +149,9 @@ class TestDraftToPublished:
         ad.refresh_from_db()
         assert ad.status == AdStatus.PUBLISHED
 
-    def test_auto_moderate_sets_published_at(self, seller, category, city, permissive_criteria):
+    def test_auto_moderate_sets_published_at(
+        self, seller, category, city, permissive_criteria
+    ):
         """published_at is set on successful auto-moderation."""
         ad = _make_draft_ad(seller, category, city)
         _transition_to_moderation(ad)
@@ -179,7 +181,9 @@ class TestDraftToPublished:
 class TestDraftToModerationFailed:
     """DRAFT -> ON_MODERATION -> ON_MODERATION_FAILED via auto_moderate."""
 
-    def test_auto_moderate_fails_banned_word(self, seller, category, city, banning_criteria):
+    def test_auto_moderate_fails_banned_word(
+        self, seller, category, city, banning_criteria
+    ):
         """Ad with banned word transitions to ON_MODERATION_FAILED."""
         ad = _make_draft_ad(seller, category, city, title="Spammy offer")
         _transition_to_moderation(ad)
@@ -281,7 +285,9 @@ class TestOriginalPublishedAtImmutability:
 class TestPublishedAtUpdates:
     """published_at is updated on every PUBLISHED transition."""
 
-    def test_published_at_updates_on_re_publish(self, seller, category, city, permissive_criteria):
+    def test_published_at_updates_on_re_publish(
+        self, seller, category, city, permissive_criteria
+    ):
         """published_at is refreshed on each PUBLISHED transition."""
         ad = _make_draft_ad(seller, category, city)
         _transition_to_moderation(ad)
@@ -341,7 +347,9 @@ class TestTransitionValidation:
 class TestAutoModerateIntegration:
     """Integration-level tests for auto_moderate with real DB objects."""
 
-    def test_auto_moderate_with_images_passes(self, seller, category, city, permissive_criteria):
+    def test_auto_moderate_with_images_passes(
+        self, seller, category, city, permissive_criteria
+    ):
         """auto_moderate passes when ad has images and meets criteria."""
         ad = _make_draft_ad(seller, category, city)
         _transition_to_moderation(ad)
@@ -355,7 +363,9 @@ class TestAutoModerateIntegration:
         ad.refresh_from_db()
         assert ad.status == AdStatus.PUBLISHED
 
-    def test_auto_moderate_creates_analytics_event(self, seller, category, city, permissive_criteria):
+    def test_auto_moderate_creates_analytics_event(
+        self, seller, category, city, permissive_criteria
+    ):
         """A successful auto_moderate creates an AnalyticsEvent."""
         from apps.analytics.models import AnalyticsEvent
 

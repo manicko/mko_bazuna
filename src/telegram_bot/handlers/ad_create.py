@@ -620,7 +620,7 @@ async def process_price(message: types.Message, state: FSMContext) -> None:
 
             await state.update_data(price_amount=payload.price_amount)
 
-        except (ValueError, Exception):
+        except ValueError, Exception:
             await message.answer("Invalid price. Enter a number or 'skip'.")
 
             return

@@ -49,7 +49,7 @@ def _is_git_available(root: Path) -> bool:
             check=True,
             capture_output=True,
         )
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         return False
     return True
 

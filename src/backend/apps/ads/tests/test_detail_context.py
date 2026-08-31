@@ -134,9 +134,8 @@ def test_detail_template_uses_bot_username_not_settings() -> None:
     """The rendered template variable name is ``bot_username``, not
     ``settings.BOT_USERNAME``."""
     content = (
-        (Path(__file__).resolve().parents[3] / "templates/ads/detail.html")
-        .read_text(encoding="utf-8")
-    )
+        Path(__file__).resolve().parents[3] / "templates/ads/detail.html"
+    ).read_text(encoding="utf-8")
     assert "{{ bot_username }}" in content
     assert "settings.BOT_USERNAME" not in content
 
@@ -146,9 +145,8 @@ def test_detail_template_uses_bot_username_not_settings() -> None:
 # ---------------------------------------------------------------------------
 
 _BREADCRUMB_CONTENT = (
-    (Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html")
-    .read_text(encoding="utf-8")
-)
+    Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html"
+).read_text(encoding="utf-8")
 
 
 def test_ellipsis_truncation_branch_present() -> None:

@@ -121,7 +121,9 @@ class Category(models.Model):  # No longer MPTTModel
     slug = models.SlugField(unique=True)
     is_active = models.BooleanField(...)
     parents = models.ManyToManyField(
-        "self", symmetrical=False, blank=True,
+        "self",
+        symmetrical=False,
+        blank=True,
         related_name="children",
     )
 ```
@@ -176,17 +178,21 @@ class Category(MPTTModel):
     # Existing model UNCHANGED
     name = ...
     slug = ...
-    parent = TreeForeignKey('self', ...)  # CANONICAL single parent
+    parent = TreeForeignKey("self", ...)  # CANONICAL single parent
     is_active = ...
+
 
 class CategoryPath(models.Model):
     """Alternative navigation paths for multi-parent browsing."""
+
     category = models.ForeignKey(
-        Category, on_delete=models.CASCADE,
+        Category,
+        on_delete=models.CASCADE,
         related_name="alt_paths",
     )
     parent = models.ForeignKey(
-        Category, on_delete=models.CASCADE,
+        Category,
+        on_delete=models.CASCADE,
         related_name="alt_children",
     )
     sort_order = models.PositiveIntegerField(default=0)
@@ -226,14 +232,18 @@ class CategoryPath(models.Model):
 #### Key Challenge
 The biggest engineering challenge is the **subtree expansion** in listings and search. Currently:
 ```python
-descendant_ids = category.get_descendants(include_self=True).values_list("id", flat=True)
+descendant_ids = category.get_descendants(include_self=True).values_list(
+    "id", flat=True
+)
 ads = ads.filter(category_id__in=descendant_ids)
 ```
 
 With Approach B, this must become:
 ```python
 # MPTT descendants (existing behavior)
-primary_ids = list(category.get_descendants(include_self=True).values_list("id", flat=True))
+primary_ids = list(
+    category.get_descendants(include_self=True).values_list("id", flat=True)
+)
 # Alternative paths (walk CategoryPath recursively or use a helper)
 alt_ids = _get_alt_subtree_ids(category)
 all_ids = primary_ids + alt_ids
@@ -255,6 +265,7 @@ class Category(models.Model):  # No longer MPTTModel
     slug = models.SlugField(unique=True)
     is_active = models.BooleanField(...)
 
+
 class CategoryClosure(models.Model):
     ancestor = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="+")
     descendant = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="+")
@@ -264,7 +275,7 @@ class CategoryClosure(models.Model):
         unique_together = ["ancestor", "descendant"]
         indexes = [
             models.Index(fields=["descendant"]),  # For ancestor lookups
-            models.Index(fields=["ancestor"]),     # For descendant lookups
+            models.Index(fields=["ancestor"]),  # For descendant lookups
         ]
 ```
 
@@ -309,7 +320,9 @@ class Category(models.Model):
     slug = models.SlugField(unique=True)
     is_active = models.BooleanField(...)
     parents = models.ManyToManyField(
-        "self", symmetrical=False, blank=True,
+        "self",
+        symmetrical=False,
+        blank=True,
         related_name="children",
     )
     # Materialized path: a string encoding all ancestor lineages

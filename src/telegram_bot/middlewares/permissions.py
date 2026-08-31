@@ -90,9 +90,7 @@ class AccountStateMiddleware(BaseMiddleware):
 
         return await handler(event, data)
 
-    async def _check_user_state(
-        self, chat_id: int
-    ) -> tuple[bool, str]:
+    async def _check_user_state(self, chat_id: int) -> tuple[bool, str]:
         """
         Check if user is banned, deleted, declined, or has revoked consent.
 
@@ -124,9 +122,7 @@ class AccountStateMiddleware(BaseMiddleware):
 
         return (True, "")
 
-    async def _check_publish_permission(
-        self, chat_id: int
-    ) -> tuple[bool, str]:
+    async def _check_publish_permission(self, chat_id: int) -> tuple[bool, str]:
         """
         Check if user can publish ads (ads_auto_publish flag).
 

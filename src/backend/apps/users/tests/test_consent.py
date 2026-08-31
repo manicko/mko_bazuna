@@ -42,7 +42,9 @@ class TestConsentAcceptView:
 
         # No DB write for anonymous consent (security gate D-3).
         assert (
-            ConsentRecord.objects.filter(user__isnull=False, choice=ConsentChoice.ACCEPTED).count()
+            ConsentRecord.objects.filter(
+                user__isnull=False, choice=ConsentChoice.ACCEPTED
+            ).count()
             == 0
         )
 
@@ -154,7 +156,9 @@ class TestConsentDeclineView:
         assert response.cookies["consent_preferences"].value == "true"
         # Anonymous consent never persists a DB record for a user account.
         assert (
-            ConsentRecord.objects.filter(user__isnull=False, choice=ConsentChoice.DECLINED).count()
+            ConsentRecord.objects.filter(
+                user__isnull=False, choice=ConsentChoice.DECLINED
+            ).count()
             == 0
         )
 
@@ -212,7 +216,9 @@ class TestConsentWithdrawView:
         """consent_withdraw soft-deletes the user, nulls PII, and marks consent revoked."""
         # Create some ads
         create_test_ad(user, category, city, title="Ad 1", status=AdStatus.PUBLISHED)
-        create_test_ad(user, category, city, title="Ad 2", status=AdStatus.ON_MODERATION)
+        create_test_ad(
+            user, category, city, title="Ad 2", status=AdStatus.ON_MODERATION
+        )
 
         client = Client()
         client.force_login(user)

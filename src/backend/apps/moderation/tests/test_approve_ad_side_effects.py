@@ -54,7 +54,9 @@ class TestApproveAdSideEffects:
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         with (
-            patch("apps.search.services.immediate_alerts.deliver_immediate_alerts") as mock_deliver,
+            patch(
+                "apps.search.services.immediate_alerts.deliver_immediate_alerts"
+            ) as mock_deliver,
             patch.object(transaction, "on_commit", side_effect=lambda fn: fn()),
         ):
             approve_ad(ad, moderator_id=seller.id)
@@ -70,7 +72,9 @@ class TestApproveAdSideEffects:
         # Mock on_commit to execute the callback immediately (simulates transaction commit).
         with (
             override_settings(IMMEDIATE_ALERTS_ENABLED=True),
-            patch("apps.search.services.immediate_alerts.deliver_immediate_alerts") as mock_deliver,
+            patch(
+                "apps.search.services.immediate_alerts.deliver_immediate_alerts"
+            ) as mock_deliver,
             patch.object(transaction, "on_commit", side_effect=lambda fn: fn()),
         ):
             approve_ad(ad, moderator_id=seller.id)
@@ -104,7 +108,9 @@ class TestApproveAdSideEffects:
         """Calling ``approve_ad`` on a PUBLISHED ad is a no-op (no error)."""
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
-        with patch("apps.search.services.immediate_alerts.deliver_immediate_alerts") as mock_deliver:
+        with patch(
+            "apps.search.services.immediate_alerts.deliver_immediate_alerts"
+        ) as mock_deliver:
             approve_ad(ad, moderator_id=seller.id)
 
         ad.refresh_from_db()

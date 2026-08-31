@@ -7,47 +7,178 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('ads', '0001_initial'),
+        ("ads", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='AnalyticsEvent',
+            name="AnalyticsEvent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('event_type', models.CharField(choices=[('registration_created', 'registration_created'), ('ad_published', 'ad_published'), ('search_performed', 'search_performed'), ('contact_initiated', 'contact_initiated'), ('search_alert_matched', 'search_alert_matched'), ('ad_viewed', 'ad_viewed'), ('contact_response', 'contact_response'), ('seller_verified', 'seller_verified'), ('trust_level_updated', 'trust_level_updated'), ('moderation_approved', 'moderation_approved'), ('moderation_rejected', 'moderation_rejected'), ('moderation_flagged', 'moderation_flagged'), ('dashboard_viewed', 'dashboard_viewed'), ('ad_edited', 'ad_edited'), ('ad_reactivated', 'ad_reactivated'), ('contact_completed', 'contact_completed'), ('ad_reported', 'ad_reported')], help_text='Type of analytics event', max_length=30)),
-                ('timestamp', models.DateTimeField(default=django.utils.timezone.now, help_text='Event timestamp')),
-                ('source', models.CharField(blank=True, choices=[('telegram', 'telegram'), ('seed', 'seed')], db_index=True, default=None, help_text="Origin of event (null = production, 'seed' = seed-generated)", max_length=20, null=True)),
-                ('ad', models.ForeignKey(blank=True, help_text='Ad associated with this event (null for non-ad events)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='analytics_events', to='ads.ad')),
-                ('user', models.ForeignKey(blank=True, help_text='User who triggered event (SET NULL on erasure)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='analytics_events', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "event_type",
+                    models.CharField(
+                        choices=[
+                            ("registration_created", "registration_created"),
+                            ("ad_published", "ad_published"),
+                            ("search_performed", "search_performed"),
+                            ("contact_initiated", "contact_initiated"),
+                            ("search_alert_matched", "search_alert_matched"),
+                            ("ad_viewed", "ad_viewed"),
+                            ("contact_response", "contact_response"),
+                            ("seller_verified", "seller_verified"),
+                            ("trust_level_updated", "trust_level_updated"),
+                            ("moderation_approved", "moderation_approved"),
+                            ("moderation_rejected", "moderation_rejected"),
+                            ("moderation_flagged", "moderation_flagged"),
+                            ("dashboard_viewed", "dashboard_viewed"),
+                            ("ad_edited", "ad_edited"),
+                            ("ad_reactivated", "ad_reactivated"),
+                            ("contact_completed", "contact_completed"),
+                            ("ad_reported", "ad_reported"),
+                        ],
+                        help_text="Type of analytics event",
+                        max_length=30,
+                    ),
+                ),
+                (
+                    "timestamp",
+                    models.DateTimeField(
+                        default=django.utils.timezone.now, help_text="Event timestamp"
+                    ),
+                ),
+                (
+                    "source",
+                    models.CharField(
+                        blank=True,
+                        choices=[("telegram", "telegram"), ("seed", "seed")],
+                        db_index=True,
+                        default=None,
+                        help_text="Origin of event (null = production, 'seed' = seed-generated)",
+                        max_length=20,
+                        null=True,
+                    ),
+                ),
+                (
+                    "ad",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Ad associated with this event (null for non-ad events)",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="analytics_events",
+                        to="ads.ad",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="User who triggered event (SET NULL on erasure)",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="analytics_events",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'db_table': 'analytics_events',
-                'indexes': [models.Index(fields=['event_type', 'timestamp'], name='idx_analytics_evt_ts')],
+                "db_table": "analytics_events",
+                "indexes": [
+                    models.Index(
+                        fields=["event_type", "timestamp"], name="idx_analytics_evt_ts"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='DailyAdMetrics',
+            name="DailyAdMetrics",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField(help_text='Date of aggregation')),
-                ('views_count', models.PositiveIntegerField(default=0, help_text='Number of views on this date')),
-                ('contacts_count', models.PositiveIntegerField(default=0, help_text='Number of contacts on this date')),
-                ('trust_score', models.FloatField(blank=True, help_text='Auto-computed trust score (0–100)', null=True)),
-                ('avg_response_time', models.FloatField(blank=True, help_text='Average response time in hours', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True, help_text='Record creation timestamp')),
-                ('updated_at', models.DateTimeField(auto_now=True, help_text='Record last update timestamp')),
-                ('ad', models.ForeignKey(help_text='Ad this metric belongs to', on_delete=django.db.models.deletion.CASCADE, related_name='daily_metrics', to='ads.ad')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField(help_text="Date of aggregation")),
+                (
+                    "views_count",
+                    models.PositiveIntegerField(
+                        default=0, help_text="Number of views on this date"
+                    ),
+                ),
+                (
+                    "contacts_count",
+                    models.PositiveIntegerField(
+                        default=0, help_text="Number of contacts on this date"
+                    ),
+                ),
+                (
+                    "trust_score",
+                    models.FloatField(
+                        blank=True,
+                        help_text="Auto-computed trust score (0–100)",
+                        null=True,
+                    ),
+                ),
+                (
+                    "avg_response_time",
+                    models.FloatField(
+                        blank=True,
+                        help_text="Average response time in hours",
+                        null=True,
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, help_text="Record creation timestamp"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        auto_now=True, help_text="Record last update timestamp"
+                    ),
+                ),
+                (
+                    "ad",
+                    models.ForeignKey(
+                        help_text="Ad this metric belongs to",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="daily_metrics",
+                        to="ads.ad",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'daily_ad_metrics',
-                'indexes': [models.Index(fields=['date', '-views_count'], name='idx_daily_metrics_date_views')],
-                'constraints': [models.UniqueConstraint(fields=('ad', 'date'), name='uq_daily_ad_metrics_ad_date')],
+                "db_table": "daily_ad_metrics",
+                "indexes": [
+                    models.Index(
+                        fields=["date", "-views_count"],
+                        name="idx_daily_metrics_date_views",
+                    )
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("ad", "date"), name="uq_daily_ad_metrics_ad_date"
+                    )
+                ],
             },
         ),
     ]

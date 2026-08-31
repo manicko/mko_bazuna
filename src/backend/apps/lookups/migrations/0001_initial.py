@@ -5,44 +5,121 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='LookupGroup',
+            name="LookupGroup",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('code', models.CharField(help_text='Machine-readable, immutable group code', max_length=100, unique=True)),
-                ('name_i18n', models.JSONField(blank=True, help_text="Localized names: {'ru': str, 'bs': str, 'en': str}", null=True)),
-                ('is_system', models.BooleanField(default=False, help_text='Protected from admin deletion')),
-                ('sort_order', models.PositiveIntegerField(default=0)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "code",
+                    models.CharField(
+                        help_text="Machine-readable, immutable group code",
+                        max_length=100,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "name_i18n",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Localized names: {'ru': str, 'bs': str, 'en': str}",
+                        null=True,
+                    ),
+                ),
+                (
+                    "is_system",
+                    models.BooleanField(
+                        default=False, help_text="Protected from admin deletion"
+                    ),
+                ),
+                ("sort_order", models.PositiveIntegerField(default=0)),
             ],
             options={
-                'verbose_name': 'lookup group',
-                'db_table': 'lookup_groups',
-                'ordering': ['sort_order'],
+                "verbose_name": "lookup group",
+                "db_table": "lookup_groups",
+                "ordering": ["sort_order"],
             },
         ),
         migrations.CreateModel(
-            name='LookupItem',
+            name="LookupItem",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('slug', models.SlugField(help_text='Globally unique identifier', max_length=100, unique=True)),
-                ('name_i18n', models.JSONField(blank=True, help_text="Localized names: {'ru': str, 'bs': str, 'en': str}", null=True)),
-                ('sort_order', models.PositiveIntegerField(default=0)),
-                ('is_active', models.BooleanField(default=True, help_text='Inactive items are hidden from UI and filter options')),
-                ('icon', models.CharField(blank=True, default='', help_text='Emoji or SVG icon name', max_length=50)),
-                ('color', models.CharField(blank=True, default='', help_text='Hex color code, e.g. #RRGGBB', max_length=7)),
-                ('group', models.ForeignKey(help_text='Parent lookup group', on_delete=django.db.models.deletion.CASCADE, related_name='items', to='lookups.lookupgroup')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "slug",
+                    models.SlugField(
+                        help_text="Globally unique identifier",
+                        max_length=100,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "name_i18n",
+                    models.JSONField(
+                        blank=True,
+                        help_text="Localized names: {'ru': str, 'bs': str, 'en': str}",
+                        null=True,
+                    ),
+                ),
+                ("sort_order", models.PositiveIntegerField(default=0)),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Inactive items are hidden from UI and filter options",
+                    ),
+                ),
+                (
+                    "icon",
+                    models.CharField(
+                        blank=True,
+                        default="",
+                        help_text="Emoji or SVG icon name",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "color",
+                    models.CharField(
+                        blank=True,
+                        default="",
+                        help_text="Hex color code, e.g. #RRGGBB",
+                        max_length=7,
+                    ),
+                ),
+                (
+                    "group",
+                    models.ForeignKey(
+                        help_text="Parent lookup group",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="items",
+                        to="lookups.lookupgroup",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'lookup item',
-                'db_table': 'lookup_items',
-                'ordering': ['group', 'sort_order'],
+                "verbose_name": "lookup item",
+                "db_table": "lookup_items",
+                "ordering": ["group", "sort_order"],
             },
         ),
     ]

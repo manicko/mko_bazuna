@@ -76,9 +76,7 @@ def _gallery_html(ad: Ad) -> str:
     the LanguagePreMiddleware resolves.
     """
     client = Client()
-    response = client.get(
-        reverse("ads:detail", args=[ad.id]) + "?lang=en"
-    )
+    response = client.get(reverse("ads:detail", args=[ad.id]) + "?lang=en")
     assert response.status_code == 200
     return response.content.decode()
 
@@ -108,7 +106,7 @@ class TestGalleryMarkup:
         # Main image img with primary thumbnail_large_url
         assert 'id="detail-main-image"' in content
         assert 'src="/media/key-0-large.jpg"' in content
-        assert 'object-contain' in content
+        assert "object-contain" in content
         # Main image GLightbox anchor
         assert 'id="detail-main-link"' in content
         assert 'class="glightbox"' in content
@@ -117,14 +115,14 @@ class TestGalleryMarkup:
         # Prev/next arrow buttons
         assert 'id="detail-prev"' in content
         assert 'id="detail-next"' in content
-        assert 'Previous image' in content
-        assert 'Next image' in content
+        assert "Previous image" in content
+        assert "Next image" in content
         # Thumbnail strip
         assert 'id="detail-thumbs"' in content
-        assert 'data-detail-thumbs' in content
+        assert "data-detail-thumbs" in content
         # AC1: the main-image container has an aspect-ratio utility to prevent
         # cumulative-layout-shift before the image finishes loading
-        assert 'aspect-' in content, "Gallery container must have an aspect-ratio class"
+        assert "aspect-" in content, "Gallery container must have an aspect-ratio class"
         # Thumbnail buttons with data attributes for all images
         assert 'data-index="0"' in content
         assert 'data-index="1"' in content
@@ -140,7 +138,7 @@ class TestGalleryMarkup:
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         content = _gallery_html(ad)
         # Main image must use object-contain for aspect-ratio preservation
-        assert 'object-contain' in content
+        assert "object-contain" in content
         # The main image ID element must not use object-cover
         main_img_match = re.search(
             r'id="detail-main-image"[^>]*class="([^"]*)"', content
@@ -157,8 +155,12 @@ class TestGalleryMarkup:
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         content = _gallery_html(ad)
         # Each thumbnail <img> inside the strip uses object-cover
-        thumb_imgs = re.findall(r'<img[^>]*class="[^"]*object-cover[^"]*"[^>]*>', content)
-        assert len(thumb_imgs) >= 2, "Expected at least 2 thumbnail imgs with object-cover"
+        thumb_imgs = re.findall(
+            r'<img[^>]*class="[^"]*object-cover[^"]*"[^>]*>', content
+        )
+        assert len(thumb_imgs) >= 2, (
+            "Expected at least 2 thumbnail imgs with object-cover"
+        )
 
     def test_detail_glightbox_href_sync(
         self, seller: User, category: Category, city: City
@@ -166,12 +168,12 @@ class TestGalleryMarkup:
         """The GLightbox anchor #detail-main-link has href matching the first image."""
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         content = _gallery_html(ad)
-        match = re.search(
-            r'id="detail-main-link"[^>]*\bhref="([^"]+)"', content
-        )
+        match = re.search(r'id="detail-main-link"[^>]*\bhref="([^"]+)"', content)
         assert match is not None, "detail-main-link anchor not found"
         href = match.group(1)
-        assert href == "/media/key-0.jpg", f"Expected href '/media/key-0.jpg', got '{href}'"
+        assert href == "/media/key-0.jpg", (
+            f"Expected href '/media/key-0.jpg', got '{href}'"
+        )
 
     def test_detail_prev_next_buttons_present(
         self, seller: User, category: Category, city: City

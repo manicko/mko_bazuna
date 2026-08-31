@@ -135,7 +135,10 @@ async def handle_contact_orm(
     Returns:
         Tuple of (is_available, seller_telegram_id or None).
     """
-    from apps.core.services.contact import get_seller_for_contact, record_contact_initiated
+    from apps.core.services.contact import (
+        get_seller_for_contact,
+        record_contact_initiated,
+    )
 
     @sync_to_async
     def _handle() -> tuple[bool, int | None]:

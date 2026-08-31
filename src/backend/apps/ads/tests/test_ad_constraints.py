@@ -132,9 +132,7 @@ class TestMutualExclusivityConstraint:
         assert ad.moderation_failed_at is None
         assert ad.rejected_at is None
 
-    def test_add_rejected_to_failed_raises(
-        self, seller: User, category, city
-    ) -> None:
+    def test_add_rejected_to_failed_raises(self, seller: User, category, city) -> None:
         """Adding ``rejected_at`` to a row already having ``moderation_failed_at`` raises."""
         ad = create_test_ad(
             seller, category, city, status=AdStatus.ON_MODERATION_FAILED
@@ -149,9 +147,7 @@ class TestMutualExclusivityConstraint:
         ad.refresh_from_db()
         assert ad.rejected_at is None
 
-    def test_add_failed_to_rejected_raises(
-        self, seller: User, category, city
-    ) -> None:
+    def test_add_failed_to_rejected_raises(self, seller: User, category, city) -> None:
         """Adding ``moderation_failed_at`` to a row already having ``rejected_at`` raises."""
         ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
         ad.refresh_from_db()
@@ -164,7 +160,9 @@ class TestMutualExclusivityConstraint:
         ad.refresh_from_db()
         assert ad.moderation_failed_at is None
 
-    def test_only_failed_satisfies_constraint(self, seller: User, category, city) -> None:
+    def test_only_failed_satisfies_constraint(
+        self, seller: User, category, city
+    ) -> None:
         """A row with only ``moderation_failed_at`` set (no ``rejected_at``) is valid."""
         ad = create_test_ad(
             seller, category, city, status=AdStatus.ON_MODERATION_FAILED

@@ -77,14 +77,10 @@ class Command(BaseCommand):
                     return
 
                 if total == 0:
-                    logger.info(
-                        "No AdImage records need thumbnail backfill"
-                    )
+                    logger.info("No AdImage records need thumbnail backfill")
                     return
 
-                logger.info(
-                    "Starting thumbnail backfill for %d records", total
-                )
+                logger.info("Starting thumbnail backfill for %d records", total)
 
                 service = ThumbnailService(storage_dir=settings.MEDIA_ROOT)
                 processed = 0
@@ -94,9 +90,7 @@ class Command(BaseCommand):
                 ids = list(queryset.values_list("id", flat=True))
                 for i in range(0, len(ids), batch_size):
                     batch_ids = ids[i : i + batch_size]
-                    batch = list(
-                        AdImage.objects.filter(id__in=batch_ids).iterator()
-                    )
+                    batch = list(AdImage.objects.filter(id__in=batch_ids).iterator())
 
                     for ad_image in batch:
                         try:
@@ -124,9 +118,7 @@ class Command(BaseCommand):
                     total,
                 )
 
-    def _process_one(
-        self, service: ThumbnailService, ad_image: AdImage
-    ) -> None:
+    def _process_one(self, service: ThumbnailService, ad_image: AdImage) -> None:
         """Generate thumbnails for a single AdImage record."""
         original_path = Path(settings.MEDIA_ROOT) / str(ad_image.image)
 

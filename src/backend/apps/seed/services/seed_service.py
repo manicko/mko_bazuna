@@ -146,8 +146,8 @@ class SeedService:
                 for ad in db_ads:
                     if ad.category is None:
                         continue
-                    resolved_conditions = CategoryLookupResolver.get_resolved_conditions(
-                        ad.category
+                    resolved_conditions = (
+                        CategoryLookupResolver.get_resolved_conditions(ad.category)
                     )
                     if resolved_conditions:
                         chosen_condition = condition_rng.choice(resolved_conditions)
@@ -169,7 +169,9 @@ class SeedService:
                 # Step 5b: Backfill SHA-256 for images (bulk_create bypasses save())
                 if ad_images:
                     hashed_count = self._backfill_image_hashes(ad_images)
-                    logger.info("[seed] AdImage SHA-256: %d hashes backfilled", hashed_count)
+                    logger.info(
+                        "[seed] AdImage SHA-256: %d hashes backfilled", hashed_count
+                    )
 
                 # Step 5c: Seed popular searches for autocomplete
                 popular_count = self._seed_popular_searches()

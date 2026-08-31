@@ -163,18 +163,21 @@ The `RunSQL` that drops the trigger has `reverse_sql=migrations.RunSQL.noop`. Ro
 
 ```python
 # Step 1: Drop trigger with restore reverse_sql
-migrations.RunSQL(
-    sql="DROP TRIGGER IF EXISTS ads_search_vector_update ON ads;",
-    reverse_sql="""
+(
+    migrations.RunSQL(
+        sql="DROP TRIGGER IF EXISTS ads_search_vector_update ON ads;",
+        reverse_sql="""
         CREATE TRIGGER ads_search_vector_update
         BEFORE INSERT OR UPDATE ON ads
         FOR EACH ROW EXECUTE FUNCTION ads_search_vector_fn_old();
     """,
-),
+    ),
+)
 # Step 2: Replace function — store old version as reverse_sql
-migrations.RunSQL(
-    sql="DROP FUNCTION IF EXISTS ads_search_vector_fn();",
-    reverse_sql="""
+(
+    migrations.RunSQL(
+        sql="DROP FUNCTION IF EXISTS ads_search_vector_fn();",
+        reverse_sql="""
         CREATE FUNCTION ads_search_vector_fn() RETURNS TRIGGER AS $$
         DECLARE v_cat TEXT;
         BEGIN
@@ -188,15 +191,18 @@ migrations.RunSQL(
         END;
         $$ LANGUAGE plpgsql;
     """,
-),
+    ),
+)
 # Steps 3-4: RenameField + AddField (auto-reverse — Django handles it)
 # Step 5: Create new trigger
-migrations.RunSQL(
-    sql="""CREATE TRIGGER ads_search_vector_update
+(
+    migrations.RunSQL(
+        sql="""CREATE TRIGGER ads_search_vector_update
            BEFORE INSERT OR UPDATE ON ads
            FOR EACH ROW EXECUTE FUNCTION ads_search_vector_fn();""",
-    reverse_sql="DROP TRIGGER IF EXISTS ads_search_vector_update ON ads;",
-),
+        reverse_sql="DROP TRIGGER IF EXISTS ads_search_vector_update ON ads;",
+    ),
+)
 ```
 
 > **Note**: The reverse function is named `ads_search_vector_fn()` in both old and new versions. This works because the function is replaced before the columns are renamed. On rollback: column renames are reversed first (auto), then the function is replaced back to old SQL. The trigger is always recreated at the end.

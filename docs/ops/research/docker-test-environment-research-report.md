@@ -492,7 +492,7 @@ DATABASES = {
         "NAME": "mko_bazuna",
         "TEST": {
             "NAME": "test_mko_bazuna",  # Explicit (optional, auto-derived)
-            "SERIALIZE": False,         # Skip test data serialization (faster)
+            "SERIALIZE": False,  # Skip test data serialization (faster)
         },
     }
 }

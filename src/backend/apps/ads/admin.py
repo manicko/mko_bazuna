@@ -95,14 +95,19 @@ class AdAdmin(admin.ModelAdmin):
         "listing_purpose",
     ]
     date_hierarchy = "created_at"
-    actions = ["action_reject", "action_ban_user", "action_soft_delete", "action_approve"]
+    actions = [
+        "action_reject",
+        "action_ban_user",
+        "action_soft_delete",
+        "action_approve",
+    ]
 
     def get_queryset(self, request):
         """Optimize queryset with related select and priority prefetch."""
         qs = super().get_queryset(request)
-        return qs.select_related("user", "category", "city", "listing_purpose").prefetch_related(
-            "moderation_priority", "features"
-        )
+        return qs.select_related(
+            "user", "category", "city", "listing_purpose"
+        ).prefetch_related("moderation_priority", "features")
 
     def has_view_permission(self, request, obj=None) -> bool:
         """Restrict view to staff/superuser only."""
@@ -115,14 +120,18 @@ class AdAdmin(admin.ModelAdmin):
     @admin.action(description="Reject selected ads")
     def action_reject(self, request, queryset):
         """Bulk reject action for moderation."""
-        count = bulk_reject(queryset, request.user.id, "Bulk rejection via admin action")
+        count = bulk_reject(
+            queryset, request.user.id, "Bulk rejection via admin action"
+        )
         self.message_user(request, f"Rejected {count} ad(s).", level="success")
 
     @admin.action(description="Approve selected ads")
     def action_approve(self, request, queryset):
         """Bulk approve action for moderation."""
         count = bulk_approve(queryset, request.user.id)
-        self.message_user(request, f"Approved {count} ad(s) for publication.", level="success")
+        self.message_user(
+            request, f"Approved {count} ad(s) for publication.", level="success"
+        )
 
     @admin.action(description="Ban users from selected ads")
     def action_ban_user(self, request, queryset):

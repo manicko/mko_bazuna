@@ -405,6 +405,7 @@ subclasses and asserts that any `choices()`/`labels()`-style method returns lazy
 import ast, pathlib, re
 from collections import Counter
 
+
 def _choices_methods_returning_literal_strings():
     """Flag StrEnum classes whose methods return tuple-list literals with str constants."""
     offenders = []
@@ -416,11 +417,19 @@ def _choices_methods_returning_literal_strings():
                 if not any("Enum" in b for b in bases):
                     continue
                 for fn in node.body:
-                    if isinstance(fn, ast.FunctionDef) and fn.name in {"choices", "labels"}:
+                    if isinstance(fn, ast.FunctionDef) and fn.name in {
+                        "choices",
+                        "labels",
+                    }:
                         for sub in ast.walk(fn):
-                            if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-                                offenders.append((str(p), sub.lineno, fn.name, sub.value))
+                            if isinstance(sub, ast.Constant) and isinstance(
+                                sub.value, str
+                            ):
+                                offenders.append(
+                                    (str(p), sub.lineno, fn.name, sub.value)
+                                )
     return offenders
+
 
 def test_enum_choice_labels_are_translated():
     bad = _choices_methods_returning_literal_strings()

@@ -57,7 +57,9 @@ def seller2() -> object:
 class TestAdImageServiceCreateOrSkip:
     """Tests for AdImageService.create_or_skip()."""
 
-    def test_creates_new_image_with_hash(self, seller, category, city, isolated_media_root):
+    def test_creates_new_image_with_hash(
+        self, seller, category, city, isolated_media_root
+    ):
         """When no duplicate exists, a new row is created with sha256 set."""
         from apps.ads.services.images import AdImageService
 
@@ -123,7 +125,9 @@ class TestAdImageServiceCreateOrSkip:
         assert first.pk != second.pk
         assert AdImage.objects.count() == 2
 
-    def test_file_missing_creates_empty_hash(self, seller, category, city, isolated_media_root):
+    def test_file_missing_creates_empty_hash(
+        self, seller, category, city, isolated_media_root
+    ):
         """When the file is absent, sha256 is empty and a row is still created."""
         from apps.ads.services.images import AdImageService
 

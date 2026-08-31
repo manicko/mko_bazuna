@@ -662,9 +662,7 @@ class TestQualityScoreTruncation:
             create_test_ad(
                 seller, category, city, title=f"Good {i}", status=AdStatus.PUBLISHED
             )
-        create_test_ad(
-            seller, category, city, title="Bad", status=AdStatus.REJECTED
-        )
+        create_test_ad(seller, category, city, title="Bad", status=AdStatus.REJECTED)
 
         score = calculator.calculate_and_save(seller)
 
@@ -727,4 +725,3 @@ class TestTrustLevelFloor:
 
         assert score.score == 0
         assert score.trust_level == TrustLevel.UNVERIFIED
-

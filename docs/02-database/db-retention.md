@@ -111,12 +111,12 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 
 ```python
 # Environment variables (set in .env.docker)
-PURGE_DELETED_RETENTION_DAYS=120   # days to keep soft-deleted ads before purging
-ARCHIVE_AGE_DAYS=60                # days before auto-archiving published ads
-DELETE_AGE_DAYS=120                # days before hard-deleting archived ads
-PURGE_FAILED_DAYS=7                # days to keep ON_MODERATION_FAILED ads
-PURGE_REJECTED_DAYS=90             # days to keep REJECTED ads
-ERASURE_RETENTION_DAYS=30          # days after consent withdrawal before hard-delete
+PURGE_DELETED_RETENTION_DAYS = 120  # days to keep soft-deleted ads before purging
+ARCHIVE_AGE_DAYS = 60  # days before auto-archiving published ads
+DELETE_AGE_DAYS = 120  # days before hard-deleting archived ads
+PURGE_FAILED_DAYS = 7  # days to keep ON_MODERATION_FAILED ads
+PURGE_REJECTED_DAYS = 90  # days to keep REJECTED ads
+ERASURE_RETENTION_DAYS = 30  # days after consent withdrawal before hard-delete
 ```
 
 ## Scheduler

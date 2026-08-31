@@ -29,8 +29,14 @@ env_path = BASE_DIR / ".env"
 if not env_path.exists():
     # Skip validation during Docker build (DJANGO_BUILD), in test environments, or when
     # environment variables are provided via docker-compose env_file
-    if os.getenv("DJANGO_SETTINGS_MODULE") and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "") and not os.getenv("DJANGO_BUILD"):
-        logger.error("ERROR: .env file not found. Copy .env.example to .env and configure values.")
+    if (
+        os.getenv("DJANGO_SETTINGS_MODULE")
+        and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "")
+        and not os.getenv("DJANGO_BUILD")
+    ):
+        logger.error(
+            "ERROR: .env file not found. Copy .env.example to .env and configure values."
+        )
         sys.exit(1)
 else:
     environ.Env.read_env(env_path)
@@ -49,7 +55,9 @@ DEBUG = env("DEBUG")
 BOT_TOKEN = env("BOT_TOKEN", default="")
 
 # ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
+ALLOWED_HOSTS = (
+    os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
+)
 
 # Internationalization
 LANGUAGE_CODE = "ru"

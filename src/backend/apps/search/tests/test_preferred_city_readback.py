@@ -192,7 +192,9 @@ class TestListingsPreferredCityReadback:
         # what page 2 shows. PER_PAGE is the view's constant 24.
         budva_ids: list[int] = []
         for _ in range(30):
-            budva_ids.append(create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED).id)
+            budva_ids.append(
+                create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED).id
+            )
         for _ in range(30):
             create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
 

@@ -46,9 +46,7 @@ class TestResolveUnsubscribe:
     """Ownership + is_active flips (CR10)."""
 
     @pytest.mark.asyncio
-    async def test_owned_search_disabled(
-        self, owner: User
-    ) -> None:
+    async def test_owned_search_disabled(self, owner: User) -> None:
         from telegram_bot.handlers.alerts import resolve_unsubscribe
 
         ss = await sync_to_async(SavedSearch.objects.create)(
@@ -62,9 +60,7 @@ class TestResolveUnsubscribe:
         assert result.is_active is False
 
     @pytest.mark.asyncio
-    async def test_non_owner_rejected(
-        self, owner: User, stranger: User
-    ) -> None:
+    async def test_non_owner_rejected(self, owner: User, stranger: User) -> None:
         from telegram_bot.handlers.alerts import resolve_unsubscribe
 
         ss = await sync_to_async(SavedSearch.objects.create)(
@@ -81,13 +77,13 @@ class TestResolveUnsubscribe:
     async def test_unknown_token_rejected(self, stranger: User) -> None:
         from telegram_bot.handlers.alerts import resolve_unsubscribe
 
-        result = await resolve_unsubscribe("no_such_token_with_40_chars_xxxxxxxx", stranger.chat_id)
+        result = await resolve_unsubscribe(
+            "no_such_token_with_40_chars_xxxxxxxx", stranger.chat_id
+        )
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_reenable_owned_search(
-        self, owner: User
-    ) -> None:
+    async def test_reenable_owned_search(self, owner: User) -> None:
         from telegram_bot.handlers.alerts import resolve_reenable
 
         ss = await sync_to_async(SavedSearch.objects.create)(
@@ -124,7 +120,9 @@ class TestUnsubscribeDeepLink:
             async def answer(self, text: str) -> None:
                 messages.append(text)
 
-        handled = await handle_unsubscribe_start(FakeMessage(), None, f"unsub_{ss.unsubscribe_token}")
+        handled = await handle_unsubscribe_start(
+            FakeMessage(), None, f"unsub_{ss.unsubscribe_token}"
+        )
 
         assert handled is True
         assert any("отключены" in m for m in messages)

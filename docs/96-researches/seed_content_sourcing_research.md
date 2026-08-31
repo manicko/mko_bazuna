@@ -268,7 +268,9 @@ class ImageGenerator(BaseGenerator):
     def __init__(self, config: dict[str, Any], ads: list[Ad]) -> None:
         super().__init__(config)
         self.ads = ads
-        self.photo_pool: dict[str, list[dict[str, Any]]] = {}  # category_slug -> [photo_info]
+        self.photo_pool: dict[
+            str, list[dict[str, Any]]
+        ] = {}  # category_slug -> [photo_info]
         self.default_pool: list[dict[str, Any]] = []
 
     def _load_manifest(self) -> None:
@@ -282,7 +284,9 @@ class ImageGenerator(BaseGenerator):
 
     def _get_photos_for_category(self, category_slug: str) -> list[dict[str, Any]]:
         """Return the photo pool for a category, falling back to default."""
-        return self.photo_pool.get(category_slug, self.default_pool) or self.default_pool
+        return (
+            self.photo_pool.get(category_slug, self.default_pool) or self.default_pool
+        )
 
     def generate(self, ads_with_categories: list[tuple[Ad, str]]) -> list[AdImage]:
         """Generate AdImage records, selecting photos per ad's category."""
@@ -531,6 +535,7 @@ def _clean_media(self) -> None:
     seed_dir = os.path.join(settings.MEDIA_ROOT, "seed")
     if os.path.exists(seed_dir):
         import shutil
+
         shutil.rmtree(seed_dir)
 ```
 

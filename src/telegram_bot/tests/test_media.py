@@ -247,12 +247,13 @@ class TestDeletePhoto:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """FileNotFoundError is terminal — os.remove called once, no retry."""
-        with patch(
-            "telegram_bot.services.media.os.remove",
-            side_effect=FileNotFoundError("no such file"),
-        ) as mock_remove, patch(
-            "telegram_bot.services.media.time.sleep"
-        ) as mock_sleep:
+        with (
+            patch(
+                "telegram_bot.services.media.os.remove",
+                side_effect=FileNotFoundError("no such file"),
+            ) as mock_remove,
+            patch("telegram_bot.services.media.time.sleep") as mock_sleep,
+        ):
             delete_photo("missing.jpg")
         assert mock_remove.call_count == 1
         assert mock_sleep.call_count == 0
@@ -262,10 +263,13 @@ class TestDeletePhoto:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """PermissionError on every attempt: swallowed, error logged, no raise."""
-        with patch(
-            "telegram_bot.services.media.os.remove",
-            side_effect=PermissionError("denied"),
-        ) as mock_remove, patch("telegram_bot.services.media.time.sleep"):
+        with (
+            patch(
+                "telegram_bot.services.media.os.remove",
+                side_effect=PermissionError("denied"),
+            ) as mock_remove,
+            patch("telegram_bot.services.media.time.sleep"),
+        ):
             delete_photo("locked.jpg")  # must not raise
         assert mock_remove.call_count == DELETE_PHOTO_MAX_ATTEMPTS
         assert "Failed to delete" in caplog.text
@@ -274,12 +278,13 @@ class TestDeletePhoto:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Transient OSError then success: retries succeed; warning logged."""
-        with patch(
-            "telegram_bot.services.media.os.remove",
-            side_effect=[PermissionError("denied"), None],
-        ) as mock_remove, patch(
-            "telegram_bot.services.media.time.sleep"
-        ) as mock_sleep:
+        with (
+            patch(
+                "telegram_bot.services.media.os.remove",
+                side_effect=[PermissionError("denied"), None],
+            ) as mock_remove,
+            patch("telegram_bot.services.media.time.sleep") as mock_sleep,
+        ):
             delete_photo("flaky.jpg")
         assert mock_remove.call_count == 2
         assert mock_sleep.call_count == 1

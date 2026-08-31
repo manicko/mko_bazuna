@@ -91,7 +91,9 @@ class TrustCalculator:
                 ]
             )
             logger.info("Updated trust score for user %s", user.id)
-        record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED, source=source)
+        record_trust_event(
+            user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED, source=source
+        )
 
         return trust_score
 

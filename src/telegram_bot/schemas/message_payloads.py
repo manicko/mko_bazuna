@@ -17,7 +17,9 @@ class TitlePayload(BaseModel):
 
     title: Annotated[
         str,
-        Field(min_length=5, max_length=200, description="Ad title in original language"),
+        Field(
+            min_length=5, max_length=200, description="Ad title in original language"
+        ),
     ]
 
 
@@ -27,7 +29,9 @@ class DescriptionPayload(BaseModel):
     description: Annotated[
         str,
         Field(
-            min_length=10, max_length=2000, description="Ad description in original language"
+            min_length=10,
+            max_length=2000,
+            description="Ad description in original language",
         ),
     ]
 

@@ -26,11 +26,11 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
         PermissionError: if seller does not own the source ad.
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-        source = Ad.objects.select_related(
-            "listing_purpose"
-        ).prefetch_related(
-            "features", "images"
-        ).get(id=source_ad_id)
+        source = (
+            Ad.objects.select_related("listing_purpose")
+            .prefetch_related("features", "images")
+            .get(id=source_ad_id)
+        )
 
         if source.user_id != seller_user_id:
             raise PermissionError("Cannot copy another user's ad")

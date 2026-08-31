@@ -31,9 +31,7 @@ def _make_user(telegram_id: int, **overrides: object) -> User:
 
 def _render(user) -> str:
     """Render the template tag for the given user and return the HTML."""
-    template = Template(
-        "{% load trust_tags %}{% render_trust_badge user %}"
-    )
+    template = Template("{% load trust_tags %}{% render_trust_badge user %}")
     context = Context({"user": user, "request": None})
     return template.render(context)
 
@@ -43,23 +41,31 @@ def trust_users():
     """Create users at each trust level for badge rendering tests."""
     user = _make_user(990100001)
     SellerTrustScore.objects.create(
-        user=user, trust_level=TrustLevel.UNVERIFIED, score=15,
+        user=user,
+        trust_level=TrustLevel.UNVERIFIED,
+        score=15,
     )
 
     verified_user = _make_user(990100002)
     SellerVerification.objects.create(user=verified_user, verified_by_admin=True)
     SellerTrustScore.objects.create(
-        user=verified_user, trust_level=TrustLevel.VERIFIED, score=35,
+        user=verified_user,
+        trust_level=TrustLevel.VERIFIED,
+        score=35,
     )
 
     trusted_user = _make_user(990100003)
     SellerTrustScore.objects.create(
-        user=trusted_user, trust_level=TrustLevel.TRUSTED, score=65,
+        user=trusted_user,
+        trust_level=TrustLevel.TRUSTED,
+        score=65,
     )
 
     pro_user = _make_user(990100004)
     SellerTrustScore.objects.create(
-        user=pro_user, trust_level=TrustLevel.PRO, score=90,
+        user=pro_user,
+        trust_level=TrustLevel.PRO,
+        score=90,
     )
 
     return {
@@ -81,7 +87,9 @@ class TestRenderTrustBadge:
     def test_no_badge_for_user_without_trust_score(self) -> None:
         """User without SellerTrustScore renders no badge."""
         no_score_user = User.objects.create(
-            telegram_id=990100005, chat_id=990100005, password="x",
+            telegram_id=990100005,
+            chat_id=990100005,
+            password="x",
         )
         html = _render(no_score_user)
         assert html == ""

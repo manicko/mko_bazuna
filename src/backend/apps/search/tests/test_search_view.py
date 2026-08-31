@@ -84,8 +84,12 @@ class TestSearchViewPublishesFilter:
     ) -> None:
         """No-query search returns only PUBLISHED ads, excluding DRAFT/ON_MODERATION/etc."""
         # Create one PUBLISHED ad and several non-PUBLISHED ads
-        create_test_ad(seller, root_category, city, title="Published Ad", status=AdStatus.PUBLISHED)
-        create_test_ad(seller, other_category, city, title="Draft Ad", status=AdStatus.DRAFT)
+        create_test_ad(
+            seller, root_category, city, title="Published Ad", status=AdStatus.PUBLISHED
+        )
+        create_test_ad(
+            seller, other_category, city, title="Draft Ad", status=AdStatus.DRAFT
+        )
         create_test_ad(
             seller,
             root_category,
@@ -93,8 +97,12 @@ class TestSearchViewPublishesFilter:
             title="Moderation Ad",
             status=AdStatus.ON_MODERATION,
         )
-        create_test_ad(seller, other_category, city, title="Rejected Ad", status=AdStatus.REJECTED)
-        create_test_ad(seller, root_category, city, title="Archived Ad", status=AdStatus.ARCHIVED)
+        create_test_ad(
+            seller, other_category, city, title="Rejected Ad", status=AdStatus.REJECTED
+        )
+        create_test_ad(
+            seller, root_category, city, title="Archived Ad", status=AdStatus.ARCHIVED
+        )
 
         client = Client()
         response = client.get("/search/")

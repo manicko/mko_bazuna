@@ -52,9 +52,11 @@ class AnalyticsEventAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
 
         # Aggregate events by event_type
-        type_aggregates = AnalyticsEvent.objects.values("event_type").annotate(
-            count=Count("id")
-        ).order_by("-count")
+        type_aggregates = (
+            AnalyticsEvent.objects.values("event_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
 
         # Aggregate events by date (last 30 days)
         from datetime import timedelta
@@ -62,13 +64,13 @@ class AnalyticsEventAdmin(admin.ModelAdmin):
         from django.utils import timezone
 
         thirty_days_ago = timezone.now() - timedelta(days=30)
-        date_aggregates = AnalyticsEvent.objects.filter(
-            timestamp__gte=thirty_days_ago
-        ).annotate(
-            date=TruncDate("timestamp")
-        ).values("date").annotate(
-            count=Count("id")
-        ).order_by("date")
+        date_aggregates = (
+            AnalyticsEvent.objects.filter(timestamp__gte=thirty_days_ago)
+            .annotate(date=TruncDate("timestamp"))
+            .values("date")
+            .annotate(count=Count("id"))
+            .order_by("date")
+        )
 
         extra_context["type_aggregates"] = type_aggregates
         extra_context["date_aggregates"] = date_aggregates

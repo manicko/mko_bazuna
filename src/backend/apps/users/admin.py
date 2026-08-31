@@ -109,7 +109,13 @@ class LoginTokenAdmin(admin.ModelAdmin):
     list_display = ["id", "telegram_id", "created_at", "expires_at", "consumed_at"]
     list_filter = ["consumed_at"]
     search_fields = ["telegram_id"]
-    readonly_fields = ["token_hash", "telegram_id", "created_at", "expires_at", "consumed_at"]
+    readonly_fields = [
+        "token_hash",
+        "telegram_id",
+        "created_at",
+        "expires_at",
+        "consumed_at",
+    ]
 
     def has_add_permission(self, request) -> bool:
         return False

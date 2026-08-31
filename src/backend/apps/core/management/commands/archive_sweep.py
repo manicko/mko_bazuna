@@ -34,36 +34,36 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-            """Execute the archive sweep command with advisory lock."""
-            dry_run: bool = options["dry_run"]
+        """Execute the archive sweep command with advisory lock."""
+        dry_run: bool = options["dry_run"]
 
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
-                with advisory_lock(AdvisoryLockId.ARCHIVE_SWEEP):
-                    # Query using the IX_ads_archive_sweep partial index
-                    # Status is PUBLISHED, published_at older than 2 months
-                    cutoff_date = timezone.now() - timedelta(days=60)
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with advisory_lock(AdvisoryLockId.ARCHIVE_SWEEP):
+                # Query using the IX_ads_archive_sweep partial index
+                # Status is PUBLISHED, published_at older than 2 months
+                cutoff_date = timezone.now() - timedelta(days=60)
 
-                    queryset = Ad.objects.filter(
-                        status=AdStatus.PUBLISHED,
-                        published_at__lt=cutoff_date,
-                    )
+                queryset = Ad.objects.filter(
+                    status=AdStatus.PUBLISHED,
+                    published_at__lt=cutoff_date,
+                )
 
-                    count = queryset.count()
+                count = queryset.count()
 
-                    if dry_run:
-                        logger.info(
-                            "DRY RUN: Would archive %d ads with PUBLISHED status older than 2 months",
-                            count,
-                        )
-                        return
-
-                    # Update status to ARCHIVED and set archived_at timestamp
-                    updated_count = queryset.update(
-                        status=AdStatus.ARCHIVED,
-                        archived_at=timezone.now(),
-                    )
-
+                if dry_run:
                     logger.info(
-                        "Archived %d ads with PUBLISHED status older than 2 months",
-                        updated_count,
+                        "DRY RUN: Would archive %d ads with PUBLISHED status older than 2 months",
+                        count,
                     )
+                    return
+
+                # Update status to ARCHIVED and set archived_at timestamp
+                updated_count = queryset.update(
+                    status=AdStatus.ARCHIVED,
+                    archived_at=timezone.now(),
+                )
+
+                logger.info(
+                    "Archived %d ads with PUBLISHED status older than 2 months",
+                    updated_count,
+                )

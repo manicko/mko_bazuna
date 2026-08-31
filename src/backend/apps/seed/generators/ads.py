@@ -20,8 +20,12 @@ from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
-ADS_TEMPLATES_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "ads_templates.json"
-WORD_LISTS_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "word_lists.json"
+ADS_TEMPLATES_PATH = (
+    Path(__file__).resolve().parent.parent / "fixtures" / "ads_templates.json"
+)
+WORD_LISTS_PATH = (
+    Path(__file__).resolve().parent.parent / "fixtures" / "word_lists.json"
+)
 
 # Map category slugs to brand groups
 # All 171 leaf slugs from categories.yaml grouped by top-level section
@@ -246,7 +250,9 @@ class AdGenerator(BaseGenerator):
             'default' key for fallback templates.
         """
         if not ADS_TEMPLATES_PATH.exists():
-            logger.warning("Templates not found at %s, using fallback", ADS_TEMPLATES_PATH)
+            logger.warning(
+                "Templates not found at %s, using fallback", ADS_TEMPLATES_PATH
+            )
             return {
                 "default": [
                     {
@@ -280,7 +286,9 @@ class AdGenerator(BaseGenerator):
             Dict with keys: conditions, brands, features, cities, item_ages.
         """
         if not WORD_LISTS_PATH.exists():
-            logger.warning("Word lists not found at %s, using empty dicts", WORD_LISTS_PATH)
+            logger.warning(
+                "Word lists not found at %s, using empty dicts", WORD_LISTS_PATH
+            )
             return {
                 "conditions": {"ru": [], "en": [], "bs": []},
                 "brands": {"default": {"ru": [], "en": [], "bs": []}},
@@ -321,15 +329,21 @@ class AdGenerator(BaseGenerator):
         # Determine category group for brand selection
         # Mapping is a plain dict[str, str]; fallback to "default"
         category_group: str = (
-            CATEGORY_GROUP_MAP[category.slug] if category.slug in CATEGORY_GROUP_MAP else "default"
+            CATEGORY_GROUP_MAP[category.slug]
+            if category.slug in CATEGORY_GROUP_MAP
+            else "default"
         )
 
         # Get word lists for this locale
         conditions: list[str] = self.word_lists.get("conditions", {}).get(locale, [])  # type: ignore[union-attr]
         brands_data: dict[str, Any] = self.word_lists.get("brands", {})
-        brands: list[str] = brands_data.get(category_group, brands_data.get("default", {})).get(locale, [])  # type: ignore[union-attr]
+        brands: list[str] = brands_data.get(
+            category_group, brands_data.get("default", {})
+        ).get(locale, [])  # type: ignore[union-attr]
         features_data: dict[str, Any] = self.word_lists.get("features", {})
-        features: list[str] = features_data.get(category.slug, features_data.get("default", {})).get(locale, [])  # type: ignore[union-attr]
+        features: list[str] = features_data.get(
+            category.slug, features_data.get("default", {})
+        ).get(locale, [])  # type: ignore[union-attr]
         cities: list[str] = self.word_lists.get("cities", {}).get(locale, [])  # type: ignore[union-attr]
         item_ages: list[str] = self.word_lists.get("item_ages", {}).get(locale, [])  # type: ignore[union-attr]
 
@@ -395,12 +409,15 @@ class AdGenerator(BaseGenerator):
             else:
                 category_templates = []
             template: dict[str, Any] = (
-                self._rng.choice(category_templates) if category_templates
-                else {"patterns": {
-                    "ru": {"title": "Товар", "description": "Описание."},
-                    "en": {"title": "Item", "description": "Description."},
-                    "bs": {"title": "Artikal", "description": "Opis."},
-                }}
+                self._rng.choice(category_templates)
+                if category_templates
+                else {
+                    "patterns": {
+                        "ru": {"title": "Товар", "description": "Описание."},
+                        "en": {"title": "Item", "description": "Description."},
+                        "bs": {"title": "Artikal", "description": "Opis."},
+                    }
+                }
             )
 
             user = self._rng.choice(self.users)
@@ -412,7 +429,9 @@ class AdGenerator(BaseGenerator):
             # which resolves to give-away exclusively) is always free (price 0).
             # Empty / unsaved-category lookup resolution is a no-op -> None.
             if category.pk is not None:
-                resolved_purposes = CategoryLookupResolver.get_resolved_purposes(category)
+                resolved_purposes = CategoryLookupResolver.get_resolved_purposes(
+                    category
+                )
             else:
                 resolved_purposes = []
             if resolved_purposes:
@@ -426,9 +445,15 @@ class AdGenerator(BaseGenerator):
 
             # Fill templates for all languages. Reuse the generated price so the
             # {price} placeholder matches the ad's actual price_amount.
-            title, description = self._fill_template(template, "ru", category, price_amount)
-            title_en, description_en = self._fill_template(template, "en", category, price_amount)
-            title_bs, description_bs = self._fill_template(template, "bs", category, price_amount)
+            title, description = self._fill_template(
+                template, "ru", category, price_amount
+            )
+            title_en, description_en = self._fill_template(
+                template, "en", category, price_amount
+            )
+            title_bs, description_bs = self._fill_template(
+                template, "bs", category, price_amount
+            )
 
             # Build timestamps consistent with status
             published_at: datetime | None = None
@@ -450,9 +475,7 @@ class AdGenerator(BaseGenerator):
             elif status == AdStatus.REJECTED:
                 rejected_at = self._random_date(now - timedelta(days=30), now)
             elif status == AdStatus.ON_MODERATION_FAILED:
-                moderation_failed_at = self._random_date(
-                    now - timedelta(days=30), now
-                )
+                moderation_failed_at = self._random_date(now - timedelta(days=30), now)
 
             ad = Ad(
                 user=user,
@@ -539,16 +562,33 @@ class AdGenerator(BaseGenerator):
 
         # Real estate: higher prices
         real_estate_slugs = {
-            "apartments", "houses", "rooms", "garages", "land-plots",
-            "other-real-estate", "offices", "flex-space", "retail-spaces",
-            "warehouses", "commercial-land",
+            "apartments",
+            "houses",
+            "rooms",
+            "garages",
+            "land-plots",
+            "other-real-estate",
+            "offices",
+            "flex-space",
+            "retail-spaces",
+            "warehouses",
+            "commercial-land",
         }
         # Vehicles
         vehicle_slugs = {
-            "cars", "motorcycles-sub", "scooters", "bicycles",
-            "scooters-scooters", "trucks-sub", "agricultural-machinery",
-            "commercial-vehicles", "campers", "boats-yachts", "motorboats",
-            "sailing-boats", "personal-watercraft",
+            "cars",
+            "motorcycles-sub",
+            "scooters",
+            "bicycles",
+            "scooters-scooters",
+            "trucks-sub",
+            "agricultural-machinery",
+            "commercial-vehicles",
+            "campers",
+            "boats-yachts",
+            "motorboats",
+            "sailing-boats",
+            "personal-watercraft",
         }
 
         if category.slug in real_estate_slugs:

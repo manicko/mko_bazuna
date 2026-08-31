@@ -71,7 +71,9 @@ class TestPriorityCalculator:
         assert "banned_word" in result["flags"]
         assert result["base_score"] == 20  # max(20, 0)
 
-    def test_banned_word_in_description(self, calculator, seller, category, city) -> None:
+    def test_banned_word_in_description(
+        self, calculator, seller, category, city
+    ) -> None:
         """One banned word in description → content score 20."""
         _banned_words_setup("scam", "fake")
         ad = create_test_ad(
@@ -194,9 +196,7 @@ class TestUserHistoryScoring:
 
         assert result["base_score"] == 15  # max(0, 15)
 
-    def test_repeat_offender_flag(
-        self, calculator, seller, category, city
-    ) -> None:
+    def test_repeat_offender_flag(self, calculator, seller, category, city) -> None:
         """>3 rejections in 7 days → +25 user score, flag 'repeat_offender'."""
         _banned_words_setup()
         now = timezone.now()
@@ -282,9 +282,7 @@ class TestUserHistoryScoring:
 
         assert result["base_score"] == 0
 
-    def test_combined_bonus(
-        self, calculator, seller, category, city
-    ) -> None:
+    def test_combined_bonus(self, calculator, seller, category, city) -> None:
         """Both >50 ads and repeat offender stack for combined user score of 40."""
         _banned_words_setup()
         now = timezone.now()
@@ -353,9 +351,7 @@ class TestPriorityLevelBoundaries:
         assert result["base_score"] == 40
         assert result["priority_level"] == AdPriorityLevel.LOW.value
 
-    def test_score_60_maps_to_medium(
-        self, calculator, seller, category, city
-    ) -> None:
+    def test_score_60_maps_to_medium(self, calculator, seller, category, city) -> None:
         """Score 60 (3 banned words) → MEDIUM (at or above the 50 threshold)."""
         _banned_words_setup("spam", "scam", "cheap")
         ad = create_test_ad(
@@ -375,9 +371,7 @@ class TestPriorityLevelBoundaries:
         assert result["base_score"] == 80
         assert result["priority_level"] == AdPriorityLevel.HIGH.value
 
-    def test_score_100_maps_to_high(
-        self, calculator, seller, category, city
-    ) -> None:
+    def test_score_100_maps_to_high(self, calculator, seller, category, city) -> None:
         """Score 100 (5+ banned words, capped) → HIGH."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
         ad = create_test_ad(
@@ -436,9 +430,7 @@ class TestEscalationRequired:
     ) -> None:
         """Escalation is not required when score < 80 and flags < 3."""
         _banned_words_setup()
-        ad = create_test_ad(
-            seller, category, city, title="Clean", description="Clean"
-        )
+        ad = create_test_ad(seller, category, city, title="Clean", description="Clean")
 
         result = calculator.calculate_priority(ad)
 
@@ -446,9 +438,7 @@ class TestEscalationRequired:
         assert result["base_score"] == 0
         assert len(result["flags"]) == 0
 
-    def test_escalation_or_logic(
-        self, calculator, seller, category, city
-    ) -> None:
+    def test_escalation_or_logic(self, calculator, seller, category, city) -> None:
         """Escalation condition uses OR — 2 banned words (score 40, 2 flags) → not required."""
         _banned_words_setup("spam", "scam")
         ad = create_test_ad(
@@ -471,7 +461,9 @@ class TestEscalationRequired:
 class TestConfidenceScore:
     """Tests for the ``confidence_score`` field in ``calculate_priority`` return dict."""
 
-    def test_confidence_score_is_0_7_placeholder(self, calculator, seller, category, city) -> None:
+    def test_confidence_score_is_0_7_placeholder(
+        self, calculator, seller, category, city
+    ) -> None:
         """Confidence score is 0.7 (placeholder for future ML) via calculate_priority."""
         _banned_words_setup()
         ad = create_test_ad(
@@ -559,7 +551,9 @@ class TestPriorityServiceBoundaries:
 
         # Now add banned words and recalculate.
         _banned_words_setup("spam")
-        create_test_ad(seller, category, city, title="spam", description="x")  # bump user's ad count
+        create_test_ad(
+            seller, category, city, title="spam", description="x"
+        )  # bump user's ad count
         ad.title = "spam"
         ad.save(update_fields=["title"])
         second = service.calculate_and_save(ad)

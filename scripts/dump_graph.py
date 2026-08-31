@@ -1,9 +1,11 @@
 """Script to dump migration graph before validation."""
+
 import os
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 
 import django
+
 django.setup()
 
 from django.db.migrations.loader import MigrationLoader

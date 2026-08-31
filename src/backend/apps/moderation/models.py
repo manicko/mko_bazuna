@@ -130,6 +130,7 @@ class ModeratorActionLog(models.Model):
     def __str__(self) -> str:
         return f"Action {self.action_type} on Ad {self.ad_id}"
 
+
 class AdModerationPriority(models.Model):
     """
     Priority scoring for moderation queue triage.

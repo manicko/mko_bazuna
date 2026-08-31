@@ -35,6 +35,7 @@ class PopularSearch(models.Model):
     def __str__(self) -> str:
         return f"{self.query} ({self.hit_count})"
 
+
 class SearchHistory(models.Model):
     """Stores user search queries for personalized autocomplete."""
 
@@ -57,6 +58,7 @@ class SearchHistory(models.Model):
 
     def __str__(self) -> str:
         return f"{self.query} (user={self.user_id})"
+
 
 class SavedSearch(models.Model):
     """Stores saved search queries with filters for alert notifications."""
@@ -151,6 +153,7 @@ class SavedSearch(models.Model):
 
     def __str__(self) -> str:
         return f"SavedSearch {self.id} for User {self.user_id}"
+
 
 class SavedSearchNotification(models.Model):
     """Tracks sent notifications to prevent duplicate alerts for the same ad."""

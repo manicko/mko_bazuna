@@ -69,7 +69,10 @@ def _make_category(slug: str = "svc-test-cat") -> Category:
 def _make_city(slug: str = "svc-test-city") -> City:
     """Create a City with sensible defaults."""
     return City.objects.create(
-        country_code="ME", name="Svc Test City", region="Svc Test Region", slug=slug,
+        country_code="ME",
+        name="Svc Test City",
+        region="Svc Test Region",
+        slug=slug,
     )
 
 
@@ -174,10 +177,14 @@ class TestPriorityService:
         user = _make_user(telegram_id=990030010)
         service = PriorityService()
 
-        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            user, category, city, title="spam scam cheap fake counterfeit"
+        )
         service.calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        low_ad = create_test_ad(
+            user, category, city, title="Clean title", description="Clean description"
+        )
         service.calculate_and_save(low_ad)
 
         high_qs = service.get_queued_ads(priority_filter=PriorityFilter.HIGH)
@@ -188,16 +195,22 @@ class TestPriorityService:
         assert low_ad in low_qs
         assert high_ad not in low_qs
 
-    def test_get_queued_ads_priority_filter_none_returns_all(self, category, city) -> None:
+    def test_get_queued_ads_priority_filter_none_returns_all(
+        self, category, city
+    ) -> None:
         """get_queued_ads with priority_filter=None returns ads of every priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
         user = _make_user(telegram_id=990030010)
         service = PriorityService()
 
-        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            user, category, city, title="spam scam cheap fake counterfeit"
+        )
         service.calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        low_ad = create_test_ad(
+            user, category, city, title="Clean title", description="Clean description"
+        )
         service.calculate_and_save(low_ad)
 
         qs = service.get_queued_ads(priority_filter=None)
@@ -217,10 +230,14 @@ class TestPriorityService:
         user = _make_user(telegram_id=990030010)
         service = PriorityService()
 
-        high_ad = create_test_ad(user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            user, category, city, title="spam scam cheap fake counterfeit"
+        )
         service.calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(user, category, city, title="Clean title", description="Clean description")
+        low_ad = create_test_ad(
+            user, category, city, title="Clean title", description="Clean description"
+        )
         service.calculate_and_save(low_ad)
 
         counts = service.get_priority_counts()
@@ -229,10 +246,14 @@ class TestPriorityService:
         assert counts["low"] == 1
         assert counts["medium"] == 0
 
-    def test_get_priority_counts_excludes_non_moderation_ads(self, category, city) -> None:
+    def test_get_priority_counts_excludes_non_moderation_ads(
+        self, category, city
+    ) -> None:
         """get_priority_counts excludes ads that are not in moderation status."""
         user = _make_user(telegram_id=990030010)
-        ad = create_test_ad(user, category, city, title="spam scam cheap", status=AdStatus.PUBLISHED)
+        ad = create_test_ad(
+            user, category, city, title="spam scam cheap", status=AdStatus.PUBLISHED
+        )
         service = PriorityService()
         service.calculate_and_save(ad)
 
@@ -265,7 +286,9 @@ class TestCalculateAdPrioritySignal:
         ad.refresh_from_db()
         assert not hasattr(ad, "moderation_priority")
 
-    def test_signal_does_not_create_priority_for_published(self, category, city) -> None:
+    def test_signal_does_not_create_priority_for_published(
+        self, category, city
+    ) -> None:
         """Signal does NOT create priority for PUBLISHED ads."""
         user = _make_user(telegram_id=990030020)
         ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
@@ -273,7 +296,9 @@ class TestCalculateAdPrioritySignal:
         ad.refresh_from_db()
         assert not hasattr(ad, "moderation_priority")
 
-    def test_signal_does_not_recalculate_existing_priority(self, category, city) -> None:
+    def test_signal_does_not_recalculate_existing_priority(
+        self, category, city
+    ) -> None:
         """Signal does NOT recalculate priority if record already exists."""
         user = _make_user(telegram_id=990030020)
         ad = create_test_ad(user, category, city)
@@ -364,7 +389,9 @@ class TestModerationQueueView:
         client = Client()
         client.force_login(self.staff_user)
 
-        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            self.user, category, city, title="spam scam cheap fake counterfeit"
+        )
         PriorityService().calculate_and_save(high_ad)
 
         low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
@@ -382,7 +409,9 @@ class TestModerationQueueView:
         client = Client()
         client.force_login(self.staff_user)
 
-        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            self.user, category, city, title="spam scam cheap fake counterfeit"
+        )
         PriorityService().calculate_and_save(high_ad)
 
         low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
@@ -394,13 +423,17 @@ class TestModerationQueueView:
         assert str(high_ad.id).encode() in response.content
         assert str(low_ad.id).encode() in response.content
 
-    def test_priority_filter_invalid_value_defaults_to_all(self, category, city) -> None:
+    def test_priority_filter_invalid_value_defaults_to_all(
+        self, category, city
+    ) -> None:
         """An unrecognized priority value falls back to showing all ads."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
         client = Client()
         client.force_login(self.staff_user)
 
-        high_ad = create_test_ad(self.user, category, city, title="spam scam cheap fake counterfeit")
+        high_ad = create_test_ad(
+            self.user, category, city, title="spam scam cheap fake counterfeit"
+        )
         PriorityService().calculate_and_save(high_ad)
 
         low_ad = create_test_ad(self.user, category, city, title="Low priority ad")

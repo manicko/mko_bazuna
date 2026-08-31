@@ -35,10 +35,14 @@ class TestApproveAdRouting:
     """Verify approve_ad delegates to set_published, not direct assignment."""
 
     @patch("apps.moderation.admin_actions.set_published")
-    def test_approve_ad_routes_through_set_published(self, mock_set_published, seller, category, city):
+    def test_approve_ad_routes_through_set_published(
+        self, mock_set_published, seller, category, city
+    ):
         """approve_ad calls set_published() instead of assigning fields directly."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
-        moderator = User.objects.create(telegram_id=900000204, chat_id=900000204, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000204, chat_id=900000204, password="x"
+        )
         approve_ad(ad, moderator.id)
 
         mock_set_published.assert_called_once_with(ad, moderator_id=moderator.id)
@@ -49,7 +53,9 @@ class TestApproveAdRouting:
     def test_approve_ad_only_from_moderation(self, seller, category, city):
         """approve_ad is a no-op when the ad is not in ON_MODERATION."""
         ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-        moderator = User.objects.create(telegram_id=900000205, chat_id=900000205, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000205, chat_id=900000205, password="x"
+        )
         with patch("apps.moderation.admin_actions.set_published") as mock_set:
             approve_ad(ad, moderator.id)
             mock_set.assert_not_called()
@@ -67,7 +73,9 @@ class TestRejectAdRouting:
     """Verify reject_ad delegates to set_rejected and respects the matrix."""
 
     @patch("apps.moderation.admin_actions.set_rejected")
-    def test_reject_ad_routes_through_set_rejected(self, mock_set_rejected, seller, category, city):
+    def test_reject_ad_routes_through_set_rejected(
+        self, mock_set_rejected, seller, category, city
+    ):
         """reject_ad calls set_rejected() instead of assigning fields directly."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
         moderator_id = seller.id + 100
@@ -83,7 +91,9 @@ class TestRejectAdRouting:
     def test_reject_ad_from_moderation_succeeds(self, seller, category, city):
         """reject_ad transitions ON_MODERATION -> REJECTED."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
-        moderator = User.objects.create(telegram_id=900000200, chat_id=900000200, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000200, chat_id=900000200, password="x"
+        )
         reject_ad(ad, moderator.id, "policy violation")
 
         ad.refresh_from_db()
@@ -93,8 +103,12 @@ class TestRejectAdRouting:
 
     def test_reject_ad_from_moderation_failed_succeeds(self, seller, category, city):
         """reject_ad transitions ON_MODERATION_FAILED -> REJECTED (new matrix edge)."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION_FAILED)
-        moderator = User.objects.create(telegram_id=900000201, chat_id=900000201, password="x")
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+        moderator = User.objects.create(
+            telegram_id=900000201, chat_id=900000201, password="x"
+        )
         reject_ad(ad, moderator.id, "manual review")
 
         ad.refresh_from_db()
@@ -107,7 +121,9 @@ class TestRejectAdRouting:
     def test_reject_ad_from_published_raises(self, seller, category, city):
         """reject_ad on PUBLISHED raises ValueError (forbidden transition)."""
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        moderator = User.objects.create(telegram_id=900000202, chat_id=900000202, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000202, chat_id=900000202, password="x"
+        )
         with pytest.raises(ValueError, match="Invalid transition"):
             reject_ad(ad, moderator.id, "not allowed")
 
@@ -117,7 +133,9 @@ class TestRejectAdRouting:
     def test_reject_ad_from_archived_raises(self, seller, category, city):
         """reject_ad on ARCHIVED raises ValueError (forbidden transition)."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
-        moderator = User.objects.create(telegram_id=900000203, chat_id=900000203, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000203, chat_id=900000203, password="x"
+        )
         with pytest.raises(ValueError, match="Invalid transition"):
             reject_ad(ad, moderator.id, "not allowed")
 
@@ -149,7 +167,9 @@ class TestSoftDeleteAdRouting:
     def test_soft_delete_ad_routes_through_transition_to(self, seller, category, city):
         """soft_delete_ad calls ad.transition_to(DELETED), not direct assignment."""
         ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-        moderator = User.objects.create(telegram_id=900000206, chat_id=900000206, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000206, chat_id=900000206, password="x"
+        )
 
         with patch.object(Ad, "transition_to", wraps=ad.transition_to) as spy:
             soft_delete_ad(ad, moderator.id, "spam")
@@ -166,7 +186,9 @@ class TestSoftDeleteAdRouting:
     def test_soft_delete_any_active_state(self, seller, category, city, start_status):
         """soft_delete_ad transitions DRAFT/ON_MODERATION/PUBLISHED -> DELETED."""
         ad = create_test_ad(seller, category, city, status=start_status)
-        moderator = User.objects.create(telegram_id=900000207, chat_id=900000207, password="x")
+        moderator = User.objects.create(
+            telegram_id=900000207, chat_id=900000207, password="x"
+        )
 
         soft_delete_ad(ad, moderator.id, "policy violation")
 

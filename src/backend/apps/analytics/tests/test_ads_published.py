@@ -43,13 +43,17 @@ def seller_ads(seller, category, city):
         )
     create_test_ad(seller, category, city, title="Draft Ad", status=AdStatus.DRAFT)
     create_test_ad(seller, category, city, title="Another Draft", status=AdStatus.DRAFT)
-    create_test_ad(seller, category, city, title="Rejected Ad", status=AdStatus.REJECTED)
+    create_test_ad(
+        seller, category, city, title="Rejected Ad", status=AdStatus.REJECTED
+    )
 
 
 class TestAdsPublishedMetric:
     """Tests for the ads_published metric in SellerStats."""
 
-    def test_ads_published_counts_only_published(self, seller_ads, seller: object) -> None:
+    def test_ads_published_counts_only_published(
+        self, seller_ads, seller: object
+    ) -> None:
         """ads_published should count only PUBLISHED ads, not drafts or rejected."""
         stats = SellerStats(user_id=seller.id).get_stats()
         assert stats["ads_published"] == 3

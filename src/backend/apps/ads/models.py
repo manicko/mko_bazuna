@@ -385,7 +385,9 @@ class Ad(models.Model):
             AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
             AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
             AdStatus.REJECTED: set(),  # Terminal
-            AdStatus.ON_MODERATION_FAILED: {AdStatus.REJECTED},  # manual review of auto-failed ads (AD-001)
+            AdStatus.ON_MODERATION_FAILED: {
+                AdStatus.REJECTED
+            },  # manual review of auto-failed ads (AD-001)
             AdStatus.DELETED: set(),  # Terminal
         }
 

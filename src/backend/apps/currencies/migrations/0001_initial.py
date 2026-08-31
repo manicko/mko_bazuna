@@ -4,28 +4,82 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ExchangeRate',
+            name="ExchangeRate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('currency', models.CharField(choices=[('EUR', 'EUR'), ('RSD', 'RSD'), ('BAM', 'BAM')], help_text='Currency this rate applies to (ISO 4217 code)', max_length=3, unique=True)),
-                ('rate_to_eur', models.DecimalField(decimal_places=8, help_text='Number of EUR equal to one unit of this currency (EUR base = 1.0)', max_digits=14)),
-                ('effective_date', models.DateField(help_text='Date this rate takes effect (audit trail for rate changes)')),
-                ('source', models.CharField(help_text="Origin of the rate, e.g. 'manual_seed' or an official provider", max_length=50)),
-                ('is_current', models.BooleanField(default=True, help_text='Only current rows (one per currency) are used for normalization')),
-                ('created_at', models.DateTimeField(auto_now_add=True, help_text='When this rate row was created')),
-                ('updated_at', models.DateTimeField(auto_now=True, help_text='When this rate row was last modified')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "currency",
+                    models.CharField(
+                        choices=[("EUR", "EUR"), ("RSD", "RSD"), ("BAM", "BAM")],
+                        help_text="Currency this rate applies to (ISO 4217 code)",
+                        max_length=3,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "rate_to_eur",
+                    models.DecimalField(
+                        decimal_places=8,
+                        help_text="Number of EUR equal to one unit of this currency (EUR base = 1.0)",
+                        max_digits=14,
+                    ),
+                ),
+                (
+                    "effective_date",
+                    models.DateField(
+                        help_text="Date this rate takes effect (audit trail for rate changes)"
+                    ),
+                ),
+                (
+                    "source",
+                    models.CharField(
+                        help_text="Origin of the rate, e.g. 'manual_seed' or an official provider",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "is_current",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Only current rows (one per currency) are used for normalization",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, help_text="When this rate row was created"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        auto_now=True, help_text="When this rate row was last modified"
+                    ),
+                ),
             ],
             options={
-                'db_table': 'exchange_rates',
-                'constraints': [models.UniqueConstraint(condition=models.Q(('is_current', True)), fields=('currency', 'is_current'), name='uq_exchange_rate_current_per_currency')],
+                "db_table": "exchange_rates",
+                "constraints": [
+                    models.UniqueConstraint(
+                        condition=models.Q(("is_current", True)),
+                        fields=("currency", "is_current"),
+                        name="uq_exchange_rate_current_per_currency",
+                    )
+                ],
             },
         ),
     ]

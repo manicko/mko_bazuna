@@ -146,7 +146,9 @@ class TestLanguageEndToEnd:
         assert TITLE_BS.encode() not in response.content
         assert translation.get_language() == "ru"
 
-    def test_invalid_lang_falls_back_to_russian_and_does_not_persist(self, e2e_ad) -> None:
+    def test_invalid_lang_falls_back_to_russian_and_does_not_persist(
+        self, e2e_ad
+    ) -> None:
         """An unsupported ``?lang=fr`` falls back to ru and sets no cookie."""
         client = Client()
         response = client.get(e2e_ad["detail_url"] + "?lang=fr")

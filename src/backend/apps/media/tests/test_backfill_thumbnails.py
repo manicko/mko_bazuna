@@ -129,7 +129,9 @@ class TestBackfillThumbnails:
             assert ad_image.thumbnail_medium is None
             assert ad_image.thumbnail_large is None
 
-    def test_backfill_generates_all_thumbnails(self, seller, category, city, isolated_media_root):
+    def test_backfill_generates_all_thumbnails(
+        self, seller, category, city, isolated_media_root
+    ):
         """Backfill generates all three thumbnail variants for missing records."""
         ad_image = _create_adimage_with_original(
             seller, category, city, isolated_media_root
@@ -156,7 +158,10 @@ class TestBackfillThumbnails:
     ):
         """Backfill only fills missing thumbnail variants, preserving existing."""
         ad_image = _create_adimage_with_original(
-            seller, category, city, isolated_media_root,
+            seller,
+            category,
+            city,
+            isolated_media_root,
         )
         # Pre-set small thumbnail
         ad_image.thumbnail_small = "existing-small.jpg"
@@ -212,7 +217,9 @@ class TestBackfillThumbnails:
         assert ad_image.thumbnail_medium is None
         assert ad_image.thumbnail_large is None
 
-    def test_backfill_batch_processing(self, seller, category, city, isolated_media_root):
+    def test_backfill_batch_processing(
+        self, seller, category, city, isolated_media_root
+    ):
         """Batch-size parameter correctly processes records in chunks."""
         # Create more records than default batch size
         num_records = 5

@@ -157,28 +157,35 @@ class AnalyticsGenerator(BaseGenerator):
                     random_hour = self.faker.random_int(0, 23)
                     random_minute = self.faker.random_int(0, 59)
                     event_time = day_date.replace(
-                        hour=random_hour, minute=random_minute, second=0, microsecond=0,
+                        hour=random_hour,
+                        minute=random_minute,
+                        second=0,
+                        microsecond=0,
                     )
-                    events.append(AnalyticsEvent(
-                        event_type=AnalyticsEventType.CONTACT_INITIATED,
-                        timestamp=event_time,
-                        user=None,
-                        ad=ad,
-                        source=AdSource.SEED,
-                    ))
+                    events.append(
+                        AnalyticsEvent(
+                            event_type=AnalyticsEventType.CONTACT_INITIATED,
+                            timestamp=event_time,
+                            user=None,
+                            ad=ad,
+                            source=AdSource.SEED,
+                        )
+                    )
 
                     # ~60% of initiations get a response from the seller
                     if self.faker.random_int(0, 99) < 60:
                         response_time = event_time + timedelta(
                             minutes=self.faker.random_int(5, 120),
                         )
-                        events.append(AnalyticsEvent(
-                            event_type=AnalyticsEventType.CONTACT_RESPONSE,
-                            timestamp=response_time,
-                            user=ad.user,
-                            ad=None,
-                            source=AdSource.SEED,
-                        ))
+                        events.append(
+                            AnalyticsEvent(
+                                event_type=AnalyticsEventType.CONTACT_RESPONSE,
+                                timestamp=response_time,
+                                user=ad.user,
+                                ad=None,
+                                source=AdSource.SEED,
+                            )
+                        )
 
         return events
 

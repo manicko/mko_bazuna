@@ -86,7 +86,11 @@ def rollup_data(seller, category, city):
         seller1, category, city, title="Rollup Ad 2", status=AdStatus.PUBLISHED
     )
     ad3 = create_test_ad(
-        seller2, category, city, title="Rollup Ad 3 (no events)", status=AdStatus.PUBLISHED
+        seller2,
+        category,
+        city,
+        title="Rollup Ad 3 (no events)",
+        status=AdStatus.PUBLISHED,
     )
 
     # Events for ad1: 3 views, 2 contacts

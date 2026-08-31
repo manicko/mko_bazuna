@@ -14,9 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 #: Root directory for seed photo fixtures (bundled JPEGs, manifests, state).
-FIXTURES_IMAGES_DIR: Path = (
-    Path(__file__).resolve().parent / "fixtures" / "images"
-)
+FIXTURES_IMAGES_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "images"
 
 #: Per-category query definitions for the Unsplash/Pexels download script.
 QUERY_HIERARCHY_PATH: Path = FIXTURES_IMAGES_DIR / "query_hierarchy.json"

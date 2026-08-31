@@ -83,4 +83,4 @@ def test_modal_has_no_dangling_search_list_ref():
     content = modal_path.read_text(encoding="utf-8")
     # No functional URL reference to the removed route remains.
     assert "url 'search:list'" not in content
-    assert "url \"search:list\"" not in content
+    assert 'url "search:list"' not in content

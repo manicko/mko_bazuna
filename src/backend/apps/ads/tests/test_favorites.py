@@ -58,14 +58,14 @@ class TestFavoriteToggle:
         assert resp.status_code == 200
         assert AdFavorite.objects.filter(user=buyer, ad=ad).exists()
         content = resp.content.decode()
-        assert "aria-pressed=\"true\"" in content
+        assert 'aria-pressed="true"' in content
 
         # Second tap removes the favorite and returns an outline heart.
         resp = client.post(f"/favorite/{ad.id}/")
         assert resp.status_code == 200
         assert not AdFavorite.objects.filter(user=buyer, ad=ad).exists()
         content = resp.content.decode()
-        assert "aria-pressed=\"false\"" in content
+        assert 'aria-pressed="false"' in content
 
     def test_guest_tap_returns_login_prompt_no_302(
         self, seller: User, category: Category, city: City
@@ -131,8 +131,12 @@ class TestAnnotateFavorites:
     def test_annotates_initial_state(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        favorited = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="Избранное")
-        not_favorited = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="Другое")
+        favorited = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, title="Избранное"
+        )
+        not_favorited = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, title="Другое"
+        )
         AdFavorite.objects.create(user=buyer, ad=favorited)
 
         qs = Ad.objects.filter(pk__in=[favorited.pk, not_favorited.pk])
@@ -180,7 +184,9 @@ class TestFavoritesList:
     def test_empty_state(
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
-        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)  # another seller's ad, not favorited
+        create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED
+        )  # another seller's ad, not favorited
         client = Client()
         client.force_login(buyer)
         resp = client.get("/cabinet/favorites/")

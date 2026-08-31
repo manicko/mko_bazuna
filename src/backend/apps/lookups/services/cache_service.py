@@ -64,7 +64,9 @@ class LookupCacheService:
             LookupItem.objects.filter(
                 group__code=group_code,
                 is_active=True,
-            ).order_by("sort_order").select_related("group")
+            )
+            .order_by("sort_order")
+            .select_related("group")
         )
         cache.set(cache_key, items, CACHE_TTL)
         return items

@@ -130,7 +130,10 @@ def moderation_stats_data():
 
     # Ad A: approved
     ad_approved = create_test_ad(
-        seller, category, city, title="Approved Ad",
+        seller,
+        category,
+        city,
+        title="Approved Ad",
         status=AdStatus.PUBLISHED,
         published_by=moderator,
         published_at=now - timedelta(hours=4),
@@ -138,13 +141,17 @@ def moderation_stats_data():
     Ad.objects.filter(id=ad_approved.id).update(created_at=now - timedelta(hours=8))
     ad_approved.refresh_from_db()
     _make_moderation_event(
-        ad_approved, AnalyticsEventType.MODERATION_APPROVED,
+        ad_approved,
+        AnalyticsEventType.MODERATION_APPROVED,
         timestamp=now - timedelta(hours=4),
     )
 
     # Ad B: rejected
     ad_rejected = create_test_ad(
-        seller, category, city, title="Rejected Ad",
+        seller,
+        category,
+        city,
+        title="Rejected Ad",
         status=AdStatus.REJECTED,
         moderated_by=moderator,
         rejected_at=now - timedelta(hours=2),
@@ -152,39 +159,53 @@ def moderation_stats_data():
     Ad.objects.filter(id=ad_rejected.id).update(created_at=now - timedelta(hours=6))
     ad_rejected.refresh_from_db()
     _make_moderation_event(
-        ad_rejected, AnalyticsEventType.MODERATION_REJECTED,
+        ad_rejected,
+        AnalyticsEventType.MODERATION_REJECTED,
         timestamp=now - timedelta(hours=2),
     )
 
     # Ad C: flagged
     ad_flagged = create_test_ad(
-        seller, category, city, title="Flagged Ad", status=AdStatus.ON_MODERATION,
+        seller,
+        category,
+        city,
+        title="Flagged Ad",
+        status=AdStatus.ON_MODERATION,
     )
     _make_moderation_event(
-        ad_flagged, AnalyticsEventType.MODERATION_FLAGGED,
+        ad_flagged,
+        AnalyticsEventType.MODERATION_FLAGGED,
         timestamp=now - timedelta(hours=1),
     )
 
     # Noise: non-moderation event
     _make_moderation_event(
-        ad_approved, AnalyticsEventType.AD_VIEWED,
+        ad_approved,
+        AnalyticsEventType.AD_VIEWED,
         timestamp=now - timedelta(hours=1),
     )
 
     # Noise: old event beyond default 30-day window
     _make_moderation_event(
         create_test_ad(
-            seller, category, city, title="Old Ad",
-            status=AdStatus.PUBLISHED, published_by=moderator,
+            seller,
+            category,
+            city,
+            title="Old Ad",
+            status=AdStatus.PUBLISHED,
+            published_by=moderator,
         ),
         AnalyticsEventType.MODERATION_APPROVED,
         timestamp=now - timedelta(days=60),
     )
 
     return {
-        "category": category, "city": city,
-        "seller": seller, "moderator": moderator,
-        "ad_approved": ad_approved, "ad_rejected": ad_rejected,
+        "category": category,
+        "city": city,
+        "seller": seller,
+        "moderator": moderator,
+        "ad_approved": ad_approved,
+        "ad_rejected": ad_rejected,
         "ad_flagged": ad_flagged,
     }
 
@@ -195,13 +216,21 @@ def pending_queue_data(seller, category, city):
     seller_local = _make_seller(telegram_id=990020301)
 
     # 2 ads on moderation
-    create_test_ad(seller_local, category, city, title="Pending 1", status=AdStatus.ON_MODERATION)
-    create_test_ad(seller_local, category, city, title="Pending 2", status=AdStatus.ON_MODERATION)
+    create_test_ad(
+        seller_local, category, city, title="Pending 1", status=AdStatus.ON_MODERATION
+    )
+    create_test_ad(
+        seller_local, category, city, title="Pending 2", status=AdStatus.ON_MODERATION
+    )
 
     # Noise: ads in other statuses
-    create_test_ad(seller_local, category, city, title="Published", status=AdStatus.PUBLISHED)
+    create_test_ad(
+        seller_local, category, city, title="Published", status=AdStatus.PUBLISHED
+    )
     create_test_ad(seller_local, category, city, title="Draft", status=AdStatus.DRAFT)
-    create_test_ad(seller_local, category, city, title="Rejected", status=AdStatus.REJECTED)
+    create_test_ad(
+        seller_local, category, city, title="Rejected", status=AdStatus.REJECTED
+    )
 
     return {"seller": seller_local, "category": category, "city": city}
 
@@ -219,32 +248,59 @@ def moderator_performance_data():
     mod_b = _make_moderator(telegram_id=990020403)
 
     # Moderator A: 2 approvals, 1 rejection
-    ad = create_test_ad(seller, category, city, title="A-Approval-1",
-                        status=AdStatus.PUBLISHED, published_by=mod_a,
-                        published_at=now - timedelta(hours=5))
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
+        title="A-Approval-1",
+        status=AdStatus.PUBLISHED,
+        published_by=mod_a,
+        published_at=now - timedelta(hours=5),
+    )
     Ad.objects.filter(id=ad.id).update(created_at=now - timedelta(hours=10))
     ad.refresh_from_db()
-    ad = create_test_ad(seller, category, city, title="A-Approval-2",
-                        status=AdStatus.PUBLISHED, published_by=mod_a,
-                        published_at=now - timedelta(hours=3))
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
+        title="A-Approval-2",
+        status=AdStatus.PUBLISHED,
+        published_by=mod_a,
+        published_at=now - timedelta(hours=3),
+    )
     Ad.objects.filter(id=ad.id).update(created_at=now - timedelta(hours=9))
     ad.refresh_from_db()
-    ad = create_test_ad(seller, category, city, title="A-Rejection",
-                        status=AdStatus.REJECTED, moderated_by=mod_a,
-                        rejected_at=now - timedelta(hours=1))
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
+        title="A-Rejection",
+        status=AdStatus.REJECTED,
+        moderated_by=mod_a,
+        rejected_at=now - timedelta(hours=1),
+    )
     Ad.objects.filter(id=ad.id).update(created_at=now - timedelta(hours=4))
     ad.refresh_from_db()
 
     # Moderator B: 1 approval
-    ad = create_test_ad(seller, category, city, title="B-Approval",
-                        status=AdStatus.PUBLISHED, published_by=mod_b,
-                        published_at=now - timedelta(hours=2))
+    ad = create_test_ad(
+        seller,
+        category,
+        city,
+        title="B-Approval",
+        status=AdStatus.PUBLISHED,
+        published_by=mod_b,
+        published_at=now - timedelta(hours=2),
+    )
     Ad.objects.filter(id=ad.id).update(created_at=now - timedelta(hours=6))
     ad.refresh_from_db()
 
     return {
-        "category": category, "city": city,
-        "seller": seller, "mod_a": mod_a, "mod_b": mod_b,
+        "category": category,
+        "city": city,
+        "seller": seller,
+        "mod_a": mod_a,
+        "mod_b": mod_b,
     }
 
 
@@ -258,32 +314,56 @@ def rejection_reasons_data():
 
     now = timezone.now()
 
-    ad1 = create_test_ad(seller, category, city, title="Rej 1", status=AdStatus.REJECTED)
-    ad2 = create_test_ad(seller, category, city, title="Rej 2", status=AdStatus.REJECTED)
-    ad3 = create_test_ad(seller, category, city, title="Rej 3", status=AdStatus.REJECTED)
-    ad4 = create_test_ad(seller, category, city, title="Rej 4", status=AdStatus.REJECTED)
+    ad1 = create_test_ad(
+        seller, category, city, title="Rej 1", status=AdStatus.REJECTED
+    )
+    ad2 = create_test_ad(
+        seller, category, city, title="Rej 2", status=AdStatus.REJECTED
+    )
+    ad3 = create_test_ad(
+        seller, category, city, title="Rej 3", status=AdStatus.REJECTED
+    )
+    ad4 = create_test_ad(
+        seller, category, city, title="Rej 4", status=AdStatus.REJECTED
+    )
 
     # 2x "spam", 1x "adult content", 1x "offensive"
     _make_action_log(ad1, moderator, "spam", created_at=now - timedelta(days=1))
     _make_action_log(ad2, moderator, "spam", created_at=now - timedelta(days=2))
-    _make_action_log(ad3, moderator, "adult content", created_at=now - timedelta(days=5))
+    _make_action_log(
+        ad3, moderator, "adult content", created_at=now - timedelta(days=5)
+    )
     _make_action_log(ad4, moderator, "offensive", created_at=now - timedelta(days=10))
 
     # Noise: non-REJECT action
-    ad5 = create_test_ad(seller, category, city, title="Noise", status=AdStatus.REJECTED)
+    ad5 = create_test_ad(
+        seller, category, city, title="Noise", status=AdStatus.REJECTED
+    )
     _make_action_log(
-        ad5, moderator, "ban reason",
+        ad5,
+        moderator,
+        "ban reason",
         action_type=ModeratorActionType.BAN_ACCOUNT,
         created_at=now - timedelta(days=1),
     )
 
     # Noise: old reason beyond 30-day window
-    ad6 = create_test_ad(seller, category, city, title="Old Rej", status=AdStatus.REJECTED)
+    ad6 = create_test_ad(
+        seller, category, city, title="Old Rej", status=AdStatus.REJECTED
+    )
     _make_action_log(
-        ad6, moderator, "very old", created_at=now - timedelta(days=60),
+        ad6,
+        moderator,
+        "very old",
+        created_at=now - timedelta(days=60),
     )
 
-    return {"category": category, "city": city, "moderator": moderator, "seller": seller}
+    return {
+        "category": category,
+        "city": city,
+        "moderator": moderator,
+        "seller": seller,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -412,8 +492,12 @@ class TestGetModeratorPerformance:
         now = timezone.now()
 
         ad = create_test_ad(
-            old_seller, old_cat, old_city, title="Old Action",
-            status=AdStatus.PUBLISHED, published_by=old_mod,
+            old_seller,
+            old_cat,
+            old_city,
+            title="Old Action",
+            status=AdStatus.PUBLISHED,
+            published_by=old_mod,
             published_at=now - timedelta(days=50),
         )
         Ad.objects.filter(id=ad.id).update(created_at=now - timedelta(days=55))

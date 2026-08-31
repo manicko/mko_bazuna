@@ -81,9 +81,9 @@ class TrustLevel(StrEnum):
     """Seller trust level based on platform activity and moderation outcomes."""
 
     UNVERIFIED = "unverified"  # Default for all new users
-    VERIFIED = "verified"      # Phone or email verified
-    TRUSTED = "trusted"       # 10+ published ads, no rejections
-    PRO = "pro"               # 50+ published ads, <5% rejection rate
+    VERIFIED = "verified"  # Phone or email verified
+    TRUSTED = "trusted"  # 10+ published ads, no rejections
+    PRO = "pro"  # 50+ published ads, <5% rejection rate
 ```
 
 ### 1.3 Verification Tracking

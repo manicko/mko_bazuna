@@ -109,9 +109,7 @@ def translate_cached(query: str) -> str:
 
 
 @lru_cache(maxsize=256)
-def translate_cached_generic(
-    query: str, source_locale: str, target_locale: str
-) -> str:
+def translate_cached_generic(query: str, source_locale: str, target_locale: str) -> str:
     """
     Cached translation function supporting any language pair.
 

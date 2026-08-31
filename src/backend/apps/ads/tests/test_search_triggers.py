@@ -201,15 +201,24 @@ class TestSearchViewSorting:
         """Create 3 PUBLISHED ads with distinct ``published_at`` timestamps."""
         now = timezone.now()
         ad1 = _create_published_ad(
-            seller, category, city, title="Ad 1",
+            seller,
+            category,
+            city,
+            title="Ad 1",
             published_at=now - timedelta(hours=2),
         )
         ad2 = _create_published_ad(
-            seller, category, city, title="Ad 2",
+            seller,
+            category,
+            city,
+            title="Ad 2",
             published_at=now - timedelta(hours=1),
         )
         ad3 = _create_published_ad(
-            seller, category, city, title="Ad 3",
+            seller,
+            category,
+            city,
+            title="Ad 3",
             published_at=now,
         )
         return {"ad1": ad1, "ad2": ad2, "ad3": ad3}

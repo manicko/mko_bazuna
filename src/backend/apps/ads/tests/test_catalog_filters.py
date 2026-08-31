@@ -635,44 +635,59 @@ class TestFilterUrlReset:
 
     def test_form_uses_request_path_not_empty(self) -> None:
         """``filter_form.html`` must use ``hx-get="{{ request.path }}"``, not ``hx-get=""``."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/ads/partials/filter_form.html"
+        )
         content = path.read_text(encoding="utf-8")
         assert 'hx-get="{{ request.path }}' in content
         assert 'hx-get=""' not in content
 
     def test_all_htmx_links_have_push_url(self) -> None:
         """Every ``hx-get`` link in ``ad_list.html`` must also carry ``hx-push-url="true"``."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        path = (
+            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        )
         content = path.read_text(encoding="utf-8")
         assert content.count("hx-get=") == 9
         assert content.count('hx-push-url="true"') == 9
 
     def test_lang_param_in_all_htmx_urls(self) -> None:
         """Every ``hx-get`` URL in ``ad_list.html`` preserves ``LANGUAGE_CODE`` as ``&lang=``."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        path = (
+            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        )
         content = path.read_text(encoding="utf-8")
         # 9 links × 2 attrs (href + hx-get) = 18 occurrences
         assert content.count("LANGUAGE_CODE") >= 18
 
     def test_clear_all_filters_has_push_url(self) -> None:
         """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        path = (
+            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        )
         content = path.read_text(encoding="utf-8")
         assert 'hx-push-url="true"' in content
         assert 'hx-get="?page=1' in content
 
     def test_sort_dropdown_is_not_gated_on_query(self) -> None:
         """The sort ``<select>`` must always render, even on search results (PO-2)."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/ads/partials/filter_form.html"
+        )
         content = path.read_text(encoding="utf-8")
         assert "{% if not query %}" not in content
 
     def test_price_inputs_use_default_filter(self) -> None:
         """Min/max price inputs use ``|default:''`` so ``None`` renders as empty, not ``"None"``."""
-        path = Path(__file__).resolve().parents[3] / "templates/ads/partials/filter_form.html"
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/ads/partials/filter_form.html"
+        )
         content = path.read_text(encoding="utf-8")
-        assert 'value="{{ min_price|default:\'\' }}"' in content
-        assert 'value="{{ max_price|default:\'\' }}"' in content
+        assert "value=\"{{ min_price|default:'' }}\"" in content
+        assert "value=\"{{ max_price|default:'' }}\"" in content
         # The raw "{{ min_price }}" / "{{ max_price }}" without the filter must not appear.
         assert 'value="{{ min_price }}"' not in content
         assert 'value="{{ max_price }}"' not in content
@@ -797,11 +812,13 @@ class TestSortOnSearchResults:
         self, seller, category, city
     ) -> None:
         create_test_ad(
-            seller, category, city, title="Транспорт велосипед", status=AdStatus.PUBLISHED
+            seller,
+            category,
+            city,
+            title="Транспорт велосипед",
+            status=AdStatus.PUBLISHED,
         )
         client = Client()
-        response = client.get(
-            "/search/?q=транспорт", headers={"HX-Request": "true"}
-        )
+        response = client.get("/search/?q=транспорт", headers={"HX-Request": "true"})
         assert response.status_code == 200
-        assert "<select name=\"sort\"" in response.content.decode("utf-8")
+        assert '<select name="sort"' in response.content.decode("utf-8")

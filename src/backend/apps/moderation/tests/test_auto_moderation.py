@@ -256,9 +256,7 @@ class TestValidateDescriptionLength:
 
     def test_description_too_short_returns_false(self):
         """Description below minimum length causes check() to return (False, ...)."""
-        ad = _create_valid_ad(
-            self.user, self.category, self.city, description="short"
-        )
+        ad = _create_valid_ad(self.user, self.category, self.city, description="short")
 
         passed, error = check(ad)
         assert passed is False
@@ -276,9 +274,7 @@ class TestValidateDescriptionLength:
 
     def test_description_min_boundary_returns_true(self):
         """Description at minimum length passes check()."""
-        ad = _create_valid_ad(
-            self.user, self.category, self.city, description="x" * 10
-        )
+        ad = _create_valid_ad(self.user, self.category, self.city, description="x" * 10)
 
         passed, error = check(ad)
         assert passed is True
@@ -463,9 +459,7 @@ class TestAutoModerateFunction:
         assert ad.status == AdStatus.PUBLISHED
         assert ad.published_at is not None
 
-        event_types = set(
-            AnalyticsEvent.objects.values_list("event_type", flat=True)
-        )
+        event_types = set(AnalyticsEvent.objects.values_list("event_type", flat=True))
         assert AnalyticsEventType.AD_PUBLISHED in event_types
         assert AnalyticsEventType.MODERATION_APPROVED in event_types
 
@@ -487,8 +481,6 @@ class TestAutoModerateFunction:
         assert ad.status == AdStatus.ON_MODERATION_FAILED
         assert ad.moderation_failed_at is not None
 
-        event_types = set(
-            AnalyticsEvent.objects.values_list("event_type", flat=True)
-        )
+        event_types = set(AnalyticsEvent.objects.values_list("event_type", flat=True))
         assert AnalyticsEventType.MODERATION_REJECTED in event_types
         assert len(event_types) == 1

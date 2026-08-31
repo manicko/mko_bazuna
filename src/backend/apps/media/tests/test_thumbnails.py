@@ -62,9 +62,7 @@ class TestThumbnailService:
         """Storage key handles multi-part extensions like .tar.gz correctly."""
         photo_bytes = _make_test_image(800, 600)
         service = ThumbnailService(storage_dir=str(tmp_path))
-        result = service.generate_thumbnails(
-            photo_bytes, "photo.tar.gz"
-        )
+        result = service.generate_thumbnails(photo_bytes, "photo.tar.gz")
 
         # os.path.splitext('photo.tar.gz') -> ('photo.tar', '.gz')
         # The stem should be 'photo.tar'
@@ -151,7 +149,7 @@ class TestThumbnailService:
             # Must preserve 2:1 aspect ratio (2000:1000)
             # Allow off-by-one from thumbnail() rounding
             assert abs(w / h - 2.0) < 0.1, (
-                f"Aspect ratio {w}/{h} = {w/h:.3f} differs from 2.0"
+                f"Aspect ratio {w}/{h} = {w / h:.3f} differs from 2.0"
             )
 
     def test_progressive_jpeg_output(self, tmp_path: Path) -> None:
@@ -163,9 +161,7 @@ class TestThumbnailService:
         thumb_path = tmp_path / result[ThumbnailSizeStrEnum.MEDIUM]
         with Image.open(thumb_path) as img:
             # Pillow stores progressive flag as int 1, not True
-            assert img.info.get("progressive"), (
-                "Expected progressive JPEG output"
-            )
+            assert img.info.get("progressive"), "Expected progressive JPEG output"
 
     def test_invalid_image_handling(self, tmp_path: Path) -> None:
         """Invalid image bytes raises ValueError."""

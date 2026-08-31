@@ -506,7 +506,9 @@ class TestExtractionCompleteness(SimpleTestCase):
     def test_all_trans_strings_extracted(self) -> None:
         template_strings = _extract_trans_msgids_from_templates()  # regex scan .html
         for po_path in _po_files():
-            po_msgids = {msgid for msgid, _, _ in _parse_po_with_fuzzy(po_path.read_text())}
+            po_msgids = {
+                msgid for msgid, _, _ in _parse_po_with_fuzzy(po_path.read_text())
+            }
             missing = template_strings - po_msgids
             assert not missing, f"{po_path}: not extracted: {missing}"
 ```

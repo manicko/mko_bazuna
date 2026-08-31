@@ -84,8 +84,12 @@ def _set_consent_cookies(
     ``samesite="Lax"`` and ``secure=True`` (D-COOKIES).
     """
     _set_consent_cookie(response, CONSENT_COOKIE_NAME, choice.value)
-    _set_consent_cookie(response, CONSENT_ANALYTICS_COOKIE, "true" if analytics else "false")
-    _set_consent_cookie(response, CONSENT_PREFERENCES_COOKIE, "true" if preferences else "false")
+    _set_consent_cookie(
+        response, CONSENT_ANALYTICS_COOKIE, "true" if analytics else "false"
+    )
+    _set_consent_cookie(
+        response, CONSENT_PREFERENCES_COOKIE, "true" if preferences else "false"
+    )
     _set_consent_cookie(
         response,
         CONSENT_TIMESTAMP_COOKIE,
@@ -129,14 +133,10 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
     """
     submission = _parse_submission(request)
     analytics = (
-        submission.analytics
-        if submission and "analytics" in request.POST
-        else True
+        submission.analytics if submission and "analytics" in request.POST else True
     )
     preferences = (
-        submission.preferences
-        if submission and "preferences" in request.POST
-        else True
+        submission.preferences if submission and "preferences" in request.POST else True
     )
     user = request.user if request.user.is_authenticated else None
 
@@ -156,7 +156,10 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
     record_consent_action(
         user=user,
         choice=ConsentChoice.ACCEPTED,
-        categories={CookieCategory.ANALYTICS: analytics, CookieCategory.PREFERENCES: preferences},
+        categories={
+            CookieCategory.ANALYTICS: analytics,
+            CookieCategory.PREFERENCES: preferences,
+        },
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )
@@ -182,9 +185,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
     submission = _parse_submission(request)
     analytics = False  # decline always rejects analytics
     preferences = (
-        submission.preferences
-        if submission and "preferences" in request.POST
-        else True
+        submission.preferences if submission and "preferences" in request.POST else True
     )
     user = request.user if request.user.is_authenticated else None
 
@@ -204,7 +205,10 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
     record_consent_action(
         user=user,
         choice=ConsentChoice.DECLINED,
-        categories={CookieCategory.ANALYTICS: analytics, CookieCategory.PREFERENCES: preferences},
+        categories={
+            CookieCategory.ANALYTICS: analytics,
+            CookieCategory.PREFERENCES: preferences,
+        },
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )

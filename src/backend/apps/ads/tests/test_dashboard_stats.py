@@ -71,25 +71,43 @@ def dashboard_seller(category, city):
     seller = _make_user(telegram_id=991001001)
     other_user = _make_user(telegram_id=991001002)
 
-    ad_a = create_test_ad(seller, category, city, title="Ad Alpha", status=AdStatus.PUBLISHED)
-    ad_b = create_test_ad(seller, category, city, title="Ad Beta", status=AdStatus.PUBLISHED)
+    ad_a = create_test_ad(
+        seller, category, city, title="Ad Alpha", status=AdStatus.PUBLISHED
+    )
+    ad_b = create_test_ad(
+        seller, category, city, title="Ad Beta", status=AdStatus.PUBLISHED
+    )
 
     now = timezone.now()
 
     # Events for ad_a
     _make_event(ad_a, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(days=1))
     _make_event(ad_a, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(days=5))
-    _make_event(ad_a, AnalyticsEventType.CONTACT_INITIATED, timestamp=now - timedelta(days=2))
+    _make_event(
+        ad_a, AnalyticsEventType.CONTACT_INITIATED, timestamp=now - timedelta(days=2)
+    )
 
     # Events for ad_b
     _make_event(ad_b, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(days=3))
-    _make_event(ad_b, AnalyticsEventType.CONTACT_INITIATED, timestamp=now - timedelta(days=15))
+    _make_event(
+        ad_b, AnalyticsEventType.CONTACT_INITIATED, timestamp=now - timedelta(days=15)
+    )
 
     # Noise: other seller's events
-    other_ad = create_test_ad(other_user, category, city, title="Other Ad", status=AdStatus.PUBLISHED)
-    _make_event(other_ad, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(hours=1))
+    other_ad = create_test_ad(
+        other_user, category, city, title="Other Ad", status=AdStatus.PUBLISHED
+    )
+    _make_event(
+        other_ad, AnalyticsEventType.AD_VIEWED, timestamp=now - timedelta(hours=1)
+    )
 
-    return {"seller": seller, "other_user": other_user, "ad_a": ad_a, "ad_b": ad_b, "other_ad": other_ad}
+    return {
+        "seller": seller,
+        "other_user": other_user,
+        "ad_a": ad_a,
+        "ad_b": ad_b,
+        "other_ad": other_ad,
+    }
 
 
 @pytest.fixture
@@ -126,7 +144,9 @@ def _locmem_cache():
 class TestDashboardContext:
     """Integration tests for seller stats in the dashboard view."""
 
-    def test_dashboard_returns_200_for_authenticated_user(self, dashboard_client) -> None:
+    def test_dashboard_returns_200_for_authenticated_user(
+        self, dashboard_client
+    ) -> None:
         """Authenticated user can access the dashboard."""
         response = dashboard_client.get("/dashboard/")
         assert response.status_code == 200
@@ -147,7 +167,9 @@ class TestDashboardContext:
         assert "ads_published" in stats
         assert "per_ad_stats" in stats
 
-    def test_context_contains_per_ad_stats_dict(self, dashboard_client, dashboard_seller) -> None:
+    def test_context_contains_per_ad_stats_dict(
+        self, dashboard_client, dashboard_seller
+    ) -> None:
         """Dashboard context includes per_ad_stats_dict lookup."""
         response = dashboard_client.get("/dashboard/")
         assert "per_ad_stats_dict" in response.context
@@ -294,7 +316,9 @@ class TestDashboardEdgeCases:
         empty_user = _make_user(telegram_id=991001003)
         client = Client()
         client.force_login(empty_user)
-        create_test_ad(empty_user, category, city, title="Lonely Ad", status=AdStatus.PUBLISHED)
+        create_test_ad(
+            empty_user, category, city, title="Lonely Ad", status=AdStatus.PUBLISHED
+        )
         response = client.get("/dashboard/")
         stats = response.context["seller_stats"]
         assert stats["total_views"] == 0

@@ -28,7 +28,9 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 def ad(seller: User, category: Category, city: City) -> Ad:
     """A PUBLISHED ad with one image."""
     ad = create_test_ad(
-        seller, category, city,
+        seller,
+        category,
+        city,
         title="Script Ad",
         description="Description",
         status=AdStatus.PUBLISHED,

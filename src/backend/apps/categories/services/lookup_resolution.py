@@ -58,12 +58,18 @@ class CategoryLookupResolver:
     @staticmethod
     def get_resolved_purpose_codes(category: Category) -> list[str]:
         """Get resolved purpose codes as string slugs."""
-        return [str(item.slug) for item in CategoryLookupResolver.get_resolved_purposes(category)]
+        return [
+            str(item.slug)
+            for item in CategoryLookupResolver.get_resolved_purposes(category)
+        ]
 
     @staticmethod
     def get_resolved_feature_codes(category: Category) -> list[str]:
         """Get resolved feature codes as string slugs."""
-        return [str(item.slug) for item in CategoryLookupResolver.get_resolved_features(category)]
+        return [
+            str(item.slug)
+            for item in CategoryLookupResolver.get_resolved_features(category)
+        ]
 
     @staticmethod
     def invalidate_category(category_id: int) -> None:
@@ -206,4 +212,7 @@ class CategoryLookupResolver:
     @staticmethod
     def get_resolved_condition_codes(category: Category) -> list[str]:
         """Get resolved condition codes as string slugs."""
-        return [str(item.slug) for item in CategoryLookupResolver.get_resolved_conditions(category)]
+        return [
+            str(item.slug)
+            for item in CategoryLookupResolver.get_resolved_conditions(category)
+        ]

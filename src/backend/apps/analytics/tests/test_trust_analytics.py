@@ -65,7 +65,9 @@ class TestCalculateSellerTrustScore:
 
         # 2 published ads → +20
         for i in range(2):
-            create_test_ad(user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED)
+            create_test_ad(
+                user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED
+            )
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 70.0) < 0.01
 
@@ -75,7 +77,9 @@ class TestCalculateSellerTrustScore:
 
         # 10 published ads → bonus capped at +50
         for i in range(10):
-            create_test_ad(user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED)
+            create_test_ad(
+                user, category, city, title=f"Pub Ad {i}", status=AdStatus.PUBLISHED
+            )
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 100.0) < 0.01
 
@@ -87,7 +91,9 @@ class TestCalculateSellerTrustScore:
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 70.0) < 0.01
 
-    def test_admin_verification_no_bonus_when_not_verified(self, category, city) -> None:
+    def test_admin_verification_no_bonus_when_not_verified(
+        self, category, city
+    ) -> None:
         """SellerVerification exists but verified_by_admin is False → no bonus."""
         user = _make_user(telegram_id=990010105)
         SellerVerification.objects.create(user=user, verified_by_admin=False)
@@ -102,7 +108,11 @@ class TestCalculateSellerTrustScore:
         # 6 rejected ads → -60, floor at 0 (base 50 - 60 = -10 → 0)
         for i in range(6):
             create_test_ad(
-                user, category, city, title=f"Rej Ad {i}", status=AdStatus.REJECTED,
+                user,
+                category,
+                city,
+                title=f"Rej Ad {i}",
+                status=AdStatus.REJECTED,
             )
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 0.0) < 0.01
@@ -113,11 +123,15 @@ class TestCalculateSellerTrustScore:
 
         # 3 published ads → +30
         for i in range(3):
-            create_test_ad(user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED)
+            create_test_ad(
+                user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED
+            )
 
         # 2 rejected ads → -20
         for i in range(2):
-            create_test_ad(user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED)
+            create_test_ad(
+                user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED
+            )
 
         # Admin verified → +20
         SellerVerification.objects.create(user=user, verified_by_admin=True)
@@ -132,7 +146,9 @@ class TestCalculateSellerTrustScore:
 
         # 5 published → +50
         for i in range(5):
-            create_test_ad(user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED)
+            create_test_ad(
+                user, category, city, title=f"Pub {i}", status=AdStatus.PUBLISHED
+            )
 
         # Verified → +20
         SellerVerification.objects.create(user=user, verified_by_admin=True)
@@ -147,7 +163,9 @@ class TestCalculateSellerTrustScore:
 
         # Many rejected ads
         for i in range(20):
-            create_test_ad(user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED)
+            create_test_ad(
+                user, category, city, title=f"Rej {i}", status=AdStatus.REJECTED
+            )
 
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 0.0) < 0.01
@@ -159,13 +177,17 @@ class TestCalculateSellerTrustScore:
 
         # Other user has many published ads
         for i in range(5):
-            create_test_ad(other, category, city, title=f"Other {i}", status=AdStatus.PUBLISHED)
+            create_test_ad(
+                other, category, city, title=f"Other {i}", status=AdStatus.PUBLISHED
+            )
 
         # Primary user has nothing → base 50
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 50.0) < 0.01
 
-    def test_seller_verification_does_not_exist_returns_base(self, category, city) -> None:
+    def test_seller_verification_does_not_exist_returns_base(
+        self, category, city
+    ) -> None:
         """Missing SellerVerification row is handled gracefully."""
         user = _make_user(telegram_id=990010112)
         # No SellerVerification created
@@ -274,33 +296,52 @@ def daily_metrics_data(category, city):
     user = _make_user(telegram_id=990010301)
     other = _make_user(telegram_id=990010302)
 
-    ad = create_test_ad(user, category, city, title="Metrics Ad", status=AdStatus.PUBLISHED)
-    other_ad = create_test_ad(other, category, city, title="Other Metrics Ad", status=AdStatus.PUBLISHED)
+    ad = create_test_ad(
+        user, category, city, title="Metrics Ad", status=AdStatus.PUBLISHED
+    )
+    other_ad = create_test_ad(
+        other, category, city, title="Other Metrics Ad", status=AdStatus.PUBLISHED
+    )
 
     today = timezone.now().date()
 
     metrics_day1 = DailyAdMetrics.objects.create(
-        ad=ad, date=today - timedelta(days=2),
-        views_count=10, contacts_count=2, trust_score=0.8,
+        ad=ad,
+        date=today - timedelta(days=2),
+        views_count=10,
+        contacts_count=2,
+        trust_score=0.8,
     )
     metrics_day2 = DailyAdMetrics.objects.create(
-        ad=ad, date=today - timedelta(days=1),
-        views_count=20, contacts_count=3, trust_score=0.9,
+        ad=ad,
+        date=today - timedelta(days=1),
+        views_count=20,
+        contacts_count=3,
+        trust_score=0.9,
     )
     metrics_day3 = DailyAdMetrics.objects.create(
-        ad=ad, date=today,
-        views_count=30, contacts_count=5, trust_score=0.95,
+        ad=ad,
+        date=today,
+        views_count=30,
+        contacts_count=5,
+        trust_score=0.95,
     )
 
     # Noise: another seller's metrics (should not appear)
     DailyAdMetrics.objects.create(
-        ad=other_ad, date=today, views_count=999, contacts_count=999,
+        ad=other_ad,
+        date=today,
+        views_count=999,
+        contacts_count=999,
     )
 
     return {
-        "user": user, "other": other,
-        "ad": ad, "other_ad": other_ad,
-        "metrics_day1": metrics_day1, "metrics_day2": metrics_day2,
+        "user": user,
+        "other": other,
+        "ad": ad,
+        "other_ad": other_ad,
+        "metrics_day1": metrics_day1,
+        "metrics_day2": metrics_day2,
         "metrics_day3": metrics_day3,
     }
 

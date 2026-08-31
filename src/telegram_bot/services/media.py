@@ -109,7 +109,7 @@ def delete_photo(storage_key: str) -> None:
             return
         except OSError as exc:
             if attempt < DELETE_PHOTO_MAX_ATTEMPTS - 1:
-                delay = DELETE_PHOTO_BASE_DELAY * (2 ** attempt)
+                delay = DELETE_PHOTO_BASE_DELAY * (2**attempt)
                 logger.warning(
                     f"Retryable error deleting photo {storage_key} "
                     f"(attempt {attempt + 1}/{DELETE_PHOTO_MAX_ATTEMPTS}): {exc}"

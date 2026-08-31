@@ -78,13 +78,19 @@ This field indicates if user has Telegram Premium subscription (fetchable via Bo
 Create in `apps/trust/models.py`:
 ```python
 class SellerTrustScore(models.Model):
-    user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="trust_score")
-    trust_level = models.CharField(max_length=20, choices=[(l.value, l.value) for l in TrustLevel])
+    user = models.OneToOneField(
+        "users.User", on_delete=models.CASCADE, related_name="trust_score"
+    )
+    trust_level = models.CharField(
+        max_length=20, choices=[(l.value, l.value) for l in TrustLevel]
+    )
     score = models.PositiveSmallIntegerField(default=0)
     ad_count_lifetime = models.PositiveIntegerField(default=0)
     ad_count_active = models.PositiveIntegerField(default=0)
     rejection_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
-    contact_response_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
+    contact_response_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.0
+    )
     last_calculated = models.DateTimeField(auto_now=True)
 ```
 
@@ -100,7 +106,9 @@ class SellerTrustScore(models.Model):
 Create in `apps/trust/models.py`:
 ```python
 class SellerVerification(models.Model):
-    user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="verification")
+    user = models.OneToOneField(
+        "users.User", on_delete=models.CASCADE, related_name="verification"
+    )
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     verified_by_admin = models.BooleanField(default=False)
     verified_at = models.DateTimeField(blank=True, null=True)

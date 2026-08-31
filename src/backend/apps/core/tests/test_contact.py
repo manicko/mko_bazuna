@@ -313,7 +313,12 @@ class TestContactCombinatorial:
         if revoked is not None:
             seller.consent_revoked_at = revoked
         seller.save(
-            update_fields=["is_banned", "is_deleted", "is_declined", "consent_revoked_at"]
+            update_fields=[
+                "is_banned",
+                "is_deleted",
+                "is_declined",
+                "consent_revoked_at",
+            ]
         )
 
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)

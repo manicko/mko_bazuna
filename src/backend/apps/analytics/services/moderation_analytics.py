@@ -84,8 +84,7 @@ def get_moderation_stats(days: int = 30) -> ModerationStats:
     )
     avg_seconds: float | None = approved_with_ad.aggregate(
         avg=Avg(
-            Extract(F("timestamp"), "epoch")
-            - Extract(F("ad__created_at"), "epoch"),
+            Extract(F("timestamp"), "epoch") - Extract(F("ad__created_at"), "epoch"),
         ),
     )["avg"]
     avg_time_to_moderate: float | None = (
@@ -135,8 +134,7 @@ def get_moderator_performance(days: int = 30) -> list[ModeratorPerformance]:
         .annotate(
             action_count=Count("id"),
             avg_seconds=Avg(
-                Extract(F("published_at"), "epoch")
-                - Extract(F("created_at"), "epoch"),
+                Extract(F("published_at"), "epoch") - Extract(F("created_at"), "epoch"),
             ),
         )
     )
@@ -151,8 +149,7 @@ def get_moderator_performance(days: int = 30) -> list[ModeratorPerformance]:
         .annotate(
             action_count=Count("id"),
             avg_seconds=Avg(
-                Extract(F("rejected_at"), "epoch")
-                - Extract(F("created_at"), "epoch"),
+                Extract(F("rejected_at"), "epoch") - Extract(F("created_at"), "epoch"),
             ),
         )
     )
@@ -171,7 +168,9 @@ def get_moderator_performance(days: int = 30) -> list[ModeratorPerformance]:
         mid = row["moderated_by"]
         if mid in perf_map:
             perf_map[mid]["actions"] += row["action_count"]
-            perf_map[mid]["total_seconds"] += (row["avg_seconds"] or 0) * row["action_count"]
+            perf_map[mid]["total_seconds"] += (row["avg_seconds"] or 0) * row[
+                "action_count"
+            ]
         else:
             perf_map[mid] = {
                 "actions": row["action_count"],
@@ -182,9 +181,7 @@ def get_moderator_performance(days: int = 30) -> list[ModeratorPerformance]:
     for mid, data in perf_map.items():
         actions = int(data["actions"])
         total_sec = float(data["total_seconds"])
-        avg_hours = (
-            round(total_sec / actions / 3600, 2) if actions > 0 else None
-        )
+        avg_hours = round(total_sec / actions / 3600, 2) if actions > 0 else None
         result.append(
             ModeratorPerformance(
                 moderator_id=mid,

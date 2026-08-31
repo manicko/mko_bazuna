@@ -4,7 +4,9 @@
 from collections import defaultdict
 from pathlib import Path
 
-LOCALE_DIR = Path(__file__).resolve().parent.parent.parent / "src" / "backend" / "locale"
+LOCALE_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "src" / "backend" / "locale"
+)
 
 LANGUAGES = {
     "ru": {
@@ -21,7 +23,7 @@ LANGUAGES = {
     },
 }
 
-PO_HEADER_TEMPLATE = '''# {lang_name} translations for Mko Bazuna.
+PO_HEADER_TEMPLATE = """# {lang_name} translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
 # Automatically generated, 2026.
@@ -40,7 +42,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\\n"
 "Plural-Forms: {plural}\\n"
 
-'''
+"""
 
 ENTRIES = [
     ("templates/ads/list.html", "Search"),
@@ -59,11 +61,17 @@ ENTRIES = [
     ("templates/ads/partials/ad_list.html", "No image"),
     ("templates/ads/partials/ad_list.html", "Page navigation"),
     ("templates/ads/partials/ad_list.html", 'No results found for "%(query)s"'),
-    ("templates/ads/partials/ad_list.html", "Try a different search term or browse all categories"),
+    (
+        "templates/ads/partials/ad_list.html",
+        "Try a different search term or browse all categories",
+    ),
     ("templates/ads/partials/ad_list.html", "No ads available"),
     ("templates/ads/partials/ad_list.html", "Check back later for new listings"),
     ("templates/ads/partials/ad_list.html", "No ads available yet"),
-    ("templates/ads/partials/ad_list.html", "Be the first to create an ad via Telegram!"),
+    (
+        "templates/ads/partials/ad_list.html",
+        "Be the first to create an ad via Telegram!",
+    ),
 ]
 
 

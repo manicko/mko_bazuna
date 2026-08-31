@@ -659,7 +659,15 @@ class TestSearchViewRecordsAutocompleteData:
         from apps.search.models import PopularSearch
 
         # Create a published ad so search has results
-        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
 
         client = Client()
         # Make a search request - this should record the popular search
@@ -677,7 +685,15 @@ class TestSearchViewRecordsAutocompleteData:
         self, buyer: User, root_category: Category, city: City
     ) -> None:
         """Authenticated user's search is recorded in history."""
-        create_test_ad(buyer, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
+        create_test_ad(
+            buyer,
+            root_category,
+            city,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
 
         client = Client()
         client.force_login(buyer)
@@ -691,7 +707,15 @@ class TestSearchViewRecordsAutocompleteData:
         self, seller: User, root_category: Category, city: City
     ) -> None:
         """Anonymous user's search IS recorded in session history (not the DB)."""
-        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
 
         client = Client()
         client.get("/search/?q=велосипед")
@@ -713,7 +737,15 @@ class TestSearchViewRecordsAutocompleteData:
         self, seller: User, root_category: Category, city: City
     ) -> None:
         """Search view exposes the resolved category for breadcrumbs (T-500)."""
-        create_test_ad(seller, root_category, city, title="Велосипед для продажи", description="Отличный велосипед", status=AdStatus.PUBLISHED, published_at=timezone.now())
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Велосипед для продажи",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
         client = Client()
         response = client.get("/search/", {"category": "transport"})
         assert response.status_code == 200

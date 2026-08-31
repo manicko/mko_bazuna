@@ -157,7 +157,9 @@ class TestSweepDrafts:
             city,
             status=AdStatus.DRAFT,
         )
-        Ad.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(minutes=90))
+        Ad.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(minutes=90)
+        )
         old.refresh_from_db()
         call_command("sweep_drafts", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
@@ -170,7 +172,9 @@ class TestSweepDrafts:
             city,
             status=AdStatus.DRAFT,
         )
-        Ad.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(minutes=90))
+        Ad.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(minutes=90)
+        )
         old.refresh_from_db()
         recent = create_test_ad(
             seller,
@@ -178,7 +182,9 @@ class TestSweepDrafts:
             city,
             status=AdStatus.DRAFT,
         )
-        Ad.objects.filter(pk=recent.pk).update(created_at=timezone.now() - timedelta(minutes=5))
+        Ad.objects.filter(pk=recent.pk).update(
+            created_at=timezone.now() - timedelta(minutes=5)
+        )
         recent.refresh_from_db()
         call_command("sweep_drafts")
         assert not Ad.objects.filter(pk=old.pk).exists()
@@ -193,7 +199,9 @@ class TestSweepDrafts:
             city,
             status=AdStatus.PUBLISHED,
         )
-        Ad.objects.filter(pk=ad.pk).update(created_at=timezone.now() - timedelta(days=10))
+        Ad.objects.filter(pk=ad.pk).update(
+            created_at=timezone.now() - timedelta(days=10)
+        )
         ad.refresh_from_db()
         call_command("sweep_drafts")
         assert Ad.objects.filter(status=AdStatus.PUBLISHED).count() == 1

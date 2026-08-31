@@ -77,9 +77,7 @@ class TestSavePhotoExifStripping:
         media_root = tmp_path / "media"
         media_root.mkdir()
         with override_settings(MEDIA_ROOT=media_root):
-            storage_key = asyncio.run(
-                save_photo("exif-test.jpg", jpeg_with_exif)
-            )
+            storage_key = asyncio.run(save_photo("exif-test.jpg", jpeg_with_exif))
 
         written_path = media_root / storage_key
         assert written_path.exists(), "save_photo did not write the file to disk"
@@ -87,7 +85,9 @@ class TestSavePhotoExifStripping:
         written_bytes = written_path.read_bytes()
 
         # The written bytes must still be a valid JPEG.
-        assert written_bytes.startswith(b"\xff\xd8\xff"), "Written file is not a valid JPEG"
+        assert written_bytes.startswith(b"\xff\xd8\xff"), (
+            "Written file is not a valid JPEG"
+        )
 
         # Re-open and verify EXIF tags are gone.
         img = Image.open(io.BytesIO(written_bytes))
@@ -97,4 +97,6 @@ class TestSavePhotoExifStripping:
         assert ExifBase.GPSInfo not in exif_data, "EXIF GPSInfo tag survived save_photo"
 
         # The stripped output must differ from the input (proves stripping ran).
-        assert written_bytes != jpeg_with_exif, "EXIF was not stripped from written bytes"
+        assert written_bytes != jpeg_with_exif, (
+            "EXIF was not stripped from written bytes"
+        )

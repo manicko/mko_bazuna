@@ -4,7 +4,6 @@ Category model for Mko Bazuna.
 Hierarchical category tree using django-mptt (single source of truth).
 """
 
-
 from apps.lookups.enums import LookupGroupCode
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
@@ -109,7 +108,9 @@ class CategoryPath(models.Model):
         from django.core.exceptions import ValidationError
 
         if self.category_id == self.parent_id:
-            raise ValidationError("A category cannot be an alternative parent of itself")
+            raise ValidationError(
+                "A category cannot be an alternative parent of itself"
+            )
 
 
 class CategoryListingPurpose(models.Model):
@@ -180,6 +181,7 @@ class CategoryListingFeature(models.Model):
 
     def __str__(self) -> str:
         return f"{self.category.slug} -> {self.feature.slug}"
+
 
 class CategoryListingCondition(models.Model):
     """M:N through table binding a Category to a listing condition LookupItem.

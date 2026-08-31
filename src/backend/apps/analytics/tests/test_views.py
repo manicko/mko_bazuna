@@ -60,7 +60,9 @@ def _make_user(
 @pytest.fixture
 def dashboard_seller(seller, category, city) -> dict:
     """Create a seller with a published ad for dashboard tests."""
-    ad = create_test_ad(seller, category, city, title="Trust Ad", status=AdStatus.PUBLISHED)
+    ad = create_test_ad(
+        seller, category, city, title="Trust Ad", status=AdStatus.PUBLISHED
+    )
     return {"seller": seller, "ad": ad}
 
 
@@ -179,7 +181,10 @@ class TestSellerTrustDashboardView:
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "trust_level" in response.context
         assert str(response.context["trust_level"]) in [
-            "unverified", "verified", "trusted", "pro",
+            "unverified",
+            "verified",
+            "trusted",
+            "pro",
         ]
 
     def test_daily_metrics_in_context(self, dashboard_seller) -> None:
@@ -226,7 +231,10 @@ class TestSellerTrustDashboardView:
 
         today = timezone.now().date()
         DailyAdMetrics.objects.create(
-            ad=ad, date=today - timedelta(days=1), views_count=5, contacts_count=2,
+            ad=ad,
+            date=today - timedelta(days=1),
+            views_count=5,
+            contacts_count=2,
         )
 
         response = client.get(reverse("analytics:seller_trust_dashboard"))
@@ -234,7 +242,9 @@ class TestSellerTrustDashboardView:
         assert response.context["total_contacts"] == 2
         assert len(response.context["daily_metrics"]) == 1
 
-    def test_other_seller_metrics_not_included(self, dashboard_seller, category, city) -> None:
+    def test_other_seller_metrics_not_included(
+        self, dashboard_seller, category, city
+    ) -> None:
         """Only the authenticated seller's metrics are included."""
         from django.test import Client
 
@@ -243,11 +253,18 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
 
         other_ad = create_test_ad(
-            _make_user(990301099), category, city, title="Other Ad", status=AdStatus.PUBLISHED
+            _make_user(990301099),
+            category,
+            city,
+            title="Other Ad",
+            status=AdStatus.PUBLISHED,
         )
         today = timezone.now().date()
         DailyAdMetrics.objects.create(
-            ad=other_ad, date=today, views_count=999, contacts_count=999,
+            ad=other_ad,
+            date=today,
+            views_count=999,
+            contacts_count=999,
         )
 
         response = client.get(reverse("analytics:seller_trust_dashboard"))
@@ -293,7 +310,12 @@ class TestModerationAnalyticsView:
         """Return a patcher for get_moderation_stats with sensible defaults."""
         return patch(
             "apps.analytics.views.moderation_dashboard.get_moderation_stats",
-            return_value={"approved": 1, "rejected": 0, "flagged": 0, "avg_time_to_moderate": None},
+            return_value={
+                "approved": 1,
+                "rejected": 0,
+                "flagged": 0,
+                "avg_time_to_moderate": None,
+            },
         )
 
     def test_anonymous_gets_404(self) -> None:
@@ -341,7 +363,9 @@ class TestModerationAnalyticsView:
         client.force_login(self.ctx["staff_user"])
         with self._patched_stats():
             response = client.get(self.ctx["url"])
-        assert "analytics/moderation_dashboard.html" in [t.name for t in response.templates]
+        assert "analytics/moderation_dashboard.html" in [
+            t.name for t in response.templates
+        ]
 
     def test_stats_in_context(self) -> None:
         """ModerationStats dict is present in the response context."""

@@ -30,7 +30,7 @@ def invalidate_lookup_cache(sender, instance, **kwargs):  # type: ignore[no-unty
 
     try:
         LookupCacheService.invalidate_all()
-    except (ConnectionInterrupted, redis.RedisError):
+    except ConnectionInterrupted, redis.RedisError:
         logger.warning(
             "Cache backend unavailable — lookup cache not invalidated after "
             "%s change; cache will refresh on next read",

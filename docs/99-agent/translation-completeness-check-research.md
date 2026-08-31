@@ -633,8 +633,9 @@ from pathlib import Path as _Path
 # Regex patterns (simple, tested against the codebase's 100 trans strings)
 _TRANS_RE = _re.compile(r'{%\s*trans\s+"([^"]*)"\s*%}')
 _BLOCKTRANS_RE = _re.compile(
-    r'{%\s*blocktrans\s*%}(.*?){%\s*endblocktrans\s*%}', _re.DOTALL
+    r"{%\s*blocktrans\s*%}(.*?){%\s*endblocktrans\s*%}", _re.DOTALL
 )
+
 
 def _collect_template_msgids() -> set[str]:
     """Return all unique msgids found in {% trans %} and {% blocktrans %} tags
@@ -647,12 +648,13 @@ def _collect_template_msgids() -> set[str]:
             msgids.add(m.group(1))
         for m in _BLOCKTRANS_RE.finditer(text):
             # blocktrans inner text may contain {{ var }} → %()s in msgid
-            inner = m.group(1).replace('{{', '%(').replace('}}', ')s').strip()
+            inner = m.group(1).replace("{{", "%(").replace("}}", ")s").strip()
             msgids.add(inner)
     return msgids
 
 
 # ─── New test: .po completeness ────────────────────────────────────────────
+
 
 class TestPoCompleteness(SimpleTestCase):
     """Verify all {% trans %} / {% blocktrans %} strings in templates are
@@ -676,8 +678,11 @@ class TestPoCompleteness(SimpleTestCase):
             if lang == "en":
                 continue
             entries = _parse_po_entries(po_path.read_text())
-            identity = [msgid for msgid, msgstr in entries
-                        if msgid and msgstr and msgid == msgstr]
+            identity = [
+                msgid
+                for msgid, msgstr in entries
+                if msgid and msgstr and msgid == msgstr
+            ]
             assert not identity, (
                 f"{po_path}: {len(identity)} entries where msgstr == msgid "
                 f"(not translated): {identity[:5]}"
@@ -685,6 +690,7 @@ class TestPoCompleteness(SimpleTestCase):
 
 
 # ─── New test: runtime canary (msgid leak detection) ──────────────────────
+
 
 @pytest.mark.django_db
 @pytest.mark.integration
@@ -702,6 +708,7 @@ class TestTransRuntimeCanary:
     @pytest.fixture(autouse=True)
     def _locale_cleanup(self):
         from django.utils import translation
+
         yield
         translation.deactivate()
 
@@ -709,8 +716,15 @@ class TestTransRuntimeCanary:
         from django.test import Client
         from django.urls import reverse
         from conftest import create_test_ad
-        ad = create_test_ad(seller, category, city, title="T",
-                           description="D", status=AdStatus.PUBLISHED)
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="T",
+            description="D",
+            status=AdStatus.PUBLISHED,
+        )
         client = Client()
         response = client.get(reverse("ads:detail", args=[ad.id]) + "?lang=bs")
         # English msgid "Contact Seller" must NOT appear when bs is active

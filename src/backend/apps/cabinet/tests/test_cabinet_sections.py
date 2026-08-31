@@ -103,7 +103,13 @@ class TestSavedSearchesManagement:
         # Edit persists new filters + language.
         client.post(
             f"/cabinet/saved-searches/{ss.id}/edit/",
-            {"query": "самокат", "city_id": "", "category_id": "", "min_price": "", "max_price": "200"},
+            {
+                "query": "самокат",
+                "city_id": "",
+                "category_id": "",
+                "min_price": "",
+                "max_price": "200",
+            },
         )
         ss.refresh_from_db()
         assert ss.query == "самокат"
@@ -126,8 +132,12 @@ class TestSavedSearchesManagement:
 
         client = _login(buyer)
         # Toggling another user's search returns 404 (scoped to request.user).
-        assert client.post(f"/cabinet/saved-searches/{ss.id}/toggle/").status_code == 404
-        assert client.post(f"/cabinet/saved-searches/{ss.id}/delete/").status_code == 404
+        assert (
+            client.post(f"/cabinet/saved-searches/{ss.id}/toggle/").status_code == 404
+        )
+        assert (
+            client.post(f"/cabinet/saved-searches/{ss.id}/delete/").status_code == 404
+        )
 
 
 # ---------------------------------------------------------------------------

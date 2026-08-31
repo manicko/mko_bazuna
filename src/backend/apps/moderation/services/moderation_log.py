@@ -142,7 +142,9 @@ def log_ban_account(user_id: int, moderator_id: int, reason: str) -> ModeratorAc
     return log
 
 
-def log_soft_delete(ad_id: int, user_id: int | None, moderator_id: int, reason: str) -> ModeratorActionLog:
+def log_soft_delete(
+    ad_id: int, user_id: int | None, moderator_id: int, reason: str
+) -> ModeratorActionLog:
     """
     Log soft delete action by moderator.
 

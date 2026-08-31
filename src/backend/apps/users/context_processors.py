@@ -32,7 +32,7 @@ def _is_expired(consent_timestamp: object) -> bool:
     """Return True when a consent timestamp is older than the re-prompt window."""
     try:
         age = timezone.now().timestamp() - float(consent_timestamp)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
     return age >= timedelta(days=CONSENT_REPROMPT_DAYS).total_seconds()
 

@@ -76,8 +76,7 @@ class Command(BaseCommand):
             delete_photo(storage_key)
 
         logger.info(
-            "Deleted %d draft ads older than 30 minutes. "
-            "Removed %d media files.",
+            "Deleted %d draft ads older than 30 minutes. Removed %d media files.",
             deleted_count,
             len(storage_keys),
         )

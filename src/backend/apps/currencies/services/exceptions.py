@@ -14,4 +14,6 @@ class ExchangeRateNotFoundError(LookupError):
 
     def __init__(self, currency: CurrencyCode) -> None:
         self.currency = currency
-        super().__init__(f"No current exchange rate found for currency {currency.value}")
+        super().__init__(
+            f"No current exchange rate found for currency {currency.value}"
+        )

@@ -81,6 +81,7 @@ def _get_cached_criteria() -> tuple:
 def _get_criteria_uncached():
     """Get ModerationCriteria singleton without caching."""
     from apps.moderation.models import ModerationCriteria as MC
+
     return MC.get_singleton()
 
 
@@ -211,7 +212,9 @@ def _is_duplicate_title(title: str, user_id: int, ad_id: int, threshold: int) ->
     ).exclude(id=ad_id)
 
     for existing_ad in existing_ads:
-        similarity = SequenceMatcher(None, title.lower(), existing_ad.title.lower()).ratio()
+        similarity = SequenceMatcher(
+            None, title.lower(), existing_ad.title.lower()
+        ).ratio()
         if similarity * 100 >= threshold:
             return True
     return False
@@ -296,31 +299,52 @@ def check(ad: Ad) -> tuple[bool, str | None]:
 
     # Validate title length
     if not _validate_title_length(ad.title, title_min, title_max):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate description length
     if not _validate_description_length(ad.description, desc_min, desc_max):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate price required
     if price_required and ad.price_amount is None:
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate image count
     if not _validate_image_count(ad, min_imgs, max_imgs):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate banned words
     if _contains_banned_words(ad.title, ad.description, banned_words):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate max ads per user
     if not _validate_max_ads_per_user(ad.user_id, max_ads):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # Validate duplicate title
     if _is_duplicate_title(ad.title, ad.user_id, ad.id, dup_threshold):
-        return (False, "Your ad content does not meet our requirements. Please review and try again.")
+        return (
+            False,
+            "Your ad content does not meet our requirements. Please review and try again.",
+        )
 
     # All checks passed
     return (True, None)

@@ -53,7 +53,11 @@ def search(request: HttpRequest) -> HttpResponse:
     PER_PAGE = 24
 
     query = (request.GET.get("q") or "").strip()
-    ads = Ad.objects.filter(status=AdStatus.PUBLISHED).select_related("category", "city", "user").prefetch_related("features")
+    ads = (
+        Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .select_related("category", "city", "user")
+        .prefetch_related("features")
+    )
 
     # Category filter (by slug) — applies in addition to FTS
     current_category = request.GET.get("category")
@@ -170,9 +174,9 @@ def search(request: HttpRequest) -> HttpResponse:
             category_filter = _fuzzy_category_match(query, locale)
             if category_filter:
                 # Expand to category subtree (consistent with listings.py)
-                descendant_ids = category_filter.get_descendants(include_self=True).values_list(
-                    "id", flat=True
-                )
+                descendant_ids = category_filter.get_descendants(
+                    include_self=True
+                ).values_list("id", flat=True)
                 ads = ads.filter(category_id__in=descendant_ids)
 
         # FTS search on the locale's per-language vector
@@ -232,7 +236,9 @@ def search(request: HttpRequest) -> HttpResponse:
     # Paginate results
     from apps.ads.views.favorite import annotate_favorites
 
-    ads = annotate_favorites(ads, request.user.id if request.user.is_authenticated else None)
+    ads = annotate_favorites(
+        ads, request.user.id if request.user.is_authenticated else None
+    )
     paginator = Paginator(ads, PER_PAGE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -240,7 +246,9 @@ def search(request: HttpRequest) -> HttpResponse:
     total_count = int(paginator.count)
     has_results = total_count > 0
     if query and not has_results:
-        logger.info("Empty search results for query '%s'", sanitize_query_for_log(query))
+        logger.info(
+            "Empty search results for query '%s'", sanitize_query_for_log(query)
+        )
 
     context = {
         "page_obj": page_obj,
@@ -336,4 +344,3 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
             if category.get_name(locale.value) == matched_name:
                 return category
     return None
-

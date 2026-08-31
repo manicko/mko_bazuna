@@ -90,8 +90,11 @@ def _check_git_status(apps_dir: str) -> bool:
             )
             return False
         return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        print("WARNING: Could not check git status (not a git repository?).", file=sys.stderr)
+    except subprocess.SubprocessError, FileNotFoundError:
+        print(
+            "WARNING: Could not check git status (not a git repository?).",
+            file=sys.stderr,
+        )
         return False
 
 
@@ -114,7 +117,9 @@ def _delete_migration_files(migrations_dir: Path, app_name: str, dry_run: bool) 
     for entry in sorted(migrations_dir.iterdir()):
         if entry.is_file() and entry.name.endswith(".py") and entry.name[0].isdigit():
             if dry_run:
-                print(f"  Would delete: {entry.relative_to(migrations_dir.parent.parent)}")
+                print(
+                    f"  Would delete: {entry.relative_to(migrations_dir.parent.parent)}"
+                )
             else:
                 entry.unlink()
                 print(f"  Deleted: {entry.relative_to(migrations_dir.parent.parent)}")
@@ -471,7 +476,9 @@ def main() -> None:
             deleted = _delete_migration_files(migrations_dir, app_name, args.dry_run)
             total_deleted += deleted
         else:
-            print(f"  {app_name}: {count} files — under threshold ({args.threshold}), skipped")
+            print(
+                f"  {app_name}: {count} files — under threshold ({args.threshold}), skipped"
+            )
 
     # Summary
     print("\n" + "=" * 60)

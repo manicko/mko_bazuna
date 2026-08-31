@@ -82,7 +82,9 @@ class Command(BaseCommand):
         total_changed = 0
         batch_ids: list[int] = []
 
-        for pk in queryset.values_list("pk", flat=True).iterator(chunk_size=_BATCH_SIZE):
+        for pk in queryset.values_list("pk", flat=True).iterator(
+            chunk_size=_BATCH_SIZE
+        ):
             batch_ids.append(pk)
             if len(batch_ids) >= _BATCH_SIZE:
                 checked, changed = self._process_batch(normalizer, batch_ids, dry_run)
@@ -119,7 +121,9 @@ class Command(BaseCommand):
             try:
                 currency = CurrencyCode(ad.price_currency)
             except ValueError:
-                logger.warning("Skipping ad %s: unknown currency %r", ad.pk, ad.price_currency)
+                logger.warning(
+                    "Skipping ad %s: unknown currency %r", ad.pk, ad.price_currency
+                )
                 continue
 
             try:
@@ -135,6 +139,8 @@ class Command(BaseCommand):
                 to_update.append(ad)
 
         if to_update and not dry_run:
-            Ad.objects.bulk_update(to_update, ["price_normalized_eur"], batch_size=_BATCH_SIZE)
+            Ad.objects.bulk_update(
+                to_update, ["price_normalized_eur"], batch_size=_BATCH_SIZE
+            )
 
         return len(ads), len(to_update)

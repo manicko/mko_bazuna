@@ -318,7 +318,9 @@ for t in templates.get("templates", []):
             errors.append(f"Missing language {lang} in template {tid}")
 
 # Validate query_hierarchy.json
-with open("src/backend/apps/seed/fixtures/images/query_hierarchy.json", encoding="utf-8") as f:
+with open(
+    "src/backend/apps/seed/fixtures/images/query_hierarchy.json", encoding="utf-8"
+) as f:
     queries = json.load(f)
 for slug in queries:
     if slug not in leaf_slugs:

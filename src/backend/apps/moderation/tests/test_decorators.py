@@ -25,7 +25,10 @@ pytestmark = [pytest.mark.unit]
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_request(method: str = "GET", is_staff: bool = False, is_superuser: bool = False) -> MagicMock:
+
+def _make_request(
+    method: str = "GET", is_staff: bool = False, is_superuser: bool = False
+) -> MagicMock:
     """Build a request mock with the desired user auth attributes."""
     request = MagicMock()
     request.method = method

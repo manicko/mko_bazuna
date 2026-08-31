@@ -81,8 +81,11 @@ class Command(BaseCommand):
                     )
                 # Validate keys are valid status names
                 valid_keys = {
-                    "published", "archived", "draft",
-                    "on_moderation", "rejected",
+                    "published",
+                    "archived",
+                    "draft",
+                    "on_moderation",
+                    "rejected",
                 }
                 for key in parsed:
                     if key not in valid_keys:
@@ -91,26 +94,26 @@ class Command(BaseCommand):
                             f"Valid keys: {', '.join(sorted(valid_keys))}"
                         )
             except json.JSONDecodeError as e:
-                raise CommandError(
-                    f"Invalid --status-distribution JSON: {e}"
-                ) from e
+                raise CommandError(f"Invalid --status-distribution JSON: {e}") from e
 
         # Confirmation prompt
         if not force:
-            self.stdout.write(self.style.WARNING(
-                "This will DELETE all existing seed data and regenerate.\n"
-                "Seed data includes: users (with seed ads), ads, images, "
-                "analytics events, and metrics."
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    "This will DELETE all existing seed data and regenerate.\n"
+                    "Seed data includes: users (with seed ads), ads, images, "
+                    "analytics events, and metrics."
+                )
+            )
             response = input("Continue? [y/N] ")
             if response.lower() not in ("y", "yes"):
                 self.stdout.write(self.style.WARNING("Seed cancelled."))
                 return
 
         # Run seed service
-        self.stdout.write(self.style.NOTICE(
-            f"Seeding database with {users} users, {ads} ads..."
-        ))
+        self.stdout.write(
+            self.style.NOTICE(f"Seeding database with {users} users, {ads} ads...")
+        )
 
         try:
             service = SeedService()

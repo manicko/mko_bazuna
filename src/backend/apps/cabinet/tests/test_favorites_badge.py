@@ -47,15 +47,21 @@ class TestFavoritesCountBadge:
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
         ad = create_test_ad(
-            seller, category, city,
-            title="Красный велосипед", status=AdStatus.PUBLISHED,
+            seller,
+            category,
+            city,
+            title="Красный велосипед",
+            status=AdStatus.PUBLISHED,
         )
         AdFavorite.objects.create(user=buyer, ad=ad)
         AdFavorite.objects.create(
             user=buyer,
             ad=create_test_ad(
-                seller, category, city,
-                title="Второй", status=AdStatus.PUBLISHED,
+                seller,
+                category,
+                city,
+                title="Второй",
+                status=AdStatus.PUBLISHED,
             ),
         )
 
@@ -71,8 +77,11 @@ class TestFavoritesCountBadge:
         self, buyer: User, seller: User, category: Category, city: City
     ) -> None:
         ad = create_test_ad(
-            seller, category, city,
-            title="Красный велосипед", status=AdStatus.PUBLISHED,
+            seller,
+            category,
+            city,
+            title="Красный велосипед",
+            status=AdStatus.PUBLISHED,
         )
         client = Client()
         client.force_login(buyer)

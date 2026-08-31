@@ -108,8 +108,11 @@ def load_config() -> dict[str, Any]:
         with open(CONFIG_EXAMPLE_PATH, encoding="utf-8") as f:
             return json.load(f)
 
-    logger.error("No config file found. Create scripts/seed-images-config.json from the example.")
+    logger.error(
+        "No config file found. Create scripts/seed-images-config.json from the example."
+    )
     return {}
+
 
 # ─── API clients ───────────────────────────────────────────────────────────
 
@@ -135,7 +138,9 @@ class PhotoSource:
         """Permanently mark this source as exhausted (rate-limit or auth error)."""
         self._exhausted = True
 
-    def _safe_get(self, url: str, headers: dict[str, str], params: dict[str, Any]) -> requests.Response:
+    def _safe_get(
+        self, url: str, headers: dict[str, str], params: dict[str, Any]
+    ) -> requests.Response:
         """Send a GET request with bounded retry on transient failures.
 
         Retries on ``ConnectionError``, ``Timeout``, and ``5xx`` server errors.
@@ -149,7 +154,9 @@ class PhotoSource:
 
         for attempt in range(max_retries + 1):
             try:
-                last_resp = requests.get(url, headers=headers, params=params, timeout=timeout)
+                last_resp = requests.get(
+                    url, headers=headers, params=params, timeout=timeout
+                )
                 self._request_count += 1
                 if last_resp.status_code < 500:
                     last_resp.raise_for_status()
@@ -172,12 +179,14 @@ class PhotoSource:
                 )
 
             if attempt < max_retries:
-                delay = min(base_delay * (2 ** attempt), 30) + random.uniform(0, 0.5)
+                delay = min(base_delay * (2**attempt), 30) + random.uniform(0, 0.5)
                 time.sleep(delay)
 
         if last_resp is not None:
             last_resp.raise_for_status()
-        raise requests.ConnectionError(f"{self.NAME}: all retries exhausted with no response")
+        raise requests.ConnectionError(
+            f"{self.NAME}: all retries exhausted with no response"
+        )
 
     def _handle_http_error(self, error: requests.HTTPError, service_name: str) -> None:
         """Classify and log an ``HTTPError`` from the photo API.
@@ -189,9 +198,7 @@ class PhotoSource:
         self._mark_exhausted()
         resp = error.response
         if resp is None:
-            logger.error(
-                "%s: request failed with no response: %s", service_name, error
-            )
+            logger.error("%s: request failed with no response: %s", service_name, error)
             return
         status = resp.status_code
         if status == 429:
@@ -213,7 +220,9 @@ class PhotoSource:
                 resp.text[:200],
             )
 
-    def _handle_request_exception(self, error: requests.RequestException, service_name: str) -> None:
+    def _handle_request_exception(
+        self, error: requests.RequestException, service_name: str
+    ) -> None:
         """Handle a non-HTTP request exception (e.g., exhausted retries on network error)."""
         self._mark_exhausted()
         logger.error(
@@ -222,7 +231,9 @@ class PhotoSource:
             error,
         )
 
-    def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, per_page: int = 30, page: int = 1
+    ) -> list[dict[str, Any]]:
         """Search for photos and return list of photo metadata dicts."""
         raise NotImplementedError
 
@@ -244,7 +255,9 @@ class UnsplashClient(PhotoSource):
         super().__init__(access_key, config)
         self._limit = config.get("unsplash_safe_limit", 45)
 
-    def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, per_page: int = 30, page: int = 1
+    ) -> list[dict[str, Any]]:
         if self.exhausted:
             logger.warning("Unsplash rate limit reached, skipping")
             return []
@@ -283,7 +296,9 @@ class PexelsClient(PhotoSource):
         super().__init__(api_key, config)
         self._limit = config.get("pexels_safe_limit", 150)
 
-    def search(self, query: str, per_page: int = 30, page: int = 1) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, per_page: int = 30, page: int = 1
+    ) -> list[dict[str, Any]]:
         if self.exhausted:
             logger.warning("Pexels rate limit reached, skipping")
             return []
@@ -382,7 +397,11 @@ def next_available_page(photo_source: PhotoSource, query: str) -> int:
     for _attempt in range(3):
         page = random.randint(1, 20)
         results = photo_source.search(query, page=page)
-        unseen = [r for r in results if photo_source.photo_id(r) not in photo_source.downloaded_ids]
+        unseen = [
+            r
+            for r in results
+            if photo_source.photo_id(r) not in photo_source.downloaded_ids
+        ]
         if unseen:
             return page
     # Fallback: just return a random page
@@ -399,7 +418,11 @@ def pick_photo(photo_source: PhotoSource, query: str) -> dict[str, Any] | None:
     if not results:
         return None
 
-    unseen = [r for r in results if photo_source.photo_id(r) not in photo_source.downloaded_ids]
+    unseen = [
+        r
+        for r in results
+        if photo_source.photo_id(r) not in photo_source.downloaded_ids
+    ]
     if not unseen:
         return None
 
@@ -470,7 +493,9 @@ def download_and_compress(
         quality -= 15
 
     # Final fallback at any quality
-    img.save(output_path, format="JPEG", quality=quality, optimize=True, progressive=True)
+    img.save(
+        output_path, format="JPEG", quality=quality, optimize=True, progressive=True
+    )
     return True
 
 
@@ -485,11 +510,13 @@ def update_manifest_for_category(
     categories = manifest.setdefault("categories", {})
     if category_slug not in categories:
         categories[category_slug] = {"photos": []}
-    categories[category_slug]["photos"].append({
-        "filename": filename,
-        "width": width,
-        "height": height,
-    })
+    categories[category_slug]["photos"].append(
+        {
+            "filename": filename,
+            "width": width,
+            "height": height,
+        }
+    )
     logger.info("Added %s -> %s to manifest", category_slug, filename)
 
 
@@ -566,11 +593,17 @@ def process_category(
     attempts = 0
     max_attempts = photos_per_category * 5  # prevent infinite loops
 
-    while downloaded < photos_per_category and attempts < max_attempts and not photo_source.exhausted:
+    while (
+        downloaded < photos_per_category
+        and attempts < max_attempts
+        and not photo_source.exhausted
+    ):
         attempts += 1
         query = compose_query(hierarchy)
 
-        logger.debug("[%s] query=%s attempt=%d/%d", category_slug, query, attempts, max_attempts)
+        logger.debug(
+            "[%s] query=%s attempt=%d/%d", category_slug, query, attempts, max_attempts
+        )
 
         photo = pick_photo(photo_source, query)
         if photo is None:
@@ -588,9 +621,7 @@ def process_category(
             # Register the existing file in the manifest so subsequent
             # photo sources don't re-check the same sequence numbers.
             cat_photos = (
-                manifest.get("categories", {})
-                .get(category_slug, {})
-                .get("photos", [])
+                manifest.get("categories", {}).get(category_slug, {}).get("photos", [])
             )
             if not any(p.get("filename") == filename for p in cat_photos):
                 logger.info(
@@ -622,7 +653,13 @@ def process_category(
 
         update_manifest_for_category(manifest, category_slug, filename, width, height)
         downloaded += 1
-        logger.info("[%s] downloaded %d/%d: %s", category_slug, downloaded, photos_per_category, filename)
+        logger.info(
+            "[%s] downloaded %d/%d: %s",
+            category_slug,
+            downloaded,
+            photos_per_category,
+            filename,
+        )
 
         # Small delay to be polite to the API
         time.sleep(0.5)
@@ -709,7 +746,9 @@ def validate_manifest() -> bool:
 
     manifest_count = len(manifest.get("categories", {}))
     hierarchy_count = len(hierarchy)
-    uncovered = sorted(set(hierarchy.keys()) - set(manifest.get("categories", {}).keys()))
+    uncovered = sorted(
+        set(hierarchy.keys()) - set(manifest.get("categories", {}).keys())
+    )
 
     logger.info(
         "Coverage: %d categories in manifest, %d in query hierarchy, %d uncovered",
@@ -754,8 +793,7 @@ def fix_cleanup(manifest: dict[str, Any]) -> int:
     for category_slug, entry in manifest.get("categories", {}).items():
         photos = entry.get("photos", [])
         kept = [
-            p for p in photos
-            if (FIXTURES_IMAGES_DIR / p.get("filename", "")).exists()
+            p for p in photos if (FIXTURES_IMAGES_DIR / p.get("filename", "")).exists()
         ]
         removed += len(photos) - len(kept)
         entry["photos"] = kept
@@ -769,7 +807,8 @@ def fix_cleanup(manifest: dict[str, Any]) -> int:
     default_entry = manifest.setdefault("default", {"photos": []})
     default_photos = default_entry.get("photos", [])
     default_kept = [
-        p for p in default_photos
+        p
+        for p in default_photos
         if (FIXTURES_IMAGES_DIR / p.get("filename", "")).exists()
     ]
     removed += len(default_photos) - len(default_kept)
@@ -977,8 +1016,7 @@ def main() -> None:
         elif not pexels_key:
             sources_enabled.append("pexels=no-key")
         logger.error(
-            "No photo sources configured (%s). "
-            "Check seed-images-config.json.",
+            "No photo sources configured (%s). Check seed-images-config.json.",
             ", ".join(sources_enabled),
         )
         sys.exit(1)
@@ -996,7 +1034,11 @@ def main() -> None:
             categories_to_process = prioritize_categories(
                 list(hierarchy_data.keys()), manifest, photos_per_category
             )
-        logger.info("=== Pass %d: %d categories to process ===", pass_number, len(categories_to_process))
+        logger.info(
+            "=== Pass %d: %d categories to process ===",
+            pass_number,
+            len(categories_to_process),
+        )
 
         for cat_slug in categories_to_process:
             hierarchy = hierarchy_data.get(cat_slug, {})
@@ -1047,7 +1089,9 @@ def main() -> None:
         # Save after each pass
         save_downloaded_ids(downloaded_ids)
         save_manifest(manifest)
-        logger.info("Pass %d complete. Total downloaded: %d", pass_number, total_downloaded)
+        logger.info(
+            "Pass %d complete. Total downloaded: %d", pass_number, total_downloaded
+        )
 
         if not loop_all:
             break

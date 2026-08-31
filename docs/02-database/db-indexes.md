@@ -22,37 +22,67 @@ definitions live in [db-schema.md](db-schema.md); StrEnum types live in [db-enum
 
 ## Indexes — ads
 ```python
-models.Index(name='IX_ads_pub_listing',
-    fields=['status', 'category_id', 'city_id', '-published_at'],
-    condition=Q(status=AdStatus.PUBLISHED))                 # partial: ~99% of public reads
-models.Index(name='IX_ads_pub_purpose',
-    fields=['listing_purpose_id'],
-    condition=Q(status=AdStatus.PUBLISHED))                 # partial: catalog filter on listing_purpose (F4)
-models.Index(name='IX_ads_pub_condition',
-    fields=['listing_condition_id'],
-    condition=Q(status=AdStatus.PUBLISHED))                 # partial: catalog filter on listing_condition (Plan 12)
-models.Index(name='IX_ads_user_status', fields=['user_id', 'status'])
-models.Index(name='IX_ads_price_normalized_eur',
-    fields=['price_normalized_eur'],
-    condition=Q(price_normalized_eur__isnull=False))        # cross-currency price filter (BAM/RSD/EUR default); zone C7
-GinIndex(name='IX_ads_search_gin', fields=['search_vector'])          # legacy concatenated vector (to be dropped)
-GinIndex(name='IX_ads_search_gin_ru', fields=['search_vector_ru'])    # real Gin on Russian TSVECTOR
-GinIndex(name='IX_ads_search_gin_bs', fields=['search_vector_bs'])    # real Gin on Bosnian TSVECTOR
-GinIndex(name='IX_ads_search_gin_en', fields=['search_vector_en'])    # real Gin on English TSVECTOR
-models.Index(name='IX_ads_archive_sweep', fields=['status', 'published_at'],
-    condition=Q(status=AdStatus.PUBLISHED))                 # archive @2mo
-models.Index(name='IX_ads_delete_sweep', fields=['status', 'published_at'],
-    condition=Q(status=AdStatus.ARCHIVED))                 # delete @4mo
-models.Index(name='IX_ads_purge_failed', fields=['status', 'moderation_failed_at'],
-    condition=Q(status=AdStatus.ON_MODERATION_FAILED))      # 7-day purge (zone C4/D12)
-models.Index(name='IX_ads_rejected_sweep', fields=['status', 'rejected_at'],
-    condition=Q(status=AdStatus.REJECTED))                 # REJECTED @90d (zone D4)
+models.Index(
+    name="IX_ads_pub_listing",
+    fields=["status", "category_id", "city_id", "-published_at"],
+    condition=Q(status=AdStatus.PUBLISHED),
+)  # partial: ~99% of public reads
+models.Index(
+    name="IX_ads_pub_purpose",
+    fields=["listing_purpose_id"],
+    condition=Q(status=AdStatus.PUBLISHED),
+)  # partial: catalog filter on listing_purpose (F4)
+models.Index(
+    name="IX_ads_pub_condition",
+    fields=["listing_condition_id"],
+    condition=Q(status=AdStatus.PUBLISHED),
+)  # partial: catalog filter on listing_condition (Plan 12)
+models.Index(name="IX_ads_user_status", fields=["user_id", "status"])
+models.Index(
+    name="IX_ads_price_normalized_eur",
+    fields=["price_normalized_eur"],
+    condition=Q(price_normalized_eur__isnull=False),
+)  # cross-currency price filter (BAM/RSD/EUR default); zone C7
+GinIndex(
+    name="IX_ads_search_gin", fields=["search_vector"]
+)  # legacy concatenated vector (to be dropped)
+GinIndex(
+    name="IX_ads_search_gin_ru", fields=["search_vector_ru"]
+)  # real Gin on Russian TSVECTOR
+GinIndex(
+    name="IX_ads_search_gin_bs", fields=["search_vector_bs"]
+)  # real Gin on Bosnian TSVECTOR
+GinIndex(
+    name="IX_ads_search_gin_en", fields=["search_vector_en"]
+)  # real Gin on English TSVECTOR
+models.Index(
+    name="IX_ads_archive_sweep",
+    fields=["status", "published_at"],
+    condition=Q(status=AdStatus.PUBLISHED),
+)  # archive @2mo
+models.Index(
+    name="IX_ads_delete_sweep",
+    fields=["status", "published_at"],
+    condition=Q(status=AdStatus.ARCHIVED),
+)  # delete @4mo
+models.Index(
+    name="IX_ads_purge_failed",
+    fields=["status", "moderation_failed_at"],
+    condition=Q(status=AdStatus.ON_MODERATION_FAILED),
+)  # 7-day purge (zone C4/D12)
+models.Index(
+    name="IX_ads_rejected_sweep",
+    fields=["status", "rejected_at"],
+    condition=Q(status=AdStatus.REJECTED),
+)  # REJECTED @90d (zone D4)
 ```
 Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `listing_condition_id` by `IX_ads_pub_condition`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
 
 ## Indexes — users
 ```python
-models.Index(name='IX_users_erasure_sweep', fields=['consent_revoked_at'])  # zone R1: idempotent 30-day hard-delete sweep
+models.Index(
+    name="IX_users_erasure_sweep", fields=["consent_revoked_at"]
+)  # zone R1: idempotent 30-day hard-delete sweep
 ```
 
 > Zone R1: `IX_users_erasure_sweep` supports the idempotent 30-day hard-delete sweep after
@@ -181,29 +211,41 @@ models.UniqueConstraint(fields=["saved_search", "ad"], name="uq_saved_search_ad"
 
 ## Indexes — category_listing_purposes
 ```python
-models.Index(name='IX_cat_listing_purpose_composite', fields=['category', 'listing_purpose'])
-models.Index(name='IX_cat_listing_purpose_reverse', fields=['listing_purpose'])  # reverse lookup on deactivation
+models.Index(
+    name="IX_cat_listing_purpose_composite", fields=["category", "listing_purpose"]
+)
+models.Index(
+    name="IX_cat_listing_purpose_reverse", fields=["listing_purpose"]
+)  # reverse lookup on deactivation
 ```
 
 ## Indexes — category_listing_features
 ```python
-models.Index(name='IX_cat_listing_feature_composite', fields=['category', 'feature'])
-models.Index(name='IX_cat_listing_feature_reverse', fields=['feature'])  # reverse lookup on deactivation
+models.Index(name="IX_cat_listing_feature_composite", fields=["category", "feature"])
+models.Index(
+    name="IX_cat_listing_feature_reverse", fields=["feature"]
+)  # reverse lookup on deactivation
 ```
 
 ## Indexes — category_listing_conditions
 ```python
-models.Index(name='IX_cat_listing_condition_composite', fields=['category', 'condition'])
-models.Index(name='IX_cat_listing_condition_reverse', fields=['condition'])  # reverse lookup on deactivation
+models.Index(
+    name="IX_cat_listing_condition_composite", fields=["category", "condition"]
+)
+models.Index(
+    name="IX_cat_listing_condition_reverse", fields=["condition"]
+)  # reverse lookup on deactivation
 ```
 
 ## Indexes — ad_features
 ```python
 # Unique constraint on (ad, feature) covers lookups by ad
-models.Index(name='IX_ad_features_feature_id', fields=['feature'])    # reverse lookup for the features filter (F5)
+models.Index(
+    name="IX_ad_features_feature_id", fields=["feature"]
+)  # reverse lookup for the features filter (F5)
 ```
 
 ## Indexes — ad_images
 ```python
-models.Index(name='IX_adimages_sha256', fields=['sha256'])  # photo deduplication lookup
+models.Index(name="IX_adimages_sha256", fields=["sha256"])  # photo deduplication lookup
 ```

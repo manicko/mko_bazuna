@@ -32,9 +32,7 @@ def _record_session_history(session: Any, normalized: str, query: str) -> None:
     (deduplication), and the list is pruned to ``_MAX_HISTORY`` entries.
     """
     entries = session.get(_SESSION_KEY) or []
-    entries = [
-        e for e in entries if e.get("query_normalized") != normalized
-    ]
+    entries = [e for e in entries if e.get("query_normalized") != normalized]
     entries.insert(0, {"query": query, "query_normalized": normalized})
     session[_SESSION_KEY] = entries[:_MAX_HISTORY]
 

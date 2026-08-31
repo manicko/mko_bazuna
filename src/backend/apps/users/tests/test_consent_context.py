@@ -121,9 +121,7 @@ class TestAuthenticatedState:
 class TestRePrompt:
     """12-month re-prompt (T-08)."""
 
-    def test_authenticated_consent_older_than_12_months_reprompts(
-        self, user
-    ) -> None:
+    def test_authenticated_consent_older_than_12_months_reprompts(self, user) -> None:
         """Consent older than 365 days => banner reappears."""
         user.consent_given_at = timezone.now() - timedelta(days=400)
         user.save(update_fields=["consent_given_at"])

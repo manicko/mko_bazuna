@@ -60,8 +60,12 @@ class Command(BaseCommand):
 
     def _dry_run_check(self) -> None:
         """Log counts of users, saved searches, and potential matches."""
-        active_searches = SavedSearch.objects.filter(is_active=True).select_related("user")
-        user_count = active_searches.values_list("user_id", flat=True).distinct().count()
+        active_searches = SavedSearch.objects.filter(is_active=True).select_related(
+            "user"
+        )
+        user_count = (
+            active_searches.values_list("user_id", flat=True).distinct().count()
+        )
         search_count = active_searches.count()
 
         total_matches = 0
@@ -88,9 +92,8 @@ class Command(BaseCommand):
         notifications_to_create: list[SavedSearchNotification] = []
         analytics_events: list[AnalyticsEvent] = []
 
-        for saved_search in (
-            SavedSearch.objects.filter(is_active=True)
-            .select_related("user", "city", "category")
+        for saved_search in SavedSearch.objects.filter(is_active=True).select_related(
+            "user", "city", "category"
         ):
             matching_ads = find_matching_ads(saved_search)
 
@@ -167,9 +170,7 @@ class Command(BaseCommand):
                         parse_mode="HTML",
                     )
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
-                    logger.warning(
-                        "Failed to send alert to user %d: %s", user_id, e
-                    )
+                    logger.warning("Failed to send alert to user %d: %s", user_id, e)
 
             total_ads = sum(len(ads) for ads in user_ads.values())
             logger.info(
@@ -182,9 +183,7 @@ class Command(BaseCommand):
 
     def _format_digest(self, ads: list) -> str:
         """Format digest message for a user."""
-        lines = [
-            f"New ads matching your saved searches ({len(ads)} found):\n"
-        ]
+        lines = [f"New ads matching your saved searches ({len(ads)} found):\n"]
 
         for ad in ads:
             price_str = (
@@ -192,9 +191,6 @@ class Command(BaseCommand):
                 if ad.price_amount is not None
                 else ""
             )
-            lines.append(
-                f"• {ad.title[:50]}\n"
-                f"  {price_str}\n"
-            )
+            lines.append(f"• {ad.title[:50]}\n  {price_str}\n")
 
         return "\n".join(lines)

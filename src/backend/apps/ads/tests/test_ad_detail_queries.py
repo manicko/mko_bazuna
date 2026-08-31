@@ -50,9 +50,7 @@ class TestAdDetailQueryCount:
             trust_level=TrustLevel.VERIFIED,
             score=50,
         )
-        ad = create_test_ad(
-            seller, category, city, status=AdStatus.PUBLISHED
-        )
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
         client = Client()
         with CaptureQueriesContext(connection) as ctx:
@@ -70,9 +68,7 @@ class TestAdDetailQueryCount:
             trust_level=TrustLevel.TRUSTED,
             score=70,
         )
-        ad = create_test_ad(
-            seller, category, city, status=AdStatus.PUBLISHED
-        )
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
         client = Client()
         with CaptureQueriesContext(connection) as ctx_with_score:
@@ -80,7 +76,8 @@ class TestAdDetailQueryCount:
 
         # Count queries that touch the trust scores table.
         trust_queries = [
-            q for q in ctx_with_score.captured_queries
+            q
+            for q in ctx_with_score.captured_queries
             if "seller_trust_scores" in q["sql"]
         ]
         # The prefetch query is a single SELECT ... WHERE user_id IN (...),

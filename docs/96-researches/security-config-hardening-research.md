@@ -119,14 +119,18 @@ env = environ.Env(
 
 env_path = BASE_DIR / ".env"
 if not env_path.exists():
-    if os.getenv("DJANGO_SETTINGS_MODULE") and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "") and not os.getenv("DJANGO_BUILD"):
+    if (
+        os.getenv("DJANGO_SETTINGS_MODULE")
+        and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "")
+        and not os.getenv("DJANGO_BUILD")
+    ):
         logger.error("ERROR: .env file not found...")
         sys.exit(1)
 else:
     environ.Env.read_env(env_path)
 
-SECRET_KEY = env("DJANGO_SECRET_KEY")       # raises ImproperlyConfigured if unset ✓
-BOT_TOKEN = env("BOT_TOKEN", default="")    # silently defaults to "" ✗ (CFG-001)
+SECRET_KEY = env("DJANGO_SECRET_KEY")  # raises ImproperlyConfigured if unset ✓
+BOT_TOKEN = env("BOT_TOKEN", default="")  # silently defaults to "" ✗ (CFG-001)
 ```
 
 **Findings:**
@@ -167,15 +171,18 @@ Django's [system check framework](https://docs.djangoproject.com/en/5.2/topics/c
 from django.conf import settings
 from django.core.checks import Error, register, Tags
 
+
 @register(Tags.security, deploy=True)
 def check_bot_token(app_configs, **kwargs):
     errors = []
     if not settings.DEBUG and not settings.BOT_TOKEN:
-        errors.append(Error(
-            "BOT_TOKEN is empty in production.",
-            hint="Set BOT_TOKEN in your environment or .env file.",
-            id="core.E001",
-        ))
+        errors.append(
+            Error(
+                "BOT_TOKEN is empty in production.",
+                hint="Set BOT_TOKEN in your environment or .env file.",
+                id="core.E001",
+            )
+        )
     return errors
 ```
 
@@ -337,12 +344,15 @@ class TestSettingsValidation:
     def fresh_settings(self):
         """Provide a way to re-import the settings module with controlled env."""
         # Remove the cached settings module so Django re-imports it
-        modules_to_clean = [name for name in sys.modules if name.startswith("config.settings")]
+        modules_to_clean = [
+            name for name in sys.modules if name.startswith("config.settings")
+        ]
         for name in modules_to_clean:
             del sys.modules[name]
 
         # Force Django to re-evaluate settings
         from django.conf import settings
+
         settings._wrapped = None
 
         yield
@@ -368,12 +378,14 @@ Instead of testing the import side-effect, refactor the validation into a callab
 # src/backend/config/settings/base.py
 from django.core.exceptions import ImproperlyConfigured
 
+
 def _require_secret_key() -> str:
     """Return DJANGO_SECRET_KEY, raising ImproperlyConfigured if unset."""
     key = env("DJANGO_SECRET_KEY")
     if not key:
         raise ImproperlyConfigured("DJANGO_SECRET_KEY must not be empty.")
     return key
+
 
 SECRET_KEY = _require_secret_key()
 ```
@@ -398,6 +410,7 @@ The project already uses `SimpleTestCase` for non-DB tests (e.g., `test_context_
 
 ```python
 from django.test import SimpleTestCase
+
 
 class TestBotTokenPolicy(SimpleTestCase):
     """BOT_TOKEN is required in production (DEBUG=False), optional in dev (DEBUG=True)."""

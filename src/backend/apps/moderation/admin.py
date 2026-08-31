@@ -34,7 +34,13 @@ class ModerationCriteriaAdmin(admin.ModelAdmin):
     Exactly one row exists, edited by admin at runtime per US-A11.
     """
 
-    list_display = ["id", "title_min_length", "title_max_length", "price_required", "updated_at"]
+    list_display = [
+        "id",
+        "title_min_length",
+        "title_max_length",
+        "price_required",
+        "updated_at",
+    ]
     readonly_fields = ["updated_at", "updated_by"]
 
     def has_add_permission(self, request) -> bool:

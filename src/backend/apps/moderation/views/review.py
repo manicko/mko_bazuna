@@ -32,7 +32,9 @@ def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
         Rendered review template or 404
     """
     ad = get_object_or_404(
-        Ad.objects.select_related("user", "category", "city").prefetch_related("images"),
+        Ad.objects.select_related("user", "category", "city").prefetch_related(
+            "images"
+        ),
         id=ad_id,
         status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
     )

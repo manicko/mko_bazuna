@@ -51,7 +51,9 @@ class ImageGenerator(BaseGenerator):
         """Load photo_manifest.json and populate photo_pool and default_pool."""
         manifest_path = FIXTURES_IMAGES_DIR / "photo_manifest.json"
         if not manifest_path.exists():
-            logger.warning("Photo manifest not found at %s, using empty pool", manifest_path)
+            logger.warning(
+                "Photo manifest not found at %s, using empty pool", manifest_path
+            )
             self.photo_pool = {}
             self.default_pool = []
             return
@@ -66,8 +68,14 @@ class ImageGenerator(BaseGenerator):
         default = manifest.get("default", {})
         self.default_pool = default.get("photos", [])
 
-        total_photos = sum(len(photos) for photos in self.photo_pool.values()) + len(self.default_pool)
-        logger.info("Loaded photo manifest: %d categories, %d photos total", len(self.photo_pool), total_photos)
+        total_photos = sum(len(photos) for photos in self.photo_pool.values()) + len(
+            self.default_pool
+        )
+        logger.info(
+            "Loaded photo manifest: %d categories, %d photos total",
+            len(self.photo_pool),
+            total_photos,
+        )
 
     def _get_photos_for_category(self, category_slug: str) -> list[ManifestEntry]:
         """Get photos for a given category slug, falling back to default pool.
@@ -78,7 +86,9 @@ class ImageGenerator(BaseGenerator):
         Returns:
             List of manifest entries (dicts with 'filename' key).
         """
-        return self.photo_pool.get(category_slug, self.default_pool) or self.default_pool
+        return (
+            self.photo_pool.get(category_slug, self.default_pool) or self.default_pool
+        )
 
     def generate(self) -> list[AdImage]:
         """Generate AdImage records for all seed ads.
@@ -113,9 +123,7 @@ class ImageGenerator(BaseGenerator):
         # Flat list of all available storage keys, used only as a last-resort
         # fallback in ``_find_category_keys``.
         self.all_image_keys = [
-            key
-            for keys in category_key_map.values()
-            for key in keys
+            key for keys in category_key_map.values() for key in keys
         ]
 
         if not self.all_image_keys:
@@ -288,7 +296,9 @@ class ImageGenerator(BaseGenerator):
             f.write(img_bytes)
 
         # Generate thumbnails
-        thumb_small = os.path.join(seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg")
+        thumb_small = os.path.join(
+            seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg"
+        )
         if os.path.exists(thumb_small):
             return True
 

@@ -39,7 +39,7 @@ def get_item(dictionary: Any, key: Any) -> Any:
         return None
     try:
         return dictionary.get(key)
-    except (AttributeError, TypeError):
+    except AttributeError, TypeError:
         return None
 
 

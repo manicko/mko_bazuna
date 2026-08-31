@@ -48,4 +48,6 @@ class Command(BaseCommand):
             for old, new in slug_rename_map.items():
                 self.stdout.write(f"  {old} -> {new}")
         else:
-            self.stdout.write(self.style.SUCCESS("Catalog loaded successfully — no renames"))
+            self.stdout.write(
+                self.style.SUCCESS("Catalog loaded successfully — no renames")
+            )

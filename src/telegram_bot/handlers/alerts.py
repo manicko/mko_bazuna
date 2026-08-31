@@ -47,9 +47,7 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
     user_id = data.get("user_id")
 
     if not user_id:
-        await message.answer(
-            "Please login first with /start login_<token>"
-        )
+        await message.answer("Please login first with /start login_<token>")
         return
 
     saved_searches = await get_user_saved_searches(user_id)
@@ -113,7 +111,7 @@ async def handle_unsubscribe_callback(
     """
     if not callback.data:
         return
-    token = callback.data[len(UNSUB_CALLBACK_PREFIX):]
+    token = callback.data[len(UNSUB_CALLBACK_PREFIX) :]
     chat_id = callback.from_user.id if callback.from_user else None
 
     saved_search = await resolve_unsubscribe(token, chat_id)
@@ -147,7 +145,7 @@ async def handle_reenable_callback(
     """Re-enable a saved search from the swapped inline button."""
     if not callback.data:
         return
-    token = callback.data[len(UNSUB_ON_PREFIX):]
+    token = callback.data[len(UNSUB_ON_PREFIX) :]
     chat_id = callback.from_user.id if callback.from_user else None
 
     saved_search = await resolve_reenable(token, chat_id)

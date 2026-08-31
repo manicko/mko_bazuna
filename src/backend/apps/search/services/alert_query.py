@@ -40,10 +40,9 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
     Returns:
         List of matching Ad objects (max 10), ordered by relevance.
     """
-    queryset: QuerySet[Ad] = (
-        Ad.objects.filter(status=AdStatus.PUBLISHED)
-        .select_related("category", "city")
-    )
+    queryset: QuerySet[Ad] = Ad.objects.filter(
+        status=AdStatus.PUBLISHED
+    ).select_related("category", "city")
 
     # Apply FTS query in the saved search's persisted language (no translation)
     if saved_search.query:
@@ -59,11 +58,15 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
             search_type="websearch",
             config=config,
         )
-        queryset = queryset.annotate(
-            rank=SearchRank(F(vector_field), search_query),
-        ).filter(
-            **{vector_field: search_query},
-        ).order_by("-rank")
+        queryset = (
+            queryset.annotate(
+                rank=SearchRank(F(vector_field), search_query),
+            )
+            .filter(
+                **{vector_field: search_query},
+            )
+            .order_by("-rank")
+        )
 
     # Apply city filter if specified
     if saved_search.city_id:
@@ -112,8 +115,7 @@ def record_notifications(saved_search: SavedSearch, ads: list[Ad]) -> int:
         Number of notification records passed in (not necessarily created).
     """
     notifications = [
-        SavedSearchNotification(saved_search=saved_search, ad=ad)
-        for ad in ads
+        SavedSearchNotification(saved_search=saved_search, ad=ad) for ad in ads
     ]
     SavedSearchNotification.objects.bulk_create(
         notifications,
@@ -169,10 +171,16 @@ def _ad_matches_saved_search(ad: Ad, saved_search: SavedSearch) -> bool:
 
     # Price range filter (EUR-normalized value, WR-04/PO-04)
     if saved_search.min_price is not None:
-        if ad.price_normalized_eur is None or ad.price_normalized_eur < saved_search.min_price:
+        if (
+            ad.price_normalized_eur is None
+            or ad.price_normalized_eur < saved_search.min_price
+        ):
             return False
     if saved_search.max_price is not None:
-        if ad.price_normalized_eur is None or ad.price_normalized_eur > saved_search.max_price:
+        if (
+            ad.price_normalized_eur is None
+            or ad.price_normalized_eur > saved_search.max_price
+        ):
             return False
 
     # Category-subtree filter

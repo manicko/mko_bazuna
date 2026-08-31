@@ -21,7 +21,9 @@ import requests
 # Load the standalone script as a module (it lives in scripts/, not on the
 # package path).  The script's ``if __name__ == "__main__"`` guard ensures
 # importing it does not run ``main()``.
-_SCRIPT_PATH = Path(__file__).resolve().parents[5] / "scripts" / "download_seed_photos.py"
+_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[5] / "scripts" / "download_seed_photos.py"
+)
 _spec = importlib.util.spec_from_file_location("download_seed_photos", _SCRIPT_PATH)
 assert _spec is not None
 assert _spec.loader is not None
@@ -132,10 +134,7 @@ class TestUnsplashSearch:
         with patch("requests.get", return_value=resp):
             with caplog.at_level(logging.WARNING):
                 client.search("test query")
-        assert any(
-            "rate limit" in r.getMessage().lower()
-            for r in caplog.records
-        )
+        assert any("rate limit" in r.getMessage().lower() for r in caplog.records)
 
     def test_403_marks_exhausted_and_returns_empty(self, config, sleep_mock):
         """A 403 marks the source exhausted and returns []."""
@@ -155,8 +154,7 @@ class TestUnsplashSearch:
             with caplog.at_level(logging.ERROR):
                 client.search("test query")
         assert any(
-            "permission denied" in r.getMessage().lower()
-            for r in caplog.records
+            "permission denied" in r.getMessage().lower() for r in caplog.records
         )
 
     def test_500_exhausts_retries_and_returns_empty(self, config, sleep_mock):
@@ -321,11 +319,17 @@ class TestPickPhotoWithErrors:
 class TestProcessCategoryResilience:
     """process_category exits cleanly when the source is exhausted on errors."""
 
-    def test_process_category_returns_zero_when_source_always_429(self, config, sleep_mock):
+    def test_process_category_returns_zero_when_source_always_429(
+        self, config, sleep_mock
+    ):
         """If every search returns 429, process_category downloads 0 photos."""
         client = UnsplashClient("test-key", config)
         resp = make_response(status_code=429, text="Rate limit")
-        hierarchy = {"objects": ["bookshelf"], "contexts": ["wooden"], "styles": ["floor photography"]}
+        hierarchy = {
+            "objects": ["bookshelf"],
+            "contexts": ["wooden"],
+            "styles": ["floor photography"],
+        }
         manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
         with patch("requests.get", return_value=resp):
             n = process_category("business-taxes", hierarchy, client, manifest, config)
@@ -341,7 +345,11 @@ class TestProcessCategoryResilience:
         # After exhaustion, the exhausted guard returns [] without calling requests.get.
         # So process_category can't proceed — the source is permanently exhausted.
         # This confirms that a 429 correctly stops further attempts for that source.
-        hierarchy = {"objects": ["bookshelf"], "contexts": ["wooden"], "styles": ["floor photography"]}
+        hierarchy = {
+            "objects": ["bookshelf"],
+            "contexts": ["wooden"],
+            "styles": ["floor photography"],
+        }
         manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
         with patch("requests.get", return_value=resp_429):
             n = process_category("business-taxes", hierarchy, client, manifest, config)
@@ -392,7 +400,9 @@ class TestProcessCategoryExistingFiles:
         assert photos[0]["width"] == 0
         assert photos[0]["height"] == 0
 
-    def test_existing_file_not_duplicated_when_in_manifest(self, seed_fs, config, sleep_mock):
+    def test_existing_file_not_duplicated_when_in_manifest(
+        self, seed_fs, config, sleep_mock
+    ):
         """If a file is already in the manifest, it is not duplicated.
 
         Manifest starts with ``cats_01.jpg`` (start_seq=2), so the loop
@@ -404,13 +414,17 @@ class TestProcessCategoryExistingFiles:
         manifest = {
             "version": 1,
             "categories": {
-                "cats": {"photos": [{"filename": "cats_01.jpg", "width": 100, "height": 100}]}
+                "cats": {
+                    "photos": [{"filename": "cats_01.jpg", "width": 100, "height": 100}]
+                }
             },
             "default": {"photos": []},
         }
 
-        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
-             patch.object(download, "download_and_compress") as mock_dl:
+        with (
+            patch.object(download, "pick_photo", return_value={"id": "x"}),
+            patch.object(download, "download_and_compress") as mock_dl,
+        ):
             n = process_category("cats", hierarchy, source, manifest, config)
 
         assert n == 3
@@ -430,8 +444,10 @@ class TestProcessCategoryExistingFiles:
         hierarchy = {"objects": ["cat"], "contexts": ["sitting"], "styles": ["photo"]}
         manifest = {"version": 1, "categories": {}, "default": {"photos": []}}
 
-        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
-             patch.object(download, "download_and_compress") as mock_dl:
+        with (
+            patch.object(download, "pick_photo", return_value={"id": "x"}),
+            patch.object(download, "download_and_compress") as mock_dl,
+        ):
             n = process_category("cats", hierarchy, source, manifest, config)
 
         assert n == 3
@@ -451,8 +467,10 @@ class TestProcessCategoryExistingFiles:
             output_path.write_bytes(b"fake-downloaded")
             return True
 
-        with patch.object(download, "pick_photo", return_value={"id": "x"}), \
-             patch.object(download, "download_and_compress", side_effect=fake_download):
+        with (
+            patch.object(download, "pick_photo", return_value={"id": "x"}),
+            patch.object(download, "download_and_compress", side_effect=fake_download),
+        ):
             n = process_category("cats", hierarchy, source, manifest, config)
 
         assert n == 3
@@ -499,8 +517,12 @@ def seed_fs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(download, "FIXTURES_IMAGES_DIR", fixtures_dir)
     monkeypatch.setattr(download, "MANIFEST_PATH", fixtures_dir / "photo_manifest.json")
-    monkeypatch.setattr(download, "DOWNLOADED_IDS_PATH", fixtures_dir / "downloaded_ids.json")
-    monkeypatch.setattr(download, "QUERY_HIERARCHY_PATH", fixtures_dir / "query_hierarchy.json")
+    monkeypatch.setattr(
+        download, "DOWNLOADED_IDS_PATH", fixtures_dir / "downloaded_ids.json"
+    )
+    monkeypatch.setattr(
+        download, "QUERY_HIERARCHY_PATH", fixtures_dir / "query_hierarchy.json"
+    )
 
     return fixtures_dir
 
@@ -515,18 +537,24 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
-                ]},
-                "phones": {"photos": [
-                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
-                    {"filename": "phones_99.jpg", "width": 100, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
+                "phones": {
+                    "photos": [
+                        {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                        {"filename": "phones_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
-            "default": {"photos": [
-                {"filename": "default_99.jpg", "width": 100, "height": 100},
-            ]},
+            "default": {
+                "photos": [
+                    {"filename": "default_99.jpg", "width": 100, "height": 100},
+                ]
+            },
         }
         result = find_missing_manifest_entries(manifest)
         assert len(result) == 3
@@ -541,10 +569,12 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -557,24 +587,32 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
-                ]},
-                "phones": {"photos": [
-                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
-                    {"filename": "phones_99.jpg", "width": 200, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                    ]
+                },
+                "phones": {
+                    "photos": [
+                        {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                        {"filename": "phones_99.jpg", "width": 200, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
         removed = fix_cleanup(manifest)
         assert removed == 2
 
-        massage_files = [p["filename"] for p in manifest["categories"]["massage"]["photos"]]
+        massage_files = [
+            p["filename"] for p in manifest["categories"]["massage"]["photos"]
+        ]
         assert massage_files == ["massage_01.jpg", "massage_02.jpg"]
-        phone_files = [p["filename"] for p in manifest["categories"]["phones"]["photos"]]
+        phone_files = [
+            p["filename"] for p in manifest["categories"]["phones"]["photos"]
+        ]
         assert phone_files == ["phones_01.jpg"]
 
     def test_fix_cleanup_returns_correct_count(self, seed_fs):
@@ -582,18 +620,24 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
-                ]},
-                "phones": {"photos": [
-                    {"filename": "phones_98.jpg", "width": 100, "height": 100},
-                    {"filename": "phones_99.jpg", "width": 100, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
+                "phones": {
+                    "photos": [
+                        {"filename": "phones_98.jpg", "width": 100, "height": 100},
+                        {"filename": "phones_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
-            "default": {"photos": [
-                {"filename": "default_97.jpg", "width": 100, "height": 100},
-            ]},
+            "default": {
+                "photos": [
+                    {"filename": "default_97.jpg", "width": 100, "height": 100},
+                ]
+            },
         }
         assert fix_cleanup(manifest) == 4
 
@@ -604,9 +648,11 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "dogs": {"photos": [
-                    {"filename": "dogs_02.jpg", "width": 100, "height": 100},
-                ]},
+                "dogs": {
+                    "photos": [
+                        {"filename": "dogs_02.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -619,12 +665,16 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "dogs": {"photos": [
-                    {"filename": "dogs_02.jpg", "width": 100, "height": 100},
-                ]},
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                ]},
+                "dogs": {
+                    "photos": [
+                        {"filename": "dogs_02.jpg", "width": 100, "height": 100},
+                    ]
+                },
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -641,10 +691,12 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -664,9 +716,11 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_99.jpg", "width": 100, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_99.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -681,15 +735,19 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_02.jpg", "width": 200, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
-                ]},
-                "phones": {"photos": [
-                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
-                    {"filename": "phones_02.jpg", "width": 200, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_02.jpg", "width": 200, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                    ]
+                },
+                "phones": {
+                    "photos": [
+                        {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                        {"filename": "phones_02.jpg", "width": 200, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -709,7 +767,9 @@ class TestFixCleanup:
         assert exc.value.code == 0
 
         result = json.loads(seed_fs.joinpath("photo_manifest.json").read_text())
-        massage_files = [p["filename"] for p in result["categories"]["massage"]["photos"]]
+        massage_files = [
+            p["filename"] for p in result["categories"]["massage"]["photos"]
+        ]
         assert "massage_99.jpg" not in massage_files
         assert "massage_01.jpg" in massage_files
         assert json.loads(seed_fs.joinpath("downloaded_ids.json").read_text()) == {
@@ -721,13 +781,17 @@ class TestFixCleanup:
         manifest = {
             "version": 1,
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg", "width": 100, "height": 100},
-                    {"filename": "massage_99.jpg", "width": 100, "height": 200},
-                ]},
-                "phones": {"photos": [
-                    {"filename": "phones_01.jpg", "width": 100, "height": 100},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg", "width": 100, "height": 100},
+                        {"filename": "massage_99.jpg", "width": 100, "height": 200},
+                    ]
+                },
+                "phones": {
+                    "photos": [
+                        {"filename": "phones_01.jpg", "width": 100, "height": 100},
+                    ]
+                },
             },
             "default": {"photos": []},
         }
@@ -882,10 +946,12 @@ class TestPrioritizeCategories:
         """count_category_photos reflects current manifest entries."""
         manifest = {
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "massage_01.jpg"},
-                    {"filename": "massage_02.jpg"},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "massage_01.jpg"},
+                        {"filename": "massage_02.jpg"},
+                    ]
+                },
                 "phones": {"photos": []},
             },
             "default": {"photos": []},
@@ -896,29 +962,40 @@ class TestPrioritizeCategories:
 
     def test_count_returns_zero_for_empty_manifest(self):
         """A manifest with no categories returns 0 for any slug."""
-        assert count_category_photos("massage", {"categories": {}, "default": {"photos": []}}) == 0
+        assert (
+            count_category_photos(
+                "massage", {"categories": {}, "default": {"photos": []}}
+            )
+            == 0
+        )
 
     def test_prioritize_zero_photo_first(self):
         """Categories with 0 photos come before categories with 3 photos."""
         manifest = {
             "categories": {
-                "massage": {"photos": [
-                    {"filename": "m_01.jpg"},
-                    {"filename": "m_02.jpg"},
-                    {"filename": "m_03.jpg"},
-                ]},
+                "massage": {
+                    "photos": [
+                        {"filename": "m_01.jpg"},
+                        {"filename": "m_02.jpg"},
+                        {"filename": "m_03.jpg"},
+                    ]
+                },
                 "phones": {"photos": []},
             },
             "default": {"photos": []},
         }
-        result = prioritize_categories(["massage", "phones"], manifest, photos_per_category=3)
+        result = prioritize_categories(
+            ["massage", "phones"], manifest, photos_per_category=3
+        )
         assert result[0] == "phones"  # 0 photos → highest deficit
         assert result[1] == "massage"  # 3 photos → lowest deficit
 
     def test_prioritize_preserves_all_categories(self):
         """No categories are dropped by prioritization."""
         manifest = {"categories": {}, "default": {"photos": []}}
-        result = prioritize_categories(["a", "b", "c", "d"], manifest, photos_per_category=3)
+        result = prioritize_categories(
+            ["a", "b", "c", "d"], manifest, photos_per_category=3
+        )
         assert sorted(result) == ["a", "b", "c", "d"]
 
     def test_prioritize_deterministic_order_among_ties(self):
@@ -946,7 +1023,9 @@ class TestPrioritizeCategories:
         # Simulate category "a" now has 3 photos
         manifest = {
             "categories": {
-                "a": {"photos": [{"f": "a_01.jpg"}, {"f": "a_02.jpg"}, {"f": "a_03.jpg"}]},
+                "a": {
+                    "photos": [{"f": "a_01.jpg"}, {"f": "a_02.jpg"}, {"f": "a_03.jpg"}]
+                },
             },
             "default": {"photos": []},
         }

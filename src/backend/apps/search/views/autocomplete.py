@@ -91,7 +91,9 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
             seen.add(text)
             unique.append(item)
 
-    return JsonResponse({
-        "suggestions": unique[:_MAX_SUGGESTIONS],
-        "query": query,
-    })
+    return JsonResponse(
+        {
+            "suggestions": unique[:_MAX_SUGGESTIONS],
+            "query": query,
+        }
+    )

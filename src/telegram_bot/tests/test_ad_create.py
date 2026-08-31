@@ -15,7 +15,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from asgiref.sync import sync_to_async
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow, pytest.mark.integration, pytest.mark.concurrent]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.slow,
+    pytest.mark.integration,
+    pytest.mark.concurrent,
+]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
@@ -104,15 +109,17 @@ class TestProcessPreviewLanguageDetection:
 
         ad = await create_draft_ad(user_id=seller_id)
 
-        state = _build_state({
-            "ad_id": ad.id,
-            "title": "Valid Title",
-            "description": "Valid description text for the ad.",
-            "price_amount": 100,
-            "price_currency": "EUR",
-            "photos": [],
-            "user_id": seller_id,
-        })
+        state = _build_state(
+            {
+                "ad_id": ad.id,
+                "title": "Valid Title",
+                "description": "Valid description text for the ad.",
+                "price_amount": 100,
+                "price_currency": "EUR",
+                "photos": [],
+                "user_id": seller_id,
+            }
+        )
 
         message = _build_message("en-US")
 
@@ -136,15 +143,17 @@ class TestProcessPreviewLanguageDetection:
 
         ad = await create_draft_ad(user_id=seller_id)
 
-        state = _build_state({
-            "ad_id": ad.id,
-            "title": "Valid Title",
-            "description": "Valid description text for the ad.",
-            "price_amount": 100,
-            "price_currency": "EUR",
-            "photos": [],
-            "user_id": seller_id,
-        })
+        state = _build_state(
+            {
+                "ad_id": ad.id,
+                "title": "Valid Title",
+                "description": "Valid description text for the ad.",
+                "price_amount": 100,
+                "price_currency": "EUR",
+                "photos": [],
+                "user_id": seller_id,
+            }
+        )
 
         message = _build_message(None)
 

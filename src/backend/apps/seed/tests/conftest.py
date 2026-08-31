@@ -43,7 +43,5 @@ def _no_op_image_generator(request: pytest.FixtureRequest) -> Iterator[None]:
     if "real_images" in request.keywords:
         yield
         return
-    with patch(
-        "apps.seed.services.seed_service.ImageGenerator", _NoImageGenerator
-    ):
+    with patch("apps.seed.services.seed_service.ImageGenerator", _NoImageGenerator):
         yield

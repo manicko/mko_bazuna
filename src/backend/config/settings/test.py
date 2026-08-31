@@ -50,6 +50,7 @@ CACHES = {
     }
 }
 
+
 # Skip migration replay during test DB creation for faster --create-db.
 # pytest-django uses create_test_db() (model introspection) instead of
 # replaying migration files. The autouse fixture in conftest.py restores

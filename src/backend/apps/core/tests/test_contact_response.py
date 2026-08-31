@@ -29,7 +29,9 @@ class TestRecordContactResponse:
 
         record_contact_response(seller_telegram_id=900100001)
 
-        event = AnalyticsEvent.objects.get(event_type=AnalyticsEventType.CONTACT_RESPONSE)
+        event = AnalyticsEvent.objects.get(
+            event_type=AnalyticsEventType.CONTACT_RESPONSE
+        )
         assert event.user_id == seller.id
 
     def test_record_contact_response_no_crash_on_missing_seller(self) -> None:

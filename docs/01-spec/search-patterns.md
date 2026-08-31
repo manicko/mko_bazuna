@@ -103,6 +103,7 @@ City name typos show suggestions using Python's `difflib` module.
 # Implemented in views/listing.py
 from difflib import get_close_matches
 
+
 def get_city_suggestion(input_city: str, valid_cities: list[str]) -> str | None:
     """Find close city match for typo correction."""
     matches = get_close_matches(input_city, valid_cities, n=1, cutoff=0.6)
@@ -168,6 +169,7 @@ last; when a `q` full-text query is active, results rank by FTS relevance then `
 # apps/core/enums.py
 class AdSort(StrEnum):
     """Sort options for ad listings."""
+
     DATE_NEW = "date_desc"
     DATE_OLD = "date_asc"
     PRICE_LOW = "price_asc"

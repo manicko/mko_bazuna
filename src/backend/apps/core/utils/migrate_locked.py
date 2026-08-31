@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 
 
-
 def main() -> int:
     """Run migrations inside advisory lock, return exit code."""
     import os

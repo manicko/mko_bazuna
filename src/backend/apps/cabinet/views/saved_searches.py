@@ -62,16 +62,27 @@ def saved_search_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         _apply_filters(request, saved_search)
         saved_search.language = request.LANGUAGE_CODE or saved_search.language
-        saved_search.save(update_fields=[
-            "query", "city", "category", "min_price", "max_price",
-            "language", "updated_at",
-        ])
+        saved_search.save(
+            update_fields=[
+                "query",
+                "city",
+                "category",
+                "min_price",
+                "max_price",
+                "language",
+                "updated_at",
+            ]
+        )
         return HttpResponseRedirect(reverse("cabinet:saved-searches"))
 
     return render(
         request,
         "cabinet/saved_search_edit.html",
-        {"saved_search": saved_search, "cities": _cities(), "categories": _categories()},
+        {
+            "saved_search": saved_search,
+            "cities": _cities(),
+            "categories": _categories(),
+        },
     )
 
 
