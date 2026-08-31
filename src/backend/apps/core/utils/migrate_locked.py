@@ -3,6 +3,14 @@
 One-shot migration runner with advisory lock.
 Session-scoped lock safe because migrate runs before PgBouncer is attached.
 Idempotent: subsequent runs will find lock already held and skip.
+
+``--run-syncdb`` ensures tables are created for unmigrated apps. When the test
+settings (``MIGRATION_MODULES = DisableMigrations``) are active, ALL apps
+— including Django built-ins like ``contenttypes`` and ``auth`` — are treated
+as unmigrated, so ``migrate`` alone creates no tables and the post-migrate
+signal crashes on the missing ``django_content_type`` table. With normal
+(dev/prod) settings, ``--run-syncdb`` is a harmless no-op because every app
+has migrations.
 """
 
 import subprocess
@@ -24,7 +32,7 @@ def main() -> int:
     manage_py = Path(__file__).resolve().parents[3] / "manage.py"
     with advisory_lock(AdvisoryLockId.MIGRATE, session=True):
         result = subprocess.run(
-            [sys.executable, str(manage_py), "migrate", "--noinput"],
+            [sys.executable, str(manage_py), "migrate", "--noinput", "--run-syncdb"],
         )
         return result.returncode
 
