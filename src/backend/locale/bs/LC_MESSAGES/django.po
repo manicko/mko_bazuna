@@ -718,6 +718,9 @@ msgstr "Sve kategorije"
 msgid "Search ads..."
 msgstr "Pretraži oglase..."
 
+msgid "Clear search"
+msgstr "Očisti pretragu"
+
 msgid "Close"
 msgstr "Zatvorite"
 

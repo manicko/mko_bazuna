@@ -142,13 +142,10 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                                    hx-target="#autocomplete-dropdown"
                                    hx-swap="none"
                                    autocomplete="off">
-                            {% if query %}
-                                <button type="button"
-                                        data-search-clear
-                                        class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                        aria-label="{% trans "Clear search" %}"
-                                        onclick="window.history.back()">&times;</button>
-                            {% endif %}
+                            <button type="button"
+                                    data-search-clear
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 hidden"
+                                    aria-label="{% trans "Clear search" %}">&times;</button>
                             <ul id="autocomplete-dropdown"
                                 class="autocomplete-dropdown absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto hidden">
                             </ul>
@@ -210,6 +207,12 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
 </div>
 <div data-mobile-categories-backdrop
      class="fixed inset-0 z-[80] bg-black/30 hidden lg:hidden"></div>
+    <style>
+        #search-input::-webkit-search-cancel-button {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+    </style>
 <script>
 (function () {
     'use strict';
@@ -223,6 +226,39 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
     var searchForm = document.querySelector('[data-search-form]');
 
     if (dropdown && searchInput) {
+
+        /* ── Clear button: show/hide + dual-behavior click ─────────────── */
+        var clearBtn = document.querySelector('[data-search-clear]');
+
+        function updateClearButton() {
+            if (!clearBtn) return;
+            if (searchInput.value.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        searchInput.addEventListener('input', updateClearButton);
+        updateClearButton();  // initial state for server-rendered pre-filled query
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var params = new URLSearchParams(window.location.search);
+                if (params.has('q') && params.get('q') === searchInput.value) {
+                    // Committed search: remove q param, preserve category/city/sort/filters
+                    params.delete('q');
+                    var url = new URL(window.location.href);
+                    url.search = params.toString();
+                    window.location.href = url.toString();
+                } else {
+                    // Just typing: clear input only
+                    searchInput.value = '';
+                    updateClearButton();
+                }
+            });
+        }
 
         function escapeHtml(str) {
             return String(str == null ? '' : str)

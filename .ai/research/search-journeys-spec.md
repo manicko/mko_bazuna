@@ -52,7 +52,7 @@ related:
 
 ### Two Bugs Identified (Problem_01.md)
 1. **Autocomplete regression:** On repeat/empty query, only history shown (no suggestions). Root cause: popular-search suggestions gated by `hit_count >= 10` (empty on low-traffic instances); anonymous history stored in Django session (`sessionid` cookie). Needs runtime investigation.
-2. **Clear (X) button does nothing:** The search input is `<input type="search">` — browsers render a native clear-X that only clears the field without navigating. **No explicit wired clear button exists.** Needs an explicit control that returns to pre-search state.
+2. **Clear (X) button does nothing:** ~The search input is `<input type="search">` — browsers render a native clear-X that only clears the field without navigating. No explicit wired clear button exists. Needs an explicit control that returns to pre-search state.~ **RESOLVED (Spec 16):** Replaced with a single 44×44 px `data-search-clear` button, native cancel-button suppressed via CSS, JS handler uses `URLSearchParams.delete('q')` for deterministic clear.
 
 ---
 
@@ -104,7 +104,7 @@ related:
 ### Known Implementation Gaps (must fix)
 1. **Header search drops category/city/filters** — the header `<form>` (`header_catalog.html:114-132`) submits only `q`. Users entering a search from a category page lose the category context.
 2. **Sort dropdown hidden on FTS results** — `{% if not query %}` gates the sort `<select>` in `filter_form.html:103-125`; `search()` ignores `sort=` when `q` is present.
-3. **Clear (X) button is native** — no wired handler; does nothing useful.
+3. **Clear (X) button is native** — RESOLVED (Spec 16): Replaced with a single 44×44 px `data-search-clear` button. Native WebKit/Safari cancel button suppressed via CSS (`::-webkit-search-cancel-button`). Button always rendered, hidden by default, shown via JS when input has text. Click handler uses `URLSearchParams.delete('q')` for deterministic clear (preserves category/city/sort/filters) — replaces the old unreliable `window.history.back()`. | Resolved
 4. **`lang=` may drop on HTMX transitions** — auto-applied only via cookie on next full reload.
 
 ---
@@ -258,7 +258,7 @@ related:
 | Bug | Required Fix | Priority |
 |-----|-------------|----------|
 | **#1 — Autocomplete shows only history on repeat** | Investigate root cause. Likely: (a) `PopularSearch` `hit_count >= 10` gate returns empty on low-traffic instance, making the dropdown appear history-only; or (b) client-side `htmx:afterRequest` handler fails to re-render all sections on repeat XHR. **Fix:** ensure all 4 sections always render; consider lowering `min_hit_count` or seeding popular queries for dev. | High |
-| **#2 — Clear (X) button does nothing** | The search input is `type="search"` with a native browser clear-X. Add an explicit, wired clear control (e.g., a custom `×` button with `onclick="window.location.href='/';"` or `history.back()`) that returns to the pre-search browsing state. | High |
+| **#2 — Clear (X) button does nothing** | **RESOLVED (Spec 16):** Replaced dual X buttons with a single 44×44 px `data-search-clear` button. Native WebKit/Safari cancel button suppressed via CSS (`::-webkit-search-cancel-button`). Button is always rendered (not `{% if query %}`-conditional), hidden by default, shown via JS when input has text. Click handler uses `URLSearchParams.delete('q')` for deterministic clear (preserves category/city/sort/filters) — replaces the old `window.history.back()` which was unreliable. | Resolved |
 | **Gap — Header search drops category/city** | Wire the header search form to carry `?category=<slug>` when submitting from a `/category/` page, and `?city=<slug>` when submitting from a `/city/` page. Use hidden inputs populated by the current URL context. | Medium |
 | **Gap — Sort hidden on FTS results** | Decide: should `/search/?q=…` honor `?sort=` with a relevance-first default? If yes, remove the `{% if not query %}` gate in `filter_form.html` and add a sort branch in `search.py` for FTS results. | Product decision |
 | **Gap — `lang=` drops on HTMX transitions** | Append `?lang=` to HTMX `hx-get` URLs, or ensure the form hrefs include the language param. Low severity (cookie re-applies on reload). | Low |
@@ -287,7 +287,7 @@ related:
 ## 7. Open Product Decisions
 
 1. **Sort on FTS results** — Should `/search/?q=…` honor `?sort=` with relevance-first default, or stay rank-only? (Templates currently hide sort on search results.)
-2. **Clear-X behavior** — Return to `/` (homepage) or `history.back()` (last browsing state)? Recommendation: `history.back()` to match OLX/Avito "return to pre-search state."
+2. **Clear-X behavior** — RESOLVED (Spec 16, PO-1=A): Navigate to `/search/` without `q=` (clear query only, preserve category/city/sort/filters). Replaces `history.back()` with deterministic URL param removal. | Resolved
 3. **Header-search context preservation** — Wire header form to carry active category + city when navigating from `/category/` or `/city/` pages? (Currently dropped.)
 4. **Autocomplete popular gate** — Keep `min_hit_count=10` for MVP, or seed popular queries / lower threshold so the dropdown never reads as "only history"?
 

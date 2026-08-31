@@ -72,13 +72,42 @@ def test_header_search_form_has_no_csrf_token() -> None:
     assert "csrfmiddlewaretoken" not in _HEADER_CATALOG_CONTENT
 
 
-def test_search_clear_button_is_wired_to_history_back() -> None:
-    """A clear-search button is rendered when ``query`` is truthy and navigates
-    back via ``window.history.back()`` (Spec B2, R2; PO-1=A)."""
+def test_search_clear_button_cleares_query_param() -> None:
+    """The clear-search button is always rendered (not server-conditional),
+    is a 44×44 px touch target, does not use window.history.back(),
+    and uses URLSearchParams to delete the q param (Spec 16, PO-1=A)."""
+    # AC2: button is always present, not wrapped in {% if query %}
     assert "data-search-clear" in _HEADER_CATALOG_CONTENT
-    assert "window.history.back()" in _HEADER_CATALOG_CONTENT, (
-        "Clear-search button must restore the pre-search history entry"
-    )
+    assert "{% if query" not in _HEADER_CATALOG_CONTENT  # no server-conditional
+    # AC3: no history.back()
+    assert "window.history.back()" not in _HEADER_CATALOG_CONTENT
+    # AC4: 44×44 px touch target
+    assert "min-w-[44px]" in _HEADER_CATALOG_CONTENT
+    assert "min-h-[44px]" in _HEADER_CATALOG_CONTENT
+    # AC7: aria-label uses {% trans %}
+    assert '{% trans "Clear search" %}' in _HEADER_CATALOG_CONTENT
+
+
+def test_search_input_native_clear_button_suppressed() -> None:
+    """The native WebKit/Safari cancel button is suppressed so only the
+    custom clear button renders (Spec 16, R1, Q5 assumed default A)."""
+    assert "::-webkit-search-cancel-button" in _HEADER_CATALOG_CONTENT
+    assert "-webkit-appearance" in _HEADER_CATALOG_CONTENT
+    assert "appearance: none" in _HEADER_CATALOG_CONTENT
+
+
+def test_clear_button_has_dual_behavior_js_handler() -> None:
+    """The clear button JS shows/hides based on input value and uses
+    URLSearchParams to delete q on committed search, not history.back()."""
+    # AC6: hidden class + input event handler
+    assert "hidden" in _HEADER_CATALOG_CONTENT  # button starts hidden
+    assert "searchInput.addEventListener('input'" in _HEADER_CATALOG_CONTENT or \
+           "addEventListener('input'" in _HEADER_CATALOG_CONTENT
+    # AC5: URLSearchParams / searchParams.delete('q') for deterministic clear
+    assert "URLSearchParams" in _HEADER_CATALOG_CONTENT or \
+           "new URL(" in _HEADER_CATALOG_CONTENT
+    assert "searchParams.delete('q')" in _HEADER_CATALOG_CONTENT or \
+           "params.delete('q')" in _HEADER_CATALOG_CONTENT
 
 
 def test_autocomplete_dropdown_element_exists() -> None:

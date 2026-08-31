@@ -718,6 +718,9 @@ msgstr "Все категории"
 msgid "Search ads..."
 msgstr "Поиск объявлений..."
 
+msgid "Clear search"
+msgstr "Очистить поиск"
+
 msgid "Close"
 msgstr "Закрыть"
 

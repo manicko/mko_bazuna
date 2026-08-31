@@ -715,6 +715,9 @@ msgstr ""
 msgid "Search ads..."
 msgstr ""
 
+msgid "Clear search"
+msgstr ""
+
 msgid "Close"
 msgstr ""
 
