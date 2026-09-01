@@ -92,6 +92,7 @@ jobs:
       - name: Compile translations
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
         run: |
           uv run python manage.py compilemessages \
             --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
@@ -194,6 +195,7 @@ jobs:
       - name: Compile translations
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
         run: |
           uv run python manage.py compilemessages \
             --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
