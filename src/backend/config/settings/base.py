@@ -28,11 +28,15 @@ env = environ.Env(
 env_path = BASE_DIR / ".env"
 if not env_path.exists():
     # Skip validation during Docker build (DJANGO_BUILD), in test environments, or when
-    # environment variables are provided via docker-compose env_file
+    # environment variables are provided via docker-compose env_file or CI directly.
+    # The DJANGO_SECRET_KEY check covers CI where individual env vars are set explicitly
+    # instead of via a .env file — this enables the secret-validation tests in
+    # test_settings_secrets.py to run subprocesses with prod/dev settings modules.
     if (
         os.getenv("DJANGO_SETTINGS_MODULE")
         and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "")
         and not os.getenv("DJANGO_BUILD")
+        and not os.getenv("DJANGO_SECRET_KEY")
     ):
         logger.error(
             "ERROR: .env file not found. Copy .env.example to .env and configure values."
