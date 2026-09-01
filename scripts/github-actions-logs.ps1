@@ -17,7 +17,7 @@ $Repo  = "mko_bazuna"
 $EnvFile = Join-Path $HOME ".github-actions\.env"
 
 # Логи сохраняем в проекте
-$OutputRoot = Join-Path $PSScriptRoot "..\.ai\actions-logs"
+$OutputRoot = Join-Path $PSScriptRoot "..\.action_logs\"
 $LatestDir  = Join-Path $OutputRoot "latest"
 
 # ============================================================

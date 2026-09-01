@@ -247,3 +247,4 @@ _step3_*.txt
 .profile_default/
 .pdbrc
 .python-eggs/
+.action_logs/
