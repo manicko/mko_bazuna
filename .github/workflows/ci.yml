@@ -211,5 +211,6 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
         run: uv run pytest src/backend/apps/ads/tests/test_i18n_completeness.py src/backend/apps/ads/tests/test_i18n_pipeline.py -v
         working-directory: src/backend
