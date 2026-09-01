@@ -93,6 +93,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
         run: |
           uv run python manage.py compilemessages \
             --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
@@ -196,6 +197,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
         run: |
           uv run python manage.py compilemessages \
             --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
