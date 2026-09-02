@@ -44,6 +44,12 @@ def test_format_price_filter_renders_original_currency() -> None:
 
 
 def test_format_price_filter_unpriced_returns_empty() -> None:
-    """An ad without a price renders an empty string."""
+    """A legacy/seed ad without a price renders an empty string (R-DISP-02)."""
     ad = Ad(price_amount=None, price_currency=None)
     assert format_price(ad) == ""
+
+
+def test_format_price_filter_free_renders_free() -> None:
+    """A Free/Charity ad (price_amount=0) renders 'Free' (R-DISP-01)."""
+    ad = Ad(price_amount=Decimal("0"), price_currency=CurrencyCode.EUR)
+    assert format_price(ad) == "Free"

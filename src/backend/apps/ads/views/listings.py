@@ -11,7 +11,7 @@ HTMX-compatible MPA (no login required).
 """
 
 import logging
-
+from decimal import Decimal
 from difflib import get_close_matches
 
 from apps.analytics.models import AnalyticsEvent
@@ -339,6 +339,20 @@ def listings(
         except ValueError:
             pass  # Invalid price, ignore filter
 
+    # Parse active price range for display in the filter summary (§6.6)
+    active_price_min: Decimal | None = None
+    active_price_max: Decimal | None = None
+    if min_price:
+        try:
+            active_price_min = Decimal(min_price)
+        except (ValueError, TypeError):
+            pass
+    if max_price:
+        try:
+            active_price_max = Decimal(max_price)
+        except (ValueError, TypeError):
+            pass
+
     # Listing purpose filter (F4) — single-select exact slug match
     listing_purpose_slug = request.GET.get("listing_purpose")
 
@@ -435,6 +449,8 @@ def listings(
         "current_sort": sort,
         "min_price": min_price,
         "max_price": max_price,
+        "active_price_min": active_price_min,
+        "active_price_max": active_price_max,
         "current_listing_purpose": listing_purpose_slug,
         "current_features": feature_slugs,
         "current_condition": condition_slug,

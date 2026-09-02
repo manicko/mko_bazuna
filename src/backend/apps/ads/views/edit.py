@@ -26,27 +26,28 @@ logger = logging.getLogger(__name__)
 
 def _apply_price_change(
     ad: Ad,
-    price_amount: Decimal | None,
+    price_amount: Decimal,
     price_currency: CurrencyCode | None,
 ) -> Ad:
     """Apply a price change and recompute ``price_normalized_eur``.
 
     Sets the source-of-truth fields (``price_amount``/``price_currency``) and
     recomputes the derived EUR-normalized value via ``PriceNormalizer`` (CR-05,
-    CR-07). When either the amount or currency is missing the normalized value
-    is cleared. Returns the ad so the caller can persist it.
+    CR-07). When the currency is missing the normalized value is cleared.
+    Returns the ad so the caller can persist it.
 
     Args:
         ad: The ad to update.
-        price_amount: The new price amount (None clears the price).
-        price_currency: The new price currency (None clears currency).
+        price_amount: The new price amount (Decimal("0") for Free).
+        price_currency: The new price currency (None preserves current).
 
     Returns:
         The updated ``ad`` instance.
     """
     ad.price_amount = price_amount
-    ad.price_currency = price_currency.value if price_currency else None
-    if price_amount is not None and price_currency is not None:
+    if price_currency is not None:
+        ad.price_currency = price_currency.value
+    if price_currency is not None:
         try:
             ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
                 price_amount, price_currency
@@ -123,23 +124,27 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     new_price_amount = request.POST.get("price_amount")
     new_price_currency = request.POST.get("price_currency")
 
-    # Parse the price amount (empty string means "unset"; invalid -> unset).
-    price_amount_value = None
+    # Parse the price amount. Empty input means "Free" (Decimal("0"));
+    # invalid input also falls back to Free, since the model field is
+    # non-null with default=0 (spec §5.2 R-MM-01).
+    price_amount_value = Decimal("0")
     if new_price_amount not in (None, ""):
         try:
             price_amount_value = Decimal(new_price_amount)
         except Exception:
-            price_amount_value = None
+            price_amount_value = Decimal("0")
 
-    # Parse the currency; fall back to the ad's current currency when invalid.
-    price_currency_value: CurrencyCode | None = None
+    # Parse the currency; fall back to the ad's current currency when
+    # unset/invalid. Do not coerce to None — a price (incl. Free=0) keeps
+    # a valid currency for normalized_eur computation.
+    price_currency_value: CurrencyCode | None = (
+        CurrencyCode(ad.price_currency) if ad.price_currency else None
+    )
     if new_price_currency:
         try:
             price_currency_value = CurrencyCode(new_price_currency)
         except ValueError:
-            price_currency_value = (
-                CurrencyCode(ad.price_currency) if ad.price_currency else None
-            )
+            pass  # Keep the ad's current currency (already set above)
 
     # Determine edit type
     has_text_change = _text_fields_changed(request, ad)

@@ -9,6 +9,7 @@ One-word queries trigger fuzzy category detection.
 
 import logging
 import re
+from decimal import Decimal
 from difflib import get_close_matches
 
 from apps.ads.models import Ad
@@ -28,6 +29,7 @@ from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
+
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,20 @@ def search(request: HttpRequest) -> HttpResponse:
         try:
             ads = ads.filter(price_normalized_eur__lte=int(max_price))
         except ValueError:
+            pass
+
+    # Parse active price range for display in the filter summary (§6.6)
+    active_price_min: Decimal | None = None
+    active_price_max: Decimal | None = None
+    if min_price:
+        try:
+            active_price_min = Decimal(min_price)
+        except (ValueError, TypeError):
+            pass
+    if max_price:
+        try:
+            active_price_max = Decimal(max_price)
+        except (ValueError, TypeError):
             pass
 
     # Listing purpose filter (F4) — single-select exact slug match
@@ -259,6 +275,8 @@ def search(request: HttpRequest) -> HttpResponse:
         "current_sort": current_sort,
         "min_price": min_price,
         "max_price": max_price,
+        "active_price_min": active_price_min,
+        "active_price_max": active_price_max,
         "current_listing_purpose": listing_purpose_slug,
         "current_features": feature_slugs,
         "current_condition": condition_slug,

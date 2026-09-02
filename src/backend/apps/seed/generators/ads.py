@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -544,11 +545,11 @@ class AdGenerator(BaseGenerator):
         self,
         category: Category,
         listing_purpose: LookupItem | None = None,
-    ) -> tuple[int | None, CurrencyCode]:
+    ) -> tuple[int | Decimal, CurrencyCode]:
         """Generate a price (amount + EUR currency) appropriate for the category.
 
         Seed ads default to **EUR** (spec Assumption 8), so the EUR-normalized
-        amount equals the original amount. Returns ``(None, CurrencyCode.EUR)``
+        amount equals the original amount. Returns ``(0, CurrencyCode.EUR)``
         for the ~20% of non-category items that are priced "free / negotiable".
 
         Give-away listings (listing purpose slug ``give-away`` — including the
