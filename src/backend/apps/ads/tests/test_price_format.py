@@ -4,6 +4,8 @@ Tests for the shared ``format_price`` display helper (spec Task 7 / T-11).
 
 from decimal import Decimal
 
+from django.utils.translation import override
+
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price, format_price_value
 from apps.currencies.enums import CurrencyCode
@@ -50,6 +52,11 @@ def test_format_price_filter_unpriced_returns_empty() -> None:
 
 
 def test_format_price_filter_free_renders_free() -> None:
-    """A Free/Charity ad (price_amount=0) renders 'Free' (R-DISP-01)."""
+    """A Free/Charity ad (price_amount=0) renders 'Free' (R-DISP-01).
+
+    Activated English locale so the assertion is deterministic regardless
+    of the project's primary language (RU).
+    """
     ad = Ad(price_amount=Decimal("0"), price_currency=CurrencyCode.EUR)
-    assert format_price(ad) == "Free"
+    with override("en"):
+        assert format_price(ad) == "Free"
