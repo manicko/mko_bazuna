@@ -388,24 +388,24 @@ class TestFilterAndSearchCombine:
         assert len(ids) == 1
 
 
-class TestPriceNullSort:
-    """``price_asc``/``price_desc`` place NULL ``price_normalized_eur`` last."""
+class TestPriceSort:
+    """``price_asc``/``price_desc`` order ads by ``price_normalized_eur`` value."""
 
-    def test_price_asc_places_nulls_last(self, seller, category, city) -> None:
-        priced = create_test_ad(
+    def test_price_asc_orders_by_value(self, seller, category, city) -> None:
+        cheap = create_test_ad(
             seller,
             category,
             city,
-            title="Priced",
+            title="Cheap",
             price=100,
             status=AdStatus.PUBLISHED,
         )
-        null = create_test_ad(
+        expensive = create_test_ad(
             seller,
             category,
             city,
-            title="No price",
-            price=None,
+            title="Expensive",
+            price=200,
             status=AdStatus.PUBLISHED,
         )
 
@@ -414,24 +414,24 @@ class TestPriceNullSort:
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
-        assert null.id in ids and priced.id in ids
-        assert ids[-1] == null.id
+        assert cheap.id in ids and expensive.id in ids
+        assert ids.index(cheap.id) < ids.index(expensive.id)
 
-    def test_price_desc_places_nulls_last(self, seller, category, city) -> None:
-        priced = create_test_ad(
+    def test_price_desc_orders_by_value(self, seller, category, city) -> None:
+        cheap = create_test_ad(
             seller,
             category,
             city,
-            title="Priced",
+            title="Cheap",
             price=100,
             status=AdStatus.PUBLISHED,
         )
-        null = create_test_ad(
+        expensive = create_test_ad(
             seller,
             category,
             city,
-            title="No price",
-            price=None,
+            title="Expensive",
+            price=200,
             status=AdStatus.PUBLISHED,
         )
 
@@ -440,8 +440,8 @@ class TestPriceNullSort:
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
-        assert null.id in ids and priced.id in ids
-        assert ids[-1] == null.id
+        assert cheap.id in ids and expensive.id in ids
+        assert ids.index(expensive.id) < ids.index(cheap.id)
 
 
 class TestRelevanceTiebreaker:
@@ -554,21 +554,21 @@ class TestFtsSortOrder:
         ids = list(a.id for a in response.context["page_obj"])
         assert ids == [ad_200.id, ad_100.id, ad_50.id]
 
-    def test_fts_price_asc_nulls_last(self, seller, category, city) -> None:
+    def test_fts_price_asc_free_sorts_first(self, seller, category, city) -> None:
+        ad_free = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            price=0,
+            status=AdStatus.PUBLISHED,
+        )
         ad_priced = create_test_ad(
             seller,
             category,
             city,
             title="Велосипед",
             price=100,
-            status=AdStatus.PUBLISHED,
-        )
-        ad_null = create_test_ad(
-            seller,
-            category,
-            city,
-            title="Велосипед",
-            price=None,
             status=AdStatus.PUBLISHED,
         )
 
@@ -580,10 +580,10 @@ class TestFtsSortOrder:
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
+        assert ad_free.id in ids
         assert ad_priced.id in ids
-        assert ad_null.id in ids
-        # NULL price must sort last (nulls_last=True), not first.
-        assert ids[-1] == ad_null.id
+        # Price 0 (Free) sorts before positive prices in ascending order.
+        assert ids.index(ad_free.id) < ids.index(ad_priced.id)
 
     def test_fts_default_sort_is_relevance(self, seller, category, city) -> None:
         now = timezone.now()

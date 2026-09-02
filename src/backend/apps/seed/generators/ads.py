@@ -602,7 +602,7 @@ class AdGenerator(BaseGenerator):
         else:
             # 20% chance of no price (free / negotiable)
             if self.faker.random_int(0, 99) < 20:
-                amount = None
+                amount = 0
             else:
                 amount = self.faker.random_int(10, 5000)
 

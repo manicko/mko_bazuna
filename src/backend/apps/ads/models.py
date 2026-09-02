@@ -5,6 +5,7 @@ Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 """
 
 import os
+from decimal import Decimal
 
 from apps.core.enums import AdSource, AdStatus
 from apps.currencies.enums import CurrencyCode
@@ -79,11 +80,13 @@ class Ad(models.Model):
         null=True,
         help_text="Original language code of the ad (e.g. 'ru', 'en', 'bs')",
     )
+    # Price is mandatory and must be a non-negative value (>=0, zero means Free).
     price_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        blank=True,
-        null=True,
+        blank=False,
+        null=False,
+        default=Decimal("0"),
         help_text="Seller's original price amount (source of truth)",
     )
     price_currency = models.CharField(
