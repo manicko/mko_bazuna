@@ -29,6 +29,12 @@ is unaffected. {% endcomment %}
         </p>
     </div>
 {% endif %}
+<!-- Price range summary -->
+{% if active_price_min or active_price_max %}
+    <div class="filter-summary">
+        {% blocktrans with min=active_price_min max=active_price_max %}Price: {{ min }}–{{ max }}{% endblocktrans %}
+    </div>
+{% endif %}
 <!-- Active filter chips -->
 {% if current_listing_purpose or current_features or current_condition %}
     <div class="flex flex-wrap gap-2 mb-4">
@@ -66,14 +72,15 @@ is unaffected. {% endcomment %}
                 </span>
             {% endif %}
         {% endfor %}
-        <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
-           hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
-           hx-push-url="true"
-           hx-target="#ad-list"
-           hx-swap="innerHTML"
-           class="text-sm text-blue-600 hover:underline">{% trans "Clear all filters" %}</a>
     </div>
 {% endif %}
+<!-- Clear all filters: resets all query params (q, sort, price, purpose, condition, features); category/city are path params, naturally preserved. -->
+<a href="?page=1{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+   hx-get="?page=1{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+   hx-push-url="true"
+   hx-target="#ad-list"
+   hx-swap="innerHTML"
+   class="text-sm text-blue-600 hover:underline">{% trans "Clear all filters" %}</a>
 <!-- Ads grid -->
 {% if page_obj %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
