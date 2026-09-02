@@ -9,6 +9,10 @@ import logging
 
 from asgiref.sync import sync_to_async
 
+from decimal import Decimal
+
+from apps.currencies.enums import CurrencyCode
+
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -65,8 +69,8 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         listing_purpose_id=new_ad.listing_purpose_id,
         title=new_ad.title,
         description=new_ad.description,
-        price_amount=None,
-        price_currency=None,
+        price_amount=Decimal("0"),
+        price_currency=CurrencyCode.EUR,
     )
 
     await message.answer(

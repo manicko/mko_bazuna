@@ -521,7 +521,7 @@ async def process_description(message: types.Message, state: FSMContext) -> None
 
     await message.answer(
         "Description saved.\n"
-        "Now choose the price currency, or select 'Skip' if price is not required.",
+        "Now choose the price currency, or select 'Free' for a zero-price (Charity) ad.",
         reply_markup=build_currency_keyboard(),
     )
 
@@ -537,7 +537,7 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 
     builder.button(text="🇧🇦 BAM", callback_data="price_currency:BAM")
 
-    builder.button(text="⏭️ Skip", callback_data="price_skip")
+    builder.button(text="🆓 Free", callback_data="price_free")
 
     builder.adjust(2)
 
@@ -551,13 +551,16 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 async def process_price_currency(
     callback: types.CallbackQuery, state: FSMContext
 ) -> None:
-    """Process currency selection (or skip) from the price inline keyboard."""
+    """Process currency selection (or Free) from the price inline keyboard."""
 
     if not callback.data or not callback.message:
         return
 
-    if callback.data == "price_skip":
-        await state.update_data(price_amount=None)
+    if callback.data == "price_free":
+        await state.update_data(
+            price_amount=Decimal("0.00"),
+            price_currency=CurrencyCode.EUR,
+        )
 
         await callback.answer()
 
@@ -582,7 +585,7 @@ async def process_price_currency(
 
         await callback.message.answer(
             f"Currency: {currency.value}\n"
-            "Now enter the price amount as a number (or send 'skip' to leave price unset)."
+            "Now enter the price amount as a number."
         )
 
 
@@ -596,34 +599,30 @@ async def process_price(message: types.Message, state: FSMContext) -> None:
 
     if currency is None:
         await message.answer(
-            "Please choose a currency first, or select 'Skip'.",
+            "Please choose a currency first or select 'Free' for a zero-price (Charity) ad.",
             reply_markup=build_currency_keyboard(),
         )
 
         return
 
     if not message.text:
-        await message.answer("Please send the price amount or 'skip'.")
+        await message.answer("Please send the price amount as a number, or select 'Free' on the keyboard.")
 
         return
 
     text = message.text.strip().lower()
 
-    if text == "skip":
-        await state.update_data(price_amount=None)
+    try:
+        price_value = Decimal(text)
 
-    else:
-        try:
-            price_value = Decimal(text)
+        payload = PricePayload(price_amount=price_value, price_currency=currency)
 
-            payload = PricePayload(price_amount=price_value, price_currency=currency)
+        await state.update_data(price_amount=payload.price_amount)
 
-            await state.update_data(price_amount=payload.price_amount)
+    except ValueError, Exception:
+        await message.answer("Invalid price. Enter a number.")
 
-        except ValueError, Exception:
-            await message.answer("Invalid price. Enter a number or 'skip'.")
-
-            return
+        return
 
     await _move_from_price_to_photos(message, state)
 
@@ -829,7 +828,7 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             ).value,
             category_id=data.get("category_id"),
             city_id=data.get("city_id"),
-            price_amount=data.get("price_amount"),
+            price_amount=data.get("price_amount") or Decimal("0"),
             price_currency=data.get("price_currency"),
             photos=data.get("photos", []),
             user_id=data.get("user_id"),
@@ -1045,7 +1044,7 @@ async def update_ad_and_moderate(
     desc_ru: str,
     category_id: int | None,
     city_id: int | None,
-    price_amount: Decimal | None,
+    price_amount: Decimal,
     price_currency: CurrencyCode | None,
     photos: list,
     user_id: int | None,
@@ -1061,13 +1060,11 @@ async def update_ad_and_moderate(
     """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
 
 
-    ``price_amount``/``price_currency`` become the source of truth; when both
+    ``price_amount``/``price_currency`` become the source of truth; when
 
-    are present ``price_normalized_eur`` is computed via ``PriceNormalizer``
+    ``price_currency`` is present ``price_normalized_eur`` is computed via
 
-    using the current rate (BR-03) before saving. When the price is skipped
-
-    both are left NULL.
+    ``PriceNormalizer`` using the current rate (BR-03) before saving.
 
     """
 
@@ -1123,7 +1120,7 @@ async def update_ad_and_moderate(
 
         # Compute the derived EUR-normalized price (BR-03).
 
-        if price_amount is not None and currency is not None:
+        if currency is not None:
             try:
                 ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
                     price_amount, currency

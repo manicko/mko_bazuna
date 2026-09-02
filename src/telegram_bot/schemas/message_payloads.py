@@ -39,15 +39,14 @@ class DescriptionPayload(BaseModel):
 class PricePayload(BaseModel):
     """Validated price input from seller (amount + currency).
 
-    The amount is nullable (a price is optional and can be skipped with
-    ``Skip`` in the bot dialog). The currency defaults to EUR (the project's
-    default display currency).
+    The amount is mandatory: the bot no longer offers a "Skip" option, so
+    ``None`` is rejected at schema validation time. A Free/Charity ad enters
+    ``Decimal("0")`` explicitly. The currency defaults to EUR.
     """
 
-    price_amount: Annotated[
-        Decimal | None,
-        Field(ge=0, description="Ad price amount in the chosen currency, nullable"),
-    ] = None
+    price_amount: Decimal = Field(
+        ge=0, description="Ad price amount in the chosen currency (>= 0)"
+    )
     price_currency: CurrencyCode = CurrencyCode.EUR
 
 
