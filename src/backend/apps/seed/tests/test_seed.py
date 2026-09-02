@@ -1231,10 +1231,10 @@ class TestSeedCategoryIntegration:
             assert Category.objects.filter(slug=ad.category.slug).exists(), (
                 f"Ad references unknown category slug: {ad.category.slug}"
             )
-            # Price may be None for free/negotiable ads (~20% of non-special
-            # categories) per AdGenerator._generate_price() — only validate
-            # the field when a price is actually set. Give-away listings
-            # (e.g. the charity category) are always free (price = 0).
+            # The seed generator returns 0 for ~20% of non-special categories
+            # (free / negotiable) per AdGenerator._generate_price(), and 0 for
+            # give-away listings (e.g. the charity category). 0 is a valid
+            # non-negative price per spec §6.1 (zero = Free/Charity).
             if ad.price_amount is not None:
                 assert isinstance(ad.price_amount, int)
                 # 0 is valid for give-away / charity listings; positive for sale
@@ -1244,7 +1244,7 @@ class TestSeedCategoryIntegration:
                 ):
                     assert ad.price_amount == 0
                 else:
-                    assert ad.price_amount > 0
+                    assert ad.price_amount is not None and ad.price_amount >= 0
                 # Seed ads use EUR, so the normalized value equals the amount.
                 assert ad.price_currency == CurrencyCode.EUR
                 assert ad.price_normalized_eur == ad.price_amount

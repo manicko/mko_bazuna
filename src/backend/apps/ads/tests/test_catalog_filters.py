@@ -14,6 +14,7 @@ render pipeline is exercised (including the filter-form template).
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 from pathlib import Path
 
@@ -662,13 +663,28 @@ class TestFilterUrlReset:
         assert content.count("LANGUAGE_CODE") >= 18
 
     def test_clear_all_filters_has_push_url(self) -> None:
-        """The "Clear all filters" link has ``hx-push-url="true"`` and path ``?page=1``."""
+        """The "Clear all filters" link has ``hx-push-url="true"`` and resets
+        all query params (R-FR-01), so ``q`` and ``sort`` must be absent from
+        its ``hx-get`` reset URL."""
         path = (
             Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         )
         content = path.read_text(encoding="utf-8")
+        # The clear-all link is the only hx-get whose value is
+        # "?page=1{% if LANGUAGE_CODE %}&lang=..." — every other link starts
+        # with "?page=1{% if query %}" or "?page={{ ... }}".
+        match = re.search(
+            r'hx-get="(\?page=1{% if LANGUAGE_CODE %}[^"]*)"',
+            content,
+        )
+        assert match is not None, "Clear all filters hx-get link not found in ad_list.html"
+        reset_url = match.group(1)
         assert 'hx-push-url="true"' in content
-        assert 'hx-get="?page=1' in content
+        # R-FR-01: the reset URL must drop q and sort (clears ALL query params).
+        assert "&q=" not in reset_url
+        assert "q=" not in reset_url
+        assert "&sort=" not in reset_url
+        assert "sort=" not in reset_url
 
     def test_sort_dropdown_is_not_gated_on_query(self) -> None:
         """The sort ``<select>`` must always render, even on search results (PO-2)."""
