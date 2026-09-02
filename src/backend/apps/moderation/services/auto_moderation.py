@@ -134,7 +134,8 @@ def auto_moderate(ad: Ad) -> bool:
         _fail_moderation(ad)
         return False
 
-    # Validate price required
+    # Bot flow guarantees price_amount is set (Free → Decimal("0")); this
+    # guard covers legacy API/seed paths that may still write NULL.
     if price_required and ad.price_amount is None:
         _fail_moderation(ad)
         return False
@@ -311,7 +312,8 @@ def check(ad: Ad) -> tuple[bool, str | None]:
             "Your ad content does not meet our requirements. Please review and try again.",
         )
 
-    # Validate price required
+    # Bot flow guarantees price_amount is set (Free → Decimal("0")); this
+    # guard covers legacy API/seed paths that may still write NULL.
     if price_required and ad.price_amount is None:
         return (
             False,
