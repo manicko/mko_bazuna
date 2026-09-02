@@ -101,7 +101,7 @@ is unaffected. {% endcomment %}
                             {{ ad|get_title:LANGUAGE_CODE }}
                             {% render_trust_badge ad.user %}
                         </h2>
-                        {% if ad.price_amount %}
+                        {% if ad.price_amount is not none %}
                             <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
                         {% endif %}
                         <p class="text-sm text-gray-600 line-clamp-3 mb-3">{{ ad|get_description:LANGUAGE_CODE }}</p>

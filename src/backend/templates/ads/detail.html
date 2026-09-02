@@ -129,7 +129,7 @@
                             </h1>
                             {% include "components/favorite_heart.html" with ad=ad is_favorited=is_favorited %}
                         </div>
-                        {% if ad.price_amount %}
+                        {% if ad.price_amount is not none %}
                             <p class="text-blue-600 font-bold text-3xl mb-4">{{ ad|format_price }}</p>
                         {% endif %}
                         <div class="mb-6">

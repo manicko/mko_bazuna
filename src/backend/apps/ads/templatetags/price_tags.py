@@ -10,6 +10,7 @@ by the bot alert messages so that template and bot formatting stay consistent
 from decimal import ROUND_HALF_UP, Decimal
 
 from django import template
+from django.utils.translation import gettext
 
 from apps.currencies.enums import CurrencyCode
 
@@ -32,6 +33,8 @@ def format_price_value(
     """
     if amount is None:
         return ""
+    if amount == 0:
+        return gettext("Free")
     amount_decimal = Decimal(str(amount))
     label = CurrencyCode(currency).value if currency else ""
     return f"{_format_amount(amount_decimal)} {label}".strip()

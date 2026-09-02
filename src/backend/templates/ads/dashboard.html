@@ -84,7 +84,7 @@
                                     <h4 class="font-semibold text-lg mb-2 line-clamp-2">
                                         <a href="{% url 'ads:detail' ad.id %}" class="hover:text-blue-600">{{ ad|get_title:LANGUAGE_CODE }}</a>
                                     </h4>
-                                    {% if ad.price_amount %}
+                                    {% if ad.price_amount is not none %}
                                         <p class="text-blue-600 font-bold mb-2">{{ ad|format_price }}</p>
                                     {% endif %}
                                     {% if seller_stats %}

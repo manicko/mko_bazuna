@@ -117,7 +117,7 @@ def create_test_ad(
     title: str = "Test Ad",
     description: str = "Test description",
     status: AdStatus = AdStatus.ON_MODERATION,
-    price: int | Decimal | None = 100,
+    price: int | Decimal = 100,
     price_currency: CurrencyCode | str = CurrencyCode.EUR,
     source: AdSource = AdSource.TELEGRAM,
     **kwargs: Any,
@@ -131,7 +131,7 @@ def create_test_ad(
 
     The ``price`` argument is the seller's original amount (in
     ``price_currency``, default EUR); the EUR-normalized value is set equal to
-    it (EUR base rate 1.0). Pass ``price=None`` for an unpriced ad.
+    it (EUR base rate 1.0). Pass ``price=0`` for a Free/Charity ad.
     """
     defaults: dict[str, Any] = {
         "user": user,
@@ -160,7 +160,7 @@ def create_test_ads_bulk(
     title_prefix: str = "Test Ad",
     description: str = "Test description",
     status: AdStatus = AdStatus.ON_MODERATION,
-    price: int | Decimal | None = 100,
+    price: int | Decimal = 100,
     price_currency: CurrencyCode | str = CurrencyCode.EUR,
     source: AdSource = AdSource.TELEGRAM,
     **kwargs: Any,
