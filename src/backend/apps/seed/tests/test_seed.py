@@ -1425,12 +1425,19 @@ class TestAdGeneratorLeafOnly:
         )
 
     def test_full_seed_coverage(self) -> None:
-        """Full seed with 600 ads covers >=90% of leaf categories with ads."""
+        """Full seed with 1200 ads covers >=90% of leaf categories with ads."""
         out = StringIO()
         call_command(
             "seed",
             "--users=10",
-            "--ads=600",
+            # Coupon-collector rationale (see .ai/problems/04_seed-coverage-test_spec.md):
+            # 360 published ads (600 * 60%) over 171 leaf categories yields
+            # E[coverage] = 87.9% (< 90% threshold) -> deterministic seed-42 failure.
+            # Bumped to 1200 ads (~720 published, E[coverage] ~= 98.5%, ~9.6 sigma
+            # above the 90% threshold) so the >=90% invariant holds reliably.
+            # Note: fragile to shared self._rng stream shifts; do not add
+            # self._rng.choice() calls upstream without re-checking coverage.
+            "--ads=1200",
             "--force",
             "--analytics=False",
             stdout=out,
