@@ -964,3 +964,10 @@ msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
 
 msgid "Error checking login status."
 msgstr "Greška pri proveri statusa prijave."
+
+msgid "Free"
+msgstr "Besplatno"
+
+#, python-format
+msgid "Price: %(min)s–%(max)s"
+msgstr "Cijena: %(min)s–%(max)s"

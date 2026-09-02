@@ -965,3 +965,10 @@ msgstr "Эта ссылка для входа недействительна, и
 
 msgid "Error checking login status."
 msgstr "Ошибка проверки статуса входа."
+
+msgid "Free"
+msgstr "Бесплатно"
+
+#, python-format
+msgid "Price: %(min)s–%(max)s"
+msgstr "Цена: %(min)s–%(max)s"

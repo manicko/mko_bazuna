@@ -962,3 +962,10 @@ msgstr ""
 
 msgid "Error checking login status."
 msgstr ""
+
+msgid "Free"
+msgstr ""
+
+#, python-format
+msgid "Price: %(min)s–%(max)s"
+msgstr ""
