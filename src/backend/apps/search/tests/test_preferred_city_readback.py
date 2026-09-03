@@ -17,6 +17,7 @@ listings() (T-05):
 
 import pytest
 from django.test import Client
+from django.utils import translation
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -215,3 +216,36 @@ class TestListingsPreferredCityReadback:
         results = _result_ids(response)
         assert results
         assert all(ad_id in budva_ids for ad_id in results)
+
+
+class TestCityBadgeReadback:
+    """The header city badge must follow the effective URL city, not a lagging
+    preference cookie (Problem 04: button showed the previous selection)."""
+
+    def test_badge_reflects_url_city_not_stale_cookie(
+        self, client: Client, podgorica: City, budva: City
+    ) -> None:
+        """On /city/<slug>/ the badge shows the URL city, not a stale cookie."""
+        translation.activate("ru")
+        # Stale preference from a prior selection.
+        client.cookies["preferred_city"] = "podgorica"
+        # Navigate to Budva — badge must show Budva, not the stale Podgorica.
+        response = client.get("/city/budva/")
+        assert response.status_code == 200
+        assert response.context["current_city"] == "budva"
+        content = response.content.decode()
+        assert "data-preferred-city-label>Будва" in content
+        assert "data-preferred-city-label>Подгорица" not in content
+
+    def test_badge_reflects_search_query_city_not_stale_cookie(
+        self, client: Client, podgorica: City, budva: City
+    ) -> None:
+        """On /search/?city=<slug> the badge shows the query city, not the cookie."""
+        translation.activate("ru")
+        client.cookies["preferred_city"] = "podgorica"
+        response = client.get("/search/?city=budva")
+        assert response.status_code == 200
+        assert response.context["current_city"] == "budva"
+        content = response.content.decode()
+        assert "data-preferred-city-label>Будва" in content
+        assert "data-preferred-city-label>Подгорица" not in content

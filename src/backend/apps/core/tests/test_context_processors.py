@@ -112,6 +112,42 @@ def test_localized_name_for_valid_slug() -> None:
     city.get_name.assert_called_once()
 
 
+def test_badge_prefers_effective_url_city_over_stale_preferred() -> None:
+    """The badge follows request.current_city (effective URL city) and ignores a
+    stale preferred-city preference — fixes the Problem 04 off-by-one where the
+    button showed the previous selection while the URL filter was already current."""
+    berane = MagicMock()
+    berane.get_name.return_value = "Беране"
+    bar = MagicMock()
+    bar.get_name.return_value = "Бар"
+
+    def filter_side_effect(*args, **kwargs):
+        slug = kwargs.get("slug")
+        mock = MagicMock()
+        mock.first.return_value = {"berane": berane, "bar": bar}.get(slug)
+        return mock
+
+    with (
+        patch("apps.categories.models.Category") as mock_category,
+        patch("apps.locations.models.City") as mock_city,
+    ):
+        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_city.objects.order_by.return_value = []
+        mock_city.objects.filter.side_effect = filter_side_effect
+
+        request = HttpRequest()
+        request.current_city = "berane"  # effective URL city (just selected)
+        request.preferred_city = "bar"  # stale cookie: previous selection
+        request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
+        context = header_context(request)
+
+    assert context["preferred_city_display"] == "Беране"
+    berane.get_name.assert_called_once()
+    # The stale preferred cookie must never be consulted once the URL city resolves.
+    assert not bar.get_name.called
+
+
 def test_country_wide_label_for_stale_slug() -> None:
     """A preferred-city slug not found in the DB falls back to the label."""
     with (

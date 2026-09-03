@@ -319,6 +319,11 @@ def listings(
                 # Second line of defense for a stale preference: no filter.
                 pass
 
+    # Expose the effective city (URL path/?city= or the preferred fallback) so
+    # the catalog header badge can display the *active* filter rather than a
+    # lagging preference cookie (see header_context — Problem 04 off-by-one).
+    request.current_city = effective_city
+
     # Price range filter
 
     min_price = request.GET.get("min_price")

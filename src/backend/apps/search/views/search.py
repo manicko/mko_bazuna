@@ -88,6 +88,11 @@ def search(request: HttpRequest) -> HttpResponse:
         except City.DoesNotExist:
             suggested_city = suggest_city(current_city)
 
+    # Expose the effective city (explicit ?city= or the preferred fallback) so
+    # the catalog header badge can display the *active* filter rather than a
+    # lagging preference cookie (see header_context — Problem 04 off-by-one).
+    request.current_city = current_city
+
     # Price range filter (EUR-equivalent values, CR-10)
     min_price = request.GET.get("min_price")
     max_price = request.GET.get("max_price")

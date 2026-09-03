@@ -49,14 +49,29 @@ def header_context(request) -> dict:
     from apps.categories.models import Category
     from apps.locations.models import City
 
-    # Default label when no preferred city is set (Q-2 recommended default).
+    # The header city badge reflects the *effective* city — the one whose ads
+    # are actually being filtered — not the stored preference. The effective
+    # slug is an explicit URL selection (``/city/<slug>/`` or ``?city=``) that
+    # the listings/search views expose as ``request.current_city``; the persisted
+    # preference (``request.preferred_city``) is only the fallback when the URL
+    # carries no city. Reading the badge from the preference alone is incorrect:
+    # that preference is written by an asynchronous POST (set_preferred_city)
+    # that races with the client-side ``window.location.href`` navigation, so
+    # the rendered page paints the *previous* selection — the off-by-one
+    # reported in Problem 04. Deriving the label from the effective URL city
+    # keeps it in lock-step with the address bar and the ad filter.
     preferred_city_display = _("Entire country")
-    preferred_city_slug = getattr(request, "preferred_city", None)
-    if preferred_city_slug:
-        city = City.objects.filter(slug=preferred_city_slug).first()
+    for city_slug in (
+        getattr(request, "current_city", None),
+        getattr(request, "preferred_city", None),
+    ):
+        if not city_slug:
+            continue
+        city = City.objects.filter(slug=city_slug).first()
         if city is not None:
             locale = getattr(request, "LANGUAGE_CODE", "ru") or "ru"
             preferred_city_display = city.get_name(locale)
+            break
 
     # Number of the authenticated user's favorites (header heart badge).
     # Anonymous visitors get ``None`` (the badge renders an outline heart with
