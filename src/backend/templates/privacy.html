@@ -6,7 +6,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{% trans "Privacy Policy" %} - Mko Bazuna</title>
+        <title>{% trans "Privacy Policy" %} - {{ site_name }}</title>
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         {% if consent_analytics and PLAUSIBLE_HOST %}
             <script defer
@@ -19,14 +19,14 @@
         <main class="container mx-auto px-4 py-8 max-w-3xl">
             <h1 class="text-3xl font-bold text-gray-800 mb-6">{% trans "Privacy Policy" %}</h1>
             <p class="text-sm text-gray-600 mb-8">
-                {% blocktrans %}This policy explains how Mko Bazuna collects, processes, and protects your
-            data, including the cookies we set and the third parties we share data with.
-            Last updated: August 2026.{% endblocktrans %}
+                {% blocktrans with site_name=site_name %}This policy explains how {{ site_name }} collects, processes, and protects your
+                data, including the cookies we set and the third parties we share data with.
+                Last updated: August 2026.{% endblocktrans %}
             </p>
             <section class="bg-white rounded-lg shadow p-6 mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "1. Controller" %}</h2>
                 <p class="text-sm text-gray-700">
-                    {% trans "The data controller for this service is the operator of the Mko Bazuna classifieds board. You can contact us over Telegram at" %}
+                    {% blocktrans with site_name=site_name %}The data controller for this service is the operator of the {{ site_name }} classifieds board. You can contact us over Telegram at{% endblocktrans %}
                     <a href="https://t.me/{{ bot_username }}"
                        class="text-blue-600 underline hover:text-blue-800"
                        target="_blank"

@@ -18,6 +18,7 @@ from django.utils import timezone
 from apps.users.models import User, LoginToken
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
+from apps.core.services.site_config import get_site_name_async
 from django.db import IntegrityError, connection, transaction
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ async def handle_login_deep_link(
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.answer(
-            "Welcome! To login, use a deep-link: /start login_<your_token>"
+            f"Welcome to {await get_site_name_async()}! To login, use a deep-link: /start login_<your_token>"
         )
         return
 

@@ -151,6 +151,7 @@ TEMPLATES = [
                 "apps.core.context_processors.plausible_host",
                 "apps.core.context_processors.language",
                 "apps.core.context_processors.header_context",
+                "apps.core.context_processors.site_config",
                 "apps.users.context_processors.consent_state",
             ],
         },

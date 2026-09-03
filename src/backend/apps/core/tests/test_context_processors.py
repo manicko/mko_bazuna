@@ -13,7 +13,7 @@ import pytest
 from django.http import HttpRequest
 from django.utils import translation
 
-from apps.core.context_processors import header_context, language
+from apps.core.context_processors import header_context, language, site_config
 
 pytestmark = [pytest.mark.unit]
 
@@ -163,3 +163,22 @@ def test_favorites_count_for_authenticated() -> None:
 
     assert result["context"]["favorites_count"] == 3
     user.favorites.count.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# site_config() context processor
+# ---------------------------------------------------------------------------
+
+
+def test_site_config_returns_dict_with_site_name_key() -> None:
+    """site_config() returns a dict with the ``site_name`` key."""
+    with patch("apps.core.services.site_config.get_site_name", return_value="Bazuna"):
+        result = site_config(HttpRequest())
+    assert result == {"site_name": "Bazuna"}
+
+
+def test_site_config_surfaces_configured_name() -> None:
+    """site_config() surfaces the name returned by get_site_name()."""
+    with patch("apps.core.services.site_config.get_site_name", return_value="MySite"):
+        result = site_config(HttpRequest())
+    assert result["site_name"] == "MySite"

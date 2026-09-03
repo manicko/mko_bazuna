@@ -9,7 +9,7 @@ Staff-only view showing moderation statistics, queue status, performance, and re
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{% trans "Moderation Analytics" %} - Mko Bazuna</title>
+        <title>{% trans "Moderation Analytics" %} - {{ site_name }}</title>
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         {% if consent_analytics and PLAUSIBLE_HOST %}
             <script defer

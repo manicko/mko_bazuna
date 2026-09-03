@@ -38,6 +38,7 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
 
 from apps.core.services.translation import translate_text
+from apps.core.services.site_config import get_site_name_async
 
 from apps.currencies.enums import CurrencyCode
 
@@ -120,7 +121,7 @@ async def cmd_post(message: types.Message, state: FSMContext) -> None:
     await state.update_data(ad_id=ad.id)
 
     await message.answer(
-        "Creating new ad. Please select a category.\n"
+        f"Welcome to {await get_site_name_async()}! Creating new ad. Please select a category.\n"
         "Send a keyword to search, or use /cancel to abort."
     )
 

@@ -1,12 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-24 03:14-0500\n"
+"POT-Creation-Date: 2026-09-03 02:00-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -16,6 +16,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "Free"
+msgstr "Besplatno"
 
 msgid "Published"
 msgstr "Objavljeno"
@@ -77,6 +80,22 @@ msgstr "30 dana"
 msgid "7 Days"
 msgstr "7 dana"
 
+msgid "Ad"
+msgstr "Oglas"
+
+msgid "Price not specified"
+msgstr "Cijena nije navedena"
+
+#, fuzzy
+#| msgid "Views"
+msgid "View ad"
+msgstr "Pregledi"
+
+#, fuzzy
+#| msgid "Delete this saved search?"
+msgid "🔕 Disable this search"
+msgstr "Obriši ovu sačuvanu pretragu?"
+
 msgid "Moderation Queue"
 msgstr "Red modulacije"
 
@@ -118,6 +137,9 @@ msgstr "Nema oglasa u redu modulacije."
 
 msgid "Moderate Ad"
 msgstr "Moderiraj oglas"
+
+msgid "Admin"
+msgstr "Admin"
 
 msgid "Back to moderation queue"
 msgstr "Natrag na red moderacije"
@@ -162,7 +184,9 @@ msgstr "Greška automoderacije"
 
 msgid ""
 "This ad failed automatic checks. You can approve, reject, or ban the user."
-msgstr "Ovaj oglas nije prošao automatske provere. Možete odobriti, odbiti ili zabraniti korisnika."
+msgstr ""
+"Ovaj oglas nije prošao automatske provere. Možete odobriti, odbiti ili "
+"zabraniti korisnika."
 
 #, python-format
 msgid "Reject Ad %(id)s"
@@ -229,7 +253,9 @@ msgstr "Vaši oglasi"
 msgid ""
 "Withdrawing consent permanently erases your Telegram ID, all ads, and "
 "prevents re-login. Are you sure?"
-msgstr "Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate ponovni priključak. Da li ste sigurni?"
+msgstr ""
+"Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate "
+"ponovni priključak. Da li ste sigurni?"
 
 msgid "Withdraw Data"
 msgstr "Povuci podatke"
@@ -330,7 +356,10 @@ msgid ""
 "Editing text (title/description) will send this ad for re-moderation and "
 "temporarily hide it from public view. Price/photo changes will be published "
 "immediately."
-msgstr "Uređivanjem teksta (naslova/opisa) ovaj oglas će biti poslat na ponovnu moderaciju i privremeno skriven iz javnog pregleda. Promene cijene/fotografija će se odmah objaviti."
+msgstr ""
+"Uređivanjem teksta (naslova/opisa) ovaj oglas će biti poslat na ponovnu "
+"moderaciju i privremeno skriven iz javnog pregleda. Promene cijene/"
+"fotografija će se odmah objaviti."
 
 msgid "Save Changes"
 msgstr "Sačuvaj promene"
@@ -350,8 +379,17 @@ msgstr "Sačuvaj pretragu"
 msgid "Did you mean:"
 msgstr "Da li ste mislili:"
 
+#, python-format
+msgid "Price: %(min)s–%(max)s"
+msgstr "Cijena: %(min)s–%(max)s"
+
 msgid "Purpose:"
 msgstr "Namjena:"
+
+#, fuzzy
+#| msgid "Location:"
+msgid "Condition:"
+msgstr "Lokacija:"
 
 msgid "Feature:"
 msgstr "Karakteristika:"
@@ -392,6 +430,9 @@ msgstr "Namjena"
 
 msgid "Any"
 msgstr "Bilo koje"
+
+msgid "Condition"
+msgstr "Stanje"
 
 msgid "Min price"
 msgstr "Min. cijena"
@@ -489,7 +530,8 @@ msgid "Unverified"
 msgstr "Neverifikovano"
 
 msgid "Score ranges from 0 to 100. Higher scores unlock trust badges."
-msgstr "Bodovi se kreću od 0 do 100. Viši bodovi otključavaju značke pouzdanja."
+msgstr ""
+"Bodovi se kreću od 0 do 100. Viši bodovi otključavaju značke pouzdanja."
 
 msgid "Total Views (30d)"
 msgstr "Ukupno pregleda (30 dana)"
@@ -505,9 +547,6 @@ msgstr "Dnevne metrike (posljednjih 30 dana)"
 
 msgid "Date"
 msgstr "Datum"
-
-msgid "Ad"
-msgstr "Oglas"
 
 msgid "No metrics data yet"
 msgstr "Još nema metrika"
@@ -530,7 +569,9 @@ msgstr "Kabinet"
 msgid ""
 "Manage your favorites, saved-search alerts, and search history from this "
 "cabinet."
-msgstr "Upravljajte omiljenim, obaveštenjima o sačuvanim pretragama i istorijom pretrage iz ovog kabineta."
+msgstr ""
+"Upravljajte omiljenim, obaveštenjima o sačuvanim pretragama i istorijom "
+"pretrage iz ovog kabineta."
 
 msgid "On"
 msgstr "Uključeno"
@@ -591,7 +632,9 @@ msgstr "Još nema sačuvanih pretraga"
 
 msgid ""
 "Use the \"Save search\" button on search results to get Telegram alerts."
-msgstr "Koristite dugme „Sačuvaj pretragu“ na rezultatima pretrage da biste dobili Telegram obaveštenja."
+msgstr ""
+"Koristite dugme „Sačuvaj pretragu“ na rezultatima pretrage da biste dobili "
+"Telegram obaveštenja."
 
 msgid "Search history"
 msgstr "Istorija pretrage"
@@ -611,7 +654,9 @@ msgstr "Postavke"
 msgid ""
 "Settings are not yet available. Language preference is managed on your "
 "profile."
-msgstr "Postavke još nisu dostupne. Preferencije jezika upravljaju se u vašem profilu."
+msgstr ""
+"Postavke još nisu dostupne. Preferencije jezika upravljaju se u vašem "
+"profilu."
 
 msgid "Expand"
 msgstr "Proširi"
@@ -641,28 +686,30 @@ msgid ""
 "We use cookies to keep the service working, to measure traffic and to "
 "remember your preferences. Please choose which non-essential cookies you "
 "allow."
-msgstr "Koristimo kolačiće da bismo održali servis u funkciji, mjerili prometa i pamtili vaše postavke. Odaberite koje neobavezne kolačiće dozvoljavate."
+msgstr ""
+"Koristimo kolačiće da bismo održali servis u funkciji, mjerili prometa i "
+"pamtili vaše postavke. Odaberite koje neobavezne kolačiće dozvoljavate."
+
+msgid "Essential"
+msgstr "Neophodni"
 
 msgid "session and CSRF protection cookies (always on)"
 msgstr "kolačići za sesiju i CSRF zaštitu (uvijek uključeni)"
 
+msgid "Analytics"
+msgstr "Analitika"
+
 msgid "anonymized traffic analytics via Plausible"
 msgstr "anonimizirana analitika prometa putem Plausible"
+
+msgid "Preferences"
+msgstr "Postavke"
 
 msgid "language and city selection"
 msgstr "izbor jezika i grada"
 
 msgid "Privacy details"
 msgstr "Detalji o privatnosti"
-
-msgid "Essential"
-msgstr "Neophodni"
-
-msgid "Analytics"
-msgstr "Analitika"
-
-msgid "Preferences"
-msgstr "Postavke"
 
 msgid "Accept"
 msgstr "Prihvati"
@@ -679,9 +726,6 @@ msgstr "Ukloni iz omiljenih"
 msgid "Add to favorites"
 msgstr "Dodaj u omiljene"
 
-msgid "Mko Bazuna"
-msgstr "Mko Bazuna"
-
 msgid "Privacy Policy"
 msgstr "Politika privatnosti"
 
@@ -690,9 +734,6 @@ msgstr "Postavke kolačića"
 
 msgid "Dashboard"
 msgstr "Ploča"
-
-msgid "Admin"
-msgstr "Admin"
 
 msgid "Logout"
 msgstr "Odjavi se"
@@ -736,20 +777,28 @@ msgstr "Prijavite se da sačuvate omiljene"
 msgid "Log in to save"
 msgstr "Prijava za čuvanje"
 
+#, python-format
 msgid ""
-"This policy explains how Mko Bazuna collects, processes, and protects your\n"
-"            data, including the cookies we set and the third parties we "
+"This policy explains how %(site_name)s collects, processes, and protects "
+"your\n"
+"                data, including the cookies we set and the third parties we "
 "share data with.\n"
-"            Last updated: August 2026."
-msgstr "Ova politika objašnjava kako Mko Bazuna prikuplja, obrađuje i štiti vaše podatke, uključujući kolačiće koje postavljamo i treće strane sa kojima delimo podatke. Posljednje ažuriranje: august 2026."
+"                Last updated: August 2026."
+msgstr ""
+"Ova politika objašnjava kako %(site_name)s prikuplja, obrađuje i štiti vaše "
+"podatke, uključujući kolačiće koje postavljamo i treće strane sa kojula "
+"delimo podatke. Posljednje ažuriranje: august 2026."
 
 msgid "1. Controller"
 msgstr "1. Operater"
 
+#, python-format
 msgid ""
-"The data controller for this service is the operator of the Mko Bazuna "
+"The data controller for this service is the operator of the %(site_name)s "
 "classifieds board. You can contact us over Telegram at"
-msgstr "Operativac podataka za ovu uslugu je operator Mko Bazuna oglasne table. Možete nas kontaktirati putem Telegrama na"
+msgstr ""
+"Operativac podataka za ovu uslugu je operator %(site_name)s oglasne table. "
+"Možete nas kontaktirati putem Telegrama na"
 
 msgid "2. Processing Purposes and Legal Bases"
 msgstr "2. Svrhe obrade i pravni oslovi"
@@ -802,7 +851,9 @@ msgstr "3. Deklaracija kolačića"
 msgid ""
 "The table below lists the cookies this site sets and whether they are "
 "essential (required for the service to function) or consent-gated."
-msgstr "Tabela ispod navodi kolačiće koje ovaj sajt postavlja i da li su neophodni (potrebni za funkcionisanje servisa) ili zahtevaju pristanak."
+msgstr ""
+"Tabela ispod navodi kolačiće koje ovaj sajt postavlja i da li su neophodni "
+"(potrebni za funkcionisanje servisa) ili zahtevaju pristanak."
 
 msgid "Cookie"
 msgstr "Kolačić"
@@ -857,7 +908,10 @@ msgid ""
 "authentication and seller-buyer contact relay via deep-links (<code>t.me/"
 "%(bot_username)s</code>). No ad content is shared; only the identifiers "
 "needed for the action."
-msgstr "autentifikacija i prenos kontakta prodavca-kupca putem deep-linkova (<code>t.me/%(bot_username)s</code>). Sadržaj oglasa se ne deli; samo identifikatori potrebni za akciju."
+msgstr ""
+"autentifikacija i prenos kontakta prodavca-kupca putem deep-linkova "
+"(<code>t.me/%(bot_username)s</code>). Sadržaj oglasa se ne deli; samo "
+"identifikatori potrebni za akciju."
 
 msgid "Google Translate"
 msgstr "Google Translate"
@@ -865,7 +919,9 @@ msgstr "Google Translate"
 msgid ""
 "best-effort, non-identifying language normalization of ad text. No personal "
 "data (telegram_id, username, IP) is transmitted."
-msgstr "naporan, neidentifikovajući jezički normalizationni tekst oglasa. Lični podaci (telegram_id, korisničko ime, IP) se ne prenose."
+msgstr ""
+"naporan, neidentifikovajući jezički normalizationni tekst oglasa. Lični "
+"podaci (telegram_id, korisničko ime, IP) se ne prenose."
 
 msgid "Plausible Analytics"
 msgstr "Plausible Analytics"
@@ -873,7 +929,9 @@ msgstr "Plausible Analytics"
 msgid ""
 "cookieless, privacy-friendly traffic analytics. Loaded only after you accept "
 "the analytics category."
-msgstr "analitika saobraćaja bez kolačića, prijateljska privatnosti. Učitava se samo nakon što prihvatite kategoriju analitike."
+msgstr ""
+"analitika saobraćaja bez kolačića, prijateljska privatnosti. Učitava se samo "
+"nakon što prihvatite kategoriju analitike."
 
 msgid "5. Your Rights"
 msgstr "5. Vaša prava"
@@ -912,16 +970,23 @@ msgid ""
 "                within <strong>30 days</strong> of withdrawal. Consent state "
 "is otherwise\n"
 "                retained for 12 months, after which you are re-prompted."
-msgstr "Kada povučete pristanak, vaš nalog i njegove oglase odmah će biti obrisani (soft-delete). Svi lični podaci će biti trajno izbrisani u roku od 30 dana od povlačenja. Stanje pristanka će inače biti zadržano 12 meseci, nakon čega ćete biti ponovo upitani."
+msgstr ""
+"Kada povučete pristanak, vaš nalog i njegove oglase odmah će biti obrisani "
+"(soft-delete). Svi lični podaci će biti trajno izbrisani u roku od 30 dana "
+"od povlačenja. Stanje pristanka će inače biti zadržano 12 meseci, nakon čega "
+"ćete biti ponovo upitani."
 
 msgid "7. Manage Your Consent"
 msgstr "7. Upravljajte vašim pristanakom"
 
 msgid "You can revisit and change your consent choices at any time. Use the"
-msgstr "Možete ponovo posetiti i promeniti vaše izbore pristanka u bilo koje vreme. Koristite"
+msgstr ""
+"Možete ponovo posetiti i promeniti vaše izbore pristanka u bilo koje vreme. "
+"Koristite"
 
 msgid "link to open the consent banner, or contact us on Telegram at"
-msgstr "link da otvorite banner pristanka, ili kontaktirajte nas putem Telegrama na"
+msgstr ""
+"link da otvorite banner pristanka, ili kontaktirajte nas putem Telegrama na"
 
 msgid "Save search alert"
 msgstr "Sačuvaj obaveštenje o pretrazi"
@@ -933,10 +998,12 @@ msgid "Search saved"
 msgstr "Pretraga sačuvana"
 
 msgid "You'll get a Telegram alert when new ads match this search."
-msgstr "Dobivaćete Telegram obaveštenje kada nove oglase odgovaraju ovoj pretrazi."
+msgstr ""
+"Dobivaćete Telegram obaveštenje kada nove oglase odgovaraju ovoj pretrazi."
 
-msgid "Login to Mko Bazuna"
-msgstr "Prijava na Mko Bazuna"
+#, python-format
+msgid "Login to %(site_name)s"
+msgstr "Prijava na %(site_name)s"
 
 msgid "Tap the button below to open Telegram and authenticate."
 msgstr "Dodirnite dugme ispod da biste otvorili Telegram i autentifikovali."
@@ -965,9 +1032,8 @@ msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
 msgid "Error checking login status."
 msgstr "Greška pri proveri statusa prijave."
 
-msgid "Free"
-msgstr "Besplatno"
+#~ msgid "Mko Bazuna"
+#~ msgstr "Mko Bazuna"
 
-#, python-format
-msgid "Price: %(min)s–%(max)s"
-msgstr "Cijena: %(min)s–%(max)s"
+#~ msgid "Login to Mko Bazuna"
+#~ msgstr "Prijava na Mko Bazuna"

@@ -85,3 +85,10 @@ def header_context(request) -> dict:
             }
         ),
     }
+
+
+def site_config(request) -> dict:
+    """Inject the admin-configured site name into every template context."""
+    from apps.core.services.site_config import get_site_name
+
+    return {"site_name": get_site_name()}

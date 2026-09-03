@@ -8,7 +8,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{% trans "Moderate Ad" %} {{ ad.id }} - Mko Bazuna Admin</title>
+        <title>{% trans "Moderate Ad" %} {{ ad.id }} - {{ site_name }} {% trans "Admin" %}</title>
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         {% if consent_analytics and PLAUSIBLE_HOST %}
             <script defer
@@ -20,7 +20,7 @@
         <header class="bg-white shadow-sm border-b">
             <div class="container mx-auto px-4 py-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold text-gray-800">
-                    <a href="/admin/">Mko Bazuna Admin</a>
+                    <a href="/admin/">{{ site_name }} {% trans "Admin" %}</a>
                 </h1>
                 {% include "components/language_switcher.html" %}
             </div>

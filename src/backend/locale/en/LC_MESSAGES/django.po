@@ -1,12 +1,12 @@
 # English translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-24 03:14-0500\n"
+"POT-Creation-Date: 2026-09-03 02:00-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
@@ -15,6 +15,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Free"
+msgstr ""
 
 msgid "Published"
 msgstr ""
@@ -76,6 +79,18 @@ msgstr ""
 msgid "7 Days"
 msgstr ""
 
+msgid "Ad"
+msgstr ""
+
+msgid "Price not specified"
+msgstr ""
+
+msgid "View ad"
+msgstr ""
+
+msgid "🔕 Disable this search"
+msgstr ""
+
 msgid "Moderation Queue"
 msgstr ""
 
@@ -116,6 +131,9 @@ msgid "No ads in the moderation queue."
 msgstr ""
 
 msgid "Moderate Ad"
+msgstr ""
+
+msgid "Admin"
 msgstr ""
 
 msgid "Back to moderation queue"
@@ -347,7 +365,14 @@ msgstr ""
 msgid "Did you mean:"
 msgstr ""
 
+#, python-format
+msgid "Price: %(min)s–%(max)s"
+msgstr ""
+
 msgid "Purpose:"
+msgstr ""
+
+msgid "Condition:"
 msgstr ""
 
 msgid "Feature:"
@@ -388,6 +413,9 @@ msgid "Listing purpose"
 msgstr ""
 
 msgid "Any"
+msgstr ""
+
+msgid "Condition"
 msgstr ""
 
 msgid "Min price"
@@ -501,9 +529,6 @@ msgid "Daily Metrics (Last 30 Days)"
 msgstr ""
 
 msgid "Date"
-msgstr ""
-
-msgid "Ad"
 msgstr ""
 
 msgid "No metrics data yet"
@@ -640,25 +665,25 @@ msgid ""
 "allow."
 msgstr ""
 
+msgid "Essential"
+msgstr ""
+
 msgid "session and CSRF protection cookies (always on)"
 msgstr ""
 
+msgid "Analytics"
+msgstr ""
+
 msgid "anonymized traffic analytics via Plausible"
+msgstr ""
+
+msgid "Preferences"
 msgstr ""
 
 msgid "language and city selection"
 msgstr ""
 
 msgid "Privacy details"
-msgstr ""
-
-msgid "Essential"
-msgstr ""
-
-msgid "Analytics"
-msgstr ""
-
-msgid "Preferences"
 msgstr ""
 
 msgid "Accept"
@@ -676,9 +701,6 @@ msgstr ""
 msgid "Add to favorites"
 msgstr ""
 
-msgid "Mko Bazuna"
-msgstr ""
-
 msgid "Privacy Policy"
 msgstr ""
 
@@ -686,9 +708,6 @@ msgid "Cookie settings"
 msgstr ""
 
 msgid "Dashboard"
-msgstr ""
-
-msgid "Admin"
 msgstr ""
 
 msgid "Logout"
@@ -733,18 +752,21 @@ msgstr ""
 msgid "Log in to save"
 msgstr ""
 
+#, python-format
 msgid ""
-"This policy explains how Mko Bazuna collects, processes, and protects your\n"
-"            data, including the cookies we set and the third parties we "
+"This policy explains how %(site_name)s collects, processes, and protects "
+"your\n"
+"                data, including the cookies we set and the third parties we "
 "share data with.\n"
-"            Last updated: August 2026."
+"                Last updated: August 2026."
 msgstr ""
 
 msgid "1. Controller"
 msgstr ""
 
+#, python-format
 msgid ""
-"The data controller for this service is the operator of the Mko Bazuna "
+"The data controller for this service is the operator of the %(site_name)s "
 "classifieds board. You can contact us over Telegram at"
 msgstr ""
 
@@ -884,8 +906,7 @@ msgstr ""
 msgid "Rectify inaccurate personal data."
 msgstr ""
 
-msgid ""
-"Erase your personal data (\"right to be forgotten\")."
+msgid "Erase your personal data (\"right to be forgotten\")."
 msgstr ""
 
 msgid "Restrict or object to processing."
@@ -933,7 +954,8 @@ msgstr ""
 msgid "You'll get a Telegram alert when new ads match this search."
 msgstr ""
 
-msgid "Login to Mko Bazuna"
+#, python-format
+msgid "Login to %(site_name)s"
 msgstr ""
 
 msgid "Tap the button below to open Telegram and authenticate."
@@ -961,11 +983,4 @@ msgid "This login link is invalid, expired, or already used."
 msgstr ""
 
 msgid "Error checking login status."
-msgstr ""
-
-msgid "Free"
-msgstr ""
-
-#, python-format
-msgid "Price: %(min)s–%(max)s"
 msgstr ""

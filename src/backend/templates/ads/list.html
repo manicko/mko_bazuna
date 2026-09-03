@@ -7,7 +7,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{% if query %}{% trans "Search" %}: {{ query }}{% elif current_category %}{% trans "Category" %}{% else %}{% trans "Ads" %}{% endif %} - Mko Bazuna</title>
+        <title>{% if query %}{% trans "Search" %}: {{ query }}{% elif current_category %}{% trans "Category" %}{% else %}{% trans "Ads" %}{% endif %} - {{ site_name }}</title>
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         {% if consent_analytics and PLAUSIBLE_HOST %}
             <script defer

@@ -51,3 +51,48 @@ def invalidate_criteria_cache(key: str = CRITERIA_CACHE_KEY) -> None:
         key: Cache key to invalidate (defaults to moderation_criteria:v1)
     """
     cache.delete(key)
+
+
+SITE_CONFIG_CACHE_KEY: Final[str] = "site_config:v1"
+SITE_CONFIG_CACHE_TTL: Final[int] = 3600  # 1 hour
+
+
+def get_cached_site_config(key: str = SITE_CONFIG_CACHE_KEY) -> str | None:
+    """
+    Get cached site name.
+
+    Args:
+        key: Cache key (defaults to site_config:v1)
+
+    Returns:
+        Site name string or None if not cached
+    """
+    return cache.get(key)
+
+
+def set_cached_site_config(
+    value: str,
+    key: str = SITE_CONFIG_CACHE_KEY,
+    ttl: int = SITE_CONFIG_CACHE_TTL,
+) -> None:
+    """
+    Set cached site name.
+
+    Args:
+        value: Site name to cache
+        key: Cache key (defaults to site_config:v1)
+        ttl: Time-to-live in seconds (defaults to 3600)
+    """
+    cache.set(key, value, ttl)
+
+
+def invalidate_site_config(key: str = SITE_CONFIG_CACHE_KEY) -> None:
+    """
+    Invalidate the cached site name.
+
+    Called when admin updates site config to ensure fresh value on next access.
+
+    Args:
+        key: Cache key to invalidate (defaults to site_config:v1)
+    """
+    cache.delete(key)
