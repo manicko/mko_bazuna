@@ -126,11 +126,12 @@ class ImageGenerator(BaseGenerator):
             key for keys in category_key_map.values() for key in keys
         ]
 
+        seed_dir = self._ensure_seed_dir()
+
         if not self.all_image_keys:
             logger.warning("No photos in manifest, using empty image pool")
             return []
 
-        seed_dir = self._ensure_seed_dir()
         thumbnail_service = ThumbnailService(storage_dir=seed_dir)
 
         # Phase 2: Assign images to ads, preprocessing each selected photo
