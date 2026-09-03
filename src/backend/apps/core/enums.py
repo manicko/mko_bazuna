@@ -39,6 +39,7 @@ class AdvisoryLockId(IntEnum):
     PURGE_DELETED_ADS = 11
     RECOMPUTE_NORMALIZED_PRICES = 12
     SEED = 110
+    TEST_SCHEMA_SETUP = 111
 
 
 class AdStatus(StrEnum):

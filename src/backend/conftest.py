@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus
+from apps.core.enums import AdSource, AdStatus, AdvisoryLockId
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
@@ -48,18 +48,35 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
     Idempotent: safe to run even when migrations are active (after squash
     without MIGRATION_MODULES). migrate --run-syncdb is also idempotent and
     ensures tables for unmigrated apps (e.g. currencies) exist even on --reuse-db.
+
+    Under pytest-xdist (-n auto), each worker runs this session-scoped fixture
+    independently against the same test_mko_bazuna DB. A session-scoped
+    PostgreSQL advisory lock (``AdvisoryLockId.TEST_SCHEMA_SETUP``) serializes
+    the DDL so concurrent CREATE OR REPLACE FUNCTION and DROP/CREATE TRIGGER
+    do not clash on system catalogs ("tuple concurrently updated"). The
+    management commands are idempotent, so sequential re-runs by each worker
+    under the lock are safe and fast.
     """
+    from apps.core.utils.advisory_lock import advisory_lock
     from django.core.management import call_command
 
     with django_db_blocker.unblock():
-        # Ensure tables for unmigrated apps exist. With MIGRATION_MODULES=
-        # DisableMigrations (test settings), app tables are only created via
-        # syncdb during django_db_setup. However, if the test DB was reused
-        # (--reuse-db) with a stale state, the currencies table may be absent.
-        # migrate --run-syncdb is idempotent and recreates any missing tables.
-        call_command("migrate", "--run-syncdb")
-        call_command("load_exchange_rates")
-        call_command("setup_search_triggers")
+        # Serialize DDL across xdist workers: all 16 workers run this session-
+        # scoped autouse fixture concurrently against the shared test_mko_bazuna
+        # DB. Without the lock, concurrent CREATE OR REPLACE FUNCTION and
+        # DROP/CREATE TRIGGER cause "tuple concurrently updated" on PostgreSQL
+        # system catalogs. pg_advisory_lock provides server-level mutual
+        # exclusion; the management commands are idempotent, so sequential
+        # re-runs by each worker are safe.
+        with advisory_lock(AdvisoryLockId.TEST_SCHEMA_SETUP, session=True):
+            # Ensure tables for unmigrated apps exist. With MIGRATION_MODULES=
+            # DisableMigrations (test settings), app tables are only created via
+            # syncdb during django_db_setup. However, if the test DB was reused
+            # (--reuse-db) with a stale state, the currencies table may be absent.
+            # migrate --run-syncdb is idempotent and recreates any missing tables.
+            call_command("migrate", "--run-syncdb")
+            call_command("load_exchange_rates")
+            call_command("setup_search_triggers")
 
 
 # ---------------------------------------------------------------------------
