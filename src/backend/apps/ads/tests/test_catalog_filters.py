@@ -740,6 +740,31 @@ class TestFilterUrlReset:
         assert 'value="{{ min_price }}"' not in content
         assert 'value="{{ max_price }}"' not in content
 
+    def test_price_inputs_step_uses_price_step_enum(self) -> None:
+        """Price range inputs render ``step="{{ price_step.value }}"`` (currently 1), not a hardcoded 0.01."""
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/ads/partials/filter_form.html"
+        )
+        content = path.read_text(encoding="utf-8")
+        assert 'step="{{ price_step.value }}"' in content
+        assert 'step="0.01"' not in content
+
+    def test_price_inputs_step_renders_as_one(
+        self, seller, category, city
+    ) -> None:
+        """The price step context processor resolves to ``PriceStep.DEFAULT = '1'`` in rendered HTML."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'step="1"' in content
+        assert 'step="0.01"' not in content
+
     # ------------------------------------------------------------------ #
     # Integration tests — HTMX rendered output
     # ------------------------------------------------------------------ #

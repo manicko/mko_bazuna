@@ -153,6 +153,7 @@ TEMPLATES = [
                 "apps.core.context_processors.language",
                 "apps.core.context_processors.header_context",
                 "apps.core.context_processors.site_config",
+                "apps.core.context_processors.price_step",
                 "apps.users.context_processors.consent_state",
             ],
         },

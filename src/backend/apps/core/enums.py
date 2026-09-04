@@ -238,6 +238,19 @@ class LanguageLocale(StrEnum):
         }[self.value]
 
 
+class PriceStep(StrEnum):
+    """HTML ``step`` attribute for price filter inputs (catalog/search).
+
+    Controls the spinner increment on the ``min_price`` / ``max_price`` inputs
+    in ``filter_form.html``. The filter operates on ``price_normalized_eur``
+    (EUR-equivalent), so a step of 1 means 1 EUR unit per click.
+
+    To change the increment in the future, edit the value below.
+    """
+
+    DEFAULT = "1"
+
+
 class ConsentChoice(StrEnum):
     """User consent decision (decision F/K, zone R3)."""
 
@@ -269,6 +282,7 @@ __all__ = [
     "ThumbnailSizeStrEnum",
     "SearchSuggestionSource",
     "LanguageLocale",
+    "PriceStep",
     "TimeRange",
     "ConsentChoice",
     "CookieCategory",

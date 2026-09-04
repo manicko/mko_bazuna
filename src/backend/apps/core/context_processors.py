@@ -5,6 +5,7 @@ Makes configuration values available to all templates.
 """
 
 import json
+from enum import StrEnum
 
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -111,3 +112,15 @@ def site_config(request) -> dict:
     from apps.core.services.site_config import get_site_name
 
     return {"site_name": get_site_name()}
+
+
+def price_step(request) -> dict[str, StrEnum]:
+    """Expose the HTML price-input step to all templates.
+
+    Returns the ``PriceStep.DEFAULT`` enum member so templates can
+    render ``step="{{ price_step.value }}"`` instead of hardcoding
+    a numeric string.
+    """
+    from apps.core.enums import PriceStep
+
+    return {"price_step": PriceStep.DEFAULT}

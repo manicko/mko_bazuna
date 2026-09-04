@@ -347,8 +347,15 @@ the URL always overrides the default.
 
 ## Price Range Filter
 
-Price filtering with dual input fields. Inputs use `min="0"` (`step="0.01"`), so
-zero is a valid bound — a range of `0–100` includes Free ads.
+Price filtering with dual input fields for `min_price` / `max_price`. Inputs use
+`min="0"` with `step="{{ price_step.value }}"` (resolved from the `PriceStep` enum —
+currently `PriceStep.DEFAULT = "1"`, i.e. 1 EUR unit per spinner click, since the
+filter operates on `price_normalized_eur`). Zero is a valid bound — a range of `0–100`
+includes Free ads. The step is a client-side UI concern only (no server-side effect;
+parsing uses `int()` / `Decimal()` which accept any numeric string — see R-PS-06).
+Enum source: `apps/core/enums.py` (`PriceStep`); exposed to every template via the
+`price_step` context processor (`apps/core/context_processors.py`, registered in
+`config/settings/base.py`).
 
 ### Input Pattern
 
@@ -357,9 +364,11 @@ zero is a valid bound — a range of `0–100` includes Free ads.
     <label class="block text-sm font-medium mb-2">Price Range (EUR)</label>
     <div class="flex gap-2">
         <input type="number" name="price_min" placeholder="Min" min="0"
+               step="{{ price_step.value }}"
                value="{{ request.GET.price_min }}"
                class="w-1/2 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
         <input type="number" name="price_max" placeholder="Max" min="0"
+               step="{{ price_step.value }}"
                value="{{ request.GET.price_max }}"
                class="w-1/2 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
     </div>
