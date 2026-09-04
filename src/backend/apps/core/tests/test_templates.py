@@ -129,3 +129,18 @@ class TestQueryReplace:
         result = _render_query_replace("q=phone&page=2")
         assert "q=phone" in result
         assert "page=2" in result
+
+    def test_preserves_multi_value_params(self) -> None:
+        """Multi-value params (e.g. ``features=delivery&features=negotiable``)
+        are all preserved when overriding a *different* parameter.
+
+        ``QueryDict.copy()`` + ``__setitem__`` only replaces the target key;
+        the remaining multi-valued keys survive through ``urlencode()``.
+        """
+        result = _render_query_replace(
+            "features=delivery&features=negotiable&q=test", page="2"
+        )
+        assert "features=delivery" in result
+        assert "features=negotiable" in result
+        assert "q=test" in result
+        assert "page=2" in result

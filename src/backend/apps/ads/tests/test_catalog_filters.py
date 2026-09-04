@@ -26,6 +26,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.core.enums import AdSort, AdStatus
 from apps.lookups.models import LookupGroup, LookupItem
+from apps.locations.models import City
 
 from conftest import create_test_ad, create_test_ads_bulk
 
@@ -650,41 +651,72 @@ class TestFilterUrlReset:
             Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         )
         content = path.read_text(encoding="utf-8")
-        assert content.count("hx-get=") == 9
-        assert content.count('hx-push-url="true"') == 9
+        # 10 links: price chip, purpose chip, condition chip, feature chip,
+        # clear-all, and 5 pagination links (««, «, page, », »»).
+        assert content.count("hx-get=") == 10
+        assert content.count('hx-push-url="true"') == 10
 
     def test_lang_param_in_all_htmx_urls(self) -> None:
-        """Every ``hx-get`` URL in ``ad_list.html`` preserves ``LANGUAGE_CODE`` as ``&lang=``."""
+        """Every ``hx-get`` URL in ``ad_list.html`` preserves ``LANGUAGE_CODE``."""
         path = (
             Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         )
         content = path.read_text(encoding="utf-8")
-        # 9 links × 2 attrs (href + hx-get) = 18 occurrences
-        assert content.count("LANGUAGE_CODE") >= 18
+        hx_get_values = re.findall(r'hx-get="([^"]*)"', content)
+        assert len(hx_get_values) > 0
+        missing = [v for v in hx_get_values if "LANGUAGE_CODE" not in v]
+        assert not missing, (
+            f"{len(missing)} hx-get values are missing LANGUAGE_CODE preservation"
+        )
 
-    def test_clear_all_filters_has_push_url(self) -> None:
-        """The "Clear all filters" link has ``hx-push-url="true"`` and resets
-        all query params (R-FR-01), so ``q`` and ``sort`` must be absent from
-        its ``hx-get`` reset URL."""
+    def test_clear_all_filters_static_guard(self) -> None:
+        """The "Clear all filters" link carries ``hx-push-url="true"`` and is
+        nested inside the chips-block ``{% if %}`` conditional so it only
+        renders when at least one filter chip is active (R-FR-01)."""
         path = (
             Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
         )
         content = path.read_text(encoding="utf-8")
-        # The clear-all link is the only hx-get whose value is
-        # "?page=1{% if LANGUAGE_CODE %}&lang=..." — every other link starts
-        # with "?page=1{% if query %}" or "?page={{ ... }}".
-        match = re.search(
-            r'hx-get="(\?page=1{% if LANGUAGE_CODE %}[^"]*)"',
-            content,
+        lines = content.splitlines()
+
+        # Locate the chips-block {% if %} — the gate wrapping all chips + clear-all.
+        chips_if_idx = None
+        for i, line in enumerate(lines):
+            if "current_listing_purpose or current_features" in line:
+                chips_if_idx = i
+                break
+        assert chips_if_idx is not None, "chips-block {% if %} not found"
+
+        # Locate the clear-all link via its translatable text marker.
+        # Search for the template tag ``{% trans "Clear all filters" %}`` to
+        # avoid matching the prose mention in the header comment (line 7).
+        clear_idx = None
+        for i, line in enumerate(lines):
+            if '{% trans "Clear all filters" %}' in line:
+                clear_idx = i
+                break
+        assert clear_idx is not None, "Clear all filters trans tag not found"
+        assert clear_idx > chips_if_idx, "clear-all appears before chips-block if"
+
+        # The <a> tag and its hx-push-url="true" must be on the lines preceding
+        # the translatable text.
+        link_block = "\n".join(lines[clear_idx - 6 : clear_idx + 1])
+        assert "Clear all filters" in content
+        assert 'hx-push-url="true"' in link_block
+
+        # Nesting-depth tracker: every {% if %}/{% for %} between the chips-block
+        # opening tag and the clear-all link must be balanced, leaving depth > 0
+        # so the clear-all stays inside the chips-block conditional.
+        depth = 1  # already inside the chips-block {% if %}
+        for i in range(chips_if_idx + 1, clear_idx):
+            line = lines[i]
+            depth += line.count("{% if ")
+            depth += line.count("{% for ")
+            depth -= line.count("{% endif %}")
+            depth -= line.count("{% endfor %}")
+        assert depth > 0, (
+            f"clear-all link is NOT inside the chips-block if (depth={depth})"
         )
-        assert match is not None, "Clear all filters hx-get link not found in ad_list.html"
-        reset_url = match.group(1)
-        assert 'hx-push-url="true"' in content
-        # R-FR-01: the reset URL must drop q and sort (clears ALL query params).
-        assert "&q=" not in reset_url
-        assert "q=" not in reset_url
-        assert "&sort=" not in reset_url
-        assert "sort=" not in reset_url
 
     def test_sort_dropdown_is_not_gated_on_query(self) -> None:
         """The sort ``<select>`` must always render, even on search results (PO-2)."""
@@ -781,6 +813,151 @@ class TestFilterUrlReset:
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         assert "&lang=en" in content
+
+    # ------------------------------------------------------------------ #
+    # Clear-all URL behavioral assertions (R-FR-01)
+    # ------------------------------------------------------------------ #
+
+    def _extract_clear_all_hx_get(self, content: str) -> str:
+        """Extract the ``hx-get`` URL of the "Clear all filters" link.
+
+        Locates the ``Clear all filters`` text in *content*, scans everything
+        before it for ``hx-get="..."`` values, and returns the last one — which
+        is the clear-all link's own ``hx-get`` attribute.
+        """
+        clear_idx = content.index("Clear all filters")
+        hx_gets = re.findall(r'hx-get="([^"]*)"', content[:clear_idx])
+        assert hx_gets, "no hx-get found before 'Clear all filters'"
+        return hx_gets[-1]
+
+    def test_clear_all_preserves_search_query(self, seller, category, city) -> None:
+        """On ``/search/?q=test`` the clear-all link preserves the search term.
+
+        Regression guard for T4: the clear-all URL must keep ``q`` so buyers
+        do not lose their search intent when clearing other filters.
+        """
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/search/?q=test&min_price=100",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Clear all filters" in content
+        clear_all_url = self._extract_clear_all_hx_get(content)
+        assert "q=test" in clear_all_url
+
+    def test_clear_all_omits_query_on_listings(self, seller, category, city) -> None:
+        """On ``/?min_price=100`` (listings) the clear-all URL has no ``q=`` param.
+
+        Regression guard for T4: ``query`` is ``None`` on the listings page, so
+        the ``{% if query %}&q=...`` branch is suppressed and the clear-all URL
+        must not contain ``q=``.
+        """
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/?min_price=100",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Clear all filters" in content
+        clear_all_url = self._extract_clear_all_hx_get(content)
+        assert "q=" not in clear_all_url
+
+    # ------------------------------------------------------------------ #
+    # Price chip + clear-all visibility (T3, R-FR-01)
+    # ------------------------------------------------------------------ #
+
+    def test_price_chip_renders_as_removable_chip(self, seller, category, city) -> None:
+        """The price filter renders as a chip with a removal ``&times;`` link
+        that drops ``min_price``/``max_price`` from the URL (T3)."""
+        create_test_ad(seller, category, city, price=300, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/?min_price=100&max_price=500",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Price:" in content
+        assert "&times;" in content
+        # The price chip removal link drops min_price/max_price.
+        price_idx = content.index("Price:")
+        price_section = content[price_idx:]
+        price_hx_gets = re.findall(r'hx-get="([^"]*)"', price_section)
+        assert price_hx_gets, "price chip removal link not found"
+        price_chip_url = price_hx_gets[0]
+        assert "min_price" not in price_chip_url
+        assert "max_price" not in price_chip_url
+
+    def test_clear_all_visible_when_only_price_filter_active(
+        self, seller, category, city
+    ) -> None:
+        """With only a price filter active the chips-block renders and the
+        clear-all link is visible (R-FR-01)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/?min_price=100&max_price=500",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Clear all filters" in content
+        assert "Price:" in content  # price chip is visible
+
+    def test_clear_all_hidden_when_no_filters_active(
+        self, seller, category, city
+    ) -> None:
+        """With no filters active the chips-block does not render, so neither
+        the clear-all link nor any filter chips are visible (R-FR-01)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/", headers={"HX-Request": "true", "Accept-Language": "en"}
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Clear all filters" not in content
+        # &times; only appears inside chip-removal <a> tags, so its absence
+        # proves no filter chips are rendered.
+        assert "&times;" not in content
+
+    # ------------------------------------------------------------------ #
+    # City + category coexistence (view-level, T7)
+    # ------------------------------------------------------------------ #
+
+    def test_city_category_coexistence(self, seller, category, city) -> None:
+        """A path-based category filter and a query-based ``?city=`` filter
+        coexist in the same request: the category narrows the subtree while
+        ``?city=`` narrows the city, and both appear in the render context."""
+        city2 = City.objects.create(
+            country_code="ME",
+            name="Другиград",
+            region="Central",
+            slug="drugigrad",
+        )
+        ad1 = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, title="Ad 1"
+        )
+        ad2 = create_test_ad(
+            seller, category, city2, status=AdStatus.PUBLISHED, title="Ad 2"
+        )
+
+        client = Client()
+        response = client.get(
+            f"/category/{category.slug}/?city={city.slug}",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        assert response.context["current_category"] == category.slug
+        assert response.context["current_city"] == city.slug
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad1.id in result_ids
+        assert ad2.id not in result_ids
 
     # ------------------------------------------------------------------ #
     # Behavioral test — no parameter accumulation

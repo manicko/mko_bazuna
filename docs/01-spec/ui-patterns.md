@@ -66,7 +66,7 @@ Ad cards follow a consistent visual hierarchy optimized for quick scanning:
         {% endif %}
         <div class="p-4">
             <h2 class="font-semibold text-lg mb-2 line-clamp-2">{{ ad.title }}</h2>
-            {% if ad.price_amount %}
+            {% if ad.price_amount is not none %}
                 <p class="text-blue-600 font-bold text-xl mb-2">{{ ad|format_price }}</p>
             {% endif %}
             <div class="flex justify-between items-center text-xs text-gray-500">
@@ -95,9 +95,9 @@ Price is the primary decision factor in classifieds. Visual treatment:
 
 ### Notes
 
-- Price shown only when set
+- Price shown only when set: `{% if ad.price_amount is not none %}`. A zero amount renders as the i18n label "Free" (via `format_price` → `format_price_value` → `gettext("Free")`)
 - Currency: seller's original currency (EUR / RSD / BAM), rendered by the shared
-  `format_price` filter as `"{amount} {currency}"` (e.g. "500 BAM"); EUR is the default
+  `format_price` filter as `"{amount} {currency}"` (e.g. "500 BAM"); EUR is the default. Zero (`0`) renders as the localized "Free" label, not "0 EUR"
 - Always uses `text-blue-600` class for prominence
 - Position: Second visual element after title
 
@@ -286,8 +286,9 @@ badge; `None` for anonymous).
 An Avito-style header hosting the place-an-ad CTA, an "All Categories"
 accordion dropdown, a search bar with a grouped HTMX autocomplete,
 breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
-§Auth Entry in Catalog Header below). HTMX 1.9.12 is loaded in the `<head>` of `list.html` and
-`detail.html` (the autocomplete relies on `htmx:afterRequest` events).
+§Auth Entry in Catalog Header below). HTMX 2.0.10 is loaded in the `<head>` of `list.html` and
+`detail.html` via jsDelivr CDN with SRI (`integrity` + `crossorigin="anonymous"`).
+The autocomplete relies on `htmx:afterRequest` events.
 
 ```html
 <header class="bg-white shadow-sm border-b">
@@ -392,7 +393,9 @@ breadcrumbs, and an **auth/cabinet entry** in the top-right corner (see
   cities from the `cities` context var; "Вся страна" clears the preference
   (`POST search:preferred_city` with `action=clear`, or an empty `slug`). Selecting a city persists
   it (`POST search:preferred_city` with the slug) and navigates to
-  `/city/<slug>/` (URL path then takes precedence over the stored preference).
+  `?city=<slug>` on the current URL (preserving the category path and other
+  active params). If the current path is `/city/<old>/`, the path segment is
+  replaced instead. URL path city takes precedence over the query-param city.
   For authenticated users the city is also written to `User.preferred_city`
   on login reconciliation. The cookie is consent-gated (`consent_preferences`
   required) — see [search-patterns.md](search-patterns.md#preferred-city-default--precedence).

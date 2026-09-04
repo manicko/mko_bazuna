@@ -446,6 +446,7 @@ def listings(
 
     context = {
         "page_obj": page_obj,
+        "query": None,
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,

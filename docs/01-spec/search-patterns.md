@@ -160,7 +160,7 @@ name), sourced from `header_context`.
 Related user stories: US-B3, US-B7. Source: `apps/core/middleware/preferred_city.py`.
 
 Buyers can sort search results by date (newest/oldest first) or price (low/high). Price sorts
-operate on the EUR-normalized `price_normalized_eur` column, placing ads with no price (`NULL`)
+operate on the EUR-normalized `price_normalized_eur` column, placing Free ads (price_amount = 0)
 last; when a `q` full-text query is active, results rank by FTS relevance then `-published_at`, `-id`.
 
 ### Implementation
@@ -198,8 +198,9 @@ class AdSort(StrEnum):
 
 > **Price units:** price inputs and price sorts are EUR-equivalent — they operate on
 > `price_normalized_eur`. An ad's *displayed* price still shows the seller's **original**
-> amount + currency via the `format_price` template filter. Price-range chips render the
-> `EUR` label. See [`filter-ui.md`](filter-ui.md) and [`db-schema.md`](../02-database/db-schema.md).
+> amount + currency via the `format_price` template filter. A zero amount (`0`) renders as the
+> localized "Free" label (not "0 EUR"). Free ads (price_amount = 0) sort last in price-ordered
+> results. Price-range chips render the `EUR` label.
 
 Related user stories: US-B2
 
@@ -313,7 +314,9 @@ The inline JS in `header_catalog.html` renders suggestions grouped by section
 a suggestion:
 
 - **City** (`type=city`): POSTs to `search:preferred_city` to persist the city,
-  then navigates to `/city/<slug>/`.
+  then sets `?city=<slug>` on the current URL (preserving the category path and
+  other active params). If the current path is `/city/<old>/`, the path segment is
+  replaced instead.
 - **Category** (`type=category`): navigates to `/category/<slug>/`.
 - **Text** (popular/history): populates the search input and submits the form
   to `search:search`.

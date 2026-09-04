@@ -181,9 +181,10 @@ where category is only a param the header form never sets.
 | Popular | Frequently searched terms | Only appears once a term reaches `hit_count >= 10` — so on a low-traffic site the Popular section is empty by design. |
 
 The merged list is deduplicated by text and capped at 10. Excess requests are throttled
-(30 per minute per IP — the dropdown simply pauses). Clicking a city navigates to `/city/<slug>/`;
-a category navigates to `/category/<slug>/`; a text suggestion fills the input and submits
-the search.
+(30 per minute per IP — the dropdown simply pauses). Clicking a city sets
+`?city=<slug>` on the current URL (preserving the category path); if already on
+`/city/<old-slug>/`, the path segment is replaced. A category navigates to
+`/category/<slug>/`; a text suggestion fills the input and submits the search.
 
 ### City handling as a buyer sees it
 

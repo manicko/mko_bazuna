@@ -347,7 +347,8 @@ the URL always overrides the default.
 
 ## Price Range Filter
 
-Price filtering with dual input fields.
+Price filtering with dual input fields. Inputs use `min="0"` (`step="0.01"`), so
+zero is a valid bound — a range of `0–100` includes Free ads.
 
 ### Input Pattern
 
@@ -365,26 +366,76 @@ Price filtering with dual input fields.
 </div>
 ```
 
+### Price-Range Summary (Active Filters)
+
+When a price range is active, a summary chip appears in the active-filters area,
+following the same `inline-flex … rounded-full` pattern as the purpose, condition,
+and features chips:
+
+```html
+{% if active_price_min or active_price_max %}
+<span class="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+    {% blocktrans with min=active_price_min max=active_price_max %}Price: {{ min }}–{{ max }}{% endblocktrans %}
+    <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}
+        {% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}
+        {% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}
+        {% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% if current_condition %}&condition={{ current_condition }}{% endif %}
+        {% for fslug in current_features %}&features={{ fslug }}{% endfor %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+       hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}
+              {% if current_category %}&category={{ current_category }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}
+              {% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% if current_condition %}&condition={{ current_condition }}{% endif %}
+              {% for fslug in current_features %}&features={{ fslug }}{% endfor %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+       hx-push-url="true" hx-target="#ad-list" hx-swap="innerHTML"
+       class="ml-2 text-orange-600 hover:text-orange-800">&times;</a>
+</span>
+{% endif %}
+```
+
+The removal link drops **only** `min_price` and `max_price`, preserving all other
+active filters (q, category, city, sort, purpose, condition, features).
+
+The `active_price_min` / `active_price_max` context variables are parsed `Decimal` values (or `None`)
+exposed by the listings/search views, aliasing the raw `min_price` / `max_price` query strings.
+The raw `min_price` / `max_price` strings are used in URL reconstruction for other chip removals.
+
 Related user stories: US-B3
 
 ## Filter Reset/Clear All
 
-Option to reset all active filters at once.
+Option to reset all active filters at once on the catalog listing page.
 
 ### Implementation
 
+The clear-all link is an HTMX link (not a plain navigation anchor) so it performs a
+partial swap and updates the browser URL via `hx-push-url`:
+
 ```html
-{% if has_active_filters %}
-    <div class="mb-4">
-        <a href="{% url 'ads:list' %}" class="text-sm text-blue-600 hover:underline">
-            Clear all filters
-        </a>
-    </div>
+{% if current_listing_purpose or current_features or current_condition or active_price_min or active_price_max %}
+    <a hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+       hx-push-url="true"
+       hx-target="#ad-list"
+       hx-swap="innerHTML"
+       class="text-sm text-blue-600 hover:underline">
+        Clear all filters
+    </a>
 {% endif %}
 ```
 
-The clear-all link drops **all** filter parameters (`listing_purpose`, `listing_condition`,
-`features`, `category`, `city`, price range, `q`) and returns to page 1.
+The condition extends the existing chips-block check (`current_listing_purpose or
+current_features or current_condition`) to also include `active_price_min or
+active_price_max`, so the clear-all button appears whenever any chip — including
+price — is active, and disappears after clearing.
+
+The clear-all link **resets all query parameters** (`sort`, `min_price`, `max_price`,
+`listing_purpose`, `listing_condition`, `features`, `page`) — it emits only `?page=1&lang=…`.
+On the **search results page** (`/search/?q=…`), `q` is **preserved** via the
+`{% if query %}` branch, because the search query is the primary content of that page.
+On the catalog listings page (`/`), `query` is `None` so `q` is omitted.
+
+Category and city that are encoded as **URL path parameters** (e.g. `/category/<slug>/`)
+are naturally preserved by the path — they are not query parameters and thus unaffected
+by the query reset. When city is applied as a **query parameter** (`?city=<slug>`) via
+the header dropdown, it is also dropped by clear-all (since it is a query param).
 
 ## Pagination URL Preservation
 

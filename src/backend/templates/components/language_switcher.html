@@ -123,5 +123,22 @@ Dependencies:
             toggleBtn.focus();
         }
     });
+
+    // Recompute language switcher hrefs after HTMX swaps so they reflect
+    // the current URL query string (without the stale params or 'page').
+    // htmx:afterSwap fires after history.pushState, so window.location.search
+    // is already up to date by the time this handler runs.
+    document.body.addEventListener('htmx:afterSwap', function () {
+        var switcherLinks = document.querySelectorAll('[data-lang-switcher-link]');
+        if (!switcherLinks.length) return;
+        var params = new URLSearchParams(window.location.search);
+        params.delete('page');
+        var base = params.toString();
+        switcherLinks.forEach(function (link) {
+            var rebuilt = new URLSearchParams(base);
+            rebuilt.set('lang', link.getAttribute('data-lang'));
+            link.setAttribute('href', '?' + rebuilt.toString());
+        });
+    });
 })();
 </script>

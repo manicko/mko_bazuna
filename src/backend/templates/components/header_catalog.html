@@ -220,6 +220,33 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
     /* ── Translated labels from context (Q6=A) ─────────────────────────────── */
     var labels = JSON.parse('{{ catalog_js_labels|escapejs }}');
 
+    /* ── City filter URL navigation (T5: coexist path city_slug + ?city=) ── */
+    // When the current path is /city/<slug>/ the city is encoded in the path
+    // segment (which the listings view treats as higher priority than ?city=).
+    // In that case we replace the segment rather than appending a query param.
+    // Otherwise we set or remove the city as a ?city= query param, preserving
+    // the category path and every other existing query parameter. See spec T5.
+    function applyCityFilter(slug) {
+        var url = new URL(window.location.href);
+        var path = url.pathname;
+        var cityPathRegex = /^\/city\/([^\/]+)\//;
+        var hasCityInPath = cityPathRegex.test(path);
+        if (slug) {
+            if (hasCityInPath) {
+                url.pathname = path.replace(cityPathRegex, '/city/' + encodeURIComponent(slug) + '/');
+                url.searchParams.delete('city');
+            } else {
+                url.searchParams.set('city', slug);
+            }
+        } else {
+            if (hasCityInPath) {
+                url.pathname = path.replace(cityPathRegex, '/');
+            }
+            url.searchParams.delete('city');
+        }
+        window.location.href = url.toString();
+    }
+
     /* ── Autocomplete dropdown ─────────────────────────────────────────── */
     var dropdown = document.getElementById('autocomplete-dropdown');
     var searchInput = document.getElementById('search-input');
@@ -337,7 +364,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                 var fd = new FormData();
                 fd.append('slug', slug);
                 fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCsrf() } });
-                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+                applyCityFilter(slug);
             } else if (type === 'category' && slug) {
                 // Filter by category.
                 window.location.href = '/category/' + encodeURIComponent(slug) + '/';
@@ -549,7 +576,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                 var fd = new FormData();
                 fd.append('action', 'clear');
                 fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': cityGetCsrf() } });
-                window.location.href = '/';
+                applyCityFilter(null);
                 return;
             }
             var link = e.target.closest('[data-city-option]');
@@ -559,7 +586,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                 var fd = new FormData();
                 fd.append('slug', slug);
                 fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': cityGetCsrf() } });
-                window.location.href = '/city/' + encodeURIComponent(slug) + '/';
+                applyCityFilter(slug);
             }
         });
     }
