@@ -138,6 +138,25 @@ def test_addopts_uses_importlib() -> None:
     assert "--import-mode=importlib" in addopts
 
 
+def test_pyproject_has_testpaths() -> None:
+    """pyproject.toml must define testpaths to restrict collection scope.
+
+    Prevents pytest from walking the entire rootdir (docs/, scripts/, etc.)
+    during xdist collection — a known cause of transient ENOMEM on local
+    Docker (see Problem_07).
+    """
+    ini_options = _load_pyproject()["tool"]["pytest"]["ini_options"]
+    assert "testpaths" in ini_options, "testpaths must be set in pyproject.toml"
+
+
+def test_testpaths_includes_backend_and_bot() -> None:
+    """testpaths must cover both the backend and Telegram bot test suites."""
+    ini_options = _load_pyproject()["tool"]["pytest"]["ini_options"]
+    paths: list[str] = ini_options["testpaths"]
+    assert "src/backend" in paths, "testpaths must include src/backend"
+    assert "src/telegram_bot" in paths, "testpaths must include src/telegram_bot"
+
+
 # --- entrypoint-test.sh parity -------------------------------------------
 
 
@@ -151,6 +170,15 @@ def test_entrypoint_defaults_loadgroup() -> None:
     """entrypoint-test.sh:41 default PYTEST_OPTS must include --dist loadgroup."""
     text = _ENTRYPOINT.read_text()
     assert "--dist loadgroup" in text
+
+
+def test_entrypoint_caps_maxprocesses() -> None:
+    """entrypoint-test.sh default PYTEST_OPTS must cap --maxprocesses to avoid
+    transient ENOMEM from -n auto forking too many workers on local Docker
+    (see Problem_07). CI runners have sufficient headroom and are unaffected.
+    """
+    text = _ENTRYPOINT.read_text()
+    assert "--maxprocesses" in text, "entrypoint must cap --maxprocesses"
 
 
 # --- Makefile parity (requires T4 / §8-rec-4 implemented) ----------------

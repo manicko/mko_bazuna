@@ -153,8 +153,10 @@ test-clean-db:
 test-recreate: test-clean-db
 	# test-clean-db (pre-flight) drops stale test_mko_bazuna* + gw* databases,
 	# handling stuck connections from crashed xdist workers before pytest runs.
+	# --maxprocesses=4 caps worker forks to prevent ENOMEM on memory-constrained
+	# local Docker (see docs/99-agent for root cause analysis).
 	docker compose $(COMPOSE_TEST) up -d db
-	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --dist loadgroup" test
+	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test
 
 # ====================== Django ======================
 

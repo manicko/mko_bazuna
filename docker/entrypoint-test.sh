@@ -41,4 +41,4 @@ echo "Running tests..."
 # xdist parallel execution: matches CI configuration (see .github/workflows/ci.yml:91).
 # -n auto: use all available CPU cores; --dist loadgroup: distribute by xdist_group()
 # markers so bot tests that share FSM state run on the same worker.
-uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short --durations=10 -n auto --dist loadgroup} "${PYTEST_MARK_ARGS[@]}"
+uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup} "${PYTEST_MARK_ARGS[@]}"
