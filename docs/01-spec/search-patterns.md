@@ -128,9 +128,12 @@ Related user stories: US-B7
 ## Preferred City Default & Precedence
 
 When a buyer visits a listing or search page **without** an explicit city in the URL
-(`?city=` query or `/city/<slug>/` path), the listings/search view applies the preferred
+(`?city=` query or `/city/<slug>/` path), the listing/search view applies the preferred
 city resolved by `PreferredCityMiddleware` as the default city filter (see
 [architecture-structure.md](architecture-structure.md#middleware--context-processors)).
+The explicit URL city — when present — is resolved **once per request** by
+`CityResolutionMiddleware` into `request.current_city` and always takes precedence;
+the preferred city is only the fallback default.
 
 ### Resolution priority
 
@@ -142,8 +145,10 @@ city resolved by `PreferredCityMiddleware` as the default city filter (see
 
 Explicit URL path (`/city/<slug>/`) and `city` query parameter **always take
 precedence** over the stored preference — the preference is only a fallback when no
-city is specified. Example: `listings.py` does `effective_city = preferred_city` when
-no path/query city is present; `search.py` does `current_city = explicit_city or request.preferred_city`.
+city is specified. `CityResolutionMiddleware` exposes the explicit URL city as
+`request.current_city` (path form takes priority over `?city=` query); the listing/search
+views read it from there. Example: `listings.py` does `effective_city = request.current_city`
+(falling back to `request.preferred_city`); `search.py` does `current_city = request.current_city or request.preferred_city`.
 
 ### Consent gating & login reconciliation
 
@@ -155,9 +160,13 @@ no path/query city is present; `search.py` does `current_city = explicit_city or
 - Stale cookies (slug no longer in `cities`) are deleted in `process_response`.
 
 The header city button shows `preferred_city_display` ("Вся страна" or the localized city
-name), sourced from `header_context`.
+name), sourced from `header_context`, which resolves the effective city as
+`request.current_city` (explicit URL city) → `request.preferred_city` (persisted default)
+→ "Entire country".
 
-Related user stories: US-B3, US-B7. Source: `apps/core/middleware/preferred_city.py`.
+Related user stories: US-B3, US-B7. Sources: `apps/core/middleware/city_resolution.py`
+(`request.current_city`, explicit URL city), `apps/core/middleware/preferred_city.py`
+(`request.preferred_city`, persisted default).
 
 Buyers can sort search results by date (newest/oldest first) or price (low/high). Price sorts
 operate on the EUR-normalized `price_normalized_eur` column, placing Free ads (price_amount = 0)
@@ -316,7 +325,14 @@ a suggestion:
 - **City** (`type=city`): POSTs to `search:preferred_city` to persist the city,
   then sets `?city=<slug>` on the current URL (preserving the category path and
   other active params). If the current path is `/city/<old>/`, the path segment is
-  replaced instead.
+  replaced instead. The POST is **awaited** before navigation so the `Set-Cookie`
+  header lands before the browser navigates away (prevents the fire-and-forget
+  race; see spec 07).
+- **Clear** (`data-city-clear`): POSTs `action=clear` to `search:preferred_city`
+  to delete the cookie + NULL `User.preferred_city` (authenticated), then
+  navigates to the country-wide URL. The POST is also **awaited**; the deletion
+  `Set-Cookie` mirrors `set_cookie` attributes (Secure/HttpOnly/SameSite=Lax on
+  HTTPS).
 - **Category** (`type=category`): navigates to `/category/<slug>/`.
 - **Text** (popular/history): populates the search input and submits the form
   to `search:search`.

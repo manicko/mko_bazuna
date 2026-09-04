@@ -27,7 +27,7 @@ src/
 │   ├── apps/                      # INSTALLED_APPS = ['apps.xxx']
 │   │   ├── core/                  # shared utils, abstract models, managers, signals
 │   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
-│   │   │   ├── middleware/           # language locale + preferred city (LanguagePreMiddleware, PreferredCityMiddleware)
+│   │   │   ├── middleware/           # city resolution + locale + preferred city (CityResolutionMiddleware, LanguagePreMiddleware, PreferredCityMiddleware)
 │   │   │   ├── services/             # contact service
 │   │   │   ├── templatetags/         # contact_tags, localized_content
 │   │   │   ├── tests/                # sweep command tests, context processor tests
@@ -161,13 +161,17 @@ Request-time enrichment injected before view rendering. Middleware lives in
 | Middleware | Location | Purpose |
 |---|---|---|
 | `LanguagePreMiddleware` | `apps/core/middleware/` | Reads `lang_pref` cookie / `?lang=X`; sets `request.LANGUAGE_CODE`. |
+| `CityResolutionMiddleware` | `apps/core/middleware/city_resolution.py` | Resolves `request.current_city` — the explicit URL-encoded city slug (`/city/<slug>/` path or `?city=` query) or `None`. Set before every view; drives the catalog header badge and the listing/search filter. No DB lookup; slugs passed through for view-level validation. |
 | `PreferredCityMiddleware` | `apps/core/middleware/preferred_city.py` | Resolves `request.preferred_city` (effective city slug or `None`) as the default city filter. Priority: authenticated `User.preferred_city` FK (wins) → validated `preferred_city` cookie → `None`. Stale cookies deleted in `process_response`. Cookie name is the module constant `PREFERRED_CITY_COOKIE_NAME` (mirrors `LanguagePreMiddleware`, not a `StrEnum`). |
 | `CategoryMiddleware` | `apps/core/middleware/` | Category context for listings (plan 16). |
 
-Registration order: `PreferredCityMiddleware` runs **after** `AuthenticationMiddleware`
-(it reads `request.user`) and **before** category/locale middleware, so views see the
-resolved `request.preferred_city` as a default filter. Writes never happen here — the
-cookie/DB is written only by `set_preferred_city` (`apps/search/views/preferred_city.py`).
+Registration order: `CityResolutionMiddleware` runs **after** `AuthenticationMiddleware` and
+**before** `PreferredCityMiddleware`, so views see `request.current_city` (the explicit URL
+city) resolved before `request.preferred_city` (the persisted default). `PreferredCityMiddleware`
+runs **after** `AuthenticationMiddleware` (it reads `request.user`). Writes never happen in
+middleware — the cookie/DB is written only by `set_preferred_city` (`apps/search/views/preferred_city.py`),
+whose persistence POST is now **awaited** client-side before navigation, and whose cookie
+deletion mirrors `set_cookie` attributes (Secure/HttpOnly/SameSite=Lax on HTTPS).
 
 ### Context processors
 

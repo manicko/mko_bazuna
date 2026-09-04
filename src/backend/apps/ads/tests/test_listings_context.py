@@ -104,6 +104,11 @@ def _run_listings(
         url = f"/?{query_string}" if query_string else "/"
         request = factory.get(url)
         request.user = AnonymousUser()
+        # Simulate CityResolutionMiddleware: resolve the explicit URL city
+        # (path form city_slug takes priority over ?city= query, matching the
+        # middleware's _CITY_PATH_RE check then GET check). RequestFactory
+        # bypasses middleware so this attribute is absent by default.
+        request.current_city = city_slug or request.GET.get("city")
 
         response = listings_view(
             request,

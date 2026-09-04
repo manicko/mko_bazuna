@@ -284,23 +284,16 @@ def listings(
 
         suggested_category = _suggest_category(request.GET.get("category", ""))
 
-    # City filter with did-you-mean. Priority: URL path ``city_slug`` wins, then
-    # an explicit ``?city=`` param is a real filter (F-5), then the
-    # middleware-resolved preferred city as the *default* filter (R-06). Only an
-    # invalid slug yields a did-you-mean suggestion (F-6).
+    # City filter with did-you-mean. Priority: the middleware-resolved
+    # ``request.current_city`` (explicit URL city: ``/city/<slug>/`` or
+    # ``?city=``) wins, then the persisted preferred city as the *default*
+    # filter (R-06). Only an unknown slug yields a did-you-mean suggestion
+    # (F-6). ``city_slug`` (URL param) is no longer parsed here —
+    # CityResolutionMiddleware exposes the resolved slug as
+    # ``request.current_city`` before the view runs.
     suggested_city = None
-    effective_city = None
-    if city_slug:
-        effective_city = city_slug
-        try:
-            city = City.objects.get(slug=city_slug)
-            ads = ads.filter(city_id=city.id)
-        except City.DoesNotExist:
-            # City not found - provide did-you-mean suggestions
-            suggested_city = suggest_city(city_slug)
-            # Show all ads but provide city suggestions
-    elif request.GET.get("city"):
-        effective_city = request.GET["city"]
+    effective_city = getattr(request, "current_city", None)
+    if effective_city:
         try:
             city = City.objects.get(slug=effective_city)
             ads = ads.filter(city_id=city.id)
@@ -318,11 +311,6 @@ def listings(
             except City.DoesNotExist:
                 # Second line of defense for a stale preference: no filter.
                 pass
-
-    # Expose the effective city (URL path/?city= or the preferred fallback) so
-    # the catalog header badge can display the *active* filter rather than a
-    # lagging preference cookie (see header_context — Problem 04 off-by-one).
-    request.current_city = effective_city
 
     # Price range filter
 

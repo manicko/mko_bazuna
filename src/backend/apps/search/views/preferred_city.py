@@ -48,7 +48,20 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
     )
     if clear_action or slug_present_empty:
         response = JsonResponse({"ok": True})
-        response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)
+        # Mirror set_cookie's attributes on the deletion Set-Cookie. Django's
+        # delete_cookie() (5.2) only emits ``Secure`` for ``__Host-``/``__Secure-``
+        # prefixed names or ``samesite="none"``; ``preferred_city`` is neither, so a
+        # plain delete_cookie() would emit a non-Secure header and browsers would not
+        # drop the Secure cookie over HTTPS. Emit an expired cookie directly instead.
+        response.set_cookie(
+            PREFERRED_CITY_COOKIE_NAME,
+            max_age=0,
+            expires="Thu, 01 Jan 1970 00:00:00 GMT",
+            path="/",
+            httponly=True,
+            samesite="Lax",
+            secure=request.is_secure(),
+        )
         if request.user.is_authenticated:
             request.user.preferred_city = None
             request.user.save(update_fields=["preferred_city"])

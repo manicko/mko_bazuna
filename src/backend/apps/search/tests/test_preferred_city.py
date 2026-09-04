@@ -229,3 +229,25 @@ class TestReset:
         assert response.status_code == 200
         assert response.json() == {"ok": True}
         assert response.cookies["preferred_city"].value == ""
+
+    def test_clear_deletion_cookie_mirrors_attributes_on_https(self) -> None:
+        """T3/D5: the deletion Set-Cookie mirrors set_cookie's security
+        attributes (Secure on HTTPS, SameSite=Lax, HttpOnly) so browsers
+        actually remove the Secure cookie that set_cookie wrote over HTTPS.
+
+        The Django test client's ``secure=True`` flag makes
+        ``request.is_secure()`` return True, mirroring the production nginx
+        TLS deployment (SECURE_SSL_REDIRECT=True, base.py).
+        """
+        client = Client()
+        response = client.post(
+            "/api/preferred-city/", {"action": "clear"}, secure=True
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        # Deletion cookie (empty value, max-age 0).
+        assert response.cookies["preferred_city"].value == ""
+        # Security attributes must match set_cookie (preferred_city.py L78-85).
+        assert response.cookies["preferred_city"]["secure"] is True
+        assert response.cookies["preferred_city"]["samesite"] == "Lax"
+        assert response.cookies["preferred_city"]["httponly"] is True

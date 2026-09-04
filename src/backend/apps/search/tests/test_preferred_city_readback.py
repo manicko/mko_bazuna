@@ -17,6 +17,7 @@ listings() (T-05):
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from django.utils import translation
 
 from apps.ads.models import Ad
@@ -249,3 +250,68 @@ class TestCityBadgeReadback:
         content = response.content.decode()
         assert "data-preferred-city-label>Будва" in content
         assert "data-preferred-city-label>Подгорица" not in content
+
+    def test_badge_updates_after_city_change(
+        self, client: Client, budva: City, podgorica: City
+    ) -> None:
+        """A4: selecting a new city shows the updated selection, not a stale one.
+
+        Simulates the server-side persistence path (the JS ``await fetch``
+        race fix is client-side and cannot be unit-tested in Django's WSGI
+        harness). Selecting Будва, then updating the preference to Подгорица
+        via the persistence endpoint, must make the badge show Подгорица on
+        the next page load — never the stale Будва.
+        """
+        translation.activate("ru")
+        client.cookies["consent_preferences"] = "true"
+        client.cookies["preferred_city"] = "budva"
+
+        # Establish a preference for Budva.
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "data-preferred-city-label>Будва" in response.content.decode()
+
+        # Update preference to Podgorica via the persistence endpoint.
+        post = client.post("/api/preferred-city/", {"slug": "podgorica"})
+        assert post.status_code == 200
+        assert post.json() == {"ok": True}
+
+        # Badge must now show Podgorica — not the stale Budva.
+        response = client.get("/")
+        content = response.content.decode()
+        assert "data-preferred-city-label>Подгорица" in content
+        assert "data-preferred-city-label>Будва" not in content
+
+
+class TestAdDetailCityBadge:
+    """Ad-detail badge must reflect the preferred city / «Entire country»
+    consistently with the homepage (A5 — regression guard for the T1 gap where
+    ``ad_detail`` never set ``request.current_city``)."""
+
+    def test_ad_detail_shows_preferred_city_badge(
+        self, client: Client, seller: User, category: Category, podgorica: City
+    ) -> None:
+        """Ad detail with a valid preferred-city cookie shows the city badge."""
+        ad = create_test_ad(
+            seller, category, podgorica, status=AdStatus.PUBLISHED
+        )
+        translation.activate("ru")
+        client.cookies["preferred_city"] = "podgorica"
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "data-preferred-city-label>Подгорица" in content
+        assert "data-preferred-city-label>Вся страна" not in content
+
+    def test_ad_detail_shows_country_wide_without_preference(
+        self, client: Client, seller: User, category: Category, podgorica: City
+    ) -> None:
+        """Ad detail without a preference shows «Entire country» (A5/A1)."""
+        ad = create_test_ad(
+            seller, category, podgorica, status=AdStatus.PUBLISHED
+        )
+        translation.activate("ru")
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Вся страна" in content

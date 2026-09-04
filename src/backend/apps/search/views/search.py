@@ -76,10 +76,13 @@ def search(request: HttpRequest) -> HttpResponse:
         except Category.DoesNotExist:
             suggested_category = current_category
 
-    # City filter (by slug). An explicit ?city= always wins; otherwise the
-    # middleware-resolved preferred city is the *default* filter (R-05).
-    explicit_city = request.GET.get("city")
-    current_city = explicit_city or getattr(request, "preferred_city", None)
+    # City filter (by slug). An explicit URL city (``request.current_city``,
+    # resolved by CityResolutionMiddleware from ``/city/<slug>/`` or
+    # ``?city=``) always wins; otherwise the persisted preferred city is the
+    # *default* filter (R-05).
+    current_city = getattr(request, "current_city", None) or getattr(
+        request, "preferred_city", None
+    )
     suggested_city = None
     if current_city:
         try:
@@ -87,11 +90,6 @@ def search(request: HttpRequest) -> HttpResponse:
             ads = ads.filter(city_id=city.id)
         except City.DoesNotExist:
             suggested_city = suggest_city(current_city)
-
-    # Expose the effective city (explicit ?city= or the preferred fallback) so
-    # the catalog header badge can display the *active* filter rather than a
-    # lagging preference cookie (see header_context — Problem 04 off-by-one).
-    request.current_city = current_city
 
     # Price range filter (EUR-equivalent values, CR-10)
     min_price = request.GET.get("min_price")

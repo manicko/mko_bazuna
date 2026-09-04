@@ -52,7 +52,8 @@ def header_context(request) -> dict:
     # The header city badge reflects the *effective* city — the one whose ads
     # are actually being filtered — not the stored preference. The effective
     # slug is an explicit URL selection (``/city/<slug>/`` or ``?city=``) that
-    # the listings/search views expose as ``request.current_city``; the persisted
+    # ``CityResolutionMiddleware`` exposes as ``request.current_city`` on every
+    # request; the persisted
     # preference (``request.preferred_city``) is only the fallback when the URL
     # carries no city. Reading the badge from the preference alone is incorrect:
     # that preference is written by an asynchronous POST (set_preferred_city)

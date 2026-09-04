@@ -112,6 +112,33 @@ def test_localized_name_for_valid_slug() -> None:
     city.get_name.assert_called_once()
 
 
+def test_badge_falls_back_to_preferred_when_current_city_none() -> None:
+    """When ``request.current_city`` is explicitly ``None`` (no URL city, which
+    is what CityResolutionMiddleware sets), the badge falls through to
+    ``request.preferred_city`` — the persisted preference. This is the
+    defense-in-depth guard for the post-middleware model: the attribute always
+    exists, so the fallback must still engage."""
+    podgorica = MagicMock()
+    podgorica.get_name.return_value = "Подгорица"
+
+    with (
+        patch("apps.categories.models.Category") as mock_category,
+        patch("apps.locations.models.City") as mock_city,
+    ):
+        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_city.objects.order_by.return_value = []
+        mock_city.objects.filter.return_value.first.return_value = podgorica
+
+        request = HttpRequest()
+        request.current_city = None  # set by middleware when URL has no city
+        request.preferred_city = "podgorica"  # persisted default (cookie/DB)
+        request.LANGUAGE_CODE = "ru"
+        translation.activate("ru")
+        context = header_context(request)
+
+    assert context["preferred_city_display"] == "Подгорица"
+
+
 def test_badge_prefers_effective_url_city_over_stale_preferred() -> None:
     """The badge follows request.current_city (effective URL city) and ignores a
     stale preferred-city preference — fixes the Problem 04 off-by-one where the
