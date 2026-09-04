@@ -21,7 +21,7 @@ def plausible_host(request):
 
 def language(request) -> dict:
     """Expose current language to templates."""
-    return {"LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", "ru")}
+    return {"LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", settings.LANGUAGE_CODE)}
 
 
 def header_context(request) -> dict:
@@ -70,7 +70,10 @@ def header_context(request) -> dict:
             continue
         city = City.objects.filter(slug=city_slug).first()
         if city is not None:
-            locale = getattr(request, "LANGUAGE_CODE", "ru") or "ru"
+            locale = (
+                getattr(request, "LANGUAGE_CODE", settings.LANGUAGE_CODE)
+                or settings.LANGUAGE_CODE
+            )
             preferred_city_display = city.get_name(locale)
             break
 

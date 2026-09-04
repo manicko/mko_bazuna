@@ -35,7 +35,7 @@ def buyer() -> User:
 
 class TestFavoritesCountBadge:
     def test_anonymous_returns_outline_heart(self) -> None:
-        resp = Client().get("/cabinet/favorites/count/")
+        resp = Client().get("/cabinet/favorites/count/?lang=ru")
         assert resp.status_code == 200
         content = resp.content.decode()
         # Anonymous: outline heart, no count badge.
@@ -67,7 +67,7 @@ class TestFavoritesCountBadge:
 
         client = Client()
         client.force_login(buyer)
-        resp = client.get("/cabinet/favorites/count/")
+        resp = client.get("/cabinet/favorites/count/?lang=ru")
         assert resp.status_code == 200
         content = resp.content.decode()
         assert 'aria-label="Моё избранное"' in content

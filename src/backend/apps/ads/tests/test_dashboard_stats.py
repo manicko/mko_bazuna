@@ -278,7 +278,7 @@ class TestDashboardHtmlRendering:
 
     def test_html_contains_time_range_selector(self, dashboard_client) -> None:
         """Dashboard HTML includes the time range select element."""
-        response = dashboard_client.get("/dashboard/")
+        response = dashboard_client.get("/dashboard/?lang=ru")
         html = response.content.decode()
         assert "time_range" in html
         assert "За всё время" in html
@@ -287,7 +287,7 @@ class TestDashboardHtmlRendering:
 
     def test_html_contains_per_ad_stats(self, dashboard_client) -> None:
         """Dashboard HTML includes per-ad view and contact counts."""
-        response = dashboard_client.get("/dashboard/")
+        response = dashboard_client.get("/dashboard/?lang=ru")
         html = response.content.decode()
         assert "Ad Alpha" in html
         assert "Ad Beta" in html

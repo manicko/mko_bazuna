@@ -2,7 +2,7 @@
 Tests for LanguagePreMiddleware language detection and priority.
 
 Verifies the priority order: ?lang=X > lang_pref cookie > Accept-Language
-header > default to Russian. Also verifies cookie persistence when ?lang is
+header > default to ``settings.LANGUAGE_CODE``. Also verifies cookie persistence when ?lang is
 used.
 
 No database interaction required.
@@ -42,11 +42,13 @@ def _make_request(
 
 @pytest.fixture
 def middleware():
-    """Instantiate middleware once per test, cleaning up thread-local
-    language state afterwards."""
+    """Instantiate middleware once per test.
+
+    Thread-local cleanup is handled by the shared autouse
+    ``_reset_translation_state`` fixture in ``src/backend/conftest.py``.
+    """
     mw = LanguagePreMiddleware(get_response=lambda r: None)
     yield mw
-    translation.deactivate()
 
 
 # --- Priority: ?lang parameter ---
@@ -82,13 +84,13 @@ def test_lang_param_valid_values(middleware: LanguagePreMiddleware) -> None:
         assert request.LANGUAGE_CODE == code
 
 
-def test_invalid_lang_param_defaults_to_russian(
+def test_invalid_lang_param_defaults_to_language_code(
     middleware: LanguagePreMiddleware,
 ) -> None:
-    """Unsupported ?lang value falls back to ru."""
+    """Unsupported ``?lang`` value falls back to ``settings.LANGUAGE_CODE``."""
     request = _make_request(get={"lang": "fr"})
     middleware.process_request(request)
-    assert request.LANGUAGE_CODE == "ru"
+    assert request.LANGUAGE_CODE == "en"
 
 
 # --- Priority: cookie ---
@@ -136,30 +138,32 @@ def test_accept_language_simple_tag(middleware: LanguagePreMiddleware) -> None:
     assert request.LANGUAGE_CODE == "ru"
 
 
-def test_accept_language_unsupported_falls_back(
+def test_accept_language_unsupported_falls_back_to_language_code(
     middleware: LanguagePreMiddleware,
 ) -> None:
-    """Unsupported Accept-Language falls back to ru."""
+    """Unsupported Accept-Language falls back to ``settings.LANGUAGE_CODE``."""
     request = _make_request(accept_language="fr-FR,fr;q=0.9")
     middleware.process_request(request)
-    assert request.LANGUAGE_CODE == "ru"
+    assert request.LANGUAGE_CODE == "en"
 
 
-def test_accept_language_empty_string(middleware: LanguagePreMiddleware) -> None:
-    """Empty Accept-Language header falls back to ru."""
+def test_accept_language_empty_string_falls_back_to_language_code(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """Empty Accept-Language header falls back to ``settings.LANGUAGE_CODE``."""
     request = _make_request(accept_language="")
     middleware.process_request(request)
-    assert request.LANGUAGE_CODE == "ru"
+    assert request.LANGUAGE_CODE == "en"
 
 
 # --- Priority: default ---
 
 
-def test_default_to_russian(middleware: LanguagePreMiddleware) -> None:
-    """No lang, cookie, or Accept-Language defaults to ru."""
+def test_default_to_language_code(middleware: LanguagePreMiddleware) -> None:
+    """No lang, cookie, or Accept-Language defaults to ``settings.LANGUAGE_CODE``."""
     request = _make_request()
     middleware.process_request(request)
-    assert request.LANGUAGE_CODE == "ru"
+    assert request.LANGUAGE_CODE == "en"
 
 
 # --- Cookie persistence (via process_response) ---
@@ -253,8 +257,8 @@ def test_thread_local_matches_request_language_code(
         ({"lang": "en"}, None, None, "en"),  # ?lang= wins
         (None, {"lang_pref": "bs"}, None, "bs"),  # cookie
         (None, None, "en-US,en;q=0.9", "en"),  # Accept-Language
-        (None, None, "fr-FR,fr;q=0.9", "ru"),  # unsupported -> default
-        ({}, None, None, "ru"),  # nothing -> default
+        (None, None, "fr-FR,fr;q=0.9", "en"),  # unsupported -> default
+        ({}, None, None, "en"),  # nothing -> default
     ]
     for get, cookies, accept_language, expected in cases:
         request = _make_request(
@@ -269,9 +273,12 @@ def test_thread_local_matches_request_language_code(
         assert translation.get_language() == expected
 
 
-def test_invalid_lang_still_syncs_to_russian(middleware: LanguagePreMiddleware) -> None:
-    """An invalid ?lang falls back to ``ru`` in both thread-local and request."""
+def test_invalid_lang_still_syncs_to_language_code(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """An invalid ``?lang`` falls back to ``settings.LANGUAGE_CODE`` in both
+    thread-local and request."""
     request = _make_request(get={"lang": "fr"})
     middleware.process_request(request)
-    assert translation.get_language() == "ru"
-    assert request.LANGUAGE_CODE == "ru"
+    assert translation.get_language() == "en"
+    assert request.LANGUAGE_CODE == "en"

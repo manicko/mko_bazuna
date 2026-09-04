@@ -143,7 +143,7 @@ class TestSearchViewPublishesFilter:
         )
 
         client = Client()
-        response = client.get("/search/?q=велосипед")
+        response = client.get("/search/?q=велосипед&lang=ru")
 
         assert response.status_code == 200
         # The DRAFT ad must never appear in search results — only PUBLISHED
@@ -240,7 +240,7 @@ class TestSearchViewDescendantCategories:
 
         client = Client()
         # "Транспорт" matches the root category name — should expand to all descendants
-        response = client.get("/search/?q=Транспорт")
+        response = client.get("/search/?q=Транспорт&lang=ru")
 
         assert response.status_code == 200
         ads_in_page = list(response.context["page_obj"])
@@ -273,7 +273,7 @@ class TestSearchViewDescendantCategories:
         )
 
         client = Client()
-        response = client.get("/search/?q=Транспорт")
+        response = client.get("/search/?q=Транспорт&lang=ru")
 
         assert response.status_code == 200
         ads_in_page = list(response.context["page_obj"])

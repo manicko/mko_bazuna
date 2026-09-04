@@ -18,14 +18,6 @@ from apps.core.context_processors import header_context, language, site_config
 pytestmark = [pytest.mark.unit]
 
 
-@pytest.fixture(autouse=True)
-def _activate_russian():
-    """Activate Russian translation for all tests and clean up afterwards."""
-    translation.activate("ru")
-    yield
-    translation.deactivate()
-
-
 # ---------------------------------------------------------------------------
 # language() context processor
 # ---------------------------------------------------------------------------
@@ -48,11 +40,11 @@ def test_language_extracts_language_code_from_request() -> None:
     assert result == {"LANGUAGE_CODE": "bs"}
 
 
-def test_language_defaults_to_russian_when_not_set() -> None:
-    """language() returns 'ru' when LANGUAGE_CODE is not on request."""
+def test_language_defaults_to_settings_language_code_when_not_set() -> None:
+    """language() returns settings.LANGUAGE_CODE when LANGUAGE_CODE is not on request."""
     request = HttpRequest()
     result = language(request)
-    assert result == {"LANGUAGE_CODE": "ru"}
+    assert result == {"LANGUAGE_CODE": "en"}
 
 
 def test_language_handles_explicit_russian() -> None:
@@ -84,8 +76,8 @@ def test_country_wide_label_when_no_preference() -> None:
     """Without a preferred city the badge shows the country-wide label."""
     request = HttpRequest()
     request.LANGUAGE_CODE = "ru"
-    translation.activate("ru")
-    result = _call_header_context(request)
+    with translation.override("ru"):
+        result = _call_header_context(request)
     assert result["context"]["preferred_city_display"] == "Вся страна"
     assert "cities" in result["context"]
 
@@ -105,8 +97,8 @@ def test_localized_name_for_valid_slug() -> None:
         request = HttpRequest()
         request.preferred_city = "podgorica"
         request.LANGUAGE_CODE = "ru"
-        translation.activate("ru")
-        context = header_context(request)
+        with translation.override("ru"):
+            context = header_context(request)
 
     assert context["preferred_city_display"] == "Подгорица"
     city.get_name.assert_called_once()
@@ -133,8 +125,8 @@ def test_badge_falls_back_to_preferred_when_current_city_none() -> None:
         request.current_city = None  # set by middleware when URL has no city
         request.preferred_city = "podgorica"  # persisted default (cookie/DB)
         request.LANGUAGE_CODE = "ru"
-        translation.activate("ru")
-        context = header_context(request)
+        with translation.override("ru"):
+            context = header_context(request)
 
     assert context["preferred_city_display"] == "Подгорица"
 
@@ -166,8 +158,8 @@ def test_badge_prefers_effective_url_city_over_stale_preferred() -> None:
         request.current_city = "berane"  # effective URL city (just selected)
         request.preferred_city = "bar"  # stale cookie: previous selection
         request.LANGUAGE_CODE = "ru"
-        translation.activate("ru")
-        context = header_context(request)
+        with translation.override("ru"):
+            context = header_context(request)
 
     assert context["preferred_city_display"] == "Беране"
     berane.get_name.assert_called_once()
@@ -188,8 +180,8 @@ def test_country_wide_label_for_stale_slug() -> None:
         request = HttpRequest()
         request.preferred_city = "deleted-city"
         request.LANGUAGE_CODE = "ru"
-        translation.activate("ru")
-        context = header_context(request)
+        with translation.override("ru"):
+            context = header_context(request)
 
     assert context["preferred_city_display"] == "Вся страна"
 
@@ -198,8 +190,8 @@ def test_cities_key_present() -> None:
     """Context exposes the ordered ``cities`` list for the dropdown."""
     request = HttpRequest()
     request.LANGUAGE_CODE = "ru"
-    translation.activate("ru")
-    result = _call_header_context(request)
+    with translation.override("ru"):
+        result = _call_header_context(request)
     assert "cities" in result["context"]
 
 
@@ -207,8 +199,8 @@ def test_favorites_count_none_for_anonymous() -> None:
     """Anonymous (or missing) request user yields ``favorites_count=None``."""
     request = HttpRequest()
     request.LANGUAGE_CODE = "ru"
-    translation.activate("ru")
-    result = _call_header_context(request)
+    with translation.override("ru"):
+        result = _call_header_context(request)
     assert result["context"]["favorites_count"] is None
 
 
@@ -220,9 +212,9 @@ def test_favorites_count_for_authenticated() -> None:
 
     request = HttpRequest()
     request.LANGUAGE_CODE = "ru"
-    translation.activate("ru")
     request.user = user
-    result = _call_header_context(request)
+    with translation.override("ru"):
+        result = _call_header_context(request)
 
     assert result["context"]["favorites_count"] == 3
     user.favorites.count.assert_called_once()

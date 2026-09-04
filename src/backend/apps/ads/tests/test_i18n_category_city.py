@@ -98,13 +98,35 @@ class TestDetailPageI18n:
         assert "Транспорт" not in content
         assert "Тестград" not in content
 
-    def test_detail_defaults_to_ru(
+    def test_detail_defaults_to_en(
         self,
         seller: User,
         localized_category: Category,
         localized_city: City,
     ) -> None:
-        """Without an explicit ``lang`` param the detail page falls back to Russian."""
+        """Without an explicit ``lang`` param the detail page defaults to English
+        (msging source language)."""
+        ad = create_test_ad(
+            seller,
+            localized_category,
+            localized_city,
+            title="Test Ad EN",
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Transport" in content
+        assert "Testgrad" in content
+
+    def test_detail_renders_ru_names(
+        self,
+        seller: User,
+        localized_category: Category,
+        localized_city: City,
+    ) -> None:
+        """``?lang=ru`` renders Russian category/city names."""
         ad = create_test_ad(
             seller,
             localized_category,
@@ -113,7 +135,7 @@ class TestDetailPageI18n:
             status=AdStatus.PUBLISHED,
         )
         client = Client()
-        response = client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]) + "?lang=ru")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         assert "Транспорт" in content

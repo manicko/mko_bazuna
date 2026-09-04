@@ -6,6 +6,13 @@ Uses real PostgreSQL (NOT SQLite) per spec.
 
 from .base import *  # noqa: F403, F401
 
+# English is the msgid source language — tests asserting on English UI strings
+# (e.g. "Clear all filters", "Page navigation") pass without explicit language
+# setup. Tests needing Russian must set ?lang=ru explicitly (see conftest.py
+# autouse _reset_translation_state fixture and the i18n testing convention
+# in docs/99-agent/rules.md).
+LANGUAGE_CODE = "en"
+
 DEBUG = True
 
 # Disable SSL/TLS redirect and secure cookies for the test client, which issues

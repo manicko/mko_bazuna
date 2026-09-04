@@ -9,7 +9,7 @@ original bug was caused by ``LocaleMiddleware`` clobbering
 tests of the middleware in isolation could not catch.
 
 Verified behaviour:
-    ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``ru``
+    ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``settings.LANGUAGE_CODE``
 and the thread-local active language (``{% get_current_language %}``) must agree
 with ``request.LANGUAGE_CODE`` at render time.
 """
@@ -40,13 +40,6 @@ DESC_EN = "English desc"
 DESC_BS = "Bosnian opis"
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-@pytest.fixture(autouse=True)
-def _locale_cleanup():
-    """Deactivate thread-local language state after each test."""
-    yield
-    translation.deactivate()
 
 
 @pytest.fixture(autouse=True)
@@ -135,28 +128,29 @@ class TestLanguageEndToEnd:
         assert TITLE_RU.encode() not in response.content
         assert translation.get_language() == "bs"
 
-    def test_default_no_signal_renders_russian(self, e2e_ad) -> None:
-        """No lang, no cookie, no Accept-Language -> Russian base."""
+    def test_default_no_signal_renders_english(self, e2e_ad) -> None:
+        """No lang, no cookie, no Accept-Language -> English (default LANGUAGE_CODE)."""
         client = Client()
         response = client.get(e2e_ad["detail_url"])
         assert response.status_code == 200
-        assert TITLE_RU.encode() in response.content
-        assert DESC_RU.encode() in response.content
-        assert TITLE_EN.encode() not in response.content
+        assert TITLE_EN.encode() in response.content
+        assert DESC_EN.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
         assert TITLE_BS.encode() not in response.content
-        assert translation.get_language() == "ru"
+        assert translation.get_language() == "en"
 
-    def test_invalid_lang_falls_back_to_russian_and_does_not_persist(
+    def test_invalid_lang_falls_back_to_english_and_does_not_persist(
         self, e2e_ad
     ) -> None:
-        """An unsupported ``?lang=fr`` falls back to ru and sets no cookie."""
+        """An unsupported ``?lang=fr`` falls back to ``settings.LANGUAGE_CODE``
+        (English in tests) and sets no cookie."""
         client = Client()
         response = client.get(e2e_ad["detail_url"] + "?lang=fr")
         assert response.status_code == 200
-        assert TITLE_RU.encode() in response.content
-        assert TITLE_EN.encode() not in response.content
+        assert TITLE_EN.encode() in response.content
+        assert TITLE_RU.encode() not in response.content
         assert "lang_pref" not in response.cookies
-        assert translation.get_language() == "ru"
+        assert translation.get_language() == "en"
 
     def test_listing_card_switches_language(self, e2e_ad) -> None:
         """The listing card renders the localized title too (F5)."""

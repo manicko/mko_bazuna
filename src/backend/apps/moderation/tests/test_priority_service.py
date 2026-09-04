@@ -350,7 +350,7 @@ class TestModerationQueueView:
         """Empty queue shows 'No ads' message."""
         client = Client()
         client.force_login(self.staff_user)
-        response = client.get(self.queue_url)
+        response = client.get(self.queue_url + "?lang=ru")
         assert response.status_code == 200
         assert "Нет объявлений в очереди модерации".encode() in response.content
 
@@ -452,7 +452,7 @@ class TestModerationQueueView:
 
         client = Client()
         client.force_login(self.staff_user)
-        response = client.get(self.queue_url)
+        response = client.get(self.queue_url + "?lang=ru")
 
         # Should show total count = 1 (low)
         assert "Все (1)".encode() in response.content

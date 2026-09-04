@@ -381,7 +381,7 @@ class TestFilterAndSearchCombine:
 
         client = Client()
         response = client.get(
-            "/search/?q=красный телефон&listing_purpose=sell&features=delivery"
+            "/search/?q=красный телефон&listing_purpose=sell&features=delivery&lang=ru"
         )
 
         assert response.status_code == 200
@@ -469,7 +469,7 @@ class TestRelevanceTiebreaker:
         )
 
         client = Client()
-        response = client.get("/search/?q=красный телефон")
+        response = client.get("/search/?q=красный телефон&lang=ru")
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
@@ -512,7 +512,7 @@ class TestFtsSortOrder:
 
         client = Client()
         response = client.get(
-            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}",
+            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}&lang=ru",
             headers={"HX-Request": "true"},
         )
 
@@ -548,7 +548,7 @@ class TestFtsSortOrder:
 
         client = Client()
         response = client.get(
-            f"/search/?q=велосипед&sort={AdSort.PRICE_HIGH}",
+            f"/search/?q=велосипед&sort={AdSort.PRICE_HIGH}&lang=ru",
             headers={"HX-Request": "true"},
         )
 
@@ -576,7 +576,7 @@ class TestFtsSortOrder:
 
         client = Client()
         response = client.get(
-            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}",
+            f"/search/?q=велосипед&sort={AdSort.PRICE_LOW}&lang=ru",
             headers={"HX-Request": "true"},
         )
 
@@ -608,7 +608,7 @@ class TestFtsSortOrder:
 
         client = Client()
         response = client.get(
-            "/search/?q=велосипед",
+            "/search/?q=велосипед&lang=ru",
             headers={"HX-Request": "true"},
         )
 
@@ -1012,6 +1012,8 @@ class TestSortOnSearchResults:
             status=AdStatus.PUBLISHED,
         )
         client = Client()
-        response = client.get("/search/?q=транспорт", headers={"HX-Request": "true"})
+        response = client.get(
+            "/search/?q=транспорт&lang=ru", headers={"HX-Request": "true"}
+        )
         assert response.status_code == 200
         assert '<select name="sort"' in response.content.decode("utf-8")

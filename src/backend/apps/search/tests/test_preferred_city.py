@@ -17,7 +17,6 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
 from django.test import Client
-from django.utils import translation
 
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_MAX_AGE
 
@@ -129,10 +128,9 @@ class TestHeaderCityBadge:
     def test_header_renders_badge_with_preferred_city(self, podgorica: City) -> None:
         """A resolved preferred city renders in the header badge + dropdown."""
         client = Client()
-        translation.activate("ru")
         client.cookies["preferred_city"] = "podgorica"
 
-        response = client.get("/")
+        response = client.get("/?lang=ru")
         assert response.status_code == 200
         content = response.content.decode()
         # Badge shows the localized city name.
@@ -147,8 +145,7 @@ class TestHeaderCityBadge:
     def test_header_renders_country_wide_label_when_unset(self) -> None:
         """Without a preference the badge shows the country-wide label."""
         client = Client()
-        translation.activate("ru")
-        response = client.get("/")
+        response = client.get("/?lang=ru")
         assert response.status_code == 200
         content = response.content.decode()
         assert "Вся страна" in content
@@ -177,8 +174,7 @@ class TestReset:
         # A fresh request sees no preference -> all-cities results + country badge.
         # (The browser no longer sends the cleared preferred_city cookie.)
         fresh = Client()
-        translation.activate("ru")
-        list_response = fresh.get("/")
+        list_response = fresh.get("/?lang=ru")
         assert list_response.status_code == 200
         assert {ad.id for ad in list_response.context["page_obj"].object_list} == {
             podgorica_ad.id,
@@ -215,7 +211,7 @@ class TestReset:
         # A fresh request falls back to all-cities (no cookie, no DB preference).
         fresh = Client()
         fresh.force_login(buyer)
-        list_response = fresh.get("/")
+        list_response = fresh.get("/?lang=ru")
         assert list_response.status_code == 200
         assert {ad.id for ad in list_response.context["page_obj"].object_list} == {
             podgorica_ad.id,
@@ -240,9 +236,7 @@ class TestReset:
         TLS deployment (SECURE_SSL_REDIRECT=True, base.py).
         """
         client = Client()
-        response = client.post(
-            "/api/preferred-city/", {"action": "clear"}, secure=True
-        )
+        response = client.post("/api/preferred-city/", {"action": "clear"}, secure=True)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
         # Deletion cookie (empty value, max-age 0).

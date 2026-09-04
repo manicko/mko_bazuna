@@ -274,7 +274,7 @@ class TestConsentWithdrawView:
         """Authenticated users see the Withdraw Data button on the dashboard."""
         client = Client()
         client.force_login(user)
-        response = client.get("/dashboard/")
+        response = client.get("/dashboard/?lang=ru")
 
         assert response.status_code == 200
         # The Withdraw Data button is present in the response

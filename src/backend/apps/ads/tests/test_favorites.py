@@ -73,7 +73,7 @@ class TestFavoriteToggle:
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
 
-        resp = client.post(f"/favorite/{ad.id}/")
+        resp = client.post(f"/favorite/{ad.id}/?lang=ru")
 
         # NO redirect (302) — a guest must get a fragment htmx can swap.
         assert resp.status_code == 200
@@ -189,6 +189,6 @@ class TestFavoritesList:
         )  # another seller's ad, not favorited
         client = Client()
         client.force_login(buyer)
-        resp = client.get("/cabinet/favorites/")
+        resp = client.get("/cabinet/favorites/?lang=ru")
         assert resp.status_code == 200
         assert "Пока нет избранного" in resp.content.decode()

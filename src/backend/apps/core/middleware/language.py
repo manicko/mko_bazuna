@@ -2,7 +2,7 @@
 Language preference middleware for Mko Bazuna.
 
 The single authority for the active language. Resolves the user language per
-priority ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``ru``,
+priority ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``settings.LANGUAGE_CODE``,
 activates the Django translation for the request thread, and keeps
 ``request.LANGUAGE_CODE`` in sync with the thread-local active language.
 
@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.conf import settings
 from django.utils import translation
 from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
@@ -47,7 +48,8 @@ class LanguagePreMiddleware(MiddlewareMixin):
         1. ``?lang=X`` query parameter
         2. ``lang_pref`` cookie
         3. ``Accept-Language`` HTTP header
-        4. Default to Russian (``ru``)
+        4. Default to ``settings.LANGUAGE_CODE`` (Russian in production,
+           English in tests)
 
     When the ``?lang=X`` parameter is present the detected language is also
     persisted in the ``lang_pref`` cookie and, for authenticated users, in the
@@ -71,7 +73,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
             self._set_language_code(request, lang)
             return
 
-        self._set_language_code(request, LanguageLocale.RUSSIAN.value)
+        self._set_language_code(request, settings.LANGUAGE_CODE)
 
     def process_response(self, request: Any, response: Any) -> Any:
         """Persist the ``lang_pref`` cookie and emit language response headers.
@@ -101,7 +103,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
         """
         if not self._is_valid_language(lang):
             logger.warning("Ignoring invalid lang parameter: %s", lang)
-            self._set_language_code(request, LanguageLocale.RUSSIAN.value)
+            self._set_language_code(request, settings.LANGUAGE_CODE)
             return
 
         self._set_language_code(request, lang)

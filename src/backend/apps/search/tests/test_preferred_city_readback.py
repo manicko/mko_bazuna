@@ -18,7 +18,6 @@ listings() (T-05):
 import pytest
 from django.test import Client
 from django.urls import reverse
-from django.utils import translation
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -88,7 +87,7 @@ class TestSearchPreferredCityReadback:
     ) -> None:
         """Anonymous cookie `podgorica` -> only Podgorica ads (AC-2)."""
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get("/search/?q=Велосипед")
+        response = client.get("/search/?q=Велосипед&lang=ru")
         assert response.status_code == 200
         assert _result_ids(response) == [podgorica_ad.id]
         assert response.context["current_city"] == "podgorica"
@@ -98,7 +97,7 @@ class TestSearchPreferredCityReadback:
     ) -> None:
         """Explicit ?city=budva wins over the preferred default (AC-3)."""
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get("/search/?q=Велосипед&city=budva")
+        response = client.get("/search/?q=Велосипед&city=budva&lang=ru")
         assert response.status_code == 200
         assert _result_ids(response) == [budva_ad.id]
         assert response.context["current_city"] == "budva"
@@ -117,7 +116,7 @@ class TestSearchPreferredCityReadback:
         client.force_login(buyer)
         client.cookies["preferred_city"] = "budva"
 
-        response = client.get("/search/?q=Велосипед")
+        response = client.get("/search/?q=Велосипед&lang=ru")
         assert response.status_code == 200
         assert _result_ids(response) == [podgorica_ad.id]
 
@@ -126,7 +125,7 @@ class TestSearchPreferredCityReadback:
     ) -> None:
         """Stale cookie -> no city filter + cookie deleted (AC-4)."""
         client.cookies["preferred_city"] = "deleted-city"
-        response = client.get("/search/?q=Велосипед")
+        response = client.get("/search/?q=Велосипед&lang=ru")
         assert response.status_code == 200
         assert set(_result_ids(response)) == {podgorica_ad.id, budva_ad.id}
         # Stale cookie cleared in the response.
@@ -141,7 +140,7 @@ class TestListingsPreferredCityReadback:
     ) -> None:
         """URL path /city/budva/ overrides the preferred default (AC-3)."""
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get("/city/budva/")
+        response = client.get("/city/budva/?lang=ru")
         assert response.status_code == 200
         assert _result_ids(response) == [budva_ad.id]
         assert response.context["current_city"] == "budva"
@@ -151,7 +150,7 @@ class TestListingsPreferredCityReadback:
     ) -> None:
         """Root catalog defaults to the preferred city (AC-2)."""
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get("/")
+        response = client.get("/?lang=ru")
         assert response.status_code == 200
         assert _result_ids(response) == [podgorica_ad.id]
         assert response.context["current_city"] == "podgorica"
@@ -227,11 +226,10 @@ class TestCityBadgeReadback:
         self, client: Client, podgorica: City, budva: City
     ) -> None:
         """On /city/<slug>/ the badge shows the URL city, not a stale cookie."""
-        translation.activate("ru")
         # Stale preference from a prior selection.
         client.cookies["preferred_city"] = "podgorica"
         # Navigate to Budva — badge must show Budva, not the stale Podgorica.
-        response = client.get("/city/budva/")
+        response = client.get("/city/budva/?lang=ru")
         assert response.status_code == 200
         assert response.context["current_city"] == "budva"
         content = response.content.decode()
@@ -242,9 +240,8 @@ class TestCityBadgeReadback:
         self, client: Client, podgorica: City, budva: City
     ) -> None:
         """On /search/?city=<slug> the badge shows the query city, not the cookie."""
-        translation.activate("ru")
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get("/search/?city=budva")
+        response = client.get("/search/?city=budva&lang=ru")
         assert response.status_code == 200
         assert response.context["current_city"] == "budva"
         content = response.content.decode()
@@ -262,12 +259,11 @@ class TestCityBadgeReadback:
         via the persistence endpoint, must make the badge show Подгорица on
         the next page load — never the stale Будва.
         """
-        translation.activate("ru")
         client.cookies["consent_preferences"] = "true"
         client.cookies["preferred_city"] = "budva"
 
         # Establish a preference for Budva.
-        response = client.get("/")
+        response = client.get("/?lang=ru")
         assert response.status_code == 200
         assert "data-preferred-city-label>Будва" in response.content.decode()
 
@@ -277,7 +273,7 @@ class TestCityBadgeReadback:
         assert post.json() == {"ok": True}
 
         # Badge must now show Podgorica — not the stale Budva.
-        response = client.get("/")
+        response = client.get("/?lang=ru")
         content = response.content.decode()
         assert "data-preferred-city-label>Подгорица" in content
         assert "data-preferred-city-label>Будва" not in content
@@ -292,12 +288,9 @@ class TestAdDetailCityBadge:
         self, client: Client, seller: User, category: Category, podgorica: City
     ) -> None:
         """Ad detail with a valid preferred-city cookie shows the city badge."""
-        ad = create_test_ad(
-            seller, category, podgorica, status=AdStatus.PUBLISHED
-        )
-        translation.activate("ru")
+        ad = create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
         client.cookies["preferred_city"] = "podgorica"
-        response = client.get(reverse("ads:detail", args=[ad.id]))
+        response = client.get(reverse("ads:detail", args=[ad.id]) + "?lang=ru")
         assert response.status_code == 200
         content = response.content.decode()
         assert "data-preferred-city-label>Подгорица" in content
@@ -307,11 +300,8 @@ class TestAdDetailCityBadge:
         self, client: Client, seller: User, category: Category, podgorica: City
     ) -> None:
         """Ad detail without a preference shows «Entire country» (A5/A1)."""
-        ad = create_test_ad(
-            seller, category, podgorica, status=AdStatus.PUBLISHED
-        )
-        translation.activate("ru")
-        response = client.get(reverse("ads:detail", args=[ad.id]))
+        ad = create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
+        response = client.get(reverse("ads:detail", args=[ad.id]) + "?lang=ru")
         assert response.status_code == 200
         content = response.content.decode()
         assert "Вся страна" in content

@@ -60,7 +60,7 @@ def test_create_saved_search_with_filters_and_language(
     assert ss.min_price == 100
     assert ss.max_price == 500
     assert ss.is_active is True
-    assert ss.language == "ru"  # test default LANGUAGE_CODE
+    assert ss.language == "en"  # default LANGUAGE_CODE in test is "en"
 
 
 def test_requires_login(client: Client) -> None:

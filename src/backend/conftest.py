@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 from django.utils import timezone
+from django.utils import translation
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -26,6 +27,41 @@ from apps.core.enums import AdSource, AdStatus, AdvisoryLockId
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
+
+
+# ---------------------------------------------------------------------------
+# i18n testing standard (Spec 07)
+#
+# Default test language is English (LANGUAGE_CODE = "en" in test.py), matching
+# the msgid source language. Tests asserting on English UI strings (e.g.
+# "Clear all filters", "Page navigation") pass without extra language setup.
+#
+# Integration tests (Client-based): drive the language via the middleware's
+# priority order — ?lang=X or Accept-Language header. NEVER call
+# translation.activate() before client.get() — LanguagePreMiddleware overrides
+# it during request processing, making the pre-activation a no-op for rendered
+# content. Use ?lang=ru or Accept-Language: ru to get Russian output.
+#
+# Unit tests (no middleware, direct function calls): use translation.override(lang)
+# context manager for automatic cleanup.
+#
+# Thread-local cleanup: the autouse _reset_translation_state fixture below calls
+# translation.deactivate() in teardown, eliminating all thread-local translation
+# state leakage between tests. Do NOT add per-file deactivate() calls.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_translation_state():
+    """Reset thread-local translation state after each test.
+
+    LanguagePreMiddleware calls translation.activate() per-request, leaving
+    thread-local state after the response. Without cleanup, this leaks to
+    subsequent tests on the same xdist worker. Following Django's documented
+    tearDown recommendation (activate(settings.LANGUAGE_CODE)).
+    """
+    yield
+    translation.deactivate()
 
 
 # ---------------------------------------------------------------------------

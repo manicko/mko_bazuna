@@ -53,7 +53,44 @@ This file contains coding standards and rules for the Mko Bazuna project.
 - **Ad creation:** Use `from conftest import create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)` — it sets status-specific timestamps automatically. Add `status=AdStatus.PUBLISHED` explicitly if the test requires it.
 - **Backdating `created_at`:** `create_test_ad` cannot backdate `created_at` (auto_now_add=True). Use: `ad = create_test_ad(...)` then `Ad.objects.filter(pk=ad.pk).update(created_at=...)` then `ad.refresh_from_db()`.
 - **Assertions:** Use plain `assert` statements — do NOT use `self.assertEqual`, `self.assertTrue`, etc.
-- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--no-reuse-db --create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and `create_test_ad`.
+- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--no-reuse-db --create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and   `create_test_ad`.
+
+### i18n / Language Testing
+
+The test environment uses English as the default language
+(`LANGUAGE_CODE = "en"` in `config/settings/test.py`), matching the msgid
+source language. This means tests asserting on English UI strings (e.g.
+`"Clear all filters"`, `"Page navigation"`) pass without explicit language
+setup.
+
+**Integration tests (using Django `Client`):**
+
+- Set the language via the middleware's documented priority order:
+  `?lang=X` query parameter or `Accept-Language` HTTP header.
+- **Never** call `translation.activate()` before `client.get()` — the
+  `LanguagePreMiddleware` overrides it during request processing, making
+  the pre-activation a no-op for rendered content. Use `?lang=ru` or
+  `Accept-Language: ru` to get Russian output.
+- For URLs with no other query params, `?lang=ru` is convenient. Where the
+  URL carries meaningful query params, prefer `Accept-Language` header to
+  avoid polluting the URL under test.
+
+**Unit tests (no middleware, direct function calls):**
+
+- Use the `translation.override(lang)` context manager for any
+  locale-specific rendering. It provides automatic rollback (even on
+  exceptions) and restores the *previous* language on exit.
+
+**Thread-local cleanup:**
+
+- An autouse `translation.deactivate()` fixture in `src/backend/conftest.py`
+  eliminates all thread-local translation state leakage between tests. Do
+  **not** add per-file `deactivate()` calls — they are now redundant.
+
+**Parametrized multi-language tests:**
+
+- Use `LanguageLocale.values()` (the StrEnum), not bare string literals,
+  per project rule #10.
 
 ## Test Infrastructure
 
