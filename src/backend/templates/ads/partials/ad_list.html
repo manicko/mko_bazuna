@@ -31,7 +31,14 @@ is unaffected. {% endcomment %}
 {% endif %}
 <!-- Active filter chips -->
 {% if current_listing_purpose or current_features or current_condition or active_price_min or active_price_max %}
-    <div class="flex flex-wrap gap-2 mb-4">
+    <div class="flex flex-wrap gap-2 mb-4 items-center">
+        {# Clear all filters: resets all query params (q, sort, price, purpose, condition, features); category/city are path params, naturally preserved. #}
+        <button type="button"
+                hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
+                hx-push-url="true"
+                hx-target="#ad-list"
+                hx-swap="innerHTML"
+                class="px-2 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] flex items-center">{% trans "Clear all filters" %}</button>
         {% if active_price_min or active_price_max %}
             <span class="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
                 {% blocktrans with min=active_price_min max=active_price_max %}Price: {{ min }}–{{ max }}{% endblocktrans %}
@@ -78,13 +85,6 @@ is unaffected. {% endcomment %}
             {% endif %}
         {% endfor %}
     </div>
-    <!-- Clear all filters: resets all query params (q, sort, price, purpose, condition, features); category/city are path params, naturally preserved. -->
-    <a href="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
-       hx-get="?page=1{% if query %}&q={{ query|urlencode }}{% endif %}{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}"
-       hx-push-url="true"
-       hx-target="#ad-list"
-       hx-swap="innerHTML"
-       class="text-sm text-blue-600 hover:underline">{% trans "Clear all filters" %}</a>
 {% endif %}
 <!-- Ads grid -->
 {% if page_obj %}

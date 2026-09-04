@@ -840,7 +840,7 @@ class TestFilterUrlReset:
         client = Client()
         response = client.get(
             "/search/?q=test&min_price=100",
-            headers={"HX-Request": "true"},
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
         assert response.status_code == 200
         content = response.content.decode("utf-8")
@@ -859,7 +859,7 @@ class TestFilterUrlReset:
         client = Client()
         response = client.get(
             "/?min_price=100",
-            headers={"HX-Request": "true"},
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
         assert response.status_code == 200
         content = response.content.decode("utf-8")

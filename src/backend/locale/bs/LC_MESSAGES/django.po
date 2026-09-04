@@ -1,12 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-03 02:00-0500\n"
+"POT-Creation-Date: 2026-09-04 10:29-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -379,6 +379,9 @@ msgstr "Sačuvaj pretragu"
 msgid "Did you mean:"
 msgstr "Da li ste mislili:"
 
+msgid "Clear all filters"
+msgstr "Očisti sve filtere"
+
 #, python-format
 msgid "Price: %(min)s–%(max)s"
 msgstr "Cijena: %(min)s–%(max)s"
@@ -393,9 +396,6 @@ msgstr "Lokacija:"
 
 msgid "Feature:"
 msgstr "Karakteristika:"
-
-msgid "Clear all filters"
-msgstr "Očisti sve filtere"
 
 msgid "No image"
 msgstr "Nema slike"
