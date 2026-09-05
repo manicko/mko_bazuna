@@ -299,7 +299,7 @@ The autocomplete relies on `htmx:afterRequest` events.
                 <button type="button" class="lg:hidden p-2 -ml-2"
                         data-mobile-categories-toggle aria-label="Categories">…</button>
                 <h1 class="text-xl font-bold text-gray-800">
-                    <a href="/">Mko Bazuna</a>
+                    <a href="/">{{ site_name }}</a>
                 </h1>
             </div>
             <div class="flex items-center gap-2">
@@ -447,6 +447,12 @@ Consent state (`consent_shown`, `consent_analytics`, `consent_preferences`) is
 provided by `apps.users.context_processors.consent_state`. The behavior above is
 the complete requirement (canonical template: `components/header_catalog.html`).
 
+The admin-edited **site name** `site_name` is injected by a *separate* context processor,
+`apps.core.context_processors.site_config` (see
+[architecture-structure.md](architecture-structure.md#context-processors)), and is rendered
+as the brand link in both headers' `<h1>` (replacing the previously hardcoded
+`"Mko Bazuna"`).
+
 ### Auth Header (`header.html`)
 
 A simpler auth-aware header for dashboard and cabinet pages. Does not
@@ -456,7 +462,7 @@ include search, categories, or breadcrumbs.
 <header class="bg-white shadow-sm border-b">
     <div class="container mx-auto px-4 py-4 flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-800">
-            <a href="{% url 'ads:listings' %}">Mko Bazuna</a>
+            <a href="{% url 'ads:listings' %}">{{ site_name }}</a>
         </h1>
         {% include "components/language_switcher.html" %}
         <nav class="flex gap-4 items-center">

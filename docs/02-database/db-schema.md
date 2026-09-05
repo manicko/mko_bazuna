@@ -378,6 +378,36 @@ Category search works TWO ways: (1) FTS matches the category word via `category_
 
 ---
 
+### site_config (singleton)
+
+Admin-editable site/brand name. Replaces 22 hardcoded `"Mko Bazuna"` occurrences across
+page `<title>` tags, header/footer brand links, the auth & privacy `blocktrans`, and the
+admin review page with a single runtime-configurable value. Modeled on the
+`ModerationCriteria` singleton pattern — exactly one row (`pk=1`, created lazily via
+`get_or_create(pk=1)` and seeded explicitly by the `0002_seed_default` data migration using
+`RunPython`, the first project migration to seed data this way; under `DisableMigrations`
+(tests) the lazy `get_or_create` in `get_singleton()` is the fallback):
+```
+id (PK)
+name (VARCHAR, default "Bazuna")      # site/brand name shown in page titles, headers, footer, and bot greetings
+db_table: site_config
+```
+The admin (`apps/core/admin.py`) registers `SiteConfigAdmin` with
+`has_add_permission = has_delete_permission = False`. A `post_save` signal
+(`apps/core/signals.py`, wired in `CoreConfig.ready()`) invalidates the cached value
+(`SITE_CONFIG_CACHE_KEY = "site_config:v1"`, 1 h TTL in `apps/core/utils/cache.py`) on
+every save.
+
+The cached name is read by **both** long-lived processes — the web via the `site_config`
+context processor (`site_name`) and the Telegram bot via `get_site_name_async()` (greetings
+on `/start` and `/post`); see [Cache Backend](../99-agent/architecture.md#cache-backend) for
+the two-process shared-cache model (Redis in prod, `LocMemCache` in tests). `get_site_name()`
+defensively falls back to `"Bazuna"` if the row or cache is unavailable. See
+[architecture-structure.md](../01-spec/architecture-structure.md#context-processors) for the
+context-processor inventory.
+
+---
+
 ### moderation_criteria (zone D3/D4, US-A11, decision O4)
 Singleton table (exactly one active row), edited by admin at runtime. Applied to NEW ads (read current row at submit; no per-ad `criteria_version` needed). Stored in DB (NOT `settings.py`) so it is editable at runtime per US-A11.
 

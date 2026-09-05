@@ -28,7 +28,8 @@ src/
 │   │   ├── core/                  # shared utils, abstract models, managers, signals
 │   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
 │   │   │   ├── middleware/           # city resolution + locale + preferred city (CityResolutionMiddleware, LanguagePreMiddleware, PreferredCityMiddleware)
-│   │   │   ├── services/             # contact service
+│   │   │   ├── migrations/
+│   │   │   ├── services/             # contact + site_config services
 │   │   │   ├── templatetags/         # contact_tags, localized_content
 │   │   │   ├── tests/                # sweep command tests, context processor tests
 │   │   │   ├── utils/                # advisory_lock, cache, migrate_locked, sanitize
@@ -181,6 +182,7 @@ deletion mirrors `set_cookie` attributes (Secure/HttpOnly/SameSite=Lax on HTTPS)
 | `consent_state` | `apps/users/context_processors.py` | `consent_shown`, `consent_analytics`, `consent_preferences` | Consent banner + script gating (11 templates) |
 | `plausible_host` | `apps/core/context_processors.py` | `PLAUSIBLE_HOST` | Gated Plausible snippet (`{% if consent_analytics and PLAUSIBLE_HOST %}`) |
 | `language` | `apps/core/context_processors.py` | `LANGUAGE_CODE` | All templates |
+| `site_config` | `apps/core/context_processors.py` | `site_name` | Admin-edited brand name surfaced in page `<title>` tags, header/footer brand links, auth & privacy `blocktrans`, and the admin review page — replaces 22 hardcoded `"Mko Bazuna"` occurrences. See [db-schema.md](../02-database/db-schema.md#site_config). |
 
 `favorites_count` is `None` for anonymous visitors (outline heart, no count); for
 authenticated sellers it is their favorite count. The header heart badge refreshes via

@@ -41,6 +41,12 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 - **Shared cache (production):** Redis via `django-redis`. Required because the web process
   runs 3 gunicorn workers and the bot runs as a separate process; `LocMemCache` is per-process
   only and cannot share rate-limit counters or cache invalidations across processes.
+- **Site name (cross-process branding):** The admin-edited `SiteConfig.name` singleton
+  (`site_config` table) is cached (`SITE_CONFIG_CACHE_KEY`, 1 h TTL) and read by **both**
+  long-lived processes — the web via the `site_config` context processor (`site_name`) and the
+  Telegram bot via `get_site_name_async()` (greetings on `/start` and `/post`). The shared
+  cache is what keeps the brand name identical between the web header and the bot greeting
+  without a redeploy. See [site_config](../02-database/db-schema.md#site_config).
 - **Redis-specific APIs:** `cache.delete_pattern()` is called (with `hasattr` guards) at
   `apps/categories/services/lookup_resolution.py:112` and
   `apps/lookups/services/cache_service.py:77` — these are no-ops under LocMemCache and

@@ -175,6 +175,8 @@ The following significant features have been implemented beyond the Phase 1 base
 | **Preferred City** | Persistent default-city selector in the catalog header with hybrid persistence (DB FK for authenticated users; consent-gated 1-year cookie for guests) and login reconciliation | `PreferredCityMiddleware`, `header_context`, `apps/search/views/preferred_city.py`, `User.preferred_city` FK |
 | **Consent & GDPR Compliance** | Consent banner, granular cookie consent, `/privacy/` policy page, `ConsentRecord` audit log, and Plausible/GLightbox script gating | `apps/users/views/consent.py`, `apps/users/context_processors.py` (`consent_state`), `consent_records` table, `core/urls.py` (`/privacy/`) |
 
+| **Site Name Centralization** | Replaces 22 hardcoded `"Mko Bazuna"` occurrences with a single admin-editable brand name from the `SiteConfig` singleton, served to both the web (via the `site_config` context processor → `site_name`) and the Telegram bot (via `get_site_name_async()`) through the shared Redis/LocMemCache cache, with `post_save` cache invalidation on admin save | [`db-schema.md`](../02-database/db-schema.md#site_config), [`architecture-structure.md`](architecture-structure.md#context-processors), `SiteConfig` model, `site_config` context processor, `get_site_name`/`get_site_name_async`, `SITE_CONFIG_CACHE_KEY` |
+
 ## Known Problems / Bug Specs
 
 Analytical specifications for identified bugs and gaps. Full details in `.ai/problems/`
