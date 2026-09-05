@@ -320,7 +320,7 @@ trivial. Priority: advisory.
 
 > **Validation Note:**
 > - **Action:** validated (unchanged)
-> - **Detail:** Confirmed against `base.py:16,28-46`. Line 16 `BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent` resolves to `<repo>/src` (file is `src/backend/config/settings/base.py`: settings←config←backend←src). Line 28 `env_path = BASE_DIR / ".env"` therefore reads `<repo>/src/.env`, and line 46 `environ.Env.read_env(env_path)` loads from there. Yet `.env.example:2` instructs contributors to "Copy this file to .env (at the repository root...)" and `docs/ops/docker-deployment.md:79` describes `.env.docker` as bind-mounted into containers "as `src/.env`" (line 79) while line 81/193 describe the repo-root `.env` as "auto-loaded by Compose". The discrepancy is real: code reads `src/.env`, docs point contributors at repo-root `.env`; local dev only works because `uv` implicitly injects the repo-root `.env` into `os.environ`, masking the `read_env` target. This is a code-vs-docs mismatch (DOC-UPDATE): the env vars themselves are not secrets, so the doc alignment is low-risk. Both proposed resolutions (point `env_path` at repo root, or standardize on `src/.env` and update docs) are valid. No rollout safety concern.
+> - **Detail:** Confirmed against `base.py:16,28-46`. Line 16 `BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent` resolves to `<repo>/src` (file is `src/backend/config/settings/base.py`: settings←config←backend←src). Line 28 `env_path = BASE_DIR / ".env"` therefore reads `<repo>/src/.env`, and line 46 `environ.Env.read_env(env_path)` loads from there. Yet `.env.example:2` instructs contributors to "Copy this file to .env (at the repository root...)" and `docs/ops/docker-deployment.md:79` describes `.env.docker` as bind-mounted into containers "as `src/.env`" (line 79) while line 81/193 describe the repo-root `.env` as "auto-loaded by Compose". The discrepancy is real: code reads `src/.env`, docs point contributors at repo-root `.env`; local dev only works because `uv` implicitly injects the repo-root `.env` into `os.environ`, masking the `read_env` target. This is a code-vs-docs mismatch (DOC-UPDATE): the env vars themselves are not secrets, so the doc alignment is low-risk. Both proposed resolutions are valid; **Approach B** (standardize on `src/.env`) is selected as the recommendation — the Docker bind-mount (`.env.docker:/app/src/.env:ro`, `docker-compose.yml:51`) and every service's `env_file: [.env.docker]` are already aligned with `src/.env`, so only doc updates and a stale-file cleanup are needed, with zero code/compose changes. No rollout safety concern.
 
 **Description:** `base.py` computes `BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent`
 (=`src/` layout, base.py:16) and then `env_path = BASE_DIR / ".env"` = **`src/.env`**
@@ -352,10 +352,22 @@ ambiguous; local dev silently depends on `uv`'s implicit `.env` loading rather
 than the explicit `read_env` in code, and any non-`uv` invocation fails to load
 the repo-root `.env`.
 
-**Recommendation:** Make the source of truth explicit — either point
-`env_path` at the repository root (`.env`) and update the Docker bind-mount to
-`/app/.env`, or document that the canonical location is `src/.env` and remove
-the conflicting repo-root `.env` guidance. Effort: small. Priority: advisory.
+**Recommendation:** Adopt **Approach B** — standardize on `src/.env` as the
+single canonical env-file location. The existing code and Docker setup are
+already aligned on this path, so **no `base.py` or `docker-compose.yml` changes
+are required**. Only documentation and working-tree cleanup:
+
+1. **Code (`base.py:16,28,46`) — leave unchanged.** `BASE_DIR = ...parent.parent.parent.parent` resolves to `<repo>/src` (and `/app/src` in the container, per `Dockerfile:62,108,143` `WORKDIR /app` + `PYTHONPATH=/app/src`). `env_path = BASE_DIR / ".env"` therefore reads `<repo>/src/.env` — the correct canonical location.
+
+2. **Docker (`docker-compose.yml:51` and all 6 other service volume stanzas) — leave unchanged.** The bind-mount `.env.docker:/app/src/.env:ro` already targets exactly the path the code reads. Additionally, every service uses `env_file: [.env.docker]`, so all vars are already injected into the container environment — `read_env` is a belt-and-suspenders fallback that already points at the right file. Changing the bind-mount to `/app/.env` (Approach A) would require editing 7 stanzas for zero functional gain.
+
+3. **`.env.example:2-3`** — change the copy instruction from "Copy this file to `.env` (at the repository root, NOT inside `src/backend/`)" to "Copy this file to `src/.env`". This aligns the contributor-facing template with what `read_env` in `base.py` actually reads.
+
+4. **`docs/ops/docker-deployment.md:193-194`** — correct the local-dev note ("For local Django development outside Docker (using `uv run` directly), use `.env` (auto-loaded by Compose)") to state that Django reads `src/.env` via `read_env`, and that `uv run` implicitly loads `src/.env` into the process environment — both resolve to the same file.
+
+5. **Working-tree cleanup** — delete the stray empty `src/.env` (0 bytes, confirmed present, gitignored) that currently masks the issue by satisfying `env_path.exists()` at `base.py:29`.
+
+**Rationale:** Approach A (point `env_path` at the repo root and re-bind-mount to `/app/.env`) touches `base.py` and 7 compose volume stanzas, introducing risk to a shipping production template for no functional gain — Docker already works correctly via `env_file` + the matching bind-mount. Approach B achieves full consistency with doc-only changes and a stale-file cleanup, zero production risk. Effort: trivial (doc-only + 1 gitignored file deletion). Priority: advisory.
 
 ---
 
@@ -389,9 +401,11 @@ the conflicting repo-root `.env` guidance. Effort: small. Priority: advisory.
   process args.
 - **CFG-006**: Remove the tracked 0-byte root `entrypoint*.sh` stubs; keep the
   canonical implementations in `docker/`.
-- **CFG-007**: Resolve the `.env` source-location discrepancy (point
-  `env_path` at the repository root, or update the Docker bind-mount/docs to
-  `src/.env`).
+- **CFG-007**: Standardize on `src/.env` as the canonical env file (matching
+  `base.py`'s `env_path = BASE_DIR / ".env"` and the Docker bind-mount
+  `.env.docker:/app/src/.env:ro`); update `.env.example` and
+  `docs/ops/docker-deployment.md` to stop directing contributors to the repo-root
+  `.env`.
 
 ## Doc Updates Needed
 
@@ -458,7 +472,7 @@ _None beyond the findings themselves._ No architectural integrity, maintainabili
 ### Required Fixes
 
 1. **CFG-001** (mandatory): Remove `${ADMIN_PASSWORD:-admin}` default → `${ADMIN_PASSWORD:?}` (or bare `${ADMIN_PASSWORD}`) in `docker-compose.yml:99` and `docker-compose.dev.override.yml:15`, so an unset `ADMIN_PASSWORD` fails fast and the entrypoint skip-guard at `entrypoint-create-admin.sh:18` is honored.
-2. **CFG-007** (doc): Pick one canonical `.env` location and align `base.py` `env_path`, the Docker bind-mount, `.env.example`, and `docs/ops/docker-deployment.md`.
+2. **CFG-007** (doc): Standardize on `src/.env` as the canonical env file (matching the existing `base.py` `env_path = BASE_DIR / ".env"` and the Docker bind-mount `.env.docker:/app/src/.env:ro`); update `.env.example` (line 2) and `docs/ops/docker-deployment.md` (line 193) to point contributors there and stop referencing the repo-root `.env`.
 
 ### Advisory Recommendations
 

@@ -186,7 +186,21 @@ This file is the self-contained validated report. The reader does not need to co
 
 **Evidence Quality:** **Medium-High** — The core technical claims (non-atomic DB/delete, swallowed errors) are verified at exact line numbers in all six sweep commands + deletion.py. However, the finding's evidence contains two factually incorrect claims: (1) "no periodic store-vs-DB reconciliation job" — `sweep_orphaned_media.py` exists but is broken and unscheduled; (2) the grep claim for "orphan" matches is false. The substance (no *working* reconciliation) is correct, but the evidence statements are inaccurate.
 
-**Recommendation:** [BEST-PRACTICE] After the committed delete, collect any `delete_photo` calls that exited via the error branch into an idempotent "pending_media_deletion" record (key + reason + attempt) for a background retry worker, OR run a periodic store-vs-DB reconciliation command that unlinks files with no matching AdImage row and logs rows whose file is missing. At minimum, escalate the exhausted-retry path from `logger.error` to a structured event/metric (not swallowed) so silent orphans are observable. **Critically:** fix `sweep_orphaned_media.py` (NEW-ME-007) to make the existing reconciliation command functional and schedule it in the hourly scheduler.
+**Recommendation:** [BEST-PRACTICE] Adopt **Approach B** — periodic store-vs-DB reconciliation via the existing `sweep_orphaned_media` command. Do NOT build a `pending_media_deletion` outbox table (Approach A); it is heavier, has no precedent in the codebase, and is strictly subsumed by a sweep backstop.
+
+**Selected approach and rationale:** `sweep_orphaned_media.py` (132 lines, `src/backend/apps/media/management/commands/sweep_orphaned_media.py`) already implements the full store-vs-DB reconciliation algorithm: it walks `MEDIA_ROOT` excluding `seed/`, collects referenced keys across all four `AdImage` fields (`image`, `thumbnail_small`, `thumbnail_medium`, `thumbnail_large`) in `_collect_referenced_keys()` (lines 33–42), computes `on_disk - referenced` (line 91), and deletes unreferenced files via `os.remove` (lines 109–121). It is architecturally identical to the existing sweep pattern (`delete_sweep.py`, etc.): advisory-locked, idempotent, designed for hourly scheduling. It is broken only because of the missing `AdvisoryLockId.SWEEP_ORPHANED_MEDIA` member (NEW-ME-007).
+
+**Concrete changes (3 files):**
+1. **`src/backend/apps/core/enums.py`** — Add `SWEEP_ORPHANED_MEDIA = 103` to the `AdvisoryLockId` enum (the enum currently has IDs 1–12, 10, 100–111; 103 is a free slot). The command's own docstring (line 13) already documents "Uses advisory lock 103."
+2. **`docker/entrypoint-scheduler.sh`** — Add `'sweep_orphaned_media'` to the `hourly_commands` list (lines 28–37), e.g. after `'purge_deleted_ads'`.
+3. **`src/backend/apps/core/tests/test_sweep_lock_structure.py`** — Add `("sweep_orphaned_media", AdvisoryLockId.SWEEP_ORPHANED_MEDIA)` to `SWEEP_COMMANDS` (lines 37–49) and `"apps.media.management.commands.sweep_orphaned_media"` to `_LOCK_TARGET_MODULES` (lines 55–67), so the lock-acquisition-inside-transaction assertion covers the newly-fixed command.
+
+**Secondary measures:**
+- Once ME-001's `os.path.realpath` containment check lands in `delete_photo`, route the sweep's direct `os.remove` call (sweep_orphaned_media.py:112) through `delete_photo` (or a shared safe-deletion primitive) to inherit the containment check — the sweep currently bypasses `delete_photo` and uses raw `os.remove`, leaving it vulnerable to the same path-traversal risk.
+- Escalate `delete_photo`'s exhausted-retry path (media.py:119–123) from `logger.error` to a structured metric/event (e.g. `AnalyticsEvent`) so transient failures are observable between hourly sweep windows.
+- For ME-002 (thumbnail orphans): the sweep already collects all four fields including thumbnails (line 36–41), so fixing NEW-ME-007 also provides automatic thumbnail orphan reclamation as a backstop — no need to extend all 6 sweep commands for that purpose (ME-002's primary fix of collecting thumbnail keys in each sweep is still recommended for promptness, but the backstop is covered).
+
+**Why not Approach A (outbox table):** No precedent exists — grep for `outbox|dead_letter|deadletter|pending_media|retry_queue|failed_deletion|media_deletion` across `src/` returned zero matches. Approach A would require a new model, migration, a daemon process, and retry wiring in `delete_photo`'s error branch, for a failure mode the sweep already covers more comprehensively (process crash, partial batch, transient lock contention, thumbnail orphans).
 
 > **Validation Note:**
 > - **Action:** evidence correction
@@ -439,7 +453,52 @@ None. All Type fields (`RUNTIME-ERROR`) are preserved as-is per the exemplar pat
 ## Advisory Recommendations
 
 1. **ME-005**: Set `Image.MAX_IMAGE_PIXELS` project-wide; prefer metadata-only dimension probe.
-2. **ME-003**: After NEW-ME-007 is fixed, escalate `delete_photo`'s exhausted-retry path from `logger.error` to a structured metric/event. Consider a `pending_media_deletion` dead-letter table for automatic retry of failed deletions.
+2. **ME-003**: After NEW-ME-007 is fixed, escalate `delete_photo`'s exhausted-retry path from `logger.error` to a structured metric/event (e.g. `AnalyticsEvent`). The now-functional `sweep_orphaned_media` reconciliation backstop covers automatic recovery — no outbox table needed.
 3. **ME-002**: After ME-001 and NEW-ME-007 are fixed, extend all 6 sweeps + `soft_delete_user_ads` to collect all 4 AdImage keys and delete each via `delete_photo`. Add reference-counting for shared seed thumbnails. Add regression test asserting thumbnail cleanup after sweep.
 4. **Code health**: Extract `delete_photo` from `telegram_bot/services/media.py` into a backend-shared location (e.g. `apps/media/services/filesystem.py`) to resolve the dependency-direction violation noted in Phase 01 (ENT-001). All 7 production modules currently import it from the bot package.
 ```
+
+---
+
+## Research Findings: ME-003 Recommendation Analysis
+
+**Date:** 2026-09-05
+**Analyst:** code-research-agent
+**Purpose:** Resolve the non-actionable dual-recommendation in ME-003 by researching the codebase and selecting ONE approach.
+
+### 1. Does `sweep_orphaned_media.py` already implement Approach B?
+
+**Yes — fully confirmed.** The command at `src/backend/apps/media/management/commands/sweep_orphaned_media.py` (132 lines) implements the complete store-vs-DB reconciliation algorithm:
+- `_collect_referenced_keys()` (lines 33–42): queries all four `AdImage` fields (`image`, `thumbnail_small`, `thumbnail_medium`, `thumbnail_large`) and builds a set of referenced keys.
+- `_walk_media_files()` (lines 45–59): walks `MEDIA_ROOT` excluding the `seed/` subdirectory.
+- `handle()` (lines 77–132): computes `orphans = on_disk - referenced` (line 91) and deletes each via `os.remove` (line 112), with `FileNotFoundError`/`OSError` handling.
+- It is advisory-locked (line 87, though broken) and supports `--dry-run` (lines 67–75).
+
+The command is **architected identically** to the existing sweep pattern (`delete_sweep.py`, `archive_sweep.py`, etc.): `transaction.atomic()` → `advisory_lock(AdvisoryLockId.X)` → query → mutate. It is designed to be scheduled hourly alongside the other sweeps in `docker/entrypoint-scheduler.sh`.
+
+### 2. Is there any existing "pending/outbox/dead-letter" DB table pattern?
+
+**No — zero precedent.** Grep for `outbox|dead_letter|deadletter|pending_media|retry_queue|failed_deletion|media_deletion` across all `.py` files in `src/` returned **zero matches**. A model scan of every `models.py` in `src/backend/apps/` (15 model classes across ads, categories, users, lookups, search, currencies, trust, locations, core, moderation, analytics) reveals **no** outbox, dead-letter, or pending-operations table. The codebase has no daemon/worker process model for deferred retries — all background work is handled by hourly management commands via `entrypoint-scheduler.sh`.
+
+### 3. Which approach is simpler, lower-risk, and aligns with existing architecture?
+
+**Approach B (reconciliation sweep) is decisively better:**
+- **Already implemented**: the algorithm exists and is correct; only the advisory-lock enum ID (103) is missing and the scheduler line is absent.
+- **Leverages existing infrastructure**: no new model, no migration, no new process. The hourly scheduler already runs 8 sweep commands; adding `sweep_orphaned_media` is a one-line change.
+- **Lower risk**: a periodic sweep is idempotent and bounded — it deletes only files with no DB reference, so it can never orphan or delete live data (assuming ME-001's containment check is also applied, per NEW-ME-007's recommendation to route through `delete_photo`).
+- **More comprehensive**: covers crash-recovery orphans, partial batch failures, transient `OSError`s, AND thumbnail orphans (ME-002) — all in one pass.
+
+**Approach A (outbox table + retry worker) is rejected:**
+- Requires a new model (`PendingMediaDeletion` or similar), migration, and a background retry worker (no existing worker process model).
+- Only addresses the `delete_photo` retry-exhaustion path, not the crash-between-DB-commit-and-delete-loop path or thumbnail orphans.
+- Has no architectural precedent in the codebase.
+
+### 4. Summary of concrete change set (selected = Approach B):
+
+| File | Change |
+|------|--------|
+| `src/backend/apps/core/enums.py` | Add `SWEEP_ORPHANED_MEDIA = 103` to `AdvisoryLockId` (line 42) |
+| `docker/entrypoint-scheduler.sh` | Add `'sweep_orphaned_media'` to `hourly_commands` list (lines 28–37) |
+| `src/backend/apps/core/tests/test_sweep_lock_structure.py` | Add the command to `SWEEP_COMMANDS` and `_LOCK_TARGET_MODULES` lists |
+| `src/telegram_bot/services/media.py` | (Secondary) Escalate exhausted-retry `logger.error` (line 119) to structured metric/event |
+| `src/backend/apps/media/management/commands/sweep_orphaned_media.py` | (Secondary, post-ME-001) Route `os.remove` (line 112) through `delete_photo` for containment check |

@@ -190,7 +190,7 @@ The `User` model extends `AbstractUser`, which carries an `email` field never ov
 - `create_admin_user.py:111` — `email=email,` in `User.objects.create(...)`.
 - `core/tests/test_create_admin_user.py:66` — `email="admin@example.com"` passed; `:70` — `assert user.email == "admin@example.com"`.
 
-**Recommendation:** Either drop `email` as a login/contact field for this Telegram-first model (override `email = None` on `User`), or add `email` to the `update_fields` in `withdraw_consent` so PII nulling matches the documented contract §4.2. Effort: small. Priority: recommended.
+**Recommendation:** **Select Approach B** — add `email` to `withdraw_consent`'s `update_fields` list (`deletion.py:141-149`) and set `user.email = ''` before save. Rationale: `User` inherits `email` from `AbstractUser` as `EmailField(blank=True, default='')`; the model does **not** override `email`, so the DB column accepts empty string and setting `user.email = ''` requires no migration. This follows the exact pattern already established for `first_name`/`last_name` (lines 137-148), which are also inherited PII fields nulled in the same block. The Telegram-first architecture confirms `email` is not a login or contact mechanism: `USERNAME_FIELD = 'username'` (`users/models.py:121`), site login is via Telegram deep-link tokens only (`technical-specification.md:139-145`), the spec collects minimum PII of `telegram_id` + optional `username` with no mention of email (`technical-specification.md:82`), and the only non-admin code referencing `email` is a display fallback in `cabinet/hub.html:25` (`{{ request.user.username|default:request.user.email }}`). No `AuthenticationBackend` or login form references email anywhere in `src/`. Email is only optionally set during admin provisioning (`create_admin_user.py:111`; `--email` arg defaults to `''`), so adding it to `withdraw_consent`'s `update_fields` closes the PII-erasure gap without breaking admin workflows, templates, or tests. **Approach A is rejected** as higher-risk: overriding `email = None` requires a migration to drop the column, breaks the `create_admin_user --email` provisioning path, forces a template edit in `hub.html:25`, and invalidates `test_create_with_email` (`core/tests/test_create_admin_user.py:60-70`) — all for zero additional GDPR protection since the 30-day hard-delete sweep (`consent_hard_delete.py`) physically removes the row regardless. Effort: small (2 lines in `deletion.py`). Priority: recommended.
 
 ---
 
@@ -261,7 +261,7 @@ _None._ PC-005 (BEST-PRACTICE) was evaluated for rejection as low-ROI but is ret
 - **PC-001 (mandatory, HIGH):** Two-part fix. (a) Add `consent_given_at` to `update_fields` in `decline_consent` and `withdraw_consent` — atomic, single-row writes; no ordering dependency. (b) Update `consent_state` context processor to force `consent_analytics=False` / `consent_preferences=False` when `is_declined` or `consent_revoked_at is not None` — pure logic change, evaluated per request. No circular dependencies; no hidden consumers. Safe. **Rollout ordering:** the context-processor fix must precede (or accompany) removing `consent_given_at` from any re-derivation path; both should ship together to avoid a window where `consent_given_at` is cleared but `consent_analytics` still re-derives from a non-null value.
 - **PC-002 (mandatory, HIGH):** Adding `gettext` to bot strings and the ru/en/bs `.po` compilation is independent of other phases. State-specific denial messages require no schema or migration changes. The bot calls `django.setup()`, so it shares the same translation catalog as the web layer. No ordering dependency.
 - **PC-004 (mandatory, MEDIUM):** Adding `storage_keys()` to `AdImage` and collecting `thumbnail_*` keys in both `soft_delete_user_ads` (DRAFT path only) and `consent_hard_delete` (30-day sweep). Both call sites use the existing `delete_photo` with its retry/log handling. No circular dependency; `AdImage` model change is additive (new method, no new fields). Safe. **Rollout ordering:** the `consent_hard_delete` sweep must run after the `AdImage.storage_keys()` method is deployed; both are in the same release, no migration required.
-- **PC-006 (mandatory, MEDIUM):** Two options: (a) override `email = None` on `User` (requires a migration to drop the column), or (b) add `email` to `update_fields` in `withdraw_consent` (no migration). Option (b) is lower-risk. Either way, no circular dependency. If option (a) is chosen, verify all admin provisioning paths don't set `email`.
+- **PC-006 (mandatory, MEDIUM):** Selected Approach B: add `email` to `withdraw_consent`'s `update_fields` (no migration required). Set `user.email = ''` before save, matching `AbstractUser`'s `EmailField(blank=True, default='')` — empty string, not `None`, since the column is not nullable. No circular dependency. The `email` field is only optionally set via `create_admin_user --email` (default `''`), so this fix covers all PII-erasure paths without breaking admin provisioning, templates, or tests.
 - No unsafe insertion points, circular dependencies, or hidden dependency chains were detected.
 
 ## Execution Validation
@@ -292,9 +292,57 @@ All cited targets remain present in the working tree and were read in full. All 
 
 3. **PC-004** (mandatory): Add `AdImage.storage_keys()` returning `["image"] + [thumbnail_* for each set]`, then replace `values_list("image", flat=True)` with `values_list("storage_keys", flat=True)` — or collect all four keys — in both `soft_delete_user_ads` (`deletion.py`) and `consent_hard_delete.py`.
 
-4. **PC-006** (mandatory): Add `email` to `withdraw_consent`'s `update_fields` (line 141-149) and set `user.email = ""` (or `None` if nullable) before save. Decide whether to keep `email` null vs empty-string based on `AbstractUser`'s `EmailField(blank=True)`.
+4. **PC-006** (mandatory): Add `"email"` to `withdraw_consent`'s `update_fields` list (`deletion.py:141-149`), set `user.email = ''` before save (matching `AbstractUser`'s `EmailField(blank=True, default='')` — empty string, not `None`, since the column is not nullable), then `user.save(update_fields=[..., 'email'])`. No migration required; no admin provisioning, template, or test changes needed.
 
 ### Advisory Recommendations
 
 1. **PC-003:** Import `get_account_state` from `apps.users.services.account_state` in `permissions.py`; map `AccountState` → `(can_interact, reason)` to eliminate the inline reimplementation in `_check_user_state`; add a regression test asserting the bot middleware and the shared predicate agree on the same `User` row.
 2. **PC-005:** Extend `_anonymize_ip` to mask IPv6 to /64 (zero the low 80 bits) using `ipaddress` module; update `ConsentRecord.ip_address` `help_text` to reflect the IPv6 policy.
+
+---
+
+## Research Appendix: PC-006 Recommendation Selection
+
+> **Action:** Resolved — single approach selected (Approach B).
+> **Date:** 2026-09-05
+
+### Decision
+
+**Selected: Approach B** — add `email` to `withdraw_consent`'s `update_fields` and set `user.email = ""` before save.
+
+### Research Summary
+
+Investigated four questions across the codebase to select a single approach:
+
+**Q1: Is email used as a login or contact mechanism?**
+- **No.** `User` (`users/models.py:13`) sets `USERNAME_FIELD = "username"` (line 121), not `email`. Authentication is via Telegram deep-link tokens (`LoginToken` model, `technical-specification.md:139-145`). No `AuthenticationBackend` subclass references email anywhere in `src/` (confirmed via negative grep for `email` in auth backends and login forms).
+
+**Q2: Is email displayed in any template?**
+- **Only one non-admin template reference.** `cabinet/hub.html:25` uses `{{ request.user.username|default:request.user.email }}` as a display-name fallback for admin users. No buyer-facing template renders user email (spec §C, line 54: "No seller identity shown on site").
+
+**Q3: Does any admin provisioning or API path rely on email being non-empty?**
+- **Admin provisioning only.** `create_admin_user.py:48-52` accepts an optional `--email` argument (defaults to `""`), set at line 111. Admin users authenticate via `USERNAME_FIELD = "username"` + password. The `email` field is `blank=True` with `default=""` from `AbstractUser`, so empty string is valid. Tests in `core/tests/test_create_admin_user.py:60-70` verify the `--email` path but default to `""`.
+
+**Q4: Does the spec mandate email?**
+- **No.** Spec §F (PII & consent, `technical-specification.md:82`): "Collect minimum: `telegram_id`, optional `username`." No mention of `email`. The erasure contract (`technical-specification.md:87`) lists only `telegram_id` + `username` + `analytics_events.user_id`/`ModeratorActionLog.user_id`. The implementation already nulls `first_name`/`last_name` (Telegram-sourced PII) beyond the spec's minimum list. Email is an inherited `AbstractUser` artifact, not a Telegram-sourced field.
+
+### Approach Comparison
+
+| Criterion | Approach A (drop email) | Approach B (add to update_fields) |
+|---|---|---|
+| Migration required | Yes (drop column) | No |
+| Breaks admin provisioning | Yes (create_admin_user --email) | No |
+| Breaks templates | Yes (hub.html:25 fallback) | No |
+| Breaks tests | Yes (test_create_with_email) | No |
+| GDPR protection gained | None (row hard-deleted at 30 days) | Full (email nulled immediately on withdrawal) |
+| Aligns with existing pattern | N/A (field removal) | Yes (matches first_name/last_name nulling) |
+| Risk | High | Low |
+
+### Conclusion
+
+**Approach B** is selected because it:
+- Follows the existing PII-nulling pattern (`first_name`/`last_name` are nulled in the same `update_fields` block at `deletion.py:137-148`)
+- Requires no migration, no template changes, no test changes
+- Closes the PII-erasure gap: if email is ever set (admin provisioning), it is purged on consent withdrawal alongside other PII
+- Aligns with the Telegram-first architecture (email is not a login mechanism; it is an optional, non-PII-core inherited field)
+- **Approach A is rejected** as higher-risk: overriding `email = None` requires a migration, breaks the `create_admin_user --email` provisioning path, forces a template edit in `hub.html:25`, and invalidates `test_create_with_email` — all for zero additional GDPR protection since the 30-day hard-delete sweep physically removes the row regardless.
