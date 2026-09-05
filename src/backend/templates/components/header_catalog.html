@@ -8,6 +8,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
 {% load i18n %}
 {% load localized_content %}
 {% load static %}
+{% load dict_tags %}
 {% with current_cat=breadcrumb_category %}
     <header class="bg-white shadow-sm border-b">
         <div class="container mx-auto px-4 py-3">
@@ -94,7 +95,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                                 {% for cat in root_categories %}
                                     <li data-category-slug="{{ cat.slug }}">
                                         <div class="flex items-center justify-between">
-                                            <a href="{% url 'ads:listings_category' cat.slug %}"
+                                            <a href="{% url 'ads:listings_category' cat.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
                                                data-category-link="{{ cat.slug }}"
                                                class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
                                                 {{ cat|get_category_name:LANGUAGE_CODE }}
@@ -177,7 +178,7 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
         {% for cat in root_categories %}
             <li data-category-slug="{{ cat.slug }}">
                 <div class="flex items-center justify-between">
-                    <a href="{% url 'ads:listings_category' cat.slug %}"
+                    <a href="{% url 'ads:listings_category' cat.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
                        data-category-link="{{ cat.slug }}"
                        class="block flex-1 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 min-h-[44px]">
                         {{ cat|get_category_name:LANGUAGE_CODE }}
@@ -220,12 +221,11 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
     /* ── Translated labels from context (Q6=A) ─────────────────────────────── */
     var labels = JSON.parse('{{ catalog_js_labels|escapejs }}');
 
-    /* ── City filter URL navigation (T5: coexist path city_slug + ?city=) ── */
-    // When the current path is /city/<slug>/ the city is encoded in the path
-    // segment (which the listings view treats as higher priority than ?city=).
-    // In that case we replace the segment rather than appending a query param.
-    // Otherwise we set or remove the city as a ?city= query param, preserving
-    // the category path and every other existing query parameter. See spec T5.
+    /* ── City filter URL navigation (Q2=A: city always as ?city= query param) ── */
+    // City is always applied as a ?city=<slug> query param, never as a
+    // /city/<slug>/ path segment. When the current path is /city/<old_slug>/
+    // (legacy path-based form) we convert it to /?city=<new_slug>, preserving
+    // lang and all other existing query parameters. See spec Q2=A.
     function applyCityFilter(slug) {
         var url = new URL(window.location.href);
         var path = url.pathname;
@@ -233,8 +233,8 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
         var hasCityInPath = cityPathRegex.test(path);
         if (slug) {
             if (hasCityInPath) {
-                url.pathname = path.replace(cityPathRegex, '/city/' + encodeURIComponent(slug) + '/');
-                url.searchParams.delete('city');
+                url.pathname = path.replace(cityPathRegex, '/');
+                url.searchParams.set('city', slug);
             } else {
                 url.searchParams.set('city', slug);
             }
@@ -366,8 +366,14 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
                 await fetch('{% url "search:preferred_city" %}', { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCsrf() } }).catch(() => undefined);
                 applyCityFilter(slug);
             } else if (type === 'category' && slug) {
-                // Filter by category.
-                window.location.href = '/category/' + encodeURIComponent(slug) + '/';
+                // Filter by category: set the path to /category/<slug>/ while
+                // preserving lang, city, sort and all active filter params,
+                // resetting pagination to page 1 (mirrors the server-side
+                // query_replace page=1 pattern on category links).
+                var url = new URL(window.location.href);
+                url.pathname = '/category/' + encodeURIComponent(slug) + '/';
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
             } else {
                 // Text suggestion (popular search / user history): populate + submit.
                 searchInput.value = text;
@@ -636,6 +642,33 @@ breadcrumb_category (listings/search) or ad.category (detail). {% endcomment %}
     window.addEventListener('htmx:afterSwap', function (e) {
         // Re-parse any newly injected submenu panels for accordion behavior.
         if (e.target) attachCategoryHandlers(e.target);
+
+        // Recompute category/breadcrumb links to match the live URL state
+        // after HTMX swaps (e.g. pagination changes ?city= or ?lang=).
+        var categoryLinks = document.querySelectorAll('[data-category-link]');
+        if (categoryLinks.length) {
+            var catParams = new URLSearchParams(window.location.search);
+            catParams.set('page', '1');
+            var catBase = catParams.toString();
+            categoryLinks.forEach(function (link) {
+                var slug = link.getAttribute('data-category-link');
+                var rebuilt = new URLSearchParams(catBase);
+                link.setAttribute(
+                    'href',
+                    '/category/' + encodeURIComponent(slug) + '/?' + rebuilt.toString()
+                );
+            });
+        }
+    });
+
+    // Safety net: ensure every HTMX-driven request carries lang from the
+    // current URL for any future navigations that bypass server-side param
+    // construction.
+    document.body.addEventListener('htmx:configRequest', function (e) {
+        var urlLang = new URLSearchParams(window.location.search).get('lang');
+        if (urlLang && !e.detail.parameters.lang) {
+            e.detail.parameters.lang = urlLang;
+        }
     });
 })();
 </script>

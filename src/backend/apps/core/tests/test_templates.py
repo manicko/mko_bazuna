@@ -144,3 +144,70 @@ class TestQueryReplace:
         assert "features=negotiable" in result
         assert "q=test" in result
         assert "page=2" in result
+
+    def test_none_values_are_skipped(self) -> None:
+        """When a kwarg value is ``None``, that key is removed from the query
+        string (not rendered as ``key=None``), and existing params survive.
+
+        Mirrors the ``{% query_replace request page=1 city=current_city %}``
+        pattern used in header/breadcrumb/did-you-mean category links, where
+        ``current_city`` may be ``None`` when no city filter is active.
+        """
+        request = Mock()
+        request.GET = QueryDict("q=phone&lang=ru")
+        template = Template(
+            "{% load dict_tags %}{% query_replace request page=1 city=city_var %}"
+        )
+        context = Context({"request": request, "city_var": None})
+        result = html.unescape(template.render(context))
+        assert "city" not in result
+        assert "q=phone" in result
+        assert "lang=ru" in result
+        assert "page=1" in result
+
+    def test_none_value_removes_existing_param(self) -> None:
+        """A ``None`` override removes an existing key from ``request.GET``."""
+        request = Mock()
+        request.GET = QueryDict("q=phone&lang=ru&page=3")
+        template = Template(
+            "{% load dict_tags %}{% query_replace request page=page_var %}"
+        )
+        context = Context({"request": request, "page_var": None})
+        result = html.unescape(template.render(context))
+        assert "page" not in result
+        assert "q=phone" in result
+        assert "lang=ru" in result
+
+    def test_query_replace_none_value_removes_param(self) -> None:
+        """Passing ``city=None`` removes the ``city`` key from the query string.
+
+        Verifies that ``None`` is treated as a deletion sentinel — the key does
+        not appear in the output at all (not even as ``city=None``), mirroring
+        the ``{% query_replace request city=request.current_city %}`` pattern
+        used in header/breadcrumb/did-you-mean links where ``current_city`` is
+        ``None`` when no city filter is active.
+        """
+        request = Mock()
+        request.GET = QueryDict("q=phone&city=old_city&lang=ru")
+        template = Template("{% load dict_tags %}{% query_replace request city=None %}")
+        result = html.unescape(template.render(Context({"request": request})))
+        assert "city" not in result
+        assert "q=phone" in result
+        assert "lang=ru" in result
+
+    def test_query_replace_sets_value(self) -> None:
+        """Passing ``city='spb'`` sets ``city=spb`` in the output query string."""
+        result = _render_query_replace("", city="spb")
+        assert "city=spb" in result
+
+    def test_query_replace_preserves_existing_params(self) -> None:
+        """Existing ``min_price=100`` is preserved when overriding ``lang='en'``.
+
+        Simulates a buyer on ``/?min_price=100`` clicking a category link:
+        the ``query_replace`` tag must carry forward the active price filter
+        while also injecting the current language.
+        """
+        result = _render_query_replace("min_price=100&q=phone", lang="en")
+        assert "min_price=100" in result
+        assert "lang=en" in result
+        assert "q=phone" in result

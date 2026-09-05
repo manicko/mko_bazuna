@@ -48,6 +48,12 @@ def query_replace(request: Any, **kwargs: Any) -> str:
     """Copy ``request.GET``, apply keyword overrides, return a urlencoded string.
 
     Each keyword argument sets (or replaces) the corresponding query parameter.
+    If a keyword argument value is ``None``, the corresponding key is *removed*
+    from the query string rather than being rendered as ``key=None``.  This
+    lets templates write ``{% query_replace request page=1 city=current_city %}``
+    where ``current_city`` may be ``None`` (no active city filter) without
+    polluting the URL with a literal ``city=None`` parameter.
+
     Useful in templates for building navigation links that preserve the current
     query string while changing or adding selected parameters.
 
@@ -60,11 +66,16 @@ def query_replace(request: Any, **kwargs: Any) -> str:
         request: The current ``HttpRequest`` (available via the ``request``
             context processor).
         **kwargs: Parameter name/value pairs to set on the resulting query.
+            A ``None`` value removes the key from the query string.
 
     Returns:
         A URL-encoded query string (without the leading ``?``).
     """
     query = request.GET.copy()
     for key, value in kwargs.items():
-        query[key] = value
+        if value is None:
+            if key in query:
+                del query[key]
+        else:
+            query[key] = value
     return query.urlencode()

@@ -750,9 +750,7 @@ class TestFilterUrlReset:
         assert 'step="{{ price_step.value }}"' in content
         assert 'step="0.01"' not in content
 
-    def test_price_inputs_step_renders_as_one(
-        self, seller, category, city
-    ) -> None:
+    def test_price_inputs_step_renders_as_one(self, seller, category, city) -> None:
         """The price step context processor resolves to ``PriceStep.DEFAULT = '1'`` in rendered HTML."""
         create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
@@ -764,6 +762,58 @@ class TestFilterUrlReset:
         content = response.content.decode("utf-8")
         assert 'step="1"' in content
         assert 'step="0.01"' not in content
+
+    # ------------------------------------------------------------------ #
+    # applyCityFilter URL navigation (Q2=A: city always as ?city= query param)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _header_catalog() -> str:
+        """Read the shared header_catalog.html template source."""
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/components/header_catalog.html"
+        )
+        return path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _extract_apply_city_filter(content: str) -> str:
+        """Extract the ``applyCityFilter`` function source from the template."""
+        start = content.index("function applyCityFilter(slug)")
+        end = content.index("\n    }", start)
+        return content[start:end]
+
+    def test_apply_city_filter_uses_query_param_for_set(self) -> None:
+        """``applyCityFilter`` sets city via ``searchParams.set('city'`` (Q2=A:
+        city always as a ``?city=`` query param, never as a ``/city/<slug>/``
+        path segment."""
+        content = self._header_catalog()
+        assert "searchParams.set('city', slug)" in content
+
+    def test_apply_city_filter_no_path_replacement_in_set(self) -> None:
+        """The old path-based ``/city/<slug>/`` replacement in the set branch is
+        gone — city is no longer written back into the URL path."""
+        content = self._header_catalog()
+        assert "path.replace(cityPathRegex, '/city/" not in content
+
+    def test_apply_city_filter_preserves_lang(self) -> None:
+        """``applyCityFilter`` never deletes ``lang`` (OQ3: lang must survive in
+        all branches — set, clear-on-path, and clear-on-query)."""
+        content = self._header_catalog()
+        assert "searchParams.delete('lang')" not in content
+        assert "params.delete('lang')" not in content
+
+    def test_clear_entire_country_preserves_lang(self) -> None:
+        """The "Entire country" clear path (``applyCityFilter(null)``) removes
+        only the ``city`` param and never touches ``lang``."""
+        content = self._header_catalog()
+        func = self._extract_apply_city_filter(content)
+        # The clear branch is the outer ``} else { ... }`` (last else in func).
+        clear_idx = func.rindex("} else {")
+        clear_end = func.index("\n        }", clear_idx)
+        clear_branch = func[clear_idx:clear_end]
+        assert "delete('city')" in clear_branch
+        assert "delete('lang')" not in clear_branch
 
     # ------------------------------------------------------------------ #
     # Integration tests — HTMX rendered output
@@ -1021,6 +1071,146 @@ class TestFilterUrlReset:
         ids = {a.id for a in response.context["page_obj"]}
         assert ad_delivery.id in ids
         assert ad_negotiable.id not in ids
+
+    # ------------------------------------------------------------------ #
+    # URL-state preservation (spec §2: CR-1 through CR-8)                  #
+    # Static template-source assertions (no DB needed)                     #
+    # ------------------------------------------------------------------ #
+
+    def test_category_links_preserve_lang_and_city(self) -> None:
+        """Category dropdown links use ``query_replace`` to preserve
+        ``lang`` and ``city`` across navigation (CR-1, CR-3)."""
+        content = self._header_catalog()
+        assert (
+            "query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE"
+            in content
+        )
+        assert "data-category-link" in content
+
+    def test_no_bare_category_path_in_dropdown(self) -> None:
+        """No category ``<a href>`` closes without ``query_replace`` (CR-2).
+
+        Every ``{% url 'ads:listings_category' cat.slug %}`` tag in
+        ``header_catalog.html`` must be immediately followed by
+        ``?{% query_replace`` — the old broken pattern produced a bare
+        ``href`` with no query string.
+        """
+        content = self._header_catalog()
+        url_tag = "listings_category' cat.slug %}"
+        total = content.count(url_tag)
+        with_replace = content.count(url_tag + "?{% query_replace")
+        assert total > 0, "No category URL tags found in header_catalog.html"
+        assert total == with_replace, (
+            f"{total - with_replace} bare category links without query_replace"
+        )
+
+    def test_breadcrumb_links_preserve_lang_and_city(self) -> None:
+        """Breadcrumb category links use ``query_replace`` to preserve
+        ``lang`` and ``city`` (CR-3)."""
+        path = (
+            Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html"
+        )
+        content = path.read_text(encoding="utf-8")
+        assert (
+            "query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE"
+            in content
+        )
+        assert "data-category-link" in content
+
+    def test_did_you_mean_category_uses_query_replace(self) -> None:
+        """The did-you-mean category link in ``ad_list.html`` uses
+        ``query_replace`` to preserve ``lang`` and ``city`` (CR-4)."""
+        path = (
+            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        )
+        content = path.read_text(encoding="utf-8")
+        assert (
+            "suggested_category %}?{% query_replace request page=1"
+            " city=request.current_city lang=LANGUAGE_CODE" in content
+        )
+
+    def test_autocomplete_category_preserves_url_params(self) -> None:
+        """The autocomplete category click handler uses the URL API to
+        preserve all existing query params instead of the old broken
+        string-concatenation pattern (CR-5)."""
+        content = self._header_catalog()
+        # Old broken pattern: direct string concat, loses all query params
+        assert (
+            "window.location.href = '/category/' + encodeURIComponent(slug)"
+            not in content
+        )
+        # Fixed pattern: uses new URL() to preserve lang, city, sort, filters
+        assert "new URL(window.location.href)" in content
+        assert "url.pathname" in content
+        assert "url.searchParams.set('page', '1')" in content
+
+    def test_config_request_hook_injects_lang(self) -> None:
+        """The ``htmx:configRequest`` hook injects ``lang`` from the current
+        URL into every HTMX request (Task 4, CR-6)."""
+        content = self._header_catalog()
+        assert "htmx:configRequest" in content
+        assert "parameters.lang" in content
+        assert "e.detail.parameters.lang" in content
+
+    def test_after_swap_recomputes_category_links(self) -> None:
+        """The ``htmx:afterSwap`` handler recomputes category links to match
+        the live URL state after HTMX swaps (Task 5, CR-7)."""
+        content = self._header_catalog()
+        assert "htmx:afterSwap" in content
+        assert "querySelectorAll('[data-category-link]')" in content
+
+    # ------------------------------------------------------------------ #
+    # Integration tests — URL state in rendered category pages              #
+    # ------------------------------------------------------------------ #
+
+    def test_category_with_city_and_lang(self, seller, category, city) -> None:
+        """GET ``/category/<slug>/?city=<city>&lang=ru`` sets context vars
+        correctly and filters ads by the city (CR-8).
+
+        Asserts that ``current_category``, ``current_city``, and
+        ``LANGUAGE_CODE`` context vars are set, and that only ads in the
+        requested city appear in the results.
+        """
+        city2 = City.objects.create(
+            country_code="ME",
+            name="Другиград",
+            region="Central",
+            slug="drugigrad",
+        )
+        ad1 = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, title="Ad 1"
+        )
+        ad2 = create_test_ad(
+            seller, category, city2, status=AdStatus.PUBLISHED, title="Ad 2"
+        )
+        client = Client()
+        response = client.get(
+            f"/category/{category.slug}/?city={city.slug}&lang=ru",
+        )
+        assert response.status_code == 200
+        assert response.context["current_category"] == category.slug
+        assert response.context["current_city"] == city.slug
+        assert response.context["LANGUAGE_CODE"] == "ru"
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad1.id in result_ids
+        assert ad2.id not in result_ids
+
+    def test_category_links_render_with_state(self, seller, category, city) -> None:
+        """Full-page GET ``/category/<slug>/?city=<city>&lang=ru`` renders
+        the category dropdown with ``lang`` and ``city`` preserved in the
+        href links (CR-8)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            f"/category/{category.slug}/?city={city.slug}&lang=ru",
+        )
+        assert response.status_code == 200
+        html = response.content.decode("utf-8")
+        # Category dropdown links preserve city and lang in the href
+        assert f"city={city.slug}" in html
+        assert "lang=ru" in html
+        # Category links are rendered (desktop dropdown + mobile panel)
+        assert "data-category-link" in html
 
 
 class TestSortOnSearchResults:

@@ -1,6 +1,7 @@
 {# Partial template for ad list grid (HTMX fragment). Renders the filter form (re-rendered on every HTMX navigation so DOM state never goes stale), active filter chips, ad cards grid, pagination, and status messages. XSS-safe via Django autoescape. #}
 {% load localized_content %}
 {% load i18n %}
+{% load dict_tags %}
 {% load trust_tags %}
 {% load price_tags %}
 {% comment %} The filter form lives inside the HTMX-swappable region so that every
@@ -16,16 +17,16 @@ is unaffected. {% endcomment %}
 {% if suggested_category %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
-            {% trans "Did you mean:" %} <a href="{% url 'ads:listings' suggested_category %}"
-    class="underline font-medium">{{ suggested_category }}</a>?
+            {% trans "Did you mean:" %} <a href="{% url 'ads:listings_category' suggested_category %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+class="underline font-medium">{{ suggested_category }}</a>?
         </p>
     </div>
 {% endif %}
 {% if suggested_city %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
-            {% trans "Did you mean:" %} <a href="{% url 'ads:listings_city' suggested_city %}"
-    class="underline font-medium">{{ suggested_city }}</a>?
+            {% trans "Did you mean:" %} <a href="{% if request.resolver_match.url_name == 'listings_city' %}{% url 'ads:listings' %}{% else %}{{ request.path }}{% endif %}?{% query_replace request page=1 city=suggested_city lang=LANGUAGE_CODE %}"
+class="underline font-medium">{{ suggested_city }}</a>?
         </p>
     </div>
 {% endif %}
