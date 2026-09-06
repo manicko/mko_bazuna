@@ -40,3 +40,32 @@ def get_site_name() -> str:
 async def get_site_name_async() -> str:
     """Async wrapper for bot handlers — runs get_site_name in a thread."""
     return await sync_to_async(get_site_name)()
+
+
+def get_bot_username() -> str:
+    """Return the admin-configured Telegram bot username (cached, 1h TTL).
+
+    Falls back to 'bazuna_bot' if the DB or cache is unavailable (Spec 18, Task 1).
+    """
+    from apps.core.utils.cache import (
+        get_cached_bot_username,
+        set_cached_bot_username,
+    )
+    from apps.core.models import SiteConfig
+
+    cached = get_cached_bot_username()
+    if cached:
+        return cached
+    try:
+        obj = SiteConfig.get_singleton()
+        username = cast(str, obj.bot_username)
+        set_cached_bot_username(username)
+        return username
+    except Exception:
+        logger.warning("SiteConfig unavailable; falling back to 'bazuna_bot'")
+        return "bazuna_bot"
+
+
+async def get_bot_username_async() -> str:
+    """Async wrapper for bot handlers — runs get_bot_username in a thread."""
+    return await sync_to_async(get_bot_username)()

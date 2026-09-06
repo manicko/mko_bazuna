@@ -17,7 +17,7 @@ class SiteConfigAdmin(admin.ModelAdmin):
     site name branding.
     """
 
-    list_display = ["name"]
+    list_display = ["name", "bot_username"]
     readonly_fields = []
 
     def has_add_permission(self, request) -> bool:

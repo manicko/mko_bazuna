@@ -96,3 +96,47 @@ def invalidate_site_config(key: str = SITE_CONFIG_CACHE_KEY) -> None:
         key: Cache key to invalidate (defaults to site_config:v1)
     """
     cache.delete(key)
+
+
+BOT_USERNAME_CACHE_KEY: Final[str] = "site_config:bot_username:v1"
+
+
+def get_cached_bot_username(key: str = BOT_USERNAME_CACHE_KEY) -> str | None:
+    """
+    Get cached bot username.
+
+    Args:
+        key: Cache key (defaults to site_config:bot_username:v1)
+
+    Returns:
+        Bot username string or None if not cached
+    """
+    return cache.get(key)
+
+
+def set_cached_bot_username(
+    value: str,
+    key: str = BOT_USERNAME_CACHE_KEY,
+    ttl: int = SITE_CONFIG_CACHE_TTL,
+) -> None:
+    """
+    Set cached bot username.
+
+    Args:
+        value: Bot username to cache
+        key: Cache key (defaults to site_config:bot_username:v1)
+        ttl: Time-to-live in seconds (defaults to 3600)
+    """
+    cache.set(key, value, ttl)
+
+
+def invalidate_bot_username_cache(key: str = BOT_USERNAME_CACHE_KEY) -> None:
+    """
+    Invalidate the cached bot username.
+
+    Called when admin updates site config to ensure fresh value on next access.
+
+    Args:
+        key: Cache key to invalidate (defaults to site_config:bot_username:v1)
+    """
+    cache.delete(key)

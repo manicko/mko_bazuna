@@ -4,6 +4,7 @@ Core models for Mko Bazuna.
 Provides shared singleton models used across apps.
 """
 
+from django.core.validators import RegexValidator
 from django.db import models
 
 
@@ -20,6 +21,18 @@ class SiteConfig(models.Model):
         max_length=255,
         default="Bazuna",
         help_text="Site name displayed in page titles and headers",
+    )
+
+    bot_username = models.CharField(
+        max_length=32,
+        default="bazuna_bot",
+        help_text="Telegram bot username without @ prefix",
+        validators=[
+            RegexValidator(
+                regex=r"^[A-Za-z0-9_]{3,32}$",
+                message="Bot username must be 3-32 characters, alphanumeric and underscore only",
+            ),
+        ],
     )
 
     class Meta:
