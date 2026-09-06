@@ -2,3 +2,14 @@
 @import "tailwindcss";
 @source "../../../backend/templates/**/*.html";
 @source "../../../theme/static/theme/js/**/*.js";
+
+/* CSS direction:rtl technique for visual reversal of bot-username display text.
+   The rtl_obfuscate template filter reverses the string server-side and inserts
+   Unicode RTL Marks between characters. This class flips the reversed text back
+   to correct visual order via bidi-override. The RLM marks and reversed source
+   defeat naive textContent/regex scrapers, while the sr-only paired span provides
+   the clean username for screen readers. See Spec 18 CR-6 / Task 3. */
+.bot-username-rtl {
+  direction: rtl;
+  unicode-bidi: bidi-override;
+}

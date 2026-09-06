@@ -1,6 +1,7 @@
 {# Public privacy policy page (GDPR Article 13). Accessible without login. #}
 {% load static %}
 {% load i18n %}
+{% load telegram_tags %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -30,7 +31,7 @@
                     <a href="https://t.me/{{ bot_username }}"
                        class="text-blue-600 underline hover:text-blue-800"
                        target="_blank"
-                       rel="noopener noreferrer">@{{ bot_username }}</a>.
+                       rel="noopener noreferrer">@<span class="bot-username-rtl" aria-hidden="true">{{ bot_username|rtl_obfuscate }}</span><span class="sr-only">{{ bot_username }}</span></a>.
                 </p>
             </section>
             <section class="bg-white rounded-lg shadow p-6 mb-6">
@@ -108,7 +109,7 @@
             <section class="bg-white rounded-lg shadow p-6 mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "4. Third-Party Disclosures" %}</h2>
                 <ul class="list-disc list-inside text-sm text-gray-700 space-y-2">
-                    <li><strong>{% trans "Telegram" %}</strong> — {% blocktrans %}authentication and seller-buyer contact relay via deep-links (<code>t.me/{{ bot_username }}</code>). No ad content is shared; only the identifiers needed for the action.{% endblocktrans %}
+                    <li><strong>{% trans "Telegram" %}</strong> — {% blocktrans with obfuscated=bot_username|rtl_obfuscate %}authentication and seller-buyer contact relay via deep-links (<code>t.me/@<span class="bot-username-rtl" aria-hidden="true">{{ obfuscated }}</span><span class="sr-only">{{ bot_username }}</span></code>). No ad content is shared; only the identifiers needed for the action.{% endblocktrans %}
                         <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
                             <li><strong>{% trans "Google Translate" %}</strong> — {% trans "best-effort, non-identifying language normalization of ad text. No personal data (telegram_id, username, IP) is transmitted." %}</li>
                             <li><strong>{% trans "Plausible Analytics" %}</strong> — {% trans "cookieless, privacy-friendly traffic analytics. Loaded only after you accept the analytics category." %}</li>
@@ -148,7 +149,7 @@
                     <a href="https://t.me/{{ bot_username }}"
                        class="text-blue-600 underline hover:text-blue-800"
                        target="_blank"
-                       rel="noopener noreferrer">@{{ bot_username }}</a>.
+                       rel="noopener noreferrer">@<span class="bot-username-rtl" aria-hidden="true">{{ bot_username|rtl_obfuscate }}</span><span class="sr-only">{{ bot_username }}</span></a>.
                 </p>
             </section>
         </main>
