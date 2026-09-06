@@ -12,6 +12,7 @@ import re
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 
@@ -46,7 +47,16 @@ async def handle_login_deep_link(
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.answer(
-            f"Welcome to {await get_site_name_async()}! To login, use a deep-link: /start login_<your_token>"
+            f"Welcome to {await get_site_name_async()}! To login, use a deep-link: /start login_<your_token>",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Contact us", callback_data="contact_us"
+                        ),
+                    ],
+                ],
+            ),
         )
         return
 

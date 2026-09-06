@@ -48,13 +48,19 @@ def dp() -> Dispatcher:
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    from telegram_bot.handlers import ad_create_router, alerts_router, login_router
+    from telegram_bot.handlers import (
+        ad_create_router,
+        alerts_router,
+        contact_router,
+        login_router,
+    )
     from telegram_bot.middlewares import AccountStateMiddleware
 
     dp.message.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
     dp.include_router(login_router)
     dp.include_router(ad_create_router)
     dp.include_router(alerts_router)
+    dp.include_router(contact_router)
 
     return dp
 

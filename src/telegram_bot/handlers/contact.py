@@ -10,14 +10,41 @@ Implements zone R2 conditions and anonymous forwarding.
 
 import logging
 import re
+from typing import Final
 
-from aiogram import Bot, types
+from aiogram import Bot, F, Router, types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+
+from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
 logger = logging.getLogger(__name__)
 
-# Deep-link pattern: contact_<ad_id>
+router = Router()
+
+# Deep-link patterns.
+# /start contact_<ad_id> — anonymous buyer-to-seller contact.
 CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
+# /start contact_us — support desk deep-link for logged-out Telegram-bypass buyers.
+CONTACT_US_PATTERN = re.compile(r"^contact_us$")
+
+# Callback data for the inline "Contact us" button (shared with login.py's
+# no-arg /start greeting).
+CONTACT_US_CALLBACK: Final[str] = "contact_us"
+
+# Greeting shown to buyers reaching the support desk (Russian, per contact.py
+# convention). Shared by the /start contact_us deep-link and the inline button
+# so both entry points produce identical output.
+_CONTACT_US_GREETING: Final[str] = (
+    "👋 Привет! Вы связались со службой поддержки Bazuna.\n\n"
+    "Напишите ваш вопрос — мы ответим как можно скорее.\n\n"
+    "Для создания объявления используйте /post."
+)
+
+# Shown when a user exceeds the contact-start rate limit (OQ1).
+CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = (
+    "Слишком много запросов в поддержку. Попробуйте позже."
+)
 
 
 async def handle_contact_start(
@@ -26,27 +53,90 @@ async def handle_contact_start(
     """
     Check if deep-link is a contact pattern and handle it.
 
-    Pattern: /start contact_<ad_id>
+    Patterns:
+      - ``/start contact_us`` -> support desk greeting for logged-out buyers
+        (Telegram-bypass users), with the inline "Contact us" button re-shower.
+      - ``/start contact_<ad_id>`` -> anonymous buyer-to-seller contact.
 
-    Returns True if handled as contact deep-link, False otherwise.
+    Returns True if handled as a contact deep-link, False otherwise.
 
-    Zone R2 conditions enforced:
+    Zone R2 conditions enforced (contact_<ad_id> branch only):
         - ad.status == PUBLISHED
         - seller.telegram_id IS NOT NULL
         - NOT seller.is_deleted
         - NOT seller.is_banned
         - seller.consent_revoked_at IS NULL
 
-    Bot messages:
+    Bot messages (contact_<ad_id> branch):
         - ad missing/not PUBLISHED -> "объявление больше недоступно"
         - seller unavailable -> "продавец больше недоступен для связи"
     """
+    if CONTACT_US_PATTERN.match(deep_link):
+        return await handle_contact_us_start(message, bot)
+
     match = CONTACT_PATTERN.match(deep_link)
     if not match:
         return False  # Not a contact deep-link
 
     ad_id = int(match.group(1))
     return await handle_contact(message, bot, ad_id)
+
+
+def _contact_us_keyboard() -> InlineKeyboardMarkup:
+    """Inline 'Contact us' keyboard — shared by the deep-link and the callback.
+
+    Using a single builder (with ``CONTACT_US_CALLBACK``) guarantees the
+    keyboard and the ``F.data`` filter can never drift apart.
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Contact us",
+                    callback_data=CONTACT_US_CALLBACK,
+                ),
+            ],
+        ],
+    )
+
+
+async def handle_contact_us_start(message: types.Message, bot: Bot) -> bool:
+    """Handle ``/start contact_us`` deep-link for logged-out Telegram-bypass users.
+
+    OQ1 ordering — bots are rejected first (fail fast, never consuming rate
+    budget), then the per-user contact-start rate limit is applied, and finally
+    the buyer is greeted with the shared support desk message + keyboard.
+
+    Always returns True: the ``contact_us`` deep-link is fully handled here and
+    must short-circuit ``login.handle_login_deep_link``.
+    """
+    if not message.from_user:
+        return True
+    if message.from_user.is_bot:
+        return True  # OQ1: reject bots, never consume rate budget
+    if not check_contact_start_rate_limit(message.from_user.id):
+        await message.answer(CONTACT_US_RATE_LIMITED_MESSAGE)
+        return True
+    await message.answer(_CONTACT_US_GREETING, reply_markup=_contact_us_keyboard())
+    return True
+
+
+@router.callback_query(F.data == CONTACT_US_CALLBACK)
+async def handle_contact_us_callback(
+    callback: types.CallbackQuery, bot: Bot
+) -> None:
+    """Inline 'Contact us' button for Telegram-bypass users — same greeting.
+
+    Mirrors ``alerts.handle_unsubscribe_callback`` (alerts.py:103-138):
+    answer the callback first to dismiss the spinner, then edit the originating
+    message to the shared support desk greeting. ``bot`` is accepted for
+    signature parity with the other callback handlers.
+    """
+    await callback.answer()  # dismiss spinner
+    if callback.message is not None:
+        await callback.message.edit_text(
+            _CONTACT_US_GREETING, reply_markup=_contact_us_keyboard()
+        )
 
 
 async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:

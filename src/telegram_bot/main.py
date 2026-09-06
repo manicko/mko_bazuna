@@ -49,6 +49,7 @@ def main() -> None:
         alerts_router,
         ad_copy_router,
         language_router,
+        contact_router,
     )
 
     dp.include_router(login_router)
@@ -56,6 +57,7 @@ def main() -> None:
     dp.include_router(alerts_router)
     dp.include_router(ad_copy_router)
     dp.include_router(language_router)
+    dp.include_router(contact_router)
 
     # Create bot and start polling
     bot = Bot(token=token)
