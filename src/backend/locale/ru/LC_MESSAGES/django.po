@@ -328,6 +328,9 @@ msgstr "Опубликовано:"
 msgid "Contact Seller"
 msgstr "Связаться с продавцом"
 
+msgid "Contact us"
+msgstr "Связаться с нами"
+
 msgid "Seller unavailable for contact"
 msgstr "Продавец недоступен для контакта"
 

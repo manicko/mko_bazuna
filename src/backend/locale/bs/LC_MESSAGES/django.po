@@ -328,6 +328,9 @@ msgstr "Objavljeno:"
 msgid "Contact Seller"
 msgstr "Kontaktiraj prodavca"
 
+msgid "Contact us"
+msgstr "Kontaktiraj nas"
+
 msgid "Seller unavailable for contact"
 msgstr "Prodavac nije dostupan za kontakt"
 
