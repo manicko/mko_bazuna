@@ -10,6 +10,8 @@ from enum import StrEnum
 from django.conf import settings
 from django.utils.translation import gettext as _
 
+from apps.core.services.site_config import get_bot_username
+
 
 def plausible_host(request):
     """
@@ -88,7 +90,7 @@ def header_context(request) -> dict:
         favorites_count = user.favorites.count()
 
     return {
-        "bot_username": settings.BOT_USERNAME,
+        "bot_username": get_bot_username(),
         "root_categories": list(
             Category.objects.root_nodes().filter(is_active=True).order_by("name")
         ),

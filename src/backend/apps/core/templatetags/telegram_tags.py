@@ -77,7 +77,8 @@ _JS_IIFE: Final[str] = (
     "el.addEventListener('click', function(e) {"
     "e.preventDefault();"
     "var username = atob(el.dataset.botEncoded);"
-    "window.location.href = 'https://t.me/' + username + '?start=' + encodeURIComponent(el.dataset.start);"
+    "var url = 'https://t.me/' + username + '?start=' + encodeURIComponent(el.dataset.start);"
+    "if (el.target === '_blank') { window.open(url, '_blank', 'noopener,noreferrer'); } else { window.location.href = url; }"
     "});"
     "})();</script>"
 )
@@ -89,12 +90,14 @@ def telegram_deep_link(
     command: str,
     *args: str,
     classes: str = "",
+    target: str = "",
 ) -> str:
     """Render an obfuscated Telegram deep-link.
 
     Usage::
 
         {% telegram_deep_link "create_ad" classes="..." %}
+        {% telegram_deep_link "create_ad" classes="..." target="_blank" %}
         {% telegram_deep_link "contact" ad.id classes="..." %}
         {% telegram_deep_link "contact_us" classes="..." %}
         {% telegram_deep_link "login" raw_token classes="..." %}
@@ -113,6 +116,9 @@ def telegram_deep_link(
         classes: Extra utility classes to append to ``js-telegram-link``.
             The tag displays a translatable label (e.g., "Contact us"), not the
             bot username, so no CSS ``direction: rtl`` class is applied.
+        target: HTML ``target`` attribute value (e.g. ``_blank``). When set,
+            the inline JS IIFE opens the deep-link via ``window.open(url, '_blank',
+            'noopener,noreferrer')`` instead of ``window.location.href`` (CR-8).
 
     Returns:
         An HTML-escaped ``<a>`` plus an inline ``<script>`` IIFE. When
@@ -138,6 +144,7 @@ def telegram_deep_link(
     # not the bot username (which is base64-encoded in data-bot-encoded).
     class_attr = f"js-telegram-link {classes}".strip()
     encoded = base64.b64encode(get_bot_username().encode("utf-8")).decode("ascii")
+    target_attr = mark_safe(f' target="{target}"') if target else ""
 
     js_verified = context.get("js_verified", True)
 
@@ -145,7 +152,8 @@ def telegram_deep_link(
         return cast(
             str,
             format_html(
-                '<a href="#" class="{}" aria-label="{}">{}</a>',
+                '<a href="#"{} class="{}" aria-label="{}">{}</a>',
+                target_attr,
                 class_attr,
                 label,
                 label,
@@ -155,7 +163,8 @@ def telegram_deep_link(
     return cast(
         str,
         format_html(
-            '<a href="#" data-bot-encoded="{}" data-start="{}" class="{}" aria-label="{}">{}</a>{}',
+            '<a href="#"{} data-bot-encoded="{}" data-start="{}" class="{}" aria-label="{}">{}</a>{}',
+            target_attr,
             encoded,
             data_start,
             class_attr,

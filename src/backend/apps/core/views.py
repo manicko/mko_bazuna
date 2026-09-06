@@ -29,12 +29,12 @@ def privacy_policy(request: HttpRequest) -> HttpResponse:
         logger.warning("Deep-link render rate limit exceeded (privacy)")
         return HttpResponse(status=429)
 
-    from django.conf import settings
+    from apps.core.services.site_config import get_bot_username
 
     return render(
         request,
         "privacy.html",
-        {"bot_username": settings.BOT_USERNAME},
+        {"bot_username": get_bot_username()},
     )
 
 

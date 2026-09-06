@@ -5,6 +5,7 @@
 {% load i18n %}
 {% load trust_tags %}
 {% load price_tags %}
+{% load telegram_tags %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -164,10 +165,7 @@
                 <!-- Contact button - zone R2 conditions enforced -->
                 <div class="p-6 border-t bg-gray-50">
                     {% if ad|can_contact %}
-                        <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
-                           class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-                            {% trans "Contact Seller" %}
-                        </a>
+                        {% telegram_deep_link "contact" ad.id classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium" %}
                     {% else %}
                         <button type="button"
                                 class="px-6 py-3 bg-gray-400 text-white rounded-lg font-medium cursor-not-allowed"

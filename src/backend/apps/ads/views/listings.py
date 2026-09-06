@@ -34,6 +34,7 @@ from django.utils.translation import gettext as _
 from django.core.paginator import Paginator
 from django.db.models import F, Q
 from django.conf import settings
+from apps.core.services.site_config import get_bot_username
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
@@ -91,7 +92,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     context = {
         "ad": ad,
         "breadcrumb_category": ad.category,
-        "bot_username": settings.BOT_USERNAME,
+        "bot_username": get_bot_username(),
         "display_features": display_features,
         "is_favorited": (
             ad.favorites.filter(user_id=request.user.id).exists()

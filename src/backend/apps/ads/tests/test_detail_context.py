@@ -2,7 +2,7 @@
 Verification test for tsk_007 — contact button ``bot_username`` context.
 
 Confirms that ``ad_detail`` passes ``bot_username`` into the template context
-(from ``settings.BOT_USERNAME``) so the Telegram deep-link renders correctly,
+(from ``get_bot_username()``) so the Telegram deep-link renders correctly,
 rather than relying on ``{{ settings.BOT_USERNAME }}`` which is NOT available
 because ``settings`` is not in Django's context processors.
 """
@@ -14,11 +14,11 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory
 
 from apps.ads.views.listings import ad_detail
+from apps.core.services.site_config import get_bot_username
 
 pytestmark = [pytest.mark.unit]
 
@@ -104,11 +104,11 @@ def test_detail_prefetch_includes_trust_score() -> None:
 
 
 def test_detail_context_contains_bot_username() -> None:
-    """``ad_detail`` must pass ``bot_username`` matching ``settings.BOT_USERNAME``."""
+    """``ad_detail`` must pass ``bot_username`` matching ``get_bot_username()``."""
     ad = MagicMock()
     context = _run_detail(ad)
     assert "bot_username" in context, "bot_username must be passed in the context dict"
-    assert context["bot_username"] == settings.BOT_USERNAME
+    assert context["bot_username"] == get_bot_username()
 
 
 def test_detail_context_contains_ad() -> None:
@@ -131,12 +131,13 @@ def test_detail_context_contains_breadcrumb_category() -> None:
 
 
 def test_detail_template_uses_bot_username_not_settings() -> None:
-    """The rendered template variable name is ``bot_username``, not
-    ``settings.BOT_USERNAME``."""
+    """The detail template uses the ``{% telegram_deep_link %}`` tag for the
+    contact button, not a cleartext ``{{ bot_username }}`` href."""
     content = (
         Path(__file__).resolve().parents[3] / "templates/ads/detail.html"
     ).read_text(encoding="utf-8")
-    assert "{{ bot_username }}" in content
+    assert "{% telegram_deep_link" in content
+    assert "{{ bot_username }}" not in content  # cleartext no longer in template
     assert "settings.BOT_USERNAME" not in content
 
 

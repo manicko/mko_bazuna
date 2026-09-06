@@ -127,12 +127,19 @@ def test_obfuscated_display_pattern_renders_correctly() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _render_tag(command: str, *, classes: str = "", js_verified: bool = True) -> str:
+def _render_tag(
+    command: str,
+    *,
+    classes: str = "",
+    target: str = "",
+    js_verified: bool = True,
+) -> str:
     """Render ``{% telegram_deep_link <command> %}`` with a mocked bot username.
 
     Args:
         command: The deep-link command (``contact_us``, ``create_ad``, etc.).
         classes: Extra utility classes to pass as the ``classes`` kwarg.
+        target: Optional HTML ``target`` attribute value (e.g. ``_blank``).
         js_verified: Whether the JS-execution cookie is set (controls whether
             the inert or full markup is rendered).
 
@@ -143,14 +150,21 @@ def _render_tag(command: str, *, classes: str = "", js_verified: bool = True) ->
         "apps.core.templatetags.telegram_tags.get_bot_username",
         return_value="test_bot",
     ):
-        template = Template(
-            "{% load telegram_tags %}{% telegram_deep_link command classes=classes %}"
+        template_str = (
+            "{% load telegram_tags %}{% telegram_deep_link command classes=classes"
         )
-        return template.render(
-            Context(
-                {"command": command, "classes": classes, "js_verified": js_verified}
-            )
-        )
+        if target:
+            template_str += " target=target"
+        template_str += " %}"
+        template = Template(template_str)
+        context_dict: dict = {
+            "command": command,
+            "classes": classes,
+            "js_verified": js_verified,
+        }
+        if target:
+            context_dict["target"] = target
+        return template.render(Context(context_dict))
 
 
 def test_telegram_deep_link_omits_bot_username_rtl_class() -> None:
@@ -231,17 +245,66 @@ def test_privacy_html_has_sr_only_pairing() -> None:
     source = _PRIVACY_PATH.read_text(encoding="utf-8")
     rtl_count = source.count('bot-username-rtl" aria-hidden="true"')
     sr_count = source.count("sr-only")
-    assert rtl_count == 3  # L33 display, L111 code, L151 display
+    # After Block C migration: only the L111 code-block disclosure remains
+    # (the two display-link occurrences at L31 and L149 are replaced by the
+    # telegram_deep_link tag, which does not emit bot-username-rtl/sr-only).
+    assert rtl_count == 1  # L111 code only
     assert sr_count >= rtl_count  # at least one sr-only per obfuscated span
 
 
 def test_privacy_html_no_bare_display_username() -> None:
     """No visible ``@{{ bot_username }}`` display text remains unobfuscated.
 
-    All ``@{{ bot_username }}`` display occurrences are wrapped in the
-    ``bot-username-rtl`` + ``sr-only`` pattern. The ``href`` attributes at
-    lines 30 and 148 still use cleartext ``{{ bot_username }}`` (Block C scope).
+    All ``@{{ bot_username }}`` display occurrences are replaced by the
+    ``{% telegram_deep_link %}`` tag. The only remaining ``bot_username``
+    usage is the ``sr-only`` span in the L111 code-block disclosure (which
+    is intentionally accessible to screen readers).
     """
     source = _PRIVACY_PATH.read_text(encoding="utf-8")
     # No bare "@{{ bot_username }}" display text — must be "@<span..." instead.
     assert "@{{ bot_username }}" not in source
+
+
+# ---------------------------------------------------------------------------
+# telegram_deep_link tag: target parameter
+# ---------------------------------------------------------------------------
+
+
+def test_telegram_deep_link_target_blank_emits_target_attr() -> None:
+    """Tag with ``target="_blank"`` emits the ``target`` attribute on the ``<a>``."""
+    html = _render_tag("contact_us", target="_blank")
+    assert 'target="_blank"' in html
+
+
+def test_telegram_deep_link_without_target_omits_target_attr() -> None:
+    """Tag without ``target`` does NOT emit a ``target`` attribute."""
+    html = _render_tag("contact_us")
+    assert "target=" not in html
+
+
+def test_telegram_deep_link_target_blank_degraded_emits_target_attr() -> None:
+    """The inert (js_verified=False) anchor also emits ``target`` when set."""
+    html = _render_tag("contact_us", target="_blank", js_verified=False)
+    assert 'target="_blank"' in html
+
+
+def test_telegram_deep_link_target_blank_emits_window_open_in_iife() -> None:
+    """The IIFE checks ``el.target === '_blank'`` and uses ``window.open``."""
+    from apps.core.templatetags.telegram_tags import _JS_IIFE
+
+    html = _render_tag("create_ad", target="_blank")
+    # The IIFE is present in the rendered output.
+    assert "window.open" in html
+    assert "el.target === '_blank'" in html
+    # Double-check the source constant too.
+    assert "window.open" in _JS_IIFE
+    assert "el.target === '_blank'" in _JS_IIFE
+
+
+def test_telegram_deep_link_without_target_uses_location_href_in_iife() -> None:
+    """Without ``target``, the IIFE falls back to ``window.location.href``."""
+    from apps.core.templatetags.telegram_tags import _JS_IIFE
+
+    html = _render_tag("contact_us")
+    assert "window.location.href" in html
+    assert "window.open" in _JS_IIFE  # IIFE constant is the same regardless of target

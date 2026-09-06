@@ -19,7 +19,7 @@ import logging
 import secrets
 from datetime import timedelta
 
-from django.conf import settings
+from apps.core.services.site_config import get_bot_username
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -308,8 +308,7 @@ def login_issue(request: HttpRequest) -> HttpResponse:
         expires_at=timezone.now() + timedelta(minutes=5),
     )
 
-    bot_username = settings.BOT_USERNAME
-    deep_link = f"https://t.me/{bot_username}?start=login_{raw_token}"
+    bot_username = get_bot_username()
 
     logger.info(f"Issued login token hash={token_hash[:8]}...")
 
@@ -317,7 +316,6 @@ def login_issue(request: HttpRequest) -> HttpResponse:
         request,
         "users/login_issue.html",
         {
-            "deep_link": deep_link,
             "bot_username": bot_username,
             "raw_token": raw_token,
         },

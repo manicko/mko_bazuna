@@ -3,14 +3,14 @@ Integration tests for ad detail page rendering (G3, G4).
 
 Verifies:
 - G3: "Back to listings" link uses ``javascript:history.back()``
-- G4: Telegram contact deep-link href is
-  ``https://t.me/{bot_username}?start=contact_{ad.id}``
+- G4: Telegram contact deep-link renders the ``{% telegram_deep_link %}`` tag
+  with ``contact_<ad.id>`` as the ``data-start`` payload (obfuscated, no
+  cleartext ``t.me`` URL in href).
 """
 
 from __future__ import annotations
 
 import pytest
-from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 
@@ -51,7 +51,8 @@ class TestAdDetailRender:
         category,
         city,
     ) -> None:
-        """G4: The contact link deep-links to Telegram with contact_<ad.id>."""
+        """G4: The contact deep-link renders the ``telegram_deep_link`` tag
+        with ``contact_<ad.id>`` as the ``data-start`` payload."""
         ad = create_test_ad(
             seller,
             category,
@@ -60,9 +61,12 @@ class TestAdDetailRender:
         )
 
         client = Client()
+        client.cookies["js"] = "true"
         response = client.get(reverse("ads:detail", args=[ad.id]))
 
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        expected_href = f"https://t.me/{settings.BOT_USERNAME}?start=contact_{ad.id}"
-        assert f'href="{expected_href}"' in content
+        assert 'href="#"' in content
+        assert "js-telegram-link" in content
+        assert "data-bot-encoded" in content
+        assert f'data-start="contact_{ad.id}"' in content

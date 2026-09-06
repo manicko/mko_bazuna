@@ -38,14 +38,17 @@ class TestLoginIssue:
     """Tests for login_issue view (token issuance)."""
 
     def test_login_issue_renders_deep_link(self) -> None:
-        """login_issue returns 200 and renders the Telegram deep-link."""
+        """login_issue returns 200 and renders the Telegram deep-link via
+        the ``{% telegram_deep_link %}`` tag."""
         client = Client()
+        client.cookies["js"] = "true"
         response = client.get("/login/issue/")
 
         assert response.status_code == 200
         content = response.content.decode()
-        assert "t.me" in content
-        assert "start=login_" in content
+        assert "js-telegram-link" in content
+        assert "data-bot-encoded" in content
+        assert 'data-start="login_' in content
 
     def test_login_issue_stores_token_hash_not_raw(self) -> None:
         """login_issue stores a SHA-256 hash, never the raw token."""

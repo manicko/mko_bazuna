@@ -101,13 +101,19 @@ def test_clear_button_has_dual_behavior_js_handler() -> None:
     URLSearchParams to delete q on committed search, not history.back()."""
     # AC6: hidden class + input event handler
     assert "hidden" in _HEADER_CATALOG_CONTENT  # button starts hidden
-    assert "searchInput.addEventListener('input'" in _HEADER_CATALOG_CONTENT or \
-           "addEventListener('input'" in _HEADER_CATALOG_CONTENT
+    assert (
+        "searchInput.addEventListener('input'" in _HEADER_CATALOG_CONTENT
+        or "addEventListener('input'" in _HEADER_CATALOG_CONTENT
+    )
     # AC5: URLSearchParams / searchParams.delete('q') for deterministic clear
-    assert "URLSearchParams" in _HEADER_CATALOG_CONTENT or \
-           "new URL(" in _HEADER_CATALOG_CONTENT
-    assert "searchParams.delete('q')" in _HEADER_CATALOG_CONTENT or \
-           "params.delete('q')" in _HEADER_CATALOG_CONTENT
+    assert (
+        "URLSearchParams" in _HEADER_CATALOG_CONTENT
+        or "new URL(" in _HEADER_CATALOG_CONTENT
+    )
+    assert (
+        "searchParams.delete('q')" in _HEADER_CATALOG_CONTENT
+        or "params.delete('q')" in _HEADER_CATALOG_CONTENT
+    )
 
 
 def test_autocomplete_dropdown_element_exists() -> None:
@@ -131,8 +137,12 @@ def test_no_settings_dot_access_in_template() -> None:
 
 
 def test_bot_username_comes_from_context() -> None:
-    """The place-an-ad deep-link uses the ``bot_username`` context var."""
-    assert "{{ bot_username }}" in _HEADER_CATALOG_CONTENT
+    """The place-an-ad deep-link uses the ``{% telegram_deep_link %}`` tag
+    (not a cleartext ``{{ bot_username }}`` href)."""
+    assert "{% telegram_deep_link" in _HEADER_CATALOG_CONTENT
+    assert (
+        "{{ bot_username }}" not in _HEADER_CATALOG_CONTENT
+    )  # cleartext no longer in template
 
 
 def test_header_search_form_preserves_category_context() -> None:

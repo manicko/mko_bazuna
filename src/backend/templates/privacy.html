@@ -27,11 +27,8 @@
             <section class="bg-white rounded-lg shadow p-6 mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "1. Controller" %}</h2>
                 <p class="text-sm text-gray-700">
-                    {% blocktrans with site_name=site_name %}The data controller for this service is the operator of the {{ site_name }} classifieds board. You can contact us over Telegram at{% endblocktrans %}
-                    <a href="https://t.me/{{ bot_username }}"
-                       class="text-blue-600 underline hover:text-blue-800"
-                       target="_blank"
-                       rel="noopener noreferrer">@<span class="bot-username-rtl" aria-hidden="true">{{ bot_username|rtl_obfuscate }}</span><span class="sr-only">{{ bot_username }}</span></a>.
+                     {% blocktrans with site_name=site_name %}The data controller for this service is the operator of the {{ site_name }} classifieds board. You can contact us over Telegram at{% endblocktrans %}
+                    {% telegram_deep_link "contact_us" classes="text-blue-600 underline hover:text-blue-800" target="_blank" %}.
                 </p>
             </section>
             <section class="bg-white rounded-lg shadow p-6 mb-6">
@@ -146,10 +143,7 @@
                     <a href="/?ref=preferences"
                        class="text-blue-600 underline hover:text-blue-800">{% trans "Cookie settings" %}</a>
                     {% trans "link to open the consent banner, or contact us on Telegram at" %}
-                    <a href="https://t.me/{{ bot_username }}"
-                       class="text-blue-600 underline hover:text-blue-800"
-                       target="_blank"
-                       rel="noopener noreferrer">@<span class="bot-username-rtl" aria-hidden="true">{{ bot_username|rtl_obfuscate }}</span><span class="sr-only">{{ bot_username }}</span></a>.
+                    {% telegram_deep_link "contact_us" classes="text-blue-600 underline hover:text-blue-800" target="_blank" %}.
                 </p>
             </section>
         </main>

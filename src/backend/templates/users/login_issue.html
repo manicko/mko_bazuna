@@ -1,6 +1,7 @@
 {# Login token issuance template for Mko Bazuna. Renders the Telegram deep-link for login authentication. User taps the button to open Telegram and complete login via bot. #}
 {% load static %}
 {% load i18n %}
+{% load telegram_tags %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -18,10 +19,7 @@
                     {% trans "Tap the button below to open Telegram and authenticate." %}
                     {% trans "This link expires in 5 minutes." %}
                 </p>
-                <a href="{{ deep_link }}"
-                   class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">
-                    {% trans "Login via Telegram" %}
-                </a>
+                {% telegram_deep_link "login" raw_token classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors" %}
                 <p id="login-status" class="text-xs text-gray-400 mt-4 hidden">{% trans "Waiting for Telegram confirmation..." %}</p>
                 <p class="text-xs text-gray-400 mt-4">
                     {% trans "Don't have Telegram?" %}
@@ -37,7 +35,7 @@
             "use strict";
             var pollUrl = "{% url 'consent:login_status' %}?token={{ raw_token }}";
             var statusEl = document.getElementById("login-status");
-            var deepLinkEl = document.querySelector('a[href^="https://t.me"]');
+            var deepLinkEl = document.querySelector('a[data-start^="login_"]');
 
             statusEl.classList.remove("hidden");
             deepLinkEl.style.display = "none";
