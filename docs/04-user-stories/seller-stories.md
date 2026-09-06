@@ -70,3 +70,20 @@ See decision P.
 Seller sees per-ad view and contact statistics on the ad detail page in the dashboard.
 Individual `AD_VIEWED` events are recorded when buyers view ad details (seller-scoped).
 See decision P.
+
+### US-S12 — Bot "Contact us" button (Telegram-bypass)
+Sellers and buyers who reach the bot directly in Telegram (without clicking a web deep-link —
+e.g., they opened `t.me/<bot_username>` directly) have a **"Contact us"** button (inline keyboard
+or reply keyboard) available in the bot interface. Pressing it triggers the same `contact_us`
+flow as the `/start contact_us` deep-link, showing a greeting and support instructions.
+Bot-side `is_bot` check and per-user rate limiting apply (5 `contact_us` starts per 10 min
+per Telegram user). See Spec 18 CR-4/CR-5/CR-10.
+
+**Acceptance criteria:**
+- AC1: A "Contact us" button is rendered in the bot's main menu or `/start` response.
+- AC2: Pressing the button triggers the `contact_us` handler (same as `/start contact_us`
+  deep-link from the footer).
+- AC3: The bot replies with a greeting and brief support instructions (no ad context).
+- AC4: `message.from_user.is_bot` is checked — bot accounts are rejected immediately.
+- AC5: Per-Telegram-user rate limiting: max 5 `contact_us` starts per 10 minutes per `user_id`
+  (`check_contact_start_rate_limit`); excess triggers return a cooldown message.

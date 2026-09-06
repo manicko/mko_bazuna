@@ -24,6 +24,24 @@ This file is the self-contained validated report. The reader does not need to co
 
 ---
 
+## Validation Correction
+
+> **Note:** The following corrections were identified by the Validator against live source and cross-phase research. They adjust QLT-001, QLT-003, and the Cross-Finding Analysis; QLT-002, QLT-004, and QLT-005 were confirmed accurate (QLT-004's count correction and `priority_calculator.py:63` for-loop note were already incorporated during validation).
+>
+> 1. **QLT-001 blocker — missing edit-view test:** `apps/ads/tests/` contains no `test_edit.py`. Step 3 of the QLT-001 rollout (migrating `edit.py`'s reactivation path through `submit_ad`) has no integration test coverage to assert behavioral equivalence. **Precondition:** create `apps/ads/tests/test_edit.py` before rewiring the web edit reactivation path.
+>
+> 2. **QLT-001 currency-coercion divergence:** The bot coerces invalid currency → `None` (ad_create.py:1105-1120) while the web edit view keeps the existing currency on `ValueError` (edit.py:140-147). A shared coercer must parameterize the currency-fallback policy (`on_invalid="none" | "keep"`) or the divergence must be explicitly documented as intentional.
+>
+> 3. **QLT-003 scope underestimate:** The findings cite 4 write sites; research confirms **10 production sites** total (9 single-row `AnalyticsEvent.objects.create` + 1 batch `bulk_create`). Six sites are in-scope for this phase (`login.py:190` + `auto_moderation.py:234/251/257` + `contact.py:114/133` already-centralized + `trust_analytics.py:106` semi-centralized); four are deferred to Phase 01 ENT-007 (`listings.py:69`, `search.py:230`) and to a batch-overload follow-up (`send_alerts.py:113/136`).
+>
+> 4. **QLT-003 transaction transparency:** `record_event` must NOT open its own `transaction.atomic()` — it is invoked inside `auto_moderation.py`'s own atomic blocks (lines 231, 248). A self-contained atomic would commit the event during a failed moderation rollback (commit-during-failure inconsistency). The canonical signature must be a bare `.objects.create()` caller-agnostic helper.
+>
+> 5. **QLT-003 f-string correction:** The findings claim `login.py:194` is "the one logging-style violation in prod non-test code." Grep confirms **38** eager f-strings across production code. `login.py:194` is one of 38; the refactor targets it specifically as a side effect of moving its adjacent create into `record_event`. Full log-hygiene is a separate effort.
+>
+> 6. **Shared-seam coherence conflict (QLT-003 vs ENT-007):** QLT-003 proposes `apps/core/services/analytics.py`; ENT-007 proposes `apps/analytics/services/record_event.py`. Both write the same `analytics_events` table from divergent module locations. **Resolution:** designate `apps/core/services/analytics.py` canonical (reuses the established `contact.py` convention); ENT-007 must converge on this location.
+
+---
+
 ## Runtime Verification Evidence
 
 | Check | Result | Notes |
@@ -50,15 +68,20 @@ This file is the self-contained validated report. The reader does not need to co
 
 ### Conflicts Detected
 
-No cross-finding conflicts. All five findings are independently valid and non-overlapping in their remediation targets.
+No cross-finding conflicts among QLT-001–005. All five findings are independently valid and non-overlapping in their remediation targets.
+
+**Cross-phase coherence conflict (QLT-003 vs ENT-007):** QLT-003 proposes a canonical analytics recorder at `apps/core/services/analytics.py`; ENT-007 (Phase 01) proposes a *separate* recorder at `apps/analytics/services/record_event.py`. Both would write the same `AnalyticsEvent` rows from divergent module locations — a maintainability hazard. **Resolution (documented in QLT-003 Validator's Verification):** designate `apps/core/services/analytics.py` canonical (reuses the established `contact.py` convention); ENT-007 must converge on this location.
 
 ### Unsafe Rollout Sequences
 
-- **QLT-001 must be applied atomically** with QLT-003's analytics-centralization if both touch `_update_and_moderate`'s `auto_moderate(ad)` call path: extracting submission orchestration moves the `AnalyticsEvent.objects.create` calls (currently inside `auto_moderate`) into the service layer, which is exactly where QLT-003 wants them. The two fixes compose cleanly — no conflict.
+- **QLT-001 step 3 (edit.py migration) is BLOCKED** on creating `apps/ads/tests/test_edit.py` — the edit-view reactivation path has no integration test to assert behavioral equivalence. Step 3 cannot proceed until the test is created. The 4-stage sequence (inert `submission.py` → bot rewire → test_edit.py → edit.py migration → QLT-003) is otherwise sound.
+- **QLT-001 must be applied before QLT-003** when both touch the `auto_moderate(ad)` call path: extracting submission orchestration moves the `AnalyticsEvent.objects.create` calls (currently inside `auto_moderate`) into the service layer, which is exactly where QLT-003 wants them. Applying QLT-003 first centralizes only `login.py:190` (its `auto_moderate` sites remain inline) — a silent half-pattern. The two fixes compose cleanly once QLT-001's orchestrator seam exists.
 - **QLT-002 `type` key removal is NOT safe without coordinated changes.** See QLT-002 validation note.
 
 ### Fragile Insertion Points
 
+- **QLT-001 step 3 (edit.py reactivation migration):** `apps/ads/tests/` contains no `test_edit.py` — the edit-view reactivation path (edit.py:152-183) has no integration test to assert behavioral equivalence after rewiring through `submit_ad`. Migrating `edit.py` without this test is a fragile insertion point — must create the test first (Stage 1.5 precondition).
+- **QLT-001 currency-coercion divergence:** the bot coerces invalid currency → `None` while the web edit keeps existing currency — a parameterized reconciliation is required before the edit path is wired through the shared coercer.
 - QLT-002's "drop `type` key" recommendation targets a key consumed by `header_catalog.html:313,327` and asserted in 12+ test locations. Dropping it without updating consumers is a fragile insertion point — flagged in the QLT-002 validation note.
 - QLT-004's `priority_calculator.py:63` suppression is on a `for word in criteria.banned_words:` loop (not `transaction.atomic()`), which is a different pattern from the majority — a `for`-loop iteration type issue rather than a context-manager one.
 
@@ -99,7 +122,23 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
 
 **Architectural Fit:** ALIGNS. §4(d) requires thin handlers delegating to a shared service layer; §4(i) requires DRY across processes (one submission orchestrator shared by bot and web). The bot is the sole ad producer (`AdSource.TELEGRAM`), so extraction yields direct shared-seam value.
 
-**Rollout Safety:** Non-atomic fix. Move submission orchestration into `apps/ads/services/submission.py`; make `ad_create.py` a thin FSM adapter; route `edit.py` through the same orchestrator. No circular dependency risk — the service layer would depend on `apps.ads.models` (already a dependency of the handler).
+**Rollout Safety:** Non-atomic fix, 4-stage sequence (per research §5b):
+
+1. **Introduce inert** `submission.py` exporting `submit_ad(SubmitAdInput)` — copy of `_update_and_moderate`'s body (ad_create.py:1042-1241). No caller wired yet — zero runtime/test impact.
+2. **Rewire the bot:** replace `update_ad_and_moderate(...)` call in `process_preview` (ad_create.py:818) with `submit_ad(...)`; delete `update_ad_and_moderate`; update the 4 call-site imports (`ad_create.py` + `test_save_photo_integration.py` ×2 + `test_ad_create.py` via `process_preview`). Green gate.
+3. **Stage 1.5 (precondition — BLOCKING):** Create `apps/ads/tests/test_edit.py` (integration tests for the edit-view reactivation path) **BEFORE** migrating `edit.py`. `apps/ads/tests/` currently contains no `test_edit.py` (confirmed absent by directory listing). Step 3 cannot be validated without it.
+4. **Migrate `edit.py` reactivation** (lines 152-183): route through `submit_ad(...)` with `photos=None`, `original_language=None`. Leave text-edit-hide (189-207) and price-only-edit (208-221) inline — they must NOT call `auto_moderate`.
+5. **Apply QLT-003:** centralize `AnalyticsEvent.objects.create` → `core/services/analytics.py:record_event` at the already-consolidated `auto_moderate` seam.
+
+**Behavioral-reconciliation sub-task (currency coercion):** The bot coerces invalid currency → `None` (ad_create.py:1105-1120: `CurrencyCode` isinstance check + `ValueError` recovery to `None`) while the web edit view keeps the existing currency on `ValueError` (edit.py:140-147). If `submit_ad` becomes the single coercer wired into `edit.py`'s reactivation path, the edit flow's "keep-current" behavior silently changes to "set None." **Resolution:** parameterize the coercion rule (`on_invalid="none" | "keep"`) in the shared coercer, OR verify via the edit conftest that `_apply_price_change` is always pre-validated before reaching the shared coercer. This is a behavior change on an active user flow.
+
+No circular dependency risk — the service layer depends on `apps.ads.models` (already a dependency of the handler).
+
+**Validator's Verification (QLT-001 execution gate):**
+
+- **BLOCKER:** `apps/ads/tests/` directory listing confirms **no `test_edit.py`**. Stage 3 (edit.py reactivation migration) is unverifiable without one. The 4-stage sequence is sound, but step 3 cannot proceed until an edit-view integration test asserts the reactivation path's behavior (status transition + `auto_moderate` invocation + currency/price normalization).
+- **Currency-coercion divergence:** confirmed. Bot (`ad_create.py:1105-1120`) invalid currency → `None`; web edit (`edit.py:140-147`) invalid `ValueError` → keeps existing currency. Reconciliation (parameterized policy or intentional documentation) is required before `submit_ad` is wired into the edit path.
+- **Transaction boundary:** the `with transaction.atomic():` block at ad_create.py:1201 wraps `ad.save()` + `AdImageService.create_or_skip` + `transition_to(ON_MODERATION)` (1201-1225); `auto_moderate(ad)` at 1233 is called **outside** the atomic. The extraction must preserve: thumbnails (no tx, 1160-1199) → atomic DB+images+transition (1201-1225) → `auto_moderate` (its own internal atomics at auto_moderation.py:231,248).
 
 ---
 
@@ -161,7 +200,7 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
 | **ID** | QLT-003 |
 | **Severity** | MEDIUM |
 | **Type** | BEST-PRACTICE |
-| **Affected Modules** | `src/telegram_bot/handlers/login.py:190-194` (REGISTRATION_CREATED inline + eager f-string log); `src/backend/apps/moderation/services/auto_moderation.py:234,251,257` (MODERATION_REJECTED, AD_PUBLISHED, MODERATION_APPROVED inline); vs. centralized `src/backend/apps/core/services/contact.py:114,118,133,137` |
+| **Affected Modules** | `src/telegram_bot/handlers/login.py:190-194` (REGISTRATION_CREATED inline + eager f-string log); `src/backend/apps/moderation/services/auto_moderation.py:234,251,257` (MODERATION_REJECTED, AD_PUBLISHED, MODERATION_APPROVED inline, inside `transaction.atomic()` @ 231, 248); vs. centralized `src/backend/apps/core/services/contact.py:114,118,133,137`. **Complete site inventory (10 production writes):** See Validator's Verification below — 6 in-scope this phase (above + `contact.py` already-centralized + `trust_analytics.py:106` semi-centralized); 4 deferred to Phase 01 ENT-007 (`listings.py:69` AD_VIEWED, `search.py:230` SEARCH_PERFORMED) and batch-overload follow-up (`send_alerts.py:113`→`bulk_create` @136). |
 | **Classification** | advisory |
 | **Validation Status** | **VALIDATED** |
 
@@ -171,7 +210,7 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
 
 - Read `login.py:155-197` — confirmed:
   - Line 190: `AnalyticsEvent.objects.create(event_type=AnalyticsEventType.REGISTRATION_CREATED, user_id=user.id)` — inline, inside `sync_to_async` closure `_handle()`, no try/except. Confirmed.
-  - Line 194: `logger.info(f"Registration event recorded for user {user.id}")` — eager f-string interpolation (the one logging-style violation in prod non-test code). Confirmed.
+  - Line 194: `logger.info(f"Registration event recorded for user {user.id}")` — eager f-string interpolation (**one of 38** eager f-strings across production code, not "the one"; see f-string correction below). `login.py:194` is the file being refactored — the f-string→lazy `%s` conversion is a side effect of moving its adjacent create into `record_event`. Confirmed.
 - Read `auto_moderation.py:225-260` — confirmed:
   - Line 234: `AnalyticsEvent.objects.create(event_type=AnalyticsEventType.MODERATION_REJECTED, user_id=ad.user_id, ad_id=ad.id)` — inline, inside `_fail_moderation`. Confirmed.
   - Line 231: `with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]` — wraps the create. Confirmed.
@@ -183,10 +222,23 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
   - Lines 133-136: `record_contact_response()` creates `AnalyticsEvent` at `core/services/contact.py:133`. Confirmed.
   - Line 137: `logger.info("Contact response event recorded for seller %s", user.id)` — lazy `%s` interpolation. Confirmed.
 - Pattern confirmed: contact uses a centralized service with lazy logging; registration and moderation publish events are inline with an eager f-string at the registration site.
+- **Complete site inventory (10 production writes, per research §2):** Codebase-wide grep for `AnalyticsEvent.objects.create(` + batch `bulk_create` pattern yields 10 production sites:
+  - **In-scope this phase (6):** `login.py:190` (REGISTRATION_CREATED, post-atomic); `auto_moderation.py:234/251/257` (MODERATION_REJECTED/AD_PUBLISHED/MODERATION_APPROVED, inside `transaction.atomic()` @ 231/248); `contact.py:114/133` (CONTACT_INITIATED/CONTACT_RESPONSE — already-centralized canonical pattern); `trust_analytics.py:106` (parameterized, semi-centralized in wrong app — migrate to canonical).
+  - **Deferred to Phase 01 ENT-007 (2):** `listings.py:69` (AD_VIEWED, bare create in GET detail view); `search.py:230` (SEARCH_PERFORMED, bare create after FTS).
+  - **Deferred to batch-overload follow-up (1):** `send_alerts.py:113`→`bulk_create` @136 (SEARCH_ALERT_MATCHED, batch).
+  - **Not production:** seed generator (`seed/generators/analytics.py:106,167,182`), management read commands, and test fixtures (10 sites) — excluded from scope.
+- **Transaction transparency (CRITICAL design constraint):** `record_event` must NOT open its own `transaction.atomic()`. It is invoked inside `auto_moderation.py`'s atomic blocks (lines 231, 248). A self-contained atomic would create a nested savepoint: on an `auto_moderate` internal failure, Django would commit the savepoint (event written) while rolling back the outer moderation state (ad status unchanged) — a commit-during-failure inconsistency. The canonical signature must be a bare `AnalyticsEvent.objects.create()` caller-agnostic helper; the caller's existing atomic scope governs commit/rollback.
+- **Canonical recorder location (decision record):** `apps/core/services/analytics.py` is designated **canonical**. It does not exist yet — `apps/core/services/` contains only `contact.py`, `site_config.py`, `translation.py`. The proposed `apps/analytics/services/record_event.py` (ENT-007) conflicts with this location — both would write the same `analytics_events` table from divergent module paths. ENT-007 must converge on `apps/core/services/analytics.py`. (See Cross-Finding Analysis — Shared-Seam Coherence Conflict.)
 
 **Architectural Fit:** ALIGNS with §4(i) (shared rules in one service layer, not duplicated across handlers/processes) and §12 (lazy logging style). The contact pattern is the established convention; the other two sites deviate.
 
-**Rollout Safety:** Non-atomic, incremental. Introduce `core/services/analytics.py` with `record_event(...)`; route login.py:190 and auto_moderation.py:234,251,257 through it. No behavioral change (same event types, same fields). The f-string→`%s` change at login.py:194 is a trivial string-format fix.
+**Rollout Safety:** Non-atomic, incremental, sequencing-locked to QLT-001. Introduce `apps/core/services/analytics.py` with `record_event(event_type, user_id=None, ad_id=None, source=None)` (transaction-transparent — no own `atomic()`); route all 6 in-scope production sites through it; defer 4 sites to Phase 01 ENT-007.
+
+**Transaction transparency (CRITICAL):** `record_event` is a bare `AnalyticsEvent.objects.create()` + lazy `%s` logging. It must NOT open its own `transaction.atomic()` — it is invoked inside the caller's existing atomic scope (`auto_moderation.py:231,248`) or bare (login.py post-atomic). A self-contained atomic would create a nested savepoint that commits the event during a failed moderation rollback (commit-during-failure inconsistency). The caller's transaction governs commit/rollback; verify no behavioral change (same event types, same fields, same timestamp defaults).
+
+**No behavioral change** (same event types, same fields). The f-string→`%s` change at `login.py:194` is a trivial string-format fix (one of 38 site-wide; this refactor targets login.py specifically). Log-text changes from `"Registration event recorded for user {id}"` to a lazy `"Analytics event recorded: type=%s user=%s ad=%s source=%s"` — verify no alerting/log-parsing rule keys on the old text before landing.
+
+**Per-step independence:** (1) create `analytics.py` (inert — no callers yet); (2) migrate `contact.py:114,133` to `record_event` (establishes canonical pattern); (3) migrate `login.py:190-194` (QLT-003 target); (4) migrate `auto_moderation.py:234,251,257` (inside atomics @ 231/248); (5) migrate `trust_analytics.py:106` to delegate; (6) ENT-007 migrates `listings.py:69` + `search.py:230`. **Order constraint:** steps 3–4 must land after QLT-001's `submission.py` exists (pattern coherence — centralize events at the single orchestrator→`auto_moderate` seam so the half-pattern never ships).
 
 ---
 
@@ -285,9 +337,9 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
 
 | Action | Count | Details |
 |--------|-------|---------|
-| Validated (unchanged) | 3 | QLT-001, QLT-003, QLT-004 |
+| Validated (unchanged) | 1 | QLT-004 |
 | Reclassified | 0 | — |
-| **Validated with correction note** | 2 | QLT-002 (type-key downstream consumers caveat); QLT-005 (builder.py line-reference corrections) |
+| **Validated with correction note** | 4 | QLT-001 (added test_edit.py precondition + currency-coercion reconciliation); QLT-002 (type-key downstream consumers caveat — unchanged); QLT-003 (expanded to 10 sites; transaction-transparency; canonical recorder location); QLT-005 (builder.py line-reference corrections — unchanged) |
 | Merged | 0 | — |
 | Rejected | 0 | — |
 
@@ -305,9 +357,9 @@ No cross-finding conflicts. All five findings are independently valid and non-ov
 
 | ID | Evidence Quality | Notes |
 |----|------------------|-------|
-| QLT-001 | **High** | All 6 inline-logic segments, file line count (1506, verified via Python), services-dir listing, edit.py re-implementation — all verified at exact line numbers. |
+| QLT-001 | **High** | All 6 inline-logic segments, file line count (1506, verified via Python), services-dir listing, edit.py re-implementation — all verified at exact line numbers. **Correction:** `apps/ads/tests/` contains no `test_edit.py` — step 3 (edit.py reactivation migration) is blocked until one is created. Currency-coercion divergence between bot (invalid→None) and web edit (invalid→keep-current) must be reconciled. |
 | QLT-002 | **High** | `dict[str, Any]`, duplicate keys, no-Pydantic, and all 12+ downstream test/template consumers verified. CAVEAT added: `type` key is actively consumed by `header_catalog.html:313,327` and tests — not droppable without coordination. |
-| QLT-003 | **High** | All 3 inline `AnalyticsEvent.objects.create()` sites (login.py:190, auto_moderation.py:234/251/257) and the centralized contact.py pattern (lazy `%s` logging) verified exact. |
+| QLT-003 | **High** | All 4 originally-named inline `AnalyticsEvent.objects.create()` sites verified exact. **Correction:** codebase-wide grep confirms 10 production write sites total (6 in-scope this phase: login.py:190 + auto_moderation.py:234/251/257 + contact.py:114/133 already-centralized + trust_analytics.py:106 semi-centralized; 4 deferred to ENT-007: listings.py:69, search.py:230, and batch send_alerts.py:113). `login.py:194` eager f-string is one of 38 site-wide (not "the one"). `record_event` must be transaction-transparent (no own `atomic()`) — invoked inside auto_moderation.py:231,248 atomics. Canonical recorder location designated: `apps/core/services/analytics.py`. |
 | QLT-004 | **Medium-High** | All 29 suppression sites verified across 17 files with exact patterns (`transaction.atomic()` ×28 + `for` loop ×1). Count is 29, not "30+" (minor overstatement). Config verified: `typeCheckingMode = "standard"` (not "strict" as phase scope claims). |
 | QLT-005 | **Medium** | `list[Any]` returns, deferred model imports, and `apps: Any` all verified. **Line references for `builder.py` are inaccurate**: `from typing import Any` at line 33 (cited as 17); `apps: Any = None` at line 55 (cited as 36). Substance fully correct. |
 
@@ -321,21 +373,21 @@ None.
 
 ### Reclassified Findings
 
-None formally reclassified (all retain original types). QLT-002 and QLT-005 received validation **correction notes** rather than type changes because the underlying spec violations are genuine.
+None formally reclassified (all retain original types). QLT-001, QLT-002, QLT-003, and QLT-005 received validation **correction notes** rather than type changes because the underlying spec violations are genuine.
 
 ---
 
 ## Rollout Recommendations (Priority Order)
 
-1. **QLT-001 (HIGH)** — Extract ad-submission orchestrator into `apps/ads/services/submission.py`. Atomic: move field-assembly, currency/price normalization, thumbnail+AdImage persistence, and DRAFT→ON_MODERATION transition out of `ad_create.py` and `edit.py` into one shared entry point. Makes the web edit view reuse the bot's submission path (DRY). Effort: large.
-2. **QLT-003 (MEDIUM)** — Introduce `core/services/analytics.py` with `record_event(...)`; route `login.py:190` and `auto_moderation.py:234/251/257` through it; switch login.py:194 f-string to lazy `%s`. Effort: small. Complements QLT-001 (extracted orchestrator can call the centralized recorder).
+1. **QLT-001 (HIGH)** — Extract ad-submission orchestrator into `apps/ads/services/submission.py` (4-stage sequence, per research §5b). **Precondition:** create `apps/ads/tests/test_edit.py` before stage 3 (edit.py reactivation migration) — no edit-view test currently exists. **Reconciliation:** parameterize currency-fallback policy (`on_invalid="none" | "keep"`) or document the bot→None vs web-edit→keep-current divergence as intentional. Atomic: move field-assembly, currency/price normalization, thumbnail+AdImage persistence, and DRAFT→ON_MODERATION transition out of `ad_create.py` and `edit.py` into one shared entry point. Preserve: thumbnails outside `atomic()` (1160-1199) → atomic DB+images+transition (1201-1225) → `auto_moderate` outside atomic (1233). Effort: large.
+2. **QLT-003 (MEDIUM)** — Introduce `apps/core/services/analytics.py` (canonical location — ENT-007 must converge here) with transaction-transparent `record_event(event_type, user_id=None, ad_id=None, source=None)` (no own `atomic()`); route all 6 in-scope production sites through it (login.py:190-194, auto_moderation.py:234/251/257, trust_analytics.py:106), plus migrate the already-centralized `contact.py:114,133` to call through it. Defer 4 sites to Phase 01 ENT-007 (listings.py:69, search.py:230) and batch-overload follow-up (send_alerts.py:113→bulk_create @136). Switch login.py:194 f-string to lazy `%s` (one of 38 site-wide; this refactor targets login.py specifically). Add rollback-gate test: assert `record_event` inside `auto_moderation` atomic is NOT written when that transaction rolls back. Effort: small. Complements QLT-001 (extracted orchestrator calls the centralized recorder).
 3. **QLT-002 (MEDIUM)** — Model autocomplete with a Pydantic `AutocompleteSuggestion` DTO; serialize via `model_dump(mode="json")`. **Do NOT drop `type` yet** — it is consumed by `header_catalog.html:313,327` and asserted in 12+ test locations. Deprecate gradually or update consumers in lockstep. Effort: small.
-4. **QLT-004 (MEDIUM)** — Add a rationale comment to each existing rule-scoped `# pyright: ignore[reportGeneralTypeIssues]` across all 29 sites (28 `transaction.atomic()` + 1 `JSONField` `for` loop), documenting the verified root cause: `django-stubs` is not a project dependency so Django ORM context-manager/JSONField APIs are untyped, while `reportGeneralTypeIssues` is enforced at config. Follow the `# noqa: RULE - rationale` separator convention already used in the codebase. Comment-only, zero-risk; no imports, modules, or runtime change. Effort: small.
+4. **QLT-004 (MEDIUM)** — Add a rationale comment to each existing rule-scoped `# pyright: ignore[reportGeneralTypeIssues]` across all 29 sites (28 `transaction.atomic()` + 1 `JSONField` `for` loop at priority_calculator.py:63), documenting the verified root cause: `django-stubs` is not a project dependency so Django ORM context-manager/JSONField APIs are untyped, while `reportGeneralTypeIssues` is enforced at config. Follow the `# noqa: RULE - rationale` separator convention already used in the codebase. Comment-only, zero-risk; no imports, modules, or runtime change. Effort: small.
 5. **QLT-005 (LOW)** — Type `LookupCacheService.get_all_groups`/`get_active_items` with concrete `LookupGroup`/`LookupItem`; type `builder.load_catalog`'s `apps` as `Apps | None`. Effort: trivial.
 
 ### Cross-Finding Rollout Ordering
 
-- **QLT-001 → QLT-003 (recommended first):** Extract submission orchestrator (QLT-001) first, then centralize analytics within the new service layer (QLT-003). The `auto_moderate(ad)` call at `ad_create.py:1233` stays in the orchestrator; its inline `AnalyticsEvent.objects.create` calls move to `core/services/analytics.py`. No circular dependency — `submission.py` would depend on `apps.ads.models` + `apps.moderation.services` + `apps.core.services.analytics`, all of which already depend on `apps.ads.models`.
+- **QLT-001 → QLT-003 (recommended first):** Extract submission orchestrator (QLT-001) first, then centralize analytics within the new service layer (QLT-003). The `auto_moderate(ad)` call at `ad_create.py:1233` stays in the orchestrator; its inline `AnalyticsEvent.objects.create` calls move to `apps/core/services/analytics.py` (canonical recorder — ENT-007 must converge here to avoid two recorders writing the same `analytics_events` table). No circular dependency — `submission.py` would depend on `apps.ads.models` + `apps.moderation.services` + `apps.core.services.analytics`, all of which already depend on `apps.ads.models`.
 - **QLT-002 and QLT-005 are independent** — can be applied in parallel with no shared files.
 - **QLT-004 is a pure comment-only refactor** — safe to apply anywhere in the sequence; no behavioral impact.
 - **QLT-002's `type`-key removal is NOT recommended** in this phase — flag it for a coordinated frontend+test update in a follow-up phase. The Pydantic DTO extraction (keeping `type`) is safe to do now.
@@ -343,6 +395,6 @@ None formally reclassified (all retain original types). QLT-002 and QLT-005 rece
 ### Rollout Safety
 
 - No circular dependencies introduced by any recommendation.
-- No fragile insertion points (all target stable, named functions/classes/methods).
-- QLT-002 `type`-key removal was the only fragile point — flagged and deferred.
+- No fragile insertion points (all target stable, named functions/classes/methods) — **except QLT-001 step 3**, which is blocked on creating `apps/ads/tests/test_edit.py` and requires currency-coercion policy reconciliation before rewiring the edit path.
+- QLT-002 `type`-key removal was the only other fragile point — flagged and deferred.
 - All fixes are additive or comment-only; no schema or migration changes required.

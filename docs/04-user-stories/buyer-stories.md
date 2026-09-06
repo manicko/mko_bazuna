@@ -72,3 +72,21 @@ saved search. Buyers may also manage subscriptions from the User Cabinet under
 
 ### US-B12 — Search history
 The buyer's recent search queries are remembered and surfaced as autocomplete suggestions on return visits. History is deduplicated and capped at 50 entries per user. Anonymous users also receive search history suggestions (session-scoped). See decision O.
+
+### US-B13 — Contact us (footer link)
+A "Contact us" link is present in the site footer, visible to **all visitors** regardless of consent
+state (Q4=A, decision K: DECLINE = browse-only, contact still works). Clicking it opens
+`https://t.me/<bot_username>?start=contact_us` — a Telegram deep-link to the site bot with no
+`ad_id`, routing to a general site-support flow (greeting + instructions). The bot username and
+deep-link URL are obfuscated in the template (CSS `direction: rtl` for display text, JS `data-*`
+click-to-reveal for the href) per Spec 18 CR-6/CR-7, with no `<noscript>` fallback (Q8=C). See
+Spec 18 (contact-us).
+
+**Acceptance criteria:**
+- AC1: Footer renders a `{% trans "Contact us" %}` link on every public page.
+- AC2: The link is visible to anonymous visitors, authenticated visitors, and DECLINE-consent
+  visitors (no consent gate on the footer link).
+- AC3: The rendered `href` is `#` or absent in static HTML; the real `t.me://` URL is assembled by
+  JS on click (click-to-reveal is the human gate).
+- AC4: The link opens `https://t.me/<bot_username>?start=contact_us` (no `ad_id`).
+- AC5: Bot username is resolved from `SiteConfig` (not `settings.BOT_USERNAME`) via `get_bot_username()`.

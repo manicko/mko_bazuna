@@ -1,6 +1,6 @@
 ---
 name: implement-plan-multiagent
-description: Execute the next semantic development plan safely and incrementally following project standards and architecture constraints
+description: Execute the next semantic development plan safely and incrementally using a strict multi-agent chain per block
 alwaysApply: false
 ---
 
@@ -11,170 +11,99 @@ alwaysApply: false
 Execute the validated development plan safely and sequentially.
 
 The Tech Lead acts only as an **orchestrator**:
+- Understand the plan and codebase context
+- Drive the required agent chain
+- Ensure sequential completion
+- Run final quality check
+- Create the final commit
 
-* Understand the plan and current codebase context.
-* Split the plan into execution blocks and atomic tasks.
-* Assign implementation work to `Implementor` agents.
-* Ensure blocks are completed sequentially.
-* Run a final `Validator`.
-* Commit the final changes.
-
-The Tech Lead **never implements code and never performs implementation-level testing or validation**.
+The Tech Lead **never implements code** and never performs implementation-level testing or validation.
 
 ---
 
 # Workflow
 
-## Step 1 — Read the Plan
+## 1. Decompose the Plan
 
-Read the plan file(s) provided at the end of this task.
+**Launch a `Planner` agent.**
 
-Understand:
+Ask the Planner to:
+- Read the plan file(s) provided at the end of this task
+- Split the plan into logical **execution blocks**
+- Provide a concise high-level description of each block (goal, scope, main outcomes)
 
-* Overall goal.
-* Planned blocks.
-* Scope.
-* Constraints.
-* Dependencies.
-
-Do not start implementation yet.
+Do not start implementation yet.  
+Use the Planner’s block list as the single source of truth for the rest of the workflow.
 
 ---
 
-## Step 2 — Collect Architecture Context
+## 2. Process Each Block (strict agent chain)
 
-**Launch a `Researcher` agent.**
+Process **only one block at a time**.  
+Do not prepare or expand future blocks until the current block is finished.
 
-Ask the Researcher to provide a concise overview of the current codebase relevant to the plan:
+For the **current block** run the following chain in order:
 
-* Relevant architecture.
-* Key files and directories.
-* Important components, classes, functions, hooks, services, and tests.
-* Existing implementation and testing patterns.
-* Current state of the relevant functionality.
-* Important dependencies.
+### 2.1 Auditor
+Launch an `Auditor` agent.  
+Ask it to study the **current code and architecture** relevant to this block only:
+- Key modules, classes, functions, services, configs
+- Existing patterns and constraints
+- Current state of the related functionality
 
-The Researcher should provide context only.
+### 2.2 Researcher
+Launch a `Researcher` agent.  
+Ask it to study **modern best practices** for solving the block’s task, grounded in the current architecture.
 
-Do not ask it to implement anything or create the detailed execution plan.
+Important:
+- Treat any solution proposed in the plan/specification as **one possible option only**
+- Do **not** treat the plan’s solution as the default until the Researcher confirms it is appropriate
+- Prefer approaches that fit the existing architecture and minimize risk
 
----
+### 2.3 Researcher (re-check) — only if needed
+If the previous Researcher found **multiple viable options**:
+- Launch a second `Researcher` to re-evaluate and select the best option
+- If only one clear option exists, **skip this step**
 
-## Step 3 — Process One Execution Block
+### 2.4 Implementor
+Launch an `Implementor` agent with the chosen approach and the concrete tasks for the block.
 
-Split the plan into logical **execution blocks**.
+The Implementor owns the full local cycle:
+- Implement the changes
+- Add/update tests where required
+- Run relevant tests, lint, and type checks
+- Fix any issues found
+- Return only when the block is implemented and locally validated
 
-Process **only one block at a time**.
+Never run Implementors in parallel.  
+Keep tasks small enough for the Implementor’s context.
 
-Do not prepare or expand future blocks until the current block is completed.
-
-For the current block:
-
-1. Break it into small atomic implementation tasks.
-2. Keep tasks small enough for the Implementor's context window.
-3. Simple tasks may be grouped together.
-4. Complex work should be split into smaller tasks.
-
----
-
-## Step 4 — Implement the Current Task
-
-**Launch an `Implementor` agent.**
-
-Give the agent the current task or a small group of closely related tasks.
-
-The Implementor is responsible for the **complete implementation cycle**:
-
-* Understand the assigned task.
-* Modify the code.
-* Add or update tests where required.
-* Run relevant tests.
-* Run relevant lint/type checks.
-* Validate the implementation according to:
-  `C:\py_dev\mko_bazuna\.kilo\rules\commands.md`
-* Fix any problems found during validation.
-* Return only after the assigned task is implemented and locally validated.
-
-For simple work, the Implementor may receive several related tasks or the entire current block.
-
-For complex work, assign only a manageable subset.
-
-**Never run Implementors in parallel.**
-
-The Tech Lead must not implement code or perform these checks itself.
+After the Implementor finishes the current block, move to the next block and repeat the full chain (2.1 → 2.4).
 
 ---
 
-## Step 5 — Continue Within the Current Block
+## 3. Final Quality Check
 
-After an Implementor finishes:
+After **all blocks** are complete:
 
-* Review only whether the assigned task was completed.
-* If the task is complete, proceed to the next atomic task.
-* If additional work is required, assign the required task to an Implementor.
+Launch an `Auditor` agent to perform a final quality review of the entire implementation:
+- Completeness against the plan
+- Architectural fit and project conventions
+- Presence of regressions or unrelated changes
+- Overall readiness
 
-Continue until the **entire current block** is implemented and locally validated by its Implementor(s).
+If problems are found:
+1. Create the smallest necessary fix task
+2. Launch an `Implementor` to fix and locally validate
+3. Re-run the final Auditor
 
-Then move to the next block.
-
----
-
-## Step 6 — Repeat for All Blocks
-
-Repeat Steps 3–5 until every execution block in the plan is complete.
-
-Always maintain sequential execution:
-
-`Block → Tasks → Implementor → Local Validation → Next Task → Next Block`
-
-Do not skip blocks or implement future blocks early.
+Do not proceed to commit until the final Auditor confirms readiness.
 
 ---
 
-## Step 7 — Final Validation
+## 4. Commit
 
-After all blocks are complete:
-
-**Launch a `Validator` agent.**
-
-Ask the Validator to verify the complete implementation against:
-
-* The original plan.
-* The intended functionality.
-* Relevant architecture and project conventions.
-* Tests and test coverage.
-* Relevant lint/type checks.
-* Regressions.
-* Unrelated changes.
-* Any missing or incomplete requirements.
-
-The Validator should perform the **final repository-level validation** and report whether the implementation is ready to commit.
-
-If the Validator finds problems:
-
-1. Do not fix them directly.
-2. Create the smallest necessary implementation task.
-3. Launch an `Implementor`.
-4. Let the Implementor implement and locally validate the fix.
-5. Run the `Validator` again.
-
-Do not commit until the Validator confirms the implementation is ready.
-
----
-
-## Step 8 — Mark the Plan as Done
-
-After successful final validation:
-
-* Rename the plan file to `*_DONE.md` or `*_DONE.yaml`.
-* Move it to `.ai/plans/done`.
-* Ensure it is no longer present in `.ai/plans/todo`.
-
----
-
-## Step 9 — Commit Changes
-
-Only after the final Validator passes, create a Conventional Commit:
+Only after the final Auditor passes, create a Conventional Commit:
 
 ```powershell
 git add <task-related files>
@@ -182,49 +111,38 @@ git commit -m "{type}({scope}): {description}"
 ```
 
 Rules:
+- Use specific file paths with `git add`
+- Never use `git add -A` or `git add .`
+- Do not include unrelated changes
 
-* Use specific file paths with `git add`.
-* Never use `git add -A` or `git add .`.
-* Do not include unrelated changes from other agents.
+Optionally mark the plan as done (rename to `*_DONE.md` / move to `.ai/plans/done`).
 
 ---
 
 # Constraints
 
-* Do not redesign the architecture.
-* Do not change the plan scope.
-* Do not perform unrelated refactors.
-* Do not introduce speculative abstractions.
-* Prefer minimal, safe implementation.
-* Follow existing project patterns and conventions.
-* Process one block at a time.
-* Keep Implementor tasks small and focused.
-* Never run Implementors in parallel.
-* The Tech Lead never implements code.
-* The Tech Lead does not perform implementation-level testing, linting, or validation.
-* `Implementor` owns implementation and local validation.
-* `Validator` owns final repository-level validation.
-* The Tech Lead owns orchestration and the final commit only.
+- Do not redesign architecture or expand scope
+- Do not perform unrelated refactors
+- Prefer minimal, safe, incremental changes
+- Follow existing project patterns
+- Process one block at a time
+- Tech Lead never implements code
+- `Implementor` owns implementation + local validation
+- Final `Auditor` owns repository-level quality check
+- Tech Lead owns orchestration and the final commit only
 
 ---
 
 # Expected Result
 
-The final result must include:
-
-* Complete implementation of the plan.
-* Implementation-level validation performed by Implementors.
-* Passing relevant tests.
-* Passing relevant lint/type checks.
-* Final validation performed by the Validator.
-* Preserved architecture and project conventions.
-* No unrelated refactors or speculative changes.
-* Plan file marked as done.
-* Plan file moved to `.ai/plans/done`.
-* Plan file removed from `.ai/plans/todo`.
-* Conventional Git commit created only after final validation passes.
+- Plan decomposed into clear execution blocks by Planner
+- Complete implementation of the plan
+- Per-block agent chain executed as specified
+- Local validation by Implementors
+- Final quality check by Auditor
+- Conventional Git commit created only after final approval
+- Architecture and conventions preserved
 
 ---
 
 # Plan File
-

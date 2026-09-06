@@ -30,6 +30,16 @@ that reference-loading path is in scope, the demo-data generation itself is not.
 > (`02-config-secrets`) and Phase 01 (`01-entry-architecture`) validated reports
 > in this same store were consulted for cross-phase conflict/merge analysis.
 
+> **🔄 Validation Correction / Cross-Phase Reconciliation (lock-ID collision, 2026-09-05):**
+>
+> **Issue:** ENT-039 originally proposed advisory-lock ID **103** for `CATALOG_LOAD` (next free slot after `BACKFILL_THUMBNAILS=102`, per `ENT-031-036-research.md:293`). Phase 07 NEW-ME-007 also claims ID **103** for `SWEEP_ORPHANED_MEDIA` — its command docstring (`sweep_orphaned_media.py:13`) already documents "advisory lock 103" and the validated findings (`07-media-validated-findings.md`) recommend adding `SWEEP_ORPHANED_MEDIA = 103` to the enum.
+>
+> `pg_advisory_lock` IDs are session-global — sharing 103 between the catalog cold-start one-shot and an hourly filesystem sweep means a stale lock in one domain deadlocks the other. Since `load_catalog`/`load_cities` gate web/bot startup via `depends_on: service_completed_successfully` (docker-compose.yml:142-144, 169-171), a stale `sweep_orphaned_media` lock would block production boot.
+>
+> **Resolution:** ID **103** is reserved for `SWEEP_ORPHANED_MEDIA` (the orphan sweep — its docstring already claims it and the research confirmed it as the correct home for the reconciliation backstop); `CATALOG_LOAD` is reassigned to ID **104** (next free slot after 102). All ENT-039 references in this file are updated to reflect 104. Cross-referenced in `07-media-validated-findings.md` (NEW-ME-007 section + Rollout Recommendations).
+>
+> **Additional recommendation:** Add a CI assertion in `test_advisory_lock_ids.py` that every `AdvisoryLockId.*` referenced at a call site is defined in the enum — this would have caught the currently-broken `sweep_orphaned_media.py:87` (`AttributeError` at runtime because `SWEEP_ORPHANED_MEDIA` was missing from the enum when the command was written). See NEW-ME-007 in `07-media-validated-findings.md` for the parallel recommendation.
+
 ---
 
 ## Runtime Verification Evidence (static)
@@ -382,7 +392,9 @@ Drop the explicit `pk` from `cities.json` (let the DB assign PKs) and have `_loa
 - `migrate_locked.py:33` / `create_admin_user.py:75` — the two other one-shots ARE lock-guarded (contrast).
 
 **Recommendation:**
-Add a `CATALOG_LOAD` member to `AdvisoryLockId` and wrap `load_catalog` in `advisory_lock(CATALOG_LOAD, session=True)` (the builder already runs inside a transaction, so the lock is a thin, safe addition). Guard any new `load_cities` one-shot (ENT-031) with the same lock. Priority: advisory.
+Add a `CATALOG_LOAD` member to `AdvisoryLockId` with ID **104** (not 103 — see the Cross-Phase Reconciliation note at the top of this file: ID 103 is owned by Phase 07 `SWEEP_ORPHANED_MEDIA` / NEW-ME-007) and wrap `load_catalog` in `advisory_lock(CATALOG_LOAD, session=True)` (the builder already runs inside a transaction, so the lock is a thin, safe addition). Guard any new `load_cities` one-shot (ENT-031) with the same lock. Priority: advisory.
+
+> **Cross-phase lock-ID registry:** `103 = SWEEP_ORPHANED_MEDIA` (orphan media sweep, hourly); `104 = CATALOG_LOAD` (catalog + cities bootstrap, cold-start). This collision and its resolution are documented jointly in `07-media-validated-findings.md` (NEW-ME-007 section). A CI assertion that every `AdvisoryLockId.*` call-site reference is defined in the enum would have caught the broken `sweep_orphaned_media.py:87` — see recommendation note at the top of this file.
 
 ---
 
@@ -431,7 +443,7 @@ No circular dependencies detected. ENT-031/ENT-038/ENT-039/ENT-040 all touch the
 
 ### Unsafe Rollout Ordering
 
-- **ENT-039 must precede any new `load_cities` one-shot** if that one-shot is placed in the catalog chain and mutates shared catalog state. Cities are a flat table (low MPTT risk), but for consistency the `load_cities` one-shot should acquire the same `CATALOG_LOAD` lock if added to the one-shot chain alongside `load_catalog`.
+- **ENT-039 must precede any new `load_cities` one-shot** if that one-shot is placed in the catalog chain and mutates shared catalog state. Cities are a flat table (low MPTT risk), but for consistency the `load_cities` one-shot should acquire the same `CATALOG_LOAD` (ID 104) lock if added to the one-shot chain alongside `load_catalog`.
 - **ENT-034's orphaned `__pycache__/0002_*.pyc`** removal is safe to do at any time (build artifact, gitignored). No rollout ordering dependency.
 - **ENT-031's fix** (new cities one-shot in the clean-launch chain) must be added to `docker-compose.yml` as a dependency of `create_admin`/`load_catalog`/`web`/`bot` only *after* the command exists; deploying the command before wiring the dependency is safe (the command is simply unused). Reversing the order (wiring first) would crash `load_catalog`'s dependents. Sequence: create command → wire into compose chain.
 
@@ -521,7 +533,7 @@ _None._
 5. **ENT-036 (LOW):** Introduce a single `bootstrap_reference_data` management command invoked uniformly by the prod one-shot, the test entrypoint, and the conftest fixture.
 6. **ENT-037 (LOW):** Extend the conftest test-schema-restore to run the real `load_catalog` one-shot (or document it as intentionally test-local); add a CI smoke test that invokes the real `load_catalog` management command against a clean DB.
 7. **ENT-038 (LOW):** Drop explicit PKs from `cities.json` (let the DB assign PKs) and return only the seeded city subset from `_load_city_fixtures`; optionally `setval` the sequence if explicit PKs are retained.
-8. **ENT-039 (LOW):** Add a `CATALOG_LOAD` member to `AdvisoryLockId` and wrap `load_catalog` in `advisory_lock(CATALOG_LOAD, session=True)` (and the new `load_cities` one-shot).
+8. **ENT-039 (LOW):** Add a `CATALOG_LOAD` member (ID 104) to `AdvisoryLockId` and wrap `load_catalog` in `advisory_lock(CATALOG_LOAD, session=True)` (and the new `load_cities` one-shot).
 
 ## Doc Updates Needed
 
