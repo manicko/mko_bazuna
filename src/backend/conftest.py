@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.core.cache import cache
 from django.utils import timezone
 from django.utils import translation
 
@@ -62,6 +63,22 @@ def _reset_translation_state():
     """
     yield
     translation.deactivate()
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache_between_tests():
+    """Clear the LocMem cache between backend tests.
+
+    The deep-link-render rate limiter (``telegram_dl_rl:{ip}``) and the upload
+    limiter store state in the per-worker cache. Without a global clear, view
+    tests that hit ad_detail/listings/privacy accumulate >60 hits per xdist
+    worker and flip to 429 mid-suite. Each rate-limiter-owning test file already
+    clears individually; this makes it global so newly-wired views (which have
+    no per-file fixture) stay green. Does NOT affect bot tests (not in this tree).
+    """
+    cache.clear()
+    yield
+    cache.clear()
 
 
 # ---------------------------------------------------------------------------

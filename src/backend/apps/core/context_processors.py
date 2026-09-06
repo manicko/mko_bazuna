@@ -124,3 +124,16 @@ def price_step(request) -> dict[str, StrEnum]:
     from apps.core.enums import PriceStep
 
     return {"price_step": PriceStep.DEFAULT}
+
+
+def js_verified(request) -> dict[str, bool]:
+    """Bridge the JS-execution gate into the template context (CR-11).
+
+    The ``{% telegram_deep_link %}`` tag reads ``context['js_verified']``
+    (``telegram_tags.py:123``). This processor maps the
+    ``request.js_verified`` attribute set by ``JSExecutionMiddleware`` to that
+    top-level key. Defaults to ``True`` when the middleware did not run (e.g.
+    management commands / direct tag invocation) so links stay functional
+    outside the request cycle.
+    """
+    return {"js_verified": getattr(request, "js_verified", True)}

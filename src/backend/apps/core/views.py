@@ -23,6 +23,12 @@ def privacy_policy(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered ``templates/privacy.html`` page.
     """
+    from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
+
+    if not check_deep_link_render_rate_limit(request):
+        logger.warning("Deep-link render rate limit exceeded (privacy)")
+        return HttpResponse(status=429)
+
     from django.conf import settings
 
     return render(

@@ -22,6 +22,7 @@ from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
 
 from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
+from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 
 from apps.locations.models import City
 
@@ -56,6 +57,9 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Rendered detail page or 404 if ad not found / not published
     """
+    if not check_deep_link_render_rate_limit(request):
+        logger.warning("Deep-link render rate limit exceeded (ad_detail)")
+        return HttpResponse(status=429)
     try:
         ad = (
             Ad.objects.select_related("category", "city", "user")
@@ -243,6 +247,12 @@ def listings(
         Rendered listings page (full or HTMX partial)
 
     """
+    # Only full-page renders carry contact deep-links (footer + header_catalog);
+    # the HTMX partial (ad_list.html) renders none and is excluded (CR-10).
+    if not request.headers.get("HX-Request"):
+        if not check_deep_link_render_rate_limit(request):
+            logger.warning("Deep-link render rate limit exceeded (listings)")
+            return HttpResponse(status=429)
 
     PER_PAGE = 24
 

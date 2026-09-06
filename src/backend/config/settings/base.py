@@ -132,6 +132,7 @@ MIDDLEWARE = [
     "apps.core.middleware.language.LanguagePreMiddleware",
     "apps.core.middleware.city_resolution.CityResolutionMiddleware",
     "apps.core.middleware.preferred_city.PreferredCityMiddleware",
+    "apps.core.middleware.js_check.JSExecutionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -152,6 +153,7 @@ TEMPLATES = [
                 "apps.core.context_processors.plausible_host",
                 "apps.core.context_processors.language",
                 "apps.core.context_processors.header_context",
+                "apps.core.context_processors.js_verified",
                 "apps.core.context_processors.site_config",
                 "apps.core.context_processors.price_step",
                 "apps.users.context_processors.consent_state",
