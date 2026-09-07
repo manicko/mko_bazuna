@@ -76,9 +76,18 @@ def test_search_clear_button_cleares_query_param() -> None:
     """The clear-search button is always rendered (not server-conditional),
     is a 44×44 px touch target, does not use window.history.back(),
     and uses URLSearchParams to delete the q param (Spec 16, PO-1=A)."""
-    # AC2: button is always present, not wrapped in {% if query %}
+    # AC2: button is always present. Spec 19 adds {% if query %} for category
+    # dropdown links only -- the clear button itself is rendered unconditionally
+    # inside the search form.
     assert "data-search-clear" in _HEADER_CATALOG_CONTENT
-    assert "{% if query" not in _HEADER_CATALOG_CONTENT  # no server-conditional
+    # Verify the search form (which wraps the clear button) contains no
+    # {% if query %} -- the button is always rendered, CSS-hidden until JS toggles it.
+    form_start = _HEADER_CATALOG_CONTENT.index("data-search-form")
+    form_end = _HEADER_CATALOG_CONTENT.index("</form>", form_start)
+    search_form = _HEADER_CATALOG_CONTENT[form_start:form_end]
+    assert "{% if query" not in search_form, (
+        "Clear-search button is inside a {% if query %} block"
+    )
     # AC3: no history.back()
     assert "window.history.back()" not in _HEADER_CATALOG_CONTENT
     # AC4: 44×44 px touch target
