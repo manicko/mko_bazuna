@@ -3,7 +3,7 @@
 **Date:** 2026-09-01  
 **Author:** Kilo (Planner Agent)  
 **Status:** Draft  
-**Based on:** `.ai/plans/ci_cd/audit-report.md` (2026-09-01), `.ai/plans/ci_cd/research.md`, `.ai/plans/ci_cd/preparation-guide.md`  
+**Based on:** `.ai/plans/ci_cd/preparation-guide.md` (2026-07-28), `.ai/plans/ci_cd/plan.md` (2026-09-01)
 **Companion:** [`preparation-guide.md_updated.md`](./preparation-guide.md_updated.md)  
 **Architecture reference:** [`docs/99-agent/architecture.md`](../../docs/99-agent/architecture.md)  
 **CI contract:** [`src/backend/tests/test_docs_ci_parity.py`](../../src/backend/tests/test_docs_ci_parity.py)  
@@ -44,7 +44,7 @@ The CI build job constructs a Docker image with `push: false` (cache-only agains
 
 - **Registry:** GitHub Container Registry (GHCR) — `ghcr.io/manicko/mko_bazuna`
 - **Deploy target:** Single VPS (4 CPU, 8 GB RAM), no staging environment
-- **Deploy trigger:** Manual `workflow_dispatch` with a **required** `image_tag` input (SHA-based or version — never `latest`)
+- **Deploy trigger:** Manual `workflow_dispatch` with a **required** `commit_sha` input (SHA-based — never `latest`)
 - **Process model:** Two processes (web gunicorn WSGI + Telegram bot) sharing one Django project and one PostgreSQL 18 database; migrations run exactly once before both start via an advisory-locked one-shot service
 - **UI:** HTMX MPA (no SPA framework)
 
@@ -139,12 +139,12 @@ certs/               # TLS certificates (fullchain.pem, privkey.pem)
 
 ```
 ~/.ssh/github_bazuna  # SSH key for GitHub (Windows → GitHub)
-~/.ssh/deploy_bazuna  # SSH key for VPS (GitHub Actions → VPS)
+~/.ssh/vps_deploy_bazuna  # SSH key for VPS (GitHub Actions → VPS)
 ```
 
 ### Reconciliation note
 
-`research.md` §5.1 lists 8 GitHub Secrets including app secrets (`DJANGO_SECRET_KEY`, `BOT_TOKEN`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`). **This is stale and contradicts both the code and the other plan files.** Current reality: only **4 server-access secrets** live in GitHub; all application secrets exist **only** in `.env.docker` on the VPS. This is enforced by code:
+The original audit listed 8 GitHub Secrets including app secrets (`DJANGO_SECRET_KEY`, `BOT_TOKEN`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`). **This is stale and contradicts both the code and the other plan files.** Current reality: only **5 server-access secrets** live in GitHub; all application secrets exist **only** in `.env.docker` on the VPS. This is enforced by code:
 
 - `config/settings/prod.py:18-22` — fails fast if `BOT_TOKEN` is empty (non-build mode)
 - `config/settings/prod.py:26-30` — fails fast if `SITE_URL` is unset
@@ -152,7 +152,7 @@ certs/               # TLS certificates (fullchain.pem, privkey.pem)
 - `config/settings/base.py:52` — `DJANGO_SECRET_KEY = env("DJANGO_SECRET_KEY")` (required, no default)
 - `.gitignore:148` — `.env.docker` is ignored; `.env.docker.example` is the tracked template
 
-**GitHub Secrets (4 only):** `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`. No workflow reads app secrets from GitHub Actions secrets.
+**GitHub Secrets (5 only):** `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`, `SERVER_FINGERPRINT`. No workflow reads app secrets from GitHub Actions secrets.
 
 ---
 
@@ -163,7 +163,7 @@ There are **two separate SSH key pairs** — do not confuse them:
 | Key Pair | Purpose | Used By |
 |---|---|---|
 | `~/.ssh/github_bazuna` | Authenticate to GitHub | Windows machine → GitHub |
-| `~/.ssh/deploy_bazuna` | Authenticate to VPS | GitHub Actions → VPS |
+| `~/.ssh/vps_deploy_bazuna` | Authenticate to VPS | GitHub Actions → VPS |
 
 **Key 1 — GitHub access:** Generated on the developer's Windows machine. Public key added to GitHub Settings → SSH and GPG keys. Private key stays local.
 
@@ -197,8 +197,8 @@ The following components are **live in the repository** and form the baseline. T
 | Languages: ru/bs/en (Bosnian, not Montenegrin) | ✅ Done | `base.py:69-73` `LANGUAGES`; `enums.py:187-192` `LanguageLocale.RUSSIAN/BOSNIAN/ENGLISH`; `Dockerfile:83` `--locale ru --locale bs --locale en` |
 | `test_docs_ci_parity.py` CI contract | ✅ Done | `tests/test_docs_ci_parity.py:45-175` — enforces loadgroup/not-seed/reuse-db/importlib on ci.yml/entrypoint/Makefile |
 | Rollback procedure documented in §Stage E | ✅ Done | `plan.md` §Stage E (lines 497–562) documents manual + automatic rollback; procedures live in this plan and the preparation-guide §Stage E. `docs/ops/docker-deployment.md` does **not** contain a rollback section — do not reference it for rollback. |
-| pytest `--import-mode=importlib` in addopts | ✅ Done | `pyproject.toml:168` `addopts = ["--import-mode=importlib", "-ra", "-q"]` |
-| pytest-xdist ≥ 3.8 (worksteal available) | ✅ Done | `pyproject.toml:213` — `pytest-xdist>=3.8.0` |
+| pytest `--import-mode=importlib` in addopts | ✅ Done | `  pyproject.toml:169` `addopts = ["--import-mode=importlib", "-ra", "-q"]` |
+| pytest-xdist ≥ 3.8 (worksteal available) | ✅ Done | `pyproject.toml:214` — `pytest-xdist>=3.8.0` |
 | Migrate-locked advisory lock (ID 100) | ✅ Done | `docker-compose.yml:35` migrate command uses `migrate_locked.main()`; one-shot service with `depends_on: db: service_healthy` |
 | `docker/entrypoint.sh` shared functions | ✅ Done | 6 entrypoint scripts in `docker/`; sourced by catalog/seed/scheduler/create-admin scripts |
 
@@ -252,8 +252,8 @@ curl http://localhost:8000/health/
 | ID | Task | Priority | Effort | Dependencies |
 |----|------|----------|--------|--------------|
 | A1 | Create `production` environment in GitHub repository settings | HIGH | trivial | None |
-| A2 | Add 4 GitHub Secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT` | HIGH | trivial | A1 |
-| A3 | Generate deploy SSH key (`~/.ssh/deploy_bazuna`) and copy public key to VPS | HIGH | trivial | None |
+| A2 | Add 5 GitHub Secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`, `SERVER_FINGERPRINT` | HIGH | trivial | A1 |
+| A3 | Generate deploy SSH key (`~/.ssh/vps_deploy_bazuna`) and copy public key to VPS | HIGH | trivial | None |
 | A4 | Install Docker and Docker Compose on VPS | HIGH | small | None |
 | A5 | Create deploy user on VPS with Docker group membership | HIGH | small | A4 |
 | A6 | Prepare VPS directory structure (`/opt/mko_bazuna/{backups,certs,media}`) | HIGH | small | A5 |
@@ -293,7 +293,7 @@ ADMIN_TELEGRAM_ID=<your-telegram-user-id>
 SEED_USERS=10
 SEED_ADS=600
 
-# GHCR image override (used by docker-compose.prod.yml)
+# GHCR image override (used by docker-compose.prod.yml; overridden at deploy time via IMAGE_TAG env var)
 REGISTRY=ghcr.io
 REPOSITORY=manicko/mko_bazuna
 IMAGE_TAG=latest
@@ -381,8 +381,8 @@ on:
 
 | ID | Task | Priority | Effort | Dependencies | Status |
 |----|------|----------|--------|--------------|--------|
-| C1 | Create `.github/workflows/deploy.yml` with `workflow_dispatch` + required `image_tag` input | HIGH | small | B2 | ⬜ To build |
-| C2 | Build job: OIDC login to GHCR → metadata-action tags → build-push with `push: true`, linux/amd64 | HIGH | small | C1 | ⬜ To build |
+| C1 | Create `.github/workflows/deploy.yml` with `workflow_dispatch` + required `commit_sha` input | HIGH | small | B2 | ⬜ To build |
+| C2 | Build job: GITHUB_TOKEN (GitHub App installation token) login to GHCR → metadata-action `context: git` tags → build-push with `push: true`, linux/amd64 | HIGH | small | C1 | ⬜ To build |
 | C3 | (Security scan integrated as D1 below) | — | — | — | Moved to Stage D |
 | C4 | Deploy job: SSH-based Docker Compose orchestration | HIGH | medium | C2, A2 | ⬜ To build |
 | C5 | `docker compose pull` before `up -d` to fetch images from GHCR | HIGH | trivial | C4 | ⬜ To build |
@@ -392,7 +392,7 @@ on:
 | C9 | Health check with automatic rollback on failure (30 attempts × 5s) | HIGH | medium | C4, C5, C6, C7, C8 | ⬜ To build |
 | C10 | `docker image prune -f` after successful deployment | HIGH | trivial | C4 | ⬜ To build |
 
-**C1 — Workflow trigger (required SHA-based `image_tag`):**
+**C1 — Workflow trigger (required SHA-based `commit_sha`):**
 
 ```yaml
 name: Deploy
@@ -400,8 +400,8 @@ name: Deploy
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: 'Image tag to deploy (e.g., sha-a913bc2 or v0.3.1)'
+      commit_sha:
+        description: 'Commit SHA to deploy (e.g., a913bc2...)'
         required: true
         default: ''
   push:
@@ -411,7 +411,7 @@ on:
 
 **C2 — Build & Push Job (GHCR, `workflow_dispatch`-driven):**
 
-The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-backed, no PAT stored as a secret). It uses `docker/metadata-action@v5` to generate SHA-based + raw-input tags, then `docker/build-push-action@v7` with `push: true`:
+The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (GitHub App installation token, no PAT stored as a secret). It checks out the exact commit requested by the user, derives an immutable `sha-<short>` tag via `git rev-parse`, uses `docker/metadata-action@v5` with `context: git` for SHA-based tags, then `docker/build-push-action@v7` with `push: true`:
 
 ```yaml
   build-and-push:
@@ -419,8 +419,19 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
     permissions:
       contents: read
       packages: write
+    outputs:
+      IMAGE_TAG: ${{ steps.vars.outputs.IMAGE_TAG }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Derive Docker image tag from checked-out SHA
+        id: vars
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "IMAGE_TAG=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -430,16 +441,14 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          token: ${{ secrets.GITHUB_TOKEN }}   # built-in OIDC-backed token; no PAT
+          token: ${{ secrets.GITHUB_TOKEN }}   # built-in GitHub App installation token
 
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
+          context: git
           images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=sha
-            type=raw,value=${{ github.event.inputs.image_tag }}
 
       - name: Build and push image
         uses: docker/build-push-action@v7
@@ -457,11 +466,12 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
 
 ```yaml
   deploy:
-    needs: [build]
+    needs: [build-and-push]
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
+      packages: read
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: false
@@ -473,49 +483,54 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || '22' }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
           envs: |
-            IMAGE_TAG=${{ github.event.inputs.image_tag }}
+            IMAGE_TAG=${{ needs.build-and-push.outputs.IMAGE_TAG }}
             REPOSITORY=${{ github.repository }}
           script: |
             set -e
             DEPLOY_DIR="/opt/mko_bazuna"
             cd "$DEPLOY_DIR"
+            mkdir -p "$DEPLOY_DIR/backups"
 
             export REGISTRY="ghcr.io"
             export REPOSITORY="${REPOSITORY}"
             export IMAGE_TAG="${IMAGE_TAG}"
 
-            # Save current image tag for potential rollback (C9)
-            CURRENT_IMAGE=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            # Save current image tag for potential rollback
+            CURRENT_IMAGE=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
               ps --format "{{.Image}}" web 2>/dev/null || echo "")
             PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | rev | cut -d: -f1 | rev)
             echo "$PREVIOUS_TAG" > /opt/mko_bazuna/.previous_tag
             echo "Previous tag saved: $PREVIOUS_TAG"
 
-            # Pull latest images from GHCR (C5)
+            # Pull latest images from GHCR
             echo "Pulling images from GHCR..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
 
-            # Pre-deploy database backup (C6)
+            # Pre-deploy database backup
             echo "Backing up database..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm \
-              db pg_dump -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -F c \
-              -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
+              exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F c \
+              > "$DEPLOY_DIR/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
-            # Pre-deploy migrations via one-shot service (C7)
+            # Pre-deploy migrations via one-shot service.
+            # NOTE: migrations are FORWARD ONLY. The automatic rollback below
+            # reverts the container image only — database migrations are NOT reversed.
+            # See §E3 for the manual DB restore procedure.
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 
-            # Start new containers using GHCR images (C8 image override is already in docker-compose.prod.yml)
+            # Start new containers (image override already in docker-compose.prod.yml:7-26)
             echo "Starting new containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-            # Clean up old images (C10)
+            # Clean up old images
             docker image prune -f
 
             echo "Deployment complete"
 
-      - name: Health check with automatic rollback (C9)
+      - name: Health check with automatic rollback
         if: always() && !cancelled()
         uses: appleboy/ssh-action@v1
         with:
@@ -523,6 +538,7 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || '22' }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
           script: |
             DEPLOY_DIR="/opt/mko_bazuna"
             cd "$DEPLOY_DIR"
@@ -534,7 +550,7 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
             # (web:8000 is not published on the host; "web" DNS only resolves inside
             #  the compose network, so curl must execute within docker compose)
             for i in $(seq 1 30); do
-              STATUS=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              STATUS=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
                 exec -T web curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health/ 2>/dev/null || echo "000")
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed"
@@ -544,22 +560,26 @@ The build job authenticates to GHCR using the built-in `GITHUB_TOKEN` (OIDC-back
               sleep 5
             done
 
-            echo "Health check failed - initiating automatic rollback..."
+            # IMAGE-ONLY ROLLBACK — does NOT revert database migrations.
+            # Migrations are forward-only; DB rollback requires restoring the
+            # pre-deploy backup (see §E3 manual rollback via SSH).
+            echo "Health check failed — initiating automatic rollback..."
             PREVIOUS_TAG=$(cat /opt/mko_bazuna/.previous_tag 2>/dev/null || echo "")
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "Rolling back to previous tag: $PREVIOUS_TAG"
-              # Tag the GHCR image with the previous tag and redeploy
-            REGISTRY="ghcr.io" REPOSITORY="${REPOSITORY}" IMAGE_TAG="$PREVIOUS_TAG" \
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml pull web
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
-              echo "Rollback completed - verify manually"
+              export REGISTRY="ghcr.io"
+              export REPOSITORY="${REPOSITORY}"
+              export IMAGE_TAG="$PREVIOUS_TAG"
+              docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull web
+              docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
+              echo "Rollback completed — verify manually"
             else
-              echo "No previous tag available for rollback - check VPS manually"
+              echo "No previous tag available for rollback — check VPS manually"
             fi
             exit 1
 ```
 
-> **C9 advisory:** For production-grade rollback, consider image-digest pinning (`--detach` via `docker image inspect --format '{{.RepoDigests}}`) instead of tag-based rollback. Tags can be mutated; digests cannot.
+> **Advisory:** For production-grade rollback, consider image-digest pinning instead of tag-based rollback. Tags can be mutated; digests cannot.
 
 ### Stage D — Security & Hardening (Priority: MEDIUM)
 
@@ -623,7 +643,7 @@ Added as a job in `ci.yml` (scans source tree, not the built image — simpler a
 ## 6. Execution Order / DAG
 
 ```
-Stage 0 (local dev) ──→ Stage A (VPS prep + 4 secrets)
+Stage 0 (local dev) ──→ Stage A (VPS prep + 5 secrets)
                               │
                               ▼
                     ┌─────────────────────┐
@@ -671,17 +691,17 @@ D3/D4/D5/D6 can run in parallel with CD since they are independent (config-only 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
 | GitHub Actions time limit (2,000 min free tier) | MEDIUM | MEDIUM | B3 path filters skip docs-only CI; concurrency (B1) cancels stale runs; consider public repo for unlimited minutes |
-| SSH key compromise (deploy key) | LOW | HIGH | ED25519 keys; rotate quarterly; deploy user with minimal permissions; separate GitHub + VPS keys |
+| SSH key compromise | LOW | HIGH | ED25519 keys; rotate quarterly; deploy user with minimal permissions; separate GitHub + VPS keys |
 | Trivy scan blocks deploy | LOW | MEDIUM | D1 uses `exit-code: '0'` (non-blocking); report-only SARIF |
-| GHCR auth misconfiguration | LOW | HIGH | Use built-in `GITHUB_TOKEN` (OIDC-backed); no PAT stored in secrets |
+| GHCR auth misconfiguration | LOW | HIGH | Use built-in `GITHUB_TOKEN` (GitHub App installation token); no PAT stored in secrets |
 | Secret leak in logs | LOW | CRITICAL | Mask `SERVER_HOST` with `::add-mask::`; app secrets NOT in GitHub Secrets (only in `.env.docker`) |
 | Database migration failure | MEDIUM | HIGH | Advisory lock (ID 100) prevents concurrent runs; test migrations in CI; **backup before deploy (C6)** |
-| Database backup failure | LOW | MEDIUM | Non-blocking backup (`|| echo WARNING`); log warning and continue |
+| Database backup failure | LOW | MEDIUM | Fail-fast backup (under `set -e`); deploy aborts if backup fails |
 | Rollback procedure failure | LOW | MEDIUM | C9 automated rollback on health-check failure; test with known-good SHA tag; manual SSH fallback (prep-guide §Stage E) |
 | Build vs pull conflict | LOW | HIGH | C8 image override in `docker-compose.prod.yml` (✅ already implemented) forces pull from GHCR |
 | Stale image deployment | MEDIUM | HIGH | C5 `docker compose pull` before `up -d` |
 | Disk bloat from old images | MEDIUM | MEDIUM | C10 `docker image prune -f` after successful deploy |
-| `latest` tag ambiguity | HIGH | MEDIUM | C1 requires `image_tag` input (`required: true`, `default: ''`); never default to `latest` |
+| `latest` tag ambiguity | HIGH | MEDIUM | C1 requires `commit_sha` input (`required: true`, `default: ''`); never default to `latest` |
 | Deploy workflow never triggered (human error) | LOW | HIGH | GitHub Environment `production` can add required reviewers for deploy job |
 
 ---
@@ -723,7 +743,7 @@ D3/D4/D5/D6 can run in parallel with CD since they are independent (config-only 
 
 | Action | Path | Status | Notes |
 |--------|------|--------|-------|
-| Create | `.github/workflows/deploy.yml` | ⬜ To build | CD: OIDC → GHCR → deploy → health → rollback |
+| Create | `.github/workflows/deploy.yml` | ⬜ To build | CD: GITHUB_TOKEN (GitHub App installation token) → GHCR → deploy → health → rollback |
 | Create | `.github/dependabot.yml` | ⬜ To build (D4) | Weekly: `github-actions` + `docker` ecosystem |
 | Create | `.gitleaks.toml` | ⬜ To build (D5) | Allowlist for build placeholders (e.g., `test-secret-key-for-testing-only`) |
 | Add job | `.github/workflows/ci.yml` | ⬜ To build (B1, B3, D3) | Add `concurrency:`, `paths-ignore:`, `dependency-audit` + `security-scan` jobs |
@@ -744,33 +764,35 @@ The deploy job executes the following on the VPS (corrected to use real `docker-
 set -e
 DEPLOY_DIR="/opt/mko_bazuna"
 cd "$DEPLOY_DIR"
+mkdir -p "$DEPLOY_DIR/backups"
 
-# Required image tag (no default to latest) — provided via workflow_dispatch
-export IMAGE_TAG="${IMAGE_TAG}"            # e.g., sha-a913bc2 or v0.3.1
+# IMAGE_TAG is derived as sha-<short> from git rev-parse in the workflow (§C2).
+# It is passed to the VPS via appleboy/ssh-action envs and never defaults to latest.
+export IMAGE_TAG="${IMAGE_TAG}"
 export REGISTRY="ghcr.io"
-export REPOSITORY="${REPOSITORY}"          # e.g., manicko/mko_bazuna
+export REPOSITORY="${REPOSITORY}"
 
-# Save current image for rollback (C9)
-CURRENT_IMAGE=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+# Save current image for rollback
+CURRENT_IMAGE=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
   ps --format "{{.Image}}" web 2>/dev/null || echo "")
 PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | rev | cut -d: -f1 | rev)
 echo "$PREVIOUS_TAG" > /opt/mko_bazuna/.previous_tag
 
-# Pull latest images from GHCR (C5)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+# Pull latest images from GHCR
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
 
-# Backup database before migrations (C6)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm \
-  db pg_dump -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-postgres}" -F c \
-  -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
+# Backup database before migrations (host-side redirect to ./backups/ for §E3b restore)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F c \
+  > "$DEPLOY_DIR/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
-# Run pre-deploy migrations (C7) — one-shot migrate service with advisory lock
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+# Run pre-deploy migrations — one-shot migrate service with advisory lock (ID 100)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 
-# Start new containers (uses GHCR images via C8 image override)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Start new containers (image override already in docker-compose.prod.yml:7-26)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-# Clean up old images (C10)
+# Clean up old images
 docker image prune -f
 
 echo "Deployment complete"
@@ -780,7 +802,7 @@ echo "Deployment complete"
 
 ```bash
 # Show which image tag is currently running for the web service
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Image}}\t{{.Status}}"
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Image}}\t{{.Status}}"
 ```
 
 ---
@@ -789,11 +811,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --format "tab
 
 | Branch | CI Behavior | CD Behavior |
 |--------|-------------|-------------|
-| `main` | All 6 CI jobs run on push/PR | `workflow_dispatch` deploy enabled (manual, required `image_tag`) |
+| `main` | All 6 CI jobs run on push/PR | `workflow_dispatch` deploy enabled (manual, required `commit_sha`) |
 | `develop` | All 6 CI jobs run on push/PR | No deploy — CI only |
 | `nightly` (ci-nightly.yml) | N/A (separate workflow) | Serial seed suite, daily cron at 03:00 UTC + manual `workflow_dispatch` |
 
-**Deploy rule:** Only `main` can trigger `workflow_dispatch` deployment. The `image_tag` input is **required** (never defaults to `latest`). Deploy via `sha-{COMMIT_SHA}` for precise traceability and rollback.
+**Deploy rule:** Only `main` can trigger `workflow_dispatch` deployment. The `commit_sha` input is **required** (never defaults to `latest`). Deploy via `sha-{COMMIT_SHA}` for precise traceability and rollback.
 
 ---
 
@@ -836,13 +858,13 @@ The correct sequence ensures image freshness and database consistency (preserved
 
 ### 12.3 Secrets Strategy
 
-**Design decision:** Application secrets live ONLY in `.env.docker` on the VPS. GitHub Secrets contain ONLY server-access credentials (`SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`). This eliminates secret drift between two locations.
+**Design decision:** Application secrets live ONLY in `.env.docker` on the VPS. GitHub Secrets contain ONLY server-access credentials (`SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`, `SERVER_FINGERPRINT`) — 5 secrets total. This eliminates secret drift between two locations.
 
 - `.env.docker` is gitignored (`.gitignore:148`)
 - `.env.docker.example` is the tracked template (23 variables)
 - `prod.py` fail-fast guards enforce `BOT_TOKEN`, `SITE_URL`, `ALLOWED_HOSTS` at startup
 - `base.py` requires `DJANGO_SECRET_KEY` (no default)
-- GHCR auth uses built-in `GITHUB_TOKEN` (OIDC-backed) — no PAT stored as a GitHub Secret
+- GHCR auth uses built-in `GITHUB_TOKEN` (GitHub App installation token) — no PAT stored as a GitHub Secret
 
 ### 12.4 Compose File Naming
 
@@ -861,7 +883,7 @@ These recommendations are **advisory** — recommended but not mandatory. They h
 
 | # | Recommendation | File/Effort | Priority | Status |
 |---|---|---|---|---|
-| 1 | **Built-in GITHUB_TOKEN (OIDC-backed)** — The deploy template uses the built-in `GITHUB_TOKEN` for GHCR auth (already OIDC-backed, no PAT required). For stricter OIDC, the `docker/login-action` can use an OIDC token exchange via `registry-type: oidc` — but the current `token: ${{ secrets.GITHUB_TOKEN }}` pattern is sufficient and correct. | `deploy.yml` build job | HIGH | ✅ Adopted (built-in GITHUB_TOKEN) |
+| 1 | **Built-in GITHUB_TOKEN (GitHub App installation token)** — The deploy template uses the built-in `GITHUB_TOKEN` for GHCR auth (a GitHub App installation token, no PAT required). The VPS authenticates to GHCR separately with a read-only PAT (`docker/login-action` on the runner handles push; a one-time `docker login ghcr.io` with `read:packages` scope on the VPS handles pull — see prep-guide §A11). | `deploy.yml` build job | HIGH | ✅ Adopted (built-in GITHUB_TOKEN) |
 | 2 | **Dependabot** — Weekly auto-updates for `github-actions` + `docker` ecosystems | `.github/dependabot.yml` (NEW) | LOW | ⬜ To adopt |
 | 3 | **Concurrency control** — Cancel superseded CI runs on same branch | `ci.yml` (add `concurrency:`) | MEDIUM | ⬜ To adopt (B1) |
 | 4 | **Trivy fs-mode** — Source-tree vulnerability scan, non-blocking CRITICAL/HIGH | `ci.yml` (add `security-scan` job) | MEDIUM | ⬜ To adopt (D1) |
@@ -873,7 +895,7 @@ These recommendations are **advisory** — recommended but not mandatory. They h
 | 10 | **Codecov** — Upload coverage to codecov.io for richer reporting | `ci.yml` + `ci-nightly.yml` | LOW | ⬜ Optional — current artifact upload works |
 | 11 | **DJLint + i18n jobs** — Already in CI | `ci.yml:157-215` | — | ✅ Already implemented |
 
-> **Note on #7 (`--dist worksteal`):** The best-practice recommendation to switch from `--dist loadgroup` to `--dist worksteal` is **advisory only**. `loadgroup` is intentionally used because bot tests share FSM state and must pin to the same worker (`xdist_group` markers, `pyproject.toml:179`). `test_docs_ci_parity.py:48` enforces `--dist loadgroup` as a CI contract. Switching to `worksteal` would require updating the parity test. Since `pytest-xdist>=3.8.0` is already declared (`pyproject.toml:213`), `worksteal` is technically available, but the trade-off is reduced FSM isolation guarantees for slightly better load balancing.
+> **Note on #7 (`--dist worksteal`):** The best-practice recommendation to switch from `--dist loadgroup` to `--dist worksteal` is **advisory only**. `loadgroup` is intentionally used because bot tests share FSM state and must pin to the same worker (`xdist_group` markers, `pyproject.toml:179`). `test_docs_ci_parity.py:48` enforces `--dist loadgroup` as a CI contract. Switching to `worksteal` would require updating the parity test. Since `pytest-xdist>=3.8.0` is already declared (`pyproject.toml:214`), `worksteal` is technically available, but the trade-off is reduced FSM isolation guarantees for slightly better load balancing.
 
 ---
 

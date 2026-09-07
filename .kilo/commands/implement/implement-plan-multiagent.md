@@ -1,6 +1,6 @@
 ---
 name: implement-plan-multiagent
-description: Execute the next semantic development plan safely and incrementally using a strict multi-agent chain per block
+description: Execute a validated development plan incrementally using a sequential multi-agent workflow per block
 alwaysApply: false
 ---
 
@@ -8,141 +8,168 @@ alwaysApply: false
 
 ## Objective
 
-Execute the validated development plan safely and sequentially.
+Execute the development plan safely, one block at a time.
 
-The Tech Lead acts only as an **orchestrator**:
-- Understand the plan and codebase context
-- Drive the required agent chain
-- Ensure sequential completion
-- Run final quality check
-- Create the final commit
+The Tech Lead is **orchestrator only**:
 
-The Tech Lead **never implements code** and never performs implementation-level testing or validation.
+* Coordinate agents
+* Pass concise handoffs
+* Ensure sequential execution
+* Commit completed blocks
+* Run final validation
+
+The Tech Lead never implements code or performs implementation-level validation.
 
 ---
 
 # Workflow
 
-## 1. Decompose the Plan
+## 1. Decompose Plan
 
-**Launch a `Planner` agent.**
+Launch a `Planner`.
 
-Ask the Planner to:
-- Read the plan file(s) provided at the end of this task
-- Split the plan into logical **execution blocks**
-- Provide a concise high-level description of each block (goal, scope, main outcomes)
+Ask it to:
 
-Do not start implementation yet.  
-Use the Planner’s block list as the single source of truth for the rest of the workflow.
+* Read the plan file(s)
+* Split the plan into logical execution blocks
+* Identify dependencies and execution order
+* Describe each block briefly
+
+Do not implement yet.
 
 ---
 
-## 2. Process Each Block (strict agent chain)
+## 2. Process Blocks
 
-Process **only one block at a time**.  
-Do not prepare or expand future blocks until the current block is finished.
-
-For the **current block** run the following chain in order:
+Process **one block at a time**.
 
 ### 2.1 Auditor
-Launch an `Auditor` agent.  
-Ask it to study the **current code and architecture** relevant to this block only:
-- Key modules, classes, functions, services, configs
-- Existing patterns and constraints
-- Current state of the related functionality
 
-### 2.2 Researcher
-Launch a `Researcher` agent.  
-Ask it to study **modern best practices** for solving the block’s task, grounded in the current architecture.
+Launch `Auditor` for the current block.
 
-Important:
-- Treat any solution proposed in the plan/specification as **one possible option only**
-- Do **not** treat the plan’s solution as the default until the Researcher confirms it is appropriate
-- Prefer approaches that fit the existing architecture and minimize risk
+It analyzes only the relevant:
 
-### 2.3 Researcher (re-check) — only if needed
-If the previous Researcher found **multiple viable options**:
-- Launch a second `Researcher` to re-evaluate and select the best option
-- If only one clear option exists, **skip this step**
+* Code and architecture
+* Existing patterns and constraints
+* Current implementation
+* Risks
+
+Return a concise handoff.
+
+### 2.2 Planner
+
+Launch `Planner` with the block and Auditor handoff.
+
+It must:
+
+* Convert the specification into concrete requirements
+* Describe viable implementation options
+* Note key trade-offs and open questions
+* **Not choose the final implementation approach when technical uncertainty exists**
+* Explicitly state when `Researcher` is required, especially for:
+
+  * Modern/current best practices
+  * Multiple viable approaches
+  * Framework/library behavior
+  * Significant architectural, security, performance, or compatibility decisions
+
+Planner output is **decision input, not the final technical decision**.
+
+### 2.3 Researcher — only when needed
+
+Launch `Researcher` when Planner identifies unresolved technical questions or multiple viable approaches.
+
+Researcher:
+
+* Evaluates the proposed options
+* Verifies relevant current best practices
+* Assesses important risks and trade-offs
+* Recommends the appropriate approach for the existing architecture
+
+Skip only when the approach is clear and requires no meaningful research.
 
 ### 2.4 Implementor
-Launch an `Implementor` agent with the chosen approach and the concrete tasks for the block.
 
-The Implementor owns the full local cycle:
-- Implement the changes
-- Add/update tests where required
-- Run relevant tests, lint, and type checks
-- Fix any issues found
-- Return only when the block is implemented and locally validated
+Launch `Implementor` with the block, Auditor handoff, Planner output, and Researcher findings if applicable.
 
-Never run Implementors in parallel.  
-Keep tasks small enough for the Implementor’s context.
+Implementor owns the local cycle:
 
-After the Implementor finishes the current block, move to the next block and repeat the full chain (2.1 → 2.4).
+* Implement
+* Add/update tests
+* Run relevant tests, lint, and type checks
+* Fix failures
+* Return only when locally validated
 
----
+Never run Implementors in parallel.
 
-## 3. Final Quality Check
+### 2.5 Commit
 
-After **all blocks** are complete:
+After successful implementation:
 
-Launch an `Auditor` agent to perform a final quality review of the entire implementation:
-- Completeness against the plan
-- Architectural fit and project conventions
-- Presence of regressions or unrelated changes
-- Overall readiness
-
-If problems are found:
-1. Create the smallest necessary fix task
-2. Launch an `Implementor` to fix and locally validate
-3. Re-run the final Auditor
-
-Do not proceed to commit until the final Auditor confirms readiness.
-
----
-
-## 4. Commit
-
-Only after the final Auditor passes, create a Conventional Commit:
+* Commit only the current block
+* Use a Conventional Commit
+* Never include unrelated changes
 
 ```powershell
 git add <task-related files>
 git commit -m "{type}({scope}): {description}"
 ```
 
-Rules:
-- Use specific file paths with `git add`
-- Never use `git add -A` or `git add .`
-- Do not include unrelated changes
+Then continue to the next block.
 
-Optionally mark the plan as done (rename to `*_DONE.md` / move to `.ai/plans/done`).
+---
+
+## 3. Final Validation
+
+After all blocks are committed:
+
+Launch `Validator` for repository-level validation:
+
+* Completeness against the plan
+* Integration between blocks
+* Architectural consistency
+* Regressions
+* Unrelated changes
+* Overall readiness
+
+If issues are found:
+
+1. Create the smallest fix task
+2. Launch `Implementor`
+3. Validate locally
+4. Commit the fix
+5. Re-run `Validator`
+
+Finish only after `Validator` passes.
 
 ---
 
 # Constraints
 
-- Do not redesign architecture or expand scope
-- Do not perform unrelated refactors
-- Prefer minimal, safe, incremental changes
-- Follow existing project patterns
-- Process one block at a time
-- Tech Lead never implements code
-- `Implementor` owns implementation + local validation
-- Final `Auditor` owns repository-level quality check
-- Tech Lead owns orchestration and the final commit only
+* One block at a time
+* No parallel Implementors
+* No unnecessary research
+* No architecture redesign or unrelated refactoring
+* Prefer minimal, safe changes
+* Keep agent handoffs concise
+* Commit after every block
+* Planner proposes; Researcher evaluates when needed
+* Tech Lead orchestrates only
+* Implementor owns implementation and local validation
+* Validator runs only at the end
 
 ---
 
 # Expected Result
 
-- Plan decomposed into clear execution blocks by Planner
-- Complete implementation of the plan
-- Per-block agent chain executed as specified
-- Local validation by Implementors
-- Final quality check by Auditor
-- Conventional Git commit created only after final approval
-- Architecture and conventions preserved
+* Clear execution blocks
+* Current architecture understood before detailed planning
+* Research used only when necessary
+* Each block implemented, validated, and committed separately
+* Final repository validation completed
+* Architecture and project conventions preserved
 
 ---
 
 # Plan File
+

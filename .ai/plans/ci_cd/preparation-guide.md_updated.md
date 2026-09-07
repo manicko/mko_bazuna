@@ -3,7 +3,7 @@
 **Date:** 2026-09-01
 **Author:** Kilo (Planner Agent)
 **Status:** Draft
-**Based on:** `.ai/plans/ci_cd/audit-report.md` (2026-09-01), `.ai/plans/ci_cd/research.md`, `.ai/plans/ci_cd/preparation-guide.md` (2026-07-28)
+**Based on:** `.ai/plans/ci_cd/plan.md` (2026-07-28), `.ai/plans/ci_cd/plan.md_updated.md`, `.ai/plans/ci_cd/preparation-guide.md` (2026-07-28)
 **Companion:** [`plan.md_updated.md`](./plan.md_updated.md)
 **Architecture reference:** [`docs/99-agent/architecture.md`](../../docs/99-agent/architecture.md)
 **CI contract:** [`src/backend/tests/test_docs_ci_parity.py`](../../src/backend/tests/test_docs_ci_parity.py)
@@ -58,7 +58,7 @@ uv --version
 
 ### 0.2 Configure SSH for GitHub
 
-Generate an SSH key for GitHub authentication (this is **different** from the deploy key — see [SSH Key Pairs](#3-ssh-key-pairs)):
+Generate an SSH key for GitHub authentication (this is **different** from the VPS deploy SSH key — see [SSH Key Pairs](#3-ssh-key-pairs)):
 
 ```powershell
 ssh-keygen -t ed25519 -f ~/.ssh/github_bazuna -C "your-email@example.com"
@@ -209,12 +209,12 @@ certs/               # TLS certificates (fullchain.pem, privkey.pem)
 .env.dev
 .env.local
 ~/.ssh/github_bazuna  # SSH key for GitHub (Windows → GitHub)
-~/.ssh/deploy_bazuna  # SSH key for VPS (GitHub Actions → VPS)
+~/.ssh/vps_deploy_bazuna  # SSH key for VPS (GitHub Actions → VPS)
 ```
 
 ### Reconciliation note — secrets strategy
 
-`research.md` §5.1 lists 8 GitHub Secrets including app secrets (`DJANGO_SECRET_KEY`, `BOT_TOKEN`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`). **This is stale and contradicts both the code and the audit.** Current reality: only **4 server-access secrets** live in GitHub; all application secrets exist **only** in `.env.docker` on the VPS. This is enforced by code:
+The original audit listed 8 GitHub Secrets including app secrets (`DJANGO_SECRET_KEY`, `BOT_TOKEN`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`). **This is stale and contradicts both the code and the audit.** Current reality: only **5 server-access secrets** live in GitHub; all application secrets exist **only** in `.env.docker` on the VPS. This is enforced by code:
 
 - `config/settings/prod.py:18-22` — fails fast if `BOT_TOKEN` is empty (non-build mode)
 - `config/settings/prod.py:26-30` — fails fast if `SITE_URL` is unset
@@ -222,7 +222,13 @@ certs/               # TLS certificates (fullchain.pem, privkey.pem)
 - `config/settings/base.py:52` — `DJANGO_SECRET_KEY = env("DJANGO_SECRET_KEY")` (required, no default)
 - `.gitignore:148` — `.env.docker` is ignored
 
-**GitHub Secrets (4 only):** `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`. No workflow reads app secrets from GitHub Actions secrets. App secrets come solely from `.env.docker` on the VPS.
+**GitHub Secrets (5 only):** `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PORT`, `SERVER_FINGERPRINT`. No workflow reads app secrets from GitHub Actions secrets. App secrets come solely from `.env.docker` on the VPS.
+
+> **GHCR pull authentication (VPS → GHCR):** The VPS must authenticate to GHCR separately from GitHub Actions. The built-in `GITHUB_TOKEN` is a **GitHub App installation token** valid only for the duration of a workflow job — it **cannot** be passed to or reused by the VPS. Instead, create a **Personal Access Token (PAT)** with **only the `read:packages` scope** and run `docker login ghcr.io` on the VPS. This credential lives **only on the VPS** (in `~/.docker/config.json`), separate from `.env.docker`. See [A11. Authenticate to GHCR on the VPS (one-time)](#a11-authenticate-to-ghcr-on-the-vps-one-time).
+
+> **Non-secret configuration:** `SERVER_HOST`, `SERVER_USER`, and `SERVER_PORT` are not secrets — they are public configuration values (e.g., `deploy`, `22`, a public IP). They *can* be stored as GitHub Actions **Variables** (referenced via `${{ vars.SERVER_HOST }}`) instead of Secrets. Keeping them as Secrets remains acceptable for organizational simplicity; the key distinction is that only `SERVER_SSH_KEY` and `SERVER_FINGERPRINT` carry confidentiality risk.
+
+> **Secret drift avoidance (best practice):** This separation of CI/CD access credentials (GitHub Secrets) from application runtime secrets (`.env.docker` on the VPS) follows OWASP guidance: runtime secrets should be managed at the deployment lifecycle, not in the CI/CD pipeline. Storing app secrets only on the VPS eliminates the "secret drift" risk — a single source of truth per secret with no second copy to diverge.
 
 ---
 
@@ -233,7 +239,9 @@ There are **two separate SSH key pairs** — do not confuse them:
 | Key Pair | Purpose | Used By |
 |----------|---------|---------|
 | `~/.ssh/github_bazuna` | Authenticate to GitHub (clone, push) | Your Windows machine → GitHub |
-| `~/.ssh/deploy_bazuna` | Authenticate to VPS for deployment | GitHub Actions → VPS |
+| `~/.ssh/vps_deploy_bazuna` | Authenticate to VPS for deployment | GitHub Actions → VPS |
+
+> **Naming:** The key is named `vps_deploy_bazuna` (not `deploy_bazuna`) to unambiguously convey that this is a **VPS access key** for GitHub Actions, **not** a GitHub Deploy Key (which grants repo read access to the VPS). See [§0.2](#02-configure-ssh-for-github) and [A4](#a4-generate-vps-deploy-ssh-key-github-actions--vps) for the distinction.
 
 **Key 1 — GitHub access (Windows → GitHub):**
 - Generated in [0.2](#02-configure-ssh-for-github)
@@ -241,10 +249,10 @@ There are **two separate SSH key pairs** — do not confuse them:
 - Private key stays on your Windows machine
 
 **Key 2 — VPS deploy access (GitHub Actions → VPS):**
-- Generated in [A4](#a4-generate-deploy-ssh-key)
+- Generated in [A4](#a4-generate-vps-deploy-ssh-key-github-actions--vps)
 - Public key copied to VPS `~/.ssh/authorized_keys`
 - Private key stored as the `SERVER_SSH_KEY` GitHub Secret
-- Used by `appleboy/ssh-action` in the deploy workflow
+- Used by `appleboy/ssh-action` in the deploy workflow (with `fingerprint:` from [A4b](#a4b-capture-the-ssh-host-fingerprint-security-hardening))
 
 ---
 
@@ -307,27 +315,56 @@ useradd -m -s /bin/bash deploy
 usermod -aG docker deploy
 ```
 
-### A4. Generate deploy SSH key (GitHub Actions → VPS)
+### A4. Generate VPS deploy SSH key (GitHub Actions → VPS)
+
+> **Terminology note:** This key pair (`vps_deploy_bazuna`) is **NOT** a GitHub Deploy Key. A GitHub Deploy Key is a *repository-specific* key that grants the VPS read access to a single GitHub repo. This key is a **VPS SSH access key**: the public key goes into the VPS `~/.ssh/authorized_keys`, and the private key becomes the `SERVER_SSH_KEY` GitHub Secret so that GitHub Actions can SSH into the VPS. The direction is reversed: GitHub Actions → VPS, not VPS → GitHub.
 
 On your **local Windows machine**, generate an SSH key pair:
 
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/deploy_bazuna -C "deploy@bazuna-vps"
+```powershell
+ssh-keygen -t ed25519 -f ~/.ssh/vps_deploy_bazuna -C "vps-deploy@bazuna"
 ```
 
-Copy the public key to the VPS:
+Copy the public key to the VPS. **Note:** `ssh-copy-id` is a Linux/macOS utility and does **not** exist in Windows OpenSSH. Use this PowerShell equivalent instead:
 
-```bash
-ssh-copy-id -i ~/.ssh/deploy_bazuna.pub deploy@<YOUR_VPS_IP>
+```powershell
+# Windows PowerShell equivalent of: ssh-copy-id -i ~/.ssh/vps_deploy_bazuna.pub deploy@<YOUR_VPS_IP>
+Get-Content $HOME\.ssh\vps_deploy_bazuna.pub |
+  ssh deploy@<YOUR_VPS_IP> "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 ```
+
+> **Alternative** (if the `deploy` user cannot yet accept password login but `root` can):
+> ```powershell
+> Get-Content $HOME\.ssh\vps_deploy_bazuna.pub |
+>   ssh root@<YOUR_VPS_IP> "mkdir -p /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && cat >> /home/deploy/.ssh/authorized_keys && chmod 600 /home/deploy/.ssh/authorized_keys && chown -R deploy:deploy /home/deploy/.ssh"
+> ```
 
 Verify the key works:
 
 ```bash
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
 ```
 
-The **private key** (`~/.ssh/deploy_bazuna`) becomes the `SERVER_SSH_KEY` GitHub Secret. Keep it secure — never commit it to the repo.
+The **private key** (`~/.ssh/vps_deploy_bazuna`) becomes the `SERVER_SSH_KEY` GitHub Secret. Keep it secure — never commit it to the repo.
+
+### A4b. Capture the SSH host fingerprint (security hardening)
+
+To prevent man-in-the-middle attacks, pin the VPS's SSH host public key fingerprint. This value is passed as the `fingerprint:` parameter to `appleboy/ssh-action` in the deploy workflow, enabling strict host-key verification.
+
+On the VPS (or via an already-trusted SSH session), retrieve the SHA256 fingerprint:
+
+```bash
+# Retrieve the fingerprint of the VPS SSH host key
+ssh deploy@<YOUR_VPS_IP> ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d ' ' -f2
+```
+
+This outputs a value like `SHA256:abcdefghijklmnopqrstuvwxyz1234567890=`. Copy that exact string and store it as the `SERVER_FINGERPRINT` GitHub Secret (see [B2](#b2-add-github-secrets--server-access-only-5-secrets)).
+
+> **If the VPS uses RSA host keys only** (no `ed25519` key), substitute `ssh_host_rsa_key.pub`:
+> ```bash
+> ls /etc/ssh/ssh_host_*_key.pub   # list available host keys
+> ```
+> Then use the appropriate key file in the `ssh-keygen -l -f` command above.
 
 ### A5. Create directory structure
 
@@ -350,8 +387,12 @@ Directory layout after this step:
 ├── docker/
 │   └── nginx/
 │       └── nginx.conf        # Copied from repo (§A6)
-└── .env.docker                # Created in A6
+├── .env.docker                # Created in A6 (chmod 600)
+└── .docker/                   # GHCR auth config (created in A11)
+    └── config.json            # docker login ghcr.io credential (read-only PAT)
 ```
+
+> **GHCR auth** (`.docker/config.json`) is created in [A11](#a11-authenticate-to-ghcr-on-the-vps-one-time). It is **not** part of `.env.docker` — it is a registry credential, not an application secret.
 
 ### A6. Copy compose files and nginx config to VPS
 
@@ -360,16 +401,16 @@ Directory layout after this step:
 From your local machine, copy the files using the full real names:
 
 ```bash
-scp -i ~/.ssh/deploy_bazuna \
+scp -i ~/.ssh/vps_deploy_bazuna \
   docker-compose.yml \
   docker-compose.prod.yml \
   docker/nginx/nginx.conf \
   deploy@<YOUR_VPS_IP>:/opt/mko_bazuna/
 
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP> \
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP> \
   "mkdir -p /opt/mko_bazuna/docker/nginx"
 
-scp -i ~/.ssh/deploy_bazuna \
+scp -i ~/.ssh/vps_deploy_bazuna \
   docker/nginx/nginx.conf \
   deploy@<YOUR_VPS_IP>:/opt/mko_bazuna/docker/nginx/
 ```
@@ -379,7 +420,7 @@ scp -i ~/.ssh/deploy_bazuna \
 Create `.env.docker` on the VPS using all 23 variables from the real `.env.docker.example` template:
 
 ```bash
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
 cd /opt/mko_bazuna
 
 cat > .env.docker << 'ENVEOF'
@@ -420,6 +461,8 @@ SEED_USERS=10
 SEED_ADS=600
 
 # ====================== Production image / registry ======================
+# GHCR auth is NOT stored here — it is handled via `docker login ghcr.io` on the
+# VPS using a read-only PAT (see §A11). These vars only identify the registry/location.
 REGISTRY=ghcr.io
 REPOSITORY=manicko/mko_bazuna
 IMAGE_TAG=<your-sha-tag-or-version>
@@ -470,10 +513,32 @@ Before GHCR images exist (i.e., before the deploy workflow is built), you can do
 
 ```bash
 cd /opt/mko_bazuna
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 The `--build` flag forces a local build since no GHCR image exists yet. Once the deploy workflow is operational (§C4), future deploys will use `docker compose pull` to fetch pre-built images from GHCR instead.
+
+### A11. Authenticate to GHCR on the VPS (one-time)
+
+The VPS must authenticate to GHCR to pull private container images. The built-in `GITHUB_TOKEN` (used by GitHub Actions to push) is a **GitHub App installation token** valid only for the duration of a workflow job — it **cannot** be passed to or reused by the VPS. Instead, create a **Personal Access Token (PAT)** with **only the `read:packages` scope** and log in on the VPS.
+
+1. **Create a PAT on GitHub:**
+   - Go to **Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token**.
+   - Give it a descriptive name (e.g., `vps-ghcr-read`).
+   - Select **only** the `read:packages` scope (minimal privilege).
+   - *(Optional)* Set an expiration date.
+   - Click **Generate token** and copy the token.
+
+2. **On the VPS**, as the `deploy` user, log in to GHCR:
+   ```bash
+   echo "<YOUR_PAT>" | docker login ghcr.io -u <YOUR_GH_USERNAME> --password-stdin
+   ```
+3. **Verify** the login works:
+   ```bash
+   docker pull ghcr.io/manicko/mko_bazuna:sha-<SOME_TAG>
+   ```
+
+4. The credential is stored in `/home/deploy/.docker/config.json` on the VPS and persists across reboots. **Never** put this PAT in `.env.docker` — it is a registry access credential, not an application secret. It is also **never** stored in GitHub Secrets; the VPS authenticates to GHCR independently from the CI/CD pipeline.
 
 ---
 
@@ -489,20 +554,21 @@ The `--build` flag forces a local build since no GHCR image exists yet. Once the
 4. (Optional) Add required reviewers for manual approval gates.
 5. Click **Configure environment**.
 
-### B2. Add GitHub Secrets — Server Access Only (4 secrets)
+### B2. Add GitHub Secrets — Server Access Only (5 secrets)
 
 **Critical design decision:** Only server-access secrets go in GitHub Secrets. All application secrets (DJANGO_SECRET_KEY, BOT_TOKEN, POSTGRES_PASSWORD, ADMIN_PASSWORD, etc.) exist **only** in `.env.docker` on the VPS. This eliminates the risk of secret drift between two locations.
 
 Go to **Settings → Secrets and variables → Actions → New repository secret**.
 
-Add **only 4 secrets**:
+Add **only 5 secrets**:
 
 | Secret Name | Value | How to obtain |
 |-------------|-------|---------------|
 | `SERVER_HOST` | VPS public IP or hostname | From VPS provider dashboard |
 | `SERVER_USER` | `deploy` | The deploy user created in A3 |
-| `SERVER_SSH_KEY` | Contents of `~/.ssh/deploy_bazuna` (private key) | Generated in A4 — **the private key, not the .pub file** |
+| `SERVER_SSH_KEY` | Contents of `~/.ssh/vps_deploy_bazuna` (private key) | Generated in A4 — **the private key, not the .pub file** |
 | `SERVER_PORT` | `22` (or your custom SSH port) | Default is 22 unless you changed it |
+| `SERVER_FINGERPRINT` | SHA256 fingerprint of VPS SSH host key (e.g., `SHA256:abcd…`) | Captured in [A4b](#a4b-capture-the-ssh-host-fingerprint-security-hardening) |
 
 #### SERVER_SSH_KEY format
 
@@ -510,8 +576,8 @@ The `SERVER_SSH_KEY` must be the **entire private key file contents**, including
 
 ```bash
 # On your local machine:
-cat ~/.ssh/deploy_bazuna | clip    # Windows
-cat ~/.ssh/deploy_bazuna | pbcopy  # macOS
+cat ~/.ssh/vps_deploy_bazuna | clip    # Windows
+cat ~/.ssh/vps_deploy_bazuna | pbcopy  # macOS
 ```
 
 ### B3. Verify secrets are set
@@ -519,10 +585,11 @@ cat ~/.ssh/deploy_bazuna | pbcopy  # macOS
 After adding all secrets, verify they appear in the list (values are hidden):
 
 ```
-SERVER_HOST    ••••••••••
-SERVER_USER    ••••••••••
-SERVER_SSH_KEY ••••••••••
-SERVER_PORT    ••••••••••
+SERVER_HOST         ••••••••••
+SERVER_USER         ••••••••••
+SERVER_SSH_KEY      ••••••••••
+SERVER_PORT         ••••••••••
+SERVER_FINGERPRINT  ••••••••••
 ```
 
 ---
@@ -567,7 +634,7 @@ This contract is **enforced** by `src/backend/tests/test_docs_ci_parity.py:45-17
 - `--dist loadgroup` (intentional — bot FSM tests share state and must pin to the same xdist worker)
 - `-m "not seed"` (fast gate — nightly seed suite runs separately)
 - `--reuse-db` (test DB schema persists between runs)
-- `--import-mode=importlib` in `pyproject.toml:168` addopts
+  - `--import-mode=importlib` in `pyproject.toml:169` addopts
 
 **Nightly seed suite (`ci-nightly.yml:73`)** runs the slow tests serially:
 
@@ -575,7 +642,7 @@ This contract is **enforced** by `src/backend/tests/test_docs_ci_parity.py:45-17
 uv run pytest -m "seed" --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db
 ```
 
-> **⚠️ Advisory only:** `pytest-xdist>=3.8.0` (`pyproject.toml:213`) technically supports `--dist worksteal` for better load balancing. However, `loadgroup` is intentionally used because bot tests share FSM-pinned state. Switching to `worksteal` would require updating `test_docs_ci_parity.py` to enforce the new flag. Do NOT adopt blindly.
+> **⚠️ Advisory only:** `pytest-xdist>=3.8.0` (`pyproject.toml:214`) technically supports `--dist worksteal` for better load balancing. However, `loadgroup` is intentionally used because bot tests share FSM-pinned state. Switching to `worksteal` would require updating `test_docs_ci_parity.py` to enforce the new flag. Do NOT adopt blindly.
 
 **Two small CI hardening tasks remain (Stage B in plan.md_updated.md §B1/B3):**
 - **B1:** Add a `concurrency:` group to `ci.yml` to cancel superseded runs.
@@ -634,13 +701,13 @@ jobs:
 **Status:** Not started. No `deploy.yml` exists. The CI build job uses `push: false`, so no image is ever published.
 
 Create `.github/workflows/deploy.yml` with:
-- `workflow_dispatch` trigger with a **required** `image_tag` input (SHA-based or version — never `latest`)
-- GHCR auth using the built-in `GITHUB_TOKEN` (OIDC-backed, no PAT stored as a secret) — replaces the `GITHUB_TOKEN`-as-password pattern from the original prep guide
-- `docker/metadata-action@v5` for SHA + raw-input tags
+- `workflow_dispatch` trigger with a **required** `commit_sha` input — the user enters a commit SHA; the workflow checks out that exact commit (`ref:`), derives an immutable `sha-<short>` tag from the checked-out SHA, and tags the image with it. **Never** trust the raw input as the image tag; always derive the tag from `git rev-parse --short HEAD` after checkout. See [Rationale §10](#10-rationale-commit_sha-vs-image_tag-why-checkout-must-pin-to-the-requested-sha) for why this matters.
+- GHCR auth using the built-in `GITHUB_TOKEN` (**GitHub App installation token**) — used only for pushing from the runner. No PAT stored as a secret. The VPS authenticates to GHCR separately with a read-only PAT (see [A11. Authenticate to GHCR on the VPS (one-time)](#a11-authenticate-to-ghcr-on-the-vps-one-time)).
+- `docker/metadata-action@v5` with `context: git` for SHA + raw tags derived from the checked-out commit
 - `docker/build-push-action@v7` with `push: true`
-- Deploy job: SSH via `appleboy/ssh-action@v1` using the 4 GitHub Secrets → VPS
+- Deploy job: SSH via `appleboy/ssh-action@v1` using the 5 GitHub Secrets → VPS (with `fingerprint` pinning for MITM protection). GHCR auth via `docker/login-action` with the built-in `GITHUB_TOKEN` (GitHub App installation token) — used only for **pushing** from the runner.
 
-**Full YAML template (corrected — uses `docker-compose.*.yml` names, OIDC, `docker compose ps` for rollback):**
+**Full YAML template (corrected — uses `docker-compose.*.yml` names, `GITHUB_TOKEN` (GitHub App installation token), `commit_sha` input, `fingerprint` pinning, and `docker compose ps` for rollback):**
 
 ```yaml
 name: Deploy
@@ -648,10 +715,10 @@ name: Deploy
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: 'Image tag to deploy (e.g., sha-a913bc2 or v0.3.1)'
+      commit_sha:
+        description: 'Commit SHA to deploy (full 40-char SHA or unambiguous short SHA)'
         required: true
-        default: ''
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -664,6 +731,9 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -673,16 +743,23 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          token: ${{ secrets.GITHUB_TOKEN }}   # built-in OIDC-backed token; no PAT
+          token: ${{ secrets.GITHUB_TOKEN }}   # built-in GitHub App installation token; no PAT
+
+      - name: Resolve immutable IMAGE_TAG from the checked-out SHA
+        id: vars
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "IMAGE_TAG=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
+          context: git
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=sha
-            type=raw,value=${{ github.event.inputs.image_tag }}
+            type=raw,value=${{ steps.vars.outputs.IMAGE_TAG }}
 
       - name: Build and push image
         uses: docker/build-push-action@v7
@@ -695,10 +772,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+    outputs:
+      IMAGE_TAG: ${{ steps.vars.outputs.IMAGE_TAG }}
+
   deploy:
     needs: [build-and-push]
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: false
@@ -710,8 +792,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || '22' }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
           envs: |
-            IMAGE_TAG=${{ github.event.inputs.image_tag }}
+            IMAGE_TAG=${{ needs.build-and-push.outputs.IMAGE_TAG }}
             REPOSITORY=${{ github.repository }}
           script: |
             set -e
@@ -722,8 +805,12 @@ jobs:
             export REPOSITORY="$REPOSITORY"
             export IMAGE_TAG="$IMAGE_TAG"
 
-            # Save current image tag for rollback (C9)
-            CURRENT_IMAGE=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            # Authenticate to GHCR for image pulls (VPS uses a read-only PAT, see §A11).
+            # The PAT must already be configured via `docker login` on the VPS.
+            mkdir -p "$DEPLOY_DIR/backups"
+
+            # Save current image tag for rollback (E1 — image-only rollback, NOT DB rollback)
+            CURRENT_IMAGE=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
               ps --format "{{.Image}}" web 2>/dev/null || echo "")
             PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | rev | cut -d: -f1 | rev || echo "")
             echo "$PREVIOUS_TAG" > /opt/mko_bazuna/.previous_tag
@@ -731,29 +818,33 @@ jobs:
 
             # Pull latest images from GHCR
             echo "Pulling images from GHCR..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
 
-            # Pre-deploy database backup (C6)
+            # Pre-deploy database backup — host-side redirect to persisted ./backups/.
+            # Container env vars (POSTGRES_USER/POSTGRES_DB) are resolved via --env-file;
+            # the dump file lands in /opt/mko_bazuna/backups/ for §E3b restore.
             echo "Backing up database..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm \
-              db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -F c \
-              -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || \
-              echo "WARNING: Backup failed, continuing..."
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
+              exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F c \
+              > "$DEPLOY_DIR/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
-            # Pre-deploy migrations via one-shot service (C7)
+            # Pre-deploy migrations via one-shot service.
+            # NOTE: migrations are FORWARD ONLY. The automatic rollback below
+            # reverts the container image only — database migrations are NOT reversed.
+            # See §E3 for the manual DB restore procedure from the pre-deploy backup.
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 
-            # Start new containers (C8: image override already in docker-compose.prod.yml:7-26)
+            # Start new containers (image override already in docker-compose.prod.yml:7-26)
             echo "Starting new containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-            # Clean up old images (C10)
+            # Clean up old images
             docker image prune -f
 
             echo "Deployment complete"
 
-      - name: Health check with automatic rollback (C9)
+      - name: Health check with automatic rollback
         if: always() && !cancelled()
         uses: appleboy/ssh-action@v1
         with:
@@ -761,6 +852,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || '22' }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
           script: |
             DEPLOY_DIR="/opt/mko_bazuna"
             cd "$DEPLOY_DIR"
@@ -772,7 +864,7 @@ jobs:
             # (web:8000 is not published on the host; "web" DNS only resolves inside
             #  the compose network, so curl must execute within docker compose)
             for i in $(seq 1 30); do
-              STATUS=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              STATUS=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
                 exec -T web curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health/ 2>/dev/null || echo "000")
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed"
@@ -782,6 +874,9 @@ jobs:
               sleep 5
             done
 
+            # IMAGE-ONLY ROLLBACK — does NOT revert database migrations.
+            # Migrations are forward-only; DB rollback requires restoring the
+            # pre-deploy backup (see §E3 manual rollback via SSH).
             echo "Health check failed — initiating automatic rollback..."
             PREVIOUS_TAG=$(cat /opt/mko_bazuna/.previous_tag 2>/dev/null || echo "")
             if [ -n "$PREVIOUS_TAG" ]; then
@@ -789,8 +884,8 @@ jobs:
               export REGISTRY="ghcr.io"
               export REPOSITORY="${REPOSITORY}"
               export IMAGE_TAG="$PREVIOUS_TAG"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml pull web
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
+              docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull web
+              docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps web
               echo "Rollback completed — verify manually"
             else
               echo "No previous tag available for rollback — check VPS manually"
@@ -827,7 +922,7 @@ git check-ignore .env.docker
 The project includes a `/health/` endpoint (`docker/Dockerfile:154-155` HEALTHCHECK). The deploy workflow verifies it via `docker compose exec` (the host cannot resolve the compose-internal `web` hostname or reach port 8000, which is not published):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T web curl -sf http://localhost:8000/health/
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml exec -T web curl -sf http://localhost:8000/health/
 ```
 
 Expected response:
@@ -841,16 +936,20 @@ Expected response:
 
 **When:** Used when a deployment breaks the production site.
 
-> **Note:** Automatic rollback is **part of the unbuilt `deploy.yml`** (§C4, step C9). It is not yet live. Manual rollback via SSH is always available.
+> **⚠️ Rollback scope — image only, NOT database migrations:** The automatic rollback reverts the **container image** (the `web` service) to the previous GHCR tag. It does **NOT** reverse database migrations, which are applied forward-only. A pre-deploy database backup (see §[A7](#a7-create-envdocker-on-the-vps)) is the ultimate fallback for catastrophic schema issues. See [E3b. Manual DB restore](#e3b-manual-db-restore-from-backup-image-only-rollback-is-insufficient) for the manual recovery procedure.
 
-### E1. Automatic rollback (TO BE IMPLEMENTED)
+> **Note:** Automatic rollback is **part of the unbuilt `deploy.yml`** (§C4). It is not yet live. Manual rollback via SSH is always available.
 
-Once `deploy.yml` is created, the health-check step (30 attempts × 5s = 150s) will automatically roll back on failure:
+### E1. Automatic rollback (image-only, TO BE IMPLEMENTED)
+
+Once `deploy.yml` is created, the health-check step (30 attempts × 5s = 150s) will automatically roll back on failure. This is an **image-only** rollback:
 
 1. The workflow reads the previous tag from `/opt/mko_bazuna/.previous_tag` (captured via `docker compose ps` before deploy).
-2. It pulls the previous image from GHCR.
+2. It pulls the previous image from GHCR (the VPS authenticates via its read-only GHCR PAT — see §A11).
 3. It restarts the `web` container with the previous image (`up -d --no-deps web`).
 4. The workflow exits with an error — you must verify manually.
+
+> **Database migrations are NOT reverted by this step.** Migrations are forward-only (`migrate --noinput`). If the rollback to the previous image fails due to a schema incompatibility, follow [E3b. Manual DB restore](#e3b-manual-db-restore-from-backup-image-only-rollback-is-insufficient) to restore the pre-deploy database backup.
 
 ### E2. Manual rollback via GitHub Actions
 
@@ -859,12 +958,14 @@ Once `deploy.yml` exists:
 1. Go to **Actions** tab in GitHub.
 2. Select the **Deploy** workflow.
 3. Click **Run workflow** (dropdown).
-4. In the `image_tag` input, enter `sha-{COMMIT_SHA}` of the known-good version.
+4. In the `commit_sha` input, enter the commit SHA of the known-good version.
    - Find the SHA on the **Commits** tab or in the **Actions** run history.
 5. Click **Run workflow**.
 
 The workflow will:
-- Build the image for that commit (if not cached).
+- Check out that specific commit (via `ref:`).
+- Build the image from that commit.
+- Derive the immutable tag `sha-<short>`.
 - Push it to GHCR.
 - Deploy it to the VPS.
 
@@ -873,7 +974,7 @@ The workflow will:
 If GitHub Actions is unavailable:
 
 ```bash
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
 
 cd /opt/mko_bazuna
 
@@ -881,15 +982,50 @@ cd /opt/mko_bazuna
 docker images | grep ghcr.io
 
 # Down current containers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml down
 
 # Set the image tag to the known-good version
+# (IMAGE_TAG is derived as sha-<COMMIT_SHA> from git rev-parse)
 export IMAGE_TAG="sha-<COMMIT_SHA>"
 
 # Pull and start
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
+
+### E3b. Manual DB restore from backup (image-only rollback is insufficient)
+
+Use this procedure when the previous image won't work with the current database schema (e.g., a destructive migration was applied, then the image was rolled back but the schema changed). This is an **image-only fallback** — it does not reverse migrations.
+
+**Prerequisites:** Locate the pre-deploy backup dump in `/opt/mko_bazuna/backups/`. It was created automatically by the deploy workflow before migrations ran (see §C4 deploy script, "Pre-deploy database backup").
+
+```bash
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
+cd /opt/mko_bazuna
+
+# Stop all containers
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml down
+
+# Restore the pre-deploy database backup
+# Find the latest pre_deploy_*.dump file:
+LATEST_BACKUP=$(ls -t /opt/mko_bazuna/backups/pre_deploy_*.dump | head -1)
+echo "Restoring from: $LATEST_BACKUP"
+
+# Restore using exec -T (runs in existing container; host file piped to stdin)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T db pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
+  < "$LATEST_BACKUP"
+
+# Start fresh DB container (pg_restore wrote to the running container's volume)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d db
+
+# Pull and start the known-good image
+export IMAGE_TAG="sha-<KNOWN_GOOD_COMMIT_SHA>"
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+> **Warning:** `pg_restore --clean` drops existing tables before restoring. Ensure you are restoring the correct backup — the most recent pre-deploy dump is almost always the right one.
 
 > The rollback procedure is documented in this guide (§Stage E above). `docs/ops/docker-deployment.md` does **not** contain a rollback section — do not reference it for rollback; all rollback steps live here.
 
@@ -914,31 +1050,33 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 | Test | Expected Result | Status |
 |------|----------------|--------|
-| Run `workflow_dispatch` with `sha-{SHA}` | Specific commit image deploys | ⬜ To verify |
-| GHCR image pushed with SHA tag | Check `ghcr.io/manicko/mko_bazuna` package, tag `sha-<sha>` | ⬜ To verify |
+| Run `workflow_dispatch` with `commit_sha` (a commit SHA) | That commit's image deploys as `sha-<short-sha>` | ⬜ To verify |
+| GHCR image pushed with SHA tag | Check `ghcr.io/manicko/mko_bazuna` package, tag `sha-<short-sha>` | ⬜ To verify |
 | `docker compose pull` runs | Images fetched from GHCR (check deploy logs) | ⬜ To verify |
 | Pre-deploy backup created | `.dump` file in `/opt/mko_bazuna/backups/` | ⬜ To verify |
 | Pre-deploy migrations run | `migrate` one-shot service runs, exits 0 | ⬜ To verify |
 | Health check passes | `docker compose exec -T web curl -sf http://localhost:8000/health/` returns 200 | ⬜ To verify |
 | Containers running | `docker compose ps` shows all services `Up` | ⬜ To verify |
 | Docker cleanup runs | `docker image prune -f` executed | ⬜ To verify |
-| Rollback on failure | Deploy broken image → automatic rollback to previous tag | ⬜ To verify |
+| Rollback on failure | Deploy broken image → automatic **image-only** rollback to previous tag (DB migrations NOT reverted) | ⬜ To verify |
+| VPS → GHCR authentication | `docker pull ghcr.io/manicko/mko_bazuna:sha-<tag>` succeeds (PAT with `read:packages` configured via §A11) | ⬜ To verify |
+| SSH host fingerprint pinned | Deploy workflow includes `fingerprint: ${{ secrets.SERVER_FINGERPRINT }}` (captured in §A4b) | ⬜ To verify |
 
 ### F3. Server Health Verification (on VPS)
 
 ```bash
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
 cd /opt/mko_bazuna
 
 # Check all containers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml ps
 
 # Check web health
 curl -s http://localhost:8000/health/
 
 # Check logs
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs web --tail 20
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs bot --tail 20
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml logs web --tail 20
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml logs bot --tail 20
 
 # Check disk space
 df -h
@@ -995,14 +1133,14 @@ CI will automatically run on the push. Wait for all 6 jobs to pass.
 1. Go to the **Actions** tab in GitHub.
 2. Select the **Deploy** workflow (requires `deploy.yml` to exist — §C4).
 3. Click the **Run workflow** dropdown → **Run workflow**.
-4. In the `image_tag` input, enter the tag to deploy:
-   - **For a specific commit:** `sha-{COMMIT_SHA}` (e.g., `sha-a913bc2`)
+4. In the `commit_sha` input, enter the **commit SHA** to deploy:
+   - Find the SHA on the **Commits** tab or in the **Actions** run history.
 5. Click **Run workflow**.
 
-> **Important:** The `image_tag` input is **required** (never defaults to `latest`). This ensures every deployment is traceable to a specific image and enables precise rollback.
+> **Important:** The `commit_sha` input is **required** — the workflow checks out that exact commit via `ref:`, derives the immutable `IMAGE_TAG=sha-<short>` from `git rev-parse --short HEAD`, and builds the image from that commit's source. This ensures every deployment is traceable to a specific commit and enables precise rollback. Never use `latest`.
 
 The workflow will:
-- Build the Docker image with the specified tag (OIDC to GHCR).
+- Build the Docker image with the specified commit SHA (GITHUB_TOKEN — a GitHub App installation token — to GHCR).
 - Push to GHCR.
 - SSH into the VPS.
 - Pull the new image.
@@ -1030,9 +1168,9 @@ Watch the workflow run in the GitHub Actions UI. It takes 2–5 minutes.
 #### Step 4. Verify on the server (recommended)
 
 ```bash
-ssh -i ~/.ssh/deploy_bazuna deploy@<YOUR_VPS_IP>
+ssh -i ~/.ssh/vps_deploy_bazuna deploy@<YOUR_VPS_IP>
 cd /opt/mko_bazuna
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml ps
 curl -s http://localhost:8000/health/
 ```
 
@@ -1041,7 +1179,7 @@ curl -s http://localhost:8000/health/
 If the deployment fails or the site is broken:
 
 1. **Automatic:** If the health check fails, `deploy.yml`'s rollback step (§E1) automatically redeploys the previous tag.
-2. **Manual via Actions:** Go to **Actions** → **Deploy** workflow → **Run workflow** dropdown → enter `sha-{KNOWN_GOOD_COMMIT_SHA}`.
+2. **Manual via Actions:** Go to **Actions** → **Deploy** workflow → **Run workflow** dropdown → enter the `commit_sha` of the known-good version.
 3. **Manual via SSH:** See [§E3](#e3-manual-rollback-via-ssh).
 
 ### G4. What NOT to do during release
@@ -1050,7 +1188,7 @@ If the deployment fails or the site is broken:
 - **Do not** edit `.env.docker` on the VPS during deploy — the workflow doesn't touch it, but manual edits can cause confusion.
 - **Do not** merge to `main` without CI passing.
 - **Do not** use `workflow_dispatch` on the `develop` branch — deploy only from `main`.
-- **Do not** leave `image_tag` empty — always specify a SHA-based or version tag.
+- **Do not** leave `commit_sha` empty — always specify a real commit SHA.
 
 ---
 
@@ -1062,10 +1200,10 @@ These are **advisory** improvements that can be implemented later. None change t
 
 2. **Add a staging environment** — Even with one VPS, run a staging instance using a separate compose project name:
    ```bash
-   # Staging
-   docker compose -p stage -f docker-compose.yml -f docker-compose.prod.yml up -d
-   # Production
-   docker compose -p prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+    # Staging
+    docker compose --env-file .env.docker -p stage -f docker-compose.yml -f docker-compose.prod.yml up -d
+    # Production
+    docker compose --env-file .env.docker -p prod -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
 
 3. **Trivy fs-mode vulnerability scan** — Add as a non-blocking CI job (scan source tree, report CRITICAL/HIGH as SARIF). See `plan.md_updated.md` §Stage D (D1).
@@ -1088,14 +1226,17 @@ These are **advisory** improvements that can be implemented later. None change t
 
 ## 11. Quick Reference
 
-### GitHub Secrets (4 secrets — server access only)
+### GitHub Secrets (5 secrets — server access + host verification only)
 
 | Name | Source |
 |------|--------|
 | `SERVER_HOST` | VPS IP address |
 | `SERVER_USER` | `deploy` |
-| `SERVER_SSH_KEY` | Private key from `~/.ssh/deploy_bazuna` |
+| `SERVER_SSH_KEY` | Private key from `~/.ssh/vps_deploy_bazuna` |
 | `SERVER_PORT` | `22` |
+| `SERVER_FINGERPRINT` | SSH host key SHA256 fingerprint (captured in §[A4b](#a4b-capture-the-ssh-host-fingerprint-security-hardening)) |
+
+> **Note:** `SERVER_HOST`, `SERVER_USER`, and `SERVER_PORT` are not secrets (public configuration). They *can* be stored as GitHub Actions **Variables** instead of Secrets for better audit transparency; keeping them as Secrets is also acceptable. Only `SERVER_SSH_KEY` and `SERVER_FINGERPRINT` are genuinely sensitive.
 
 ### VPS `.env.docker` variables (23 variables — app secrets live here only)
 
@@ -1121,7 +1262,7 @@ These are **advisory** improvements that can be implemented later. None change t
 | `SEED_ADS` | `600` (demo data) |
 | `REGISTRY` | `ghcr.io` |
 | `REPOSITORY` | `manicko/mko_bazuna` |
-| `IMAGE_TAG` | SHA tag or version (e.g., `sha-a913bc2`) |
+| `IMAGE_TAG` | Derived as `sha-<COMMIT_SHA>` at build time via `git rev-parse --short HEAD` (see §C4, `deploy.yml` template) |
 | `FIX_PERMISSIONS` | `0` (auto-on when `DEBUG=True`) |
 | `SKIP_ENV_CHECK` | Empty (skip env-file validation) |
 
@@ -1131,8 +1272,9 @@ These are **advisory** improvements that can be implemented later. None change t
 |------|----------|---------|
 | Private key | `~/.ssh/github_bazuna` (local) | GitHub authentication (clone, push) |
 | Public key | `~/.ssh/github_bazuna.pub` (local) | GitHub → Settings → SSH and GPG keys |
-| Private key | `~/.ssh/deploy_bazuna` (local) | Becomes `SERVER_SSH_KEY` GitHub Secret |
-| Public key | `~/.ssh/deploy_bazuna.pub` (local) | Copied to VPS `~/.ssh/authorized_keys` |
+| Private key | `~/.ssh/vps_deploy_bazuna` (local) | Becomes `SERVER_SSH_KEY` GitHub Secret |
+| Public key | `~/.ssh/vps_deploy_bazuna.pub` (local) | Copied to VPS `~/.ssh/authorized_keys` |
+| Host key fingerprint | VPS SSH host `SHA256:…` (captured in §A4b) | Becomes `SERVER_FINGERPRINT` GitHub Secret |
 
 ### Directory structure on VPS
 
@@ -1146,7 +1288,9 @@ These are **advisory** improvements that can be implemented later. None change t
 ├── docker/
 │   └── nginx/
 │       └── nginx.conf            # Copied from repo
-└── .env.docker                    # Created in A7 (chmod 600)
+├── .env.docker                    # Created in A7 (chmod 600)
+└── .docker/                       # GHCR auth (created in §A11)
+    └── config.json                # docker login ghcr.io credential (read-only PAT)
 ```
 
 ### Local development commands
@@ -1167,29 +1311,33 @@ These are **advisory** improvements that can be implemented later. None change t
 set -e
 DEPLOY_DIR="/opt/mko_bazuna"
 cd "$DEPLOY_DIR"
+mkdir -p "$DEPLOY_DIR/backups"
 
 export REGISTRY="ghcr.io"
 export REPOSITORY="${REPOSITORY}"
-export IMAGE_TAG="${IMAGE_TAG}"   # e.g., sha-a913bc2 or v0.3.1
+export IMAGE_TAG="${IMAGE_TAG}"   # derived as sha-<COMMIT_SHA> from git rev-parse; e.g., sha-a913bc2
+
+# Note: GHCR pull auth is via `docker login ghcr.io` (read-only PAT) configured on
+# the VPS in §A11 — NOT via GITHUB_TOKEN. The GITHUB_TOKEN is runner-ephemeral.
 
 # Save current tag for rollback
-CURRENT_IMAGE=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps --format "{{.Image}}" web 2>/dev/null || echo "")
+CURRENT_IMAGE=$(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml ps --format "{{.Image}}" web 2>/dev/null || echo "")
 PREVIOUS_TAG=$(echo "$CURRENT_IMAGE" | rev | cut -d: -f1 | rev || echo "")
 echo "$PREVIOUS_TAG" > /opt/mko_bazuna/.previous_tag
 
 # Pull latest images from GHCR
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml pull
 
-# Backup database before migrations
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm \
-  db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -F c \
-  -f /backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump || echo "WARNING: Backup failed, continuing..."
+# Backup database before migrations (host-side redirect to ./backups/ for §E3b restore)
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F c \
+  > "$DEPLOY_DIR/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
 # Run pre-deploy migrations (advisory lock, ID 100)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 
 # Start new containers (uses GHCR images via docker-compose.prod.yml:7-26 image overrides)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Clean up old images
 docker image prune -f
@@ -1204,10 +1352,29 @@ The project supports three languages — **Russian / Bosnian / English** (Bosnia
 | StrEnum name | Locale code | Evidence |
 |--------------|-------------|----------|
 | `RUSSIAN` | `ru` | `base.py:69-73`; `Dockerfile:83` |
-| `BOSNIAN` | `bs` | `enums.py:187-192`; `Dockerfile:83` |
+| `BOSNIAN` | `bs` | `apps/core/enums.py:192`; `Dockerfile:83` |
 | `ENGLISH` | `en` | `base.py:69-73`; `Dockerfile:83` |
 
 The launch **geography** is Montenegro, but the UI **language code** is Bosnian (`bs`). Updated docs use `ru`/`bs`/`en` consistently.
+
+---
+
+## 10. Rationale: `commit_sha` vs `image_tag` — why checkout must pin to the requested SHA
+
+The original plan accepted an arbitrary `image_tag` input (e.g., `sha-a913bc2`) and used it to tag the built image. **This is a security and traceability hazard:**
+
+1. **`actions/checkout@v4` checks out the workflow's trigger ref by default** — the branch selected at `workflow_dispatch` time (=`GITHUB_SHA`). It does **not** read the `image_tag` input and look up that commit.
+2. If a user enters `sha-a913bc2` while triggering from a different commit, the workflow builds from the **wrong commit** but tags the image as `sha-a913bc2`.
+3. The mismatched tag propagates to the VPS via `IMAGE_TAG=${{ github.event.inputs.image_tag }}`, so `docker compose pull` fetches an image labeled with one commit's SHA but built from another. Traceability is broken; rollback to a "known-good SHA" can redeploy the wrong binary.
+
+**The fix** (implemented in §C4):
+- The `workflow_dispatch` input is renamed `commit_sha` (the actual commit to build, not a tag label).
+- `actions/checkout@v4` uses `ref: ${{ inputs.commit_sha }}` + `fetch-depth: 0` to fetch exactly that commit.
+- The `IMAGE_TAG` is **derived** from the checked-out SHA via `git rev-parse --short HEAD` (step output), not trusted from user input.
+- `docker/metadata-action@v5` uses `context: git` so both the `type=sha` tag and the `type=raw` tag reflect the actual checked-out commit.
+- The deploy job reads `IMAGE_TAG` from `needs.build-and-push.outputs.IMAGE_TAG`, never from `github.event.inputs.*`.
+
+This produces an ironclad chain: `commit A → checkout A → build A → GHCR sha-A → deploy sha-A`.
 
 ---
 

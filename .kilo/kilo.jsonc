@@ -11,7 +11,8 @@
         "-y",
         "@modelcontextprotocol/server-filesystem",
         "C:\\py_dev\\mko_bazuna\\"
-      ]
+      ],
+      "enabled": true
     },
   },
   "snapshot": false
