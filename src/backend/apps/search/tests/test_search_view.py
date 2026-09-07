@@ -280,6 +280,66 @@ class TestSearchViewDescendantCategories:
         # No published ads exist, so page should be empty
         assert len(ads_in_page) == 0
 
+    def test_q_and_category_coexist(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """GET /search/?q=<term>&category=<slug> filters by both FTS keyword
+        AND category subtree (Spec 19 CR-1, Assumption A3).
+
+        A two-word query is used to avoid the single-word fuzzy category match
+        path (search.py L192-199), keeping the category filter as the sole
+        subtree constraint alongside FTS.
+        """
+        ad_root = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам красный телевизор",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_child = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Продам красный телевизор",
+            status=AdStatus.PUBLISHED,
+        )
+        # Same title, non-descendant category — excluded by ?category= filter
+        create_test_ad(
+            seller,
+            other_category,
+            city,
+            title="Продам красный телевизор",
+            status=AdStatus.PUBLISHED,
+        )
+        # Same category subtree, non-matching title — excluded by FTS
+        ad_no_match = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Синяя кофемашина",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            f"/search/?q=красный+телевизор&category={root_category.slug}&lang=ru"
+        )
+
+        assert response.status_code == 200
+        assert response.context["query"] == "красный телевизор"
+        assert response.context["current_category"] == root_category.slug
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_root.id in result_ids
+        assert ad_child.id in result_ids  # descendant of root_category
+        assert ad_no_match.id not in result_ids  # matched category but not FTS
+        assert len(result_ids) == 2  # other_category ad excluded by category filter
+
 
 class TestSearchViewCitySuggestion:
     """Search view provides did-you-mean city suggestions (Block 8 V5)."""

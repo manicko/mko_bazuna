@@ -1086,6 +1086,7 @@ class TestFilterUrlReset:
             in content
         )
         assert "data-category-link" in content
+        assert "{% url 'search:search' %}" in content
 
     def test_no_bare_category_path_in_dropdown(self) -> None:
         """No category ``<a href>`` closes without ``query_replace`` (CR-2).
@@ -1103,6 +1104,8 @@ class TestFilterUrlReset:
         assert total == with_replace, (
             f"{total - with_replace} bare category links without query_replace"
         )
+        assert "{% if query %}" in content
+        assert "{% url 'search:search' %}?{% query_replace" in content
 
     def test_breadcrumb_links_preserve_lang_and_city(self) -> None:
         """Breadcrumb category links use ``query_replace`` to preserve
@@ -1116,6 +1119,8 @@ class TestFilterUrlReset:
             in content
         )
         assert "data-category-link" in content
+        assert "{% url 'search:search' %}" in content
+        assert "{% if query %}" in content
 
     def test_did_you_mean_category_uses_query_replace(self) -> None:
         """The did-you-mean category link in ``ad_list.html`` uses
@@ -1128,6 +1133,8 @@ class TestFilterUrlReset:
             "suggested_category %}?{% query_replace request page=1"
             " city=request.current_city lang=LANGUAGE_CODE" in content
         )
+        assert "{% if query %}" in content
+        assert "{% url 'search:search' %}?{% query_replace" in content
 
     def test_autocomplete_category_preserves_url_params(self) -> None:
         """The autocomplete category click handler uses the URL API to
@@ -1143,6 +1150,8 @@ class TestFilterUrlReset:
         assert "new URL(window.location.href)" in content
         assert "url.pathname" in content
         assert "url.searchParams.set('page', '1')" in content
+        assert "url.searchParams.get('q')" in content
+        assert "url.searchParams.set('category', slug)" in content
 
     def test_config_request_hook_injects_lang(self) -> None:
         """The ``htmx:configRequest`` hook injects ``lang`` from the current
@@ -1158,6 +1167,33 @@ class TestFilterUrlReset:
         content = self._header_catalog()
         assert "htmx:afterSwap" in content
         assert "querySelectorAll('[data-category-link]')" in content
+        assert "recomputeCategoryLinks" in content
+        assert "get('q')" in content
+
+    def test_search_page_routes_category_links_to_search_engine(self) -> None:
+        """All category navigation surfaces conditionally route to /search/?q=...&category=<slug>
+        when query is active (Spec 19 CR-1, CR-2, Q2=A)."""
+        header = self._header_catalog()
+        breadcrumb_path = (
+            Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html"
+        )
+        ad_list_path = (
+            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        )
+        breadcrumb = breadcrumb_path.read_text(encoding="utf-8")
+        ad_list = ad_list_path.read_text(encoding="utf-8")
+
+        for name, content in [
+            ("header_catalog.html", header),
+            ("breadcrumb.html", breadcrumb),
+            ("ad_list.html", ad_list),
+        ]:
+            assert "{% if query %}" in content, (
+                f"{name} missing % if query % block for search-page routing"
+            )
+            assert "{% url 'search:search' %}?{% query_replace" in content, (
+                f"{name} missing search:search URL in if-query branch"
+            )
 
     # ------------------------------------------------------------------ #
     # Integration tests — URL state in rendered category pages              #
@@ -1211,6 +1247,40 @@ class TestFilterUrlReset:
         assert "lang=ru" in html
         # Category links are rendered (desktop dropdown + mobile panel)
         assert "data-category-link" in html
+
+    def test_search_page_category_links_preserve_q(
+        self, seller, category, city
+    ) -> None:
+        """On /search/?q=<term>, category dropdown links route to /search/?q=<term>&category=<slug>
+        instead of /category/<slug>/ which drops FTS filtering (Spec 19 CR-1, T7c)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            f"/search/?q=boats&city={city.slug}&lang=ru",
+            headers={"Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        html = response.content.decode("utf-8")
+        assert "data-category-link" in html
+        # Extract href values from <a> tags that also carry data-category-link.
+        # query_replace output is urlencoded; Django auto-escaping converts & to &amp;
+        # in href attribute values.
+        cat_hrefs = re.findall(
+            r'href="([^"]*)"[^>]*?data-category-link', html, re.DOTALL
+        )
+        assert len(cat_hrefs) > 0, (
+            "No data-category-link hrefs found in search page HTML"
+        )
+        for href in cat_hrefs:
+            assert "/search/?q=boats" in href, (
+                f"Category link on search page should route to /search/ with q: {href}"
+            )
+            assert "category=" in href, (
+                f"Category link should include category param: {href}"
+            )
+            assert not href.startswith("/category/"), (
+                f"Category link should NOT route to listings engine on search page: {href}"
+            )
 
 
 class TestSortOnSearchResults:
