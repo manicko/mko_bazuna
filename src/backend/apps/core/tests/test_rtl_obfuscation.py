@@ -132,7 +132,7 @@ def _render_tag(
     *,
     classes: str = "",
     target: str = "",
-    js_verified: bool = True,
+    js_verified: bool = True,  # Kept for API compatibility; no longer affects output.
 ) -> str:
     """Render ``{% telegram_deep_link <command> %}`` with a mocked bot username.
 
@@ -140,8 +140,8 @@ def _render_tag(
         command: The deep-link command (``contact_us``, ``create_ad``, etc.).
         classes: Extra utility classes to pass as the ``classes`` kwarg.
         target: Optional HTML ``target`` attribute value (e.g. ``_blank``).
-        js_verified: Whether the JS-execution cookie is set (controls whether
-            the inert or full markup is rendered).
+        js_verified: Deprecated — the tag always renders the full interactive
+            link regardless of this flag (kept only for call-site compatibility).
 
     Returns:
         The rendered HTML string.
@@ -160,10 +160,11 @@ def _render_tag(
         context_dict: dict = {
             "command": command,
             "classes": classes,
-            "js_verified": js_verified,
         }
         if target:
             context_dict["target"] = target
+        # js_verified is passed but no longer gates the tag output.
+        context_dict["js_verified"] = js_verified
         return template.render(Context(context_dict))
 
 
@@ -185,7 +186,13 @@ def test_telegram_deep_link_keeps_js_telegram_link_class() -> None:
 
 
 def test_telegram_deep_link_degraded_omits_bot_username_rtl() -> None:
-    """The inert (js_verified=False) anchor also omits ``bot-username-rtl``."""
+    """The link never emits ``bot-username-rtl`` — visible text is a label, not username.
+
+    Even when ``js_verified=False`` (legacy degradation path), the tag renders
+    the full interactive link with ``data-*`` attributes and the IIFE click
+    handler. The obfuscation layer (base64-encoded username, no cleartext URL)
+    provides scrape resistance regardless of the ``js_verified`` flag.
+    """
     html = _render_tag("contact_us", js_verified=False)
     assert "bot-username-rtl" not in html
 
@@ -283,9 +290,16 @@ def test_telegram_deep_link_without_target_omits_target_attr() -> None:
 
 
 def test_telegram_deep_link_target_blank_degraded_emits_target_attr() -> None:
-    """The inert (js_verified=False) anchor also emits ``target`` when set."""
+    """The link with ``js_verified=False`` still emits ``target`` and full markup.
+
+    The tag always renders the complete interactive link (with click handler)
+    regardless of ``js_verified`` — the flag no longer gates link functionality.
+    """
     html = _render_tag("contact_us", target="_blank", js_verified=False)
     assert 'target="_blank"' in html
+    # Full markup is always present even when js_verified=False
+    assert "data-bot-encoded" in html
+    assert "data-start" in html
 
 
 def test_telegram_deep_link_target_blank_emits_window_open_in_iife() -> None:

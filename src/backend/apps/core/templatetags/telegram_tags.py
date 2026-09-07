@@ -19,6 +19,13 @@ HTML get a reversed, mark-streaked string instead of the clean username.
 
 Templates must never reference ``settings.BOT_USERNAME`` or a bare
 ``{{ bot_username }}`` context variable — use this tag or filter instead.
+
+The ``{% telegram_deep_link %}`` tag always renders the full interactive link
+(with ``data-*`` attributes and click-handler IIFE) regardless of the
+``js_verified`` context flag. The obfuscation layer (base64-encoded username,
+click-time URL assembly, no cleartext ``t.me/<username>`` in the HTML) provides
+scrape resistance. The ``js_verified`` flag is used separately by the footer's
+cookie-setting script to prove JS execution for subsequent requests.
 """
 
 from __future__ import annotations
@@ -105,11 +112,19 @@ def telegram_deep_link(
     The real ``t.me/<username>`` URL is assembled in the browser from a
     base64-encoded username (``data-bot-encoded``) and a server-controlled
     ``start`` payload (``data-start``); neither the username nor the cleartext
-    URL appears in the static ``href``.
+    URL appears in the static ``href``. The inline ``<script>`` IIFE attaches a
+    click handler that assembles the URL at click time, so real browsers always
+    get a working link on first visit.
+
+    The ``js_verified`` context flag (set by ``JSExecutionMiddleware``) is no
+    longer used to gate the link itself — the obfuscation layer (base64-encoded
+    username, no cleartext URL, click-time assembly) already resists scrapers.
+    The flag remains available for the cookie-setting script in the footer
+    template, which proves JS execution for subsequent requests.
 
     Args:
-        context: Template context (``takes_context=True`` so Block 6 can inject
-            the ``js_verified`` flag set by the JS-execution cookie middleware).
+        context: Template context (``takes_context=True`` — ``js_verified`` is
+            accepted but no longer gates the link output).
         command: One of ``TelegramDeepLinkCommand`` values.
         *args: Optional payload argument (ad.id for ``contact``, raw_token
             for ``login``).
@@ -121,9 +136,9 @@ def telegram_deep_link(
             'noopener,noreferrer')`` instead of ``window.location.href`` (CR-8).
 
     Returns:
-        An HTML-escaped ``<a>`` plus an inline ``<script>`` IIFE. When
-        ``context["js_verified"]`` is falsy, degrades to an inert ``href="#"``
-        anchor with no ``data-*`` attributes and no script (Q8=C).
+        An HTML-escaped ``<a>`` with ``data-*`` attributes plus an inline
+        ``<script>`` IIFE click handler. The ``href`` is always ``#`` (never
+        a cleartext Telegram URL).
     """
     try:
         cmd = TelegramDeepLinkCommand(command)
@@ -145,20 +160,6 @@ def telegram_deep_link(
     class_attr = f"js-telegram-link {classes}".strip()
     encoded = base64.b64encode(get_bot_username().encode("utf-8")).decode("ascii")
     target_attr = mark_safe(f' target="{target}"') if target else ""
-
-    js_verified = context.get("js_verified", True)
-
-    if not js_verified:
-        return cast(
-            str,
-            format_html(
-                '<a href="#"{} class="{}" aria-label="{}">{}</a>',
-                target_attr,
-                class_attr,
-                label,
-                label,
-            ),
-        )
 
     return cast(
         str,

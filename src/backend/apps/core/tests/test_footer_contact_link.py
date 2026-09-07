@@ -137,19 +137,24 @@ def test_rendered_footer_contains_js_cookie_script() -> None:
 
 
 def test_contact_link_remains_visible_when_js_not_verified() -> None:
-    """Link is visible but inert when ``js_verified`` is False (no consent gate).
+    """Link is fully functional for all visitors — no first-visit dead link.
 
     Per spec Block A the link is visible to ALL visitors regardless of consent
-    state. With ``js_verified=False`` the tag degrades to a bare anchor (no
-    ``data-bot-encoded``/``data-start``, no click-handler IIFE), while the
-    static cookie script still runs to prove JS execution for a subsequent
-    request.
+    state. The ``js_verified`` flag no longer gates the link itself — the
+    obfuscation layer (base64-encoded username, click-time URL assembly, no
+    cleartext URL in HTML) provides scrape resistance. The flag only controls
+    the cookie-setting script for subsequent requests.
+
+    With ``js_verified=False`` the tag still emits the full interactive link:
+    ``data-*`` attributes, click-handler IIFE, and working deep-link assembly.
     """
     html = _render_footer(js_verified=False)
     assert "js-telegram-link" in html
     assert "Contact us" in html
-    # Degraded to inert: no obfuscated payload, no deep-link script.
-    assert "data-bot-encoded" not in html
-    assert "data-start" not in html
+    # Full interactive markup is present even when js_verified=False
+    assert "data-bot-encoded" in html
+    assert "data-start" in html
+    # IIFE click handler is present
+    assert "addEventListener" in html
     # Cookie script is static HTML — present regardless of js_verified.
     assert _COOKIE_ASSIGNMENT in html
