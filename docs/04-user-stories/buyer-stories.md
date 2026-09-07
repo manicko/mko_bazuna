@@ -80,7 +80,7 @@ state (Q4=A, decision K: DECLINE = browse-only, contact still works). Clicking i
 `ad_id`, routing to a general site-support flow (greeting + instructions). The bot username and
 deep-link URL are obfuscated in the template (CSS `direction: rtl` for display text, JS `data-*`
 click-to-reveal for the href) per Spec 18 CR-6/CR-7, with no `<noscript>` fallback (Q8=C). See
-Spec 18 (contact-us).
+[`contact-us.md`](../01-spec/contact-us.md).
 
 **Acceptance criteria:**
 - AC1: Footer renders a `{% trans "Contact us" %}` link on every public page.

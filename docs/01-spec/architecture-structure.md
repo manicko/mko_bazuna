@@ -30,7 +30,7 @@ src/
 │   │   │   ├── middleware/           # city resolution + locale + preferred city (CityResolutionMiddleware, LanguagePreMiddleware, PreferredCityMiddleware)
 │   │   │   ├── migrations/
 │   │   │   ├── services/             # contact + site_config services
-│   │   │   ├── templatetags/         # contact_tags, localized_content
+│   │   │   ├── templatetags/         # contact_tags, localized_content, dict_tags (query_replace), telegram_tags (telegram_deep_link, rtl_obfuscate)
 │   │   │   ├── tests/                # sweep command tests, context processor tests
 │   │   │   ├── utils/                # advisory_lock, cache, migrate_locked, sanitize
 │   │   │   ├── context_processors.py
@@ -131,7 +131,7 @@ src/
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
 │   ├── states.py                  # AdCreateState FSM states (aiogram 3.x)
-│   ├── handlers/                  # aiogram 3.x handlers (login, ad_create)
+│   ├── handlers/                  # aiogram 3.x handlers (login, ad_create, contact)
 │   ├── schemas/                   # pydantic v2 DTOs for bot message payloads (rule 11)
 │   ├── services/                  # business logic (media.py for photo handling)
 │   ├── config.py
@@ -178,7 +178,7 @@ deletion mirrors `set_cookie` attributes (Secure/HttpOnly/SameSite=Lax on HTTPS)
 
 | Processor | Module | Variables | Consumed by |
 |---|---|---|---|
-| `header_context` | `apps/core/context_processors.py` | `bot_username`, `root_categories`, `preferred_city_display`, `cities`, `favorites_count` | Catalog header (`header_catalog.html`) |
+| `header_context` | `apps/core/context_processors.py` | `root_categories`, `preferred_city_display`, `cities`, `favorites_count`, `catalog_js_labels` | Catalog header (`header_catalog.html`) — Note: `bot_username` is **not** injected here; it is resolved at template-render time via the `telegram_deep_link` tag (`apps/core/templatetags/telegram_tags.py`) which calls `get_bot_username()` internally. See [contact-us.md](../01-spec/contact-us.md). |
 | `consent_state` | `apps/users/context_processors.py` | `consent_shown`, `consent_analytics`, `consent_preferences` | Consent banner + script gating (11 templates) |
 | `plausible_host` | `apps/core/context_processors.py` | `PLAUSIBLE_HOST` | Gated Plausible snippet (`{% if consent_analytics and PLAUSIBLE_HOST %}`) |
 | `language` | `apps/core/context_processors.py` | `LANGUAGE_CODE` | All templates |
@@ -311,6 +311,8 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 - **Rate limiting:**
   - `/login/`: 10 req/s burst 20 (`login_limit` zone)
   - `/search/`: 20 req/s burst 40 (`search_limit` zone)
+  - `/contact/` (deep-link page render, Spec 18): per-IP cap of 5 renders per 10 min — see [contact-us.md](../01-spec/contact-us.md#rate-limiting-dual-layer) for the full dual-layer table including bot-side limits.
+  - **Bot-side** (`/start contact_us`): per-Telegram-user rate limit of 5 per 10 min via `check_contact_start_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a cooldown message (Spec 18 CR-10).
 - **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var). For local development with HTTPS, see [Local HTTPS with mkcert](../../ops/local-https-mkcert.md).
 
 ## Audit Zone References

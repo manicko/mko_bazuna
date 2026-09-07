@@ -380,16 +380,21 @@ Category search works TWO ways: (1) FTS matches the category word via `category_
 
 ### site_config (singleton)
 
-Admin-editable site/brand name. Replaces 22 hardcoded `"Mko Bazuna"` occurrences across
-page `<title>` tags, header/footer brand links, the auth & privacy `blocktrans`, and the
-admin review page with a single runtime-configurable value. Modeled on the
-`ModerationCriteria` singleton pattern — exactly one row (`pk=1`, created lazily via
-`get_or_create(pk=1)` and seeded explicitly by the `0002_seed_default` data migration using
-`RunPython`, the first project migration to seed data this way; under `DisableMigrations`
-(tests) the lazy `get_or_create` in `get_singleton()` is the fallback):
+Admin-editable site/brand name and Telegram bot username. Replaces 22 hardcoded
+`"Mko Bazuna"` occurrences across page `<title>` tags, header/footer brand links,
+the auth & privacy `blocktrans`, and the admin review page with a single
+runtime-configurable value. The bot username replaces the cleartext
+`BOT_USERNAME` env var as the source of truth for all deep-link rendering
+(Spec 18). Modeled on the `ModerationCriteria` singleton pattern — exactly one
+row (`pk=1`, created lazily via `get_or_create(pk=1)` and seeded explicitly by
+the `0002_seed_default` data migration using `RunPython`, then `0003_add_bot_username`
+seeds `bot_username` from the `BOT_USERNAME` env var, the first project
+migration to seed data this way; under `DisableMigrations` (tests) the lazy
+`get_or_create` in `get_singleton()` is the fallback):
 ```
 id (PK)
 name (VARCHAR, default "Bazuna")      # site/brand name shown in page titles, headers, footer, and bot greetings
+bot_username (VARCHAR, default "bazuna_bot")  # Telegram bot username WITHOUT @ prefix; RegexValidator ^[A-Za-z0-9_]{3,32}$
 db_table: site_config
 ```
 The admin (`apps/core/admin.py`) registers `SiteConfigAdmin` with
@@ -398,13 +403,21 @@ The admin (`apps/core/admin.py`) registers `SiteConfigAdmin` with
 (`SITE_CONFIG_CACHE_KEY = "site_config:v1"`, 1 h TTL in `apps/core/utils/cache.py`) on
 every save.
 
-The cached name is read by **both** long-lived processes — the web via the `site_config`
-context processor (`site_name`) and the Telegram bot via `get_site_name_async()` (greetings
-on `/start` and `/post`); see [Cache Backend](../99-agent/architecture.md#cache-backend) for
-the two-process shared-cache model (Redis in prod, `LocMemCache` in tests). `get_site_name()`
-defensively falls back to `"Bazuna"` if the row or cache is unavailable. See
-[architecture-structure.md](../01-spec/architecture-structure.md#context-processors) for the
-context-processor inventory.
+The cached config (both `name` and `bot_username`) is read by **both** long-lived
+processes — the web via the `site_config` context processor (`site_name`) and the
+`get_bot_username()` service, and the Telegram bot via `get_site_name_async()` (greetings
+on `/start` and `/post`) and `get_bot_username_async()` (deep-link construction); see
+[Cache Backend](../99-agent/architecture.md#cache-backend) for the two-process
+shared-cache model (Redis in prod, `LocMemCache` in tests). `get_site_name()` and
+`get_bot_username()` defensively fall back to `"Bazuna"` and `"bazuna_bot"`
+respectively if the row or cache is unavailable. The `BOT_USERNAME` env var is now a
+**seed value only** (consumed by migration `0003`); all runtime reads go through the
+`get_bot_username()` service. See [`contact-us.md`](../01-spec/contact-us.md) for the
+full deep-link obfuscation and rate-limiting architecture.
+
+After the site name, the bot username is the second field of this singleton; see
+[architecture-structure.md](../01-spec/architecture-structure.md#context-processors) for
+the context-processor inventory.
 
 ---
 

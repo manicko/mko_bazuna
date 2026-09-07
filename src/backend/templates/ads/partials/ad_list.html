@@ -18,8 +18,8 @@ is unaffected. {% endcomment %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
             {% trans "Did you mean:" %} {% if query %}<a href="{% url 'search:search' %}?{% query_replace request page=1 category=suggested_category city=request.current_city lang=LANGUAGE_CODE %}"
-class="underline font-medium">{{ suggested_category }}</a>{% else %}<a href="{% url 'ads:listings_category' suggested_category %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
-class="underline font-medium">{{ suggested_category }}</a>{% endif %}?
+   class="underline font-medium">{{ suggested_category }}</a>{% else %}<a href="{% url 'ads:listings_category' suggested_category %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+   class="underline font-medium">{{ suggested_category }}</a>{% endif %}?
         </p>
     </div>
 {% endif %}
@@ -27,7 +27,7 @@ class="underline font-medium">{{ suggested_category }}</a>{% endif %}?
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
             {% trans "Did you mean:" %} <a href="{% if request.resolver_match.url_name == 'listings_city' %}{% url 'ads:listings' %}{% else %}{{ request.path }}{% endif %}?{% query_replace request page=1 city=suggested_city lang=LANGUAGE_CODE %}"
-class="underline font-medium">{{ suggested_city }}</a>?
+    class="underline font-medium">{{ suggested_city }}</a>?
         </p>
     </div>
 {% endif %}

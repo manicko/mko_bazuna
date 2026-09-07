@@ -490,10 +490,10 @@ full-size photo as a plain fallback. Content is localized via
     <!-- Contact Seller -->
     <div class="p-6 border-t bg-gray-50">
         {% if ad|can_contact %}
-            <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
-               class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-                Contact Seller
-            </a>
+            {% telegram_deep_link "contact" ad_id=ad.id
+                classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                label="Contact Seller" %}
+            <p class="text-xs text-gray-500 mt-2">Message sent through Telegram bot</p>
         {% else %}
             <button type="button" disabled
                     class="px-6 py-3 bg-gray-300 text-white rounded-lg font-medium cursor-not-allowed">
@@ -541,15 +541,18 @@ full-size photo as a plain fallback. Content is localized via
 | Lazy load | `loading="lazy"` on all images |
 | Title | `ad|get_title:LANGUAGE_CODE` |
 | Description | `ad|get_description:LANGUAGE_CODE` |
-| Contact button | `bot_username` context var (never `settings.BOT_USERNAME`) |
+| Contact button | `{% telegram_deep_link "contact" ad_id=ad.id %}` tag (resolves `get_bot_username()` internally) |
 | Pages | `ads/detail.html` |
 
 ### Shared Navigation Headers
 
 Two header variants share a global context processor (`apps.core.context_processors.header_context`,
 see [architecture-structure.md](architecture-structure.md#middleware--context-processors))
-that injects `bot_username`, `root_categories`, `preferred_city_display`, `cities`, and
-`favorites_count`. Consent state (`consent_shown`, `consent_analytics`,
+that injects `root_categories`, `preferred_city_display`, `cities`, and
+`favorites_count`. The Telegram bot username for deep-link CTAs is resolved at
+template-render time via the `{% telegram_deep_link %}` tag (see
+[contact-us.md](../01-spec/contact-us.md)), not injected as a context
+variable. Consent state (`consent_shown`, `consent_analytics`,
 `consent_preferences`) is provided by `apps.users.context_processors.consent_state`. Both
 headers are rendered as Django include fragments.
 
@@ -578,8 +581,9 @@ when `cat.get_children.exists`. Full behavior documented in
             <div class="flex items-center gap-2">
                 {% include "components/header_favorites_badge.html" %}
                 {% include "components/header_auth_entry.html" %}
-                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
-                   class="px-4 py-2 bg-blue-600 text-white rounded-lg" data-place-ad>+ Подать объявление</a>
+                {% telegram_deep_link "create_ad"
+                    classes="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                    label="+ Подать объявление" %}
                 {% include "components/language_switcher.html" %}
             </div>
         </div>

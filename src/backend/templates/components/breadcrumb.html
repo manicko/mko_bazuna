@@ -13,34 +13,36 @@ include context. {% endcomment %}
      class="mt-3 flex flex-wrap items-center text-sm text-gray-500">
     {% if breadcrumb_category %}
         {% if query %}
-        <a href="{% url 'search:search' %}?{% query_replace request page=1 category=None city=None lang=LANGUAGE_CODE %}" class="hover:text-blue-600">{% trans "Home" %}</a>
+            <a href="{% url 'search:search' %}?{% query_replace request page=1 category=None city=None lang=LANGUAGE_CODE %}"
+               class="hover:text-blue-600">{% trans "Home" %}</a>
         {% else %}
-        <a href="{% url 'ads:listings' %}?{% query_replace request city=request.current_city lang=LANGUAGE_CODE %}" class="hover:text-blue-600">{% trans "Home" %}</a>
+            <a href="{% url 'ads:listings' %}?{% query_replace request city=request.current_city lang=LANGUAGE_CODE %}"
+               class="hover:text-blue-600">{% trans "Home" %}</a>
         {% endif %}
         <span class="mx-1 text-gray-400">&rsaquo;</span>
         {% with ancestors=breadcrumb_category.get_ancestors %}
             {% if ancestors|length > 2 %}
                 {% if query %}
-                <a href="{% url 'search:search' %}?{% query_replace request page=1 category=ancestors.0.slug city=request.current_city lang=LANGUAGE_CODE %}"
-                   data-category-link="{{ ancestors.0.slug }}"
-                   class="hover:text-blue-600">{{ ancestors.0|get_category_name:LANGUAGE_CODE }}</a>
+                    <a href="{% url 'search:search' %}?{% query_replace request page=1 category=ancestors.0.slug city=request.current_city lang=LANGUAGE_CODE %}"
+                       data-category-link="{{ ancestors.0.slug }}"
+                       class="hover:text-blue-600">{{ ancestors.0|get_category_name:LANGUAGE_CODE }}</a>
                 {% else %}
-                <a href="{% url 'ads:listings_category' ancestors.0.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
-                   data-category-link="{{ ancestors.0.slug }}"
-                   class="hover:text-blue-600">{{ ancestors.0|get_category_name:LANGUAGE_CODE }}</a>
+                    <a href="{% url 'ads:listings_category' ancestors.0.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+                       data-category-link="{{ ancestors.0.slug }}"
+                       class="hover:text-blue-600">{{ ancestors.0|get_category_name:LANGUAGE_CODE }}</a>
                 {% endif %}
                 <span class="mx-1 text-gray-400">&rsaquo;</span>
                 <span class="mx-1 text-gray-400">…</span>
                 <span class="mx-1 text-gray-400">&rsaquo;</span>
                 {% with last_ancestor=ancestors|slice:"::-1"|first %}
                     {% if query %}
-                    <a href="{% url 'search:search' %}?{% query_replace request page=1 category=last_ancestor.slug city=request.current_city lang=LANGUAGE_CODE %}"
-                       data-category-link="{{ last_ancestor.slug }}"
-                       class="hover:text-blue-600">{{ last_ancestor|get_category_name:LANGUAGE_CODE }}</a>
+                        <a href="{% url 'search:search' %}?{% query_replace request page=1 category=last_ancestor.slug city=request.current_city lang=LANGUAGE_CODE %}"
+                           data-category-link="{{ last_ancestor.slug }}"
+                           class="hover:text-blue-600">{{ last_ancestor|get_category_name:LANGUAGE_CODE }}</a>
                     {% else %}
-                    <a href="{% url 'ads:listings_category' last_ancestor.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
-                       data-category-link="{{ last_ancestor.slug }}"
-                       class="hover:text-blue-600">{{ last_ancestor|get_category_name:LANGUAGE_CODE }}</a>
+                        <a href="{% url 'ads:listings_category' last_ancestor.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+                           data-category-link="{{ last_ancestor.slug }}"
+                           class="hover:text-blue-600">{{ last_ancestor|get_category_name:LANGUAGE_CODE }}</a>
                     {% endif %}
                 {% endwith %}
                 <span class="mx-1 text-gray-400">&rsaquo;</span>
@@ -48,13 +50,13 @@ include context. {% endcomment %}
             {% else %}
                 {% for cat in ancestors %}
                     {% if query %}
-                    <a href="{% url 'search:search' %}?{% query_replace request page=1 category=cat.slug city=request.current_city lang=LANGUAGE_CODE %}"
-                       data-category-link="{{ cat.slug }}"
-                       class="hover:text-blue-600">{{ cat|get_category_name:LANGUAGE_CODE }}</a>
+                        <a href="{% url 'search:search' %}?{% query_replace request page=1 category=cat.slug city=request.current_city lang=LANGUAGE_CODE %}"
+                           data-category-link="{{ cat.slug }}"
+                           class="hover:text-blue-600">{{ cat|get_category_name:LANGUAGE_CODE }}</a>
                     {% else %}
-                    <a href="{% url 'ads:listings_category' cat.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
-                       data-category-link="{{ cat.slug }}"
-                       class="hover:text-blue-600">{{ cat|get_category_name:LANGUAGE_CODE }}</a>
+                        <a href="{% url 'ads:listings_category' cat.slug %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+                           data-category-link="{{ cat.slug }}"
+                           class="hover:text-blue-600">{{ cat|get_category_name:LANGUAGE_CODE }}</a>
                     {% endif %}
                     <span class="mx-1 text-gray-400">&rsaquo;</span>
                 {% endfor %}

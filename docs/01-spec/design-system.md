@@ -681,19 +681,15 @@ Anonymity-preserving contact mechanism via Telegram.
 ```html
 <div class="p-6 border-t bg-gray-50">
     {% if ad|can_contact %}
-        <a 
-             href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
-            class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            role="button"
-        >
-            Contact Seller
-        </a>
+        {% telegram_deep_link "contact" ad_id=ad.id
+            classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            label="Contact Seller" %}
         <p class="text-xs text-gray-500 mt-2">
             Message sent through Telegram bot
         </p>
     {% else %}
-        <button 
-            type="button" 
+        <button
+            type="button"
             disabled
             class="px-6 py-3 bg-gray-300 text-white rounded-lg font-medium cursor-not-allowed"
         >

@@ -411,7 +411,19 @@ Related user stories: US-B3
 
 ## Filter Reset/Clear All
 
-Option to reset all active filters at once on the catalog listing page.
+There are two distinct reset operations, per Spec 17 (URL State Preservation):
+
+| Operation | What it clears | What it preserves | Where |
+|---|---|---|---|
+| **Clear all filters** | `sort`, `min_price`, `max_price`, `listing_purpose`, `listing_condition`, `features`, `page`, **`city`** (if a query param) | `lang`, `q` (on search pages), category (path-encoded) | Top of the filter/chip bar on listings and search pages |
+| **Entire country** (city clear) | **`city`** only | `lang`, `sort`, `listing_purpose`, `listing_condition`, `features`, `min_price`, `max_price`, `q`, category (path) | Preferred-city panel in the catalog header ("Вся страна") |
+
+Under Spec 17, the explicit city is carried as a **query parameter** (`?city=<slug>`)
+appended to the current URL — not a path segment. The "Entire country" clear drops
+only `?city=` from the URL, preserving `lang` and all non-city filters on all pages.
+This differs from "Clear all filters" which resets the entire query-param set. See
+[`url-state-preservation.md`](../01-spec/url-state-preservation.md#entire-country-clear-behavior)
+for the full URL-state matrix.
 
 ### Implementation
 
@@ -436,15 +448,14 @@ active_price_max`, so the clear-all button appears whenever any chip — includi
 price — is active, and disappears after clearing.
 
 The clear-all link **resets all query parameters** (`sort`, `min_price`, `max_price`,
-`listing_purpose`, `listing_condition`, `features`, `page`) — it emits only `?page=1&lang=…`.
-On the **search results page** (`/search/?q=…`), `q` is **preserved** via the
-`{% if query %}` branch, because the search query is the primary content of that page.
-On the catalog listings page (`/`), `query` is `None` so `q` is omitted.
+`listing_purpose`, `listing_condition`, `features`, `page`) — it emits only
+`?page=1&lang=…`. On the **search results page** (`/search/?q=…`), `q` is **preserved**
+via the `{% if query %}` branch, because the search query is the primary content of
+that page. On the catalog listings page (`/`), `query` is `None` so `q` is omitted.
 
-Category and city that are encoded as **URL path parameters** (e.g. `/category/<slug>/`)
-are naturally preserved by the path — they are not query parameters and thus unaffected
-by the query reset. When city is applied as a **query parameter** (`?city=<slug>`) via
-the header dropdown, it is also dropped by clear-all (since it is a query param).
+Category is encoded in the **URL path** (`/category/<slug>/`) and is naturally
+preserved by the path — it is not a query parameter. The "Entire country" city clear
+(see the table above) is a separate operation that drops `?`city=` only.
 
 ## Pagination URL Preservation
 
@@ -452,6 +463,7 @@ Every pagination link must preserve the **full** active filter set so a bookmark
 two stays on the same result subset (no divergence from page 1). In addition to the existing
 `q`/`category`/`city`/`sort`/`min_price`/`max_price`/`page` parameters, pagination URLs carry:
 
+- `lang=<code>` (the active language, see [url-state-preservation.md](url-state-preservation.md#language-behavior)).
 - `listing_purpose=<slug>` when a purpose is selected (dropped when none).
 - `listing_condition=<slug>` when a condition is selected (dropped when none).
 - **Repeated** `features=<slug>` for each selected feature (one query-param per feature, not
@@ -461,8 +473,9 @@ The `sort` parameter is preserved in pagination URLs even while a `q` (full-text
 so the user's sort preference is retained across result pages.
 
 ```html
-<!-- Pagination links append the active listing_purpose + listing_condition + each feature -->
-<a href="?page=2&category={{ category_slug }}&city={{ city_slug }}&sort={{ current_sort }}
+<!-- Pagination links append the active lang + listing_purpose + listing_condition + each feature;
+     city is a query param (?city=), category is path-encoded (/category/<slug>/) -->
+<a href="?page=2&lang={{ LANGUAGE_CODE }}{% if current_city %}&city={{ current_city }}{% endif %}&sort={{ current_sort }}
    {% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}
    {% if current_listing_condition %}&listing_condition={{ current_listing_condition }}{% endif %}
    {% for fslug in current_features %}&features={{ fslug }}{% endfor %}">

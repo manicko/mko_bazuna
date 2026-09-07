@@ -105,13 +105,20 @@ Related user stories: US-B4
 
 ## Contact Seller Button
 
-The contact mechanism preserves seller anonymity while enabling communication through Telegram.
+The contact mechanism preserves seller anonymity while enabling communication through Telegram
+via the `telegram_deep_link` template tag (Spec 18). See [`contact-us.md`](contact-us.md)
+for the full deep-link obfuscation and rate-limiting architecture.
 
 ### Deep-link Format
 
 ```
 https://t.me/<bot_username>?start=contact_<ad_id>
 ```
+
+The `href` is assembled by JavaScript at click time from a base64-encoded
+`data-bot-encoded` attribute emitted by the `{% telegram_deep_link "contact" ad_id=ad.id %}`
+template tag. Static HTML never contains the bot username or the full
+`t.me://` URL — see [contact-us.md](contact-us.md#deep-link-rendering-the-telegram-deep-link-template-tag).
 
 ### Render Conditions
 
@@ -127,12 +134,10 @@ Button renders only when ALL conditions are met:
 ```html
 <div class="p-6 border-t bg-gray-50">
     {% if ad|can_contact %}
-        <a href="https://t.me/{{ bot_username }}?start=contact_{{ ad.id }}"
-           class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-            Contact Seller
-        </a>
+        {% telegram_deep_link "contact" ad_id=ad.id
+            classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium" %}
     {% else %}
-        <button type="button" 
+        <button type="button"
                 class="px-6 py-3 bg-gray-400 text-white rounded-lg font-medium cursor-not-allowed"
                 disabled>
             Contact Seller
@@ -270,11 +275,12 @@ Related user stories: US-S2
 
 The site uses **two header variants** rather than a single monolithic header. Both
 are server-rendered Django include fragments and share a global context processor
-(`apps.core.context_processors.header_context`) that injects `bot_username`
-(the Telegram deep-link target), `root_categories` (ordered top-level
-`Category` nodes for the "All Categories" dropdown), and
+(`apps.core.context_processors.header_context`) that injects `root_categories`
+(ordered top-level `Category` nodes for the "All Categories" dropdown), and
 `favorites_count` (the authenticated user's favorited-ad count, for the header
-badge; `None` for anonymous).
+badge; `None` for anonymous). The Telegram bot username for deep-link CTAs is
+**not** injected as a context variable — it is resolved at template-render time
+via the `{% telegram_deep_link %}` tag (see [contact-us.md](contact-us.md)).
 
 | Header | Template | Used on |
 |--------|----------|---------|
@@ -305,9 +311,9 @@ The autocomplete relies on `htmx:afterRequest` events.
             <div class="flex items-center gap-2">
                 {% include "components/header_favorites_badge.html" %}
                 {% include "components/header_auth_entry.html" %}
-                <a href="https://t.me/{{ bot_username }}?start=create_ad" target="_blank"
-                   class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
-                   data-place-ad>+ Подать объявление</a>
+                 {% telegram_deep_link "create_ad"
+                    classes="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
+                    label="Подать объявление" %}
                 {% include "components/language_switcher.html" %}
             </div>
         </div>
@@ -385,9 +391,12 @@ The autocomplete relies on `htmx:afterRequest` events.
 ### Catalog Header — Component behavior
 
 - **Place-an-ad CTA:** Opens the Telegram bot deep-link
-  `https://t.me/{{ bot_username }}?start=create_ad` in a new tab. Uses the
-  `bot_username` context variable (never references `settings.BOT_USERNAME`
-  directly).
+  `https://t.me/<bot_username>?start=create_ad` (`target="_blank"`) via the
+  `{% telegram_deep_link "create_ad" %}` template tag. The `href` is assembled
+  by JavaScript at click time from a base64-encoded `data-*` attribute — the
+  bot username is resolved server-side via `get_bot_username()` and never
+  rendered in cleartext in the HTML. See [contact-us.md](contact-us.md) for the
+  full deep-link obfuscation architecture.
 - **Preferred-city selector:** A `📍` button shows `preferred_city_display`
   ("Вся страна" or the localized city name). Expanding it lists all Montenegro
   cities from the `cities` context var; "Вся страна" clears the preference
@@ -398,7 +407,8 @@ The autocomplete relies on `htmx:afterRequest` events.
   replaced instead. URL path city takes precedence over the query-param city.
   For authenticated users the city is also written to `User.preferred_city`
   on login reconciliation. The cookie is consent-gated (`consent_preferences`
-  required) — see [search-patterns.md](search-patterns.md#preferred-city-default--precedence).
+  required) — see [search-patterns.md](search-patterns.md#preferred-city-default--precedence)
+  and the [URL state model](../01-spec/url-state-preservation.md#url-state-model-path-encoded-vs-query-encoded)
 - **"All Categories" dropdown (desktop):** Lazy-loading accordion. The panel
   is rendered server-side with top-level `root_categories`; submenus are
   fetched on first expand via `GET /categories/<slug>/submenu/` and injected
@@ -441,11 +451,15 @@ This corrects the previous Spec-14 R-05c which excluded auth nav.
 
 **Context variables** (from `apps.core.context_processors.header_context`, see
 [architecture-structure.md](architecture-structure.md#middleware--context-processors)):
-`bot_username`, `root_categories`, `preferred_city_display`, `cities`,
+`root_categories`, `preferred_city_display`, `cities`,
 `favorites_count` (None for anonymous → outline heart with no count).
-Consent state (`consent_shown`, `consent_analytics`, `consent_preferences`) is
-provided by `apps.users.context_processors.consent_state`. The behavior above is
-the complete requirement (canonical template: `components/header_catalog.html`).
+The bot username for deep-link CTAs is resolved at template-render time via the
+`{% telegram_deep_link %}` tag (see [contact-us.md](contact-us.md)), not injected
+as a context variable — templates must never reference `settings.BOT_USERNAME`
+directly. Consent state (`consent_shown`, `consent_analytics`,
+`consent_preferences`) is provided by `apps.users.context_processors.consent_state`.
+The behavior above is the complete requirement (canonical template:
+`components/header_catalog.html`).
 
 The admin-edited **site name** `site_name` is injected by a *separate* context processor,
 `apps.core.context_processors.site_config` (see

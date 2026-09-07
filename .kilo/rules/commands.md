@@ -1,8 +1,8 @@
 # Project Commands
 
-**Environment:** Windows · `uv` (Python) · PostgreSQL 18 in Docker (`mko-bazuna-test-db-*`, port 5433)
+**Environment:** Windows 11 · `uv` (Python) · PostgreSQL 18 in Docker (`mko-bazuna-test`, port 5433)
 
-## Python
+## Python (PowerShell)
 
 | Task | Command |
 |---|---|
@@ -14,35 +14,32 @@
 
 ## Tests (Docker only — never `uv run pytest` locally)
 
-Tests need PostgreSQL 18 in Docker on port 5433; local `uv run pytest` fails (DB unreachable on `localhost:5432`).
+Local `uv run pytest` fails — no DB on `localhost:5432`. All test commands below use the `mko-bazuna-test` Compose project.
 
-**Start test DB:**
+**PowerShell alias (copy once):**
 ```powershell
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
+$dc='docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml'
 ```
 
-**Run a specific test:**
-```powershell
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm `
-  -e PYTEST_OPTS="<opts>" test
-```
-
-> Never pass `--override-ini=addopts=` (it strips `--import-mode=importlib`). Append opts directly to `PYTEST_OPTS`. Docker entrypoint defaults to `--reuse-db` (safe via named volume); use `--create-db` locally or after migrations. **Never** use `--reuse-db` against a local persistent DB — stale schema causes ~527 errors.
-
-| Command | What it does | When to use |
+| Task | Command | When to use |
 |---|---|---|
-| `make test` | Fast gate: skips `seed` tests (~300s) | Default dev iteration |
-| `make test-all` | Full suite incl. `seed` (~35 min) | Changes touch seeding/images |
-| `make test-recreate` | Fresh schema (`--create-db`) | After migration changes or interrupted run |
+| Start DB | ` $dc up -d db` | Before running tests |
+| Fast gate | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Default dev iteration (skips seed suite) |
+| Full suite | `$dc run --rm test` | Changes touch seeding/images (~35 min) |
+| Fresh schema | `$dc run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test` | After migration changes or interrupted run |
+| Stop DB | `$dc down` | Done testing (preserves data volume) |
 
-> **Fast gate:** `make test` sets `PYTEST_SKIP_MARKERS=seed`; the Docker entrypoint (`docker/entrypoint-test.sh`) turns this into `-m "not (seed)"`.
+**Run a single test** (override all pytest flags via `PYTEST_OPTS`; never `--override-ini=addopts=` — strips `--import-mode=importlib`):
+```powershell
+$dc run --rm -e PYTEST_OPTS="-k test_name" test
+```
+
+**Test entrypoint flow** (Dockerfile `ENTRYPOINT` = `entrypoint.sh`, `command` = `entrypoint-test.sh`): `compilemessages` (.po→.mo), `uv sync --group dev`, `migrate --run-syncdb`, `load_exchange_rates`, `setup_search_triggers`, then pytest. Default flags: `--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`.
 
 ## Test fixtures
 
-Canonical source of truth: `src/backend/conftest.py`. Import via `from conftest import create_test_ad` (`pyproject.toml` sets `pythonpath = ["src", "src/backend"]`). Key fixtures: `seller` (900000001), `user` (900000002), `category`, `city`. `create_test_ad(..., status=AdStatus.PUBLISHED)` sets status-specific timestamps automatically.
-
-**Exception:** `src/telegram_bot/tests/conftest.py` redefines these (async `user`) because bot tests live outside the `src/backend/` conftest-discovery hierarchy — keep them separate.
+Source of truth: `src/backend/conftest.py`. Import `from conftest import create_test_ad` (pyproject.toml: `pythonpath = ["src", "src/backend"]`). Key fixtures: `seller` (900000001), `user` (900000002), `category`, `city`. `create_test_ad(..., status=AdStatus.PUBLISHED)` sets status timestamps. **Exception:** `src/telegram_bot/tests/conftest.py` redefines these (async `user`) — bot tests live outside the `src/backend/` conftest hierarchy.
 
 ## i18n
 
-See **project rule #16** (Definition of Done): wrap template strings in `{% trans %}` / `{% blocktrans %}` and Python strings in `gettext` / `gettext_lazy`. Run `make makemessages` then `make compilemessages` before committing. Languages: `ru` (primary), `en`, `bs`. Verify with `test_i18n_completeness.py` (run as a specific test, see above). Database-based i18n (`feature_tag.html` via `get_lookup_name`) is exempt.
+Wrap templates in `{% trans %}` / `{% blocktrans %}` and Python in `gettext` / `gettext_lazy` (project rule #16). Extract: `uv run python src/backend/manage.py makemessages -l ru -l bs -l en --no-location`; compile: `uv run python src/backend/manage.py compilemessages --locale ru --locale bs --locale en`. `.mo` files are gitignored — auto-compiled by the test entrypoint (`entrypoint.sh` `compile_messages`); production compiles at image build time and re-compiles at container startup. Verify with `test_i18n_completeness.py`. DB-based i18n (`feature_tag.html` via `get_lookup_name`) is exempt.

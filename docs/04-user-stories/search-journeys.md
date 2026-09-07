@@ -253,8 +253,11 @@ explicit city (`?city=`/`/city/<s>/`) is dropped by the header search.
 The exact query-param names, endpoints, and persistence rules (e.g. `min_price`/`max_price`,
 `condition`, repeated `features=` for AND-semantics, rate limits, preferred-city persistence)
 are specified in the single source of truth — [`search-patterns.md`](../01-spec/search-patterns.md)
-and [`filter-ui.md`](../01-spec/filter-ui.md). The URL shapes used in each journey above are
-already captured inline in the step tables, so they are not repeated here.
+and [`filter-ui.md`](../01-spec/filter-ui.md). The URL-state preservation strategy (path-encoded
+primary context vs. query-encoded refinements, `query_replace` tag, HTMX safety nets, "Entire
+country" clear behavior, language-switching rules) is specified in
+[`url-state-preservation.md`](../01-spec/url-state-preservation.md). The URL shapes used in each
+journey above are already captured inline in the step tables, so they are not repeated here.
 
 ---
 
@@ -268,7 +271,10 @@ already captured inline in the step tables, so they are not repeated here.
    Recommended by the OLX/Avito comparison: return to the pre-search state.
 3. **Header-search context preservation.** Should the header bar carry the active category
    (path → `?category=`) and city when submitting from a `/category/…` or `/city/…` page,
-   matching OLX/Avito? Currently dropped in journeys 2, 4, and 6.
+   matching OLX/Avito? Currently dropped in journeys 2, 4, and 6. Note: Spec 17 implemented
+   the `?city=` query-parameter mechanism and the "Entire country" clear, but did **not** change
+   the header search bar — it still submits only `q`. See
+   [`url-state-preservation.md`](../01-spec/url-state-preservation.md#catalog-navigation-url-contract).
 4. **Autocomplete popular gate.** Is `min_hit_count=10` intended for MVP, or should popular
    suggestions degrade gracefully on low traffic so the dropdown never reads as "only
    history" ([Problem_01.md #1](../../.ai/problems/Problem_01.md))?
