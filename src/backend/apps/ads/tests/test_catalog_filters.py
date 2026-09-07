@@ -727,6 +727,37 @@ class TestFilterUrlReset:
         content = path.read_text(encoding="utf-8")
         assert "{% if not query %}" not in content
 
+    def test_sort_block_is_right_pinned(self) -> None:
+        """The Sort block is pinned to the right edge of the filter row while
+        the filter controls remain left-aligned (same row, free space between).
+
+        Guards the ``ml-auto`` utility on the Sort wrapper ``<div>``: the form
+        row is a flex row (``flex flex-wrap ... items-end``), so ``ml-auto``
+        consumes the free main-axis space and pushes the Sort block to the right
+        edge; the label/select inside stay left-aligned.
+        """
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "templates/ads/partials/filter_form.html"
+        )
+        content = path.read_text(encoding="utf-8")
+        # The container holding the filters + sort must be a flex row so that
+        # ``ml-auto`` pinning and ``items-end`` alignment apply.
+        assert "flex flex-wrap gap-4 items-end" in content
+        # Walk back from the Sort <select> to its enclosing <div> wrapper and
+        # confirm it carries ``ml-auto`` (right-edge pinning).
+        lines = content.splitlines()
+        select_idx = next(
+            i for i, line in enumerate(lines) if "<select name=\"sort\"" in line
+        )
+        wrapper = next(
+            line for line in reversed(lines[:select_idx]) if "<div" in line
+        )
+        assert "ml-auto" in wrapper, (
+            "Sort block wrapper must carry ml-auto to pin it to the right edge "
+            f"of the flex row, got: {wrapper!r}"
+        )
+
     def test_price_inputs_use_default_filter(self) -> None:
         """Min/max price inputs use ``|default:''`` so ``None`` renders as empty, not ``"None"``."""
         path = (
