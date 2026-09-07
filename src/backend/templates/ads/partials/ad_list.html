@@ -17,8 +17,9 @@ is unaffected. {% endcomment %}
 {% if suggested_category %}
     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
         <p class="text-sm text-blue-800">
-            {% trans "Did you mean:" %} <a href="{% url 'ads:listings_category' suggested_category %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
-class="underline font-medium">{{ suggested_category }}</a>?
+            {% trans "Did you mean:" %} {% if query %}<a href="{% url 'search:search' %}?{% query_replace request page=1 category=suggested_category city=request.current_city lang=LANGUAGE_CODE %}"
+class="underline font-medium">{{ suggested_category }}</a>{% else %}<a href="{% url 'ads:listings_category' suggested_category %}?{% query_replace request page=1 city=request.current_city lang=LANGUAGE_CODE %}"
+class="underline font-medium">{{ suggested_category }}</a>{% endif %}?
         </p>
     </div>
 {% endif %}
