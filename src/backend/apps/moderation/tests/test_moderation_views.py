@@ -15,6 +15,8 @@ coverage that the active ``test_admin_actions.py`` / ``test_priority*.py``
 files do NOT provide is actually exercised in CI.
 """
 
+import inspect
+
 import pytest
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -555,3 +557,34 @@ class TestBanUserView:
         # Seller should still be banned with default reason
         seller.refresh_from_db()
         assert seller.is_banned is True
+
+
+# ---------------------------------------------------------------------------
+# Tests: Structural assertions for DB-003 locking (select_for_update)
+# ---------------------------------------------------------------------------
+
+
+class TestModerationReviewLocking:
+    """Verify that approve_ad and reject_ad use row-level locking (DB-003).
+
+    These structural assertions guard against accidental removal of the
+    ``select_for_update()`` / ``transaction.atomic()`` pattern in
+    ``review.py`` — the fix for the stale-state race window between fetching
+    an ``Ad`` and transitioning it inside the bot/web two-process architecture.
+    """
+
+    def test_approve_ad_uses_select_for_update_and_atomic(self) -> None:
+        """approve_ad source contains select_for_update inside transaction.atomic."""
+        from apps.moderation.views import review
+
+        source = inspect.getsource(review.approve_ad)
+        assert "transaction.atomic" in source
+        assert "select_for_update" in source
+
+    def test_reject_ad_uses_select_for_update_and_atomic(self) -> None:
+        """reject_ad source contains select_for_update inside transaction.atomic."""
+        from apps.moderation.views import review
+
+        source = inspect.getsource(review.reject_ad)
+        assert "transaction.atomic" in source
+        assert "select_for_update" in source

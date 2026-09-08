@@ -11,6 +11,7 @@ from apps.core.enums import AdStatus
 from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.moderation.views.decorators import staff_required
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -71,29 +72,34 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     from apps.moderation.admin_actions import approve_ad as do_approve
 
-    ad = get_object_or_404(Ad, id=ad_id, status=AdStatus.ON_MODERATION)
-    try:
-        do_approve(ad, request.user.id)
-    except MaxAdsExceeded as exc:
-        logger.warning(
-            "Approve skipped for ad %s: user %s reached max %s active "
-            "ads (current_count=%s)",
-            ad_id,
-            exc.user_id,
-            exc.limit,
-            exc.current_count,
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad = get_object_or_404(
+            Ad.objects.select_for_update(),
+            id=ad_id,
+            status=AdStatus.ON_MODERATION,
         )
-        messages.error(
-            request,
-            _(
-                "Cannot approve: the ad owner has reached the maximum number of active ads."
-            ),
-        )
-        return redirect(reverse("moderation:review", kwargs={"ad_id": ad_id}))
+        try:
+            do_approve(ad, request.user.id)
+        except MaxAdsExceeded as exc:
+            logger.warning(
+                "Approve skipped for ad %s: user %s reached max %s active "
+                "ads (current_count=%s)",
+                ad_id,
+                exc.user_id,
+                exc.limit,
+                exc.current_count,
+            )
+            messages.error(
+                request,
+                _(
+                    "Cannot approve: the ad owner has reached the maximum number of active ads."
+                ),
+            )
+            return redirect(reverse("moderation:review", kwargs={"ad_id": ad_id}))
 
-    logger.info(f"Admin {request.user.id} approved ad {ad_id}")
+        logger.info(f"Admin {request.user.id} approved ad {ad_id}")
 
-    return redirect(f"/admin/ads/ad/{ad_id}/change/")
+        return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
 
 @staff_required
@@ -110,25 +116,26 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     from apps.moderation.admin_actions import reject_ad as do_reject
 
-    ad = get_object_or_404(
-        Ad,
-        id=ad_id,
-        status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
-    )
-
     if request.method != "POST":
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
-    # Build reason from category + text
-    reason_category = request.POST.get("reason_category", "") or ""
-    reason_text = (request.POST.get("reason_text") or "").strip()
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad = get_object_or_404(
+            Ad.objects.select_for_update(),
+            id=ad_id,
+            status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
+        )
+        # Build reason from category + text
+        reason_category = request.POST.get("reason_category", "") or ""
+        reason_text = (request.POST.get("reason_text") or "").strip()
 
-    # Combine for internal record
-    reason = f"{reason_category}"
-    if reason_text:
-        reason = f"{reason_category}: {reason_text}"
+        # Combine for internal record
+        reason = f"{reason_category}"
+        if reason_text:
+            reason = f"{reason_category}: {reason_text}"
 
-    do_reject(ad, request.user.id, reason)
+        do_reject(ad, request.user.id, reason)
+
     logger.info(f"Admin {request.user.id} rejected ad {ad_id}")
 
     return redirect("/admin/ads/ad/?status__exact=on_moderation")
