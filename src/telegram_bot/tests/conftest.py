@@ -62,6 +62,12 @@ def dp() -> Dispatcher:
     dp.include_router(alerts_router)
     dp.include_router(contact_router)
 
+    # Mirror production: register the graceful-shutdown hook so lifecycle tests
+    # exercise the same connection-cleanup path.
+    from telegram_bot.main import _on_shutdown
+
+    dp.shutdown.register(_on_shutdown)
+
     return dp
 
 
