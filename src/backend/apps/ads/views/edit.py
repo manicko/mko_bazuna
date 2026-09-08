@@ -17,6 +17,7 @@ from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
 from apps.moderation.services.auto_moderation import auto_moderate
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -115,79 +116,122 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         return render(request, "ads/edit.html", context)
 
     # POST: process edit
-    # Determine if this is a reactivation request
-    is_reactivation = ad.status == AdStatus.ARCHIVED and request.POST.get("reactivate")
+    # DB-003: re-fetch the Ad under a row lock inside a transaction so the
+    # status-driven branch below and the subsequent transition_to() operate
+    # on a locked, consistent row. The GET path returns before this block, so
+    # the lock is scoped to POST mutations only (mirrors review.py reject_ad).
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-    # Get form data - use empty string defaults to ensure non-None values
-    new_title = (request.POST.get("title") or "").strip()
-    new_description = (request.POST.get("description") or "").strip()
-    new_price_amount = request.POST.get("price_amount")
-    new_price_currency = request.POST.get("price_currency")
-
-    # Parse the price amount. Empty input means "Free" (Decimal("0"));
-    # invalid input also falls back to Free, since the model field is
-    # non-null with default=0 (spec §5.2 R-MM-01).
-    price_amount_value = Decimal("0")
-    if new_price_amount not in (None, ""):
-        try:
-            price_amount_value = Decimal(new_price_amount)
-        except Exception:
-            price_amount_value = Decimal("0")
-
-    # Parse the currency; fall back to the ad's current currency when
-    # unset/invalid. Do not coerce to None — a price (incl. Free=0) keeps
-    # a valid currency for normalized_eur computation.
-    price_currency_value: CurrencyCode | None = (
-        CurrencyCode(ad.price_currency) if ad.price_currency else None
-    )
-    if new_price_currency:
-        try:
-            price_currency_value = CurrencyCode(new_price_currency)
-        except ValueError:
-            pass  # Keep the ad's current currency (already set above)
-
-    # Determine edit type
-    has_text_change = _text_fields_changed(request, ad)
-
-    if is_reactivation:
-        # Reactivation: update fields then run moderation check
-        ad.title = new_title
-        ad.description = new_description
-        ad = _apply_price_change(ad, price_amount_value, price_currency_value)
-        ad.save(
-            update_fields=[
-                "title",
-                "description",
-                "price_amount",
-                "price_currency",
-                "price_normalized_eur",
-            ]
+        # Determine if this is a reactivation request
+        is_reactivation = ad.status == AdStatus.ARCHIVED and request.POST.get(
+            "reactivate"
         )
 
-        # Transition to ON_MODERATION (clears archived_at via transition_to)
-        ad.transition_to(AdStatus.ON_MODERATION)
+        # Get form data - use empty string defaults to ensure non-None values
+        new_title = (request.POST.get("title") or "").strip()
+        new_description = (request.POST.get("description") or "").strip()
+        new_price_amount = request.POST.get("price_amount")
+        new_price_currency = request.POST.get("price_currency")
 
-        # Run auto-moderation check
-        passed = auto_moderate(ad)
+        # Parse the price amount. Empty input means "Free" (Decimal("0"));
+        # invalid input also falls back to Free, since the model field is
+        # non-null with default=0 (spec §5.2 R-MM-01).
+        price_amount_value = Decimal("0")
+        if new_price_amount not in (None, ""):
+            try:
+                price_amount_value = Decimal(new_price_amount)
+            except Exception:
+                price_amount_value = Decimal("0")
 
-        if passed:
-            # Auto-moderate sets status to PUBLISHED and published_at
-            return redirect("ads:dashboard")
-        else:
-            # Moderation failed - stay on edit page with error
-            ad = Ad.objects.prefetch_related("images").get(id=ad_id)
-            return render(
-                request,
-                "ads/edit.html",
-                {"ad": ad, "error": _("Ad failed moderation checks")},
+        # Parse the currency; fall back to the ad's current currency when
+        # unset/invalid. Do not coerce to None — a price (incl. Free=0) keeps
+        # a valid currency for normalized_eur computation.
+        price_currency_value: CurrencyCode | None = (
+            CurrencyCode(ad.price_currency) if ad.price_currency else None
+        )
+        if new_price_currency:
+            try:
+                price_currency_value = CurrencyCode(new_price_currency)
+            except ValueError:
+                pass  # Keep the ad's current currency (already set above)
+
+        # Determine edit type
+        has_text_change = _text_fields_changed(request, ad)
+
+        if is_reactivation:
+            # Reactivation: update fields then run moderation check
+            ad.title = new_title
+            ad.description = new_description
+            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+            ad.save(
+                update_fields=[
+                    "title",
+                    "description",
+                    "price_amount",
+                    "price_currency",
+                    "price_normalized_eur",
+                ]
             )
 
-    elif ad.status == AdStatus.PUBLISHED:
-        # Zone C2: Text edit -> ON_MODERATION, hidden immediately
-        # Price/photo edit -> stays PUBLISHED
-        # Mixed edit -> follows text rule
-        if has_text_change:
-            # Text edit: go to moderation
+            # Transition to ON_MODERATION (clears archived_at via transition_to)
+            ad.transition_to(AdStatus.ON_MODERATION)
+
+            # Run auto-moderation check
+            passed = auto_moderate(ad)
+
+            if passed:
+                # Auto-moderate sets status to PUBLISHED and published_at
+                return redirect("ads:dashboard")
+            else:
+                # Moderation failed - stay on edit page with error
+                ad = Ad.objects.prefetch_related("images").get(id=ad_id)
+                return render(
+                    request,
+                    "ads/edit.html",
+                    {"ad": ad, "error": _("Ad failed moderation checks")},
+                )
+
+        elif ad.status == AdStatus.PUBLISHED:
+            # Zone C2: Text edit -> ON_MODERATION, hidden immediately
+            # Price/photo edit -> stays PUBLISHED
+            # Mixed edit -> follows text rule
+            if has_text_change:
+                # Text edit: go to moderation
+                ad.title = new_title
+                ad.description = new_description
+                ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+                ad.save(
+                    update_fields=[
+                        "title",
+                        "description",
+                        "price_amount",
+                        "price_currency",
+                        "price_normalized_eur",
+                        "updated_at",
+                    ]
+                )
+
+                # Use transition_to for status change to ON_MODERATION
+                ad.transition_to(AdStatus.ON_MODERATION)
+                logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
+            else:
+                # Price/photo only edit: stay published; recompute normalized price.
+                ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+                ad.save(
+                    update_fields=[
+                        "price_amount",
+                        "price_currency",
+                        "price_normalized_eur",
+                        "updated_at",
+                    ]
+                )
+                logger.info(f"Ad {ad_id} price/photo edited, stays PUBLISHED")
+
+            return redirect("ads:dashboard")
+
+        else:
+            # Other statuses (ON_MODERATION, ON_MODERATION_FAILED): direct save
             ad.title = new_title
             ad.description = new_description
             ad = _apply_price_change(ad, price_amount_value, price_currency_value)
@@ -201,43 +245,9 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     "updated_at",
                 ]
             )
+            logger.info(f"Ad {ad_id} edited in status {ad.status}")
 
-            # Use transition_to for status change to ON_MODERATION
-            ad.transition_to(AdStatus.ON_MODERATION)
-            logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
-        else:
-            # Price/photo only edit: stay published; recompute normalized price.
-            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
-            ad.save(
-                update_fields=[
-                    "price_amount",
-                    "price_currency",
-                    "price_normalized_eur",
-                    "updated_at",
-                ]
-            )
-            logger.info(f"Ad {ad_id} price/photo edited, stays PUBLISHED")
-
-        return redirect("ads:dashboard")
-
-    else:
-        # Other statuses (ON_MODERATION, ON_MODERATION_FAILED): direct save
-        ad.title = new_title
-        ad.description = new_description
-        ad = _apply_price_change(ad, price_amount_value, price_currency_value)
-        ad.save(
-            update_fields=[
-                "title",
-                "description",
-                "price_amount",
-                "price_currency",
-                "price_normalized_eur",
-                "updated_at",
-            ]
-        )
-        logger.info(f"Ad {ad_id} edited in status {ad.status}")
-
-        return redirect("ads:dashboard")
+            return redirect("ads:dashboard")
 
 
 @login_required
@@ -254,20 +264,21 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    ad = get_object_or_404(Ad, id=ad_id)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-    # Authorization check
-    if ad.user_id != request.user.id:
-        logger.warning(
-            f"User {request.user.id} attempted to archive ad {ad_id} owned by {ad.user_id}"
-        )
-        return HttpResponseForbidden(
-            _("You do not have permission to archive this ad.")
-        )
+        # Authorization check
+        if ad.user_id != request.user.id:
+            logger.warning(
+                f"User {request.user.id} attempted to archive ad {ad_id} owned by {ad.user_id}"
+            )
+            return HttpResponseForbidden(
+                _("You do not have permission to archive this ad.")
+            )
 
-    if ad.status == AdStatus.PUBLISHED:
-        ad.transition_to(AdStatus.ARCHIVED)
-        logger.info(f"Ad {ad_id} archived by user {request.user.id}")
+        if ad.status == AdStatus.PUBLISHED:
+            ad.transition_to(AdStatus.ARCHIVED)
+            logger.info(f"Ad {ad_id} archived by user {request.user.id}")
 
     return redirect("ads:dashboard")
 
@@ -287,24 +298,25 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    ad = get_object_or_404(Ad, id=ad_id)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-    # Authorization check
-    if ad.user_id != request.user.id:
-        logger.warning(
-            f"User {request.user.id} attempted to reactivate ad {ad_id} owned by {ad.user_id}"
-        )
-        return HttpResponseForbidden(
-            _("You do not have permission to reactivate this ad.")
-        )
+        # Authorization check
+        if ad.user_id != request.user.id:
+            logger.warning(
+                f"User {request.user.id} attempted to reactivate ad {ad_id} owned by {ad.user_id}"
+            )
+            return HttpResponseForbidden(
+                _("You do not have permission to reactivate this ad.")
+            )
 
-    if ad.status == AdStatus.ARCHIVED:
-        # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
-        ad.transition_to(AdStatus.ON_MODERATION)
+        if ad.status == AdStatus.ARCHIVED:
+            # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
+            ad.transition_to(AdStatus.ON_MODERATION)
 
-        # Run auto-moderation check
-        auto_moderate(ad)
+            # Run auto-moderation check
+            auto_moderate(ad)
 
-        logger.info(f"Ad {ad_id} reactivation initiated by user {request.user.id}")
+            logger.info(f"Ad {ad_id} reactivation initiated by user {request.user.id}")
 
     return redirect("ads:dashboard")
