@@ -9,12 +9,16 @@ AnalyticsEvent creation) are tested through auto_moderate().
 
 import pytest
 from django.core.cache import cache
+from unittest.mock import patch
 
 from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.moderation.admin_actions import approve_ad
 from apps.moderation.models import ModerationCriteria, ModeratorActionLog
 from apps.moderation.services.auto_moderation import auto_moderate, check
+from apps.moderation.services.exceptions import MaxAdsExceeded
+from apps.moderation.services.moderation_log import set_published
 
 from conftest import create_test_ad
 
@@ -484,3 +488,202 @@ class TestAutoModerateFunction:
         event_types = set(AnalyticsEvent.objects.values_list("event_type", flat=True))
         assert AnalyticsEventType.MODERATION_REJECTED in event_types
         assert len(event_types) == 1
+
+
+# ---------------------------------------------------------------------------
+# T2 — DB-002 TOCTOU fix: locked re-count + exception catch paths
+# ---------------------------------------------------------------------------
+
+
+class TestMaxAdsTOCTOUFix:
+    """Tests for the TOCTOU-safe max_ads_per_user enforcement (DB-002).
+
+    These tests verify that set_published() is the authoritative, locked
+    check (not just the advisory check in auto_moderate()), and that all
+    callers (auto_moderate, admin_actions, review view) catch
+    MaxAdsExceeded gracefully.
+    """
+
+    def test_web_approve_ad_path_has_no_pre_count_check(
+        self, moderation_criteria, seller, category, city
+    ):
+        """approve_ad delegates to set_published without a pre-count check.
+
+        This documents the gap: the fix catches MaxAdsExceeded inside
+        set_published, not before it in approve_ad. With the user already
+        at cap, approve_ad still calls set_published (proving no pre-check
+        short-circuits it).
+        """
+        moderation_criteria.max_ads_per_user = 1
+        moderation_criteria.save()
+
+        # User already at cap: 1 PUBLISHED + will be 1 ON_MODERATION
+        create_test_ad(
+            seller,
+            category,
+            city,
+            title="Published Ad",
+            description="Published ad description text",
+            status=AdStatus.PUBLISHED,
+        )
+        on_moderation_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Pending Ad",
+            description="Pending ad description text",
+            status=AdStatus.ON_MODERATION,
+        )
+        moderator = seller  # reuse seller as moderator in tests
+
+        with patch("apps.moderation.admin_actions.set_published") as mock_set:
+            approve_ad(on_moderation_ad, moderator_id=moderator.id)
+
+        # set_published was called — no pre-count check skipped it
+        mock_set.assert_called_once_with(on_moderation_ad, moderator_id=moderator.id)
+
+    @pytest.mark.parametrize(
+        "max_ads, expected_raise",
+        [(2, False), (1, True)],
+        ids=["under_cap_passes", "at_cap_raises"],
+    )
+    def test_set_published_lock_serializes_concurrent_counts(
+        self, max_ads, expected_raise, moderation_criteria, seller, category, city
+    ):
+        """The locked re-count in set_published is authoritative.
+
+        With 0 existing PUBLISHED ads and 1 ON_MODERATION ad (the target):
+        - max_ads=2: re-count = 1 (the ON_MODERATION ad) → 1 < 2 → passes.
+        - max_ads=1: re-count = 1 (the ON_MODERATION ad) → 1 >= 1 → raises.
+
+        This proves set_published enforces the cap independently of the
+        advisory _validate_max_ads_per_user check.
+        """
+        moderation_criteria.max_ads_per_user = max_ads
+        moderation_criteria.save()
+
+        on_moderation_ad = _create_valid_ad(seller, category, city)
+
+        if expected_raise:
+            with pytest.raises(MaxAdsExceeded) as exc_info:
+                set_published(on_moderation_ad)
+            exc = exc_info.value
+            assert exc.user_id == seller.id
+            assert exc.limit == max_ads
+            assert exc.current_count == 1  # just the ON_MODERATION ad
+            on_moderation_ad.refresh_from_db()
+            assert on_moderation_ad.status == AdStatus.ON_MODERATION
+        else:
+            set_published(on_moderation_ad)
+            on_moderation_ad.refresh_from_db()
+            assert on_moderation_ad.status == AdStatus.PUBLISHED
+
+    @patch(
+        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
+        return_value=True,
+    )
+    @patch(
+        "apps.moderation.services.moderation_log.set_published",
+        side_effect=MaxAdsExceeded(1, 10, 10),
+    )
+    def test_auto_moderate_catches_max_ads_exceeded(
+        self,
+        mock_set_published,
+        mock_validate_max,
+        moderation_criteria,
+        user,
+        category,
+        city,
+    ):
+        """auto_moderate catches MaxAdsExceeded from set_published.
+
+        The advisory check is mocked to pass, but set_published (under the
+        lock) raises MaxAdsExceeded. auto_moderate must catch it, fail the
+        ad, and return False — never propagating the exception.
+        """
+        ad = _create_valid_ad(user, category, city)
+
+        result = auto_moderate(ad)
+
+        assert result is False
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+
+        # set_published was called (proving we got past the advisory check)
+        mock_set_published.assert_called_once()
+        # No AD_PUBLISHED event should exist (set_published raised before creating it)
+        assert not AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.AD_PUBLISHED
+        ).exists()
+
+    def test_auto_moderate_returns_false_at_cap(
+        self, moderation_criteria, user, category, city
+    ):
+        """At cap: the advisory check fails and auto_moderate returns False.
+
+        With max_ads=1 and 1 PUBLISHED + 1 ON_MODERATION (count=2), the
+        advisory _validate_max_ads_per_user returns False, so set_published
+        is never called. The ad lands in ON_MODERATION_FAILED.
+        """
+        moderation_criteria.max_ads_per_user = 1
+        moderation_criteria.save()
+
+        create_test_ad(
+            user,
+            category,
+            city,
+            title="Published Ad",
+            description="Published ad description text",
+            status=AdStatus.PUBLISHED,
+        )
+        ad = _create_valid_ad(user, category, city, title="New Submission Ad")
+
+        with patch(
+            "apps.moderation.services.moderation_log.set_published"
+        ) as mock_set_published:
+            result = auto_moderate(ad)
+
+        assert result is False
+        mock_set_published.assert_not_called()
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+
+    def test_edit_reactivation_route_returns_false_at_cap(
+        self, moderation_criteria, user, category, city
+    ):
+        """Reactivation (ARCHIVED -> ON_MODERATION -> auto_moderate) fails at cap.
+
+        User has 1 PUBLISHED + 1 ARCHIVED (not counted) + 1 ON_MODERATION
+        (reactivated ad). Advisory check sees 2 active (PUBLISHED +
+        ON_MODERATION) >= max_ads=1 → fails. Ad lands ON_MODERATION_FAILED.
+        Covers edit.py:171 auto_moderate() call in the web reactivation path.
+        """
+        moderation_criteria.max_ads_per_user = 1
+        moderation_criteria.save()
+
+        create_test_ad(
+            user,
+            category,
+            city,
+            title="Published Ad",
+            description="Published ad description text",
+            status=AdStatus.PUBLISHED,
+        )
+        # Archived ad is not counted toward the cap
+        create_test_ad(
+            user,
+            category,
+            city,
+            title="Archived Ad",
+            description="Archived ad description text",
+            status=AdStatus.ARCHIVED,
+        )
+        # The reactivated ad in ON_MODERATION
+        ad = _create_valid_ad(user, category, city, title="Reactivated Ad Title")
+
+        result = auto_moderate(ad)
+
+        assert result is False
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED

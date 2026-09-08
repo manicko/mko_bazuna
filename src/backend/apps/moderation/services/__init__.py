@@ -1,6 +1,7 @@
 """Moderation services package."""
 
 from .auto_moderation import auto_moderate, check
+from .exceptions import MaxAdsExceeded
 from .moderation_log import (
     log_auto_fail,
     log_auto_publish,
@@ -17,6 +18,7 @@ from .priority import PriorityService
 __all__ = [
     "auto_moderate",
     "check",
+    "MaxAdsExceeded",
     "log_auto_fail",
     "log_auto_publish",
     "log_ban_account",

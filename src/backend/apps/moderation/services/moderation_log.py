@@ -6,15 +6,14 @@ Reason field is TEXT and NEVER shown to seller (US-A11).
 """
 
 import logging
-from typing import TYPE_CHECKING
 
 from django.db import transaction
 
+from apps.ads.models import Ad
 from apps.core.enums import AdStatus, ModeratorActionType
-from apps.moderation.models import ModeratorActionLog
-
-if TYPE_CHECKING:
-    from apps.ads.models import Ad
+from apps.moderation.models import ModerationCriteria, ModeratorActionLog
+from apps.moderation.services.exceptions import MaxAdsExceeded
+from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +168,7 @@ def log_soft_delete(
     return log
 
 
-def set_moderation_failed(ad: "Ad", reason: str = "Auto-moderation failed") -> None:  # noqa: UP037
+def set_moderation_failed(ad: Ad, reason: str = "Auto-moderation failed") -> None:
     """Set ad status to ON_MODERATION_FAILED and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
@@ -184,7 +183,7 @@ def set_moderation_failed(ad: "Ad", reason: str = "Auto-moderation failed") -> N
         log_auto_fail(ad_id=ad.id, user_id=ad.user_id)
 
 
-def set_rejected(ad: "Ad", moderator_id: int, reason: str) -> None:  # noqa: UP037
+def set_rejected(ad: Ad, moderator_id: int, reason: str) -> None:
     """Set ad status to REJECTED, populate moderated_by, and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
@@ -205,17 +204,42 @@ def set_rejected(ad: "Ad", moderator_id: int, reason: str) -> None:  # noqa: UP0
         )
 
 
-def set_published(ad: "Ad", moderator_id: int | None = None) -> None:  # noqa: UP037
+def set_published(ad: Ad, moderator_id: int | None = None) -> None:
     """Set ad status to PUBLISHED with optional moderator and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
     audit log entry are committed or rolled back together (DB-002).
 
+    The user row is locked with ``select_for_update()`` and the active-ads
+    count is re-counted inside the transaction — this is the authoritative,
+    race-safe guard for ``max_ads_per_user`` (the advisory check in
+    ``auto_moderate`` / ``check`` is best-effort only).
+
     Args:
         ad: The Ad instance to publish.
         moderator_id: The moderator user ID (None for auto-publish).
+
+    Raises:
+        MaxAdsExceeded: If the user has already reached their active-ads cap.
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        # Lock the user row to serialize concurrent publish attempts for the
+        # same user, closing the TOCTOU race on max_ads_per_user (DB-002).
+        User.objects.select_for_update().get(pk=ad.user_id)
+
+        max_ads = ModerationCriteria.get_singleton().max_ads_per_user
+        active_statuses = [AdStatus.PUBLISHED, AdStatus.ON_MODERATION]
+        active_count = Ad.objects.filter(
+            user_id=ad.user_id,
+            status__in=active_statuses,
+        ).count()
+        if active_count >= max_ads:
+            raise MaxAdsExceeded(
+                user_id=ad.user_id,
+                limit=max_ads,
+                current_count=active_count,
+            )
+
         ad.transition_to(AdStatus.PUBLISHED, moderator_id=moderator_id)
 
         if moderator_id:

@@ -25,6 +25,13 @@
                 {% include "components/language_switcher.html" %}
             </div>
         </header>
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="p-4 mb-2 rounded-lg bg-red-100 text-red-800">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
         <main class="container mx-auto px-4 py-6">
             <div class="mb-4">
                 <a href="../" class="text-blue-600 hover:underline">&larr; {% trans "Back to moderation queue" %}</a>

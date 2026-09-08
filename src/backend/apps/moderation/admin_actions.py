@@ -10,6 +10,7 @@ import logging
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.core.utils.sanitize import mask_telegram_id
+from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.moderation.services.moderation_log import (
     log_ban_account,
     log_soft_delete,
@@ -115,6 +116,9 @@ def bulk_approve(queryset, moderator_id: int) -> int:
     """
     Bulk approve ads for publication.
 
+    Ads whose user has reached the ``max_ads_per_user`` cap are skipped
+    (logged at WARN) rather than aborting the bulk operation.
+
     Args:
         queryset: Ad queryset to approve
         moderator_id: Moderator user ID performing the action
@@ -124,7 +128,18 @@ def bulk_approve(queryset, moderator_id: int) -> int:
     """
     count = 0
     for ad in queryset.filter(status=AdStatus.ON_MODERATION):
-        approve_ad(ad, moderator_id)
+        try:
+            approve_ad(ad, moderator_id)
+        except MaxAdsExceeded as exc:
+            logger.warning(
+                "Skipping ad %s in bulk_approve: user %s reached "
+                "max %s active ads (current_count=%s)",
+                ad.id,
+                exc.user_id,
+                exc.limit,
+                exc.current_count,
+            )
+            continue
         count += 1
     return count
 

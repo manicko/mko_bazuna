@@ -20,6 +20,7 @@ from apps.core.utils.cache import (
     invalidate_criteria_cache,  # noqa: F401 - re-exported for external use
     set_cached_criteria,
 )
+from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.trust.services.trust_calculator import TrustCalculator
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,11 @@ def auto_moderate(ad: Ad) -> bool:
         return False
 
     # All checks passed - publish
-    _pass_moderation(ad)
+    try:
+        _pass_moderation(ad)
+    except MaxAdsExceeded:
+        _fail_moderation(ad)
+        return False
     return True
 
 
