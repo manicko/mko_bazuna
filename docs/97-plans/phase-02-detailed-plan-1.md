@@ -137,7 +137,7 @@ MEDIA_ROOT/
 # - maintain aspect ratio with object-fit CSS
 ```
 
-2. **Update Media Service** (`telegram_bot/services/media.py`)
+2. **Update Media Service** (`apps/media/services/filesystem.py` — relocated from `telegram_bot/services/media.py`)
    - Integrate thumbnail generation into `save_photo()`
    - Store thumbnails with `_small`, `_medium`, `_large` suffixes
    - Maintain atomic write pattern with O_CREAT|O_EXCL

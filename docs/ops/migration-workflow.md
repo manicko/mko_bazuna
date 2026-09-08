@@ -46,14 +46,17 @@ and the Telegram bot (aiogram). Both import the same Django project and share th
 `docker-compose.yml` wires the startup with `depends_on` + `condition: service_completed_successfully`:
 
 ```
-db  →  migrate  →  web (gunicorn)
-               →  bot (aiogram)
+db  →  migrate  →  load_catalog  →  web (gunicorn)
+                            →  bot (aiogram)
+                          →  create_admin
+                          →  seed (profile-gated)
 ```
 
 - `db` is a `postgres:18-alpine` container with a `pg_isready` healthcheck.
-- `migrate` runs migrations, then exits. `web` and `bot` both block on `migrate` completing
-  successfully.
-- `create_admin` and `seed` (when enabled via profile) also depend on `migrate`.
+- `migrate` runs `migrate_locked.main` (all 3 steps under advisory lock), then exits.
+- `load_catalog` loads `categories.yaml` into the DB, then exits. `web` and `bot` both
+  block on `load_catalog` completing successfully.
+- `create_admin` and `seed` (when enabled via profile) also depend on `load_catalog`.
 
 ### The migrate service
 
@@ -73,24 +76,30 @@ migrate:
     DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 ```
 
-It runs `manage.py migrate --noinput` in the `prod` settings, so the same image path used in
+It runs `migrate_locked.main` in the `prod` settings (which internally executes `migrate --run-syncdb`,
+`setup_search_triggers`, and `load_exchange_rates`), so the same image path used in
 production is exercised in dev.
 
 ### Advisory lock (`migrate_locked.py`)
 
-`apps/core/utils/migrate_locked.py` wraps `migrate` in a PostgreSQL **session-scoped** advisory lock
-(ID `AdvisoryLockId.MIGRATE = 100`, defined in `apps/core/enums.py`):
+`apps/core/utils/migrate_locked.py` wraps the full post-migration sequence in a PostgreSQL **session-scoped** advisory lock
+(ID `AdvisoryLockId.MIGRATE = 100`, defined in `apps/core/enums.py`). Inside the lock it runs
+all three steps as an atomic sequence — `migrate --run-syncdb`, `setup_search_triggers`, and
+`load_exchange_rates` — replacing the previous `&&`-chained shell command that released the lock
+between steps:
 
 ```python
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 
 with advisory_lock(AdvisoryLockId.MIGRATE, session=True):
-    result = subprocess.run(
-        [sys.executable, "src/backend/manage.py", "migrate", "--noinput"],
-        cwd="/app",
+    steps = (
+        ("migrate", "--noinput", "--run-syncdb"),
+        ("setup_search_triggers",),
+        ("load_exchange_rates",),
     )
-    return result.returncode
+    for argv in steps:
+        subprocess.run([sys.executable, str(manage_py), *argv])
 ```
 
 `apps/core/utils/advisory_lock.py` uses `pg_advisory_lock` (session scope) for the migrate path.

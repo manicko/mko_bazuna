@@ -17,7 +17,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 - **Fixed values:** `StrEnum` only — never plain strings/dicts/lists for constants.
 - **Small modules and functions:** Modules, services, components, and functions must be small and focused on one thing.
-- **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start.
+- **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start. Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write a readiness marker used by the file-based `healthcheck-bot.sh` (process + marker freshness).
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
@@ -25,7 +25,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   processes read rates from the shared DB. See
   [`db-schema`](../../02-database/db-schema.md) ([`db-enums`](../../02-database/db-enums.md),
   [`db-indexes`](../../02-database/db-indexes.md)).
-- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via advisory lock. See [migration-workflow](../../ops/migration-workflow.md).
+- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. See [migration-workflow](../../ops/migration-workflow.md).
 
 ## Commands
 
@@ -54,4 +54,6 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 - **Dev/test:** `config/settings/dev.py` and `config/settings/test.py` override `CACHES` to
   `LocMemCache` — no Redis needed for local development or testing.
 - **Docker:** `redis:7-alpine` service in `docker-compose.yml`; wired into `web`, `bot`,
-  and `scheduler` via `REDIS_URL` env var and `depends_on` healthchecks.
+and `scheduler` via `REDIS_URL` env var and `depends_on` healthchecks. The `scheduler`
+service also `depends_on: load_catalog (completed successfully)` so sweep commands never
+start before the category catalog is loaded.

@@ -14,7 +14,7 @@ This document identifies testing and quality assurance gaps in the Mko Bazuna Ph
 |------|---------|---------------|
 | `telegram_bot/tests/test_ad_lifecycle.py` | Ad lifecycle transitions (DRAFT → PUBLISHED) | Integration |
 | `telegram_bot/tests/test_create_draft_ad.py` | Draft ad creation/deletion | Integration (async) |
-| `telegram_bot/tests/test_media.py` | Media validation (JPEG, dimensions, EXIF) | Unit |
+| `apps/media/tests/test_filesystem.py` | Media file operations (delete_photo, retries) | Unit |
 | `telegram_bot/tests/test_login_claim.py` | Login token atomic claim | Integration (async) |
 | `telegram_bot/tests/test_claim_login_token.py` | Login token claim (duplicate coverage) | Integration (async) |
 | `backend/apps/ads/tests/test_search_triggers.py` | PostgreSQL FTS trigger verification | Integration |
@@ -320,14 +320,16 @@ src/
 │       ├── test_handlers_fsm.py     (NEW)
 │       ├── test_ad_lifecycle.py  (existing)
 │       ├── test_create_draft_ad.py (existing)
-│       ├── test_media.py         (existing)
-│       └── test_login_claim.py   (existing)
+│       ├── test_login_claim.py   (existing)
+│       └── test_multi_lang_translation.py (existing)
 └── backend/
     └── apps/
         ├── ads/tests/
         │   ├── test_search_triggers.py (existing)
         │   ├── test_media_security.py (existing)
         │   └── test_listings_views.py  (NEW)
+        ├── media/tests/
+        │   └── test_filesystem.py     (relocated from telegram_bot/tests/test_media.py)
         ├── moderation/tests/
         │   ├── test_auto_moderation.py (existing)
         │   └── test_moderation_negative.py (NEW)

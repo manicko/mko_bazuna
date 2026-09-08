@@ -54,7 +54,7 @@ def dp() -> Dispatcher:
         contact_router,
         login_router,
     )
-    from telegram_bot.middlewares import AccountStateMiddleware
+    from telegram_bot.middlewares import AccountStateMiddleware, DatabaseConnectionMiddleware
 
     dp.message.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
     dp.include_router(login_router)
@@ -70,6 +70,7 @@ def dp() -> Dispatcher:
     dp.startup.register(_on_startup)
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(LivenessMiddleware())
+    dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
     return dp
 
@@ -179,8 +180,10 @@ def city() -> City:
 # Bot handlers run inside ``@sync_to_async`` (asgiref 3.12, default
 # ``thread_sensitive=True``). With no parent ``AsyncToSync`` wrapper, asgiref
 # parks them on its shared single-worker thread, which lives in a separate
-# thread-local context and therefore gets its OWN PostgreSQL backend (Django
-# ``ConnectionHandler`` is thread-local when ``thread_critical=False``).
+# thread-local context and therefore gets its OWN PostgreSQL backend (Django's
+# ``ConnectionHandler`` is thread-local by design — each thread gets its own
+# ``BaseDatabaseWrapper`` — so the shared asgiref worker thread, being a
+# different thread from the test runner, obtains a separate backend).
 #
 # Django's ``TransactionTestCase``/``TestCase`` teardown only closes the
 # connection that belongs to the thread running the test. The worker-thread

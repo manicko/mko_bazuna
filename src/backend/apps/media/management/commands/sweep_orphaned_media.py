@@ -23,6 +23,7 @@ from django.db import transaction
 from apps.ads.models import AdImage
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
+from apps.media.services.filesystem import delete_photo
 
 logger = logging.getLogger(__name__)
 
@@ -105,28 +106,13 @@ class Command(BaseCommand):
             return
 
         deleted = 0
-        errors = 0
         for key in sorted(orphans):
-            file_path = os.path.join(media_root, key)
-            try:
-                os.remove(file_path)
-                deleted += 1
-                if deleted % 100 == 0:
-                    logger.info("Deleted %d orphaned files...", deleted)
-            except FileNotFoundError:
-                # Another process may have removed it concurrently — acceptable.
-                pass
-            except OSError as exc:
-                errors += 1
-                logger.error("Failed to delete orphan %s: %s", key, exc)
+            delete_photo(key)
+            deleted += 1
+            if deleted % 100 == 0:
+                logger.info("Deleted %d orphaned files...", deleted)
 
-        logger.info(
-            "Orphan sweep complete: deleted %d files (%d errors).",
-            deleted,
-            errors,
-        )
+        logger.info("Orphan sweep complete: deleted %d files.", deleted)
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Deleted {deleted} orphaned media files ({errors} errors)."
-            )
+            self.style.SUCCESS(f"Deleted {deleted} orphaned media files.")
         )

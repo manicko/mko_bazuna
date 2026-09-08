@@ -27,3 +27,12 @@ class TestTestSchemaSetupLockId:
         """AdvisoryLockId.TEST_SCHEMA_SETUP resolves to 111."""
         assert AdvisoryLockId.TEST_SCHEMA_SETUP == 111
         assert AdvisoryLockId.TEST_SCHEMA_SETUP.value == 111
+
+
+class TestSweepOrphanedMediaLockId:
+    """Verify the advisory lock ID for the orphaned-media reconciliation sweep."""
+
+    def test_advisory_lock_id_sweep_orphaned_media(self) -> None:
+        """AdvisoryLockId.SWEEP_ORPHANED_MEDIA resolves to 103."""
+        assert AdvisoryLockId.SWEEP_ORPHANED_MEDIA == 103
+        assert AdvisoryLockId.SWEEP_ORPHANED_MEDIA.value == 103

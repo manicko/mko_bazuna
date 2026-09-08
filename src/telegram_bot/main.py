@@ -17,7 +17,7 @@ from telegram_bot.lifecycle import (  # noqa: E402
     _on_shutdown,
     _on_startup,
 )
-from telegram_bot.middlewares import AccountStateMiddleware  # noqa: E402
+from telegram_bot.middlewares import AccountStateMiddleware, DatabaseConnectionMiddleware  # noqa: E402
 from django.conf import settings  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ def main() -> None:
     dp.startup.register(_on_startup)
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(LivenessMiddleware())
+    dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
     # Include routers
     from telegram_bot.handlers import (

@@ -132,15 +132,16 @@ starting the long-lived web and bot processes. The full chain is:
 db (healthy, pg_isready)
   → migrate (one-shot, advisory-locked, exits 0)
     → load_catalog (one-shot, loads categories.yaml)
+      → web (gunicorn, long-lived)
+      → bot (aiogram, long-lived)
       → create_admin (one-shot, skipped if ADMIN_PASSWORD is empty)
-        → seed (one-shot, auto-runs in dev)
-  → web (gunicorn, long-lived)
-  → bot (aiogram, long-lived)
+      → seed (one-shot, auto-runs in dev)
 ```
 
 - **`db`** — PostgreSQL 18 with a `pg_isready` healthcheck. `web` and `bot` both block on
   downstream one-shot services completing successfully.
-- **`migrate`** — runs `manage.py migrate --noinput` inside a PostgreSQL advisory lock (ID 100) so
+- **`migrate`** — runs `apps.core.utils.migrate_locked.main` (all three steps — `migrate --run-syncdb`,
+  `setup_search_triggers`, `load_exchange_rates` — under a session-scoped advisory lock ID 100) so
   concurrent runs are serialized. Exits 0 on success (including a fresh DB with no pending
   migrations). See [the migration workflow](migration-workflow.md) for details.
 - **`load_catalog`** — loads the category tree from `apps/categories/catalog/categories.yaml`.
@@ -279,11 +280,11 @@ docker compose --env-file .env.docker -f docker-compose.yml run --rm migrate
 | Service | Image/Command | Notes |
 |---------|---------------|-------|
 | `db` | `postgres:18-alpine` | Persistent volume `postgres_data` |
-| `migrate` | Build image, runs migrations | One-shot service with advisory lock |
+| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100 |
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
 | `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
-| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure |
+| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; file-based liveness healthcheck via `docker/healthcheck-bot.sh` |
 | `nginx` | `nginx:alpine` | Ports 80/443; TLS termination |
 
 ### TLS Configuration
@@ -511,9 +512,12 @@ make test-db    # recreates test DB under mko-bazuna-test
 
 ## Scheduled Jobs
 
-### Hourly Sweeps
+### Scheduler Service (Production)
 
-The platform runs several periodic cleanup tasks:
+The scheduler is a production service (`--profile scheduler`) defined in
+`docker-compose.yml` and `docker-compose.prod.yml`. It runs all seven sweep commands
+hourly in a loop via `entrypoint-scheduler.sh`. The scheduler depends on `load_catalog`
+completing successfully (`depends_on: condition: service_completed_successfully`).
 
 | Task | Purpose | Schedule |
 |------|---------|----------|
@@ -790,7 +794,7 @@ generation process, and configuration options.
 ### Container Health
 
 - **Web:** Exits on crash; `restart: unless-stopped` restarts automatically
-- **Bot:** Healthcheck verifies process is running; logs emitted via stdout
+- **Bot:** File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process alive + readiness marker freshness); lifecycle hooks in `telegram_bot/lifecycle.py` write the marker on startup and clean up the bot session on shutdown
 - **Database:** Healthcheck via `pg_isready`
 
 ### Log Access

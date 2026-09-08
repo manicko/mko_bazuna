@@ -109,22 +109,23 @@ Both processes share the same Django project and connect to a single PostgreSQL 
 graph TD
     subgraph "Startup Sequence"
         A[db] --> B[migrate]
-        B --> C[create_admin]
-        C --> D[web]
-        C --> E[bot]
-        D --> F[nginx]
+        B --> C[load_catalog]
+        C --> D[create_admin]
+        C --> E[web]
+        C --> F[bot]
+        E --> G[nginx]
     end
 
     subgraph "Optional Profiles"
-        G[scheduler] --> D
-        H[backup] --> A
-        I[pgbouncer] --> A
+        H[scheduler] --> E
+        I[backup] --> A
+        J[pgbouncer] --> A
     end
 
     subgraph "Runtime Dependencies"
-        D -.->|proxy_pass| A
-        E -.->|ORM| A
-        F -.->|proxy_pass| D
+        E -.->|proxy_pass| A
+        F -.->|ORM| A
+        G -.->|proxy_pass| E
     end
 ```
 
@@ -168,12 +169,17 @@ graph TD
 
 ### Migration Safety
 
-The `migrate` service uses **session-scoped advisory lock (ID 100)** to prevent concurrent runs:
+The `migrate` service uses **session-scoped advisory lock (ID 100)** to prevent concurrent runs.
+It runs `apps.core.utils.migrate_locked.main`, which executes `migrate --run-syncdb`,
+`setup_search_triggers`, and `load_exchange_rates` as an atomic sequence under the lock:
 
 ```python
-# apps.core.utils.migrate_locked implements:
-# pg_advisory_lock(100) before migration
-# pg_advisory_unlock(100) after completion
+# apps.core.utils.migrate_locked.main implements:
+#   pg_advisory_lock(100)
+#   migrate --run-syncdb
+#   setup_search_triggers
+#   load_exchange_rates
+#   pg_advisory_unlock(100)
 ```
 
 This is critical because both `web` and `bot` services depend on migrations completing exactly once.
@@ -188,7 +194,7 @@ This is critical because both `web` and `bot` services depend on migrations comp
 |---------|----------|-----------|-----------------|
 | web | `/health/` | 30s | 3 failures |
 | db | `pg_isready` | 5s | 5 failures |
-| bot | Process check | 30s | Exit code != 0 |
+| bot | Process healthcheck + readiness marker (`docker/healthcheck-bot.sh`) | 30s | Exit code != 0 |
 
 ### Log Aggregation
 

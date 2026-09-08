@@ -99,7 +99,7 @@ When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecyc
    - All `Ad` rows belonging to the user (including `DELETED` status ads)
    - All `AdImage` rows (via `on_delete=CASCADE`)
    - All `SellerVerification` rows (via `on_delete=CASCADE`)
-   - Physical ad-image files deleted via `delete_photo()` loop after transaction commits
+    - Physical ad-image files deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits
 
    **Note:** This is a **30-day** hard-delete, distinct from `purge_deleted_ads` which uses a **120-day** retention window for all `DELETED`-status ads regardless of consent withdrawal. Consent-withdrawn users' ads are purged at 30 days; other soft-deleted ads persist until 120 days.
 
@@ -123,5 +123,7 @@ ERASURE_RETENTION_DAYS = 30  # days after consent withdrawal before hard-delete
 
 All sweep commands run hourly via the `scheduler` service
 (`entrypoint-scheduler.sh`), which loops every hour and executes each sweep.
+The scheduler depends on `load_catalog` completing successfully (via `depends_on:
+condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`).
 Each command is individually advisory-locked, so concurrent container restarts
 won't cause duplicate work.

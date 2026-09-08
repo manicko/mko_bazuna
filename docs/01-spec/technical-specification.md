@@ -85,7 +85,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
 - **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, `ERASURE_RETENTION_DAYS=30`; index `IX_users_erasure_sweep`):
   - NULL `telegram_id` + `username`; SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`
-  - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` after transaction commits (TX-then-FS pattern)
+   - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` (`apps.media.services.filesystem`) after transaction commits (TX-then-FS pattern)
   - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
   - **PII logging:** All `telegram_id` values in logger calls and `stdout.write` output are masked via `mask_telegram_id()` (SHA-256 hash, non-reversible, `tg_` prefix) from `apps/core/utils/sanitize.py`. Raw telegram_id must never appear in logs.
   - **Withdrawal UI:** Authenticated sellers can withdraw consent via a "Withdraw Data" POST button on the seller dashboard (`/dashboard/`), beside the Logout link. Requires CSRF token + confirmation dialog. Triggers `consent_withdraw` view → `withdraw_consent()`.
@@ -160,7 +160,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 
 ### L. Usage analytics (phase 1)
 - **Web traffic:** Plausible (cookieless, <1KB JS, EU-hosted SaaS) — JS snippet only, no Python dep, no consent banner needed (legitimate interest). Fallback: self-host Plausible CE / Umami via Docker.
-- **Product metrics:** internal `AnalyticsEvent` model — `event_type` (StrEnum: `REGISTRATION_CREATED`, `AD_PUBLISHED`, `SEARCH_PERFORMED`, `CONTACT_INITIATED`), `timestamp`, optional `user_id`. Aggregated via ORM; admin/CLI `show_metrics` access.
+- **Product metrics:** `AnalyticsEvent` model (StrEnum `AnalyticsEventType`: `REGISTRATION_CREATED`, `AD_PUBLISHED`, `SEARCH_PERFORMED`, `CONTACT_INITIATED`, `AD_VIEWED`, `MODERATION_APPROVED`/`MODERATION_REJECTED`/`MODERATION_FLAGGED`) persisted via `record_event()` service in `apps/core/services/analytics.py`. The service is transaction-transparent (no `transaction.atomic()` of its own), catches and logs all persistence errors, and returns `None` on failure so analytics never breaks the request lifecycle. Aggregated via ORM; admin/CLI `show_metrics` access.
 - Privacy: Plausible collects no PII; mention traffic measurement in privacy policy. `user_id` references already-collected `telegram_id`.
 
 ### M. Trust signals system
@@ -180,7 +180,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Search history** (`SearchHistory`): per-user search query tracking with deduplication and 50-entry cap. Supports both authenticated and anonymous users.
 
 ### P. Seller dashboard statistics
-- **Per-ad analytics** (`AnalyticsEvent.ad` FK): every analytics event can now be associated with a specific ad, enabling per-ad view and contact statistics.
+- **Per-ad analytics** (`record_event()` → `AnalyticsEvent.ad` FK): every analytics event is recorded via the `record_event()` service (`apps/core/services/analytics.py`) and associated with a specific ad, enabling per-ad view and contact statistics.
 - **AD_VIEWED event**: recorded on ad detail page views (seller-scoped — `user_id` is the seller, not the viewer).
 - **SellerStats service**: aggregates events with 5-minute cache TTL; returns `total_views`, `total_contacts`, `ads_published`, and per-ad statistics filtered by `TimeRange` (`ALL_TIME`, `THIRTY_DAYS`, `SEVEN_DAYS`).
 - **DailyAdMetrics model**: pre-aggregated daily view/contact counts per ad, supporting efficient dashboard queries without real-time ORM aggregation.
@@ -191,7 +191,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **AdModerationPriority model**: one-to-one with `Ad`; stores `base_score`, `priority_level` (`HIGH`/`MEDIUM`/`LOW`), risk `flags`, `confidence_score`, and `escalation_required` flag.
 - **PriorityCalculator service**: computes priority scores from content risk (banned words) and user history (repeat offender, trust level). Maps score to `AdPriorityLevel` enum.
 - **ModerationAnalytics service**: aggregates moderation statistics — pending queue size, moderator performance metrics, rejection reason breakdowns.
-- **Auto-moderation integration**: `_pass_moderation()` and `_fail_moderation()` now create `AnalyticsEvent` records with `ad_id` for moderation tracking (`MODERATION_APPROVED`, `MODERATION_REJECTED`, `MODERATION_FLAGGED`).
+- **Auto-moderation integration**: `_pass_moderation()` and `_fail_moderation()` now call `record_event()` to persist `AnalyticsEvent` records with `ad_id` for moderation tracking (`MODERATION_APPROVED`, `MODERATION_REJECTED`, `MODERATION_FLAGGED`).
 
 ### R. Seed data module (development-only)
 - **Purpose:** Development-only demo data generation for visual evaluation, pagination testing, search/filter verification, and load testing.
@@ -201,8 +201,8 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   - `UserGenerator` — creates fake seller users via Faker (`ru_RU`). Uses `itertools.count()` for unique `telegram_id`/`chat_id`. 30% probability of non-null `username`.
   - `AdGenerator` — creates ads referencing existing users/categories/cities. Reads category-specific templates from `ads_templates.json` (51+ templates across 30 categories). Multi-language support: populates `title`/`description` (ru), `title_en`/`description_en`, `title_bs`/`description_bs`, sets `original_language = "ru"`. Variable interpolation via `word_lists.json` (conditions, brands, features, cities, item_ages).
   - `ImageGenerator` — loads bundled CC0 photos from `photo_manifest.json` (~90 photos across 30 categories, 3-16 per category). Selects photos by ad category slug, falls back to default pool. Pre-processes all photos once: writes to `MEDIA_ROOT/seed/`, generates 3 thumbnail sizes via `ThumbnailService`.
-  - `AnalyticsGenerator` — creates `AnalyticsEvent` records (`AD_VIEWED`) spread across 90 days with recent-biased distribution. Optionally creates `DailyAdMetrics` rollup records.
-- **SeedService orchestrator:** Coordinates all generators, cleans seedable tables in FK-safe order (`DailyAdMetrics` → `AnalyticsEvent` → `AdImage` → `Ad` → seed `User`) plus `MEDIA_ROOT/seed/` directory. Uses session-scoped advisory lock ID 110 to prevent concurrent seeds.
+   - `AnalyticsGenerator` — creates `AnalyticsEvent` records via `record_event()` (`AD_VIEWED`) spread across 90 days with recent-biased distribution. Optionally creates `DailyAdMetrics` rollup records.
+   - **SeedService orchestrator:** Coordinates all generators, cleans seedable tables in FK-safe order (`DailyAdMetrics` → `AnalyticsEvent` → `AdImage` → `Ad` → seed `User`) plus `MEDIA_ROOT/seed/` directory. Analytics events are created via `record_event()` with `source=AdSource.SEED`. Uses session-scoped advisory lock ID 110 to prevent concurrent seeds.
 - **Configuration:** `config/seed.default.json` — tunable parameters (status distribution weights, image count range, analytics range, Faker seed).
 - **Static fixtures:**
   - `fixtures/categories.json` — real Montenegro classifieds category tree (django-mptt compatible, Russian names, 30 categories).

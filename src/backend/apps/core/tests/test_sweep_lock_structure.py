@@ -40,6 +40,7 @@ SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("consent_hard_delete", AdvisoryLockId.CONSENT_HARD_DELETE),
     ("cleanup_login_tokens", AdvisoryLockId.CLEANUP_LOGIN_TOKENS),
     ("sweep_drafts", AdvisoryLockId.SWEEP_DRAFTS),
+    ("sweep_orphaned_media", AdvisoryLockId.SWEEP_ORPHANED_MEDIA),
     ("purge_failed_ads", AdvisoryLockId.PURGE_FAILED_ADS),
     ("purge_rejected_ads", AdvisoryLockId.PURGE_REJECTED_ADS),
     ("purge_deleted_ads", AdvisoryLockId.PURGE_DELETED_ADS),
@@ -63,6 +64,7 @@ _LOCK_TARGET_MODULES: tuple[str, ...] = (
     "apps.core.management.commands.purge_deleted_ads",
     "apps.analytics.management.commands.rollup_daily_metrics",
     "apps.media.management.commands.backfill_thumbnails",
+    "apps.media.management.commands.sweep_orphaned_media",
     "apps.search.management.commands.send_alerts",
 )
 

@@ -30,6 +30,7 @@ hourly_commands = [
     'delete_sweep',
     'consent_hard_delete',
     'sweep_drafts',
+    'sweep_orphaned_media',
     'cleanup_login_tokens',
     'purge_failed_ads',
     'purge_rejected_ads',

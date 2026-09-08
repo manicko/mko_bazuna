@@ -6,12 +6,12 @@ alwaysApply: false
 ---
 
 # Workflow
+Do not argue on the workflow, just follow.
 
 ## Step 1 — Study Findings
 
 Summarize all validated findings from the audit report provided at the end of this prompt.
 Group by severity (CRITICAL → HIGH → MEDIUM → LOW / Advisory).
-Do not argue on the workflow, just follow.
 
 ## Step 2 — Risk & Complexity Triage (Researcher)
 

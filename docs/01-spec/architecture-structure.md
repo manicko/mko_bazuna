@@ -130,10 +130,11 @@ src/
 │   │       └── views/
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
+│   ├── lifecycle.py               # bot startup/shutdown hooks (writes liveness marker, drops pending updates, closes sessions)
 │   ├── states.py                  # AdCreateState FSM states (aiogram 3.x)
 │   ├── handlers/                  # aiogram 3.x handlers (login, ad_create, contact)
 │   ├── schemas/                   # pydantic v2 DTOs for bot message payloads (rule 11)
-│   ├── services/                  # business logic (media.py for photo handling)
+│   ├── services/                  # business logic (rate_limit.py; media.py relocated to apps/media/services/filesystem.py)
 │   ├── config.py
 │   └── main.py
 ├── scraping_service/              # DEFERRED to phase 2 (decision B). Separate Telethon userbot process.
@@ -196,9 +197,9 @@ see [ui-patterns.md](ui-patterns.md).
 | Service | Image / Command | Notes |
 |---------|----------------|-------|
 | `db` | `postgres:18-alpine` + volume + healthcheck (`pg_isready`) | — |
-| `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application --bind 0.0.0.0:8000` | Mounts `media_volume`; `env_file: .env`; `depends_on migrate` (completed successfully); port 8000 NOT published. |
-| `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on migrate`; `restart: unless-stopped`. |
-| `migrate` | Same image; one-shot migration | Runs `entrypoint.sh` with `migrate` command; session-scoped advisory lock ID 100. |
+| `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application --bind 0.0.0.0:8000` | Mounts `media_volume`; `env_file: .env`; `depends_on load_catalog` (completed successfully); port 8000 NOT published. |
+| `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on load_catalog` (completed successfully); `restart: unless-stopped`. File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process + readiness marker). |
+| `migrate` | Same image; one-shot migration | Runs `python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())'` — single command that runs all three steps (migrate, loaddata, create_admin checks) inside a session-scoped advisory lock (ID 100). |
 | `create_admin` | Same image; one-shot admin creation | Runs `entrypoint-create-admin.sh`; session-scoped advisory lock ID 101. Idempotent. |
 | `seed` | Same image; one-shot demo data | Runs `entrypoint-seed.sh`; gated by `profiles: ["seed"]`. Populates DB with demo data. Session-scoped advisory lock ID 110. |
 | `nginx` | `nginx:alpine`; ports 80/443 | Mounts `media_volume` (ro); `proxy_pass → web:8000`; serves `/media/`; TLS. Static files served via whitenoise proxy. |
@@ -224,7 +225,8 @@ Volumes: `postgres_data`, `media_volume`. Static files baked into image via whit
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile scheduler up -d
 ```
 
-The scheduler runs all sweep commands hourly: `archive_sweep`, `delete_sweep`, `consent_hard_delete`, `sweep_drafts`, `cleanup_login_tokens`, `purge_failed_ads`, `purge_rejected_ads`.
+The scheduler runs all sweep commands hourly: `archive_sweep`, `delete_sweep`, `consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`, `cleanup_login_tokens`, `purge_failed_ads`, `purge_rejected_ads`.
+The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`).
 
 **Systemd alternative (bare metal):**
 
@@ -271,8 +273,12 @@ sweeps (or a sweep and a migration) from colliding on the same rows, every comma
 acquires a **transaction-scoped PostgreSQL advisory lock**
 (`apps.core.utils.advisory_lock`, `pg_advisory_xact_lock`) before doing its work. The
 lock is released automatically on transaction commit/rollback, so it is safe under
-PgBouncer transaction pooling. `migrate` instead uses a **session-scoped** lock
-(`pg_advisory_lock`) because it runs before PgBouncer is attached.
+PgBouncer transaction pooling. The `migrate` step instead uses a **session-scoped** lock
+(`pg_advisory_lock`, via `apps.core.utils.migrate_locked.main` running under `AdvisoryLockId.MIGRATE`)
+because it runs before PgBouncer is attached. Inside that session lock, `migrate_locked`
+runs all three post-migration setup steps as an atomic sequence: `migrate --run-syncdb`,
+`setup_search_triggers`, and `load_exchange_rates` (replacing the previous `&&`-chained
+shell command that released the lock between steps).
 
 Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 (`apps.core.enums`) so they never collide:
@@ -289,7 +295,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 8 | `rollup_daily_metrics` |
 | 9 | `alert_delivery_task` |
 | 10 | `queue_processing` |
-| 100 | `migrate` (session-scoped, pre-PgBouncer) |
+| 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 | 102 | `backfill_thumbnails` |
 | 110 | `seed` (session-scoped, prevents concurrent seed operations) |

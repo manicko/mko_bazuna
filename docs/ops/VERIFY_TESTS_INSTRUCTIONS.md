@@ -77,7 +77,7 @@ Run migrations in a throwaway container that uses the dev override (bind-mounts 
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm migrate
 ```
 
-Expected output: `Migrations complete` (or no output if already applied). The `migrate_locked.py` uses an advisory lock (ID 100) so this is safe to re-run.
+Expected output: `Migrations complete` (or no output if already applied). The `migrate` service runs `migrate_locked.main` (advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. Safe to re-run.
 
 ---
 
@@ -115,7 +115,7 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
 2. Wait for PostgreSQL to be ready
-3. Run migrations via `migrate_locked.py` (advisory-locked, idempotent)
+  3. Run migrations via direct `manage.py` calls: `migrate --run-syncdb`, `load_exchange_rates`, and `setup_search_triggers` (the test entrypoint uses direct manage.py calls, NOT `migrate_locked.py`)
 4. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup`)
 5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
@@ -176,13 +176,13 @@ Expected: `git status` shows nothing for `uv.lock` (it's tracked), and `exit: 1`
 
 ### B4 — `migrate_locked.py` works without CWD
 
-The `migrate_locked.py` now uses `Path(__file__).resolve().parents[3]` to find `manage.py`. Run migrations from any directory:
+The `migrate_locked.py` now uses `Path(__file__).resolve().parents[3]` to find `manage.py`. Run migrations from any directory (dev compose `migrate` service):
 
 ```pwsh
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python -c "from apps.core.utils.migrate_locked import main; import sys; print('CATALOG_PATH parent:', main.__module__); sys.exit(main())"
 ```
 
-Expected: migrations run regardless of CWD.
+Expected: migrations run regardless of CWD. Note: the **test entrypoint** (`entrypoint-test.sh`) bypasses `migrate_locked.py` and calls `manage.py migrate --run-syncdb` directly (see Step 6 above).
 
 ---
 

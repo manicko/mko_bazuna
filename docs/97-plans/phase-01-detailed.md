@@ -195,17 +195,21 @@ src/backend/
 
 ```
 src/telegram_bot/
-├── states.py                  # ✅ AdCreateState enum
+├── lifecycle.py               # Bot startup/shutdown hooks (liveness marker, session cleanup)
 ├── main.py                    # ✅ Bot entrypoint with middleware
+├── states.py                  # ✅ AdCreateState enum
 ├── handlers/
 │   ├── login.py               # ✅ /start handler + deep-link
 │   ├── ad_create.py           # ✅ Full FSM flow
 │   └── contact.py             # ✅ Contact deep-link handler
 ├── middlewares/
 │   └── permissions.py         # ✅ Account state middleware
-├── services/media.py          # ✅ Photo validation/storage
-├── schemas/message_payloads.py # ✅ Pydantic v2 DTOs
-└── tests/                     # ✅ Comprehensive test suite
+├── services/                  # ✅ rate_limit.py (media.py relocated to apps/media/services/filesystem.py)
+├── schemas/
+│   ├── message_payloads.py    # ✅ Pydantic v2 DTOs
+│   └── saved_search.py
+├── config.py
+└── tests/                     # ✅ Comprehensive test suite (test_media.py tests relocated to apps/media/tests/test_filesystem.py)
 ```
 
 ---

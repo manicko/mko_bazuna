@@ -38,10 +38,6 @@ C:\py_dev\mko_bazuna\src
 │       └── users
 ├── static
 ├── telegram_bot
-│   ├── bot
-│   │   ├── filters
-│   │   ├── handlers
-│   │   └── states
 │   ├── handlers
 │   │   ├── ad_copy.py
 │   │   ├── ad_create.py
@@ -49,6 +45,7 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── contact.py
 │   │   └── login.py
 │   ├── main.py
+│   ├── lifecycle.py
 │   ├── middlewares
 │   │   └── permissions.py
 │   ├── parsers
@@ -56,7 +53,6 @@ C:\py_dev\mko_bazuna\src
 │   │   ├── message_payloads.py
 │   │   └── saved_search.py
 │   ├── services
-│   │   ├── media.py
 │   │   └── rate_limit.py
 │   ├── states.py
 │   └── tests
@@ -66,7 +62,6 @@ C:\py_dev\mko_bazuna\src
 │       ├── test_claim_login_token.py
 │       ├── test_create_draft_ad.py
 │       ├── test_login_claim.py
-│       ├── test_media.py
 │       └── test_multi_lang_translation.py
 ├── templates
 └── theme
