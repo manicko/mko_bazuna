@@ -40,7 +40,7 @@ from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.media.services.thumbnails import ThumbnailService
 from telegram_bot.handlers.ad_create import save_photo
-from telegram_bot.services.media import generate_storage_key
+from apps.media.services.filesystem import generate_storage_key
 
 from conftest import create_test_ad
 

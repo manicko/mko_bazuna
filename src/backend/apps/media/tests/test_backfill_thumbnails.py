@@ -26,7 +26,7 @@ from django.test import override_settings
 
 from apps.ads.models import AdImage
 
-from telegram_bot.services.media import generate_storage_key
+from apps.media.services.filesystem import generate_storage_key
 
 from conftest import create_test_ad
 

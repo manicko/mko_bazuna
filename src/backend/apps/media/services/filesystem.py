@@ -1,5 +1,5 @@
 """
-Media service for Telegram bot photo handling.
+Media filesystem utilities for image validation and storage.
 
 Validates photos and generates storage keys per spec.
 """

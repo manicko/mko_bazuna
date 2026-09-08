@@ -15,7 +15,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction
 from apps.ads.models import AdImage
-from telegram_bot.services.media import delete_photo
+from apps.media.services.filesystem import delete_photo
 
 logger = logging.getLogger(__name__)
 

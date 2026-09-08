@@ -29,7 +29,7 @@ from apps.users.models import LoginToken, User
 
 from django.utils import timezone
 
-from telegram_bot.services.media import delete_photo
+from apps.media.services.filesystem import delete_photo
 
 
 logger = logging.getLogger(__name__)

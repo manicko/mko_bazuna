@@ -23,7 +23,7 @@ from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 from django.test import Client, override_settings
 
-from telegram_bot.services.media import (
+from apps.media.services.filesystem import (
     delete_photo,
     generate_storage_key,
     strip_photo_exif,

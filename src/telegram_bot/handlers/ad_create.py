@@ -53,7 +53,7 @@ from telegram_bot.schemas.message_payloads import (
     TitlePayload,
 )
 
-from telegram_bot.services.media import (
+from apps.media.services.filesystem import (
     generate_storage_key,
     validate_photo,
     strip_photo_exif,
