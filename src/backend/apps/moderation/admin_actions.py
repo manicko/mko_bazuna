@@ -127,20 +127,36 @@ def bulk_approve(queryset, moderator_id: int) -> int:
         Number of ads approved
     """
     count = 0
-    for ad in queryset.filter(status=AdStatus.ON_MODERATION):
-        try:
-            approve_ad(ad, moderator_id)
-        except MaxAdsExceeded as exc:
-            logger.warning(
-                "Skipping ad %s in bulk_approve: user %s reached "
-                "max %s active ads (current_count=%s)",
-                ad.id,
-                exc.user_id,
-                exc.limit,
-                exc.current_count,
-            )
-            continue
-        count += 1
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+        # Lock rows in PK order to match sweep lock ordering (no deadlock).
+        # transition_to's refresh_from_db() raises Ad.DoesNotExist if a row was
+        # hard-deleted mid-bulk (e.g. before the lock was acquired) — skip it
+        # per-ad rather than aborting the whole bulk. MaxAdsExceeded (DB-002)
+        # is already caught per-ad and preserved here.
+        for ad in (
+            queryset.filter(status=AdStatus.ON_MODERATION)
+            .order_by("pk")
+            .select_for_update()
+        ):
+            try:
+                approve_ad(ad, moderator_id)
+            except MaxAdsExceeded as exc:
+                logger.warning(
+                    "Skipping ad %s in bulk_approve: user %s reached "
+                    "max %s active ads (current_count=%s)",
+                    ad.id,
+                    exc.user_id,
+                    exc.limit,
+                    exc.current_count,
+                )
+                continue
+            except Ad.DoesNotExist:
+                logger.warning(
+                    "Skipping ad %s in bulk_approve: row hard-deleted mid-bulk",
+                    ad.id,
+                )
+                continue
+            count += 1
     return count
 
 
@@ -157,12 +173,27 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
         Number of ads rejected
     """
     count = 0
-    for ad in queryset.filter(
-        status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]
-    ):
-        if ad.status != AdStatus.REJECTED:
-            reject_ad(ad, moderator_id, reason)
-            count += 1
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+        # Lock rows in PK order. reject_ad()→set_rejected()→transition_to()
+        # calls refresh_from_db(); a row hard-deleted mid-bulk raises
+        # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.
+        for ad in (
+            queryset.filter(
+                status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]
+            )
+            .order_by("pk")
+            .select_for_update()
+        ):
+            if ad.status != AdStatus.REJECTED:
+                try:
+                    reject_ad(ad, moderator_id, reason)
+                except Ad.DoesNotExist:
+                    logger.warning(
+                        "Skipping ad %s in bulk_reject: row hard-deleted mid-bulk",
+                        ad.id,
+                    )
+                    continue
+                count += 1
     return count
 
 
@@ -207,7 +238,20 @@ def bulk_delete(queryset, moderator_id: int, reason: str) -> int:
         Number of ads deleted
     """
     count = 0
-    for ad in queryset.exclude(status=AdStatus.DELETED):
-        soft_delete_ad(ad, moderator_id, reason)
-        count += 1
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+        # Lock rows in PK order. soft_delete_ad()→transition_to(DELETED) calls
+        # refresh_from_db(); a row hard-deleted mid-bulk raises
+        # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.
+        for ad in (
+            queryset.exclude(status=AdStatus.DELETED).order_by("pk").select_for_update()
+        ):
+            try:
+                soft_delete_ad(ad, moderator_id, reason)
+            except Ad.DoesNotExist:
+                logger.warning(
+                    "Skipping ad %s in bulk_delete: row hard-deleted mid-bulk",
+                    ad.id,
+                )
+                continue
+            count += 1
     return count

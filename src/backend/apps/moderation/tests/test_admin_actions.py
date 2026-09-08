@@ -10,6 +10,7 @@ REJECTED, and that PUBLISHED/ARCHIVED -> REJECTED raises ValueError.
 
 from __future__ import annotations
 
+import inspect
 from unittest.mock import patch
 
 import pytest
@@ -17,11 +18,15 @@ from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.moderation.admin_actions import (
     approve_ad,
+    bulk_approve,
+    bulk_ban_users,
+    bulk_delete,
+    bulk_reject,
     reject_ad,
     soft_delete_ad,
 )
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -195,3 +200,130 @@ class TestSoftDeleteAdRouting:
         ad.refresh_from_db()
         assert ad.status == AdStatus.DELETED
         assert ad.deleted_at is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests: DB-003 structural guards for bulk locking
+# ---------------------------------------------------------------------------
+
+
+class TestBulkLockingStructure:
+    """Structural guards: bulk_approve/reject/delete must lock Ad rows."""
+
+    @staticmethod
+    def test_bulk_approve_uses_select_for_update_orderby_atomic() -> None:
+        """bulk_approve wraps its fetch-and-transition loop with row locking."""
+        src = inspect.getsource(bulk_approve)
+        assert "select_for_update" in src
+        assert "order_by" in src
+        assert "pk" in src
+        assert "transaction.atomic" in src
+
+    @staticmethod
+    def test_bulk_reject_uses_select_for_update_orderby_atomic() -> None:
+        """bulk_reject wraps its fetch-and-transition loop with row locking."""
+        src = inspect.getsource(bulk_reject)
+        assert "select_for_update" in src
+        assert "order_by" in src
+        assert "pk" in src
+        assert "transaction.atomic" in src
+
+    @staticmethod
+    def test_bulk_delete_uses_select_for_update_orderby_atomic() -> None:
+        """bulk_delete wraps its fetch-and-transition loop with row locking."""
+        src = inspect.getsource(bulk_delete)
+        assert "select_for_update" in src
+        assert "order_by" in src
+        assert "pk" in src
+        assert "transaction.atomic" in src
+
+    @staticmethod
+    def test_bulk_ban_users_not_locked() -> None:
+        """bulk_ban_users must NOT gain select_for_update (out of DB-003 scope)."""
+        src = inspect.getsource(bulk_ban_users)
+        assert "select_for_update" not in src
+
+
+# ---------------------------------------------------------------------------
+# Tests: DB-003 functional bulk operations
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestBulkOperations:
+    """Functional tests for the DB-003 locking bulk helpers."""
+
+    def test_bulk_approve_publishes_all(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """3 ON_MODERATION ads for one user → all PUBLISHED, return count == 3."""
+        ads = create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            3,
+            status=AdStatus.ON_MODERATION,
+        )
+        moderator = User.objects.create(
+            telegram_id=900000210, chat_id=900000210, password="x"
+        )
+
+        count = bulk_approve(Ad.objects.all(), moderator.id)
+
+        assert count == 3
+        for ad in ads:
+            ad.refresh_from_db()
+            assert ad.status == AdStatus.PUBLISHED
+
+    def test_bulk_delete_skips_hard_deleted_row(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """bulk_delete skips an ad whose row vanished mid-bulk (Ad.DoesNotExist).
+
+        Patches ``Ad.transition_to`` to raise ``Ad.DoesNotExist`` for one ad,
+        simulating a concurrent hard-delete sweep that won the race before the
+        ``select_for_update()`` lock was acquired.  The bulk must log + skip the
+        vanished row and continue processing the rest.
+        """
+        ads = create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            2,
+            status=AdStatus.ON_MODERATION,
+        )
+        moderator = User.objects.create(
+            telegram_id=900000211, chat_id=900000211, password="x"
+        )
+
+        # The second ad (higher PK, processed second) simulates a hard-delete
+        # race: transition_to raises Ad.DoesNotExist for it.
+        vanished_pk = ads[1].pk
+        original_transition_to = Ad.transition_to
+
+        def patched_transition_to(
+            self_ad: Ad,
+            target: AdStatus,
+            moderator_id: int | None = None,
+        ) -> None:
+            if self_ad.pk == vanished_pk:
+                raise Ad.DoesNotExist("Ad matching query does not exist.")
+            return original_transition_to(self_ad, target, moderator_id=moderator_id)
+
+        with patch.object(Ad, "transition_to", patched_transition_to):
+            count = bulk_delete(Ad.objects.all(), moderator.id, "hard-delete race")
+
+        assert count == 1
+        # First ad: successfully soft-deleted
+        ads[0].refresh_from_db()
+        assert ads[0].status == AdStatus.DELETED
+        assert ads[0].deleted_at is not None
+        # Second ad: skipped (DoesNotExist caught per-ad), unchanged
+        ads[1].refresh_from_db()
+        assert ads[1].status == AdStatus.ON_MODERATION
