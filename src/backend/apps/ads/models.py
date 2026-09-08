@@ -394,6 +394,11 @@ class Ad(models.Model):
             AdStatus.DELETED: set(),  # Terminal
         }
 
+        # DB-003: re-read from DB to defeat stale-state races (DB vs. bot
+        # process, concurrent sweeps). Raises Ad.DoesNotExist if a hard-delete
+        # sweep removed the row between caller fetch and transition.
+        self.refresh_from_db()
+
         current = AdStatus(self.status)
 
         # DELETED is a terminal state - no transitions allowed from it

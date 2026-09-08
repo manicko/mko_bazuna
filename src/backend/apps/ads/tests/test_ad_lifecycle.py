@@ -140,3 +140,15 @@ class TestCheckConstraints:
         ad.refresh_from_db()
         assert ad.moderation_failed_at is None
         assert ad.rejected_at is None
+
+
+def test_transition_after_concurrent_hard_delete_raises(seller, category, city):
+    """DB-003: refresh_from_db in transition_to must raise DoesNotExist
+    if a concurrent sweep hard-deleted the row between fetch and transition."""
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    # Simulate a concurrent hard-delete sweep removing the row
+    with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+        Ad.objects.filter(pk=ad.id).delete()
+    # transition_to should now raise Ad.DoesNotExist via refresh_from_db
+    with pytest.raises(Ad.DoesNotExist):
+        ad.transition_to(AdStatus.ON_MODERATION)
