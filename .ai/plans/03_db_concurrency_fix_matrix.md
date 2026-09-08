@@ -1,7 +1,7 @@
 # Phase 03 — Database & Concurrency Fix Matrix
 
 **Audit source:** `.ai/audit/99-validation/03-db-concurrency-validated-findings.md`
-**Status:** research-complete, ready for implementation
+**Status:** Batch A (DB-001 + DB-004) implemented, tested, and committed (commit 2039249). Batch B (DB-002) implementation in progress.
 **Execution order (dependency):** DB-001 → DB-002 → DB-003 → DB-004
 **DB-004 runs independently (no file overlap with DB-001/002/003)**
 
