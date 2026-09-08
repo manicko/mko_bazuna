@@ -27,7 +27,7 @@ def _run_detail(ad: MagicMock) -> dict[str, Any]:
     """Invoke ``ad_detail`` with DB/managers mocked to capture context.
 
     ``Ad.objects.select_related(...).prefetch_related(...).get(...)`` is
-    mocked to return a MagicMock ad. ``AnalyticsEvent.objects.create`` is
+    mocked to return a MagicMock ad. ``record_event`` is
     patched to avoid DB/analytics hits. ``render`` is stubbed to capture the
     3rd positional ``context`` arg.
     """
@@ -44,7 +44,7 @@ def _run_detail(ad: MagicMock) -> dict[str, Any]:
 
     with (
         patch("apps.ads.views.listings.Ad") as mock_ad,
-        patch("apps.ads.views.listings.AnalyticsEvent") as mock_ae,
+        patch("apps.ads.views.listings.record_event") as mock_re,
         patch(
             "apps.ads.views.listings.render",
             side_effect=fake_render,
@@ -52,7 +52,7 @@ def _run_detail(ad: MagicMock) -> dict[str, Any]:
     ):
         # Chain: .select_related().prefetch_related().get()
         mock_ad.objects.select_related.return_value.prefetch_related.return_value.get.return_value = ad
-        mock_ae.objects.create.return_value = None
+        mock_re.return_value = None
 
         factory = RequestFactory()
         request = factory.get(f"/ads/{ad.id}/")
@@ -81,14 +81,14 @@ def test_detail_prefetch_includes_trust_score() -> None:
 
     with (
         patch("apps.ads.views.listings.Ad") as mock_ad,
-        patch("apps.ads.views.listings.AnalyticsEvent") as mock_ae,
+        patch("apps.ads.views.listings.record_event") as mock_re,
         patch(
             "apps.ads.views.listings.render",
             side_effect=fake_render,
         ),
     ):
         mock_ad.objects.select_related.return_value.prefetch_related.return_value.get.return_value = ad
-        mock_ae.objects.create.return_value = None
+        mock_re.return_value = None
 
         factory = RequestFactory()
         request = factory.get(f"/ads/{ad.id}/")

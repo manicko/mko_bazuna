@@ -14,14 +14,12 @@ import logging
 from decimal import Decimal
 from difflib import get_close_matches
 
-from apps.analytics.models import AnalyticsEvent
-
-
 from apps.ads.models import Ad, AdImage
 
 from apps.categories.models import Category
 
 from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
+from apps.core.services.analytics import record_event
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 
 from apps.locations.models import City
@@ -71,8 +69,8 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
         raise Http404("Ad not found") from None
 
     # Record the view event for seller statistics
-    AnalyticsEvent.objects.create(
-        event_type=AnalyticsEventType.AD_VIEWED,
+    record_event(
+        AnalyticsEventType.AD_VIEWED,
         user_id=ad.user_id,  # Seller, not viewer
         ad_id=ad.id,
     )

@@ -13,9 +13,9 @@ from decimal import Decimal
 from difflib import get_close_matches
 
 from apps.ads.models import Ad
-from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, AdSort, AnalyticsEventType, LanguageLocale
+from apps.core.services.analytics import record_event
 from apps.locations.models import City
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.http import HttpRequest, HttpResponse
@@ -227,8 +227,8 @@ def search(request: HttpRequest) -> HttpResponse:
             ads = ads.order_by("-rank", "-published_at", "-id")
 
         # Record search event (analytics) after successful execution
-        AnalyticsEvent.objects.create(
-            event_type=AnalyticsEventType.SEARCH_PERFORMED,
+        record_event(
+            AnalyticsEventType.SEARCH_PERFORMED,
             user_id=request.user.id if request.user.is_authenticated else None,
         )
 
