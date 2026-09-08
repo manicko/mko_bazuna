@@ -12,26 +12,15 @@ django.setup()
 
 from aiogram import Bot, Dispatcher  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
+from telegram_bot.lifecycle import (  # noqa: E402
+    LivenessMiddleware,
+    _on_shutdown,
+    _on_startup,
+)
 from telegram_bot.middlewares import AccountStateMiddleware  # noqa: E402
 from django.conf import settings  # noqa: E402
-from django.db import close_old_connections, connections  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-
-async def _on_shutdown(*args: object, **kwargs: object) -> None:
-    """Close all Django ORM database connections on bot shutdown.
-
-    Registered as an aiogram shutdown callback so that when ``run_polling``
-    tears down on SIGTERM/SIGINT, every connection Django opened (including
-    worker-thread backends used by ``@sync_to_async`` handlers) is released
-    cleanly before the process exits.
-
-    Kept side-effect-free beyond connection close so it can later be extracted
-    to a shared ``lifecycle.py`` module (see ENT-005).
-    """
-    connections.close_all()
-    close_old_connections()
 
 
 def main() -> None:
@@ -58,6 +47,13 @@ def main() -> None:
     # Register account state middleware
     dp.message.middleware(AccountStateMiddleware())
 
+    # Register lifecycle hooks: startup writes the liveness marker,
+    # shutdown removes it and closes DB connections, LivenessMiddleware
+    # touches the marker on every inbound update for freshness.
+    dp.startup.register(_on_startup)
+    dp.shutdown.register(_on_shutdown)
+    dp.update.middleware(LivenessMiddleware())
+
     # Include routers
     from telegram_bot.handlers import (
         login_router,
@@ -79,10 +75,6 @@ def main() -> None:
     bot = Bot(token=token)
 
     logger.info("Bot starting with FSM for ad creation...")
-
-    # Graceful shutdown: fire _on_shutdown on SIGTERM/SIGINT (via aiogram's
-    # built-in signal handling in run_polling) to close Django DB connections.
-    dp.shutdown.register(_on_shutdown)
 
     dp.run_polling(bot)
 

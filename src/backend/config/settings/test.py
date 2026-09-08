@@ -45,6 +45,11 @@ STORAGES = {  # noqa: F405
     },
 }
 
+# Disable the bot liveness marker in tests so LivenessMiddleware and the
+# startup/shutdown hooks become no-op pass-throughs (no real files written).
+# Set BOT_LIVENESS_FILE="" so lifecycle._marker_path() returns None.
+BOT_LIVENESS_FILE = ""  # noqa: F405
+
 # Faster password hasher for tests
 PASSWORD_HASHERS = [  # noqa: F405
     "django.contrib.auth.hashers.MD5PasswordHasher",

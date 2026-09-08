@@ -127,6 +127,10 @@ COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
 COPY --chown=app:app docker/entrypoint*.sh /app/
 RUN chmod +x /app/entrypoint*.sh
 
+# Copy bot healthcheck script
+COPY --chown=app:app docker/healthcheck-bot.sh /app/docker/
+RUN chmod +x /app/docker/healthcheck-bot.sh
+
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

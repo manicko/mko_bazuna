@@ -62,11 +62,14 @@ def dp() -> Dispatcher:
     dp.include_router(alerts_router)
     dp.include_router(contact_router)
 
-    # Mirror production: register the graceful-shutdown hook so lifecycle tests
-    # exercise the same connection-cleanup path.
-    from telegram_bot.main import _on_shutdown
+    # Mirror production lifecycle hooks: startup writes the liveness marker,
+    # shutdown removes it and closes DB connections, LivenessMiddleware
+    # touches the marker on every inbound update for freshness.
+    from telegram_bot.lifecycle import LivenessMiddleware, _on_shutdown, _on_startup
 
+    dp.startup.register(_on_startup)
     dp.shutdown.register(_on_shutdown)
+    dp.update.middleware(LivenessMiddleware())
 
     return dp
 

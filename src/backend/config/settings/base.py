@@ -235,6 +235,11 @@ LOGIN_URL = "/login/issue/"
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
 
+# File-based liveness marker path for the bot container healthcheck.
+# Written on startup, touched on each inbound update, removed on shutdown.
+# See src/telegram_bot/lifecycle.py and docker/healthcheck-bot.sh (ENT-005).
+BOT_LIVENESS_FILE = os.getenv("BOT_LIVENESS_FILE", "/tmp/mko_bazuna_bot_alive")
+
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.
