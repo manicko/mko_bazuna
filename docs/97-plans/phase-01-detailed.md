@@ -70,7 +70,7 @@ Phase 1 work is **~95% complete**. The core architecture is fully implemented:
 | Item | Location | Status | Notes |
 |------|----------|--------|-------|
 | **Category seed migration** | `apps/categories/migrations/0002_seed_categories.py` | ✅ Complete | Contains Russian/Montenegrin category names with MPTT structure |
-| **City seed migration** | `apps/locations/migrations/0002_seed_cities.py` | ✅ Complete | All 23 Montenegro municipalities seeded |
+| **City reference data** | `apps/locations/management/commands/load_cities.py` | ✅ Complete | `load_cities` one-shot loads 15 ME cities from `cities.json` with `CATALOG_LOAD` (ID 104) lock |
 | **Static files configuration** | `config/settings/base.py` | ✅ Verified | Tailwind output.css path configured correctly |
 | **nginx media protection config** | Docker/nginx config | ✅ Complete | X-Accel-Redirect internal `/protected-media/` location defined |
 | **Contact handler tests** | `apps/core/tests/test_contact.py` | ✅ Complete | Tests exist for R2 conditions and pattern matching |

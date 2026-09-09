@@ -259,7 +259,6 @@ dependency**, not whether the data is "local":
 | `ads/0006_backfill_translations` | External API (`deep_translator.GoogleTranslator`) | **Extracted** → `manage.py backfill_translations` |
 | `categories/0005_load_catalog` | Live Python import | **Fixed in place** — refactored to accept `apps=` and use `apps.get_model()`; YAML rewrite suppressed when called from a migration |
 | `categories/0002_seed_categories` | Hardcoded MPTT raw SQL (`lft`/`rght`) | **Fixed in place** — rewritten to use `apps.get_model("categories", "Category")` + `parent=` FK assignment so MPTT recalculates tree values |
-| `locations/0002_seed_cities` | Local static seed data | **Safe to keep** (no external deps; local data may stay) |
 
 Rules of thumb (PO decision Q3, Q4):
 
@@ -269,9 +268,10 @@ Rules of thumb (PO decision Q3, Q4):
 - **Fix in place** any `RunPython` that imports the *live* app modules (e.g.
   `from apps.categories.catalog.builder import load_catalog`) without the `apps` argument. The fix is
   to thread `apps` through and access models only via `apps.get_model(...)`.
-- **Keep** purely local, deterministic seed data (`seed_categories`, `seed_cities`) — these are
+- **Keep** purely local, deterministic seed data (`seed_categories`) — these are
   safe to retain as `RunPython` in the consolidated migration, or to delegate to `call_command` if
-  you prefer to reuse the management-command path.
+  you prefer to reuse the management-command path. City reference data is already extracted
+  to the `load_cities` one-shot command (`manage.py load_cities`).
 
 The two extracted commands:
 

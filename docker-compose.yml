@@ -1,5 +1,5 @@
 # Base docker-compose.yml for Mko Bazuna
-# Services: db, redis, migrate, web, bot, nginx, create_admin
+# Services: db, redis, migrate, load_cities, load_catalog, create_admin, web, bot, nginx, seed
 # Static served by whitenoise in image; media served by nginx from media_volume
 
 services:
@@ -52,11 +52,11 @@ services:
     # One-shot service: runs migrations with advisory lock (ID 100), then exits
     # Idempotent: advisory lock prevents concurrent runs
 
-  load_catalog:
+  load_cities:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    entrypoint: /app/entrypoint-catalog.sh
+    entrypoint: /app/entrypoint-cities.sh
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -76,8 +76,35 @@ services:
       - .env.docker
     volumes:
       - ./.env.docker:/app/src/.env:ro
+    # One-shot service: loads cities.json into the cities table, then exits
+    # Idempotent via CATALOG_LOAD (ID 104) advisory lock; NOT profile-gated
+
+  load_catalog:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    entrypoint: /app/entrypoint-catalog.sh
+    depends_on:
+      load_cities:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: db
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
+      BOT_TOKEN: ${BOT_TOKEN}
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env.docker
+    volumes:
+      - ./.env.docker:/app/src/.env:ro
     # One-shot service: loads categories.yaml into DB, then exits
-    # Depends on migrate completing successfully
+    # Depends on load_cities completing successfully
 
   create_admin:
     build:
