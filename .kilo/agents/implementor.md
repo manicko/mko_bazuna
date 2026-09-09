@@ -25,15 +25,16 @@ permission:
     
   bash:
     "*": allow
-
+    "git *": ask
     # === READ-ONLY GIT ===   
     "git*status*": allow
     "git*diff*": allow
     "git*log*": allow
     "git*show*": allow
-    "*git*add *": allow
-    "*git*commit *": allow
-    "*git *": ask
+    "git*add*": allow
+    "git*commit*": allow
+    "git*stash*": allow
+    
     
     # === BUILD & TEST ===
     
