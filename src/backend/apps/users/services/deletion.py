@@ -201,11 +201,11 @@ def soft_delete_user_ads(user: User) -> list[str]:
     )
 
     if draft_ad_ids:
-        draft_storage_keys = list(
-            AdImage.objects.filter(ad_id__in=draft_ad_ids).values_list(
-                "image", flat=True
-            )
-        )
+        draft_storage_keys = [
+            key
+            for img in AdImage.objects.filter(ad_id__in=draft_ad_ids)
+            for key in img.storage_keys()
+        ]
 
         # Delete AdImage rows for DRAFT ads (not cascade-deleted since Ad is soft-deleted)
         AdImage.objects.filter(ad_id__in=draft_ad_ids).delete()

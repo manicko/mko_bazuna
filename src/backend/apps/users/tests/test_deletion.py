@@ -195,6 +195,62 @@ class TestWithdrawConsentSoftDeletesAds:
         assert user.last_name == ""
         assert user.email == ""
 
+    def test_withdraw_returns_all_thumbnail_storage_keys(self, user: User, monkeypatch):
+        """withdraw_consent returns all 4 storage keys for an AdImage with thumbnails.
+
+        Covers PC-004: storage_keys() collects image + thumbnail_small/medium/large
+        so no thumbnail derivatives are orphaned on disk.
+        """
+        from apps.ads.models import AdImage
+        from apps.categories.models import Category
+        from apps.core.enums import AdStatus
+        from apps.locations.models import City
+
+        category = Category.objects.create(name="Test Category", slug="test-category")
+        city = City.objects.create(
+            country_code="ME",
+            name="Test City",
+            region="Test Region",
+            slug="test-city",
+        )
+
+        draft_ad = create_test_ad(
+            user,
+            category,
+            city,
+            title="Draft Ad",
+            description="Description",
+            status=AdStatus.DRAFT,
+        )
+        AdImage.objects.create(
+            ad=draft_ad,
+            image="orphan-key.jpg",
+            thumbnail_small="orphan-key-small.jpg",
+            thumbnail_medium="orphan-key-medium.jpg",
+            thumbnail_large="orphan-key-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _spy(key: str) -> None:
+            deleted_keys.append(key)
+
+        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+
+        result = withdraw_consent(user)
+
+        expected = {
+            "orphan-key.jpg",
+            "orphan-key-small.jpg",
+            "orphan-key-medium.jpg",
+            "orphan-key-large.jpg",
+        }
+        assert set(result) == expected
+        assert len(result) == 4
+        # delete_photo called for each of the 4 keys after transaction commits
+        assert set(deleted_keys) == expected
+        assert len(deleted_keys) == 4
+
 
 class TestGiveConsent:
     """Tests for give_consent service."""
@@ -292,7 +348,13 @@ class TestWithdrawConsentAtomicity:
             description="Description",
             status=AdStatus.DRAFT,
         )
-        AdImage.objects.create(ad=draft_ad, image="test-draft-key.jpg")
+        AdImage.objects.create(
+            ad=draft_ad,
+            image="test-draft-key.jpg",
+            thumbnail_small="test-draft-key-small.jpg",
+            thumbnail_medium="test-draft-key-medium.jpg",
+            thumbnail_large="test-draft-key-large.jpg",
+        )
 
         deleted_keys: list[str] = []
 
@@ -306,6 +368,11 @@ class TestWithdrawConsentAtomicity:
         assert isinstance(result, list)
         assert all(isinstance(k, str) for k in result)
         assert "test-draft-key.jpg" in result
+        assert "test-draft-key-small.jpg" in result
+        assert "test-draft-key-medium.jpg" in result
+        assert "test-draft-key-large.jpg" in result
+        # All 4 keys returned for the single AdImage (image + 3 thumbnails)
+        assert len(result) == 4
         # delete_photo called with the same keys after transaction commits
         assert deleted_keys == result
 
@@ -351,7 +418,13 @@ class TestWithdrawConsentAtomicity:
             description="Description",
             status=AdStatus.DRAFT,
         )
-        AdImage.objects.create(ad=draft_ad, image="orphan-key.jpg")
+        AdImage.objects.create(
+            ad=draft_ad,
+            image="orphan-key.jpg",
+            thumbnail_small="orphan-key-small.jpg",
+            thumbnail_medium="orphan-key-medium.jpg",
+            thumbnail_large="orphan-key-large.jpg",
+        )
 
         called: list[str] = []
 
@@ -364,7 +437,14 @@ class TestWithdrawConsentAtomicity:
 
         assert isinstance(result, list)
         assert all(isinstance(k, str) for k in result)
-        assert "orphan-key.jpg" in result
+        expected = {
+            "orphan-key.jpg",
+            "orphan-key-small.jpg",
+            "orphan-key-medium.jpg",
+            "orphan-key-large.jpg",
+        }
+        assert set(result) == expected
+        assert len(result) == 4
         # delete_photo must NOT be called by soft_delete_user_ads (DB-only)
         assert called == []
 
