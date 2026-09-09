@@ -6,6 +6,8 @@ import json
 import os
 import shutil
 import tempfile
+from collections.abc import Iterator
+
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -1384,6 +1386,80 @@ class TestLeafCategoryFiltering:
         assert "goods" not in slug_set
         assert "services-jobs" not in slug_set
         assert "business" not in slug_set
+
+
+class TestCityFixtures:
+    """Verify SeedService._load_city_fixtures() (ENT-038).
+
+    Guards two defects fixed by the upsert-by-slug rewrite:
+      1. Fixed PKs + ignore_conflicts left the BigAutoField sequence trailing live
+         data, so a later City.objects.create() could reuse pk 1..15 → IntegrityError.
+      2. Returning City.objects.all() leaked pre-existing rows into the demo pool.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _service(self, db: None) -> Iterator[None]:
+        self.service = SeedService()
+        yield
+
+    def test_returns_only_the_seeded_subset(self) -> None:
+        """Returned list is exactly the 15 fixture cities — never the whole table."""
+        cities = self.service._load_city_fixtures()
+        assert len(cities) == 15
+        assert {c.slug for c in cities} == {
+            "podgorica",
+            "niksic",
+            "bar",
+            "kotor",
+            "budva",
+            "tivat",
+            "herceg-novi",
+            "cetinje",
+            "bijelo-polje",
+            "pljevlja",
+            "rozaje",
+            "berane",
+            "ulcinj",
+            "danilovgrad",
+            "mojkovac",
+        }
+
+    def test_does_not_leak_preexisting_cities(self) -> None:
+        """A pre-existing city (created externally) is not returned as seeded."""
+        pre = City.objects.create(
+            name="Прелокација", slug="preloc", region="Test", country_code="ME"
+        )
+        cities = self.service._load_city_fixtures()
+        assert len(cities) == 15
+        assert pre.pk not in {c.pk for c in cities}
+
+    def test_upsert_is_idempotent_and_sequence_stays_ahead(self) -> None:
+        """Re-seed updates in place (same PKs, no duplicates) and the
+        BigAutoField sequence never trails live data."""
+        first = self.service._load_city_fixtures()
+        first_pks = {c.pk for c in first}
+        assert len(first_pks) == 15
+        assert all(pk is not None for pk in first_pks)
+
+        second = self.service._load_city_fixtures()
+        assert {c.pk for c in second} == first_pks  # same rows, updated in place
+        assert City.objects.count() == 15  # no duplicates from re-seed
+
+        # Defect #1 regression guard: a bare create() must NOT collide on pk 1..15.
+        extra = City.objects.create(
+            name="Тестоград", slug="testograd", region="Test", country_code="ME"
+        )
+        assert extra.pk > max(first_pks)
+        assert City.objects.count() == 16
+
+    def test_returns_empty_when_fixture_missing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Missing cities.json yields [] (unchanged graceful path)."""
+        import apps.seed.services.seed_service as ss
+
+        monkeypatch.setattr(ss, "FIXTURES_DIR", Path("/nonexistent/seed-fixtures"))
+        assert self.service._load_city_fixtures() == []
 
 
 @pytest.mark.seed

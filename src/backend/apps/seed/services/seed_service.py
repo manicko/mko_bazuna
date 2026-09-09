@@ -298,13 +298,18 @@ class SeedService:
         with open(fixture_path, encoding="utf-8") as f:
             data = f.read()
 
-        objs: list[City] = []
-        for deserialized in deserialize("json", data):
-            obj = deserialized.object
-            objs.append(obj)
+        objs: list[City] = [
+            deserialized.object for deserialized in deserialize("json", data)
+        ]
+        seeded_slugs = [obj.slug for obj in objs]
 
-        City.objects.bulk_create(objs, ignore_conflicts=True)
-        return list(City.objects.all())
+        City.objects.bulk_create(
+            objs,
+            update_conflicts=True,
+            update_fields=["name", "region", "country_code", "name_i18n"],
+            unique_fields=["slug"],
+        )
+        return list(City.objects.filter(slug__in=seeded_slugs))
 
     def _log_progress(self, name: str, count: int, elapsed: float) -> None:
         """Log progress for a generation step."""
