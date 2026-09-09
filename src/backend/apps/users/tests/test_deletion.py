@@ -92,6 +92,7 @@ class TestWithdrawConsentInvalidatesTokens:
         user.refresh_from_db()
         assert user.telegram_id is None
         assert user.username is None
+        assert user.email == ""
         assert user.consent_revoked_at is not None
         assert user.is_deleted is True
         # consent_given_at is cleared on withdraw (PC-001)
@@ -179,6 +180,20 @@ class TestWithdrawConsentSoftDeletesAds:
         assert ad1.status == AdStatus.DELETED
         assert ad1.deleted_at is not None
         assert ad2.status == AdStatus.DELETED
+
+    def test_withdraw_soft_deletes_user_sets_pii_nulls(self, user: User):
+        """withdraw_consent nulls PII: telegram_id, username, first_name, last_name, email."""
+        user.email = "admin@example.com"
+        user.save(update_fields=["email"])
+
+        withdraw_consent(user)
+
+        user.refresh_from_db()
+        assert user.telegram_id is None
+        assert user.username is None
+        assert user.first_name == ""
+        assert user.last_name == ""
+        assert user.email == ""
 
 
 class TestGiveConsent:

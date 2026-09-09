@@ -85,7 +85,7 @@ def withdraw_consent(user: User) -> list[str]:
     - Sets is_deleted = True, deleted_at = now()
 
     - NULLs telegram_id, username immediately (breaks chat linkage)
-    - Empties first_name, last_name (NOT NULL fields — use "" not None)
+    - Empties first_name, last_name, email (NOT NULL fields — use "" not None)
 
     - Invalidates/deletes all active LoginTokens (prevents re-linking after withdrawal)
 
@@ -138,6 +138,7 @@ def withdraw_consent(user: User) -> list[str]:
         user.username = None
         user.first_name = ""
         user.last_name = ""
+        user.email = ""
         user.consent_given_at = None
 
         user.save(
@@ -150,6 +151,7 @@ def withdraw_consent(user: User) -> list[str]:
                 "username",
                 "first_name",
                 "last_name",
+                "email",
             ]
         )
 
