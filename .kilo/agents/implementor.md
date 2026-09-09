@@ -26,11 +26,14 @@ permission:
   bash:
     "*": allow
     "git *": ask
+
     # === READ-ONLY GIT ===   
     "git*status*": allow
     "git*diff*": allow
     "git*log*": allow
     "git*show*": allow
+
+    # === COMMIT GIT ===       
     "git*add*": allow
     "git*commit*": allow
     "git*stash*": allow
@@ -85,17 +88,16 @@ permission:
     "curl*": allow
 
     # === ASK: potentially destructive git ===
-    "*git*reset *": ask
-    "*git*checkout *": ask
-    "git clean *": ask
-    "git stash *": ask
-    "git rebase *": ask
-    "git push *": ask
-    "git commit --amend*": ask
-    "git cherry-pick *": ask
-    "git branch*": ask
-    "git merge*": ask
-    "git restore*": ask
+    "git*reset *": ask
+    "git*checkout *": ask
+    "git*clean *": ask
+    "git*rebase *": ask
+    "git*push *": ask
+    "git*commit*--amend*": ask
+    "git*cherry-pick *": ask
+    "git*branch*": ask
+    "git*merge*": ask
+    "git*restore*": ask
     "git tag -d*": ask
     "gc --prune=now*": ask
     "git update-ref -d*": ask
@@ -157,10 +159,13 @@ permission:
     "systemctl disable *": ask
 
     # === ASK: potentially destructive packages ===
-    "pip uninstall *": ask
-    "npm uninstall *": ask
-    "uv pip uninstall *": ask
     "uv run *": allow
+    "pip*uninstall *": ask
+    "pip*install *": ask
+    "npm*uninstall *": ask
+    "npm*install *": ask
+    "uv pip uninstall *": ask
+    "uv pip install *": ask
 
     # === ASK: potentially destructive network ===
     "curl -X DELETE*": ask
@@ -177,9 +182,6 @@ permission:
     "git filter-repo*": deny
     "git reflog*": deny
 
-    # === DENY: git write (orchestrator's job) ===
-    "*git add*": ask
-    "*git commit*": ask
 
     # === DENY: destructive filesystem ===
     "format*": deny
