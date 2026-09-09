@@ -81,7 +81,7 @@ source (StrEnum: TELEGRAM | SEED, default TELEGRAM)  # account creation origin (
 **`login_tokens`** (decision H / US-S1, zone C1) — separate table for atomic Telegram login. Bot and web are two processes; token claimed exactly once under shared lock.
 ```
 id (PK)
-token_hash (CHAR(64) UNIQUE, indexed)   # SHA-256 of raw 32-char URL-safe token; raw token NEVER stored
+token_hash (CHAR(64) UNIQUE, indexed)   # SHA-256 of raw 32-char URL-safe token; raw token NEVER stored (192-bit CSPRNG; exceeds NIST SP 800-63B §5.1.1.2 128-bit authenticator minimum)
 telegram_id (BIGINT, nullable)          # filled by BOT on /start login_<token>
 created_at (TIMESTAMP)
 expires_at (TIMESTAMP)                  # +5 min from creation
