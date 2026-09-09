@@ -311,7 +311,7 @@ class TestLoginStatusNoPii:
 
         client = Client()
         with caplog.at_level("INFO"):
-            response = client.get(f"/login/status/?token={raw_token}")
+            response = client.post("/login/status/", {"token": raw_token})
 
         assert response.status_code == 200
         # Raw telegram_id must not appear in any log output

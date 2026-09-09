@@ -106,13 +106,13 @@ class TestLoginStatus:
     def test_login_status_410_no_token(self) -> None:
         """No token parameter returns 410."""
         client = Client()
-        response = client.get("/login/status/")
+        response = client.post("/login/status/", {})
         assert response.status_code == 410
 
     def test_login_status_410_nonexistent_token(self) -> None:
         """A token hash that doesn't exist returns 410."""
         client = Client()
-        response = client.get("/login/status/?token=fake_token_32_chars_aaaaaaaaaaaa")
+        response = client.post("/login/status/", {"token": "fake_token_32_chars_aaaaaaaaaaaa"})
         assert response.status_code == 410
 
     def test_login_status_204_pending(self) -> None:
@@ -125,7 +125,7 @@ class TestLoginStatus:
         )
 
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 204
 
     def test_login_status_410_expired(self) -> None:
@@ -138,7 +138,7 @@ class TestLoginStatus:
         )
 
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
 
     def test_login_status_410_already_consumed(self) -> None:
@@ -153,7 +153,7 @@ class TestLoginStatus:
         )
 
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
 
     def test_login_status_200_claimed_and_user_exists(self) -> None:
@@ -174,7 +174,7 @@ class TestLoginStatus:
         )
 
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 200
 
         # Verify session was established
@@ -199,7 +199,21 @@ class TestLoginStatus:
         )
 
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 410
+
+    def test_login_status_405_on_get(self) -> None:
+        """GET requests are rejected with 405 (token must come via POST body)."""
+        client = Client()
+        response = client.get("/login/status/")
+        assert response.status_code == 405
+
+    def test_login_status_410_on_post_unknown_token(self) -> None:
+        """A POST with an unknown token hash returns 410 (POST path regression)."""
+        client = Client()
+        response = client.post(
+            "/login/status/", {"token": "unknown_token_32chars_abcde_abcdefghij"}
+        )
         assert response.status_code == 410
 
 
@@ -228,7 +242,7 @@ class TestLoginTokenSecurity:
 
         # Poll with a tampered token — its SHA-256 hash won't match any row.
         wrong_token = "wrong_token_32chars_abcde_abcdefghij"
-        response = client.get(f"/login/status/?token={wrong_token}")
+        response = client.post("/login/status/", {"token": wrong_token})
         assert response.status_code == 410
 
     @pytest.mark.parametrize("field", ["token_hash"])
@@ -271,11 +285,11 @@ class TestLoginTokenSecurity:
 
         client = Client()
         # First poll — should consume and return 200.
-        first = client.get(f"/login/status/?token={raw_token}")
+        first = client.post("/login/status/", {"token": raw_token})
         assert first.status_code == 200
 
         # Second poll — token is now consumed → 410.
-        second = client.get(f"/login/status/?token={raw_token}")
+        second = client.post("/login/status/", {"token": raw_token})
         assert second.status_code == 410
 
     def test_bot_phase_claim_completes_when_user_exists(self) -> None:
@@ -304,7 +318,7 @@ class TestLoginTokenSecurity:
 
         # Token has telegram_id set but consumed_at is NULL → first poll claims it.
         client = Client()
-        response = client.get(f"/login/status/?token={raw_token}")
+        response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 200
 
         token = LoginToken.objects.get(token_hash=token_hash)
@@ -347,7 +361,7 @@ def _claim_login(client: Client, user: User, username: str) -> None:
         telegram_id=user.telegram_id,
         expires_at=timezone.now() + timedelta(hours=1),
     )
-    response = client.get(f"/login/status/?token={raw_token}")
+    response = client.post("/login/status/", {"token": raw_token})
     assert response.status_code == 200
 
 

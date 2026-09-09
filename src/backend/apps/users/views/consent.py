@@ -356,6 +356,7 @@ def _reconcile_preferred_city_on_login(request: HttpRequest, user: User) -> None
     )
 
 
+@require_POST
 @never_cache
 def login_status(request: HttpRequest) -> HttpResponse:
     """
@@ -367,14 +368,14 @@ def login_status(request: HttpRequest) -> HttpResponse:
     a web session (django.contrib.auth.login + session.cycle_key).
 
     Args:
-        request: HTTP request with query param ?token=<raw_token>
+        request: HTTP request with POST body field ``token``.
 
     Returns:
         HttpResponse 200 — token consumed, session established (session cookie set)
         HttpResponse 204 — pending (bot has not claimed the token yet)
         HttpResponse 410 — gone (token invalid, expired, already consumed, or user banned)
     """
-    raw_token = request.GET.get("token", "")
+    raw_token = request.POST.get("token", "")
     if not raw_token:
         return HttpResponse(status=410)
 

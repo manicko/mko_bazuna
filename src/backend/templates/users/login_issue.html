@@ -33,7 +33,8 @@
         <script>
         (function () {
             "use strict";
-            var pollUrl = "{% url 'consent:login_status' %}?token={{ raw_token }}";
+            var pollUrl = "{% url 'consent:login_status' %}";
+            var csrfToken = "{{ csrf_token|escapejs }}";
             var statusEl = document.getElementById("login-status");
             var deepLinkEl = document.querySelector('a[data-start^="login_"]');
 
@@ -41,7 +42,9 @@
             deepLinkEl.style.display = "none";
 
             var interval = setInterval(function () {
-                fetch(pollUrl, { cache: "no-store" })
+                var fd = new FormData();
+                fd.append("token", "{{ raw_token }}");
+                fetch(pollUrl, { method: "POST", body: fd, headers: { "X-CSRFToken": csrfToken } })
                     .then(function (resp) {
                         if (resp.status === 200) {
                             clearInterval(interval);
