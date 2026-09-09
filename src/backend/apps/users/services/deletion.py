@@ -64,7 +64,9 @@ def decline_consent(user: User) -> None:
 
     user.is_declined = True
 
-    user.save(update_fields=["ads_auto_publish", "is_declined"])
+    user.consent_given_at = None
+
+    user.save(update_fields=["ads_auto_publish", "is_declined", "consent_given_at"])
 
     logger.info(
         f"User {user.id} declined consent - browse-only mode: "
@@ -136,12 +138,14 @@ def withdraw_consent(user: User) -> list[str]:
         user.username = None
         user.first_name = ""
         user.last_name = ""
+        user.consent_given_at = None
 
         user.save(
             update_fields=[
                 "consent_revoked_at",
                 "is_deleted",
                 "deleted_at",
+                "consent_given_at",
                 "telegram_id",
                 "username",
                 "first_name",

@@ -81,6 +81,10 @@ class TestWithdrawConsentInvalidatesTokens:
         claimed = claim_token()
         assert claimed is not None, "Token should be claimable before withdrawal"
 
+        # Set consent_given_at before withdraw (simulates prior consent)
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
+
         # Now withdraw consent - this should delete the token
         withdraw_consent(user)
 
@@ -90,6 +94,8 @@ class TestWithdrawConsentInvalidatesTokens:
         assert user.username is None
         assert user.consent_revoked_at is not None
         assert user.is_deleted is True
+        # consent_given_at is cleared on withdraw (PC-001)
+        assert user.consent_given_at is None
 
         # Second claim attempt on the same token fails
         second_claim = claim_token()
@@ -108,6 +114,10 @@ class TestDeclineConsentDoesNotInvalideTokens:
             expires_at=now + timezone.timedelta(hours=1),
         )
 
+        # Set consent_given_at before decline (simulates prior consent)
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
+
         decline_consent(user)
 
         # Token should still exist
@@ -118,6 +128,8 @@ class TestDeclineConsentDoesNotInvalideTokens:
         assert user.telegram_id is not None
         assert user.consent_revoked_at is None
         assert user.is_deleted is False
+        # consent_given_at is cleared on decline (PC-001)
+        assert user.consent_given_at is None
 
 
 class TestWithdrawConsentSoftDeletesAds:
@@ -340,3 +352,31 @@ class TestWithdrawConsentAtomicity:
         assert "orphan-key.jpg" in result
         # delete_photo must NOT be called by soft_delete_user_ads (DB-only)
         assert called == []
+
+
+class TestClearConsentGivenAt:
+    """Explicit accept→decline and accept→withdraw transitions for consent_given_at (PC-001)."""
+
+    def test_accept_then_decline_clears_consent_given_at(self, user: User):
+        """give_consent sets consent_given_at; decline_consent clears it."""
+        give_consent(user)
+        user.refresh_from_db()
+        assert user.consent_given_at is not None
+
+        decline_consent(user)
+        user.refresh_from_db()
+        assert user.consent_given_at is None
+        assert user.is_declined is True
+        assert user.ads_auto_publish is False
+
+    def test_accept_then_withdraw_clears_consent_given_at(self, user: User):
+        """give_consent sets consent_given_at; withdraw_consent clears it."""
+        give_consent(user)
+        user.refresh_from_db()
+        assert user.consent_given_at is not None
+
+        withdraw_consent(user)
+        user.refresh_from_db()
+        assert user.consent_given_at is None
+        assert user.consent_revoked_at is not None
+        assert user.is_deleted is True
