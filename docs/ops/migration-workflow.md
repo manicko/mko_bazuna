@@ -46,17 +46,19 @@ and the Telegram bot (aiogram). Both import the same Django project and share th
 `docker-compose.yml` wires the startup with `depends_on` + `condition: service_completed_successfully`:
 
 ```
-db  →  migrate  →  load_catalog  →  web (gunicorn)
-                            →  bot (aiogram)
-                          →  create_admin
-                          →  seed (profile-gated)
+db  →  migrate  →  load_cities  →  load_catalog  →  web (gunicorn)
+                                        →  bot (aiogram)
+                                     →  create_admin
+                                     →  seed (profile-gated)
 ```
 
 - `db` is a `postgres:18-alpine` container with a `pg_isready` healthcheck.
 - `migrate` runs `migrate_locked.main` (all 3 steps under advisory lock), then exits.
+- `load_cities` loads `cities.json` (15 ME cities) into the DB, then exits.
 - `load_catalog` loads `categories.yaml` into the DB, then exits. `web` and `bot` both
-  block on `load_catalog` completing successfully.
-- `create_admin` and `seed` (when enabled via profile) also depend on `load_catalog`.
+  block on `load_catalog` completing successfully (transitively on `load_cities`).
+- `create_admin` and `seed` (when enabled via profile) also depend on `load_catalog`
+  (transitively on `load_cities`).
 
 ### The migrate service
 

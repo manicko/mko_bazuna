@@ -45,7 +45,6 @@ Save the concise result as `{code_context}`.
 Then launch a `Planner` with the plan and `{code_context}`.
 
 Ask it to:
-
 - Decompose the plan into logical execution blocks
 - Identify dependencies and execution order
 - Assess implementation, rollout, regression, and compatibility risks
@@ -59,7 +58,7 @@ Ask it to:
   - **Validator** — independent review when implementation risk is high
 - Identify the reason for each required agent
 - Keep the scope minimal and avoid speculative redesign
-
+- Important: Never change code, you only plan
 
 Save the result as `{plan_context}`.
 
@@ -87,7 +86,7 @@ Inspect the current implementation and architecture relevant to the block:
 * Existing patterns and constraints
 * Current implementation
 * Risks
-
+* Important: Never change code
 Return `{context_a}`.
 
 ### 2.2 Researcher — if required
@@ -102,7 +101,7 @@ Launch a `Researcher` with:
 - Assess architectural, implementation, rollout, regression, and compatibility risks
 - Select the **best implementation path** for maintainability, future evolution, and project conventions
 - Avoid speculative redesign
-
+- Important: Never change code
 Return `{context_r}`.
 
 
@@ -132,7 +131,10 @@ Define:
 
 Tests should verify **logic and component interaction**, not trivial implementation details.
 
+Important: Never change code
+
 Return `{plan_task}`.
+
 
 
 ### 2.4 Implementor
@@ -183,7 +185,7 @@ git commit -m "{type}({scope}): {description}"
 You are working with other agents in parallel if you see changes not done by you - it is normal.
 Never ran `git reset`, `git checkout`
 Never rewrite history.
-
+Important: Never change code
 ---
 
 ## 4. Final Validation
@@ -199,33 +201,20 @@ Check:
 * Tests and quality gates
 * Documentation
 * Unrelated changes
+* Important: Never change code
 
-If issues are found:
-
-1. Create the smallest fix task
-2. Launch one `Implementor`
-3. Validate locally
-4. Commit the fix
-5. Re-run `Validator`
-
-Finish only after `Validator` passes.
+## 5. If issues are found:
+Launch one `Implementor` to fix and commit
+Validate locally
 
 ---
 
 # Constraints
-
-* Initial `Auditor` runs before planning to establish `{code_context}`
-* Planner creates work items and decides which agents are needed per block
+* Only Implementor can change code. Instruct other agents to not change any code file.
 * Execute only the agents required for the current block
 * Pass concise context between agents
 * Independent non-Implementor agents may run in parallel
 * **Never run multiple Implementors in parallel**
-* Keep work items small and coherent
-* Use semantic code units, never line numbers
-* Prefer minimal, maintainable changes
-* No unrelated refactoring or speculative redesign
-* Commit after every implementation block
-* Validator is used for final validation and only for high-risk blocks when explicitly selected by the Planner
 
 ---
 

@@ -2,9 +2,11 @@
 
 from pathlib import Path
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.categories.catalog import builder
+from apps.categories.models import Category
+from apps.locations.models import City
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "catalog" / "categories.yaml"
 
@@ -51,3 +53,22 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS("Catalog loaded successfully — no renames")
             )
+
+        # Post-load guard (ENT-040): fail fast on empty reference data so an
+        # empty catalog blocks web/bot startup instead of booting an empty board.
+        if not Category.objects.exists():
+            self.stdout.write(
+                self.style.ERROR(
+                    "Catalog loaded zero categories — aborting "
+                    "(load_catalog produced no rows; would boot empty catalog)"
+                )
+            )
+            raise CommandError("Catalog loaded zero categories")
+        if not City.objects.exists():
+            self.stdout.write(
+                self.style.ERROR(
+                    "Catalog loaded categories but zero cities — aborting "
+                    "(load_cities one-shot did not populate cities)"
+                )
+            )
+            raise CommandError("Catalog loaded zero cities")

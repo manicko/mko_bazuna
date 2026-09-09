@@ -174,7 +174,7 @@ db (healthy, pg_isready)
 make up
 
 # The dependency chain runs automatically:
-# db → migrate → load_catalog → create_admin → seed → web, bot
+# db → migrate → load_cities → load_catalog → create_admin → seed → web, bot
 # Web is served at http://localhost:8000 (hot-reload enabled)
 ```
 

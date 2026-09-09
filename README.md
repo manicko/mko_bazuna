@@ -24,7 +24,7 @@ Two long-lived processes share one Django project + one DB:
 ```bash
 # Configure .env.docker with your values (BOT_TOKEN, DJANGO_SECRET_KEY, POSTGRES_PASSWORD)
 make build                  # build Docker images (one-time)
-make up                     # start dev environment on :8000; runs db → migrate → load_catalog → create_admin → seed → web, bot
+make up                     # start dev environment on :8000; runs db → migrate → load_cities → load_catalog → create_admin → seed → web, bot
 ```
 
 > **Project isolation:** `make` sets `COMPOSE_PROJECT_NAME` automatically (`mko-bazuna-dev` for dev,
