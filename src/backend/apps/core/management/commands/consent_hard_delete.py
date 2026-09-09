@@ -65,12 +65,14 @@ class Command(BaseCommand):
                 # Collect user IDs for logging before processing
                 user_ids = list(queryset.values_list("id", flat=True))
 
-                # Collect storage keys for physical media cleanup before ORM cascade
-                storage_keys = list(
-                    AdImage.objects.filter(ad__user_id__in=user_ids).values_list(
-                        "image", flat=True
-                    )
-                )
+                # Collect storage keys for physical media cleanup before ORM cascade.
+                # Use AdImage.storage_keys() to include thumbnail derivatives
+                # (thumbnail_small/medium/large), not just the main image key.
+                storage_keys = [
+                    key
+                    for img in AdImage.objects.filter(ad__user_id__in=user_ids)
+                    for key in img.storage_keys()
+                ]
 
                 # Null out analytics_events.user_id (preserves aggregate history)
                 AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)

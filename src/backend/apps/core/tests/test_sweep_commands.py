@@ -315,6 +315,46 @@ class TestConsentHardDelete:
         call_command("consent_hard_delete")
         assert User.objects.filter(pk=seller.pk).exists()
 
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Hard-delete sweep passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        seller.consent_revoked_at = timezone.now() - timedelta(days=60)
+        seller.save()
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+        )
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-hardcmd.jpg",
+            thumbnail_small="test-uuid-hardcmd-small.jpg",
+            thumbnail_medium="test-uuid-hardcmd-medium.jpg",
+            thumbnail_large="test-uuid-hardcmd-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.consent_hard_delete.delete_photo",
+            _record,
+        )
+
+        call_command("consent_hard_delete")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not User.objects.filter(pk=seller.pk).exists()
+
     def test_lock_id_is_consent_hard_delete(self):
         assert AdvisoryLockId.CONSENT_HARD_DELETE == 3
 
