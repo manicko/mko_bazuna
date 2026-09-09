@@ -85,8 +85,13 @@ def _clear_cache_between_tests():
 # Schema restoration — pytest-django creates the test DB from model
 # introspection (MIGRATION_MODULES=None), so migration RunSQL/seed data that
 # creates triggers and currency rows is skipped. This autouse fixture runs
-# after django_db_setup and restores that schema/data so the test DB mirrors
-# production.
+# after django_db_setup and restores that schema/data. The restore mirrors ONLY
+# the prod `migrate` one-shot (migrate --run-syncdb + load_exchange_rates +
+# setup_search_triggers). Catalog reference data (load_catalog), cities, and
+# create_admin are NOT restored at session scope — they are loaded per-class by
+# the tests that need them (see test_submenu.py, test_breadcrumbs_render.py,
+# test_seed.py) because a session-scope load_catalog would collide on
+# Category(slug="transport") (test_submenu.py:22 / test_seed.py:1383).
 # WHY call_command (in-process) AND NOT bootstrap_reference_data?
 #   The `bootstrap_reference_data` command delegates to
 #   `migrate_locked.main()`, which spawns child processes via

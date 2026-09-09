@@ -1,7 +1,9 @@
-"""Tests for the load_catalog management command (ENT-040).
+"""Tests for the load_catalog management command (ENT-040, ENT-037).
 
 Covers the post-load guard that asserts Category and City rows exist after
 the catalog builder runs, raising CommandError if either dataset is empty.
+Also covers the ENT-037 smoke test: load_catalog populates LookupItem rows
+via builder Phase 1 (lookups).
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from django.core.management.base import CommandError
 
 from apps.categories.models import Category
 from apps.locations.models import City
+from apps.lookups.models import LookupItem
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -54,3 +57,19 @@ class TestLoadCatalogPostLoadGuard:
 
         with pytest.raises(CommandError, match="zero cities"):
             call_command("load_catalog", "--no-rewrite")
+
+    def test_load_catalog_populates_lookup_items(self, city: City) -> None:
+        """The real management command populates LookupItem rows (ENT-037).
+
+        ``load_catalog`` invokes ``builder.load_catalog``, whose Phase 1
+        (``_load_lookups``) creates ``LookupItem`` rows via
+        ``update_or_create``. The *city* fixture satisfies the command's
+        post-load ``City.objects.exists()`` guard — ``load_catalog`` itself
+        does not seed cities (ENT-031).
+        """
+        assert LookupItem.objects.count() == 0
+
+        call_command("load_catalog", "--no-rewrite")
+
+        assert LookupItem.objects.exists()
+        assert LookupItem.objects.count() > 0
