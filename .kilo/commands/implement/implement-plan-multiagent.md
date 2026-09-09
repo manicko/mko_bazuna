@@ -1,22 +1,25 @@
 ---
 name: implement-plan-multiagent
-description: Execute a validated development plan incrementally using a sequential multi-agent workflow per block
+
+description: Execute development plan incrementally using adaptive multi-agent workflow
+
 alwaysApply: false
+
 ---
 
-# Task: Sequential Plan Implementation
+# Task: Multi-Agent Plan Implementation
 
 ## Objective
 
-Execute the development plan safely, one block at a time.
+Execute the development plan safely and incrementally.
 
 The Tech Lead is **orchestrator only**:
 
-* Coordinate agents
-* Pass concise handoffs
-* Ensure sequential execution
-* Commit completed blocks
-* Run final validation
+- Coordinate agents
+- Pass only required context
+- Control dependencies and execution order
+- Commit completed blocks
+- Run final validation
 
 The Tech Lead never implements code or performs implementation-level validation.
 
@@ -24,118 +27,183 @@ The Tech Lead never implements code or performs implementation-level validation.
 
 # Workflow
 
-## 1. Decompose Plan
+## 1. Inspect relevant current architecture and implementation 
 
-Launch a `Planner`.
+Launch an `Auditor` to inspect the current codebase relevant to the plan.
+
+Ask it to determine:
+
+- What is already implemented
+- Whether the plan matches the current implementation
+- Relevant architecture, dependencies, and constraints
+- Important discrepancies or risks
+
+Save the concise result as `{code_context}`.
+
+
+## 2. Decompose Plan
+Then launch a `Planner` with the plan and `{code_context}`.
 
 Ask it to:
 
-* Read the plan file(s)
-* Split the plan into logical execution blocks
-* Identify dependencies and execution order
-* Describe each block briefly
+- Decompose the plan into logical execution blocks
+- Identify dependencies and execution order
+- Assess implementation, rollout, regression, and compatibility risks
+- Identify multiple implementation paths alternatives when relevant, for maintainability, future evolution, and project conventions
+- **Not choose the final implementation approach when technical uncertainty exists**
+- For each block, determine whether the following agents are required:
+  - **High risks** - all agents below 
+  - **Auditor** — deeper code/architecture investigation due to uncertainty or complexity
+  - **Researcher** — modern best practices, multiple viable approaches, architectural/support implications
+  - **Planner** — detailed pre-implementation design, architecture, testing, or complex execution
+  - **Validator** — independent review when implementation risk is high
+- Identify the reason for each required agent
+- Keep the scope minimal and avoid speculative redesign
 
-Do not implement yet.
+
+Save the result as `{plan_context}`.
+
+
+
+## 3. Execute Blocks
+
+Execute blocks according to `{plan_context}`.
+
+Independent blocks may be prepared in parallel, including `Auditor`, `Researcher`, and `Planner` work.
+
+**Never run multiple `Implementor` agents in parallel.**
+
+For each block, execute the required agents sequentially and pass context forward.
 
 ---
+### 3.1 Auditor — if required
 
-## 2. Process Blocks
+Launch `Auditor`  with:
 
-Process **one block at a time**.
+`{plan_context_exec_block}`
 
-### 2.1 Auditor
-
-Launch `Auditor` for the current block.
-
-It analyzes only the relevant:
-
+Inspect the current implementation and architecture relevant to the block:
 * Code and architecture
 * Existing patterns and constraints
 * Current implementation
 * Risks
 
-Return a concise handoff.
+Return `{context_a}`.
 
-### 2.2 Planner
+### 2.2 Researcher — if required
 
-Launch `Planner` with the block and Auditor handoff.
+Launch a `Researcher` with:
 
-It must:
+`{plan_context_exec_block} + {context_a}`
 
-* Convert the specification into concrete requirements
-* Describe viable implementation options
-* Note key trade-offs and open questions
-* **Not choose the final implementation approach when technical uncertainty exists**
-* Explicitly state when `Researcher` is required, especially for:
+- Identify viable alternatives when relevant
+- Research the relevant modern practices 
+- Evaluate viable implementation approaches
+- Assess architectural, implementation, rollout, regression, and compatibility risks
+- Select the **best implementation path** for maintainability, future evolution, and project conventions
+- Avoid speculative redesign
 
-  * Modern/current best practices
-  * Multiple viable approaches
-  * Framework/library behavior
-  * Significant architectural, security, performance, or compatibility decisions
+Return `{context_r}`.
 
-Planner output is **decision input, not the final technical decision**.
 
-### 2.3 Researcher — only when needed
+### 2.3 Planner — if required
 
-Launch `Researcher` when Planner identifies unresolved technical questions or multiple viable approaches.
+Launch a `Planner` with:
 
-Researcher:
+`{plan_context_exec_block} + {context_a} + {context_r}`
 
-* Evaluates the proposed options
-* Verifies relevant current best practices
-* Assesses important risks and trade-offs
-* Recommends the appropriate approach for the existing architecture
+Create the implementation task for the `Implementor`.
 
-Skip only when the approach is clear and requires no meaningful research.
+Use **semantic code units only**:
+- Files
+- Modules
+- Classes
+- Functions
+- Methods
+- Components
+
+**Never use line numbers.**
+
+Define:
+- Exact implementation scope
+- Implementation sequence
+- Architectural constraints
+- Required tests
+
+Tests should verify **logic and component interaction**, not trivial implementation details.
+
+Return `{plan_task}`.
+
 
 ### 2.4 Implementor
 
-Launch `Implementor` with the block, Auditor handoff, Planner output, and Researcher findings if applicable.
+Launch **`Implementor`** (one at a time) with the required context:
+
+`{context_a} + {context_r} + {plan_task}`
 
 Implementor owns the local cycle:
 
-* Implement
-* Add/update tests
-* Run relevant tests, lint, and type checks
-* Fix failures
-* Return only when locally validated
-
-Never run Implementors in parallel.
-
-### 2.5 Commit
-
-After successful implementation:
-
-* Commit only the current block
-* Use a Conventional Commit
-* Never include unrelated changes
-
-```powershell
-git add <task-related files>
+- Implementation
+- Required tests
+- Relevant tests, lint, and type checks
+- Fixing failures
+- Local validation
+- Commit only the current work item
+```bash
+git add <specific-files>
 git commit -m "{type}({scope}): {description}"
 ```
 
-Then continue to the next block.
+You are working with other agents in parallel if you see changes not done by you - it is normal.
+Never ran `git reset`, `git checkout`
+Never rewrite history.
+
+- Return only when locally validated and commit
 
 ---
 
-## 3. Final Validation
 
-After all blocks are committed:
+## 3. Documentation
 
-Launch `Validator` for repository-level validation:
+After all implementation blocks are complete:
 
-* Completeness against the plan
-* Integration between blocks
+Launch `Doc-specialist`.
+
+Ask it to update only the documentation affected by the implementation, following:
+
+`mko_bazuna/docs/00-overview/doc-maintenance-rules.md`
+
+Do not introduce unrelated documentation changes.
+
+Commit documentation changes separately.
+```bash
+git add <specific-files>
+git commit -m "{type}({scope}): {description}"
+```
+You are working with other agents in parallel if you see changes not done by you - it is normal.
+Never ran `git reset`, `git checkout`
+Never rewrite history.
+
+---
+
+## 4. Final Validation
+
+Launch `Validator` for the completed implementation.
+
+Check:
+
+* Plan completeness
+* Cross-block integration
 * Architectural consistency
 * Regressions
+* Tests and quality gates
+* Documentation
 * Unrelated changes
-* Overall readiness
 
 If issues are found:
 
 1. Create the smallest fix task
-2. Launch `Implementor`
+2. Launch one `Implementor`
 3. Validate locally
 4. Commit the fix
 5. Re-run `Validator`
@@ -146,27 +214,29 @@ Finish only after `Validator` passes.
 
 # Constraints
 
-* One block at a time
-* No parallel Implementors
-* No unnecessary research
-* No architecture redesign or unrelated refactoring
-* Prefer minimal, safe changes
-* Keep agent handoffs concise
-* Commit after every block
-* Planner proposes; Researcher evaluates when needed
-* Tech Lead orchestrates only
-* Implementor owns implementation and local validation
-* Validator runs only at the end
+* Initial `Auditor` runs before planning to establish `{code_context}`
+* Planner creates work items and decides which agents are needed per block
+* Execute only the agents required for the current block
+* Pass concise context between agents
+* Independent non-Implementor agents may run in parallel
+* **Never run multiple Implementors in parallel**
+* Keep work items small and coherent
+* Use semantic code units, never line numbers
+* Prefer minimal, maintainable changes
+* No unrelated refactoring or speculative redesign
+* Commit after every implementation block
+* Validator is used for final validation and only for high-risk blocks when explicitly selected by the Planner
 
 ---
 
 # Expected Result
 
-* Clear execution blocks
-* Current architecture understood before detailed planning
-* Research used only when necessary
-* Each block implemented, validated, and committed separately
-* Final repository validation completed
+* Current implementation understood before execution planning
+* Plan decomposed into dependency-aware work blocks
+* Agent usage adapted to block complexity and risk
+* Each block implemented, locally validated, and committed separately
+* Documentation updated according to repository rules
+* Final validation passed
 * Architecture and project conventions preserved
 
 ---
