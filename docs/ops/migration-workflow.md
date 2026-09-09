@@ -304,7 +304,7 @@ These are invoked by the Docker compose one-shot chain after `migrate` completes
 1. `bootstrap_reference_data` — acquires `AdvisoryLockId.MIGRATE` (100) and runs:
    `migrate --run-syncdb` → `load_exchange_rates` → `setup_search_triggers`
 2. `manage.py load_cities` (ENT-031) — loads 15 Montenegro cities from
-   `apps/locations/fixtures/cities.json`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
+   `apps/seed/fixtures/cities.json`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
 3. `manage.py load_catalog --no-rewrite` — loads the category tree, lookups, and
    category paths from `categories.yaml`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
 4. `manage.py create_admin` — creates the Django admin superuser from env vars
@@ -375,7 +375,7 @@ catalog loading via `load_catalog` using `apps.get_model()`.
 
 The seed data pipeline that depends on migrations is documented separately in
 [the seed data workflow](seed-workflow.md) — categories are loaded via the catalog builder and cities
-via the `seed_cities` fixture.
+via `SeedService._load_city_fixtures()` (reading `cities.json`).
 
 ## Troubleshooting
 
