@@ -12,16 +12,12 @@ alwaysApply: false
 ## Objective
 
 Execute the development plan safely and incrementally.
-
 The Tech Lead is **orchestrator only**:
-
 - Coordinate agents
 - Pass only required context
 - Control dependencies and execution order
-- Commit completed blocks
-- Run final validation
 
-The Tech Lead never implements code or performs implementation-level validation.
+The Tech Lead understand project rules and general architecture but never implements code.
 
 ---
 
@@ -32,14 +28,12 @@ The Tech Lead never implements code or performs implementation-level validation.
 Launch an `Auditor` to inspect the current codebase relevant to the plan.
 
 Ask it to determine:
-
 - What is already implemented
 - Whether the plan matches the current implementation
 - Relevant architecture, dependencies, and constraints
 - Important discrepancies or risks
 
 Save the concise result as `{code_context}`.
-
 
 ## 2. Decompose Plan
 Then launch a `Planner` with the plan and `{code_context}`.
@@ -60,19 +54,11 @@ Ask it to:
 - Keep the scope minimal and avoid speculative redesign
 - Important: Never change code, you only plan
 
-Save the result as `{plan_context}`.
-
-
+Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
 
 ## 3. Execute Blocks
 
-Execute blocks according to `{plan_context}`.
-
-Independent blocks may be prepared in parallel, including `Auditor`, `Researcher`, and `Planner` work.
-
-**Never run multiple `Implementor` agents in parallel.**
-
-For each block, execute the required agents sequentially and pass context forward.
+For each block, execute the required agents sequentially (following the order below):
 
 ---
 ### 3.1 Auditor — if required
@@ -87,9 +73,10 @@ Inspect the current implementation and architecture relevant to the block:
 * Current implementation
 * Risks
 * Important: Never change code
-Return `{context_a}`.
 
-### 2.2 Researcher — if required
+Update `Execution plan` and Return `{context_a}`.
+
+### 3.2 Researcher — if required
 
 Launch a `Researcher` with:
 
@@ -102,10 +89,10 @@ Launch a `Researcher` with:
 - Select the **best implementation path** for maintainability, future evolution, and project conventions
 - Avoid speculative redesign
 - Important: Never change code
-Return `{context_r}`.
+Update `Execution plan` and Return `{context_r}`.
 
 
-### 2.3 Planner — if required
+### 3.3 Planner — if required
 
 Launch a `Planner` with:
 
@@ -128,20 +115,18 @@ Define:
 - Implementation sequence
 - Architectural constraints
 - Required tests
-
 Tests should verify **logic and component interaction**, not trivial implementation details.
-
+- Use template `.ai\tasks\templates\task_template.yaml` to organize `{task_description}` in the `Execution plan`
 Important: Never change code
 
-Return `{plan_task}`.
+Update `Execution plan` and Return `{task_description}`.
 
 
-
-### 2.4 Implementor
+### 3.4 Implementor
 
 Launch **`Implementor`** (one at a time) with the required context:
 
-`{context_a} + {context_r} + {plan_task}`
+`{context_a} + {context_r} + {task_description}`
 
 Implementor owns the local cycle:
 
@@ -165,7 +150,7 @@ Never rewrite history.
 ---
 
 
-## 3. Documentation
+## 4. Documentation
 
 After all implementation blocks are complete:
 
@@ -188,7 +173,7 @@ Never rewrite history.
 Important: Never change code
 ---
 
-## 4. Final Validation
+## 5. Final Validation
 
 Launch `Validator` for the completed implementation.
 
@@ -203,7 +188,7 @@ Check:
 * Unrelated changes
 * Important: Never change code
 
-## 5. If issues are found:
+## 6. If issues are found:
 Launch one `Implementor` to fix and commit
 Validate locally
 

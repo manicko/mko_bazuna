@@ -2,7 +2,6 @@
 description: Tech Lead. Owns technical decisions, task decomposition, agent selection, execution control, review, and final acceptance.
 mode: all
 color: "#3B82F6"
-steps: 180
 
 permission:
    agent_manager: deny

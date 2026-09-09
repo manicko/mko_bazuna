@@ -322,7 +322,8 @@ usermod -aG docker deploy
 On your **local Windows machine**, generate an SSH key pair:
 
 ```powershell
-ssh-keygen -t ed25519 -f ~/.ssh/vps_deploy_bazuna -C "vps-deploy@bazuna"
+New-Item -ItemType Directory -Force -Path $HOME\.ssh
+ssh-keygen -t ed25519 -f $HOME\.ssh\vps_deploy_bazuna -C "vps-deploy@bazuna"
 ```
 
 Copy the public key to the VPS. **Note:** `ssh-copy-id` is a Linux/macOS utility and does **not** exist in Windows OpenSSH. Use this PowerShell equivalent instead:

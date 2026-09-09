@@ -15,6 +15,7 @@ permission:
 
   grep: allow
   glob: allow
+
   edit:
     "*": allow
     "*.env": allow
@@ -25,14 +26,15 @@ permission:
   bash:
     "*": allow
 
-    # === READ-ONLY GIT ===
-
+    # === READ-ONLY GIT ===   
+    "git*status*": allow
+    "git*diff*": allow
+    "git*log*": allow
+    "git*show*": allow
+    "*git*add *": allow
+    "*git*commit *": allow
     "*git *": ask
-    "git status*": allow
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-
+    
     # === BUILD & TEST ===
     
     "uv *": allow
