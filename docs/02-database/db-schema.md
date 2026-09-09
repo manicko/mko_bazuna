@@ -91,6 +91,7 @@ Two-phase atomic claim (each = one UPDATE under transaction):
 1. Bot: `UPDATE login_tokens SET telegram_id=<tg> WHERE token_hash=? AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > now()`
 2. Web: `UPDATE login_tokens SET consumed_at=now() WHERE token_hash=? AND telegram_id IS NOT NULL AND consumed_at IS NULL AND expires_at > now()`
 Both check `expires_at > now()`; token compare via `hmac.compare_digest` (constant time). Background task deletes expired/consumed tokens. Session cookies: `SECURE` + `HTTPONLY` + `SAMESITE=Lax`.
+Token consumption is POST-only (token submitted in request body, never as a URL query parameter) and guarded by CSRF protection.
 
 ---
 

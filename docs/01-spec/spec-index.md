@@ -72,7 +72,7 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 - **Consent (F):** DECLINE (browse-only) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days).
 - **Language/search (G):** content translated to Russian at ad publication (egress); buyers search per-language FTS vectors with no query-time translation; exact city match + did-you-mean.
 - **Consent banner (K):** buyers browse `PUBLISHED` ads before accepting; DECLINE blocks seller login only (no erasure, contact still works) ≠ WITHDRAW (`consent_revoked_at` + erasure). Banner covers bot too — no separate bot confirmation.
-- **Login (H):** QR deep-link `login_<token>` (32-char), `LoginToken` two-phase atomic claim, `hmac.compare_digest`.
+- **Login (H):** QR deep-link `login_<token>` (32-char), `LoginToken` two-phase atomic claim, `hmac.compare_digest`; consumption via POST body + CSRF (not URL query).
 - **Lifecycle (J):** timers from `published_at` (reset on every PUBLISHED transition); text edits → `PUBLISHED→ON_MODERATION` + hide; archive@2mo, delete@4mo.
 
 ## AdStatus state machine
