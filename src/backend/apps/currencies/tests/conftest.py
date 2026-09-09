@@ -2,9 +2,9 @@
 Test fixtures for the currencies app.
 
 Provides ``ExchangeRate`` rows so the price-normalizer and recompute-command
-tests are self-contained and do not depend on migration-level data seeding
-(the ``seed_initial_rates`` RunPython in ``0001_initial``). Tests that need a
-rate simply request the ``exchange_rates`` fixture.
+tests are self-contained. The fixtures create their own ``_SEED_RATES``
+directly (no migration-level data seeding); tests that need a rate simply
+request the ``exchange_rates`` fixture.
 """
 
 from __future__ import annotations
@@ -16,9 +16,9 @@ from apps.currencies.models import ExchangeRate
 
 # Fixed seed rates used across the currency test suite.
 # ``rate_to_eur`` = number of EUR equal to one unit of the currency
-# (EUR is the base, rate 1.0). Mirrors the initial migration seed so the
-# test expectations in ``test_price_normalizer`` and
-# ``test_recompute_command`` stay in sync.
+# (EUR is the base, rate 1.0). These rates are created by the ``exchange_rates``
+# fixture (not by any migration); the test expectations in
+# ``test_price_normalizer`` and ``test_recompute_command`` stay in sync.
 _SEED_RATES: dict[CurrencyCode, str] = {
     CurrencyCode.EUR: "1.0",
     CurrencyCode.BAM: "0.512",

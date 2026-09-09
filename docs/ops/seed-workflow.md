@@ -94,7 +94,8 @@ apps/categories/catalog/categories.yaml
 ```
 
 The `load_catalog()` function from `apps.categories.catalog.builder` creates/updates all Category records.
-This is the same mechanism used by the catalog data migration — it is idempotent and safe to run multiple times.
+This is the same mechanism used by the `load_catalog` management command — it is idempotent and safe
+to run multiple times.
 
 The YAML file defines:
 - 7 top-level sections: `real-estate`, `transport`, `goods`, `animals`, `services-jobs`, `business`, `charity`

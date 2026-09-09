@@ -279,9 +279,50 @@ The two extracted commands:
 
 - `manage.py load_catalog [--config PATH] [--no-rewrite]` — loads/updates the catalog from
   `apps/categories/catalog/categories.yaml`. Uses live imports + rewrites YAML by default; the
-  migration calls the same builder with `apps=apps, rewrite_yaml=False`.
+  `build_reference_data` / `bootstrap_reference_data` one-shot calls the same builder with
+  `rewrite_yaml=False`.
 - `manage.py backfill_translations [--batch-size N]` — translates existing Russian ads to `en`/`bs`.
   Idempotent: skips ads that already have both target fields populated.
+
+### Post-squash seeding contract
+
+After the migration squash (see `make consolidate`), the reference-data split is an explicit,
+justified decision:
+
+**Migrations (schema + minimal app-default data only):**
+
+| App | Migration | What it seeds |
+|-----|-----------|---------------|
+| `core` | `0002_seed_default` | `SiteConfig(pk=1, name="Bazuna")` — a single row the app requires at boot, before any one-shot can run |
+| All other apps | `0001_initial` | Schema only — **no** `RunPython` data seeding |
+
+**One-shot commands (reference data + external resources):**
+
+These are invoked by the Docker compose one-shot chain after `migrate` completes
+(see `docker-compose.yml` lines 31-194):
+
+1. `bootstrap_reference_data` — acquires `AdvisoryLockId.MIGRATE` (100) and runs:
+   `migrate --run-syncdb` → `load_exchange_rates` → `setup_search_triggers`
+2. `manage.py load_cities` (ENT-031) — loads 15 Montenegro cities from
+   `apps/locations/fixtures/cities.json`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
+3. `manage.py load_catalog --no-rewrite` — loads the category tree, lookups, and
+   category paths from `categories.yaml`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
+4. `manage.py create_admin` — creates the Django admin superuser from env vars
+
+**Why this split?**
+
+- *External dependencies*: `load_catalog` imports live app modules (builder) and reads
+  `categories.yaml`; `load_cities` reads `cities.json`; `load_exchange_rates` makes HTTP
+  calls to ECB. These do not belong in migrations (rule: extract RunPython with external
+  deps to management commands — see above).
+- *Crash safety*: one-shots run as separate compose containers (`depends_on: condition:
+  service_completed_successfully`). A failure in `load_catalog` does not roll back schema
+  migrations, and vice-versa.
+- *Test isolation*: the conftest autouse fixture (`_restore_test_schema_post_db_setup`)
+  restores **only** the prod `migrate` one-shot (migrate + rates + triggers) at session
+  scope. Catalog/cities/admin are loaded per-class by tests that need them, because
+  session-scope `load_catalog` collides on `Category(slug="transport")` — see the section
+  comment at the top of `conftest.py` for the full rationale.
 
 ## Migration Rules
 
