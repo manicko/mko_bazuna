@@ -6,6 +6,7 @@ Single ads table with lifecycle timestamps and native PostgreSQL FTS search.
 
 import os
 from decimal import Decimal
+from typing import cast
 
 from apps.core.enums import AdSource, AdStatus
 from apps.currencies.enums import CurrencyCode
@@ -617,6 +618,22 @@ class AdImage(models.Model):
         if self.thumbnail_large:
             return f"{settings.MEDIA_URL}{self.thumbnail_large}"
         return None
+
+    def storage_keys(self) -> list[str]:
+        """Return all non-empty storage keys for this image.
+
+        Includes the main image key plus any non-empty thumbnail keys,
+        so filesystem erasure removes the original and all derived
+        thumbnail files.
+        """
+        keys: list[str] = [cast(str, self.image)]
+        if self.thumbnail_small:
+            keys.append(cast(str, self.thumbnail_small))
+        if self.thumbnail_medium:
+            keys.append(cast(str, self.thumbnail_medium))
+        if self.thumbnail_large:
+            keys.append(cast(str, self.thumbnail_large))
+        return keys
 
 
 class AdFeature(models.Model):
