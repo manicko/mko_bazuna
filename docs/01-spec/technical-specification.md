@@ -139,7 +139,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 ### H. Telegram login behavior (US-S1)
 - Site "Login via Telegram" button opens a QR / code page.
 - QR encodes deep-link `https://t.me/<bot_username>?start=login_<token>` (32-char URL-safe token (~192-bit CSPRNG, rate-limited 5-min TTL — exceeds NIST SP 800-63B's 128-bit minimum), generated on site).
-- Completion: user taps "Login" in bot → bot writes sender `telegram_id` into `LoginToken` via shared ORM → site checks token readiness and authenticates by `telegram_id` (create/find).
+- Completion: user taps "Login" in bot → bot writes sender `telegram_id` into `LoginToken` via shared ORM → site checks token readiness and authenticates by `telegram_id` (create/find). Site-side consumption is POST-only (token read from `request.POST` + CSRF), never a URL query parameter.
 - Expired/invalid token: clear message + retry path. No silent failures.
 - **Session:** persistent cookie, survives browser restart until explicit logout or long idle.
 - Re-login reuses existing `telegram_id` (no duplicate account). Token is atomic, one-time, constant-time compare (`hmac.compare_digest`).
