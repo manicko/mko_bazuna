@@ -15,6 +15,7 @@ from typing import Final
 from aiogram import Bot, F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+from django.utils.translation import gettext as _
 
 from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
@@ -35,14 +36,14 @@ CONTACT_US_CALLBACK: Final[str] = "contact_us"
 # Greeting shown to buyers reaching the support desk (Russian, per contact.py
 # convention). Shared by the /start contact_us deep-link and the inline button
 # so both entry points produce identical output.
-_CONTACT_US_GREETING: Final[str] = (
+_CONTACT_US_GREETING: Final[str] = _(
     "👋 Привет! Вы связались со службой поддержки Bazuna.\n\n"
     "Напишите ваш вопрос — мы ответим как можно скорее.\n\n"
     "Для создания объявления используйте /post."
 )
 
 # Shown when a user exceeds the contact-start rate limit (OQ1).
-CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = (
+CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = _(
     "Слишком много запросов в поддержку. Попробуйте позже."
 )
 
@@ -92,7 +93,7 @@ def _contact_us_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Contact us",
+                    text=_("Contact us"),
                     callback_data=CONTACT_US_CALLBACK,
                 ),
             ],
@@ -122,9 +123,7 @@ async def handle_contact_us_start(message: types.Message, bot: Bot) -> bool:
 
 
 @router.callback_query(F.data == CONTACT_US_CALLBACK)
-async def handle_contact_us_callback(
-    callback: types.CallbackQuery, bot: Bot
-) -> None:
+async def handle_contact_us_callback(callback: types.CallbackQuery, bot: Bot) -> None:
     """Inline 'Contact us' button for Telegram-bypass users — same greeting.
 
     Mirrors ``alerts.handle_unsubscribe_callback`` (alerts.py:103-138):
@@ -161,7 +160,7 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
         - seller unavailable -> "продавец больше недоступен для связи"
     """
     if not message.from_user:
-        await message.answer("Ошибка: не удалось определить отправителя")
+        await message.answer(_("Ошибка: не удалось определить отправителя"))
         return True
 
     buyer_telegram_id = message.from_user.id
@@ -173,27 +172,30 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     )
 
     if not is_available:
-        await message.answer("объявление больше недоступно")
+        await message.answer(_("объявление больше недоступно"))
         return True
 
     if seller_telegram_id is None:
-        await message.answer("продавец больше недоступен для связи")
+        await message.answer(_("продавец больше недоступен для связи"))
         return True
 
     # Send anonymous message to seller
     await bot.send_message(
         chat_id=seller_telegram_id,
         text=(
-            f"Новый запрос от покупателя!\n\n"
-            f"Покупатель: {ANONYMOUS_BUYER_LABEL}\n"
-            f"Ad ID: {ad_id}\n\n"
-            f"Напишите своё сообщение — оно будет переслано анонимно."
+            _(
+                "Новый запрос от покупателя!\n\n"
+                "Покупатель: %(buyer)s\n"
+                "Ad ID: %(ad_id)s\n\n"
+                "Напишите своё сообщение — оно будет переслано анонимно."
+            )
+            % {"buyer": ANONYMOUS_BUYER_LABEL, "ad_id": ad_id}
         ),
     )
 
     # Confirm to buyer
     await message.answer(
-        "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+        _("Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате.")
     )
     return True
 
@@ -242,4 +244,4 @@ async def handle_contact_orm(
     return await _handle()
 
 
-ANONYMOUS_BUYER_LABEL = "Покупатель"
+ANONYMOUS_BUYER_LABEL = _("Покупатель")

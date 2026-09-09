@@ -14,6 +14,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+from django.utils.translation import gettext as _
 
 from apps.core.enums import LanguageLocale
 from apps.users.models import User
@@ -35,13 +36,13 @@ async def cmd_language(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     user_id = data.get("user_id")
     if not user_id:
-        await message.answer("Please login first with /start login_<token>")
+        await message.answer(_("Please login first with /start login_<token>"))
         return
 
     current_lang = await _get_user_language(user_id)
     keyboard = build_language_keyboard(current_lang)
     await message.answer(
-        "Select your preferred language:",
+        _("Select your preferred language:"),
         reply_markup=keyboard,
     )
 
@@ -58,13 +59,13 @@ async def handle_language_callback(
     try:
         locale = LanguageLocale(lang_code)
     except ValueError:
-        await callback.answer("Unsupported language.", show_alert=True)
+        await callback.answer(_("Unsupported language."), show_alert=True)
         return
 
     data = await state.get_data()
     user_id = data.get("user_id")
     if not user_id:
-        await callback.answer("Please login first.", show_alert=True)
+        await callback.answer(_("Please login first."), show_alert=True)
         return
 
     await _set_user_language(user_id, locale.value)
@@ -72,7 +73,7 @@ async def handle_language_callback(
     keyboard = build_language_keyboard(locale.value)
     if callback.message is not None:
         await callback.message.edit_reply_markup(reply_markup=keyboard)
-    await callback.answer(f"Language set to {locale.value}")
+    await callback.answer(_("Language set to %(lang)s") % {"lang": locale.value})
 
 
 def build_language_keyboard(current: str = "") -> InlineKeyboardMarkup:

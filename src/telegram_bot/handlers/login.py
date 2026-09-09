@@ -15,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from apps.users.models import User, LoginToken
 from apps.analytics.models import AnalyticsEvent
@@ -46,8 +47,13 @@ async def handle_login_deep_link(
 
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
+        site_name = await get_site_name_async()
         await message.answer(
-            f"Welcome to {await get_site_name_async()}! To login, use a deep-link: /start login_<your_token>",
+            _(
+                "Welcome to %(site)s! To login, use a deep-link: "
+                "/start login_<your_token>"
+            )
+            % {"site": site_name},
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -78,7 +84,7 @@ async def handle_login_deep_link(
     match = LOGIN_PATTERN.match(deep_link)
     if not match:
         await message.answer(
-            "Invalid login link format. Expected: /start login_<token>"
+            _("Invalid login link format. Expected: /start login_<token>")
         )
         return
 
@@ -95,7 +101,7 @@ async def handle_login_deep_link(
     )
 
     if not login_token:
-        await message.answer("This login link is invalid, expired, or already used.")
+        await message.answer(_("This login link is invalid, expired, or already used."))
         return
 
     # user is guaranteed non-None when login_token is claimed
@@ -104,11 +110,13 @@ async def handle_login_deep_link(
 
     if created:
         await message.answer(
-            "Login successful! Your account has been created. "
-            "You can now create ads with /post."
+            _(
+                "Login successful! Your account has been created. "
+                "You can now create ads with /post."
+            )
         )
     else:
-        await message.answer("Login successful! You can now create ads with /post.")
+        await message.answer(_("Login successful! You can now create ads with /post."))
 
 
 def _claim_login_token(
