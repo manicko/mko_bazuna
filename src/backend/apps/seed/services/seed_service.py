@@ -276,7 +276,7 @@ class SeedService:
         )
         from apps.categories.catalog.builder import load_catalog
 
-        load_catalog(CATALOG_PATH)
+        load_catalog(CATALOG_PATH, rewrite_yaml=False)
         # Only leaf categories (no children) — ads must live at the terminal level.
         # Parent categories aggregate ads via MPTT subtree filtering in the
         # listings view, so they should never be directly assigned ads.
