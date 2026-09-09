@@ -39,8 +39,10 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         - Phase 2 jobs: 6-7 (purge_failed_ads, purge_rejected_ads)
         - migrate service: 100 (session-scoped, runs pre-PgBouncer)
         - create_admin_user: 101 (session-scoped)
-        - backfill_thumbnails: 102 (session-scoped)
-        - seed service: 110 (session-scoped)
+    - backfill_thumbnails: 102 (session-scoped)
+    - sweep_orphaned_media: 103 (session-scoped)
+    - catalog_load: 104 (session-scoped)
+    - seed service: 110 (session-scoped)
         - test schema setup: 111 (session-scoped, serializes xdist workers)
     """
     if not session:
