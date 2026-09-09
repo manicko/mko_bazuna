@@ -70,16 +70,16 @@ squash (ENT-034).
 |----|-------|---------|-------------------|----------------|
 | ENT-031 | Cities not loaded on clean prod deploy | **VALIDATED** | High | All claims verified. Docs reference a non-existent `locations/0002_seed_cities.py` migration (stale) — corroborates the gap. Minor: affected-modules list cites `docker-compose.yml:108-135` for the seed service (accurate). |
 | ENT-032 | `admin/admin` default credential | **MERGED** | High | Identical root cause to Phase 02 **CFG-001** (already validated). Merged into CFG-001; independent corroboration only. |
-| ENT-033 | `migrate` `&&` chain couples DDL + trigger DDL + rates | **VALIDATED** | High | `docker-compose.yml:35` chain, `migrate_locked.py:33-37` lock scope, DDL/raw-cursor, prod vs test divergence all confirmed. Minor: "load_catalog, web, bot all depends_on migrate" is imprecise — web/bot depend on `load_catalog`, not `migrate` directly; the transitive cascade is still correct. |
+| ENT-033 | `migrate` `&&` chain couples DDL + trigger DDL + rates | **RESOLVED** | High | `docker-compose.yml:35` chain, `migrate_locked.py:33-37` lock scope, DDL/raw-cursor, prod vs test divergence all confirmed. Minor: "load_catalog, web, bot all depends_on migrate" is imprecise — web/bot depend on `load_catalog`, not `migrate` directly; the transitive cascade is still correct.  Already resolved in code: `migrate_locked.main()` wraps all three steps under the MIGRATE lock; `bootstrap_reference_data` command provides single entrypoint. |
 | ENT-034 | Squash removed reference-data RunPython; command-only seeding | **VALIDATED** | High | Git history (`4ea19cb`→`495bf74`) verified; current `0001`s are schema-only; `core/0002_seed_default` is the lone survivor; orphaned `0002_*.pyc` confirmed on disk. Note: stale comment in `currencies/tests/conftest.py:6` still references the removed `seed_initial_rates`. |
 | ENT-035 | `rewrite_yaml=True` default diverges from prod `--no-rewrite` | **VALIDATED** | High | `seed_service.py:279` default vs `entrypoint-catalog.sh:17 --no-rewrite` vs `builder.py:56/155-156` confirmed; `categories.yaml` verified clean (0 `new_slug`/`deferred`). Latent only. |
-| ENT-036 | `load_exchange_rates` bootstrap triplicated | **VALIDATED** | High | Three call sites confirmed (`docker-compose.yml:35`, `entrypoint-test.sh:22`, `conftest.py:114`); `INITIAL_RATES` defined once. Error-handling differs (prod `&&` fail-closed vs test `|| true`). |
+| ENT-036 | `load_exchange_rates` bootstrap triplicated | **RESOLVED** | High | Three call sites confirmed (`docker-compose.yml:35`, `entrypoint-test.sh:22`, `conftest.py:114`); `INITIAL_RATES` defined once. Error-handling differs (prod `&&` fail-closed vs test `|| true`).  Resolved via Block 5: `bootstrap_reference_data` command delegates to `migrate_locked.main()`; prod/CI/test-entrypoint now use it; conftest retains in-process calls. |
 | ENT-037 | conftest schema-restore mirrors only `migrate` one-shot | **VALIDATED** | High | `conftest.py:113-115` restore set confirmed; no `load_catalog` in conftest (grep-verified). Per-module `load_catalog` callers confirmed. Minor: cited "affected module" `seed/tests/conftest.py:36-46` is actually the `ImageGenerator` no-op patch fixture — unrelated to catalog loading (mischaracterization, core claim intact). |
 | ENT-038 | cities: explicit PK + `ignore_conflicts` + returns all rows | **VALIDATED** | High | `seed_service.py:306-307`, `cities.json` pk 1..15, `BigAutoField` PK confirmed. Minor: cited range `301-307` is slightly off (actual 306-307) — substance intact. |
 | ENT-039 | `load_catalog` runs without an advisory lock | **VALIDATED** | High | `AdvisoryLockId` (no `CATALOG_LOAD`), `entrypoint-catalog.sh:17` unlocked, `builder.py:121` `transaction.atomic()` only; `migrate_locked.py:33` / `create_admin_user.py:75` confirmed lock-guarded (contrast). |
 | ENT-040 | `load_catalog` silently succeeds on empty catalog YAML | **VALIDATED** | High | `builder.py:108-117` (no-op on empty/null), `load_catalog.py:51-52` (unconditional SUCCESS), `docker-compose.yml:62,142-144,169-171` gates confirmed. |
 
-**Totals:** 9 VALIDATED · 0 WITHDRAWN · 1 MERGED.
+**Totals:** 7 VALIDATED · 2 RESOLVED · 0 WITHDRAWN · 1 MERGED.
 
 ---
 
@@ -503,10 +503,10 @@ _None._
 |---------|----------------------|------------------|---------------------|
 | ENT-031 | Yes — `seed_service.py:285-307`, `seed.py`, `builder.py:122-151`, `locations/0001_initial.py`, `docker-compose.yml:113-114`, `docker-compose.dev.override.yml:69-70` | Yes | Yes — small (new one-shot + compose wiring) |
 | ENT-032 | Yes — `docker-compose.yml:99`, `docker-compose.dev.override.yml:15`, `entrypoint-create-admin.sh:18`, `create_admin_user.py:75,107-113` | Yes | Yes — trivial (already mandated by CFG-001) |
-| ENT-033 | Yes — `docker-compose.yml:35`, `migrate_locked.py:33-37`, `load_exchange_rates.py:46-79`, `setup_search_triggers.py:106-131`, `entrypoint-test.sh:21-23` | Yes | Yes — small/medium (consolidate into locked Python entrypoint) |
+| ENT-033 | RESOLVED — `migrate_locked.py:48-66` wraps all 3 steps under MIGRATE lock; `&&` chain eliminated from `docker-compose.yml:35`; `bootstrap_reference_data` command provides single entrypoint | Done | Done |
 | ENT-034 | Yes — `currencies/0001_initial.py`, `core/0002_seed_default.py`, orphaned `.pyc` files, `currencies/tests/conftest.py:6` | Yes | Yes — trivial for pyc/comment cleanup; medium for data-migration seeding design |
 | ENT-035 | Yes — `seed_service.py:277-279`, `builder.py:53-57,155-156`, `load_catalog.py:36-39`, `entrypoint-catalog.sh:17` | Yes | Yes — trivial (one default-arg change) |
-| ENT-036 | Yes — `docker-compose.yml:35`, `entrypoint-test.sh:22`, `conftest.py:114`, `load_exchange_rates.py:27-35` | Yes | Yes — small (new bootstrap command) |
+| ENT-036 | Resolved — `bootstrap_reference_data` command created; prod/CI/entrypoint use it; conftest retains in-process calls for DB-name safety | Done | Done |
 | ENT-037 | Yes — `conftest.py:113-115,68-73`, `entrypoint-test.sh:21-23`, per-module callers | Yes | Yes — small (extend restore set or document intent; add real-command smoke test) |
 | ENT-038 | Yes — `seed_service.py:306-307`, `cities.json:2-16`, `locations/0001_initial.py:16-22` | Yes | Yes — small (drop explicit pk / return seeded subset; optionally `setval`) |
 | ENT-039 | Yes — `core/enums.py:23-42`, `entrypoint-catalog.sh:17`, `builder.py:121`, `migrate_locked.py:33`, `create_admin_user.py:75` | Yes | Yes — trivial (enum member + lock wrap) |
@@ -526,11 +526,11 @@ _None._
 
 ## Advisory Recommendations
 
-1. **ENT-033 (MEDIUM):** Consolidate `setup_search_triggers` + `load_exchange_rates` into the locked `migrate_locked.main()` Python entrypoint (resolving both the `&&` coupling here and Phase 01 ENT-003's lock-scope gap), and standardize prod/test error handling.
+1. **ENT-033 (MEDIUM):** RESOLVED — `migrate_locked.main()` already runs all three steps inside the `MIGRATE` lock (no `&&` chain); `bootstrap_reference_data` command provides a single entrypoint for prod/CI/test-entrypoint.
 2. **ENT-034 (MEDIUM):** Document the post-squash seeding contract (migrations build schema; one-shot commands seed reference data); consider seeding the EUR base rate in a data migration; remove orphaned `__pycache__/0002_*.pyc`.
 3. **ENT-035 (MEDIUM):** Make `SeedService._load_category_fixtures` call `load_catalog(CATALOG_PATH, rewrite_yaml=False)` to mirror the prod one-shot.
 4. **ENT-040 (MEDIUM):** Add a post-load row-count guard in `load_catalog` (`Category.objects.exists()` and, post-ENT-031, `City.objects.exists()`); `sys.exit(1)` when zero rows loaded.
-5. **ENT-036 (LOW):** Introduce a single `bootstrap_reference_data` management command invoked uniformly by the prod one-shot, the test entrypoint, and the conftest fixture.
+5. **ENT-036 (LOW):** RESOLVED — `bootstrap_reference_data` management command created; prod compose + CI + test entrypoint now invoke it; conftest retains in-process `call_command` for `test_mko_bazuna` DB-name safety.
 6. **ENT-037 (LOW):** Extend the conftest test-schema-restore to run the real `load_catalog` one-shot (or document it as intentionally test-local); add a CI smoke test that invokes the real `load_catalog` management command against a clean DB.
 7. **ENT-038 (LOW):** Drop explicit PKs from `cities.json` (let the DB assign PKs) and return only the seeded city subset from `_load_city_fixtures`; optionally `setval` the sequence if explicit PKs are retained.
 8. **ENT-039 (LOW):** Add a `CATALOG_LOAD` member (ID 104) to `AdvisoryLockId` and wrap `load_catalog` in `advisory_lock(CATALOG_LOAD, session=True)` (and the new `load_cities` one-shot).

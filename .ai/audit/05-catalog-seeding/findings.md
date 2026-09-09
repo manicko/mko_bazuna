@@ -109,6 +109,7 @@ Remove the `:-admin` default from `docker-compose.yml:99` and `docker-compose.de
 | **Type** | SPEC-DEVIATION |
 | **Affected Modules** | `docker-compose.yml:35` (migrate command), `src/backend/apps/core/utils/migrate_locked.py:33-37`, `src/backend/apps/currencies/management/commands/load_exchange_rates.py:46-79`, `src/backend/apps/ads/management/commands/setup_search_triggers.py:106-131`, `docker/entrypoint-test.sh:21-23` |
 | **Classification** | advisory |
+| **Status** | RESOLVED — `migrate_locked.main()` already wraps all three steps (`migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates`) under `AdvisoryLockId.MIGRATE` (100) session lock via `subprocess.run`; the `&&` chain is eliminated from `docker-compose.yml:35`. |
 
 **Description:**
 The prod `migrate` one-shot command is a single `&&` chain:
@@ -124,6 +125,9 @@ python -c '...migrate_locked.main()...' && python manage.py setup_search_trigger
 
 **Recommendation:**
 Decouple reference-data seeding from DDL: run `load_exchange_rates` independently of `setup_search_triggers` (and optionally under its own guard), so trigger-failure cannot starve the currency table. Standardize the prod/test error handling so the two entrypoints can't silently diverge again. Priority: advisory (operational robustness).
+
+**Resolution:**
+Already resolved in code. `migrate_locked.main()` (`migrate_locked.py:48-66`) now runs all three steps (`migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates`) inside the `with advisory_lock(AdvisoryLockId.MIGRATE, session=True):` block as `subprocess.run` child processes. The `&&` chain in `docker-compose.yml:35` is gone — the migrate service now runs a single `python -c` invocation. ENT-036 further consolidates this into the `bootstrap_reference_data` management command.
 
 ---
 
@@ -194,6 +198,7 @@ Make `SeedService._load_category_fixtures` call `load_catalog(CATALOG_PATH, rewr
 | **Type** | BEST-PRACTICE |
 | **Affected Modules** | `docker-compose.yml:35` (prod `migrate` one-shot), `docker/entrypoint-test.sh:22`, `src/backend/conftest.py:114`, `src/backend/apps/currencies/management/commands/load_exchange_rates.py:31-35` |
 | **Classification** | advisory |
+| **Status** | RESOLVED — `bootstrap_reference_data` management command created; prod compose + CI now invoke `manage.py bootstrap_reference_data`; test entrypoint consolidated to one call. Conftest retains in-process `call_command` for the `test_mko_bazuna` DB-name constraint. |
 
 **Description:**
 Exchange-rate seeding is invoked in three places with the same intent: (1) the prod `migrate` one-shot (`docker-compose.yml:35`), (2) `entrypoint-test.sh:22` (guarded with `|| true`), and (3) the pytest session fixture `conftest.py:114`. There is no single source of truth for "bootstrap exchange rates on startup," and the three call sites differ in error handling (prod is fail-closed via `&&`; test is `|| true`). If `INITIAL_RATES` (load_exchange_rates.py:31-35) gains a currency, all three must stay consistent by discipline; a drift (e.g., a rate added to the command but a stale cached state assumed by a future caller) would surface only at runtime. The single `INITIAL_RATES`/`EFFECTIVE_DATE`/`SOURCE` constants are defined once (load_exchange_rates.py:27-35), which mitigates content drift, but the *invocation* duplication remains operational overhead.
@@ -206,6 +211,9 @@ Exchange-rate seeding is invoked in three places with the same intent: (1) the p
 
 **Recommendation:**
 Encapsulate the bootstrap sequence in one function/command (e.g. a `bootstrap_reference_data` management command) invoked uniformly by the prod one-shot, the test entrypoint, and the conftest fixture, so error handling and the rate set are identical everywhere. Priority: advisory.
+
+**Resolution:**
+Implemented via Block 5. A new `bootstrap_reference_data` management command (`src/backend/apps/core/management/commands/bootstrap_reference_data.py`) delegates to `migrate_locked.main()`, which runs all three steps under the `MIGRATE` advisory lock. The four `python -c` call sites (docker-compose.yml:35, ci.yml:86, ci.yml:227, ci-nightly.yml:65) and the test entrypoint (entrypoint-test.sh) now use `manage.py bootstrap_reference_data`. Conftest.py retains in-process `call_command` calls under `TEST_SCHEMA_SETUP` (111) because `migrate_locked.main()` spawns subprocesses that would connect to the hardcoded `mko_bazuna` DB instead of `test_mko_bazuna`.
 
 ---
 
@@ -321,11 +329,11 @@ Add an explicit post-load guard in the `load_catalog` command: after `builder.lo
 
 ## Advisory Recommendations
 
-- **ENT-033** (MEDIUM): Decouple `load_exchange_rates` from `setup_search_triggers` in the `migrate` `&&` chain; unify prod/test error handling.
+- **ENT-033** (MEDIUM): RESOLVED — `migrate_locked.main()` now runs all three steps inside the `MIGRATE` lock (no `&&` chain); `bootstrap_reference_data` command provides a single entrypoint.
 - **ENT-034** (MEDIUM): Document the post-squash seeding contract and avoid an empty reference-data window after `migrate`; clean orphaned `__pycache__/0002_*.pyc`.
 - **ENT-035** (MEDIUM): Make `SeedService._load_category_fixtures` call `load_catalog(..., rewrite_yaml=False)` to match the prod one-shot.
 - **ENT-040** (MEDIUM): Add a post-load row-count guard to the `load_catalog` command (fail-fast on empty catalog).
-- **ENT-036** (LOW): Centralize `load_exchange_rates` bootstrap into one command invoked uniformly by prod/test/conftest.
+- **ENT-036** (LOW): RESOLVED — `bootstrap_reference_data` management command replaces the triplicated invocation across prod compose, test entrypoint, and CI; conftest retains in-process calls for DB-name safety.
 - **ENT-037** (LOW): Extend the conftest test-schema-restore to mirror the catalog one-shot (or document it as intentionally test-local); add a real-command smoke test.
 - **ENT-038** (LOW): Drop explicit PKs from `cities.json` and return only the seeded city subset to avoid sequence drift.
 - **ENT-039** (LOW): Add a `CATALOG_LOAD` advisory lock id and guard `load_catalog` with it.

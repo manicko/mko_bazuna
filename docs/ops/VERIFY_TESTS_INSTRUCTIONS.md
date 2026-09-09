@@ -77,7 +77,7 @@ Run migrations in a throwaway container that uses the dev override (bind-mounts 
 docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm migrate
 ```
 
-Expected output: `Migrations complete` (or no output if already applied). The `migrate` service runs `migrate_locked.main` (advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. Safe to re-run.
+Expected output: `Migrations complete` (or no output if already applied). The `migrate` service runs the `bootstrap_reference_data` management command (advisory lock ID 100), which delegates to `migrate_locked.main` to execute `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. Safe to re-run.
 
 ---
 
@@ -115,7 +115,7 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
 2. Wait for PostgreSQL to be ready
-  3. Run migrations via direct `manage.py` calls: `migrate --run-syncdb`, `load_exchange_rates`, and `setup_search_triggers` (the test entrypoint uses direct manage.py calls, NOT `migrate_locked.py`)
+  3. Run migrations via `manage.py migrate --run-syncdb`, `load_exchange_rates`, and `setup_search_triggers` (the test entrypoint bypasses `migrate_locked.py` / `bootstrap_reference_data` and calls `manage.py` steps directly)
 4. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup`)
 5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
@@ -179,10 +179,10 @@ Expected: `git status` shows nothing for `uv.lock` (it's tracked), and `exit: 1`
 The `migrate_locked.py` now uses `Path(__file__).resolve().parents[3]` to find `manage.py`. Run migrations from any directory (dev compose `migrate` service):
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python -c "from apps.core.utils.migrate_locked import main; import sys; print('CATALOG_PATH parent:', main.__module__); sys.exit(main())"
+docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python src/backend/manage.py bootstrap_reference_data
 ```
 
-Expected: migrations run regardless of CWD. Note: the **test entrypoint** (`entrypoint-test.sh`) bypasses `migrate_locked.py` and calls `manage.py migrate --run-syncdb` directly (see Step 6 above).
+Expected: the `bootstrap_reference_data` command executes successfully regardless of CWD (it delegates to `migrate_locked.main`, which resolves the `manage.py` path via `Path(__file__).resolve().parents[3]`). Note: the **test entrypoint** (`entrypoint-test.sh`) bypasses `bootstrap_reference_data` / `migrate_locked.py` and calls `manage.py` steps directly (see Step 6 above).
 
 ---
 

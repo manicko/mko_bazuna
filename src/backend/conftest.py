@@ -87,6 +87,21 @@ def _clear_cache_between_tests():
 # creates triggers and currency rows is skipped. This autouse fixture runs
 # after django_db_setup and restores that schema/data so the test DB mirrors
 # production.
+# WHY call_command (in-process) AND NOT bootstrap_reference_data?
+#   The `bootstrap_reference_data` command delegates to
+#   `migrate_locked.main()`, which spawns child processes via
+#   `subprocess.run([sys.executable, manage_py, ...])`. Those children
+#   connect to the database via the inherited `DATABASE_URL` env var,
+#   which is hardcoded to `mko_bazuna` — NOT the
+#   `test_mko_bazuna` DB that pytest-django provisions via
+#   `django_db_setup` (pytest-django swaps the DB name only on the
+#   in-process connection). Running `bootstrap_reference_data` here would
+#   seed the wrong database. Therefore all three steps are invoked with
+#   `call_command` so they operate on the in-process connection that
+#   points at `test_mko_bazuna`. The lock used here is
+#   `AdvisoryLockId.TEST_SCHEMA_SETUP` (111), distinct from the prod
+#   `MIGRATE` lock (100) — conftest runs in test settings and must not
+#   contend with any prod lock holder.
 # ---------------------------------------------------------------------------
 
 
@@ -101,6 +116,16 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
     Idempotent: safe to run even when migrations are active (after squash
     without MIGRATION_MODULES). migrate --run-syncdb is also idempotent and
     ensures tables for unmigrated apps (e.g. currencies) exist even on --reuse-db.
+
+    WHY `call_command` instead of `manage.py bootstrap_reference_data`:
+    `bootstrap_reference_data` delegates to `migrate_locked.main()`,
+    whose `subprocess.run` children connect via the hardened
+    `DATABASE_URL` (pointing to `mko_bazuna`, the prod/dev DB name),
+    bypassing pytest-django's in-process DB swap to
+    `test_mko_bazuna`. By using `call_command` in-process, these
+    three steps operate on the already-provisioned test connection.
+    The lock is `AdvisoryLockId.TEST_SCHEMA_SETUP` (111), not
+    `MIGRATE` (100), so there is no contention with prod lock holders.
 
     Under pytest-xdist (-n auto), each worker runs this session-scoped fixture
     independently against the same test_mko_bazuna DB. A session-scoped
@@ -127,6 +152,10 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
             # syncdb during django_db_setup. However, if the test DB was reused
             # (--reuse-db) with a stale state, the currencies table may be absent.
             # migrate --run-syncdb is idempotent and recreates any missing tables.
+            # In-process call_command — NOT bootstrap_reference_data,
+            # which would spawn subprocesses targeting the hardcoded
+            # mko_bazuna DB name instead of test_mko_bazuna (see module
+            # comment above).
             call_command("migrate", "--run-syncdb")
             call_command("load_exchange_rates")
             call_command("setup_search_triggers")

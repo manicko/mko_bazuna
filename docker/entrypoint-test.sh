@@ -18,9 +18,11 @@ uv sync --frozen --no-install-project --group dev
 # test_mko_bazuna is handled by the autouse fixture in conftest.py (T4e).
 # With DisableMigrations (tests use --run-syncdb), migrate creates tables
 # for unmigrated apps (currencies). Required before load_exchange_rates.
-uv run python src/backend/manage.py migrate --run-syncdb || { echo "::error::migrate --run-syncdb failed" >&2; }
-uv run python src/backend/manage.py load_exchange_rates || true
-uv run python src/backend/manage.py setup_search_triggers || true
+# bootstrap_reference_data runs all three steps (migrate + setup_search_triggers
+# + load_exchange_rates) as one locked subprocess sequence via migrate_locked.
+# Fail-open (|| true) preserves the lenient test-entrypoint policy: a DDL or
+# trigger error must not block the test suite from running.
+uv run python src/backend/manage.py bootstrap_reference_data || true
 # Run pytest with short traceback format and duration reporting for slowness visibility.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override ALL pytest flags
 # (single-token flags only; multi-token values like -m "not seed" are fragile here

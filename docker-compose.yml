@@ -32,7 +32,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: bash -c "python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())'"
+    command: bash -c "python src/backend/manage.py bootstrap_reference_data"
     depends_on:
       db:
         condition: service_healthy
@@ -235,3 +235,4 @@ services:
 volumes:
   postgres_data:
   media_volume:
+

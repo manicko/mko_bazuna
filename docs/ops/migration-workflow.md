@@ -69,7 +69,7 @@ migrate:
   build:
     context: .
     dockerfile: docker/Dockerfile
-  command: python -c "from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())"
+  command: python src/backend/manage.py bootstrap_reference_data
   depends_on:
     db:
       condition: service_healthy
@@ -78,9 +78,9 @@ migrate:
     DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 ```
 
-It runs `migrate_locked.main` in the `prod` settings (which internally executes `migrate --run-syncdb`,
-`setup_search_triggers`, and `load_exchange_rates`), so the same image path used in
-production is exercised in dev.
+It runs the `bootstrap_reference_data` management command (which delegates to `migrate_locked.main`
+in the `prod` settings, internally executing `migrate --run-syncdb`, `setup_search_triggers`, and
+`load_exchange_rates`), so the same image path used in production is exercised in dev.
 
 ### Advisory lock (`migrate_locked.py`)
 

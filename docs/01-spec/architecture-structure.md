@@ -199,7 +199,7 @@ see [ui-patterns.md](ui-patterns.md).
 | `db` | `postgres:18-alpine` + volume + healthcheck (`pg_isready`) | — |
 | `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application --bind 0.0.0.0:8000` | Mounts `media_volume`; `env_file: .env`; `depends_on load_catalog` (completed successfully); port 8000 NOT published. |
 | `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on load_catalog` (completed successfully); `restart: unless-stopped`. File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process + readiness marker). |
-| `migrate` | Same image; one-shot migration | Runs `python -c 'from apps.core.utils.migrate_locked import main; import sys; sys.exit(main())'` — single command that runs all three steps (migrate, loaddata, create_admin checks) inside a session-scoped advisory lock (ID 100). |
+| `migrate` | Same image; one-shot migration | Runs `python src/backend/manage.py bootstrap_reference_data` — delegates to `migrate_locked.main`, which executes all three steps (`migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates`) inside a session-scoped advisory lock (ID 100). |
 | `create_admin` | Same image; one-shot admin creation | Runs `entrypoint-create-admin.sh`; session-scoped advisory lock ID 101. Idempotent. |
 | `seed` | Same image; one-shot demo data | Runs `entrypoint-seed.sh`; gated by `profiles: ["seed"]`. Populates DB with demo data. Session-scoped advisory lock ID 110. |
 | `nginx` | `nginx:alpine`; ports 80/443 | Mounts `media_volume` (ro); `proxy_pass → web:8000`; serves `/media/`; TLS. Static files served via whitenoise proxy. |
