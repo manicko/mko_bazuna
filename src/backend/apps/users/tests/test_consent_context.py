@@ -156,3 +156,31 @@ class TestPreferenceCenterOverride:
         request.GET = {"ref": "preferences"}
         ctx = consent_state(request)
         assert ctx["consent_shown"] is False
+
+
+class TestConsentTransition:
+    """Once consent is declined or withdrawn, analytics/preferences stay off (PC-001).
+
+    These tests set ``consent_given_at`` to a recent timestamp (within the 12-month
+    re-prompt window) to prove that without the decline/withdraw guard the context
+    processor would otherwise re-derive ``consent_analytics=True``.
+    """
+
+    def test_accepted_then_declined_disables_analytics(self, user) -> None:
+        """User with recent consent_given_at + is_declined => analytics off."""
+        user.consent_given_at = timezone.now() - timedelta(days=100)
+        user.is_declined = True
+        user.ads_auto_publish = False
+        user.save(update_fields=["consent_given_at", "is_declined", "ads_auto_publish"])
+        ctx = consent_state(_auth_request(user))
+        assert ctx["consent_analytics"] is False
+        assert ctx["consent_preferences"] is False
+
+    def test_accepted_then_withdrawn_disables_analytics(self, user) -> None:
+        """User with recent consent_given_at + consent_revoked_at => analytics off."""
+        user.consent_given_at = timezone.now() - timedelta(days=100)
+        user.consent_revoked_at = timezone.now()
+        user.save(update_fields=["consent_given_at", "consent_revoked_at"])
+        ctx = consent_state(_auth_request(user))
+        assert ctx["consent_analytics"] is False
+        assert ctx["consent_preferences"] is False

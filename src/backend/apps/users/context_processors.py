@@ -65,7 +65,13 @@ def consent_state(request) -> dict[str, bool]:
             or user.consent_revoked_at is not None
         )
 
-        if consent_given_at is not None:
+        if user.is_declined or user.consent_revoked_at is not None:
+            # Consent is a one-way gate: once declined or withdrawn, analytics
+            # and preferences are permanently disabled for this request.
+            consent_analytics = False
+            consent_preferences = False
+
+        elif consent_given_at is not None:
             # T-08: re-prompt if consent is older than 12 months.
             if timezone.now() - consent_given_at < timedelta(
                 days=CONSENT_REPROMPT_DAYS
