@@ -12,8 +12,10 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update, Message
 from asgiref.sync import sync_to_async
+from django.utils.translation import gettext as _
 
 from apps.users.models import User
+from apps.users.services.account_state import get_account_state
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,16 @@ class AccountStateMiddleware(BaseMiddleware):
     """
     Middleware that checks account state on every Telegram message.
 
-    Enforces three independent account flags:
+    Delegates flag evaluation to the shared ``get_account_state`` predicate
+    (``apps.users.services.account_state``) so that bot and web dashboard
+    share a single source of truth for account-state flags.
+
+    Enforces four independent account flags:
     - is_banned: Admin action, blocks all bot interactions
     - is_deleted: GDPR withdrawal, blocks all bot interactions (telegram_id nulled)
     - is_declined: User declined consent, blocks all bot interactions (browse-only)
+    - consent_revoked: Consent withdrawn, blocks all bot interactions (data erasing)
     - ads_auto_publish=False: Restricts /post command only
-    - consent_revoked_at: Blocks all bot interactions for withdrawn users
 
     For banned/deleted/declined/withdrawn users: responds with rejection message and skips handler.
     For publish-restricted users: allows other commands but blocks /post.
@@ -94,6 +100,10 @@ class AccountStateMiddleware(BaseMiddleware):
         """
         Check if user is banned, deleted, declined, or has revoked consent.
 
+        Delegates to the shared ``get_account_state`` predicate so that the
+        bot and web dashboard evaluate account-state flags from one source of
+        truth. Returns a state-specific denial message for each blocked state.
+
         Uses stable chat_id (never nullified) instead of telegram_id to ensure
         withdrawn/deleted users are properly blocked.
 
@@ -108,17 +118,28 @@ class AccountStateMiddleware(BaseMiddleware):
         except User.DoesNotExist:
             return (True, "")  # User not registered yet
 
-        if user.is_banned:
-            return (False, "Your account is banned. Contact support for assistance.")
+        state = get_account_state(user)
 
-        if user.is_deleted:
-            return (False, "Your account has been deleted.")
+        if state.is_banned:
+            return (
+                False,
+                _("Your account is restricted. Contact support for assistance."),
+            )
 
-        if user.is_declined:
-            return (False, "Your account has been deleted.")
+        if state.is_deleted:
+            return (False, _("Your account has been deleted."))
 
-        if user.consent_revoked_at is not None:
-            return (False, "Your account has been deleted.")
+        if state.is_declined:
+            return (
+                False,
+                _(
+                    "Consent declined: you can browse but cannot post. "
+                    "Contact still works."
+                ),
+            )
+
+        if state.consent_revoked:
+            return (False, _("Consent withdrawn: your data is being erased."))
 
         return (True, "")
 
@@ -126,6 +147,7 @@ class AccountStateMiddleware(BaseMiddleware):
         """
         Check if user can publish ads (ads_auto_publish flag).
 
+        Delegates to the shared ``get_account_state`` predicate for flag access.
         Uses stable chat_id lookup.
 
         Args:
@@ -139,10 +161,14 @@ class AccountStateMiddleware(BaseMiddleware):
         except User.DoesNotExist:
             return (True, "")  # Will be handled by login check
 
-        if not user.ads_auto_publish:
+        state = get_account_state(user)
+
+        if not state.ads_auto_publish:
             return (
                 False,
-                "Your account has publishing restrictions. Contact support for assistance.",
+                _(
+                    "Your account has publishing restrictions. Contact support for assistance."
+                ),
             )
 
         return (True, "")
