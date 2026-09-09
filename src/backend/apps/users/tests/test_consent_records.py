@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 from apps.core.enums import ConsentChoice
 from apps.users.models import ConsentRecord
+from apps.users.services.consent_record import _anonymize_ip
 from django.test import Client
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
@@ -75,3 +76,21 @@ class TestConsentRecords:
         # either None (unset) or end in ".0" (anonymized).
         if record.ip_address is not None:
             assert record.ip_address.endswith(".0")
+
+
+class TestAnonymizeIp:
+    """Direct unit tests for the _anonymize_ip helper (PC-005)."""
+
+    def test_ipv6_masked_to_64_prefix(self) -> None:
+        """IPv6 input is truncated to its /64 network prefix."""
+        result = _anonymize_ip("2001:db8:85a3::8a2e:370:7334")
+        assert result == "2001:db8:85a3::"
+
+    def test_ipv4_last_octet_zeroed(self) -> None:
+        """IPv4 input has its last octet zeroed."""
+        result = _anonymize_ip("192.168.1.100")
+        assert result == "192.168.1.0"
+
+    def test_none_input_returns_none(self) -> None:
+        """None input yields None."""
+        assert _anonymize_ip(None) is None

@@ -238,7 +238,7 @@ class ConsentRecord(models.Model):
     ip_address = models.GenericIPAddressField(
         null=True,
         blank=True,
-        help_text="Anonymized IP (last IPv4 octet zeroed)",
+        help_text="Anonymized IP (IPv4 last octet zeroed; IPv6 /64 prefix retained)",
     )
     user_agent = models.TextField(
         blank=True,
