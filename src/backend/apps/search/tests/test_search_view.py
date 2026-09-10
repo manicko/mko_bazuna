@@ -13,6 +13,7 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
 import pytest
+from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
@@ -476,3 +477,76 @@ class TestSearchViewPagination:
         assert response.status_code == 200
         page_obj = response.context["page_obj"]
         assert page_obj.number == 1
+
+
+class TestSearchViewInputRobustness:
+    """Input-robustness tests for the /search/ FTS path (SRH-001, SRH-004).
+
+    Guards the input boundary against hostile/malformed/oversized queries:
+    previously a >200-char q caused a DataError -> HTTP 500 (public DoS).
+    """
+
+    def test_query_exceeding_max_length_returns_200(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A q longer than 200 chars is truncated, not rejected with 500."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=" + "а" * 300 + "&lang=ru")
+
+        assert response.status_code == 200
+
+    def test_sql_injection_query_returns_200(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A SQL-injection-style q returns 200 and leaves the DB intact."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=%27%3B%20DROP%20TABLE%20ads%3B%20--&lang=ru")
+
+        assert response.status_code == 200
+        # The ads table must still exist and contain the published ad
+        assert Ad.objects.filter(title="Транспорт").exists()
+
+    def test_homoglyph_and_control_chars_query_returns_200(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A q with Cyrillic + zero-width + HTML-like payload returns 200."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        # Cyrillic + zero-width space + HTML-like fragment
+        response = client.get(
+            "/search/?q=%D0%A2%D1%80%D0%B0%D0%BD%D1%81%D0%BF%D0%BE%D1%80%D1%82%u200B<script>&lang=ru"
+        )
+
+        assert response.status_code == 200

@@ -11,6 +11,7 @@ import logging
 import re
 from decimal import Decimal
 from difflib import get_close_matches
+from typing import Final
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -33,6 +34,11 @@ from apps.lookups.models import LookupItem
 
 logger = logging.getLogger(__name__)
 
+# Maximum accepted length of a search query string. Truncating at the input edge
+# prevents a DataError when the value is persisted into CharField(max_length=200)
+# via increment_popular_search / record_search_history (SRH-001).
+MAX_SEARCH_QUERY_LENGTH: Final[int] = 200
+
 
 def search(request: HttpRequest) -> HttpResponse:
     """
@@ -54,7 +60,7 @@ def search(request: HttpRequest) -> HttpResponse:
     """
     PER_PAGE = 24
 
-    query = (request.GET.get("q") or "").strip()
+    query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
     ads = (
         Ad.objects.filter(status=AdStatus.PUBLISHED)
         .select_related("category", "city", "user")
@@ -111,12 +117,12 @@ def search(request: HttpRequest) -> HttpResponse:
     if min_price:
         try:
             active_price_min = Decimal(min_price)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
     if max_price:
         try:
             active_price_max = Decimal(max_price)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
 
     # Listing purpose filter (F4) — single-select exact slug match
