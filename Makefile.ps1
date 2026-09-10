@@ -53,6 +53,7 @@ function Show-Help {
     Write-Host "  test-clean-db  Drop stale test databases (test_mko_bazuna + gw* shards)"
     Write-Host "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
     Write-Host "  lint           Run ruff linter inside web container"
+    Write-Host "  format         Auto-fix lint issues (including import sorting) inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
     Write-Host "  shell          Open bash shell in web container"
     Write-Host "  migrate        Run database migrations (one-shot, advisory-locked)"
@@ -174,6 +175,12 @@ function Invoke-Lint {
 function Invoke-Typecheck {
     $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run basedpyright src/
+}
+
+# Run linter with auto-fix inside web container
+function Invoke-Format {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
+    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
 }
 
 # Open shell in web container
@@ -367,6 +374,7 @@ switch ($Target.ToLower()) {
     "test" { Invoke-Test }
     "test-all" { Invoke-TestAll }
     "lint" { Invoke-Lint }
+    "format" { Invoke-Format }
     "typecheck" { Invoke-Typecheck }
     "shell" { Invoke-Shell }
     "migrate" { Invoke-Migrate }

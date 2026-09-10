@@ -1,7 +1,7 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
-          lint typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
+          lint format typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
           backup restore prune-backups db-shell clean create-admin load-catalog seed
 
 # ====================== Settings ======================
@@ -14,7 +14,7 @@ COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
 # simultaneously without colliding on service names, networks, or named volumes.
 # Each project gets its own `postgres_data` and `uv_cache` volumes.
 # Target-specific assignment (group syntax): the var is exported to the recipe shell.
-up down reset build restart lint typecheck lint-templates shell makemigrations create-admin \
+up down reset build restart lint format typecheck lint-templates shell makemigrations create-admin \
     load-catalog seed logs backup restore prune-backups clean db-shell migrate: \
     export COMPOSE_PROJECT_NAME = mko-bazuna-dev
 
@@ -46,6 +46,7 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint           Ruff"
+	@echo "  format         Auto-fix lint issues (including import sorting)"
 	@echo "  typecheck      Basedpyright"
 	@echo "  lint-templates Djlint"
 	@echo ""
@@ -108,6 +109,9 @@ test-all:
 
 lint:
 	docker compose $(COMPOSE_FILES) run --rm web uv run ruff check src/
+
+format:
+	docker compose $(COMPOSE_FILES) run --rm web uv run ruff check --fix src/
 
 typecheck:
 	docker compose $(COMPOSE_FILES) run --rm web uv run basedpyright src/
