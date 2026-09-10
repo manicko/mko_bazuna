@@ -27,7 +27,10 @@ pytestmark = [pytest.mark.unit]
 
 
 def _make_request(
-    method: str = "GET", is_staff: bool = False, is_superuser: bool = False
+    method: str = "GET",
+    is_staff: bool = False,
+    is_superuser: bool = False,
+    is_authenticated: bool = True,
 ) -> MagicMock:
     """Build a request mock with the desired user auth attributes."""
     request = MagicMock()
@@ -35,6 +38,7 @@ def _make_request(
     user = MagicMock()
     user.is_staff = is_staff
     user.is_superuser = is_superuser
+    user.is_authenticated = is_authenticated
     request.user = user
     return request
 
@@ -97,8 +101,8 @@ class TestStaffRequiredApi:
     """Tests for ``staff_required_api`` JSON API decorator."""
 
     def test_non_staff_returns_403_json(self) -> None:
-        """A non-staff user gets a 403 JSON response."""
-        request = _make_request(method="POST", is_staff=False)
+        """An authenticated non-staff user gets a 403 JSON response."""
+        request = _make_request(method="POST", is_staff=False, is_authenticated=True)
 
         @staff_required_api
         def view(request: object) -> JsonResponse:
@@ -106,7 +110,7 @@ class TestStaffRequiredApi:
 
         response = view(request)
         assert response.status_code == 403
-        assert json.loads(response.content) == {"error": "Unauthorized"}
+        assert json.loads(response.content) == {"error": "Staff access required"}
 
     def test_staff_get_returns_405(self) -> None:
         """A staff user using GET (wrong method) gets a 405 JSON response."""
@@ -154,3 +158,29 @@ class TestStaffRequiredApi:
 
         response = view(request)
         assert response.status_code == 403
+
+    def test_unauthenticated_returns_401(self) -> None:
+        """An unauthenticated POST gets a 401 with a WWW-Authenticate challenge."""
+        request = _make_request(method="POST", is_authenticated=False)
+
+        @staff_required_api
+        def view(request: object) -> JsonResponse:
+            return JsonResponse({"ok": True})
+
+        response = view(request)
+        assert response.status_code == 401
+        assert json.loads(response.content) == {"error": "Authentication required"}
+        assert response.headers["WWW-Authenticate"] == "Bearer"
+
+    def test_unauthenticated_get_returns_401(self) -> None:
+        """An unauthenticated GET gets 401 (authn check precedes method check)."""
+        request = _make_request(method="GET", is_authenticated=False)
+
+        @staff_required_api
+        def view(request: object) -> JsonResponse:
+            return JsonResponse({"ok": True})
+
+        response = view(request)
+        assert response.status_code == 401
+        assert json.loads(response.content) == {"error": "Authentication required"}
+        assert response.headers["WWW-Authenticate"] == "Bearer"

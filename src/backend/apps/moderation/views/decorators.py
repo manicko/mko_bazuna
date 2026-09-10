@@ -36,14 +36,20 @@ def staff_required_api(
 ) -> Callable[..., JsonResponse]:
     """Require staff or superuser access for JSON API endpoints.
 
-    Returns 403 JSON response for non-staff users.
-    Enforces POST-only method.
+    Returns 401 (with WWW-Authenticate challenge) for unauthenticated requests,
+    403 for authenticated-but-non-staff users, and 405 for wrong HTTP method.
     """
 
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> JsonResponse:
+        if not request.user.is_authenticated:
+            return JsonResponse(
+                {"error": "Authentication required"},
+                status=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         if not (request.user.is_staff or request.user.is_superuser):
-            return JsonResponse({"error": "Unauthorized"}, status=403)
+            return JsonResponse({"error": "Staff access required"}, status=403)
         if request.method != "POST":
             return JsonResponse({"error": "POST required"}, status=405)
         return view_func(request, *args, **kwargs)

@@ -485,6 +485,19 @@ class TestBulkModerationActionView:
         )
         assert response.status_code == 403
 
+    def test_unauthenticated_returns_401(self) -> None:
+        """Anonymous POST gets 401 with a WWW-Authenticate challenge."""
+        client = Client()
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {"action": BulkModerationAction.APPROVE.value, "selected_items": []}
+            ),
+            content_type="application/json",
+        )
+        assert response.status_code == 401
+        assert response.headers["WWW-Authenticate"] == "Bearer"
+
     def test_requires_post_method(self) -> None:
         """GET request returns 405."""
         client = Client()
