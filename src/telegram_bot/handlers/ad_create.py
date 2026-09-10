@@ -1242,35 +1242,44 @@ async def translate_all_languages(
 ) -> dict[str, str]:
     """Translate text to all target languages in parallel.
 
-
-    Delegates to the shared translation service (apps.core.services.translation)
-
-    which provides 500ms timeout, circuit breaker, and LRU cache.
-
+    Uses an ``asyncio.Semaphore`` (created inside the coroutine to stay
+    compatible with ``asyncio_mode=strict``) to bound concurrent ``to_thread``
+    dispatches, and ``return_exceptions=True`` on ``asyncio.gather`` so one
+    locale's failure does not cancel the batch.  Falls back to the original
+    text on any failure.
 
     Args:
-
         text: Source text to translate.
-
         target_locales: List of target locale codes (e.g. ['ru', 'bs', 'en']).
 
-
     Returns:
-
         Dict mapping locale codes to translated text. Falls back to original
-
         text on failure (via the shared service's graceful fallback).
-
     """
 
+    _sem = asyncio.Semaphore(len(target_locales))
+
+    async def _translate_one(loc: str) -> str:
+        async with _sem:
+            return await asyncio.to_thread(translate_text, text, "auto", loc)
+
     results = await asyncio.gather(
-        *[
-            asyncio.to_thread(translate_text, text, "auto", loc)
-            for loc in target_locales
-        ]
+        *(_translate_one(loc) for loc in target_locales),
+        return_exceptions=True,
     )
 
-    return dict(zip(target_locales, results, strict=True))
+    translated: dict[str, str] = {}
+    for loc, result in zip(target_locales, results, strict=True):
+        if isinstance(result, Exception):
+            logger.warning(
+                "Translation for %s raised: %s — falling back to original",
+                loc,
+                result,
+            )
+            translated[loc] = text
+        else:
+            translated[loc] = result
+    return translated
 
 
 # --- Purpose / Feature helper functions ---

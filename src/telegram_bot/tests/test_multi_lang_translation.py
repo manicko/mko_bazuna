@@ -174,6 +174,22 @@ class TestTranslateAllLanguages:
         assert result == {"ru": "", "en": ""}
         mock_translate.assert_not_called()
 
+    async def test_gather_return_exceptions_isolates_failure(self) -> None:
+        """One locale's failure does not cancel translations in other locales."""
+
+        def _side_effect(text: str, source: str, target: str) -> str:
+            if target == "bs":
+                raise RequestError("BS translation failed")
+            return f"{text}-{target}"
+
+        with patch(_TRANSLATE_PATH) as mock_translate:
+            mock_translate.side_effect = _side_effect
+            result = await translate_all_languages("Hello", ["ru", "bs", "en"])
+
+        assert result["ru"] == "Hello-ru"
+        assert result["bs"] == "Hello"
+        assert result["en"] == "Hello-en"
+
 
 class TestTranslateTextExceptNarrowing:
     """Unit tests for the narrowed except clause in translate_text (sync).
@@ -201,3 +217,44 @@ class TestTranslateTextExceptNarrowing:
         with patch(_TRANSLATE_PATH, side_effect=AttributeError("unexpected")):
             with pytest.raises(AttributeError):
                 translate_text("Original text", "auto", "ru")
+
+
+class TestTranslateTextRetry:
+    """Tests for bounded retry with exponential backoff in translate_text.
+
+    translate_text retries retryable exceptions (TooManyRequests, RequestError,
+    TimeoutError, RequestException) up to ``TRANSLATION_MAX_ATTEMPTS`` (2),
+    while ``TranslationNotFound`` is not retried — it deterministically returns
+    the same response, so retrying wastes a round-trip.
+    """
+
+    def test_retry_succeeds_after_transient_failure(self) -> None:
+        """A retryable failure followed by success returns the translation."""
+        with patch(_TRANSLATE_PATH) as mock_translate:
+            mock_translate.side_effect = [
+                TooManyRequests("rate limited"),
+                "переведено",
+            ]
+            result = translate_text("hello", "auto", "ru")
+
+        assert result == "переведено"
+        assert mock_translate.call_count == 2
+
+    def test_too_many_requests_retried_then_fallback(self) -> None:
+        """Persistent TooManyRequests exhausts retries and falls back to original."""
+        with patch(_TRANSLATE_PATH) as mock_translate:
+            mock_translate.side_effect = TooManyRequests("rate limited")
+            result = translate_text("hello", "auto", "ru")
+
+        assert result == "hello"
+        assert mock_translate.call_count == 2
+        assert _CIRCUIT_BREAKER._failure_count > 0
+
+    def test_translation_not_found_not_retried(self) -> None:
+        """TranslationNotFound is not retried — single attempt then fallback."""
+        with patch(_TRANSLATE_PATH) as mock_translate:
+            mock_translate.side_effect = TranslationNotFound("no element")
+            result = translate_text("hello", "auto", "ru")
+
+        assert result == "hello"
+        assert mock_translate.call_count == 1

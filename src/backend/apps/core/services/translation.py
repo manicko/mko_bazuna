@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 
 TRANSLATION_TIMEOUT_SECONDS: Final[float] = 0.5  # ~500ms timeout via exceptions
 
+# Retry configuration: 2 total attempts (1 retry) with capped exponential backoff.
+TRANSLATION_MAX_ATTEMPTS: Final[int] = 2
+TRANSLATION_BACKOFF_BASE: Final[float] = 0.1  # 100ms base; backoff = 0.1 * 2**attempt
+
 
 class TranslationCircuitBreaker:
     """
@@ -133,7 +137,12 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
     Translate text from source_locale to target_locale via deep-translator.
 
     Generalized version supporting any language pair.
-    Uses timeout, fallback, and circuit-breaker pattern for graceful degradation.
+    Uses timeout, fallback, circuit-breaker pattern for graceful degradation.
+
+    Retries retryable failures (TimeoutError, RequestException, TooManyRequests,
+    RequestError) up to ``TRANSLATION_MAX_ATTEMPTS`` with exponential backoff.
+    ``TranslationNotFound`` is not retried — the same input deterministically
+    returns the same response, so retrying wastes a round-trip.
 
     Args:
         text: The text to translate
@@ -153,36 +162,52 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
         )
         return text
 
-    try:
-        future = _EXECUTOR.submit(
-            translate_cached_generic, text, source_locale, target_locale
-        )
-        result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
-        if result:
-            _CIRCUIT_BREAKER.record_success()
-            logger.debug(
-                "Translated '%s' (%s->%s) -> '%s'",
+    for attempt in range(TRANSLATION_MAX_ATTEMPTS):
+        try:
+            future = _EXECUTOR.submit(
+                translate_cached_generic, text, source_locale, target_locale
+            )
+            result = future.result(timeout=TRANSLATION_TIMEOUT_SECONDS)
+            if result:
+                _CIRCUIT_BREAKER.record_success()
+                logger.debug(
+                    "Translated '%s' (%s->%s) -> '%s'",
+                    sanitize_query_for_log(text),
+                    source_locale,
+                    target_locale,
+                    sanitize_query_for_log(result),
+                )
+                return result
+            # Empty result — fall back without retrying
+            break
+        except deep_translator.exceptions.TranslationNotFound as e:
+            _CIRCUIT_BREAKER.record_failure()
+            logger.warning(
+                "Translation not found for text '%s' (%s->%s): %s",
                 sanitize_query_for_log(text),
                 source_locale,
                 target_locale,
-                sanitize_query_for_log(result),
+                e,
             )
-            return result
-    except (
-        TimeoutError,
-        RequestException,
-        deep_translator.exceptions.TooManyRequests,
-        deep_translator.exceptions.RequestError,
-        deep_translator.exceptions.TranslationNotFound,
-    ) as e:
-        _CIRCUIT_BREAKER.record_failure()
-        logger.warning(
-            "Translation failed for text '%s' (%s->%s): %s",
-            sanitize_query_for_log(text),
-            source_locale,
-            target_locale,
-            e,
-        )
+            break  # No retry — same input returns same response
+        except (
+            TimeoutError,
+            RequestException,
+            deep_translator.exceptions.TooManyRequests,
+            deep_translator.exceptions.RequestError,
+        ) as e:
+            _CIRCUIT_BREAKER.record_failure()
+            logger.warning(
+                "Translation failed (attempt %d/%d) for text '%s' (%s->%s): %s",
+                attempt + 1,
+                TRANSLATION_MAX_ATTEMPTS,
+                sanitize_query_for_log(text),
+                source_locale,
+                target_locale,
+                e,
+            )
+            if attempt + 1 < TRANSLATION_MAX_ATTEMPTS:
+                time.sleep(TRANSLATION_BACKOFF_BASE * (2 ** attempt))
 
     logger.info(
         "Translation fallback: returning original text '%s'",
