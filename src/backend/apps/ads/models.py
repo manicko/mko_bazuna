@@ -13,10 +13,12 @@ from apps.currencies.enums import CurrencyCode
 from apps.lookups.enums import LookupGroupCode
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.media.services.filesystem import KEY_FORMAT_REGEX
 from django.conf import settings
 from django.urls import reverse
 
@@ -531,6 +533,12 @@ class AdImage(models.Model):
     image = models.CharField(
         max_length=64,
         help_text="Storage key (UUID v4 + .jpg, no ad_id/user/telegram PII)",
+        validators=[
+            RegexValidator(
+                regex=KEY_FORMAT_REGEX,
+                message="Storage key must end in .jpg with no path traversal",
+            ),
+        ],
     )
     telegram_file_id = models.CharField(
         max_length=255,
@@ -547,18 +555,36 @@ class AdImage(models.Model):
         blank=True,
         null=True,
         help_text="Storage key for small thumbnail (<uuid>-small.jpg)",
+        validators=[
+            RegexValidator(
+                regex=KEY_FORMAT_REGEX,
+                message="Storage key must end in .jpg with no path traversal",
+            ),
+        ],
     )
     thumbnail_medium = models.CharField(
         max_length=64,
         blank=True,
         null=True,
         help_text="Storage key for medium thumbnail (<uuid>-medium.jpg)",
+        validators=[
+            RegexValidator(
+                regex=KEY_FORMAT_REGEX,
+                message="Storage key must end in .jpg with no path traversal",
+            ),
+        ],
     )
     thumbnail_large = models.CharField(
         max_length=64,
         blank=True,
         null=True,
         help_text="Storage key for large thumbnail (<uuid>-large.jpg)",
+        validators=[
+            RegexValidator(
+                regex=KEY_FORMAT_REGEX,
+                message="Storage key must end in .jpg with no path traversal",
+            ),
+        ],
     )
     sha256 = models.CharField(
         max_length=64,
@@ -571,6 +597,27 @@ class AdImage(models.Model):
     class Meta:
         db_table = "ad_images"
         ordering = ["position"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(image__regex=KEY_FORMAT_REGEX),
+                name="ck_ad_images_image_key_format",
+            ),
+            models.CheckConstraint(
+                condition=Q(thumbnail_small__isnull=True)
+                | Q(thumbnail_small__regex=KEY_FORMAT_REGEX),
+                name="ck_ad_images_thumb_small_key_format",
+            ),
+            models.CheckConstraint(
+                condition=Q(thumbnail_medium__isnull=True)
+                | Q(thumbnail_medium__regex=KEY_FORMAT_REGEX),
+                name="ck_ad_images_thumb_medium_key_format",
+            ),
+            models.CheckConstraint(
+                condition=Q(thumbnail_large__isnull=True)
+                | Q(thumbnail_large__regex=KEY_FORMAT_REGEX),
+                name="ck_ad_images_thumb_large_key_format",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"AdImage {self.id} for Ad {self.ad_id}"
@@ -582,7 +629,10 @@ class AdImage(models.Model):
         ``AdImageService.create_or_skip()`` for bot-uploaded photos so that
         duplicate uploads by the same seller are detected and logged.
         """
+        from apps.media.services.filesystem import assert_storage_key_contained
         from apps.media.services.hash_service import FileHashService
+
+        assert_storage_key_contained(self.image)
 
         if self._state.adding or not self.sha256:
             media_root = settings.MEDIA_ROOT

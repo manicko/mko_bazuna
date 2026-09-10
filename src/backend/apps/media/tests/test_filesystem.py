@@ -289,3 +289,31 @@ class TestDeletePhoto:
         assert mock_remove.call_count == 2
         assert mock_sleep.call_count == 1
         assert "Retryable error" in caplog.text
+
+    @pytest.mark.django_db
+    def test_delete_photo_logs_media_deletion_error_on_retry_exhaustion(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When retries are exhausted, a MediaDeletionError row is persisted (ME-003).
+
+        The DB write is best-effort: even if the DB write is blocked (e.g.
+        no django_db marker), delete_photo must never raise.
+        """
+        from apps.media.models import MediaDeletionError
+
+        with (
+            patch(
+                "apps.media.services.filesystem.os.remove",
+                side_effect=PermissionError("denied"),
+            ) as mock_remove,
+            patch("apps.media.services.filesystem.time.sleep"),
+        ):
+            delete_photo("locked.jpg")  # must not raise
+
+        assert mock_remove.call_count == DELETE_PHOTO_MAX_ATTEMPTS
+        assert "Failed to delete" in caplog.text
+
+        error = MediaDeletionError.objects.get()
+        assert error.storage_key == "locked.jpg"
+        assert error.error_type == "PermissionError"
+        assert error.attempts == DELETE_PHOTO_MAX_ATTEMPTS

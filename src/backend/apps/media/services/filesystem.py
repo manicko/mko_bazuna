@@ -6,11 +6,12 @@ Validates photos and generates storage keys per spec.
 
 import io
 import logging
+import os
 import time
 import uuid
+from pathlib import Path
 
 from PIL import Image, ImageOps
-import os
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,50 @@ logger = logging.getLogger(__name__)
 
 # JPEG magic bytes for validation
 JPEG_MAGIC_BYTES = [b"\xff\xd8\xff"]
+
+# Shared storage-key format validator.
+# Matches: <two-alnum><alnum-or-._->* optionally followed by
+# (/<two-alnum><alnum-or-._->*)* then .jpg
+# Examples: "abc12345-...-uuid.jpg", "seed/kvartiry_01.jpg",
+# "seed/kvartiry_01-small.jpg", "<uuid>-small.jpg"
+KEY_FORMAT_REGEX = (
+    r"^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9._-]*"
+    r"(/[A-Za-z0-9][A-Za-z0-9._-]*)*\.jpg$"
+)
+
+
+def assert_storage_key_contained(storage_key: str) -> None:
+    """Validate that *storage_key* is a safe relative path within MEDIA_ROOT.
+
+    Rejects NUL bytes, absolute paths (leading ``/``), and parent-directory
+    (``..``) segments, then canonicalises both MEDIA_ROOT and the resolved
+    file path and asserts containment as a final defence-in-depth measure.
+
+    Raises:
+        ValueError: if *storage_key* violates any containment rule.  This is
+            a data-integrity / security error — it is **not** an
+            ``OSError`` and is allowed to propagate so sweep/cron operators
+            surface poisoning rather than silently operating outside
+            MEDIA_ROOT.
+    """
+    if "\x00" in storage_key:
+        raise ValueError(f"Storage key contains NUL byte: {storage_key!r}")
+
+    if storage_key.startswith("/"):
+        raise ValueError(f"Storage key must be relative, not absolute: {storage_key!r}")
+
+    if ".." in Path(storage_key).parts:
+        raise ValueError(
+            f"Storage key contains parent-directory segment: {storage_key!r}"
+        )
+
+    real_media_root = os.path.realpath(str(settings.MEDIA_ROOT))
+    real_path = os.path.realpath(os.path.join(str(settings.MEDIA_ROOT), storage_key))
+
+    if real_path != real_media_root and not real_path.startswith(
+        real_media_root + os.sep
+    ):
+        raise ValueError(f"Storage key resolves outside MEDIA_ROOT: {storage_key!r}")
 
 
 def validate_jpeg_bytes(data: bytes) -> bool:
@@ -98,6 +143,7 @@ def delete_photo(storage_key: str) -> None:
     Args:
         storage_key: Relative storage key (e.g. ``"<uuid>.jpg"``).
     """
+    assert_storage_key_contained(storage_key)
     path = os.path.join(settings.MEDIA_ROOT, storage_key)
     for attempt in range(DELETE_PHOTO_MAX_ATTEMPTS):
         try:
@@ -120,7 +166,28 @@ def delete_photo(storage_key: str) -> None:
                     f"Failed to delete photo {storage_key} after "
                     f"{DELETE_PHOTO_MAX_ATTEMPTS} attempts: {exc}"
                 )
+                _record_deletion_error(storage_key, exc)
                 return
+
+
+def _record_deletion_error(storage_key: str, exc: OSError) -> None:
+    """Best-effort persistence of a deletion failure for escalation (ME-003).
+
+    Wrapped in try/except so it **never** raises — ``delete_photo`` must
+    preserve its "never raise" contract so that sweep/cron jobs are never
+    aborted by an orphaned file or a downstream DB write failure.
+    """
+    try:
+        from apps.media.models import MediaDeletionError
+
+        MediaDeletionError.objects.create(
+            storage_key=storage_key,
+            error_type=type(exc).__name__,
+            error_message=str(exc)[:1000],
+            attempts=DELETE_PHOTO_MAX_ATTEMPTS,
+        )
+    except Exception:
+        logger.exception("Failed to persist MediaDeletionError for %s", storage_key)
 
 
 def strip_photo_exif(photo_bytes: bytes) -> bytes:

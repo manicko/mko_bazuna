@@ -23,6 +23,7 @@ from apps.core.services.analytics import record_event
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 
 from apps.locations.models import City
+from apps.media.services.filesystem import assert_storage_key_contained
 
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 
@@ -103,12 +104,17 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
 
 def _serve_image(image_key: str) -> HttpResponse:
-    """Serve a media file directly (development fallback without nginx).
+    """Serve a media file directly (development fallback without nginx.
 
     Uses ``FileResponse`` to stream the file from ``MEDIA_ROOT``.  In production,
     the ``media_gate`` view returns an ``X-Accel-Redirect`` header that nginx
     intercepts; this helper is only used when ``DEBUG=True``.
     """
+    try:
+        assert_storage_key_contained(image_key)
+    except ValueError:
+        raise Http404("Image not found") from None
+
     file_path = settings.MEDIA_ROOT / image_key
     if not file_path.exists():
         raise Http404("Image not found")
@@ -153,6 +159,14 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
     # instead of a clean 404.
     if any(ord(ch) < 0x20 for ch in image_key):
         raise Http404("Image not found")
+
+    # Defence-in-depth: reject path-traversal keys (../, absolute paths, NUL)
+    # before they reach the DB or the filesystem. Raises ValueError on
+    # violation; translate to 404 so traversal attempts are not leaked.
+    try:
+        assert_storage_key_contained(image_key)
+    except ValueError:
+        raise Http404("Image not found") from None
 
     # Match any AdImage that references this key in its ``image`` field or in
     # one of the ``thumbnail_*`` fields. ``get`` must not be used: seed data

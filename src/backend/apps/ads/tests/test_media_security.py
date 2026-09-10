@@ -346,6 +346,33 @@ class TestPhysicalDeletion:
         assert not (isolated_media_root / key1).exists()
         assert not (isolated_media_root / key2).exists()
 
+    def test_delete_photo_rejects_traversal_key(self, isolated_media_root):
+        """delete_photo raises ValueError for path-traversal keys and does not
+        delete files outside MEDIA_ROOT."""
+        escape_file = isolated_media_root.parent / "escape_test.jpg"
+        escape_file.write_bytes(b"do not delete me")
+        try:
+            with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+                with pytest.raises(ValueError):
+                    delete_photo("../escape_test.jpg")
+
+            assert escape_file.exists()
+        finally:
+            escape_file.unlink(missing_ok=True)
+
+    def test_delete_photo_accepts_valid_key(self, isolated_media_root):
+        """delete_photo successfully deletes a file with a valid UUID key
+        (regression guard for the containment filter)."""
+        key = generate_storage_key()
+        file_path = isolated_media_root / key
+        file_path.write_bytes(b"valid image data")
+        assert file_path.exists()
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            delete_photo(key)
+
+        assert not file_path.exists()
+
 
 class TestPathTraversalRejection:
     """Path-traversal keys are rejected by the media_gate view."""
@@ -387,6 +414,23 @@ class TestPathTraversalRejection:
         """Random non-existent key returns 404 (not a path traversal)."""
         client = Client()
         url = "/media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 404
+
+    def test_media_gate_rejects_dotdot_key(
+        self, seller, category, city, isolated_media_root
+    ):
+        """media_gate returns 404 for keys containing ../ even when an AdImage row exists.
+
+        The containment check (assert_storage_key_contained) must reject the
+        traversal key before the DB lookup, so a valid AdImage row in the
+        database does not cause the request to succeed.
+        """
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = "/media/%2e%2e%2fescape.jpg"
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
