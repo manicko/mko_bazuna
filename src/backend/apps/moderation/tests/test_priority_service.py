@@ -26,6 +26,7 @@ from apps.core.enums import (
 from apps.locations.models import City
 from apps.moderation.models import AdModerationPriority, ModerationCriteria
 from apps.moderation.services.priority import PriorityService
+from apps.moderation.views.api_bulk import MAX_BULK_ACTIONS
 from apps.users.models import User
 from conftest import create_test_ad
 
@@ -675,3 +676,52 @@ class TestBulkModerationActionView:
         assert len(data["errors"]) == 1
         assert data["errors"][0]["id"] == 99999
         assert data["errors"][0]["error"] == "Processing failed"
+
+    # ── Ext-003b: bulk API caps batch size at MAX_BULK_ACTIONS ────────────────
+
+    def test_bulk_exceeds_max_actions_returns_400(self) -> None:
+        """Batch exceeding MAX_BULK_ACTIONS is rejected with 400 before any DB write."""
+        client = Client()
+        client.force_login(self.staff_user)
+        too_many = list(range(MAX_BULK_ACTIONS + 1))
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": too_many,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == (
+            f"selected_items exceeds maximum of {MAX_BULK_ACTIONS}"
+        )
+        # Rejected before the per-item loop: no DB writes occurred.
+        assert "completed" not in data
+
+    def test_bulk_at_max_actions_accepted(self) -> None:
+        """Batch at exactly MAX_BULK_ACTIONS is accepted (not rejected by the cap)."""
+        client = Client()
+        client.force_login(self.staff_user)
+        ids = list(range(MAX_BULK_ACTIONS))
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": ids,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # Fake IDs do not exist, so all fail individually; the key assertion is
+        # that the cap did not reject the request (proceeded to per-item processing).
+        assert data["completed"] == 0
+        assert len(data["errors"]) == MAX_BULK_ACTIONS

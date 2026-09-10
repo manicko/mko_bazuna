@@ -6,6 +6,7 @@ Provides JSON API for approving, rejecting, or flagging multiple ads at once.
 
 import json
 import logging
+from typing import Final
 
 from django.http import HttpRequest, JsonResponse
 
@@ -16,6 +17,8 @@ from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required_api
 
 logger = logging.getLogger(__name__)
+
+MAX_BULK_ACTIONS: Final[int] = 100
 
 
 @staff_required_api
@@ -43,6 +46,17 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
     action = data.get("action", "")
     ad_ids: list[int] = data.get("selected_items", [])
     reason: str = data.get("reason", "")
+
+    if len(ad_ids) > MAX_BULK_ACTIONS:
+        logger.warning(
+            "Bulk moderation rejected: %d items exceeds max %d",
+            len(ad_ids),
+            MAX_BULK_ACTIONS,
+        )
+        return JsonResponse(
+            {"error": f"selected_items exceeds maximum of {MAX_BULK_ACTIONS}"},
+            status=400,
+        )
 
     try:
         action_enum = BulkModerationAction(action)
