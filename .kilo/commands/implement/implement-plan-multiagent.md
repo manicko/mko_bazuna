@@ -38,23 +38,24 @@ Save the concise result as `{code_context}`.
 ## 2. Decompose Plan
 Then launch a `Planner` with the plan and `{code_context}`.
 
-Ask it to:
+With task:
+-------------------------
 - Decompose the plan into logical execution blocks
 - Identify dependencies and execution order
 - Assess implementation, rollout, regression, and compatibility risks
 - Identify multiple implementation paths alternatives when relevant, for maintainability, future evolution, and project conventions
 - **Not choose the final implementation approach when technical uncertainty exists**
+- Keep the scope minimal and avoid speculative redesign
 - For each block, determine whether the following agents are required:
   - **High risks** - all agents below 
   - **Auditor** — deeper code/architecture investigation due to uncertainty or complexity
   - **Researcher** — modern best practices, multiple viable approaches, architectural/support implications
   - **Planner** — detailed pre-implementation design, architecture, testing, or complex execution
-  - **Validator** — independent review when implementation risk is high
-- Identify the reason for each required agent
-- Keep the scope minimal and avoid speculative redesign
+  - **Validator** — independent plan review when implementation risk is high
 - Important: Never change code, you only plan
 
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
+----------------------------------
 
 ## 3. Execute Blocks
 
