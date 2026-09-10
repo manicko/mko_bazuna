@@ -32,7 +32,7 @@ django-mptt is not yet validated against Django 6.0.
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
 - Background jobs: Django management commands + systemd timer / cron (Celery)
 - **Async bot + sync Django ORM:** bot runs `django.setup()` and shares the ORM. Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
-- Query translation: deep-translator (Montenegrin → Russian at search time; hard timeout ~500ms + fallback to original query).
+- Query translation: deep-translator (Bosnian→Russian title/description translation at ad publication time; hard timeout ~500ms + fallback to original query). NOT used for search queries (search is per-language FTS, no query-time translation).
 
 ## Package List (pyproject.toml)
 
