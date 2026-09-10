@@ -86,15 +86,11 @@ msgstr "Oglas"
 msgid "Price not specified"
 msgstr "Cijena nije navedena"
 
-#, fuzzy
-#| msgid "Views"
 msgid "View ad"
-msgstr "Pregledi"
+msgstr "Pogledaj oglas"
 
-#, fuzzy
-#| msgid "Delete this saved search?"
 msgid "🔕 Disable this search"
-msgstr "Obriši ovu sačuvanu pretragu?"
+msgstr "🔕 Onemogući ovu pretragu"
 
 msgid "Moderation Queue"
 msgstr "Red modulacije"
@@ -392,10 +388,8 @@ msgstr "Cijena: %(min)s–%(max)s"
 msgid "Purpose:"
 msgstr "Namjena:"
 
-#, fuzzy
-#| msgid "Location:"
 msgid "Condition:"
-msgstr "Lokacija:"
+msgstr "Stanje:"
 
 msgid "Feature:"
 msgstr "Karakteristika:"

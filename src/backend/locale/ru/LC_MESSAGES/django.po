@@ -86,15 +86,11 @@ msgstr "Объявление"
 msgid "Price not specified"
 msgstr "Цена не указана"
 
-#, fuzzy
-#| msgid "Views"
 msgid "View ad"
-msgstr "Просмотры"
+msgstr "Просмотреть объявление"
 
-#, fuzzy
-#| msgid "Delete this saved search?"
 msgid "🔕 Disable this search"
-msgstr "Удалить этот сохранённый поиск?"
+msgstr "🔕 Отключить этот поиск"
 
 msgid "Moderation Queue"
 msgstr "Очередь модерации"
@@ -392,10 +388,8 @@ msgstr "Цена: %(min)s–%(max)s"
 msgid "Purpose:"
 msgstr "Назначение:"
 
-#, fuzzy
-#| msgid "Location:"
 msgid "Condition:"
-msgstr "Местоположение:"
+msgstr "Состояние:"
 
 msgid "Feature:"
 msgstr "Особенность:"
