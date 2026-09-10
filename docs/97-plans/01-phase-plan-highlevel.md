@@ -269,6 +269,17 @@ Phase 1 Core ◄── Search Enhancement (category in search_vector)
    - 30-day erasure sweep (zone R1)
    - Idempotent cleanup task
 
+#### Technical Debt / Infrastructure
+10. **Phase 08 SRH-003 — Drop legacy `search_vector` column + `IX_ads_search_gin` (TODO, gated)**
+    - The generic `search_vector` column and its `IX_ads_search_gin` GIN index on `ads` are maintained on every ad INSERT/UPDATE by the `ads_search_vector_fn` trigger — consuming 7 of 16 `to_tsvector` calls (44% of trigger CPU) — but are never read by any production queries (both the web search view and `alert_query.find_matching_ads` use only the per-language vectors `search_vector_ru/bs/_en` via `LanguageLocale.fts_vector_field`).
+    - **Status:** Tracked only. Do NOT remove out-of-band. gated on Phase 3. This cleanup must execute within Phase 3's schema-maintenance window, sequenced with the dual-write migration plan in `docs/07-design-researches/migration_patterns.md`.
+    - **Implementation footprint (for Phase 3 execution — NOT to be executed in this phase):**
+      1. New migration — `DROP INDEX IF EXISTS IX_ads_search_gin` → `ALTER TABLE ads DROP COLUMN IF EXISTS search_vector` → `CREATE OR REPLACE FUNCTION ads_search_vector_fn()` with the 7 `to_tsvector` assignments to `NEW.search_vector` removed. No separate backfill `RunSQL` required.
+      2. `apps/ads/management/commands/setup_search_triggers.py` — remove the `NEW.search_vector :=` block from `SEARCH_VECTOR_FN_SQL`; must stay in lockstep with the function-body copy embedded in `ads/migrations/0001_initial.py` trigger DDL.
+      3. `apps/ads/models.py` — remove the `search_vector` `SearchVectorField` field and the `GinIndex(name="IX_ads_search_gin")` from `Ad.Meta.indexes`.
+      4. `apps/ads/tests/test_search_triggers.py` — rename test methods/docstrings containing "all_search_vectors" → "per_language_vectors" (assertions already cover only the 3 per-language vectors, not the generic column).
+    - **Cross-references (documented legacy-transitional artifact):** `docs/02-database/db-schema.md` (legacy dual-write); `docs/02-database/db-indexes.md` (`IX_ads_search_gin` legacy note); `docs/01-spec/i18n-spec.md` (legacy during dual-write transition, to be dropped in Phase 3); `docs/07-design-researches/migration_patterns.md` (dual-write transition pattern — `OLD_SEARCH_VECTOR_FN` legacy function writes the generic column); `docs/97-plans/phase-02-detailed-plan-1.md` (documents `IX_ads_search_gin on search_vector` as a current index in the partial-index-refinement inventory).
+
 ### Dependencies
 
 ```
