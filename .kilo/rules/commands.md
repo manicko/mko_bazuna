@@ -7,10 +7,13 @@
 | Task | Command |
 |---|---|
 | Lint | `uv run ruff check <path>` |
+| Auto-fix | `uv run ruff check --fix <path>` |
 | Lint templates | `uv run djlint src/backend/templates/` |
-| Format | `uv run ruff format --check <path>` |
+| Format | `uv run ruff format <path>` |
 | Typecheck | `uv run basedpyright <path>` |
 | Add dep | `uv add <pkg>` / `uv add --dev <pkg>` |
+
+> `ruff check --fix` handles import sorting (I001) and other fixable lint rules. `ruff format` only formats code (line wrapping, quotes) — it does **NOT** sort imports. The `make format` target runs `ruff check --fix src/` (not `ruff format`).
 
 ## Tests (Docker only — never `uv run pytest` locally)
 

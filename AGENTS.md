@@ -14,7 +14,7 @@ A Telegram-driven classifieds board (Avito-like) with a Django website. Sellers 
 - **Test (fast gate):** `make test` — skips nightly `seed` suite (~300s); auto-starts test DB. Start DB only: `make test-db`.
 - **Test (full suite):** `make test-all` (~35 min, includes `seed`).
 - **Test (fresh schema):** `make test-recreate` (`--no-reuse-db --create-db`).
-- **Lint:** `uv run ruff check <path>`
+- **Lint:** `uv run ruff check <path>` · **Auto-fix:** `uv run ruff check --fix <path>`
 - **Typecheck:** `uv run basedpyright <path>`
 - **Add dep:** `uv add <package>`
 
