@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from functools import lru_cache
 from typing import Final
 
+import deep_translator.exceptions
 from deep_translator import GoogleTranslator
 from requests.exceptions import RequestException
 
@@ -167,7 +168,13 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                 sanitize_query_for_log(result),
             )
             return result
-    except (TimeoutError, RequestException, Exception) as e:
+    except (
+        TimeoutError,
+        RequestException,
+        deep_translator.exceptions.TooManyRequests,
+        deep_translator.exceptions.RequestError,
+        deep_translator.exceptions.TranslationNotFound,
+    ) as e:
         _CIRCUIT_BREAKER.record_failure()
         logger.warning(
             "Translation failed for text '%s' (%s->%s): %s",

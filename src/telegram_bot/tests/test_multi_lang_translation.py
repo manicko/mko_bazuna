@@ -14,11 +14,17 @@ import time
 from unittest.mock import patch
 
 import pytest
+from deep_translator.exceptions import (
+    RequestError,
+    TooManyRequests,
+    TranslationNotFound,
+)
 
 from apps.core.services.translation import (
     _CIRCUIT_BREAKER,
     translate_cached,
     translate_cached_generic,
+    translate_text,
 )
 from telegram_bot.handlers.ad_create import translate_all_languages
 
@@ -80,7 +86,7 @@ class TestTranslateAllLanguages:
     async def test_timeout_fallback_returns_original_text(self) -> None:
         """Returns original text when translation raises an exception."""
         with patch(_TRANSLATE_PATH) as mock_translate:
-            mock_translate.side_effect = RuntimeError("Translation failed")
+            mock_translate.side_effect = TooManyRequests("Translation failed")
             result = await translate_all_languages("Original text", ["ru", "bs"])
 
         assert result["ru"] == "Original text"
@@ -91,7 +97,7 @@ class TestTranslateAllLanguages:
 
         def _side_effect(text: str, source: str, target: str) -> str:
             if target == "bs":
-                raise RuntimeError("BS translation failed")
+                raise TooManyRequests("BS translation failed")
             return f"{text}-{target}"
 
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -131,7 +137,7 @@ class TestTranslateAllLanguages:
 
     async def test_circuit_breaker_open_short_circuits(self) -> None:
         """After 3 translation failures the circuit opens and short-circuits."""
-        with patch(_TRANSLATE_PATH, side_effect=RuntimeError("fail")):
+        with patch(_TRANSLATE_PATH, side_effect=TooManyRequests("fail")):
             # Three failed calls open the circuit.
             await translate_all_languages("test text", ["ru"])
             await translate_all_languages("test text", ["ru"])
@@ -167,3 +173,31 @@ class TestTranslateAllLanguages:
 
         assert result == {"ru": "", "en": ""}
         mock_translate.assert_not_called()
+
+
+class TestTranslateTextExceptNarrowing:
+    """Unit tests for the narrowed except clause in translate_text (sync).
+
+    translate_text is synchronous (it owns its thread-pool worker), so these
+    tests call it directly without requiring an event loop.
+    """
+
+    @pytest.mark.parametrize(
+        "exc_type",
+        [RequestError, TooManyRequests, TranslationNotFound],
+        ids=["RequestError", "TooManyRequests", "TranslationNotFound"],
+    )
+    def test_narrowed_except_catches_deep_translator_family(
+        self, exc_type: type[Exception]
+    ) -> None:
+        """deep_translator.exceptions family is caught and falls back to original text."""
+        with patch(_TRANSLATE_PATH, side_effect=exc_type("simulated failure")):
+            result = translate_text("Original text", "auto", "ru")
+
+        assert result == "Original text"
+
+    def test_non_family_error_propagates(self) -> None:
+        """Non-family exceptions (AttributeError) propagate instead of being swallowed."""
+        with patch(_TRANSLATE_PATH, side_effect=AttributeError("unexpected")):
+            with pytest.raises(AttributeError):
+                translate_text("Original text", "auto", "ru")
