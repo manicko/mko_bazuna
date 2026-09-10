@@ -15,10 +15,18 @@ the daily ``send_alerts`` command never double-sends; users without a stable
 
 import asyncio
 import logging
-import threading
+from concurrent.futures import ThreadPoolExecutor
+from typing import Final
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import (
+    AiogramError,
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+    TelegramServerError,
+)
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from django.conf import settings
 from django.utils import timezone
@@ -36,7 +44,18 @@ from apps.search.services.alert_query import (
 logger = logging.getLogger(__name__)
 
 # Telegram fan-out safety cap (R2).
-_SEND_CONCURRENCY = 10
+_SEND_CONCURRENCY: Final[int] = 10
+
+# Capped backoff base (seconds) for transient retries (429/network/5xx).
+_BACKOFF_BASE: Final[float] = 0.5
+
+# Bounded thread pool: caps concurrent delivery daemon threads globally.
+# Replaces unbounded threading.Thread (one per published ad burst).
+_MAX_DELIVERY_THREADS: Final[int] = 5
+_executor: ThreadPoolExecutor = ThreadPoolExecutor(
+    max_workers=_MAX_DELIVERY_THREADS,
+    thread_name_prefix="immediate-alert-send",
+)
 
 # Inline callback prefix for unsubscribe (callback_data="unsub:<token>").
 UNSUB_CALLBACK_PREFIX = "unsub:"
@@ -85,13 +104,9 @@ def deliver_immediate_alerts(ad_id: int) -> None:
     if not payloads:
         return
 
-    thread = threading.Thread(
-        target=_run_send,
-        args=(payloads,),
-        daemon=True,
-        name="immediate-alert-send",
-    )
-    thread.start()
+    # Dispatch to the bounded global thread pool so concurrent publish
+    # bursts never exceed _MAX_DELIVERY_THREADS daemon threads.
+    _executor.submit(_run_send, payloads)
 
 
 def build_alert_message(
@@ -166,31 +181,64 @@ def _run_send(payloads: list[dict]) -> None:
     """Run the async send loop for the collected payloads in this thread."""
     try:
         asyncio.run(_send_payloads(settings.BOT_TOKEN, payloads))
-    except Exception as exc:  # pragma: no cover - defensive
+    except AiogramError as exc:
         logger.error("Immediate alert send failed: %s", exc)
 
 
 async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
-    """Send all payloads concurrently, capped by ``asyncio.Semaphore``."""
+    """Send all payloads concurrently, capped by ``asyncio.Semaphore``.
+
+    One Bot is constructed per thread/event-loop and reused across all
+    payloads in the batch, then closed once in finally (mirrors
+    ``send_alerts.py`` ``_send_user_digests``).
+    """
     sem = asyncio.Semaphore(_SEND_CONCURRENCY)
+    bot = Bot(token=bot_token)
+    try:
+        async def _send(payload: dict) -> None:
+            async with sem:
+                try:
+                    await bot.send_message(
+                        chat_id=payload["chat_id"],
+                        text=payload["text"],
+                        parse_mode="HTML",
+                        reply_markup=payload["reply_markup"],
+                    )
+                except (TelegramBadRequest, TelegramForbiddenError) as exc:
+                    # Permanent failures — dead-letter (no retry).
+                    logger.warning(
+                        "Permanent immediate alert failure to chat %s: %s",
+                        payload["chat_id"],
+                        exc,
+                    )
+                except (
+                    TelegramRetryAfter,
+                    TelegramNetworkError,
+                    TelegramServerError,
+                ) as exc:
+                    # Transient failures — retry once with capped backoff.
+                    if isinstance(exc, TelegramRetryAfter) and exc.retry_after:
+                        backoff: float = float(exc.retry_after)
+                    else:
+                        backoff = _BACKOFF_BASE
+                    await asyncio.sleep(backoff)
+                    try:
+                        await bot.send_message(
+                            chat_id=payload["chat_id"],
+                            text=payload["text"],
+                            parse_mode="HTML",
+                            reply_markup=payload["reply_markup"],
+                        )
+                    except AiogramError as retry_exc:
+                        logger.warning(
+                            "Immediate alert retry failed to chat %s: %s",
+                            payload["chat_id"],
+                            retry_exc,
+                        )
 
-    async def _send(payload: dict) -> None:
-        async with sem:
-            bot = Bot(token=bot_token)
-            try:
-                await bot.send_message(
-                    chat_id=payload["chat_id"],
-                    text=payload["text"],
-                    parse_mode="HTML",
-                    reply_markup=payload["reply_markup"],
-                )
-            except (TelegramBadRequest, TelegramForbiddenError) as exc:
-                logger.warning(
-                    "Failed to send immediate alert to chat %s: %s",
-                    payload["chat_id"],
-                    exc,
-                )
-            finally:
-                await bot.session.close()
-
-    await asyncio.gather(*(_send(p) for p in payloads))
+        await asyncio.gather(
+            *(_send(p) for p in payloads),
+            return_exceptions=True,
+        )
+    finally:
+        await bot.session.close()

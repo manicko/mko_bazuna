@@ -662,16 +662,9 @@ class TestDeliverImmediateAlerts:
     def test_records_notification_idempotently(
         self, seller: User, buyer: User, category: Category, city: City, monkeypatch
     ) -> None:
-        # Keep the background Telegram thread from running in tests.
-        class FakeThread:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            def start(self):
-                pass
-
+        # Keep the background Telegram send from running in tests.
         monkeypatch.setattr(
-            "apps.search.services.immediate_alerts.threading.Thread", FakeThread
+            "apps.search.services.immediate_alerts._run_send", lambda payloads: None
         )
 
         from apps.search.services.immediate_alerts import deliver_immediate_alerts
