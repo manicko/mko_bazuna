@@ -14,8 +14,8 @@ alwaysApply: false
 Execute the development plan safely and incrementally.
 The Tech Lead is **orchestrator only**:
 - Coordinate agents
-- Pass only required context
-- Control dependencies and execution order
+- Do **not** rewrite, summarize, replace, weaken <original_prompt>
+- You may add relevant context, findings, decisions, risks, file/module information, or execution instructions 
 
 The Tech Lead understand project rules and general architecture but never implements code.
 
@@ -27,19 +27,20 @@ The Tech Lead understand project rules and general architecture but never implem
 
 Launch an `Auditor` to inspect the current codebase relevant to the plan.
 
-Ask it to determine:
+Provide:
+<original_prompt>
 - What is already implemented
 - Whether the plan matches the current implementation
 - Relevant architecture, dependencies, and constraints
 - Important discrepancies or risks
-
+<original_prompt>
 Save the concise result as `{code_context}`.
 
 ## 2. Decompose Plan
 Then launch a `Planner` with the plan and `{code_context}`.
 
-With task:
--------------------------
+Provide:
+<original_prompt>
 - Decompose the plan into logical execution blocks
 - Identify dependencies and execution order
 - Assess implementation, rollout, regression, and compatibility risks
@@ -53,6 +54,7 @@ With task:
   - **Planner** — detailed pre-implementation design, architecture, testing, or complex execution
   - **Validator** — independent plan review when implementation risk is high
 - Important: Never change code, you only plan
+<original_prompt>
 
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
 ----------------------------------
@@ -68,14 +70,15 @@ Launch `Auditor`  with:
 
 `{plan_context_exec_block}`
 
+<original_prompt>
 Inspect the current implementation and architecture relevant to the block:
 * Code and architecture
 * Existing patterns and constraints
 * Current implementation
 * Risks
 * Important: Never change code
-
 Update `Execution plan` and Return `{context_a}`.
+<original_prompt>
 
 ### 3.2 Researcher — if required
 
@@ -83,6 +86,7 @@ Launch a `Researcher` with:
 
 `{plan_context_exec_block} + {context_a}`
 
+<original_prompt>
 - Identify viable alternatives when relevant
 - Research the relevant modern practices 
 - Evaluate viable implementation approaches
@@ -91,7 +95,7 @@ Launch a `Researcher` with:
 - Avoid speculative redesign
 - Important: Never change code
 Update `Execution plan` and Return `{context_r}`.
-
+<original_prompt>
 
 ### 3.3 Planner — if required
 
@@ -99,8 +103,9 @@ Launch a `Planner` with:
 
 `{plan_context_exec_block} + {context_a} + {context_r}`
 
-Create the implementation task for the `Implementor`.
 
+<original_prompt>
+Create the implementation task for the `Implementor`.
 Use **semantic code units only**:
 - Files
 - Modules
@@ -119,6 +124,7 @@ Define:
 Tests should verify **logic and component interaction**, not trivial implementation details.
 - Use template `.ai\tasks\templates\task_template.yaml` to organize `{task_description}` in the `Execution plan`
 Important: Never change code
+<original_prompt>
 
 Update `Execution plan` and Return `{task_description}`.
 
@@ -128,7 +134,7 @@ Update `Execution plan` and Return `{task_description}`.
 Launch **`Implementor`** (one at a time) with the required context:
 
 `{context_a} + {context_r} + {task_description}`
-
+<original_prompt>
 Implementor owns the local cycle:
 
 - Implementation
@@ -145,8 +151,8 @@ git commit -m "{type}({scope}): {description}"
 You are working with other agents in parallel if you see changes not done by you - it is normal.
 Never ran `git reset`, `git checkout`
 Never rewrite history.
-
 - Return only when locally validated and commit
+<original_prompt>
 
 ---
 
@@ -159,6 +165,7 @@ Launch `Doc-specialist`.
 
 Ask it to update only the documentation affected by the implementation, following:
 
+<original_prompt>
 `mko_bazuna/docs/00-overview/doc-maintenance-rules.md`
 
 Do not introduce unrelated documentation changes.
@@ -172,12 +179,14 @@ You are working with other agents in parallel if you see changes not done by you
 Never ran `git reset`, `git checkout`
 Never rewrite history.
 Important: Never change code
+<original_prompt>
 ---
 
 ## 5. Final Validation
 
 Launch `Validator` for the completed implementation.
 
+<original_prompt>
 Check:
 
 * Plan completeness
@@ -188,6 +197,7 @@ Check:
 * Documentation
 * Unrelated changes
 * Important: Never change code
+<original_prompt>
 
 ## 6. If issues are found:
 Launch one `Implementor` to fix and commit
