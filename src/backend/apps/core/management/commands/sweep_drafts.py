@@ -60,11 +60,11 @@ class Command(BaseCommand):
 
                 # Collect storage keys for physical media cleanup before ORM cascade
                 ad_ids = list(queryset.values_list("id", flat=True))
-                storage_keys = list(
-                    AdImage.objects.filter(ad_id__in=ad_ids).values_list(
-                        "image", flat=True
-                    )
-                )
+                storage_keys = [
+                    key
+                    for img in AdImage.objects.filter(ad_id__in=ad_ids)
+                    for key in img.storage_keys()
+                ]
 
                 # Delete atomically - CASCADE will handle ad_images
                 deleted_count, _ = queryset.delete()

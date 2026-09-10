@@ -142,6 +142,45 @@ class TestDeleteSweep:
         call_command("delete_sweep")
         assert not AdImage.objects.filter(pk=img.pk).exists()
 
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Delete sweep passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.ARCHIVED,
+            published_at=timezone.now() - timedelta(days=200),
+        )
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-delete-sweep.jpg",
+            thumbnail_small="test-uuid-delete-sweep-small.jpg",
+            thumbnail_medium="test-uuid-delete-sweep-medium.jpg",
+            thumbnail_large="test-uuid-delete-sweep-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.delete_sweep.delete_photo",
+            _record,
+        )
+
+        call_command("delete_sweep")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not Ad.objects.filter(pk=ad.pk).exists()
+
     def test_lock_id_is_delete_sweep(self):
         assert AdvisoryLockId.DELETE_SWEEP == 2
 
@@ -205,6 +244,48 @@ class TestSweepDrafts:
         ad.refresh_from_db()
         call_command("sweep_drafts")
         assert Ad.objects.filter(status=AdStatus.PUBLISHED).count() == 1
+
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Sweep drafts passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DRAFT,
+        )
+        Ad.objects.filter(pk=ad.pk).update(
+            created_at=timezone.now() - timedelta(minutes=90)
+        )
+        ad.refresh_from_db()
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-sweep-drafts.jpg",
+            thumbnail_small="test-uuid-sweep-drafts-small.jpg",
+            thumbnail_medium="test-uuid-sweep-drafts-medium.jpg",
+            thumbnail_large="test-uuid-sweep-drafts-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.sweep_drafts.delete_photo",
+            _record,
+        )
+
+        call_command("sweep_drafts")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not Ad.objects.filter(pk=ad.pk).exists()
 
     def test_lock_id_is_sweep_drafts(self):
         assert AdvisoryLockId.SWEEP_DRAFTS == 4
@@ -457,6 +538,45 @@ class TestPurgeFailedAds:
         call_command("purge_failed_ads")
         assert Ad.objects.filter(pk=rejected.pk).exists()
 
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Purge failed ads passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.ON_MODERATION_FAILED,
+            moderation_failed_at=timezone.now() - timedelta(days=10),
+        )
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-purge-failed.jpg",
+            thumbnail_small="test-uuid-purge-failed-small.jpg",
+            thumbnail_medium="test-uuid-purge-failed-medium.jpg",
+            thumbnail_large="test-uuid-purge-failed-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.purge_failed_ads.delete_photo",
+            _record,
+        )
+
+        call_command("purge_failed_ads")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not Ad.objects.filter(pk=ad.pk).exists()
+
     def test_lock_id_is_purge_failed_ads(self):
         assert AdvisoryLockId.PURGE_FAILED_ADS == 6
 
@@ -515,6 +635,45 @@ class TestPurgeRejectedAds:
         log.refresh_from_db()
         assert ModeratorActionLog.objects.filter(pk=log.pk).exists()
         assert log.ad_id is None
+
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Purge rejected ads passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.REJECTED,
+            rejected_at=timezone.now() - timedelta(days=120),
+        )
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-purge-rejected.jpg",
+            thumbnail_small="test-uuid-purge-rejected-small.jpg",
+            thumbnail_medium="test-uuid-purge-rejected-medium.jpg",
+            thumbnail_large="test-uuid-purge-rejected-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.purge_rejected_ads.delete_photo",
+            _record,
+        )
+
+        call_command("purge_rejected_ads")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not Ad.objects.filter(pk=ad.pk).exists()
 
     def test_lock_id_is_purge_rejected_ads(self):
         assert AdvisoryLockId.PURGE_REJECTED_ADS == 7
@@ -599,6 +758,45 @@ class TestPurgeDeletedAds:
 
         assert "test-uuid-deleted.jpg" in deleted_keys
         assert not Ad.objects.filter(pk=old.pk).exists()
+
+    def test_collects_thumbnail_keys_for_media_cleanup(
+        self, seller, category, city, monkeypatch
+    ):
+        """Purge deleted ads passes all storage keys (image + thumbnails) to delete_photo.
+
+        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
+        derivatives are not orphaned on disk alongside the main image.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DELETED,
+            deleted_at=timezone.now() - timedelta(days=200),
+        )
+        img = AdImage.objects.create(
+            ad=ad,
+            image="test-uuid-purge-deleted.jpg",
+            thumbnail_small="test-uuid-purge-deleted-small.jpg",
+            thumbnail_medium="test-uuid-purge-deleted-medium.jpg",
+            thumbnail_large="test-uuid-purge-deleted-large.jpg",
+        )
+
+        deleted_keys: list[str] = []
+
+        def _record(storage_key: str) -> None:
+            deleted_keys.append(storage_key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.purge_deleted_ads.delete_photo",
+            _record,
+        )
+
+        call_command("purge_deleted_ads")
+
+        expected = img.storage_keys()
+        assert sorted(deleted_keys) == sorted(expected)
+        assert not Ad.objects.filter(pk=ad.pk).exists()
 
 
 class TestConcurrentSweep:
