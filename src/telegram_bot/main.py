@@ -22,6 +22,7 @@ from telegram_bot.lifecycle import (  # noqa: E402
 from telegram_bot.middlewares import (  # noqa: E402
     AccountStateMiddleware,
     DatabaseConnectionMiddleware,
+    UpdateIdDedupMiddleware,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def main() -> None:
     # touches the marker on every inbound update for freshness.
     dp.startup.register(_on_startup)
     dp.shutdown.register(_on_shutdown)
+    dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 

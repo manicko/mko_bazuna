@@ -58,6 +58,7 @@ def dp() -> Dispatcher:
     from telegram_bot.middlewares import (
         AccountStateMiddleware,
         DatabaseConnectionMiddleware,
+        UpdateIdDedupMiddleware,
     )
 
     dp.message.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
@@ -73,6 +74,7 @@ def dp() -> Dispatcher:
 
     dp.startup.register(_on_startup)
     dp.shutdown.register(_on_shutdown)
+    dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
