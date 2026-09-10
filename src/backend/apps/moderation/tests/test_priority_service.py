@@ -471,6 +471,7 @@ class TestBulkModerationActionView:
         self.user = _make_user(telegram_id=990030040)
         self.staff_user = _make_staff_user(telegram_id=990030041)
         self.bulk_url = reverse("moderation:bulk_action")
+        assert self.bulk_url == "/moderation/api/v1/bulk-action/"
 
     def test_requires_staff_forbidden(self) -> None:
         """Non-staff user gets 403."""
@@ -738,3 +739,16 @@ class TestBulkModerationActionView:
         # that the cap did not reject the request (proceeded to per-item processing).
         assert data["completed"] == 0
         assert len(data["errors"]) == MAX_BULK_ACTIONS
+
+    def test_unknown_version_returns_404(self) -> None:
+        """POST to an unknown API version (/api/v2/) degrades to 404 (not 500)."""
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            "/moderation/api/v2/bulk-action/",
+            data=json.dumps(
+                {"action": BulkModerationAction.APPROVE.value, "selected_items": [1]}
+            ),
+            content_type="application/json",
+        )
+        assert response.status_code == 404

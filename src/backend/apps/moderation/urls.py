@@ -16,5 +16,5 @@ urlpatterns = [
     path("approve/<int:ad_id>/", approve_ad, name="approve"),
     path("reject/<int:ad_id>/", reject_ad, name="reject"),
     path("ban/<int:ad_id>/", ban_user, name="ban"),
-    path("bulk-action/", bulk_moderation_action, name="bulk_action"),
+    path("api/v1/bulk-action/", bulk_moderation_action, name="bulk_action"),
 ]
