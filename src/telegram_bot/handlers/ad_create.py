@@ -7,44 +7,34 @@ Implements step-by-step ad creation with Pydantic validation.
 
 """
 
+import asyncio
 import difflib
-
 import logging
-
 import os
-
 from decimal import Decimal
 
-
 from aiogram import Bot, Router, types
-
 from aiogram.filters import Command
-
 from aiogram.fsm.context import FSMContext
-
 from aiogram.fsm.state import StatesGroup
-
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from django.conf import settings
-
-
 from apps.ads.models import Ad
-
 from apps.ads.services.images import AdImageService
-
 from apps.categories.models import Category
-
 from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
-
-from apps.core.services.translation import translate_text
 from apps.core.services.site_config import get_site_name_async
-
+from apps.core.services.translation import translate_text
 from apps.currencies.enums import CurrencyCode
-
 from apps.currencies.services.price_normalizer import PriceNormalizer
-
 from apps.locations.models import City
+from apps.media.services.filesystem import (
+    delete_photo,
+    generate_storage_key,
+    strip_photo_exif,
+    validate_photo,
+)
+from apps.media.services.thumbnails import ThumbnailService
+from django.conf import settings
 
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
@@ -52,23 +42,8 @@ from telegram_bot.schemas.message_payloads import (
     PricePayload,
     TitlePayload,
 )
-
 from telegram_bot.services.rate_limit import check_upload_rate_limit
-
-from apps.media.services.filesystem import (
-    generate_storage_key,
-    validate_photo,
-    strip_photo_exif,
-    delete_photo,
-)
-
 from telegram_bot.states import AdCreateState
-
-import asyncio
-
-
-from apps.media.services.thumbnails import ThumbnailService
-
 
 logger = logging.getLogger(__name__)
 
@@ -587,8 +562,7 @@ async def process_price_currency(
         await callback.answer()
 
         await callback.message.answer(
-            f"Currency: {currency.value}\n"
-            "Now enter the price amount as a number."
+            f"Currency: {currency.value}\nNow enter the price amount as a number."
         )
 
 
@@ -609,7 +583,9 @@ async def process_price(message: types.Message, state: FSMContext) -> None:
         return
 
     if not message.text:
-        await message.answer("Please send the price amount as a number, or select 'Free' on the keyboard.")
+        await message.answer(
+            "Please send the price amount as a number, or select 'Free' on the keyboard."
+        )
 
         return
 
@@ -1089,9 +1065,8 @@ async def update_ad_and_moderate(
 
     """
 
-    from asgiref.sync import sync_to_async
-
     from apps.moderation.services.auto_moderation import auto_moderate
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _update_and_moderate() -> tuple[bool, list[str]]:
@@ -1303,9 +1278,8 @@ async def translate_all_languages(
 async def get_resolved_purposes(category_id: int) -> list:
     """Get resolved listing purposes for a category."""
 
-    from asgiref.sync import sync_to_async
-
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1328,9 +1302,8 @@ async def get_resolved_purposes(category_id: int) -> list:
 async def get_resolved_features(category_id: int) -> list:
     """Get resolved listing features for a category."""
 
-    from asgiref.sync import sync_to_async
-
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1352,8 +1325,8 @@ async def get_resolved_features(category_id: int) -> list:
 
 async def get_resolved_conditions(category_id: int) -> list:
     """Get resolved listing conditions for a category."""
-    from asgiref.sync import sync_to_async
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1372,9 +1345,8 @@ async def get_resolved_conditions(category_id: int) -> list:
 async def get_default_purpose(category_id: int, purposes: list) -> object | None:
     """Get the default purpose for a category, if configured."""
 
-    from asgiref.sync import sync_to_async
-
     from apps.categories.models import CategoryListingPurpose
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1396,9 +1368,8 @@ async def get_default_purpose(category_id: int, purposes: list) -> object | None
 async def get_lookup_item_by_slug(slug: str):
     """Get a LookupItem by slug."""
 
-    from asgiref.sync import sync_to_async
-
     from apps.lookups.models import LookupItem
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1418,9 +1389,8 @@ async def get_lookup_item(item_id: int | None):
     if item_id is None:
         return None
 
-    from asgiref.sync import sync_to_async
-
     from apps.lookups.models import LookupItem
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
@@ -1437,9 +1407,8 @@ async def get_lookup_item(item_id: int | None):
 async def get_feature_names(feature_ids: list[int]) -> list[str]:
     """Get feature names as localized strings."""
 
-    from asgiref.sync import sync_to_async
-
     from apps.lookups.models import LookupItem
+    from asgiref.sync import sync_to_async
 
     @sync_to_async
     def _get():
