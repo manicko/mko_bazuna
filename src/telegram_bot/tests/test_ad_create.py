@@ -92,6 +92,18 @@ async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str
     return {loc: f"{text}-{loc}" for loc in target_locales}
 
 
+def _build_photo_message() -> MagicMock:
+    """Build a mock Telegram message containing a single photo upload."""
+    photo_item = MagicMock()
+    photo_item.file_id = "test_file_id"
+    message = MagicMock()
+    message.text = None
+    message.photo = [photo_item]
+    message.answer = AsyncMock()
+    message.bot = MagicMock()
+    return message
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -167,3 +179,113 @@ class TestProcessPreviewLanguageDetection:
 
         saved = await sync_to_async(Ad.objects.get)(id=ad.id)
         assert saved.original_language == "bs"
+
+
+class TestProcessPhotos:
+    """Tests for process_photos — upload cap, rate limit, and done handling."""
+
+    @pytest.mark.asyncio
+    async def test_process_photos_rejects_after_five(self) -> None:
+        """5 photos already in state — a new photo upload is rejected with the cap message."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [{}, {}, {}, {}, {}], "user_id": 900000001})
+        message = _build_photo_message()
+
+        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+            await process_photos(message, state)
+
+        mock_download.assert_not_called()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at most 5" in answer_text
+
+    @pytest.mark.asyncio
+    async def test_done_with_zero_photos_shows_correct_message(self) -> None:
+        """'done' with 0 photos shows 'at least 1', not 'at most 5'."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        message = _build_message(None)
+        message.text = "done"
+
+        await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at least 1" in answer_text
+        assert "at most 5" not in answer_text
+
+    @pytest.mark.asyncio
+    async def test_done_with_six_photos_shows_correct_message(self) -> None:
+        """'done' with 6 photos shows 'at most 5', not 'at least 1'."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [{}] * 6, "user_id": 900000001})
+        message = _build_message(None)
+        message.text = "done"
+
+        await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at most 5" in answer_text
+        assert "at least 1" not in answer_text
+
+    @pytest.mark.asyncio
+    async def test_process_photos_rate_limited(self, monkeypatch) -> None:
+        """Rate-limited uploads are rejected before download_photo."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            lambda user_id: False,
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        message = _build_photo_message()
+
+        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+            await process_photos(message, state)
+
+        mock_download.assert_not_called()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "too fast" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_process_photos_allows_when_not_rate_limited(
+        self, monkeypatch
+    ) -> None:
+        """When not rate-limited, the flow proceeds to download and save the photo."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            lambda user_id: True,
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        state.update_data = AsyncMock()
+        message = _build_photo_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.download_photo",
+                new=AsyncMock(return_value=b"fake_photo_bytes"),
+            ) as mock_download,
+            patch(
+                "telegram_bot.handlers.ad_create.save_photo",
+                new=AsyncMock(return_value="fake_storage_key"),
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.validate_photo",
+                return_value=(True, None),
+            ),
+        ):
+            await process_photos(message, state)
+
+        mock_download.assert_awaited_once()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "Photo saved" in answer_text

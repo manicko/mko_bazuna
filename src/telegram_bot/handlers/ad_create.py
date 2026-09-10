@@ -53,6 +53,8 @@ from telegram_bot.schemas.message_payloads import (
     TitlePayload,
 )
 
+from telegram_bot.services.rate_limit import check_upload_rate_limit
+
 from apps.media.services.filesystem import (
     generate_storage_key,
     validate_photo,
@@ -660,8 +662,12 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
             PhotoCountPayload(photo_count=count)
 
         except Exception:
-            await message.answer(f"Please send at least 1 photo (you have {count}).")
-
+            if count == 0:
+                await message.answer("Please send at least 1 photo before finishing.")
+            else:
+                await message.answer(
+                    f"You can upload at most 5 photos (you have {count})."
+                )
             return
 
         await state.set_state(AdCreateForm.preview)
@@ -680,6 +686,20 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
     # Get largest photo
 
     photo = message.photo[-1]
+
+    # Enforce the hard cap before downloading — prevents unbounded uploads
+    # and orphaned files beyond the 5-photo limit.
+    if len(photos) >= 5:
+        await message.answer(
+            f"You already have {len(photos)} photos. You can upload at most 5 photos."
+        )
+        return
+
+    # Enforce per-seller upload burst limit (anti-abuse).
+    user_id = data.get("user_id")
+    if user_id is not None and not check_upload_rate_limit(user_id):
+        await message.answer("Uploading too fast, please wait a moment.")
+        return
 
     # Download photo bytes for validation
 
