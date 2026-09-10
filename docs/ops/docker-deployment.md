@@ -525,9 +525,11 @@ completing successfully (`depends_on: condition: service_completed_successfully`
 | `delete_sweep` | Hard-delete ads older than 4 months | Hourly |
 | `consent_hard_delete` | Erase PII after 30-day withdrawal | Hourly |
 | `sweep_drafts` | Delete abandoned DRAFT ads | Hourly |
+| `sweep_orphaned_media` | Reclaim orphaned files in MEDIA_ROOT | Hourly |
 | `cleanup_login_tokens` | Remove expired login tokens | Hourly |
 | `purge_failed_ads` | Delete failed moderation ads (7 days) | Hourly |
 | `purge_rejected_ads` | Delete rejected ads (90 days) | Hourly |
+| `purge_deleted_ads` | Purge soft-deleted ads (120 days) | Hourly |
 
 ### Running Sweeps
 

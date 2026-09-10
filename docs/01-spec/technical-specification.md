@@ -72,7 +72,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 ### E. Photos & moderation (US-S2, US-A10)
 - **1 to 5 photos** per ad.
 - Only **compressed Telegram photos** accepted (`message.photo`); `message.document` with `image/*` is rejected.
-- Format: JPEG (Telegram-converted). Limit: up to 2560px long side, ~2 MB/photo; ≤ 5 photos / 10 MB per ad.
+- Format: JPEG (Telegram-converted). Limit: up to 2560px long side, ~2 MB/photo; ≤ 5 photos / 10 MB per ad. Pillow's `MAX_IMAGE_PIXELS` is set to `2560 * 2560 * 2` (= 13,107,200) in `MediaConfig.ready()` as a decompression-bomb guard — oversized images trigger `DecompressionBombError` before a full pixel decode, rather than silently allocating a multi-hundred-MB buffer.
 - Phase-1 moderation is **text-only** (US-A10). Bad photos removed manually by moderator (incl. account ban).
 - **No server-side photo optimization in phase 1** — accept Telegram-compressed images, store in our storage (decision E-storage), serve as-is.
 - **Storage (E-storage):** phase 1 = local `MEDIA_ROOT` (Docker volume) behind nginx via Django `FileSystemStorage` (the `STORAGES` contract). `django-storages` deferred to S3/R2/MinIO swap (YAGNI); later swap = add `django-storages`+`boto3` + one `STORAGES` line, no code rewrite.

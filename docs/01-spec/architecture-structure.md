@@ -241,7 +241,7 @@ Type=simple
 WorkingDirectory=/opt/mko-bazuna
 ExecStart=/opt/venv/bin/python manage.py shell -c "
 import time, sys, subprocess;
-commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'cleanup_login_tokens', 'purge_failed_ads', 'purge_rejected_ads'];
+commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'sweep_orphaned_media', 'cleanup_login_tokens', 'purge_failed_ads', 'purge_rejected_ads', 'purge_deleted_ads'];
 while True:
     for cmd in commands: subprocess.run([sys.executable, 'manage.py', cmd]);
     time.sleep(3600)
@@ -295,10 +295,15 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 8 | `rollup_daily_metrics` |
 | 9 | `alert_delivery_task` |
 | 10 | `queue_processing` |
+| 11 | `purge_deleted_ads` |
+| 12 | `recompute_normalized_prices` |
 | 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 | 102 | `backfill_thumbnails` |
+| 103 | `sweep_orphaned_media` (hourly orphan-file reconciliation) |
+| 104 | `catalog_load` (one-shot, gates web/bot startup) |
 | 110 | `seed` (session-scoped, prevents concurrent seed operations) |
+| 111 | `test_schema_setup` (xdist fixture, resets test DB) |
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not
@@ -319,6 +324,7 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
   - `/search/`: 20 req/s burst 40 (`search_limit` zone)
   - `/contact/` (deep-link page render, Spec 18): per-IP cap of 5 renders per 10 min — see [contact-us.md](../01-spec/contact-us.md#rate-limiting-dual-layer) for the full dual-layer table including bot-side limits.
   - **Bot-side** (`/start contact_us`): per-Telegram-user rate limit of 5 per 10 min via `check_contact_start_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a cooldown message (Spec 18 CR-10).
+  - **Bot-side** (photo upload): per-seller rate limit of 10 uploads per 60 s via `check_upload_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a "Uploading too fast, please wait a moment." cooldown message.
 - **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var). For local development with HTTPS, see [Local HTTPS with mkcert](../../ops/local-https-mkcert.md).
 
 ## Audit Zone References

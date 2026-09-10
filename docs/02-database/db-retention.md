@@ -99,7 +99,7 @@ When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecyc
    - All `Ad` rows belonging to the user (including `DELETED` status ads)
    - All `AdImage` rows (via `on_delete=CASCADE`)
    - All `SellerVerification` rows (via `on_delete=CASCADE`)
-    - Physical ad-image files deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits
+    - Physical ad-image files (including thumbnail derivatives) deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits, using `AdImage.storage_keys()` to collect all key variants (image + `thumbnail_small/medium/large`)
 
    **Note:** This is a **30-day** hard-delete, distinct from `purge_deleted_ads` which uses a **120-day** retention window for all `DELETED`-status ads regardless of consent withdrawal. Consent-withdrawn users' ads are purged at 30 days; other soft-deleted ads persist until 120 days.
 
