@@ -16,6 +16,92 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+
+msgid ""
+"Cannot approve: the ad owner has reached the maximum number of active ads."
+msgstr ""
+
+msgid ""
+"Login successful! Your account has been created. You can now create ads "
+"with /post."
+msgstr ""
+
+msgid ""
+"Welcome to %(site)s! To login, use a deep-link: /start login_<your_token>"
+msgstr ""
+
+msgid ""
+"Your account has publishing restrictions. Contact support for assistance."
+msgstr ""
+
+msgid ""
+"Новый запрос от покупателя!\n"
+"\n"
+"Покупатель: %(buyer)s\n"
+"Ad ID: %(ad_id)s\n"
+"\n"
+"Напишите своё сообщение — оно будет переслано анонимно."
+msgstr ""
+
+msgid ""
+"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"\n"
+"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"\n"
+"Для создания объявления используйте /post."
+msgstr ""
+
+msgid "Consent declined: you can browse but cannot post. Contact still works."
+msgstr ""
+
+msgid "Consent withdrawn: your data is being erased."
+msgstr ""
+
+msgid "Invalid login link format. Expected: /start login_<token>"
+msgstr ""
+
+msgid "Language set to %(lang)s"
+msgstr ""
+
+msgid "Login successful! You can now create ads with /post."
+msgstr ""
+
+msgid "Please login first with /start login_<token>"
+msgstr ""
+
+msgid "Please login first."
+msgstr ""
+
+msgid "Select your preferred language:"
+msgstr ""
+
+msgid "Unsupported language."
+msgstr ""
+
+msgid "Your account has been deleted."
+msgstr ""
+
+msgid "Your account is restricted. Contact support for assistance."
+msgstr ""
+
+msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgstr ""
+
+msgid "Ошибка: не удалось определить отправителя"
+msgstr ""
+
+msgid "Покупатель"
+msgstr ""
+
+msgid "Слишком много запросов в поддержку. Попробуйте позже."
+msgstr ""
+
+msgid "объявление больше недоступно"
+msgstr ""
+
+msgid "продавец больше недоступен для связи"
+msgstr ""
+
 msgid "Free"
 msgstr ""
 
@@ -877,8 +963,9 @@ msgstr ""
 #, python-format
 msgid ""
 "authentication and seller-buyer contact relay via deep-links (<code>t.me/"
-"%(bot_username)s</code>). No ad content is shared; only the identifiers "
-"needed for the action."
+"@<span class=\"bot-username-rtl\" aria-hidden=\"true\">%(obfuscated)s</"
+"span><span class=\"sr-only\">%(bot_username)s</span></code>). No ad content "
+"is shared; only the identifiers needed for the action."
 msgstr ""
 
 msgid "Google Translate"

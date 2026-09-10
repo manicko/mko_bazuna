@@ -1,12 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 10:29-0500\n"
+"POT-Creation-Date: 2026-09-10 04:56-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -16,6 +16,110 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid ""
+"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"\n"
+"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"\n"
+"Для создания объявления используйте /post."
+msgstr ""
+"👋 Zdravo! Kontaktirao si podršku Bazune.\n"
+"\n"
+"Napiši pitanje — odgovorićemo što prije.\n"
+"\n"
+"Za kreiranje oglasа користи /post."
+
+msgid "Слишком много запросов в поддержку. Попробуйте позже."
+msgstr "Previše zahtjeva za podrškom. Pokušaj kasnije."
+
+msgid "Contact us"
+msgstr "Kontaktiraj nas"
+
+msgid "Ошибка: не удалось определить отправителя"
+msgstr "Greška: nije moguće odrediti pošiljaoca"
+
+msgid "объявление больше недоступно"
+msgstr "Oglas više nije dostupan"
+
+msgid "продавец больше недоступен для связи"
+msgstr "Prodavac više nije dostupan za kontakt"
+
+#, python-format
+msgid ""
+"Новый запрос от покупателя!\n"
+"\n"
+"Покупатель: %(buyer)s\n"
+"Ad ID: %(ad_id)s\n"
+"\n"
+"Напишите своё сообщение — оно будет переслано анонимно."
+msgstr ""
+"Novi zahtjev od kupca!\n"
+"\n"
+"Kupac: %(buyer)s\n"
+"Ad ID: %(ad_id)s\n"
+"\n"
+"Napiši poruku — biće proslijeđena anonimno."
+
+msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgstr "Tvoj zahtjev je anonimno poslan prodavcu. Čekaj odgovor u ovom čatovu."
+
+msgid "Покупатель"
+msgstr "Kupac"
+
+msgid "Please login first with /start login_<token>"
+msgstr "Prvo se prijavite sa /start login_<token>"
+
+msgid "Select your preferred language:"
+msgstr "Odaberite željeni jezik:"
+
+msgid "Unsupported language."
+msgstr "Nepodržani jezik."
+
+msgid "Please login first."
+msgstr "Prvo se prijavite."
+
+#, python-format
+msgid "Language set to %(lang)s"
+msgstr "Jezik postavljen na %(lang)s"
+
+#, python-format
+msgid ""
+"Welcome to %(site)s! To login, use a deep-link: /start login_<your_token>"
+msgstr ""
+"Dobrodošli u %(site)s! Prijavite se pomoću deep-linka: /start login_<your_token>"
+
+msgid "Invalid login link format. Expected: /start login_<token>"
+msgstr "Neispravan format login linka. Očekivano: /start login_<token>"
+
+msgid "This login link is invalid, expired, or already used."
+msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
+
+msgid ""
+"Login successful! Your account has been created. You can now create ads "
+"with /post."
+msgstr ""
+"Prijava usječna! Vaš nalog je kreiran. Sada možete kreirati oglase sa /post."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
+
+msgid "Your account is restricted. Contact support for assistance."
+msgstr "Vaš nalog je ograničen. Kontaktirajte podršku za pomoć."
+
+msgid "Your account has been deleted."
+msgstr "Vaš nalog je izbrisan."
+
+msgid "Consent declined: you can browse but cannot post. Contact still works."
+msgstr "Suglasnost odbijena: pregled samo, kontakt i dalje radi."
+
+msgid "Consent withdrawn: your data is being erased."
+msgstr "Suglasnost povučena: vaši podaci se brišu."
+
+msgid ""
+"Your account has publishing restrictions. Contact support for assistance."
+msgstr ""
+"Vaš nalog ima ograničenja za objavljivanje. Kontaktirajte podršku za pomoć."
 
 msgid "Free"
 msgstr "Besplatno"
@@ -79,6 +183,20 @@ msgstr "30 dana"
 
 msgid "7 Days"
 msgstr "7 dana"
+
+msgid "Contact Seller"
+msgstr "Kontaktiraj prodavca"
+
+msgid "Submit an ad"
+msgstr "Pošalji oglas"
+
+msgid "Login via Telegram"
+msgstr "Prijava putem Telegrama"
+
+msgid ""
+"Cannot approve: the ad owner has reached the maximum number of active ads."
+msgstr ""
+"Ne može se odobriti: vlasnik oglasa je dostigao maksimalan broj aktivnih oglasa."
 
 msgid "Ad"
 msgstr "Oglas"
@@ -320,12 +438,6 @@ msgstr "Kategorija:"
 
 msgid "Published:"
 msgstr "Objavljeno:"
-
-msgid "Contact Seller"
-msgstr "Kontaktiraj prodavca"
-
-msgid "Contact us"
-msgstr "Kontaktiraj nas"
 
 msgid "Seller unavailable for contact"
 msgstr "Prodavac nije dostupan za kontakt"
@@ -744,9 +856,6 @@ msgstr "Meni naloga"
 msgid "Account"
 msgstr "Nalog"
 
-msgid "Submit an ad"
-msgstr "Pošalji oglas"
-
 msgid "Preferred city"
 msgstr "Preferirani grad"
 
@@ -903,12 +1012,11 @@ msgstr "Telegram"
 #, python-format
 msgid ""
 "authentication and seller-buyer contact relay via deep-links (<code>t.me/"
-"%(bot_username)s</code>). No ad content is shared; only the identifiers "
-"needed for the action."
+"@<span class=\"bot-username-rtl\" aria-hidden=\"true\">%(obfuscated)s</"
+"span><span class=\"sr-only\">%(bot_username)s</span></code>). No ad content "
+"is shared; only the identifiers needed for the action."
 msgstr ""
-"autentifikacija i prenos kontakta prodavca-kupca putem deep-linkova "
-"(<code>t.me/%(bot_username)s</code>). Sadržaj oglasa se ne deli; samo "
-"identifikatori potrebni za akciju."
+"autentifikacija i prenos kontakta prodavca-kupca putem deep-linkova (<code>t.me/@<span class=\"bot-username-rtl\" aria-hidden=\"true\">%(obfuscated)s</span><span class=\"sr-only\">%(bot_username)s</span></code>). Sadržaj oglasa se ne deli; samo identifikatori potrebni za akciju."
 
 msgid "Google Translate"
 msgstr "Google Translate"
@@ -1008,9 +1116,6 @@ msgstr "Dodirnite dugme ispod da biste otvorili Telegram i autentifikovali."
 msgid "This link expires in 5 minutes."
 msgstr "Ovaj link ističe za 5 minuta."
 
-msgid "Login via Telegram"
-msgstr "Prijava putem Telegrama"
-
 msgid "Waiting for Telegram confirmation..."
 msgstr "Čekanje na potvrdu Telegrama..."
 
@@ -1022,9 +1127,6 @@ msgstr "Dobijite ga ovdje"
 
 msgid "Login successful! Redirecting..."
 msgstr "Prijava uspešna! Preusmeravanje..."
-
-msgid "This login link is invalid, expired, or already used."
-msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
 
 msgid "Error checking login status."
 msgstr "Greška pri proveri statusa prijave."

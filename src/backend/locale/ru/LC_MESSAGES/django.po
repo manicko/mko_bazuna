@@ -1,12 +1,12 @@
 # Russian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 10:29-0500\n"
+"POT-Creation-Date: 2026-09-10 04:56-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Russian <ru@li.org>\n"
@@ -16,6 +16,111 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid ""
+"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"\n"
+"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"\n"
+"Для создания объявления используйте /post."
+msgstr ""
+"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"\n"
+"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"\n"
+"Для создания объявления используйте /post."
+
+msgid "Слишком много запросов в поддержку. Попробуйте позже."
+msgstr "Слишком много запросов в поддержку. Попробуйте позже."
+
+msgid "Contact us"
+msgstr "Связаться с нами"
+
+msgid "Ошибка: не удалось определить отправителя"
+msgstr "Ошибка: не удалось определить отправителя"
+
+msgid "объявление больше недоступно"
+msgstr "объявление больше недоступно"
+
+msgid "продавец больше недоступен для связи"
+msgstr "продавец больше недоступен для связи"
+
+#, python-format
+msgid ""
+"Новый запрос от покупателя!\n"
+"\n"
+"Покупатель: %(buyer)s\n"
+"Ad ID: %(ad_id)s\n"
+"\n"
+"Напишите своё сообщение — оно будет переслано анонимно."
+msgstr ""
+"Новый запрос от покупателя!\n"
+"\n"
+"Покупатель: %(buyer)s\n"
+"Ad ID: %(ad_id)s\n"
+"\n"
+"Напишите своё сообщение — оно будет переслано анонимно."
+
+msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgstr "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+
+msgid "Покупатель"
+msgstr "Покупатель"
+
+msgid "Please login first with /start login_<token>"
+msgstr "Пожалуйста, войдите с помощью /start login_<token>"
+
+msgid "Select your preferred language:"
+msgstr "Выберите предпочитаемый язык:"
+
+msgid "Unsupported language."
+msgstr "Неподдерживаемый язык."
+
+msgid "Please login first."
+msgstr "Пожалуйста, войдите сначала."
+
+#, python-format
+msgid "Language set to %(lang)s"
+msgstr "Язык установлен: %(lang)s"
+
+#, python-format
+msgid ""
+"Welcome to %(site)s! To login, use a deep-link: /start login_<your_token>"
+msgstr ""
+"Добро пожаловать в %(site)s! Чтобы войти, используйте deep-link: /start login_<your_token>"
+
+msgid "Invalid login link format. Expected: /start login_<token>"
+msgstr "Неверный формат login-ссылки. Ожидалось: /start login_<token>"
+
+msgid "This login link is invalid, expired, or already used."
+msgstr "Эта ссылка для входа недействительна, истекла или уже использована."
+
+msgid ""
+"Login successful! Your account has been created. You can now create ads "
+"with /post."
+msgstr ""
+"Вход выполнен успешно! Ваш аккаунт создан. Теперь вы можете создавать объявления с помощью /post."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr ""
+"Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
+
+msgid "Your account is restricted. Contact support for assistance."
+msgstr "Ваш аккаунт ограничен. Обратитесь в поддержку для получения помощи."
+
+msgid "Your account has been deleted."
+msgstr "Ваш аккаунт удалён."
+
+msgid "Consent declined: you can browse but cannot post. Contact still works."
+msgstr "Согласие отклонено: просмотр только, связь по-прежнему работает."
+
+msgid "Consent withdrawn: your data is being erased."
+msgstr "Согласие отозвано: ваши данные удаляются."
+
+msgid ""
+"Your account has publishing restrictions. Contact support for assistance."
+msgstr ""
+"Ваш аккаунт имеет ограничения на публикацию. Обратитесь в поддержку для получения помощи."
 
 msgid "Free"
 msgstr "Бесплатно"
@@ -79,6 +184,20 @@ msgstr "30 дней"
 
 msgid "7 Days"
 msgstr "7 дней"
+
+msgid "Contact Seller"
+msgstr "Связаться с продавцом"
+
+msgid "Submit an ad"
+msgstr "Разместить объявление"
+
+msgid "Login via Telegram"
+msgstr "Войти через Telegram"
+
+msgid ""
+"Cannot approve: the ad owner has reached the maximum number of active ads."
+msgstr ""
+"Нельзя одобрить: владелец объявления достиг максимального количества активных объявлений."
 
 msgid "Ad"
 msgstr "Объявление"
@@ -320,12 +439,6 @@ msgstr "Категория:"
 
 msgid "Published:"
 msgstr "Опубликовано:"
-
-msgid "Contact Seller"
-msgstr "Связаться с продавцом"
-
-msgid "Contact us"
-msgstr "Связаться с нами"
 
 msgid "Seller unavailable for contact"
 msgstr "Продавец недоступен для контакта"
@@ -746,9 +859,6 @@ msgstr "Меню аккаунта"
 msgid "Account"
 msgstr "Аккаунт"
 
-msgid "Submit an ad"
-msgstr "Разместить объявление"
-
 msgid "Preferred city"
 msgstr "Предпочитаемый город"
 
@@ -908,12 +1018,11 @@ msgstr "Telegram"
 #, python-format
 msgid ""
 "authentication and seller-buyer contact relay via deep-links (<code>t.me/"
-"%(bot_username)s</code>). No ad content is shared; only the identifiers "
-"needed for the action."
+"@<span class=\"bot-username-rtl\" aria-hidden=\"true\">%(obfuscated)s</"
+"span><span class=\"sr-only\">%(bot_username)s</span></code>). No ad content "
+"is shared; only the identifiers needed for the action."
 msgstr ""
-"аутентификация и передача контакта продавца-покупателю через deep-links "
-"(<code>t.me/%(bot_username)s</code>). Содержимое объявлений не передаётся; "
-"передаются только идентификаторы, необходимые для действия."
+"аутентификация и передача контакта продавца-покупателю через deep-links (<code>t.me/@<span class=\"bot-username-rtl\" aria-hidden=\"true\">%(obfuscated)s</span><span class=\"sr-only\">%(bot_username)s</span></code>). Содержимое объявлений не передаётся; передаются только идентификаторы, необходимые для действия."
 
 msgid "Google Translate"
 msgstr "Google Translate"
@@ -1015,9 +1124,6 @@ msgstr "Нажмите кнопку ниже, чтобы открыть Telegram
 msgid "This link expires in 5 minutes."
 msgstr "Эта ссылка истекает через 5 минут."
 
-msgid "Login via Telegram"
-msgstr "Войти через Telegram"
-
 msgid "Waiting for Telegram confirmation..."
 msgstr "Ожидание подтверждения в Telegram..."
 
@@ -1029,9 +1135,6 @@ msgstr "Получить здесь"
 
 msgid "Login successful! Redirecting..."
 msgstr "Вход выполнен успешно! Перенаправление..."
-
-msgid "This login link is invalid, expired, or already used."
-msgstr "Эта ссылка для входа недействительна, истекла или уже использована."
 
 msgid "Error checking login status."
 msgstr "Ошибка проверки статуса входа."
