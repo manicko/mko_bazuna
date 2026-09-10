@@ -4,9 +4,10 @@ Category model for Mko Bazuna.
 Hierarchical category tree using django-mptt (single source of truth).
 """
 
-from apps.lookups.enums import LookupGroupCode
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
+
+from apps.lookups.enums import LookupGroupCode
 
 
 class Category(MPTTModel):

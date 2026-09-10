@@ -10,10 +10,11 @@ with a session_key.
 from __future__ import annotations
 
 import pytest
+from django.test import Client
+
 from apps.core.enums import ConsentChoice
 from apps.users.models import ConsentRecord
 from apps.users.services.consent_record import _anonymize_ip
-from django.test import Client
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

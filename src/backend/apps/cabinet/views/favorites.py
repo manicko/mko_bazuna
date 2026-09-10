@@ -9,12 +9,13 @@ the card disappears without a full page reload.
 
 import logging
 
-from apps.ads.models import Ad
-from apps.ads.views.favorite import annotate_favorites
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+
+from apps.ads.models import Ad
+from apps.ads.views.favorite import annotate_favorites
 
 logger = logging.getLogger(__name__)
 

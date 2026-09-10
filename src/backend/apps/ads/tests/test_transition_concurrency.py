@@ -26,7 +26,6 @@ from django.db import connection, transaction
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-
 from conftest import create_test_ad
 
 pytestmark = [

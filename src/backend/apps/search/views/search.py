@@ -13,24 +13,24 @@ from decimal import Decimal
 from difflib import get_close_matches
 from typing import Final
 
-from apps.ads.models import Ad
-from apps.categories.models import Category
-from apps.core.enums import AdStatus, AdSort, AnalyticsEventType, LanguageLocale
-from apps.core.services.analytics import record_event
-from apps.locations.models import City
 from django.contrib.postgres.search import SearchQuery, SearchRank
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
 from django.core.paginator import Paginator
 from django.db.models import F
-from apps.core.utils.sanitize import sanitize_query_for_log
-from apps.search.services.popular_search import increment_popular_search
-from apps.search.services.search_history import record_search_history
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+
+from apps.ads.models import Ad
+from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.core.enums import AdSort, AdStatus, AnalyticsEventType, LanguageLocale
+from apps.core.services.analytics import record_event
+from apps.core.utils.sanitize import sanitize_query_for_log
+from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
-
+from apps.search.services.popular_search import increment_popular_search
+from apps.search.services.search_history import record_search_history
 
 logger = logging.getLogger(__name__)
 

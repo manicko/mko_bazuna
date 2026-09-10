@@ -16,11 +16,12 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from apps.core.models import SiteConfig
-from apps.core.services.site_config import get_site_name
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
+
+from apps.core.models import SiteConfig
+from apps.core.services.site_config import get_site_name
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

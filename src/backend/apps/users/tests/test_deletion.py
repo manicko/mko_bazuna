@@ -7,6 +7,8 @@ Verifies token invalidation on consent withdrawal and ad soft-deletion.
 import hashlib
 
 import pytest
+from django.utils import timezone
+
 from apps.users.models import LoginToken, User
 from apps.users.services.deletion import (
     decline_consent,
@@ -14,8 +16,6 @@ from apps.users.services.deletion import (
     soft_delete_user_ads,
     withdraw_consent,
 )
-from django.utils import timezone
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

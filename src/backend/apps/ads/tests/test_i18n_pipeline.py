@@ -19,7 +19,6 @@ from django.template import Context
 
 from apps.lookups.models import LookupItem
 
-
 pytestmark = [pytest.mark.unit]
 
 

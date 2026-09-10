@@ -18,7 +18,6 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.core.enums import AdSort, AdStatus
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

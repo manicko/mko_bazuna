@@ -7,15 +7,16 @@ Signal handlers for moderation app.
 
 import logging
 
+from django.conf import settings
+from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.moderation.models import ModerationCriteria
 from apps.moderation.services.auto_moderation import _invalidate_criteria_cache
 from apps.moderation.services.priority import PriorityService
-from django.conf import settings
-from django.db import transaction
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 

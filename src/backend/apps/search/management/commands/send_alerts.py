@@ -11,15 +11,16 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.db import transaction
+
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId, AnalyticsEventType
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
-from django.core.management.base import BaseCommand
-from django.db import transaction
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 

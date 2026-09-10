@@ -16,7 +16,7 @@ spy replaces ``advisory_lock`` and each command is driven through
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import AsyncMock, DEFAULT, MagicMock
+from unittest.mock import DEFAULT, AsyncMock, MagicMock
 
 import pytest
 from django.core.management import call_command
@@ -25,7 +25,6 @@ from django.utils import timezone
 
 from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.search.management.commands import send_alerts
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

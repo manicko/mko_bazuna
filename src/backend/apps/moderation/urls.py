@@ -2,10 +2,11 @@
 URLs for moderation app admin views.
 """
 
+from django.urls import path
+
 from apps.moderation.views import approve_ad, ban_user, moderation_review, reject_ad
 from apps.moderation.views.api_bulk import bulk_moderation_action
 from apps.moderation.views.queue import moderation_queue
-from django.urls import path
 
 app_name = "moderation"
 

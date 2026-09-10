@@ -1,14 +1,15 @@
 """Users app URLs."""
 
+from django.urls import path
+
 from apps.users.views.consent import (
     consent_accept,
     consent_decline,
+    consent_withdraw,
     login_issue,
     login_status,
-    consent_withdraw,
 )
 from apps.users.views.logout import logout_view
-from django.urls import path
 
 app_name = "consent"
 

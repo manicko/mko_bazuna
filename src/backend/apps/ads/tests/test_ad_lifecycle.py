@@ -12,13 +12,12 @@ All tests use the real ORM against PostgreSQL.
 
 from __future__ import annotations
 
+import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-import pytest
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

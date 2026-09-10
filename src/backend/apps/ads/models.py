@@ -8,19 +8,19 @@ import os
 from decimal import Decimal
 from typing import cast
 
-from apps.core.enums import AdSource, AdStatus
-from apps.currencies.enums import CurrencyCode
-from apps.lookups.enums import LookupGroupCode
+from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.enums import AdSource, AdStatus
+from apps.currencies.enums import CurrencyCode
+from apps.lookups.enums import LookupGroupCode
 from apps.media.services.filesystem import KEY_FORMAT_REGEX
-from django.conf import settings
-from django.urls import reverse
 
 
 class Ad(models.Model):

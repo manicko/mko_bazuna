@@ -17,9 +17,9 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from apps.core.enums import AdStatus
 from django.test import override_settings
 
+from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

@@ -4,8 +4,9 @@ Django admin registration for core app.
 SiteConfig singleton editing with add/delete disabled.
 """
 
-from apps.core.models import SiteConfig
 from django.contrib import admin
+
+from apps.core.models import SiteConfig
 
 
 @admin.register(SiteConfig)

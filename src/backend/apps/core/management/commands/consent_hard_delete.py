@@ -9,16 +9,17 @@ Uses advisory lock 3 for idempotent, safe concurrent execution.
 import logging
 from datetime import timedelta
 
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
+from apps.media.services.filesystem import delete_photo
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-from django.db import transaction
-from apps.ads.models import AdImage
-from apps.media.services.filesystem import delete_photo
 
 logger = logging.getLogger(__name__)
 

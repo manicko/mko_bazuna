@@ -7,6 +7,8 @@ Tests the real can_contact_seller predicate using persisted User+Ad fixtures.
 from types import SimpleNamespace
 
 import pytest
+from django.utils import timezone
+
 from apps.core.enums import AdStatus
 from apps.core.services.contact import (
     can_contact_seller,
@@ -14,7 +16,6 @@ from apps.core.services.contact import (
     record_contact_response,
 )
 from conftest import create_test_ad
-from django.utils import timezone
 from telegram_bot.handlers.contact import CONTACT_PATTERN
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

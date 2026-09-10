@@ -18,6 +18,8 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from django.conf import settings
+
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.categories.models import Category
@@ -34,8 +36,6 @@ from apps.media.services.filesystem import (
     validate_photo,
 )
 from apps.media.services.thumbnails import ThumbnailService
-from django.conf import settings
-
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
     PhotoCountPayload,
@@ -1065,8 +1065,9 @@ async def update_ad_and_moderate(
 
     """
 
-    from apps.moderation.services.auto_moderation import auto_moderate
     from asgiref.sync import sync_to_async
+
+    from apps.moderation.services.auto_moderation import auto_moderate
 
     @sync_to_async
     def _update_and_moderate() -> tuple[bool, list[str]]:
@@ -1278,8 +1279,9 @@ async def translate_all_languages(
 async def get_resolved_purposes(category_id: int) -> list:
     """Get resolved listing purposes for a category."""
 
-    from apps.categories.services.lookup_resolution import CategoryLookupResolver
     from asgiref.sync import sync_to_async
+
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     @sync_to_async
     def _get():
@@ -1302,8 +1304,9 @@ async def get_resolved_purposes(category_id: int) -> list:
 async def get_resolved_features(category_id: int) -> list:
     """Get resolved listing features for a category."""
 
-    from apps.categories.services.lookup_resolution import CategoryLookupResolver
     from asgiref.sync import sync_to_async
+
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     @sync_to_async
     def _get():
@@ -1325,8 +1328,9 @@ async def get_resolved_features(category_id: int) -> list:
 
 async def get_resolved_conditions(category_id: int) -> list:
     """Get resolved listing conditions for a category."""
-    from apps.categories.services.lookup_resolution import CategoryLookupResolver
     from asgiref.sync import sync_to_async
+
+    from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     @sync_to_async
     def _get():
@@ -1345,8 +1349,9 @@ async def get_resolved_conditions(category_id: int) -> list:
 async def get_default_purpose(category_id: int, purposes: list) -> object | None:
     """Get the default purpose for a category, if configured."""
 
-    from apps.categories.models import CategoryListingPurpose
     from asgiref.sync import sync_to_async
+
+    from apps.categories.models import CategoryListingPurpose
 
     @sync_to_async
     def _get():
@@ -1368,8 +1373,9 @@ async def get_default_purpose(category_id: int, purposes: list) -> object | None
 async def get_lookup_item_by_slug(slug: str):
     """Get a LookupItem by slug."""
 
-    from apps.lookups.models import LookupItem
     from asgiref.sync import sync_to_async
+
+    from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():
@@ -1389,8 +1395,9 @@ async def get_lookup_item(item_id: int | None):
     if item_id is None:
         return None
 
-    from apps.lookups.models import LookupItem
     from asgiref.sync import sync_to_async
+
+    from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():
@@ -1407,8 +1414,9 @@ async def get_lookup_item(item_id: int | None):
 async def get_feature_names(feature_ids: list[int]) -> list[str]:
     """Get feature names as localized strings."""
 
-    from apps.lookups.models import LookupItem
     from asgiref.sync import sync_to_async
+
+    from apps.lookups.models import LookupItem
 
     @sync_to_async
     def _get():

@@ -12,23 +12,22 @@ Uses an isolated temporary MEDIA_ROOT to avoid side effects.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 import io
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from apps.core.enums import AdStatus
+from django.test import Client, override_settings
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
-from django.test import Client, override_settings
 
+from apps.core.enums import AdStatus
 from apps.media.services.filesystem import (
     delete_photo,
     generate_storage_key,
     strip_photo_exif,
 )
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
@@ -201,9 +200,9 @@ class TestMediaAccessControl:
         self, seller, staff_user, category, city, isolated_media_root
     ):
         """Staff users can view images for any ad status."""
-        from apps.core.enums import AdStatus
-
         from django.test import Client
+
+        from apps.core.enums import AdStatus
 
         key = generate_storage_key()
         _create_ad_with_image(

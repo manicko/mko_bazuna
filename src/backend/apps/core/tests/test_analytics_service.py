@@ -14,9 +14,8 @@ import logging
 import pytest
 
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdStatus, AdSource, AnalyticsEventType
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType
 from apps.core.services.analytics import record_event
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

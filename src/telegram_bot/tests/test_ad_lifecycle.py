@@ -7,8 +7,10 @@ via the shared auto_moderate service, asserting immutability of original_publish
 All tests use the real ORM with monkeypatched criteria to avoid DB cache coupling.
 """
 
-import pytest
 from datetime import timedelta
+
+import pytest
+from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -16,8 +18,6 @@ from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.moderation.services.auto_moderation import auto_moderate
 from apps.users.models import User
-from django.utils import timezone
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

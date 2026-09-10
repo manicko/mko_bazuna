@@ -12,13 +12,13 @@ import hashlib
 from datetime import timedelta
 
 import pytest
+from django.test import Client
+from django.utils import timezone
+
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, ConsentChoice
 from apps.locations.models import City
 from apps.users.models import ConsentRecord, LoginToken, User
-from django.test import Client
-from django.utils import timezone
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

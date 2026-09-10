@@ -15,7 +15,6 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.core.enums import AdStatus
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

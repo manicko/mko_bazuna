@@ -18,11 +18,11 @@ def get_site_name() -> str:
 
     Falls back to 'Bazuna' if the DB or cache is unavailable (R-SN-05).
     """
+    from apps.core.models import SiteConfig
     from apps.core.utils.cache import (
         get_cached_site_config,
         set_cached_site_config,
     )
-    from apps.core.models import SiteConfig
 
     cached = get_cached_site_config()
     if cached:
@@ -47,11 +47,11 @@ def get_bot_username() -> str:
 
     Falls back to 'bazuna_bot' if the DB or cache is unavailable (Spec 18, Task 1).
     """
+    from apps.core.models import SiteConfig
     from apps.core.utils.cache import (
         get_cached_bot_username,
         set_cached_bot_username,
     )
-    from apps.core.models import SiteConfig
 
     cached = get_cached_bot_username()
     if cached:

@@ -17,9 +17,10 @@ from __future__ import annotations
 import importlib
 
 import pytest
-from apps.core.models import SiteConfig
 from django.apps import apps as django_apps
 from django.test import override_settings
+
+from apps.core.models import SiteConfig
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

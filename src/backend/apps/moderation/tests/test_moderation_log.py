@@ -5,9 +5,8 @@ Tests the authoritative lock + re-count + raise behavior inside
 set_published(), independent of the advisory check in auto_moderate().
 """
 
-from django.core.cache import cache
-
 import pytest
+from django.core.cache import cache
 
 from apps.core.enums import AdStatus
 from apps.moderation.models import ModerationCriteria

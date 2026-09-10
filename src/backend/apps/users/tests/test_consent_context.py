@@ -13,10 +13,11 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from apps.users.context_processors import consent_state
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.utils import timezone
+
+from apps.users.context_processors import consent_state
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

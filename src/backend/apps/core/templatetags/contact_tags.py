@@ -4,8 +4,9 @@ Template tags for contact button render conditions.
 Provides `can_contact` filter for zone R2 conditions in templates.
 """
 
-from apps.core.services.contact import can_contact_seller
 from django import template
+
+from apps.core.services.contact import can_contact_seller
 
 register = template.Library()
 

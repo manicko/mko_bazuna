@@ -20,6 +20,10 @@ import threading
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from django.conf import settings
+from django.utils import timezone
+from django.utils.translation import gettext as _, override as translation_override
+
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.core.enums import AdStatus, LanguageLocale
@@ -28,9 +32,6 @@ from apps.search.services.alert_query import (
     find_matching_saved_searches,
     record_notifications,
 )
-from django.conf import settings
-from django.utils import timezone
-from django.utils.translation import gettext as _, override as translation_override
 
 logger = logging.getLogger(__name__)
 

@@ -32,7 +32,6 @@ from apps.categories.models import Category
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 
-
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.slow,

@@ -24,7 +24,6 @@ from apps.search.services.alert_query import (
     record_notifications,
 )
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

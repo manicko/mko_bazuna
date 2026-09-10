@@ -32,10 +32,10 @@ from typing import Any
 import pytest
 from aiogram.types import TelegramObject
 from asgiref.sync import sync_to_async
+from django.db import close_old_connections as django_close_old_connections
 
 import telegram_bot.middlewares.connection as connection_module
 from apps.users.models import User
-from django.db import close_old_connections as django_close_old_connections
 from telegram_bot.middlewares import DatabaseConnectionMiddleware
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

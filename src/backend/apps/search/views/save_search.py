@@ -9,10 +9,11 @@ returns an HTMX success fragment.
 
 import logging
 
-from apps.search.models import SavedSearch
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+
+from apps.search.models import SavedSearch
 
 logger = logging.getLogger(__name__)
 

@@ -12,8 +12,9 @@ telegram_id already exists.
 """
 
 import logging
-from django.core.management.base import BaseCommand, CommandError
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock

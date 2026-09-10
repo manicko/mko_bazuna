@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Update, Message
+from aiogram.types import Message, TelegramObject, Update
 from asgiref.sync import sync_to_async
 from django.utils.translation import gettext as _
 

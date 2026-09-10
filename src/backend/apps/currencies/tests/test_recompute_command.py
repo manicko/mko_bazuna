@@ -7,9 +7,9 @@ from decimal import Decimal
 import pytest
 from django.core.management import call_command
 
-from conftest import create_test_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

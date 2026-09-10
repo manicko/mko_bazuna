@@ -7,12 +7,13 @@ Provides JSON API for approving, rejecting, or flagging multiple ads at once.
 import json
 import logging
 
+from django.http import HttpRequest, JsonResponse
+
 from apps.ads.models import Ad
 from apps.core.enums import BulkModerationAction
 from apps.moderation.admin_actions import approve_ad, reject_ad
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required_api
-from django.http import HttpRequest, JsonResponse
 
 logger = logging.getLogger(__name__)
 

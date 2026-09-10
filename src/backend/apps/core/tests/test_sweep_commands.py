@@ -15,19 +15,19 @@ correct retention-window filtering.
 from datetime import timedelta
 
 import pytest
+from django.core.management import call_command
+from django.utils import timezone
+
 from apps.ads.models import Ad, AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import (
     AdStatus,
-    AnalyticsEventType,
     AdvisoryLockId,
+    AnalyticsEventType,
     ModeratorActionType,
 )
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import LoginToken, User
-from django.core.management import call_command
-from django.utils import timezone
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

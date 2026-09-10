@@ -86,16 +86,11 @@ exclude = '''
 )/
 '''
 
-# isort configuration (used by isort hook)
-[tool.isort]
-profile = "black"
-known_first_party = ["mko_bazuna", "settings", "core"]
-combine_as_imports = true
-
 # Ruff top-level global settings
 [tool.ruff]
 line-length = 88
 fix = false   # IMPORTANT: do NOT auto-fix by default
+src = ["src", "src/backend"]
 # global excludes (keeps ruff from checking virtual envs and build artifacts)
 exclude = [
     ".direnv",
@@ -123,21 +118,19 @@ exclude = [
 select = [
     "E",  # PEP8 errors
     "F",  # Pyflakes
-    "I",  # import-sorted checks (ruff checks imports)
+    "I",  # isort: import sorting (ruff built-in; replaces standalone isort tool)
     "B",  # bugbear (best practices)
     "UP", # pyupgrade rules
 ]
 # We ignore line length because Black enforces it
 ignore = [
     "E501",
-    # optionally ignore import-sort warning which is handled by isort:
-    "I001",  # "Import block is un-sorted or un-formatted" if you prefer isort to run
 ]
 
 # Specific ruff.isort-related options (only ruff-supported keys)
 # Note: do NOT set profile here (ruff doesn't accept "profile" key)
 [tool.ruff.lint.isort]
-known-first-party = ["mko_bazuna", "settings", "core"]
+known-first-party = ["apps", "config", "theme", "telegram_bot", "conftest"]
 combine-as-imports = true
 
 # Ruff formatting section

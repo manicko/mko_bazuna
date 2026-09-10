@@ -13,13 +13,13 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
 import pytest
+from django.test import Client
+
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
-from django.test import Client
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

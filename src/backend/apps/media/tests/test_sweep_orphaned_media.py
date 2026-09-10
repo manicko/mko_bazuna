@@ -24,7 +24,6 @@ from django.test import override_settings
 
 from apps.ads.models import AdImage
 from apps.core.enums import AdStatus
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

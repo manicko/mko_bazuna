@@ -1,7 +1,8 @@
 """Core app URLs."""
 
-from apps.core import views
 from django.urls import path
+
+from apps.core import views
 
 app_name = "core"
 

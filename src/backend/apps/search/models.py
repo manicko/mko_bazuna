@@ -6,8 +6,9 @@ Tracks popular search queries with hit count and last seen timestamp.
 
 import secrets
 
-from apps.core.enums import AdSource
 from django.db import models
+
+from apps.core.enums import AdSource
 
 
 class PopularSearch(models.Model):

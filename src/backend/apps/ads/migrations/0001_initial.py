@@ -2,13 +2,14 @@
 
 from decimal import Decimal
 
-import apps.core.enums
-import apps.lookups.enums
 import django.contrib.postgres.indexes
 import django.contrib.postgres.search
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
+
+import apps.core.enums
+import apps.lookups.enums
 
 
 class Migration(migrations.Migration):

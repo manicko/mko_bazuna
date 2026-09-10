@@ -8,11 +8,12 @@ no longer fires alerts.
 
 import logging
 
-from apps.search.models import SavedSearch
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+
+from apps.search.models import SavedSearch
 
 logger = logging.getLogger(__name__)
 

@@ -11,10 +11,11 @@ import hashlib
 from datetime import timedelta
 
 import pytest
-from apps.locations.models import City
-from apps.users.models import LoginToken, User
 from django.test import Client
 from django.utils import timezone
+
+from apps.locations.models import City
+from apps.users.models import LoginToken, User
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

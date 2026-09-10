@@ -6,18 +6,15 @@ Usage: /copy <ad_id>
 """
 
 import logging
-
-from asgiref.sync import sync_to_async
-
 from decimal import Decimal
-
-from apps.currencies.enums import CurrencyCode
 
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from asgiref.sync import sync_to_async
 
 from apps.ads.services.copy_service import copy_ad
+from apps.currencies.enums import CurrencyCode
 from telegram_bot.states import AdCreateState
 
 logger = logging.getLogger(__name__)

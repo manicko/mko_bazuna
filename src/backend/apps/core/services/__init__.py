@@ -6,8 +6,8 @@ from .contact import (
     record_contact_initiated,
     record_contact_response,
 )
-from .translation import translate_text
 from .site_config import get_site_name, get_site_name_async
+from .translation import translate_text
 
 __all__ = [
     "can_contact_seller",

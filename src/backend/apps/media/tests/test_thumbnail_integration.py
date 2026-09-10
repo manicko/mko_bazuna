@@ -32,17 +32,16 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from PIL import Image
 from django.test import override_settings
+from PIL import Image
 
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
-from apps.media.services.thumbnails import ThumbnailService
-from telegram_bot.handlers.ad_create import save_photo
 from apps.media.services.filesystem import generate_storage_key
-
+from apps.media.services.thumbnails import ThumbnailService
 from conftest import create_test_ad
+from telegram_bot.handlers.ad_create import save_photo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

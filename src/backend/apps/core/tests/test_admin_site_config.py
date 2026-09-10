@@ -13,8 +13,9 @@ All checks are pure metadata introspection — no database access required.
 from __future__ import annotations
 
 import pytest
-from apps.core.models import SiteConfig
 from django.core.validators import RegexValidator
+
+from apps.core.models import SiteConfig
 
 pytestmark = [pytest.mark.unit]
 

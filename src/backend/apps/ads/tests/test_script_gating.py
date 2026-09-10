@@ -18,7 +18,6 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

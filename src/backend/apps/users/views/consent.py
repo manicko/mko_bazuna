@@ -19,7 +19,6 @@ import logging
 import secrets
 from datetime import timedelta
 
-from apps.core.services.site_config import get_bot_username
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -33,6 +32,7 @@ from pydantic import ValidationError
 from apps.core.enums import ConsentChoice, CookieCategory
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
+from apps.core.services.site_config import get_bot_username
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
 from apps.users.models import LoginToken, User

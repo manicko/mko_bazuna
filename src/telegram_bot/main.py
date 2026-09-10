@@ -12,13 +12,17 @@ django.setup()
 
 from aiogram import Bot, Dispatcher  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
+from django.conf import settings  # noqa: E402
+
 from telegram_bot.lifecycle import (  # noqa: E402
     LivenessMiddleware,
     _on_shutdown,
     _on_startup,
 )
-from telegram_bot.middlewares import AccountStateMiddleware, DatabaseConnectionMiddleware  # noqa: E402
-from django.conf import settings  # noqa: E402
+from telegram_bot.middlewares import (  # noqa: E402
+    AccountStateMiddleware,
+    DatabaseConnectionMiddleware,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +61,12 @@ def main() -> None:
 
     # Include routers
     from telegram_bot.handlers import (
-        login_router,
+        ad_copy_router,
         ad_create_router,
         alerts_router,
-        ad_copy_router,
-        language_router,
         contact_router,
+        language_router,
+        login_router,
     )
 
     dp.include_router(login_router)

@@ -13,13 +13,14 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from django.core.cache import cache
+
 from apps.core.models import SiteConfig
 from apps.core.services.site_config import get_bot_username
 from apps.core.utils.cache import (
     BOT_USERNAME_CACHE_KEY,
     get_cached_bot_username,
 )
-from django.core.cache import cache
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

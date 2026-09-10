@@ -27,9 +27,9 @@ import pytest
 from django.core.cache import cache
 
 from telegram_bot.handlers.contact import (
+    _CONTACT_US_GREETING,
     CONTACT_US_PATTERN,
     CONTACT_US_RATE_LIMITED_MESSAGE,
-    _CONTACT_US_GREETING,
     handle_contact_us_callback,
     handle_contact_us_start,
 )

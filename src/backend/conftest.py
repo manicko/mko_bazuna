@@ -19,8 +19,7 @@ from typing import Any
 
 import pytest
 from django.core.cache import cache
-from django.utils import timezone
-from django.utils import translation
+from django.utils import timezone, translation
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
@@ -28,7 +27,6 @@ from apps.core.enums import AdSource, AdStatus, AdvisoryLockId
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
-
 
 # ---------------------------------------------------------------------------
 # i18n testing standard (Spec 07)
@@ -140,8 +138,9 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
     management commands are idempotent, so sequential re-runs by each worker
     under the lock are safe and fast.
     """
-    from apps.core.utils.advisory_lock import advisory_lock
     from django.core.management import call_command
+
+    from apps.core.utils.advisory_lock import advisory_lock
 
     with django_db_blocker.unblock():
         # Serialize DDL across xdist workers: all 16 workers run this session-

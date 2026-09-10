@@ -9,9 +9,10 @@ Covers the HTMX partial used by the header's "All Categories" dropdown:
 """
 
 import pytest
+from django.test import Client
+
 from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
-from django.test import Client
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

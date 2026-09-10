@@ -2,9 +2,8 @@
 Media app for photo thumbnail generation and media processing.
 """
 
-from PIL import Image
-
 from django.apps import AppConfig
+from PIL import Image
 
 
 class MediaConfig(AppConfig):

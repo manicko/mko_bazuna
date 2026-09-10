@@ -35,11 +35,12 @@ import logging
 from enum import StrEnum
 from typing import Final, cast
 
-from apps.core.services.site_config import get_bot_username
 from django import template
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
+
+from apps.core.services.site_config import get_bot_username
 
 register = template.Library()
 logger = logging.getLogger(__name__)

@@ -7,8 +7,8 @@ to *liveness* (PID is alive).  See ENT-005.
 
 import logging
 import os
-from pathlib import Path
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from aiogram import BaseMiddleware

@@ -8,6 +8,7 @@ Tests the happy path (seller found, event created) and edge case
 from __future__ import annotations
 
 import pytest
+
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
 from apps.core.services.contact import record_contact_response

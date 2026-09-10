@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 
 from apps.ads.models import Ad, AdImage
@@ -28,7 +29,6 @@ from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
 from apps.trust.services.trust_calculator import TrustCalculator
 from apps.users.models import User
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 

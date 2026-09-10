@@ -9,14 +9,13 @@ Photo files are deleted after the transaction commits.
 import logging
 from datetime import timedelta
 
-from apps.ads.models import Ad
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-from django.db import transaction
-
-from apps.ads.models import AdImage
 from apps.media.services.filesystem import delete_photo
 
 logger = logging.getLogger(__name__)

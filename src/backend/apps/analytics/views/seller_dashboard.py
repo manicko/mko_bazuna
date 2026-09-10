@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import logging
 
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+
 from apps.analytics.services.trust_analytics import (
     calculate_seller_trust_score,
     get_seller_daily_metrics,
     get_trust_level,
 )
-from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 

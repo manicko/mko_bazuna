@@ -29,7 +29,6 @@ from apps.search.services.search_history import (
     record_search_history,
 )
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

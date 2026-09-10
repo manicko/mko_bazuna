@@ -10,10 +10,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from apps.core.enums import TrustLevel
-from apps.trust.models import SellerTrustScore
 from django import template
 from django.template.loader import render_to_string
+
+from apps.core.enums import TrustLevel
+from apps.trust.models import SellerTrustScore
 
 if TYPE_CHECKING:
     from apps.users.models import User

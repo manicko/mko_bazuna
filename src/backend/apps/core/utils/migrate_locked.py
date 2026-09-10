@@ -36,6 +36,7 @@ def main() -> int:
     0 if all succeeded.
     """
     import os
+
     import django
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")

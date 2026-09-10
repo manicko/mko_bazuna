@@ -7,9 +7,10 @@ max-ads-per-user) are tested through check(); side effects (status transitions,
 AnalyticsEvent creation) are tested through auto_moderate().
 """
 
+from unittest.mock import patch
+
 import pytest
 from django.core.cache import cache
-from unittest.mock import patch
 
 from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
@@ -19,7 +20,6 @@ from apps.moderation.models import ModerationCriteria, ModeratorActionLog
 from apps.moderation.services.auto_moderation import auto_moderate, check
 from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.moderation.services.moderation_log import set_published
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

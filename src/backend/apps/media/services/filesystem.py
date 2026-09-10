@@ -11,8 +11,8 @@ import time
 import uuid
 from pathlib import Path
 
-from PIL import Image, ImageOps
 from django.conf import settings
+from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 

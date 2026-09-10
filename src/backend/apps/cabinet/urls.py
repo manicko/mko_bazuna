@@ -5,6 +5,8 @@ This module is the shared append target for the cabinet sections
 which are serialized here to avoid concurrent-edit conflicts.
 """
 
+from django.urls import path
+
 from apps.cabinet.views import cabinet_hub, cabinet_settings
 from apps.cabinet.views.favorites import favorites_count_badge, favorites_list
 from apps.cabinet.views.saved_searches import (
@@ -14,7 +16,6 @@ from apps.cabinet.views.saved_searches import (
     saved_searches_list,
 )
 from apps.cabinet.views.search_history import search_history_clear, search_history_list
-from django.urls import path
 
 app_name = "cabinet"
 

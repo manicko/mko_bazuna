@@ -20,9 +20,8 @@ from django.db import transaction
 from django.test import override_settings
 
 from apps.core.enums import AdStatus
-from apps.moderation.models import AdModerationPriority
 from apps.moderation.admin_actions import approve_ad
-
+from apps.moderation.models import AdModerationPriority
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

@@ -19,18 +19,12 @@ Hard-delete sweep (30 days) is Phase 4 per zone R1.
 import logging
 
 from django.db import transaction
-
-
-from apps.ads.models import Ad, AdImage
-
-from apps.core.enums import AdStatus
-
-from apps.users.models import LoginToken, User
-
 from django.utils import timezone
 
+from apps.ads.models import Ad, AdImage
+from apps.core.enums import AdStatus
 from apps.media.services.filesystem import delete_photo
-
+from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
 

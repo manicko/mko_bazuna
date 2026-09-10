@@ -14,31 +14,25 @@ import logging
 from decimal import Decimal
 from difflib import get_close_matches
 
-from apps.ads.models import Ad, AdImage
-
-from apps.categories.models import Category
-
-from apps.core.enums import AdStatus, AdSort, AnalyticsEventType
-from apps.core.services.analytics import record_event
-from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
-
-from apps.locations.models import City
-from apps.media.services.filesystem import assert_storage_key_contained
-
+from django.conf import settings
+from django.core.paginator import Paginator
+from django.db.models import F, Q
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
-
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
-from django.core.paginator import Paginator
-from django.db.models import F, Q
-from django.conf import settings
-from apps.core.services.site_config import get_bot_username
+from apps.ads.models import Ad, AdImage
+from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
+from apps.core.enums import AdSort, AdStatus, AnalyticsEventType
+from apps.core.services.analytics import record_event
+from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
+from apps.core.services.site_config import get_bot_username
+from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
-
+from apps.media.services.filesystem import assert_storage_key_contained
 
 logger = logging.getLogger(__name__)
 

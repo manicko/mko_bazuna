@@ -22,7 +22,6 @@ from apps.analytics.services.trust_analytics import (
 from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerVerification
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

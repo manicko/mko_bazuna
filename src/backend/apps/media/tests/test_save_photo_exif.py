@@ -12,9 +12,9 @@ import asyncio
 import io
 
 import pytest
+from django.test import override_settings
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
-from django.test import override_settings
 
 from telegram_bot.handlers.ad_create import save_photo
 

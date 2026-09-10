@@ -20,14 +20,12 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from PIL import Image
 from django.core.management import call_command
 from django.test import override_settings
+from PIL import Image
 
 from apps.ads.models import AdImage
-
 from apps.media.services.filesystem import generate_storage_key
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

@@ -6,10 +6,11 @@ Provides metrics view aggregating AnalyticsEvent by type and date.
 
 import logging
 
-from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from django.contrib import admin
 from django.db.models import Count
 from django.db.models.functions import TruncDate
+
+from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 
 logger = logging.getLogger(__name__)
 

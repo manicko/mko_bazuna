@@ -1,7 +1,8 @@
 """Categories app URLs."""
 
-from apps.categories.views import category_submenu
 from django.urls import path
+
+from apps.categories.views import category_submenu
 
 app_name = "categories"
 

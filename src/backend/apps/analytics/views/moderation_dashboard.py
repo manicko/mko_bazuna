@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import logging
 
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+
 from apps.analytics.services.moderation_analytics import (
     ModerationStats,
     get_moderation_stats,
@@ -18,8 +21,6 @@ from apps.analytics.services.moderation_analytics import (
     get_rejection_reasons,
 )
 from apps.moderation.views.decorators import staff_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 

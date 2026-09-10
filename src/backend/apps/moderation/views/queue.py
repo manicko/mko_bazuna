@@ -7,11 +7,12 @@ counts per priority level.
 
 import logging
 
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+
 from apps.core.enums import PriorityFilter
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 

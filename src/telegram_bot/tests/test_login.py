@@ -23,8 +23,9 @@ from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
-from apps.users.models import LoginToken
 from django.utils import timezone
+
+from apps.users.models import LoginToken
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),

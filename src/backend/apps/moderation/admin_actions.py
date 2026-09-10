@@ -7,6 +7,8 @@ Used by moderation review views and admin actions.
 
 import logging
 
+from django.db import transaction
+
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.core.utils.sanitize import mask_telegram_id
@@ -18,7 +20,6 @@ from apps.moderation.services.moderation_log import (
     set_rejected,
 )
 from apps.users.models import User
-from django.db import transaction
 
 logger = logging.getLogger(__name__)
 

@@ -7,6 +7,8 @@ Includes listing_purpose and features display for lookup integration.
 
 import logging
 
+from django.contrib import admin
+
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import (
@@ -16,7 +18,6 @@ from apps.moderation.admin_actions import (
     bulk_reject,
 )
 from apps.moderation.services.priority import PriorityService
-from django.contrib import admin
 
 logger = logging.getLogger(__name__)
 

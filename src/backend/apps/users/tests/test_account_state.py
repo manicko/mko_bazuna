@@ -9,6 +9,7 @@ Covers the full flag matrix for:
 """
 
 import pytest
+
 from apps.users.models import User
 from apps.users.services import (
     AccountState,

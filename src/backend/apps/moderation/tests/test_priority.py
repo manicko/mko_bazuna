@@ -21,9 +21,8 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.core.enums import AdPriorityLevel, AdStatus
 from apps.moderation.models import ModerationCriteria
-from apps.moderation.services.priority_calculator import PriorityCalculator
 from apps.moderation.services.priority import PriorityService
-
+from apps.moderation.services.priority_calculator import PriorityCalculator
 from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

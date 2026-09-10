@@ -14,8 +14,9 @@ Verifies the extracted ``components/header.html`` across representative pages:
 - Authenticated users see an avatar icon with a dropdown menu + heart-with-count badge in the catalog header
 """
 
-import pytest
 from collections.abc import Generator
+
+import pytest
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
@@ -25,7 +26,6 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

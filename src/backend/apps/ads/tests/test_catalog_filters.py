@@ -22,12 +22,10 @@ import pytest
 from django.test import Client
 from django.utils import timezone
 
-
 from apps.ads.models import Ad
 from apps.core.enums import AdSort, AdStatus
-from apps.lookups.models import LookupGroup, LookupItem
 from apps.locations.models import City
-
+from apps.lookups.models import LookupGroup, LookupItem
 from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

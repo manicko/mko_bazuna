@@ -21,7 +21,6 @@ from django.urls import reverse
 
 from apps.core.enums import AdStatus, TrustLevel
 from apps.trust.models import SellerTrustScore
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

@@ -7,7 +7,6 @@ import os
 import shutil
 import tempfile
 from collections.abc import Iterator
-
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -31,7 +30,6 @@ from apps.seed.generators.users import UserGenerator
 from apps.seed.paths import FIXTURES_IMAGES_DIR
 from apps.seed.services.seed_service import SeedService
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

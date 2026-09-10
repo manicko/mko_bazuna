@@ -15,13 +15,14 @@ import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
-from apps.categories.models import Category
-from apps.locations.models import City
-from apps.users.models import User
 from django.conf import settings
 from django.db import connections
 from django.db.backends.signals import connection_created
 from django.utils import timezone
+
+from apps.categories.models import Category
+from apps.locations.models import City
+from apps.users.models import User
 
 # ---------------------------------------------------------------------------
 # aiogram infrastructure
@@ -54,7 +55,10 @@ def dp() -> Dispatcher:
         contact_router,
         login_router,
     )
-    from telegram_bot.middlewares import AccountStateMiddleware, DatabaseConnectionMiddleware
+    from telegram_bot.middlewares import (
+        AccountStateMiddleware,
+        DatabaseConnectionMiddleware,
+    )
 
     dp.message.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
     dp.include_router(login_router)

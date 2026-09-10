@@ -5,8 +5,9 @@ LookupGroup admin with inline LookupItem rows.
 System groups protected from deletion.
 """
 
-from apps.lookups.models import LookupGroup, LookupItem
 from django.contrib import admin
+
+from apps.lookups.models import LookupGroup, LookupItem
 
 
 class LookupItemInline(admin.TabularInline):

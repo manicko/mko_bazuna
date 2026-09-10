@@ -14,14 +14,14 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from apps.users.models import User, LoginToken
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
 from apps.core.services.site_config import get_site_name_async
-from django.db import IntegrityError, connection, transaction
+from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
 

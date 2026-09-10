@@ -4,8 +4,9 @@ SellerTrustScore and SellerVerification models for trust scoring.
 Tracks seller trust levels, verification status, and performance metrics.
 """
 
-from apps.core.enums import TrustLevel
 from django.db import models
+
+from apps.core.enums import TrustLevel
 
 
 class SellerTrustScore(models.Model):

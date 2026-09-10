@@ -1,8 +1,7 @@
 """Unit tests for ``MediaConfig.ready`` — ``MAX_IMAGE_PIXELS`` setting."""
 
-from PIL import Image
-
 import pytest
+from PIL import Image
 
 pytestmark = [pytest.mark.unit]
 

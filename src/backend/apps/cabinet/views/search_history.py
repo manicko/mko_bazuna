@@ -8,11 +8,12 @@ merged into the account (D6/A6).
 
 import logging
 
-from apps.search.models import SearchHistory
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
+
+from apps.search.models import SearchHistory
 
 logger = logging.getLogger(__name__)
 

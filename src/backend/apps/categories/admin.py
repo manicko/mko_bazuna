@@ -5,14 +5,15 @@ Uses django-mptt admin for hierarchical category tree.
 Includes inlines for CategoryPath, CategoryListingPurpose, and CategoryListingFeature.
 """
 
+from django.contrib import admin
+from mptt.admin import MPTTModelAdmin
+
 from apps.categories.models import (
     Category,
     CategoryListingFeature,
     CategoryListingPurpose,
     CategoryPath,
 )
-from django.contrib import admin
-from mptt.admin import MPTTModelAdmin
 
 
 class CategoryPathInline(admin.TabularInline):

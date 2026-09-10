@@ -11,16 +11,17 @@ Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
 import logging
 from decimal import Decimal
 
-from apps.ads.models import Ad
-from apps.core.enums import AdStatus
-from apps.currencies.enums import CurrencyCode
-from apps.currencies.services.price_normalizer import PriceNormalizer
-from apps.moderation.services.auto_moderation import auto_moderate
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
+
+from apps.ads.models import Ad
+from apps.core.enums import AdStatus
+from apps.currencies.enums import CurrencyCode
+from apps.currencies.services.price_normalizer import PriceNormalizer
+from apps.moderation.services.auto_moderation import auto_moderate
 
 logger = logging.getLogger(__name__)
 

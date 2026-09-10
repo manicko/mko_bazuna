@@ -11,6 +11,7 @@ Requires a working PostgreSQL database per project spec.
 from __future__ import annotations
 
 import pytest
+
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
@@ -19,7 +20,6 @@ from apps.locations.models import City
 from apps.trust.models import SellerTrustScore, SellerVerification
 from apps.trust.services.trust_calculator import TrustCalculator
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

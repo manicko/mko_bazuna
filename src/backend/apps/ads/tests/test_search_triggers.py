@@ -12,16 +12,16 @@ with the 'russian'/'simple'/'english' text search configurations is
 PostgreSQL-only).
 """
 
-import pytest
 from datetime import timedelta
 
-from apps.ads.models import Ad
-from apps.categories.models import Category
-from apps.core.enums import AdStatus
+import pytest
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.test import Client
 from django.utils import timezone
 
+from apps.ads.models import Ad
+from apps.categories.models import Category
+from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]

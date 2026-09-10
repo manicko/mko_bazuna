@@ -10,12 +10,13 @@ Implements US-S6 self-delete ad flow:
 
 import logging
 
-from apps.ads.models import Ad
-from apps.core.enums import AdStatus
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext as _
+
+from apps.ads.models import Ad
+from apps.core.enums import AdStatus
 
 logger = logging.getLogger(__name__)
 

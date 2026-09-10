@@ -4,9 +4,10 @@ Analytics models for Mko Bazuna.
 AnalyticsEvent for product metrics.
 """
 
-from apps.core.enums import AdSource, AnalyticsEventType
 from django.db import models
 from django.utils import timezone
+
+from apps.core.enums import AdSource, AnalyticsEventType
 
 
 class AnalyticsEvent(models.Model):

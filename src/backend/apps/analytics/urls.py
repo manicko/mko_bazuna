@@ -6,9 +6,10 @@ Routes:
     /analytics/moderation/      — Moderation analytics dashboard (staff only)
 """
 
+from django.urls import path
+
 from apps.analytics.views.moderation_dashboard import moderation_analytics
 from apps.analytics.views.seller_dashboard import seller_trust_dashboard
-from django.urls import path
 
 app_name = "analytics"
 

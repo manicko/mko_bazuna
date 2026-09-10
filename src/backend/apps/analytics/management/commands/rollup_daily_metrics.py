@@ -9,13 +9,14 @@ into DailyAdMetrics records for yesterday's date. Uses advisory lock 8
 import logging
 from datetime import timedelta
 
-from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AdvisoryLockId, AnalyticsEventType
-from apps.core.utils.advisory_lock import advisory_lock
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
+
+from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
+from apps.core.enums import AdvisoryLockId, AnalyticsEventType
+from apps.core.utils.advisory_lock import advisory_lock
 
 logger = logging.getLogger(__name__)
 

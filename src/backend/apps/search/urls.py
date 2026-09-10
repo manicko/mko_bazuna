@@ -1,10 +1,11 @@
 """Search app URLs."""
 
+from django.urls import path
+
 from apps.search.views.autocomplete import autocomplete
 from apps.search.views.preferred_city import set_preferred_city
 from apps.search.views.save_search import save_search
 from apps.search.views.search import search
-from django.urls import path
 
 app_name = "search"
 

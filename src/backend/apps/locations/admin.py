@@ -4,8 +4,9 @@ Django admin registration for locations app.
 City management for ad locations.
 """
 
-from apps.locations.models import City
 from django.contrib import admin
+
+from apps.locations.models import City
 
 
 @admin.register(City)

@@ -19,15 +19,13 @@ from __future__ import annotations
 import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
-from django.utils import timezone
-from django.utils import translation
+from django.utils import timezone, translation
 
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
-
 from conftest import create_test_ad
 
 # Distinct, unambiguous seed values per locale: the strings do not overlap

@@ -23,7 +23,7 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 
 from apps.ads.views.listings import listings as listings_view

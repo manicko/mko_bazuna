@@ -15,8 +15,8 @@ from datetime import timedelta
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
-from apps.analytics.models import AnalyticsEvent, AnalyticsEventType
 from apps.ads.models import Ad
+from apps.analytics.models import AnalyticsEvent, AnalyticsEventType
 from apps.core.enums import AdStatus, TimeRange
 
 logger = logging.getLogger(__name__)
