@@ -5,20 +5,16 @@ Verifies that ``translate_all_languages`` correctly dispatches parallel
 translation and falls back to the original text on failure.
 
 All tests mock ``translate_cached_generic`` (the shared service's LRU-cached
-translator) to avoid hitting real translation APIs (deep-translator / Google
-Translate).  Patching at this level lets the mock receive ``(text,
-source_locale, target_locale)`` so per-locale assertions are possible.
+translator) to avoid hitting the real Google Cloud Translation API.  Patching
+at this level lets the mock receive ``(text, source_locale, target_locale)``
+so per-locale assertions are possible.
 """
 
 import time
 from unittest.mock import patch
 
+import httpx
 import pytest
-from deep_translator.exceptions import (
-    RequestError,
-    TooManyRequests,
-    TranslationNotFound,
-)
 
 from apps.core.services.translation import (
     _CIRCUIT_BREAKER,
@@ -34,6 +30,19 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
 # translate_text looks up this name at call-time from the module namespace,
 # so patching here intercepts every call from translate_all_languages.
 _TRANSLATE_PATH: str = "apps.core.services.translation.translate_cached_generic"
+
+# A reusable httpx.Request for constructing httpx exceptions in tests.
+_REQUEST: httpx.Request = httpx.Request("POST", "http://test")
+
+
+def _make_http_error(status_code: int) -> httpx.HTTPStatusError:
+    """Factory for httpx.HTTPStatusError with a given response status code."""
+    response = httpx.Response(status_code, request=_REQUEST)
+    return httpx.HTTPStatusError(
+        f"HTTP {status_code}",
+        request=response.request,
+        response=response,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -86,7 +95,7 @@ class TestTranslateAllLanguages:
     async def test_timeout_fallback_returns_original_text(self) -> None:
         """Returns original text when translation raises an exception."""
         with patch(_TRANSLATE_PATH) as mock_translate:
-            mock_translate.side_effect = TooManyRequests("Translation failed")
+            mock_translate.side_effect = _make_http_error(429)
             result = await translate_all_languages("Original text", ["ru", "bs"])
 
         assert result["ru"] == "Original text"
@@ -97,7 +106,7 @@ class TestTranslateAllLanguages:
 
         def _side_effect(text: str, source: str, target: str) -> str:
             if target == "bs":
-                raise TooManyRequests("BS translation failed")
+                raise _make_http_error(429)
             return f"{text}-{target}"
 
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -137,7 +146,7 @@ class TestTranslateAllLanguages:
 
     async def test_circuit_breaker_open_short_circuits(self) -> None:
         """After 3 translation failures the circuit opens and short-circuits."""
-        with patch(_TRANSLATE_PATH, side_effect=TooManyRequests("fail")):
+        with patch(_TRANSLATE_PATH, side_effect=_make_http_error(429)):
             # Three failed calls open the circuit.
             await translate_all_languages("test text", ["ru"])
             await translate_all_languages("test text", ["ru"])
@@ -179,7 +188,7 @@ class TestTranslateAllLanguages:
 
         def _side_effect(text: str, source: str, target: str) -> str:
             if target == "bs":
-                raise RequestError("BS translation failed")
+                raise httpx.RequestError("BS translation failed", request=_REQUEST)
             return f"{text}-{target}"
 
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -199,15 +208,23 @@ class TestTranslateTextExceptNarrowing:
     """
 
     @pytest.mark.parametrize(
-        "exc_type",
-        [RequestError, TooManyRequests, TranslationNotFound],
-        ids=["RequestError", "TooManyRequests", "TranslationNotFound"],
+        "exc",
+        [
+            httpx.RequestError("transport error", request=_REQUEST),
+            httpx.ReadTimeout("read timeout", request=_REQUEST),
+            _make_http_error(429),
+            _make_http_error(400),
+        ],
+        ids=[
+            "RequestError",
+            "ReadTimeout",
+            "HTTPStatusError-429",
+            "HTTPStatusError-400",
+        ],
     )
-    def test_narrowed_except_catches_deep_translator_family(
-        self, exc_type: type[Exception]
-    ) -> None:
-        """deep_translator.exceptions family is caught and falls back to original text."""
-        with patch(_TRANSLATE_PATH, side_effect=exc_type("simulated failure")):
+    def test_narrowed_except_catches_httpx_family(self, exc: Exception) -> None:
+        """httpx exception family is caught and falls back to original text."""
+        with patch(_TRANSLATE_PATH, side_effect=exc):
             result = translate_text("Original text", "auto", "ru")
 
         assert result == "Original text"
@@ -222,17 +239,17 @@ class TestTranslateTextExceptNarrowing:
 class TestTranslateTextRetry:
     """Tests for bounded retry with exponential backoff in translate_text.
 
-    translate_text retries retryable exceptions (TooManyRequests, RequestError,
-    TimeoutError, RequestException) up to ``TRANSLATION_MAX_ATTEMPTS`` (2),
-    while ``TranslationNotFound`` is not retried — it deterministically returns
-    the same response, so retrying wastes a round-trip.
+    translate_text retries retryable exceptions (httpx.TimeoutException,
+    httpx.RequestError, httpx.HTTPStatusError on 429/5xx) up to
+    ``TRANSLATION_MAX_ATTEMPTS`` (2), while non-retryable HTTP errors
+    (400/401/403) fall back immediately without retry.
     """
 
     def test_retry_succeeds_after_transient_failure(self) -> None:
         """A retryable failure followed by success returns the translation."""
         with patch(_TRANSLATE_PATH) as mock_translate:
             mock_translate.side_effect = [
-                TooManyRequests("rate limited"),
+                _make_http_error(429),
                 "переведено",
             ]
             result = translate_text("hello", "auto", "ru")
@@ -241,19 +258,19 @@ class TestTranslateTextRetry:
         assert mock_translate.call_count == 2
 
     def test_too_many_requests_retried_then_fallback(self) -> None:
-        """Persistent TooManyRequests exhausts retries and falls back to original."""
+        """Persistent HTTP 429 exhausts retries and falls back to original."""
         with patch(_TRANSLATE_PATH) as mock_translate:
-            mock_translate.side_effect = TooManyRequests("rate limited")
+            mock_translate.side_effect = _make_http_error(429)
             result = translate_text("hello", "auto", "ru")
 
         assert result == "hello"
         assert mock_translate.call_count == 2
         assert _CIRCUIT_BREAKER._failure_count > 0
 
-    def test_translation_not_found_not_retried(self) -> None:
-        """TranslationNotFound is not retried — single attempt then fallback."""
+    def test_non_retryable_http_error_not_retried(self) -> None:
+        """HTTP 400 is not retried — single attempt then fallback."""
         with patch(_TRANSLATE_PATH) as mock_translate:
-            mock_translate.side_effect = TranslationNotFound("no element")
+            mock_translate.side_effect = _make_http_error(400)
             result = translate_text("hello", "auto", "ru")
 
         assert result == "hello"

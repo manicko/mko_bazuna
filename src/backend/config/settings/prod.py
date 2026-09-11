@@ -21,6 +21,14 @@ if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
         "Provide it via the .env.docker runtime file."
     )
 
+# Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
+# Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds.
+if not GOOGLE_TRANSLATE_API_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+    raise ImproperlyConfigured(
+        "GOOGLE_TRANSLATE_API_KEY must be set in production. "
+        "Provide it via the .env.docker runtime file."
+    )
+
 # SITE_URL is required in production so Telegram alert links are absolute and
 # correct. A dev-only default must not silently leak into prod traffic.
 if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405

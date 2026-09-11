@@ -5,12 +5,13 @@ Translates existing Russian-language ads (title, description) to:
     - Bosnian (title_bs, description_bs)
 
 Skips ads where translations are already populated.
-Uses deep-translator (GoogleTranslator) for batch translation.
+Uses the Google Cloud Translation API (via httpx) for batch translation.
 Idempotent: safe to run multiple times.
 """
 
 import logging
 
+import httpx
 from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
@@ -35,11 +36,14 @@ def _translate_text(text: str, target: str) -> str | None:
     if not text or not text.strip():
         return None
     try:
-        from deep_translator import GoogleTranslator
+        from apps.core.services.translation import translate_cached_generic
 
-        translator = GoogleTranslator(source="ru", target=target)
-        return translator.translate(text)
-    except Exception as exc:
+        return translate_cached_generic(text, "ru", target)
+    except (
+        httpx.HTTPStatusError,
+        httpx.RequestError,
+        httpx.TimeoutException,
+    ) as exc:
         logger.warning(
             "Translation failed for target=%r text=%r: %s",
             target,

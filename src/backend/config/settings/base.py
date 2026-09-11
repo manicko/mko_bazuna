@@ -58,6 +58,11 @@ DEBUG = env("DEBUG")
 # Allow empty string for development when bot is not needed
 BOT_TOKEN = env("BOT_TOKEN", default="")
 
+# Google Cloud Translation API key (v2 Basic, API-key auth via ?key= query param).
+# Used by the shared translation service and the backfill management command.
+# Empty string default allows dev/test without the key (translations fall back to original text).
+GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "")
+
 # ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
 ALLOWED_HOSTS = (
     os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []

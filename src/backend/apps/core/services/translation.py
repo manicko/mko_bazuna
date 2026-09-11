@@ -11,15 +11,15 @@ removed — the search path now uses language-aware per-language FTS vectors
 with no external translation.
 """
 
+import html
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from functools import lru_cache
 from typing import Final
 
-import deep_translator.exceptions
-from deep_translator import GoogleTranslator
-from requests.exceptions import RequestException
+import httpx
+from django.conf import settings
 
 from apps.core.utils.sanitize import sanitize_query_for_log
 
@@ -36,6 +36,15 @@ TRANSLATION_TIMEOUT_SECONDS: Final[float] = 0.5  # ~500ms timeout via exceptions
 # Retry configuration: 2 total attempts (1 retry) with capped exponential backoff.
 TRANSLATION_MAX_ATTEMPTS: Final[int] = 2
 TRANSLATION_BACKOFF_BASE: Final[float] = 0.1  # 100ms base; backoff = 0.1 * 2**attempt
+
+GOOGLE_TRANSLATE_V2_URL: Final[str] = "https://translation.googleapis.com/language/translate/v2"
+
+# Module-level httpx client with socket-level timeout enforcement.
+# Sync httpx.Client is thread-safe for concurrent requests (connection pool
+# is internally synchronized). Timeout truly interrupts hung upstream calls,
+# reclaiming ThreadPoolExecutor workers instead of abandoning them (the
+# orphaned-worker problem from deep_translator's requests.get without timeout).
+_TRANSLATION_CLIENT: Final[httpx.Client] = httpx.Client(timeout=TRANSLATION_TIMEOUT_SECONDS)
 
 
 class TranslationCircuitBreaker:
@@ -109,8 +118,7 @@ def translate_cached(query: str) -> str:
     Returns:
         Translated query in Russian
     """
-    translator = GoogleTranslator(source="bs", target="ru")
-    return translator.translate(query)
+    return _translate_via_api(query, "bs", "ru")
 
 
 @lru_cache(maxsize=256)
@@ -128,21 +136,38 @@ def translate_cached_generic(query: str, source_locale: str, target_locale: str)
     Returns:
         Translated text
     """
-    translator = GoogleTranslator(source=source_locale, target=target_locale)
-    return translator.translate(query)
+    return _translate_via_api(query, source_locale, target_locale)
+
+
+def _translate_via_api(query: str, source_locale: str, target_locale: str) -> str:
+    """Translate text via Google Cloud Translation API v2 Basic.
+
+    Raises httpx.HTTPStatusError, httpx.RequestError, httpx.TimeoutException
+    on failure -- the caller (``translate_text``) owns retry, circuit-breaker,
+    and graceful fallback.
+    """
+    response = _TRANSLATION_CLIENT.post(
+        GOOGLE_TRANSLATE_V2_URL,
+        params={"key": settings.GOOGLE_TRANSLATE_API_KEY},
+        json={"q": query, "source": source_locale, "target": target_locale},
+    )
+    response.raise_for_status()
+    data = response.json()
+    translated = data["data"]["translations"][0]["translatedText"]
+    return html.unescape(translated)
 
 
 def translate_text(text: str, source_locale: str, target_locale: str) -> str:
     """
-    Translate text from source_locale to target_locale via deep-translator.
+    Translate text from source_locale to target_locale via the Google Cloud Translation API.
 
     Generalized version supporting any language pair.
     Uses timeout, fallback, circuit-breaker pattern for graceful degradation.
 
-    Retries retryable failures (TimeoutError, RequestException, TooManyRequests,
-    RequestError) up to ``TRANSLATION_MAX_ATTEMPTS`` with exponential backoff.
-    ``TranslationNotFound`` is not retried — the same input deterministically
-    returns the same response, so retrying wastes a round-trip.
+    Retries retryable failures (TimeoutError, httpx.TimeoutException, httpx.RequestError,
+    httpx.HTTPStatusError on 429/5xx) up to ``TRANSLATION_MAX_ATTEMPTS`` with
+    exponential backoff. Non-retryable HTTP errors (400/401/403) fall back
+    immediately without retry.
 
     Args:
         text: The text to translate
@@ -180,22 +205,8 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                 return result
             # Empty result — fall back without retrying
             break
-        except deep_translator.exceptions.TranslationNotFound as e:
-            _CIRCUIT_BREAKER.record_failure()
-            logger.warning(
-                "Translation not found for text '%s' (%s->%s): %s",
-                sanitize_query_for_log(text),
-                source_locale,
-                target_locale,
-                e,
-            )
-            break  # No retry — same input returns same response
-        except (
-            TimeoutError,
-            RequestException,
-            deep_translator.exceptions.TooManyRequests,
-            deep_translator.exceptions.RequestError,
-        ) as e:
+        except (TimeoutError, httpx.TimeoutException, httpx.RequestError) as e:
+            # Transport-level failures — always retryable
             _CIRCUIT_BREAKER.record_failure()
             logger.warning(
                 "Translation failed (attempt %d/%d) for text '%s' (%s->%s): %s",
@@ -208,6 +219,33 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
             )
             if attempt + 1 < TRANSLATION_MAX_ATTEMPTS:
                 time.sleep(TRANSLATION_BACKOFF_BASE * (2 ** attempt))
+        except httpx.HTTPStatusError as e:
+            # HTTP 4xx/5xx — retry only for 429/5xx, fall back on 400/401/403
+            _CIRCUIT_BREAKER.record_failure()
+            status = e.response.status_code
+            if status in (429, 500, 502, 503, 504) and attempt + 1 < TRANSLATION_MAX_ATTEMPTS:
+                logger.warning(
+                    "Translation rate-limited/server error (attempt %d/%d, HTTP %d) "
+                    "for text '%s' (%s->%s): %s",
+                    attempt + 1,
+                    TRANSLATION_MAX_ATTEMPTS,
+                    status,
+                    sanitize_query_for_log(text),
+                    source_locale,
+                    target_locale,
+                    e,
+                )
+                time.sleep(TRANSLATION_BACKOFF_BASE * (2 ** attempt))
+            else:
+                logger.warning(
+                    "Translation failed (HTTP %d) for text '%s' (%s->%s): %s",
+                    status,
+                    sanitize_query_for_log(text),
+                    source_locale,
+                    target_locale,
+                    e,
+                )
+                break
 
     logger.info(
         "Translation fallback: returning original text '%s'",
