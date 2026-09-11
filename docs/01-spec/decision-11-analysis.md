@@ -437,9 +437,9 @@ Acceptance:
 - BOSNIAN fts_config returns "simple" (no "bosnian" PostgreSQL config). Correct.
 - Seed images are pre-existing JPEG fixtures in fixtures/images/.
 - No query-time translation egress: ad title/description are pre-translated at
-  creation time via `deep-translator` (documented in technical-specification.md,
+  creation time via httpx + Google Cloud Translation API (documented in technical-specification.md,
   zone R3). Search runs per-language on pre-built `search_vector_ru`,
-  `search_vector_bs`, `search_vector_en` columns — no Google Translate API
+  `search_vector_bs`, `search_vector_en` columns — no Google Cloud Translation API
   calls at search time.
 - Cache backend in dev is LocMemCache (single-process); rate limiter works
   but won't be shared across processes.

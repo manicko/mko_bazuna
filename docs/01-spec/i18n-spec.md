@@ -222,8 +222,8 @@ message rendering.
 
 Seller input may arrive in any supported language, but **title + description are translated to
 Russian at ad publication**. The bot delegates to the shared
-`apps.core.services.translation.translate_text` helper, which uses `deep-translator` against
-Google Translate, runs in parallel via `asyncio.gather` + `asyncio.to_thread`, enforces a 500 ms
+`apps.core.services.translation.translate_text` helper, which uses httpx against
+the Google Cloud Translation API, runs in parallel via `asyncio.gather` + `asyncio.to_thread`, enforces a 500 ms
 timeout, a circuit breaker (3 failures → 60 s cooldown), and an LRU cache. No user PII
 (`telegram_id`, `username`, IP) is included in the request (decision G, data flow). Because the
 Russian vector is built from this translated content,

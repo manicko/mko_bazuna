@@ -47,7 +47,7 @@ Seller input  (ru / bs / en / Montenegrin)
       │
       ▼  (bot ad-creation confirm step)
 core.translation.translate_text
-      │  • Google Translate (deep-translator GoogleTranslator)
+      │  • Google Cloud Translation API v2 Basic via httpx (`GOOGLE_TRANSLATE_API_KEY`)
       │  • ThreadPoolExecutor (max_workers=4), ~500ms timeout
       │  • circuit-breaker (3 failures → 60s cooldown) + LRU cache (128 / 256 entries)
       │  • original-text fallback on failure
@@ -90,7 +90,7 @@ and, for authenticated users, the session.
 
 | Element | Detail |
 |---|---|
-| Provider | Google Translate via `deep-translator` `GoogleTranslator` |
+| Provider | Google Cloud Translation API v2 Basic via httpx (`GOOGLE_TRANSLATE_API_KEY`) |
 | Concurrency | `ThreadPoolExecutor(max_workers=4)` for parallel per-language translation |
 | Timeout | ~500 ms per call |
 | Circuit breaker | `TranslationCircuitBreaker` (module singleton): 3 failures → 60 s cooldown |
@@ -104,7 +104,7 @@ that `to_tsvector('russian', …)` is correct for the base vector.
 ### Backfill command
 
 `management.commands.backfill_translations` — one-shot migration of existing Russian-base ads
-into the `en`/`bs` columns via `GoogleTranslator(source="ru")`. Batch size 100, idempotent
+into the `en`/`bs` columns via the shared translation service. Batch size 100, idempotent
 (skips already-populated fields), sets `original_language="ru"` when null.
 
 ## Search integration

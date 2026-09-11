@@ -32,7 +32,7 @@ django-mptt is not yet validated against Django 6.0.
 - Telegram bot (phase 1): aiogram 3.x (Bot API). Telethon NOT used in phase 1.
 - Background jobs: Django management commands + systemd timer / cron (Celery)
 - **Async bot + sync Django ORM:** bot runs `django.setup()` and shares the ORM. Blocking ORM calls and Telegram photo downloads wrapped in `sync_to_async`. Each process holds its OWN psycopg3 pool (`CONN_MAX_AGE=0`); shared external PgBouncer (transaction mode) recommended.
-- Query translation: deep-translator (Bosnian→Russian title/description translation at ad publication time; hard timeout ~500ms + fallback to original query). NOT used for search queries (search is per-language FTS, no query-time translation).
+- Query translation: httpx + Google Cloud Translation API v2 Basic (Bosnian→Russian title/description translation at ad publication time; ~500ms socket-level timeout + fallback to original query). NOT used for search queries (search is per-language FTS, no query-time translation).
 
 ## Package List (pyproject.toml)
 
@@ -47,7 +47,8 @@ django-tailwind>=4.4.0            # Tailwind standalone CLI (NO Node.js). daisyU
 django-htmx>=1.19.0               # HTMX for the MPA.
 pillow>=10.4.0                    # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1.
 aiogram>=3.15.0                   # Bot API bot (login/contact/publish). NO built-in PG FSM storage — draft Ad stored via ORM.
-deep-translator>=1.11.0           # Ad title/description translation at publication time (deep-translator). NOT used for search queries (search is per-language FTS, no query-time translation).
+httpx>=0.28.0                     # Google Cloud Translation API v2 Basic (httpx, `GOOGLE_TRANSLATE_API_KEY`) at ad publication time. NOT used for search queries (search is per-language FTS, no query-time translation).
+requests>=2.34.2                  # Retained for non-translation uses (seed photo downloads); NOT used for translation egress.
 # Search: native PostgreSQL FTS only (no haystack/Whoosh).
 # API (DRF): DEFERRED to post-MVP.
 # Tasks (celery/redis): DEFERRED to post-MVP (management commands + cron instead).
@@ -85,14 +86,14 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 | django-filter | `>=26.1` | List filters. Requires Django>=5.2. |
 | aiogram FSM | use `Ad.DRAFT` in ORM | No built-in PG FSM storage; never Redis/Mongo. |
 | django-tailwind | `>=4.4.0` | daisyUI excluded (standalone has no plugin support). |
-| deep-translator | `>=1.11.0` | Google-scrape fragility → enforce timeout + fallback wrapper. |
+| httpx | `>=0.28.0` | Socket-level timeout + cancel scope (worker reclamation) replaces Google-scrape fragility; uses official Google Cloud Translation API v2 Basic. |
 | pytest-asyncio | `>=1.4.0` | Major jump from 0.24; set `asyncio_mode="strict"`, `minversion="8.4"`. |
 
 ## Residual Risks
 
 | Risk | Level | Mitigation |
 |------|-------|------------|
-| deep-translator Google-scrape fragility | HIGH | Hard timeout ~500ms + mandatory fallback to original query. |
+| httpx + Google Cloud Translation API (worker reclamation via socket timeout) | HIGH | Socket-level timeout (~500ms) + circuit breaker (3 failures → 60s cooldown) + LRU cache, governing bot-side ad-creation translation. Mandatory fallback to original text/query on failure. |
 | aiogram FSM "PostgreSQL storage" misconception | HIGH | Use `Ad.DRAFT` in shared Django ORM; no DB-backed FSM. |
 | django-mptt abandonment | MEDIUM | Plan replacement (recursive CTE / django-tree-queries) before Django 6.0; keep `<6.0`. |
 | django-tailwind without daisyUI | MEDIUM | Plain Tailwind suffices for MVP. |

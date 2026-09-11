@@ -132,7 +132,7 @@ Telegram Login (S1) ──► Ad Creation (S2) ──► Edit/Delete (S5/S6)
 ### External Dependencies
 - Telegram Bot API access
 - PostgreSQL 18 database
-- Deep-translator for Montenegrin→Russian translation
+- httpx + Google Cloud Translation API v2 Basic for Montenegrin→Russian translation
 
 ---
 

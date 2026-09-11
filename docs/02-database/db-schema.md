@@ -371,7 +371,7 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 > title+description to Russian on ad creation so `to_tsvector('russian', …)` is correct. Montenegrin/English
 > UI translates back on display.
 
-The implemented translation egress pipeline (publication-time Google Translate, circuit
+The implemented translation egress pipeline (publication-time Google Cloud Translation API via httpx, circuit
 breaker, 500 ms timeout, LRU cache, no-PII boundary) is documented in
 [i18n-translation-egress.md](../96-researches/i18n-translation-egress.md).
 

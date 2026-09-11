@@ -258,7 +258,7 @@ dependency**, not whether the data is "local":
 
 | Migration | Kind | Disposition |
 |-----------|------|-------------|
-| `ads/0006_backfill_translations` | External API (`deep_translator.GoogleTranslator`) | **Extracted** → `manage.py backfill_translations` |
+| `ads/0006_backfill_translations` | External API (Google Cloud Translation API v2 Basic via httpx) | **Extracted** → `manage.py backfill_translations` |
 | `categories/0005_load_catalog` | Live Python import | **Fixed in place** — refactored to accept `apps=` and use `apps.get_model()`; YAML rewrite suppressed when called from a migration |
 | `categories/0002_seed_categories` | Hardcoded MPTT raw SQL (`lft`/`rght`) | **Fixed in place** — rewritten to use `apps.get_model("categories", "Category")` + `parent=` FK assignment so MPTT recalculates tree values |
 
@@ -331,7 +331,7 @@ during regeneration). Violating them is what caused the original `migrate` servi
 
 | Rule | Do | Don't |
 |------|----|-------|
-| **No external calls** | Put API/SDK work in a `management/commands/` command; call it on demand. | Call `deep_translator`, HTTP clients, or any network code inside `RunPython`/`RunSQL`. |
+| **No external calls** | Put API/SDK work in a `management/commands/` command; call it on demand. | Call `httpx` (Google Cloud Translation API), `requests`, or any network code inside `RunPython`/`RunSQL`. |
 | **Historical models only** | Access models via `apps.get_model("app", "Model")` in `RunPython`. | `from apps.foo.models import Bar` inside a migration (breaks when model shape diverges). |
 | **Idempotent SQL** | `CREATE OR REPLACE FUNCTION ...`, `CREATE INDEX IF NOT EXISTS`, `DROP ... IF EXISTS`. | Bare `CREATE FUNCTION`/`CREATE INDEX` (fails on re-run; fails `--fake` reconciliation). |
 | **Idempotent data** | Make `RunPython` safe to run twice (skip already-populated rows). | Assume rows are absent; `INSERT` unconditionally. |
@@ -386,7 +386,7 @@ Most often caused by one of the fragile patterns documented above:
 1. **Live import in a migration** — `ImportError` or `OperationalError: no such table/column`.
    Confirm the offending migration uses `apps.get_model(...)` instead of a direct `from apps...`
    import. Re-run `make makemigrations --check --dry-run` to catch drift.
-2. **External API call** — `deep_translator`/`GoogleTranslator` fails at build time. The migration
+2. **External API call** — Google Cloud Translation API (httpx) fails at build time. The migration
    must have been extracted to `manage.py backfill_translations`; run it manually after `up`.
 3. **Hardcoded MPTT values** — `categories/0002_seed_categories` raw SQL fails when the `categories`
    table name or column layout diverges. The rewritten ORM version sets `parent=` and lets MPTT

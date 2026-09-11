@@ -390,13 +390,13 @@ serves translations as a JavaScript `gettext()` function. Requires running
   static strings** in one template. The project already has a working pattern
   for inline JS in `header_catalog.html` (vanilla JS, no framework).
 
-### D.6 `deep-translator` (already a project dependency)
+### D.6 `httpx` (already a project dependency)
 
-The project includes `deep-translator>=1.11.0` (line 19 of `pyproject.toml`).
-This could be used to auto-generate `msgstr` values during `makemessages`
-workflow. However, it's currently used only for Montenegrin→Russian ad-content
-translation at publication time (per `spec-index.md:47`). Using it for UI string
-translation would be a new use case.
+The project includes `httpx>=0.28.0` (line 23 of `pyproject.toml`).
+This could be used to interface with translation/MCP endpoints during the
+`makemessages` workflow. However, it's currently used only for Montenegrin→Russian
+ad-content translation at publication time (per `spec-index.md:47`). Using it
+for UI string translation would be a new use case.
 
 ### Recommendation for Task D
 
