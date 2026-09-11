@@ -18,8 +18,8 @@ from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AnalyticsEventType
+from apps.core.services.analytics import record_event
 from apps.core.services.site_config import get_site_name_async
 from apps.users.models import LoginToken, User
 
@@ -205,11 +205,11 @@ async def handle_login_orm(
             created = False
         else:
             if created:
-                AnalyticsEvent.objects.create(
-                    event_type=AnalyticsEventType.REGISTRATION_CREATED,
+                record_event(
+                    AnalyticsEventType.REGISTRATION_CREATED,
                     user_id=user.id,
                 )
-                logger.info(f"Registration event recorded for user {user.id}")
+                logger.info("Registration event recorded for user %s", user.id)
         return login_token, user, created
 
     return await _handle()

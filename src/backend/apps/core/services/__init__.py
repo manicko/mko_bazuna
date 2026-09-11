@@ -1,5 +1,6 @@
 """Core services package for Mko Bazuna."""
 
+from .analytics import record_event
 from .contact import (
     can_contact_seller,
     get_seller_for_contact,
@@ -17,4 +18,5 @@ __all__ = [
     "translate_text",
     "get_site_name",
     "get_site_name_async",
+    "record_event",
 ]

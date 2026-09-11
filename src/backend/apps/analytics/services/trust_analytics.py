@@ -14,8 +14,9 @@ from django.db.models import QuerySet
 from django.utils import timezone
 
 from apps.ads.models import Ad
-from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
+from apps.analytics.models import DailyAdMetrics
 from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.services.analytics import record_event
 from apps.trust.models import SellerVerification
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ def record_trust_event(
             events so ``SeedService._clean()`` can identify them for deletion).
             ``None`` (the default) is correct for production events.
     """
-    AnalyticsEvent.objects.create(
+    record_event(
         event_type=event,
         user_id=user_id,
         source=source,

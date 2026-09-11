@@ -8,8 +8,8 @@ Used by web templates to determine if contact button should render.
 import logging
 
 from apps.ads.models import Ad
-from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.services.analytics import record_event
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import User
 
@@ -111,10 +111,7 @@ def record_contact_initiated(buyer_telegram_id: int | None = None) -> None:
         except User.DoesNotExist:
             pass  # User may not exist yet, that's fine
 
-    AnalyticsEvent.objects.create(
-        event_type=AnalyticsEventType.CONTACT_INITIATED,
-        user_id=user_id,
-    )
+    record_event(AnalyticsEventType.CONTACT_INITIATED, user_id=user_id)
     logger.info("Contact initiated event recorded for buyer %s", user_id)
 
 
@@ -130,10 +127,7 @@ def record_contact_response(seller_telegram_id: int) -> None:
     """
     try:
         user = User.objects.get(telegram_id=seller_telegram_id)
-        AnalyticsEvent.objects.create(
-            event_type=AnalyticsEventType.CONTACT_RESPONSE,
-            user_id=user.id,
-        )
+        record_event(AnalyticsEventType.CONTACT_RESPONSE, user_id=user.id)
         logger.info("Contact response event recorded for seller %s", user.id)
     except User.DoesNotExist:
         logger.warning(
