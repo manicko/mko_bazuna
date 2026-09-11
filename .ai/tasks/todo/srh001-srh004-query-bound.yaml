@@ -1,0 +1,104 @@
+# Task: SRH-001 + SRH-004 — Bound q at input edge + input-robustness regression tests
+# Source: .ai/plans/21-search-fts-finding-fixes.md (Block 1)
+# Priority: high
+# Classification: mandatory
+# Risk: low (backward-compatible truncation; no migration; matches autocomplete pattern)
+
+id: srh001_srh004_query_bound
+title: "SRH-001 + SRH-004: Bound q at /search/ input edge + add input-robustness regression tests"
+priority: high
+depends_on: []
+classification: mandatory
+source_reference: .ai/plans/21-search-fts-finding-fixes.md
+source_section: "Block 1: SRH-001 + SRH-004"
+
+description: >
+  The /search/ view reads q with only .strip() and no length bound. The uncapped
+  query flows to increment_popular_search(query) and record_search_history(query),
+  both of which persist into PopularSearch.query / SearchHistory.query —
+  CharField(max_length=200). Any q exceeding 200 chars triggers PostgreSQL DataError
+  on INSERT into varchar(200) -> HTTP 500. This is a public anonymous DoS.
+
+  Fix: truncate q at the input edge (line 57 of search.py) using a named constant
+  MAX_SEARCH_QUERY_LENGTH = 200, before the if query: block. This is backward
+  compatible (legitimate queries ≤200 chars unaffected), requires no migration,
+  no i18n changes, and matches the existing sanitize_autocomplete_query pattern
+  (silent cap at 100 chars). Add regression tests to pin the fix.
+
+files:
+  - path: src/backend/apps/search/views/search.py
+    targets:
+      - type: module
+  - path: src/backend/apps/search/tests/test_search_view.py
+    targets:
+      - type: module
+
+changes:
+  - action: add_constant
+    description: >
+      Add module-level constant MAX_SEARCH_QUERY_LENGTH: Final[int] = 200
+      after imports, before the search() function. Aligned to PopularSearch.query
+      and SearchHistory.query CharField(max_length=200).
+    code_hint: |
+      MAX_SEARCH_QUERY_LENGTH: Final[int] = 200
+
+  - action: add_import
+    description: >
+      Add 'from typing import Final' to search.py imports (following the pattern
+      already used in popular_search.py:9 and _MIN_HIT_COUNT).
+    code_hint: |
+      from typing import Final
+
+  - action: modify_code
+    description: >
+      Cap the query at line 57. Change:
+        query = (request.GET.get("q") or "").strip()
+      to:
+        query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
+      The truncation must occur BEFORE the if query: block (current line 183)
+      that gates increment_popular_search (line 237) and record_search_history
+      (lines 238-242).
+    anchor: "query = (request.GET.get(\"q\") or \"\").strip()"
+
+  - action: add_tests
+    description: >
+      Add TestSearchViewInputRobustness class to test_search_view.py with tests:
+      (a) test_query_exceeding_max_length_returns_200 — q=300 chars → 200
+      (b) test_sql_injection_query_returns_200 — q="'; DROP TABLE ads; --" → 200, DB intact
+      (c) test_homoglyph_and_control_chars_query_returns_200 — q with Cyrillic + zero-width + HTML → 200
+      Tests follow existing pattern: seller/root_category/city fixtures, create_test_ad
+      with status=AdStatus.PUBLISHED, Client() for HTTP.
+    code_hint: |
+      class TestSearchViewInputRobustness:
+          """Input-robustness tests for the /search/ FTS path (SRH-001, SRH-004)."""
+
+          def test_query_exceeding_max_length_returns_200(...): ...
+          def test_sql_injection_query_returns_200(...): ...
+          def test_homoglyph_and_control_chars_query_returns_200(...): ...
+
+acceptance_criteria:
+  - search.py has MAX_SEARCH_QUERY_LENGTH: Final[int] = 200 module constant
+  - search.py imports Final from typing
+  - Line 57 truncates: query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
+  - Truncation occurs before the if query: block (before increment_popular_search call)
+  - TestSearchViewInputRobustness with 3 tests added to test_search_view.py
+  - >200-char q returns HTTP 200 (not 500)
+  - SQL injection q returns HTTP 200 and DB intact
+  - ruff check passes on both files
+  - ruff format --check passes on both files
+  - basedpyright passes on search.py
+  - Tests pass: PYTEST_OPTS="-k 'TestSearchViewInputRobustness'"
+
+verification:
+  - ruff check src/backend/apps/search/views/search.py src/backend/apps/search/tests/test_search_view.py
+  - ruff format --check src/backend/apps/search/views/search.py src/backend/apps/search/tests/test_search_view.py
+  - uv run basedpyright src/backend/apps/search/views/search.py
+  - $dc run --rm -e PYTEST_OPTS="-k 'TestSearchViewInputRobustness'" test
+
+commit:
+  type: fix
+  scope: search
+  description: "Bound search query length to 200 chars at input edge to prevent DataError/500; add input-robustness regression tests"
+  files_to_stage:
+    - src/backend/apps/search/views/search.py
+    - src/backend/apps/search/tests/test_search_view.py
