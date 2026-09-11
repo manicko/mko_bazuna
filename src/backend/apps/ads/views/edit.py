@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
 from apps.ads.models import Ad
+from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
@@ -161,36 +162,47 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         has_text_change = _text_fields_changed(request, ad)
 
         if is_reactivation:
-            # Reactivation: update fields then run moderation check
-            ad.title = new_title
-            ad.description = new_description
-            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
-            ad.save(
-                update_fields=[
-                    "title",
-                    "description",
-                    "price_amount",
-                    "price_currency",
-                    "price_normalized_eur",
-                ]
+            # Route through the shared submission orchestrator.
+            #
+            # The currency pre-coercion above (lines for price_currency_value)
+            # ensures it is a valid CurrencyCode | None — submit_ad's
+            # defensive coercion is a no-op here. This is an intentional
+            # divergence: the web edit path preserves the user's existing
+            # currency on invalid input, while the bot flow (always passes
+            # a valid CurrencyCode) has no such need. See submit_ad docstring.
+            #
+            # submit_ad fetches a fresh Ad row; the outer transaction's row
+            # lock guarantees no concurrent mutation, sets fields, saves,
+            # transitions ARCHIVED -> ON_MODERATION, then calls auto_moderate
+            # outside its own atomic.
+            passed, errors = submit_ad(
+                SubmitAdInput(
+                    ad_id=ad_id,
+                    title_ru=new_title,
+                    desc_ru=new_description,
+                    category_id=ad.category_id,
+                    city_id=ad.city_id,
+                    price_amount=price_amount_value,
+                    price_currency=price_currency_value,
+                    photos=[],
+                    user_id=ad.user_id,
+                    listing_condition_id=ad.listing_condition_id,
+                )
             )
 
-            # Transition to ON_MODERATION (clears archived_at via transition_to)
-            ad.transition_to(AdStatus.ON_MODERATION)
-
-            # Run auto-moderation check
-            passed = auto_moderate(ad)
-
             if passed:
-                # Auto-moderate sets status to PUBLISHED and published_at
                 return redirect("ads:dashboard")
             else:
-                # Moderation failed - stay on edit page with error
                 ad = Ad.objects.prefetch_related("images").get(id=ad_id)
                 return render(
                     request,
                     "ads/edit.html",
-                    {"ad": ad, "error": _("Ad failed moderation checks")},
+                    {
+                        "ad": ad,
+                        "error": errors[0]
+                        if errors
+                        else _("Ad failed moderation checks"),
+                    },
                 )
 
         elif ad.status == AdStatus.PUBLISHED:

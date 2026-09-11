@@ -59,6 +59,18 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
 
     This is a synchronous function.  Callers that run in an async context
     (e.g. the bot handler) must wrap the call in ``sync_to_async``.
+
+    .. note::
+
+        **Currency coercion divergence (QLT-001 Stage 3 / Path 2):**
+        This function defensively coerces ``CurrencyCode | str`` inputs,
+        falling back to ``None`` on ``ValueError`` (inherited from the bot
+        handler's original ``update_ad_and_moderate``).  The web edit view
+        pre-validates currency at the view layer (preserving the user's
+        current currency on invalid form input) and passes a valid
+        ``CurrencyCode | None`` via ``SubmitAdInput``, so the coercion is a
+        no-op for the edit path.  Do not remove this defensive check without
+        verifying the bot flow still guards against raw-string currencies.
     """
     try:
         ad = Ad.objects.get(id=input.ad_id)

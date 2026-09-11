@@ -113,15 +113,20 @@ class TestReactivationStatusTransition:
         We mock ``auto_moderate`` to return ``True`` so the mock bypasses
         ``_pass_moderation`` (which would set PUBLISHED).  This isolates the
         view's own transition (``ARCHIVED -> ON_MODERATION`` via
-        ``ad.transition_to`` before the moderation call) and verifies
+        ``ad.transition_to`` inside submit_ad) and verifies
         ``auto_moderate`` is invoked.
+
+        Note: after the A4 migration, ``auto_moderate`` is called inside
+        ``submit_ad`` (not directly in edit.py), so the mock targets the
+        source module ``apps.moderation.services.auto_moderation``.
         """
         ad = archived_ad
         original_title = "Old Title"
         Ad.objects.filter(pk=ad.pk).update(title=original_title)
 
         with patch(
-            "apps.ads.views.edit.auto_moderate", return_value=True
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=True,
         ) as mock_moderate:
             response = client_.post(
                 reverse("ads:edit", args=[ad.id]),
@@ -186,11 +191,15 @@ class TestReactivationAutoModerate:
         bypasses the internal ``_fail_moderation`` (which sets
         ``ON_MODERATION_FAILED``), the ad remains at ``ON_MODERATION`` —
         the view only re-renders the edit page on failure.
+
+        Note: after the A4 migration, ``auto_moderate`` is called inside
+        ``submit_ad``, so the mock targets the source module.
         """
         ad = archived_ad
 
         with patch(
-            "apps.ads.views.edit.auto_moderate", return_value=False
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=False,
         ) as mock_moderate:
             response = client_.post(
                 reverse("ads:edit", args=[ad.id]),
