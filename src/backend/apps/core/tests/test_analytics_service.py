@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from django.db import transaction
 
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdSource, AdStatus, AnalyticsEventType
@@ -97,3 +98,22 @@ class TestRecordEvent:
         assert "RuntimeError" in caplog.text
         # No event should have been persisted.
         assert AnalyticsEvent.objects.count() == 0
+
+    def test_record_event_inside_rollback_not_persisted(self) -> None:
+        """``record_event`` is transaction-transparent: an event created inside an
+        ``atomic()`` block that is rolled back must NOT be committed."""
+
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            record_event(AnalyticsEventType.SEARCH_PERFORMED)
+            transaction.set_rollback(True)
+
+        assert AnalyticsEvent.objects.count() == 0
+
+    def test_record_event_inside_commit_persisted(self) -> None:
+        """``record_event`` created inside an ``atomic()`` block with no rollback
+        must be committed within the atomic scope."""
+
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            record_event(AnalyticsEventType.SEARCH_PERFORMED)
+
+        assert AnalyticsEvent.objects.count() == 1
