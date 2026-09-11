@@ -1,10 +1,15 @@
 """
-Inert ad submission service — verbatim extraction of the bot handler's
+Shared ad submission service — extracted verbatim from the bot handler's
 ``_update_and_moderate`` logic (QLT-001 Stage 1).
 
-No callers are wired yet.  ``submit_ad`` exists solely to provide a
-shared, DTO-accepting orchestration seam that both the bot handler and the
-web edit view will adopt in subsequent stages (A2, A4).
+``submit_ad`` is now wired into both callers:
+  * the bot handler's ``process_preview`` step, invoked via ``sync_to_async``
+    (see ``ad_create.py``); and
+  * the web edit view's ``ad_edit`` reactivation branch, which transitions
+    an ``ARCHIVED`` ad back to ``ON_MODERATION`` (see ``edit.py``).
+
+The currency-coercion divergence between the two call paths (Path 2) is
+documented in the ``submit_ad`` function docstring.
 """
 
 from __future__ import annotations
