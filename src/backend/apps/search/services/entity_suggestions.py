@@ -10,6 +10,7 @@ import logging
 from apps.categories.models import Category
 from apps.core.enums import SearchSuggestionSource
 from apps.locations.models import City
+from apps.search.schemas import AutocompleteSuggestion
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def _category_path(category: Category, locale: str = "ru") -> str:
 
 def get_entity_suggestions(
     prefix: str, limit: int = 5, locale: str = "ru"
-) -> list[dict]:
+) -> list[AutocompleteSuggestion]:
     """
     Get matching category and city names for autocomplete.
 
@@ -50,8 +51,7 @@ def get_entity_suggestions(
         locale: Language code for localized names (e.g. "ru", "bs", "en").
 
     Returns:
-        A combined list of dicts, each with keys ``text``, ``source``,
-        and ``type``.
+        A combined list of ``AutocompleteSuggestion`` objects.
     """
     normalized = prefix.strip()
     if not normalized:
@@ -68,24 +68,24 @@ def get_entity_suggestions(
         name__istartswith=normalized,
     ).order_by("name")[:limit]
 
-    suggestions: list[dict] = [
-        {
-            "text": cat.get_name(locale),
-            "source": SearchSuggestionSource.CATEGORY.value,
-            "type": SearchSuggestionSource.CATEGORY.value,
-            "slug": cat.slug,
-            "category_path": _category_path(cat, locale),
-        }
+    suggestions: list[AutocompleteSuggestion] = [
+        AutocompleteSuggestion(
+            text=cat.get_name(locale),
+            source=SearchSuggestionSource.CATEGORY,
+            type=SearchSuggestionSource.CATEGORY,
+            slug=cat.slug,
+            category_path=_category_path(cat, locale),
+        )
         for cat in categories
     ]
 
     suggestions.extend(
-        {
-            "text": city.get_name(locale),
-            "source": SearchSuggestionSource.CITY.value,
-            "type": SearchSuggestionSource.CITY.value,
-            "slug": city.slug,
-        }
+        AutocompleteSuggestion(
+            text=city.get_name(locale),
+            source=SearchSuggestionSource.CITY,
+            type=SearchSuggestionSource.CITY,
+            slug=city.slug,
+        )
         for city in cities
     )
 

@@ -6,12 +6,12 @@ and cities), and popular searches into a single deduplicated JSON response.
 """
 
 import logging
-from typing import Any
 
 from django.http import HttpRequest, JsonResponse
 
 from apps.core.enums import SearchSuggestionSource
 from apps.core.utils.sanitize import sanitize_autocomplete_query
+from apps.search.schemas import AutocompleteSuggestion
 from apps.search.services.entity_suggestions import get_entity_suggestions
 from apps.search.services.popular_search import get_popular_suggestions
 from apps.search.services.rate_limit import rate_limit_check
@@ -57,7 +57,7 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
     if not rate_limit_check(request):
         return JsonResponse({"error": "rate_limit"}, status=429)
 
-    suggestions: list[dict[str, Any]] = []
+    suggestions: list[AutocompleteSuggestion] = []
 
     # 1. User search history (highest priority, shown first).
     user_id = request.user.id if request.user.is_authenticated else None
@@ -66,11 +66,11 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
     )
     for item in user_history:
         suggestions.append(
-            {
-                "text": item,
-                "source": SearchSuggestionSource.USER_HISTORY.value,
-                "type": SearchSuggestionSource.USER_HISTORY.value,
-            }
+            AutocompleteSuggestion(
+                text=item,
+                source=SearchSuggestionSource.USER_HISTORY,
+                type=SearchSuggestionSource.USER_HISTORY,
+            )
         )
 
     # 2. Entity suggestions (categories + cities), localized to the
@@ -84,16 +84,19 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
 
     # Deduplicate by "text" field, preserving insertion order.
     seen: set[str] = set()
-    unique: list[dict[str, Any]] = []
+    unique: list[AutocompleteSuggestion] = []
     for item in suggestions:
-        text = item.get("text", "")
+        text = item.text
         if text and text not in seen:
             seen.add(text)
             unique.append(item)
 
     return JsonResponse(
         {
-            "suggestions": unique[:_MAX_SUGGESTIONS],
+            "suggestions": [
+                suggestion.model_dump(mode="json")
+                for suggestion in unique[:_MAX_SUGGESTIONS]
+            ],
             "query": query,
         }
     )

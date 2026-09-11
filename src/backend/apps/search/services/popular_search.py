@@ -12,6 +12,7 @@ from django.db.models import F
 
 from apps.core.enums import SearchSuggestionSource
 from apps.search.models import PopularSearch
+from apps.search.schemas import AutocompleteSuggestion
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def increment_popular_search(query: str) -> None:
         )
 
 
-def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
+def get_popular_suggestions(prefix: str, limit: int = 5) -> list[AutocompleteSuggestion]:
     """
     Return the most popular completed queries matching ``prefix``.
 
@@ -58,8 +59,7 @@ def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
         limit: Maximum number of suggestions to return (default 5).
 
     Returns:
-        A list of dicts, each with keys ``text``, ``source``, ``type``, and
-        ``hit_count``.
+        A list of ``AutocompleteSuggestion`` objects.
     """
     normalized_prefix = prefix.strip().lower()
     if not normalized_prefix:
@@ -71,11 +71,11 @@ def get_popular_suggestions(prefix: str, limit: int = 5) -> list[dict]:
     ).order_by("-hit_count")[:limit]
 
     return [
-        {
-            "text": obj.query,
-            "source": SearchSuggestionSource.POPULAR_SEARCH.value,
-            "type": SearchSuggestionSource.POPULAR_SEARCH.value,
-            "hit_count": obj.hit_count,
-        }
+        AutocompleteSuggestion(
+            text=obj.query,
+            source=SearchSuggestionSource.POPULAR_SEARCH,
+            type=SearchSuggestionSource.POPULAR_SEARCH,
+            hit_count=obj.hit_count,
+        )
         for obj in qs
     ]

@@ -325,8 +325,8 @@ class TestPopularSearchService:
         # Only queries with hit_count >= 10
         assert len(results) == 2
         # Ordered by popularity descending
-        assert results[0]["text"] == "велосипед"
-        assert results[1]["text"] == "веревка"
+        assert results[0].text == "велосипед"
+        assert results[1].text == "веревка"
 
     def test_get_popular_suggestions_no_match_returns_empty(self) -> None:
         """No matching prefix returns empty list."""
@@ -491,26 +491,26 @@ class TestEntitySuggestionsService:
     def test_returns_matching_categories(self, root_category: Category) -> None:
         """Returns categories matching the prefix."""
         results = get_entity_suggestions("тран")
-        texts = [r["text"] for r in results]
+        texts = [r.text for r in results]
         assert "Транспорт" in texts
 
     def test_uses_prefix_matching(self, root_category: Category) -> None:
         """Uses istartswith (prefix match), not full-text contains."""
         # "спорт" should NOT match "Транспорт" (it contains "спорт" but doesn't start with it)
         results = get_entity_suggestions("спорт")
-        texts = [r["text"] for r in results]
+        texts = [r.text for r in results]
         assert "Транспорт" not in texts
 
     def test_excludes_inactive_categories(self, inactive_category: Category) -> None:
         """Inactive categories are excluded from suggestions."""
         results = get_entity_suggestions("уста")
-        texts = [r["text"] for r in results]
+        texts = [r.text for r in results]
         assert "Устаревшее" not in texts
 
     def test_returns_matching_cities(self, city: City, city2: City) -> None:
         """Returns cities matching the prefix."""
         results = get_entity_suggestions("тест")
-        texts = [r["text"] for r in results]
+        texts = [r.text for r in results]
         assert "Тестград" in texts
 
     def test_empty_prefix_returns_empty(self) -> None:
@@ -519,13 +519,13 @@ class TestEntitySuggestionsService:
         assert get_entity_suggestions("   ") == []
 
     def test_suggestion_structure(self, root_category: Category, city: City) -> None:
-        """Each suggestion has text, source, and type keys."""
+        """Each suggestion has text, source, and type fields."""
         results = get_entity_suggestions("т")
         for r in results:
-            assert "text" in r
-            assert "source" in r
-            assert "type" in r
-            assert r["source"] in [
+            assert r.text is not None
+            assert r.source is not None
+            assert r.type is not None
+            assert r.source in [
                 SearchSuggestionSource.CATEGORY.value,
                 SearchSuggestionSource.CITY.value,
             ]
@@ -535,31 +535,31 @@ class TestEntitySuggestionsService:
     ) -> None:
         """Category suggestions expose a root→leaf ``category_path`` string."""
         results = get_entity_suggestions("вел")
-        cat = next((r for r in results if r.get("type") == "category"), None)
+        cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
-        assert "category_path" in cat
-        assert cat["category_path"] == "Транспорт > Велосипеды"
+        assert cat.category_path is not None
+        assert cat.category_path == "Транспорт > Велосипеды"
 
     def test_entity_suggestions_expose_slug(
         self, root_category: Category, child_category: Category, city: City
     ) -> None:
         """Category and city suggestions expose a ``slug`` for click navigation."""
         cat_results = get_entity_suggestions("вел")
-        cat = next((r for r in cat_results if r.get("type") == "category"), None)
+        cat = next((r for r in cat_results if r.type == "category"), None)
         assert cat is not None
-        assert cat["slug"] == "bicycles"
+        assert cat.slug == "bicycles"
 
         city_results = get_entity_suggestions("тест")
-        city_sug = next((r for r in city_results if r.get("type") == "city"), None)
+        city_sug = next((r for r in city_results if r.type == "city"), None)
         assert city_sug is not None
-        assert city_sug["slug"] == city.slug
+        assert city_sug.slug == city.slug
 
     def test_non_category_sources_omit_category_path(self, city: City) -> None:
-        """City suggestions carry no ``category_path`` key."""
+        """City suggestions carry no ``category_path`` value."""
         results = get_entity_suggestions("тест")
         for r in results:
-            if r.get("type") != "category":
-                assert "category_path" not in r
+            if r.type != "category":
+                assert r.category_path is None
 
     def test_entity_suggestions_localized_bs(
         self, root_category: Category, city: City
@@ -571,10 +571,10 @@ class TestEntitySuggestionsService:
         city.save(update_fields=["name_i18n"])
 
         results = get_entity_suggestions("тран", locale="bs")
-        cat = next((r for r in results if r.get("type") == "category"), None)
+        cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
-        assert cat["text"] == "Prevoz"
-        assert cat["category_path"] == "Prevoz"
+        assert cat.text == "Prevoz"
+        assert cat.category_path == "Prevoz"
 
     def test_entity_suggestions_localized_en(
         self, root_category: Category, city: City
@@ -584,9 +584,9 @@ class TestEntitySuggestionsService:
         root_category.save(update_fields=["name_i18n"])
 
         results = get_entity_suggestions("тран", locale="en")
-        cat = next((r for r in results if r.get("type") == "category"), None)
+        cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
-        assert cat["text"] == "Transport"
+        assert cat.text == "Transport"
 
     def test_entity_suggestions_localized_falls_back_to_ru(
         self, root_category: Category
@@ -596,9 +596,9 @@ class TestEntitySuggestionsService:
         root_category.save(update_fields=["name_i18n"])
 
         results = get_entity_suggestions("тран", locale="bs")
-        cat = next((r for r in results if r.get("type") == "category"), None)
+        cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
-        assert cat["text"] == "Транспорт"
+        assert cat.text == "Транспорт"
 
     def test_entity_suggestions_localized_category_path_bs(
         self, root_category: Category, child_category: Category
@@ -610,10 +610,10 @@ class TestEntitySuggestionsService:
         child_category.save(update_fields=["name_i18n"])
 
         results = get_entity_suggestions("вел", locale="bs")
-        cat = next((r for r in results if r.get("type") == "category"), None)
+        cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
-        assert cat["text"] == "Bicikli"
-        assert cat["category_path"] == "Prevoz > Bicikli"
+        assert cat.text == "Bicikli"
+        assert cat.category_path == "Prevoz > Bicikli"
 
 
 # ---------------------------------------------------------------------------
