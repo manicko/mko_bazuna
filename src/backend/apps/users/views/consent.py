@@ -381,7 +381,7 @@ def login_status(request: HttpRequest) -> HttpResponse:
 
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         try:
             token = LoginToken.objects.get(token_hash=token_hash)
         except LoginToken.DoesNotExist:

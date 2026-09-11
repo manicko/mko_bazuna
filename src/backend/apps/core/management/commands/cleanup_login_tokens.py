@@ -38,7 +38,7 @@ class Command(BaseCommand):
         """Execute the login token cleanup command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.CLEANUP_LOGIN_TOKENS):
                 now = timezone.now()
                 consumed_cutoff = now - timedelta(hours=24)

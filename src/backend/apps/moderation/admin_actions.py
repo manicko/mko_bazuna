@@ -102,7 +102,7 @@ def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     if ad.status == AdStatus.DELETED:
         return
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad.transition_to(AdStatus.DELETED)
         log_soft_delete(
             ad_id=ad.id,
@@ -128,7 +128,7 @@ def bulk_approve(queryset, moderator_id: int) -> int:
         Number of ads approved
     """
     count = 0
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
         # Lock rows in PK order to match sweep lock ordering (no deadlock).
         # transition_to's refresh_from_db() raises Ad.DoesNotExist if a row was
         # hard-deleted mid-bulk (e.g. before the lock was acquired) — skip it
@@ -174,7 +174,7 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
         Number of ads rejected
     """
     count = 0
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
         # Lock rows in PK order. reject_ad()→set_rejected()→transition_to()
         # calls refresh_from_db(); a row hard-deleted mid-bulk raises
         # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.
@@ -239,7 +239,7 @@ def bulk_delete(queryset, moderator_id: int, reason: str) -> int:
         Number of ads deleted
     """
     count = 0
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  DB-003: lock Ad rows through every transition
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
         # Lock rows in PK order. soft_delete_ad()→transition_to(DELETED) calls
         # refresh_from_db(); a row hard-deleted mid-bulk raises
         # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.

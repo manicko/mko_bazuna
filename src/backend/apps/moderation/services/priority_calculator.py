@@ -60,7 +60,7 @@ class PriorityCalculator:
 
         if criteria.banned_words:
             combined = f"{ad.title} {ad.description}".lower()
-            for word in criteria.banned_words:  # pyright: ignore[reportGeneralTypeIssues]
+            for word in criteria.banned_words:  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; JSONField 'banned_words' has no static type
                 if word.lower() in combined:
                     flags.append("banned_word")
                     score += 20

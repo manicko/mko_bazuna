@@ -109,7 +109,7 @@ def withdraw_consent(user: User) -> list[str]:
 
     """
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         if user.is_deleted:
             logger.info(f"User {user.id} already soft-deleted — skipping withdrawal")
             return []

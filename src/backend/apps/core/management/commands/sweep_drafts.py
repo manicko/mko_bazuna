@@ -39,7 +39,7 @@ class Command(BaseCommand):
         """Execute the draft sweep command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.SWEEP_DRAFTS):
                 # Query draft ads older than 30 minutes
                 cutoff_date = timezone.now() - timedelta(minutes=30)

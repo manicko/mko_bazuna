@@ -121,7 +121,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     # status-driven branch below and the subsequent transition_to() operate
     # on a locked, consistent row. The GET path returns before this block, so
     # the lock is scoped to POST mutations only (mirrors review.py reject_ad).
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Determine if this is a reactivation request
@@ -265,7 +265,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Authorization check
@@ -299,7 +299,7 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Authorization check

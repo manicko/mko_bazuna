@@ -53,7 +53,7 @@ class Command(BaseCommand):
         dry_run: bool = options["dry_run"]
         batch_size: int = options["batch_size"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(LOCK_ID):
                 # Find AdImage records that have an original image but are
                 # missing at least one thumbnail variant.

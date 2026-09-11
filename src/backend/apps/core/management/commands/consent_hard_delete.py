@@ -43,7 +43,7 @@ class Command(BaseCommand):
         """Execute the consent hard-delete command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.CONSENT_HARD_DELETE):
                 # Query using the IX_users_erasure_sweep index
                 # consent_revoked_at is not null and older than 30 days

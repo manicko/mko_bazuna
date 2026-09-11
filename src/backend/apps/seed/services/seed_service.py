@@ -87,7 +87,7 @@ class SeedService:
 
             # All generation steps are atomic: a crash mid-generation rolls back
             # to the post-clean state. _clean() runs outside this block.
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                 # Step 2: Load fixtures (categories, cities)
                 categories = self._load_category_fixtures()
                 cities = self._load_city_fixtures()
@@ -230,7 +230,7 @@ class SeedService:
         because ``User.objects.filter(ads__source=...)`` missed them.
         Categories and Cities are NOT deleted (they are static fixtures).
         """
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             # Direct source filters — no longer dependent on Ad FK traversal.
             # Deletion order is FK-safe: children before parents.
             # 1. DailyAdMetrics (FK to Ad, CASCADE)

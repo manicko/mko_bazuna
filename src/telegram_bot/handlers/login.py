@@ -181,7 +181,7 @@ async def handle_login_orm(
         # Atomic UPDATE ... RETURNING claim — single query, zero TOCTOU.
         # token_hash is unique-indexed; the UPDATE row lock guarantees only
         # one concurrent claimer wins. See docs/02-database/db-schema.md:84-85.
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             login_token = _claim_login_token(token_hash, telegram_id, now)
 
         if login_token is None:
@@ -189,7 +189,7 @@ async def handle_login_orm(
 
         # Get or create user by stable chat_id (never nullified on withdraw)
         try:
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                 user, created = User.objects.get_or_create(
                     chat_id=telegram_id,
                     defaults={

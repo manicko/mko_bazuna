@@ -1194,7 +1194,7 @@ async def update_ad_and_moderate(
 
                 photo["thumbnail_large"] = None
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             ad.listing_condition_id = listing_condition_id
             ad.save()
 

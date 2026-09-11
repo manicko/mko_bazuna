@@ -25,7 +25,7 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
         Ad.DoesNotExist: if source_ad_id not found.
         PermissionError: if seller does not own the source ad.
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         source = (
             Ad.objects.select_related("listing_purpose")
             .prefetch_related("features", "images")

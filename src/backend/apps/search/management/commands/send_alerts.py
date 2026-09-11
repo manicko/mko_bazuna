@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 self._dry_run_check()
             return
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):
                 user_ads, notifications_to_create, analytics_events = (
                     self._collect_alerts()

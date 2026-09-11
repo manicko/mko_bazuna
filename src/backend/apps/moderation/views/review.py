@@ -73,7 +73,7 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     from apps.moderation.admin_actions import approve_ad as do_approve
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(
             Ad.objects.select_for_update(),
             id=ad_id,
@@ -120,7 +120,7 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     if request.method != "POST":
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(
             Ad.objects.select_for_update(),
             id=ad_id,

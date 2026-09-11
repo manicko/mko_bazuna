@@ -39,7 +39,7 @@ class Command(BaseCommand):
         """Execute the purge command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.PURGE_FAILED_ADS):
                 # Query using the IX_ads_purge_failed partial index
                 # Status is ON_MODERATION_FAILED, moderation_failed_at older than 7 days

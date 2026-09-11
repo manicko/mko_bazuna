@@ -40,7 +40,7 @@ class Command(BaseCommand):
         """Execute the daily metrics rollup with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.ROLLUP_DAILY_METRICS):
                 yesterday = timezone.now().date() - timedelta(days=1)
 

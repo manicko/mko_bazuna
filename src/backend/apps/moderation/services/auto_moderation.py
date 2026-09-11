@@ -233,7 +233,7 @@ def _fail_moderation(ad: Ad) -> None:
     """
     from apps.moderation.services.moderation_log import set_moderation_failed
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         set_moderation_failed(ad)
 
         AnalyticsEvent.objects.create(
@@ -250,7 +250,7 @@ def _pass_moderation(ad: Ad) -> None:
     """
     from apps.moderation.services.moderation_log import set_published
 
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         set_published(ad)
 
         AnalyticsEvent.objects.create(

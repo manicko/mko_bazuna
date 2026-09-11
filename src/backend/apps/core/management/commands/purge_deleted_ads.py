@@ -40,7 +40,7 @@ class Command(BaseCommand):
         """Execute the purge command with advisory lock."""
         dry_run: bool = options["dry_run"]
 
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.PURGE_DELETED_ADS):
                 # Query using the IX_ads_purge_deleted partial index
                 # Status is DELETED, deleted_at older than 120 days (4 months)

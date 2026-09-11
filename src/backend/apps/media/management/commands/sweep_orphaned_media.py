@@ -84,7 +84,7 @@ class Command(BaseCommand):
         # Snapshot referenced keys before deleting anything (the DB side is
         # read-only here — no writes, so no advisory lock is strictly needed,
         # but we take it to avoid two instances racing on filesystem cleanup).
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.SWEEP_ORPHANED_MEDIA):
                 referenced = _collect_referenced_keys()
                 on_disk = set(_walk_media_files(media_root))

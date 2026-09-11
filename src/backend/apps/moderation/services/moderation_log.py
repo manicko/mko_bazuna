@@ -178,7 +178,7 @@ def set_moderation_failed(ad: Ad, reason: str = "Auto-moderation failed") -> Non
         ad: The Ad instance that failed moderation.
         reason: The reason for failure (default: auto-moderation).
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad.transition_to(AdStatus.ON_MODERATION_FAILED)
         log_auto_fail(ad_id=ad.id, user_id=ad.user_id)
 
@@ -194,7 +194,7 @@ def set_rejected(ad: Ad, moderator_id: int, reason: str) -> None:
         moderator_id: The moderator user ID performing the rejection.
         reason: The rejection reason (INTERNAL ONLY - never shown to seller).
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad.transition_to(AdStatus.REJECTED, moderator_id=moderator_id)
         log_manual_reject(
             ad_id=ad.id,
@@ -222,7 +222,7 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
     Raises:
         MaxAdsExceeded: If the user has already reached their active-ads cap.
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         # Lock the user row to serialize concurrent publish attempts for the
         # same user, closing the TOCTOU race on max_ads_per_user (DB-002).
         User.objects.select_for_update().get(pk=ad.user_id)
