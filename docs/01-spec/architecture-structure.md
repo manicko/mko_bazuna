@@ -29,7 +29,7 @@ src/
 │   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
 │   │   │   ├── middleware/           # city resolution + locale + preferred city (CityResolutionMiddleware, LanguagePreMiddleware, PreferredCityMiddleware)
 │   │   │   ├── migrations/
-│   │   │   ├── services/             # contact + site_config services
+│   │   │   ├── services/             # contact, site_config, analytics (record_event — QLT-003), translation
 │   │   │   ├── templatetags/         # contact_tags, localized_content, dict_tags (query_replace), telegram_tags (telegram_deep_link, rtl_obfuscate)
 │   │   │   ├── tests/                # sweep command tests, context processor tests
 │   │   │   ├── utils/                # advisory_lock, cache, migrate_locked, sanitize
@@ -48,8 +48,11 @@ src/
 │   │   │   └── urls.py
 │   │   ├── ads/                   # ads, images, statuses
 │   │   │   ├── migrations/
+│   │   │   ├── services/             # submission (submit_ad, SubmitAdInput — QLT-001), images, copy_service
 │   │   │   ├── tests/
+│   │   │   ├── templatetags/
 │   │   │   ├── views/                # dashboard, delete, edit, listings
+│   │   │   ├── management/
 │   │   │   ├── admin.py
 │   │   │   ├── apps.py
 │   │   │   ├── models.py
@@ -97,6 +100,7 @@ src/
 │   │   │   └── tests/                # test_seed.py
 │   │   ├── search/                # PostgreSQL FTS (per-language search_vector_ru/bs/en, GIN, ru/bs/en configs) — no haystack/whoosh
 │   │   │   ├── migrations/
+│   │   │   ├── schemas.py            # AutocompleteSuggestion Pydantic DTO (replaces dict[str, Any] — QLT-002)
 │   │   │   ├── services/             # alert_query, entity_suggestions, popular_search, rate_limit, search_history
 │   │   │   ├── tests/
 │   │   │   ├── views/                # autocomplete, search

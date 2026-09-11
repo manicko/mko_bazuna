@@ -172,7 +172,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 ### N. Photo thumbnails
 - **Thumbnail generation** (`ThumbnailService`): three size variants — small (240x180), medium (640x480), large (1280x960) — generated via Pillow with LANCZOS resampling, EXIF orientation correction, and progressive JPEG (quality=85).
 - **Storage**: thumbnail keys stored alongside originals in `MEDIA_ROOT`; keys follow `<uuid>-<size>.jpg` pattern. Original images preserved; thumbnails are additive.
-- **Integration**: bot's `update_ad_and_moderate()` triggers thumbnail generation after each photo upload. Thumbnails served via `thumbnail_small_url`/`thumbnail_medium_url`/`thumbnail_large_url` properties on `AdImage`.
+- **Integration**: `submit_ad()` in `apps/ads/services/submission.py` triggers thumbnail generation as part of ad submission (QLT-001). Thumbnails served via `thumbnail_small_url`/`thumbnail_medium_url`/`thumbnail_large_url` properties on `AdImage`.
 
 ### O. Saved searches and autocomplete
 - **Autocomplete** (`AutocompleteView`): hybrid suggestions from three sources — user search history (`SearchHistory`), popular searches (`PopularSearch`), and entity matching (categories + cities). Rate-limited (30 req/min per IP via cache). Results deduplicated and capped at 10.
