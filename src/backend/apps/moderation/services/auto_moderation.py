@@ -12,8 +12,8 @@ from typing import Final
 from django.db import transaction
 
 from apps.ads.models import Ad
-from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.services.analytics import record_event
 from apps.core.utils.cache import (
     CRITERIA_CACHE_KEY,  # noqa: F401 - re-exported for external use
     get_cached_criteria,
@@ -236,7 +236,7 @@ def _fail_moderation(ad: Ad) -> None:
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         set_moderation_failed(ad)
 
-        AnalyticsEvent.objects.create(
+        record_event(
             event_type=AnalyticsEventType.MODERATION_REJECTED,
             user_id=ad.user_id,
             ad_id=ad.id,
@@ -253,13 +253,13 @@ def _pass_moderation(ad: Ad) -> None:
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         set_published(ad)
 
-        AnalyticsEvent.objects.create(
+        record_event(
             event_type=AnalyticsEventType.AD_PUBLISHED,
             user_id=ad.user_id,
             ad_id=ad.id,
         )
 
-        AnalyticsEvent.objects.create(
+        record_event(
             event_type=AnalyticsEventType.MODERATION_APPROVED,
             user_id=ad.user_id,
             ad_id=ad.id,
