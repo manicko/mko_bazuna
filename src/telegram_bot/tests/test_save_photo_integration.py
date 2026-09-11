@@ -1,5 +1,5 @@
 """
-Integration test for the ``update_ad_and_moderate`` thumbnail pipeline (G-07).
+Integration test for the ``submit_ad`` thumbnail pipeline (G-07).
 
 The bot's ad-finalisation path (``telegram_bot/handlers/ad_create.py``) reads
 the uploaded photo from ``MEDIA_ROOT``, runs it through
@@ -69,10 +69,8 @@ class TestSavePhotoThumbnailsIntegration:
     async def test_thumbnails_populated_on_success(self, user, tmp_path) -> None:
         """Successful generation populates all three ``thumbnail_*`` fields."""
         from apps.ads.models import AdImage
-        from telegram_bot.handlers.ad_create import (
-            create_draft_ad,
-            update_ad_and_moderate,
-        )
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from telegram_bot.handlers.ad_create import create_draft_ad
 
         category = await _make_category()
         city = await _make_city()
@@ -94,16 +92,18 @@ class TestSavePhotoThumbnailsIntegration:
                 return_value=True,
             ),
         ):
-            passed, errors = await update_ad_and_moderate(
-                ad_id=ad.id,
-                title_ru="Title",
-                desc_ru="Description",
-                category_id=category.id,
-                city_id=city.id,
-                price_amount=100,
-                price_currency=CurrencyCode.EUR,
-                photos=photos,
-                user_id=user.id,
+            passed, errors = await sync_to_async(submit_ad)(
+                SubmitAdInput(
+                    ad_id=ad.id,
+                    title_ru="Title",
+                    desc_ru="Description",
+                    category_id=category.id,
+                    city_id=city.id,
+                    price_amount=100,
+                    price_currency=CurrencyCode.EUR,
+                    photos=photos,
+                    user_id=user.id,
+                )
             )
 
         assert passed is True
@@ -118,10 +118,8 @@ class TestSavePhotoThumbnailsIntegration:
     async def test_thumbnails_null_on_generation_failure(self, user, tmp_path) -> None:
         """When ``generate_thumbnails`` raises, all three ``thumbnail_*`` stay null."""
         from apps.ads.models import AdImage
-        from telegram_bot.handlers.ad_create import (
-            create_draft_ad,
-            update_ad_and_moderate,
-        )
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from telegram_bot.handlers.ad_create import create_draft_ad
 
         category = await _make_category()
         city = await _make_city()
@@ -145,16 +143,18 @@ class TestSavePhotoThumbnailsIntegration:
                 side_effect=ValueError("corrupt input"),
             ),
         ):
-            passed, errors = await update_ad_and_moderate(
-                ad_id=ad.id,
-                title_ru="Title",
-                desc_ru="Description",
-                category_id=category.id,
-                city_id=city.id,
-                price_amount=100,
-                price_currency=CurrencyCode.EUR,
-                photos=photos,
-                user_id=user.id,
+            passed, errors = await sync_to_async(submit_ad)(
+                SubmitAdInput(
+                    ad_id=ad.id,
+                    title_ru="Title",
+                    desc_ru="Description",
+                    category_id=category.id,
+                    city_id=city.id,
+                    price_amount=100,
+                    price_currency=CurrencyCode.EUR,
+                    photos=photos,
+                    user_id=user.id,
+                )
             )
 
         assert passed is True

@@ -18,16 +18,16 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from asgiref.sync import sync_to_async
 from django.conf import settings
 
 from apps.ads.models import Ad
-from apps.ads.services.images import AdImageService
+from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, LanguageLocale, ThumbnailSizeStrEnum
+from apps.core.enums import AdStatus, LanguageLocale
 from apps.core.services.site_config import get_site_name_async
 from apps.core.services.translation import translate_text
 from apps.currencies.enums import CurrencyCode
-from apps.currencies.services.price_normalizer import PriceNormalizer
 from apps.locations.models import City
 from apps.media.services.filesystem import (
     delete_photo,
@@ -35,7 +35,6 @@ from apps.media.services.filesystem import (
     strip_photo_exif,
     validate_photo,
 )
-from apps.media.services.thumbnails import ThumbnailService
 from telegram_bot.schemas.message_payloads import (
     DescriptionPayload,
     PhotoCountPayload,
@@ -811,27 +810,29 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
 
         # Update ad with multi-language content and run moderation
 
-        is_valid, errors = await update_ad_and_moderate(
-            ad_id=data["ad_id"],
-            title_ru=title_translations.get("ru", original_title),
-            desc_ru=desc_translations.get("ru", original_desc),
-            title_bs=title_translations.get("bs", original_title),
-            desc_bs=desc_translations.get("bs", original_desc),
-            title_en=title_translations.get("en", original_title),
-            desc_en=desc_translations.get("en", original_desc),
-            original_language=LanguageLocale.from_code(
-                message.from_user.language_code,
-                fallback=LanguageLocale.BOSNIAN,
-            ).value,
-            category_id=data.get("category_id"),
-            city_id=data.get("city_id"),
-            price_amount=data.get("price_amount") or Decimal("0"),
-            price_currency=data.get("price_currency"),
-            photos=data.get("photos", []),
-            user_id=data.get("user_id"),
-            listing_purpose_id=data.get("listing_purpose_id"),
-            feature_ids=data.get("feature_ids"),
-            listing_condition_id=data.get("condition_id"),
+        is_valid, errors = await sync_to_async(submit_ad)(
+            SubmitAdInput(
+                ad_id=data["ad_id"],
+                title_ru=title_translations.get("ru", original_title),
+                desc_ru=desc_translations.get("ru", original_desc),
+                title_bs=title_translations.get("bs", original_title),
+                desc_bs=desc_translations.get("bs", original_desc),
+                title_en=title_translations.get("en", original_title),
+                desc_en=desc_translations.get("en", original_desc),
+                original_language=LanguageLocale.from_code(
+                    message.from_user.language_code,
+                    fallback=LanguageLocale.BOSNIAN,
+                ).value,
+                category_id=data.get("category_id"),
+                city_id=data.get("city_id"),
+                price_amount=data.get("price_amount") or Decimal("0"),
+                price_currency=data.get("price_currency"),
+                photos=data.get("photos", []),
+                user_id=data.get("user_id"),
+                listing_purpose_id=data.get("listing_purpose_id"),
+                feature_ids=data.get("feature_ids"),
+                listing_condition_id=data.get("condition_id"),
+            )
         )
 
         if is_valid:
@@ -1033,208 +1034,6 @@ async def get_city(city_id: int):
             return None
 
     return await _get()
-
-
-async def update_ad_and_moderate(
-    ad_id: int,
-    title_ru: str,
-    desc_ru: str,
-    category_id: int | None,
-    city_id: int | None,
-    price_amount: Decimal,
-    price_currency: CurrencyCode | None,
-    photos: list,
-    user_id: int | None,
-    title_bs: str = "",
-    desc_bs: str = "",
-    title_en: str = "",
-    desc_en: str = "",
-    original_language: str | None = None,
-    listing_purpose_id: int | None = None,
-    feature_ids: list[int] | None = None,
-    listing_condition_id: int | None = None,
-) -> tuple[bool, list[str]]:
-    """Update ad with multi-language content, create images, and delegate to shared auto_moderate.
-
-
-    ``price_amount``/``price_currency`` become the source of truth; when
-
-    ``price_currency`` is present ``price_normalized_eur`` is computed via
-
-    ``PriceNormalizer`` using the current rate (BR-03) before saving.
-
-    """
-
-    from asgiref.sync import sync_to_async
-
-    from apps.moderation.services.auto_moderation import auto_moderate
-
-    @sync_to_async
-    def _update_and_moderate() -> tuple[bool, list[str]]:
-
-        from django.db import transaction
-
-        try:
-            ad = Ad.objects.get(id=ad_id)
-
-        except Ad.DoesNotExist:
-            return False, ["Ad not found"]
-
-        # Update ad fields — Russian remains the base content
-
-        ad.title = title_ru
-
-        ad.description = desc_ru
-
-        ad.category_id = category_id
-
-        ad.city_id = city_id
-
-        ad.price_amount = price_amount
-
-        # Coerce the currency to a CurrencyCode member (FSM state may carry it
-
-        # as a member or as a plain ISO 4217 string). An invalid currency is
-
-        # treated as "no price" so we never crash or write bad data.
-
-        currency: CurrencyCode | None = None
-
-        if price_currency is not None:
-            try:
-                currency = (
-                    price_currency
-                    if isinstance(price_currency, CurrencyCode)
-                    else CurrencyCode(str(price_currency))
-                )
-
-            except ValueError:
-                logger.warning(
-                    "Invalid price_currency %r for ad %s", price_currency, ad_id
-                )
-
-        ad.price_currency = currency.value if currency else None
-
-        # Compute the derived EUR-normalized price (BR-03).
-
-        if currency is not None:
-            try:
-                ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
-                    price_amount, currency
-                )
-
-            except Exception:
-                logger.exception("Failed to normalize price for ad %s", ad_id)
-
-                ad.price_normalized_eur = None
-
-        else:
-            ad.price_normalized_eur = None
-
-        # Store multi-language translations
-
-        if title_bs:
-            ad.title_bs = title_bs
-
-        if desc_bs:
-            ad.description_bs = desc_bs
-
-        if title_en:
-            ad.title_en = title_en
-
-        if desc_en:
-            ad.description_en = desc_en
-
-        if original_language:
-            ad.original_language = original_language
-
-        # Save listing purpose
-
-        if listing_purpose_id:
-            ad.listing_purpose_id = listing_purpose_id
-
-        # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
-
-        # so a DB rollback does not leave filesystem and DB desynced.
-
-        for photo in photos:
-            try:
-                original_path = os.path.join(settings.MEDIA_ROOT, photo["storage_key"])
-
-                with open(original_path, "rb") as f:
-                    photo_bytes = f.read()
-
-                thumbnail_service = ThumbnailService(settings.MEDIA_ROOT)
-
-                thumbnail_keys = thumbnail_service.generate_thumbnails(
-                    photo_bytes, photo["storage_key"]
-                )
-
-                photo["thumbnail_small"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.SMALL
-                )
-
-                photo["thumbnail_medium"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.MEDIUM
-                )
-
-                photo["thumbnail_large"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.LARGE
-                )
-
-            except Exception:
-                logger.exception(
-                    "Failed to generate thumbnails for %s",
-                    photo["storage_key"],
-                )
-
-                photo["thumbnail_small"] = None
-
-                photo["thumbnail_medium"] = None
-
-                photo["thumbnail_large"] = None
-
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-            ad.listing_condition_id = listing_condition_id
-            ad.save()
-
-            # Save features (M2M via through model)
-
-            if feature_ids is not None:
-                ad.features.set(feature_ids)
-
-            # Create AdImage records with pre-generated thumbnails
-
-            for photo in photos:
-                AdImageService.create_or_skip(
-                    ad=ad,
-                    image=photo["storage_key"],
-                    telegram_file_id=photo["telegram_file_id"],
-                    position=photo["position"],
-                    thumbnail_small=photo.get("thumbnail_small"),
-                    thumbnail_medium=photo.get("thumbnail_medium"),
-                    thumbnail_large=photo.get("thumbnail_large"),
-                )
-
-            # Transition DRAFT -> ON_MODERATION (state machine requires this step)
-
-            ad.transition_to(AdStatus.ON_MODERATION)
-
-        # Delegate to shared auto-moderation service
-
-        # Handles: banned_words, duplicate_title, all validations,
-
-        # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
-
-        passed = auto_moderate(ad)
-
-        if passed:
-            return True, []
-
-        else:
-            return False, ["Ad failed moderation checks"]
-
-    return await _update_and_moderate()
 
 
 async def translate_all_languages(

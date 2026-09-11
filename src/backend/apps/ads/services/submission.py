@@ -24,7 +24,6 @@ from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
 from apps.media.services.thumbnails import ThumbnailService
-from apps.moderation.services.auto_moderation import auto_moderate
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +164,8 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     # Delegate to shared auto-moderation service
     # Handles: banned_words, duplicate_title, all validations,
     # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
+    from apps.moderation.services.auto_moderation import auto_moderate
+
     passed = auto_moderate(ad)
     if passed:
         return True, []

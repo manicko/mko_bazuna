@@ -7,7 +7,7 @@ No test previously exercises this *entire* chain:
 * ``test_save_photo_exif.py`` tests ``save_photo`` EXIF stripping only (no
   thumbnails are produced).
 * ``test_save_photo_integration.py`` (telegram_bot/tests) tests the
-  ``generate_thumbnails`` -> ``AdImage`` path via ``update_ad_and_moderate`` but
+  ``generate_thumbnails`` -> ``AdImage`` path via ``submit_ad`` but
   *bypasses* ``save_photo`` -- it writes the bytes manually to ``tmp_path``.
 
 This module calls ``save_photo`` for real (an EXIF-bearing JPEG in, an

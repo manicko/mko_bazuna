@@ -5,7 +5,7 @@ Verifies that the ad's ``original_language`` is derived from
 ``message.from_user.language_code`` via ``LanguageLocale.from_code``, with a
 fallback to ``BOSNIAN`` when the code is missing or unsupported.
 
-The full ``process_preview`` → ``update_ad_and_moderate`` → ``auto_moderate``
+The full ``process_preview`` → ``submit_ad`` → ``auto_moderate``
 pipeline is exercised against the real PostgreSQL ORM.  ``translate_all_languages``
 is mocked to avoid hitting the Google Translate API.
 """
