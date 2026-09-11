@@ -5,10 +5,15 @@ All lookup records are cached with 1-hour TTL. Cache is invalidated on
 post_save / post_delete signals for LookupGroup and LookupItem.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING
 
 from django.core.cache import cache
+
+if TYPE_CHECKING:
+    from apps.lookups.models import LookupGroup, LookupItem
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +30,7 @@ class LookupCacheService:
     """
 
     @staticmethod
-    def get_all_groups() -> list[Any]:
+    def get_all_groups() -> list[LookupGroup]:
         """Get all lookup groups (cached).
 
         Returns:
@@ -44,7 +49,7 @@ class LookupCacheService:
         return groups
 
     @staticmethod
-    def get_active_items(group_code: str) -> list[Any]:
+    def get_active_items(group_code: str) -> list[LookupItem]:
         """Get active items for a group (cached).
 
         Args:

@@ -11,7 +11,8 @@ never merged into an account on login.
 """
 
 import logging
-from typing import Any
+
+from django.contrib.sessions.backends.base import SessionBase
 
 from apps.search.models import SearchHistory
 
@@ -24,20 +25,21 @@ _MAX_HISTORY: int = 50
 _SESSION_KEY: str = "search_history"
 
 
-def _record_session_history(session: Any, normalized: str, query: str) -> None:
+def _record_session_history(session: SessionBase | None, normalized: str, query: str) -> None:
     """Record a query in the session, deduped and capped at ``_MAX_HISTORY``.
 
     The session stores a list of ``{query, query_normalized}`` dicts ordered
     most-recent-first. The same normalized query replaces its previous entry
     (deduplication), and the list is pruned to ``_MAX_HISTORY`` entries.
     """
+    assert session is not None
     entries = session.get(_SESSION_KEY) or []
     entries = [e for e in entries if e.get("query_normalized") != normalized]
     entries.insert(0, {"query": query, "query_normalized": normalized})
     session[_SESSION_KEY] = entries[:_MAX_HISTORY]
 
 
-def record_search_history(user_id: int | None, query: str, session: Any = None) -> None:
+def record_search_history(user_id: int | None, query: str, session: SessionBase | None = None) -> None:
     """
     Record a search query in the user's search history.
 
@@ -89,7 +91,7 @@ def record_search_history(user_id: int | None, query: str, session: Any = None) 
 def get_user_search_history(
     user_id: int | None,
     limit: int = 5,
-    session: Any = None,
+    session: SessionBase | None = None,
     prefix: str | None = None,
 ) -> list[str]:
     """
