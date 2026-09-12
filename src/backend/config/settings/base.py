@@ -173,8 +173,7 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database - PostgreSQL ONLY (no SQLite fallback per zone C5)
 # Use DATABASE_URL for 12-factor config (single source of truth)
 # If DATABASE_URL is set, use it; otherwise fall back to discrete POSTGRES_* vars
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
+if os.getenv("DATABASE_URL"):
     # Parse DATABASE_URL using django-environ's built-in parsing
     DATABASES = {"default": env.db()}
     # PgBouncer async safety (zone C5) - only for PostgreSQL
@@ -275,6 +274,3 @@ CACHES = {
         },
     }
 }
-
-# Redis connection URL (shared cache backend for web + bot processes).
-REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
