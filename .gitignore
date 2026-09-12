@@ -248,3 +248,6 @@ _step3_*.txt
 .pdbrc
 .python-eggs/
 .action_logs/
+
+# Stale root entrypoint stubs (CFG-006: canonical scripts live in docker/)
+/entrypoint*.sh
