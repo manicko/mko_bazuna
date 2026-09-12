@@ -191,8 +191,11 @@ postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 individual database variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), ensuring the
 correct hostname (`db`) is used for inter-container communication.
 
-For local Django development outside Docker (using `uv run` directly), use `.env` (auto-loaded by
-Compose) with `DATABASE_URL` pointing to `localhost`:
+For local Django development outside Docker (using `uv run` directly), Django reads `src/.env`
+via `read_env(BASE_DIR / ".env")` where `BASE_DIR = src/`. The `uv run` command also implicitly
+injects `src/.env` into `os.environ` — both resolve to the same file. Place
+`DATABASE_URL=postgres://postgres:postgres@localhost:5432/mko_bazuna` there for local
+development pointing to `localhost`:
 
 ```bash
 # Start Django locally (not in Docker)
