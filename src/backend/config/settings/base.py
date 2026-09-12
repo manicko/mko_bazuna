@@ -61,12 +61,10 @@ BOT_TOKEN = env("BOT_TOKEN", default="")
 # Google Cloud Translation API key (v2 Basic, API-key auth via ?key= query param).
 # Used by the shared translation service and the backfill management command.
 # Empty string default allows dev/test without the key (translations fall back to original text).
-GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "")
+GOOGLE_TRANSLATE_API_KEY = env("GOOGLE_TRANSLATE_API_KEY", default="")
 
-# ALLOWED_HOSTS: split comma-separated values, empty defaults to ['']
-ALLOWED_HOSTS = (
-    os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS", "") else []
-)
+# ALLOWED_HOSTS: split comma-separated values, empty defaults to []
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 # Internationalization
 LANGUAGE_CODE = "ru"
@@ -183,11 +181,11 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB", "mko_bazuna"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "NAME": env("POSTGRES_DB", default="mko_bazuna"),
+            "USER": env("POSTGRES_USER", default="postgres"),
             "PASSWORD": env("POSTGRES_PASSWORD"),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "HOST": env("POSTGRES_HOST", default="localhost"),
+            "PORT": env("POSTGRES_PORT", default="5432"),
             # PgBouncer async safety (zone C5)
             "CONN_MAX_AGE": 0,
             "OPTIONS": {
@@ -237,29 +235,25 @@ LOGIN_URL = "/login/issue/"
 
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
-BOT_USERNAME = os.getenv("BOT_USERNAME", "")
+BOT_USERNAME = env("BOT_USERNAME", default="")
 
 # File-based liveness marker path for the bot container healthcheck.
 # Written on startup, touched on each inbound update, removed on shutdown.
 # See src/telegram_bot/lifecycle.py and docker/healthcheck-bot.sh (ENT-005).
-BOT_LIVENESS_FILE = os.getenv("BOT_LIVENESS_FILE", "/tmp/mko_bazuna_bot_alive")
+BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive")
 
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.
-SITE_URL = os.getenv("SITE_URL", "http://localhost:8000").rstrip("/")
+SITE_URL = env.str("SITE_URL", default="http://localhost:8000").rstrip("/")
 
 # Near-real-time publish-time alert delivery (AL-001). Default OFF so rollout
 # is opt-in (CR15 / R1); the daily `send_alerts` command always backfills.
-IMMEDIATE_ALERTS_ENABLED = os.getenv("IMMEDIATE_ALERTS_ENABLED", "false").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+IMMEDIATE_ALERTS_ENABLED = env.bool("IMMEDIATE_ALERTS_ENABLED", default=False)
 
 # Plausible analytics host (cookieless, no consent banner needed)
 # Format: hostname only, e.g., "analytics.example.com" or "plausible.io"
-PLAUSIBLE_HOST = os.getenv("PLAUSIBLE_HOST", "")
+PLAUSIBLE_HOST = env("PLAUSIBLE_HOST", default="")
 
 # Cache configuration — shared cache via Redis (django-redis).
 # Production and Docker environments use Redis so that cache keys and rate-limit
