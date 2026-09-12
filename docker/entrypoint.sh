@@ -38,7 +38,7 @@ wait_for_db() {
 
     echo "Waiting for PostgreSQL..."
     for i in {1..30}; do
-        if /opt/venv/bin/python -c "import psycopg; psycopg.connect('$DATABASE_URL')" 2>/dev/null; then
+        if /opt/venv/bin/python -c "import os, psycopg; psycopg.connect(os.environ['DATABASE_URL'])" 2>/dev/null; then
             echo "Database ready"
             return 0
         fi
@@ -57,7 +57,7 @@ wait_for_redis() {
     fi
     echo "Waiting for Redis..."
     for i in {1..15}; do
-        if /opt/venv/bin/python -c "import redis; redis.from_url('$REDIS_URL').ping()" 2>/dev/null; then
+        if /opt/venv/bin/python -c "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()" 2>/dev/null; then
             echo "Redis ready"
             return 0
         fi
