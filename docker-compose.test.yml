@@ -74,5 +74,22 @@ services:
     # One-shot service: exits with pytest exit code
     profiles: ["test"]
 
+  # Override create_admin for test: provides hardcoded ADMIN_PASSWORD so config
+  # validation succeeds without a real .env.docker; uses test DB credentials
+  # matching the db/migrate overrides above.
+  create_admin:
+    environment:
+      POSTGRES_DB: mko_bazuna
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
+      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      BOT_TOKEN: test-bot-token-for-testing
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: "test-admin-password"
+      ADMIN_TELEGRAM_ID: "-1"
+    env_file: []
+
 volumes:
   uv_cache:
