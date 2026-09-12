@@ -4,15 +4,16 @@ Bulk moderation actions API endpoint.
 Provides JSON API for approving, rejecting, or flagging multiple ads at once.
 """
 
-import json
 import logging
 from typing import Final
 
 from django.http import HttpRequest, JsonResponse
+from pydantic import ValidationError
 
 from apps.ads.models import Ad
 from apps.core.enums import BulkModerationAction
 from apps.moderation.admin_actions import approve_ad, reject_ad
+from apps.moderation.schemas import BulkModerationRequest
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.decorators import staff_required_api
 
@@ -39,13 +40,14 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
         }
     """
     try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        logger.warning("Invalid JSON in bulk moderation request body")
-        return JsonResponse({"error": "Invalid JSON in request body"}, status=400)
-    action = data.get("action", "")
-    ad_ids: list[int] = data.get("selected_items", [])
-    reason: str = data.get("reason", "")
+        payload = BulkModerationRequest.model_validate_json(request.body)
+    except ValidationError:
+        logger.warning("Invalid bulk moderation request body")
+        return JsonResponse({"error": "Invalid request body"}, status=400)
+
+    action_enum = payload.action
+    ad_ids: list[int] = payload.selected_items
+    reason: str = payload.reason
 
     if len(ad_ids) > MAX_BULK_ACTIONS:
         logger.warning(
@@ -57,12 +59,6 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
             {"error": f"selected_items exceeds maximum of {MAX_BULK_ACTIONS}"},
             status=400,
         )
-
-    try:
-        action_enum = BulkModerationAction(action)
-    except ValueError:
-        logger.warning("Unknown bulk moderation action: %s", action)
-        return JsonResponse({"error": f"Unknown action: {action}"}, status=400)
 
     results: dict[str, object] = {"completed": 0, "errors": []}
 

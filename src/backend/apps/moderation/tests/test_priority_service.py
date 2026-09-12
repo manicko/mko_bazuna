@@ -620,7 +620,7 @@ class TestBulkModerationActionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["error"] == "Unknown action: unknown"
+        assert data["error"] == "Invalid request body"
 
     # ── Finding 01: approve_ad enforces POST-only ─────────────────────────
 
@@ -651,7 +651,7 @@ class TestBulkModerationActionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["error"] == "Invalid JSON in request body"
+        assert data["error"] == "Invalid request body"
 
     def test_empty_body_returns_400(self) -> None:
         """POST with empty body returns 400 with error message."""
@@ -665,7 +665,47 @@ class TestBulkModerationActionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["error"] == "Invalid JSON in request body"
+        assert data["error"] == "Invalid request body"
+
+    def test_extra_key_returns_400(self) -> None:
+        """POST with an unknown key is rejected by extra='forbid'."""
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [],
+                    "rogue": "x",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "Invalid request body"
+
+    def test_selected_items_type_mismatch_returns_400(self) -> None:
+        """POST with selected_items as a non-list is rejected by type validation."""
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": "not-a-list",
+                    "reason": "",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "Invalid request body"
 
     # ── Finding 14: bulk API sanitizes error messages ──────────────────────
 
