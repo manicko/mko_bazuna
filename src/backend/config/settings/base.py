@@ -200,9 +200,9 @@ STATIC_URL = "/static/"
 # STATIC_ROOT lives at /app/staticfiles so it matches the path copied out of the
 # builder stage in docker/Dockerfile and served by whitenoise at runtime.
 STATIC_ROOT = BASE_DIR.parent / "staticfiles"
-# Theme static files: src/theme/static (discovered by AppDirectoriesFinder
-# via INSTALLED_APPS ["theme"]; not listed here to avoid duplicate collection)
-STATICFILES_DIRS = [BASE_DIR.parent / "static"]
+# Theme static files live in src/theme/static and are discovered automatically
+# via AppDirectoriesFinder through INSTALLED_APPS ["theme"].
+
 
 # Media files
 MEDIA_URL = "/media/"
