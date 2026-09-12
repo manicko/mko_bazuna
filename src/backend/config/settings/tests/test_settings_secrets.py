@@ -19,7 +19,9 @@ at module import.
 import os
 import subprocess
 import sys
+from pathlib import Path
 
+import environ
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.settings]
@@ -116,3 +118,29 @@ def test_google_translate_api_key_required_in_production() -> None:
     assert result.returncode != 0, result.stderr
     assert "ImproperlyConfigured" in result.stderr
     assert "GOOGLE_TRANSLATE_API_KEY" in result.stderr
+
+
+def test_secret_key_with_dollar_sign_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Single-quoted secret key containing '$' must be preserved by django-environ.
+
+    Regression test for the '$xp' Docker Compose interpolation issue:
+    Django secret keys may contain '$' characters. In .env files loaded by
+    Docker Compose, unquoted values have '$VAR' interpolated (so '$xp' would
+    be silently stripped). Single-quoting the value prevents this.
+
+    This test guards the Django-side behavior: that django-environ correctly
+    strips single quotes and preserves the literal '$xp' substring when
+    reading the bind-mounted .env file at container startup.
+    """
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "DJANGO_SECRET_KEY='=0y-)6rzn_dfoe+u$xp)u#*3yn&h!@9d+t=1va0r+#mg1hj+k+'\n"
+    )
+    monkeypatch.delenv("DJANGO_SECRET_KEY", raising=False)
+    environ.Env.read_env(env_file, overwrite=True)
+
+    assert os.environ["DJANGO_SECRET_KEY"] == (
+        "=0y-)6rzn_dfoe+u$xp)u#*3yn&h!@9d+t=1va0r+#mg1hj+k+"
+    )

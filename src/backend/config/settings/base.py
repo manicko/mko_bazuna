@@ -23,7 +23,8 @@ env = environ.Env(
     BOT_TOKEN=(str, ""),
 )
 
-# Read .env file (django-environ uses python-dotenv internally)
+# Read .env file using django-environ's own parser (which handles
+# single-quoted values as literal, preventing "$VAR" interpolation).
 # Fail fast if .env is missing (only in container environment)
 env_path = BASE_DIR / ".env"
 if not env_path.exists():
