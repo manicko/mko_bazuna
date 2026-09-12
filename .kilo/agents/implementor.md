@@ -27,7 +27,8 @@ permission:
     "*": allow
     "git *": ask
 
-    # === READ-ONLY GIT ===   
+    # === READ-ONLY GIT === 
+    "git*ls-files*" : allow 
     "git*status*": allow
     "git*diff*": allow
     "git*log*": allow
