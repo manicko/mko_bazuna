@@ -136,11 +136,11 @@ def test_secret_key_with_dollar_sign_preserved(
     """
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "DJANGO_SECRET_KEY='=0y-)6rzn_dfoe+u$xp)u#*3yn&h!@9d+t=1va0r+#mg1hj+k+'\n"
+        "DJANGO_SECRET_KEY='=t$test-key-with-$dollar$ign$chars'\n"
     )
     monkeypatch.delenv("DJANGO_SECRET_KEY", raising=False)
     environ.Env.read_env(env_file, overwrite=True)
 
     assert os.environ["DJANGO_SECRET_KEY"] == (
-        "=0y-)6rzn_dfoe+u$xp)u#*3yn&h!@9d+t=1va0r+#mg1hj+k+"
+        "=t$test-key-with-$dollar$ign$chars"
     )
