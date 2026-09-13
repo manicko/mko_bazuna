@@ -11,6 +11,22 @@ from .base import *  # noqa: F403, F401
 
 DEBUG = False
 
+# Console logging for production (INFO-level root logger so application
+# loggers propagate to stdout for log aggregation).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
+
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
