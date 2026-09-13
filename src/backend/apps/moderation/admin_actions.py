@@ -74,14 +74,15 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     """
     user = ad.user
     if user and not user.is_banned:
-        user.is_banned = True
-        user.save(update_fields=["is_banned"])
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            user.is_banned = True
+            user.save(update_fields=["is_banned"])
 
-        log_ban_account(
-            user_id=user.id,
-            moderator_id=moderator_id,
-            reason=reason,
-        )
+            log_ban_account(
+                user_id=user.id,
+                moderator_id=moderator_id,
+                reason=reason,
+            )
         logger.info(
             f"User {mask_telegram_id(user.telegram_id)} banned by moderator {moderator_id}"
         )
@@ -213,16 +214,17 @@ def bulk_ban_users(queryset, moderator_id: int, reason: str) -> int:
     user_ids = set(queryset.values_list("user_id", flat=True))
     count = 0
 
-    for user_id in user_ids:
-        if user_id:
-            log_ban_account(
-                user_id=user_id,
-                moderator_id=moderator_id,
-                reason=reason,
-            )
-            count += 1
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+        for user_id in user_ids:
+            if user_id:
+                log_ban_account(
+                    user_id=user_id,
+                    moderator_id=moderator_id,
+                    reason=reason,
+                )
+                count += 1
 
-    User.objects.filter(id__in=user_ids).update(is_banned=True)
+        User.objects.filter(id__in=user_ids).update(is_banned=True)
     return count
 
 

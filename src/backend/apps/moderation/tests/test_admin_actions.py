@@ -19,6 +19,7 @@ from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.moderation.admin_actions import (
     approve_ad,
+    ban_user_for_ad,
     bulk_approve,
     bulk_ban_users,
     bulk_delete,
@@ -240,13 +241,23 @@ class TestBulkLockingStructure:
 
     @staticmethod
     def test_bulk_ban_users_not_locked() -> None:
-        """bulk_ban_users must NOT gain select_for_update (out of DB-003 scope)."""
+        """bulk_ban_users must NOT gain select_for_update (out of DB-003 scope).
+
+        It must still wrap the ban+audit-log writes in transaction.atomic().
+        """
         src = inspect.getsource(bulk_ban_users)
         assert "select_for_update" not in src
+        assert "transaction.atomic" in src
+
+    @staticmethod
+    def test_ban_user_for_ad_uses_atomic() -> None:
+        """ban_user_for_ad must wrap ban+audit-log writes in transaction.atomic() (DB-003)."""
+        src = inspect.getsource(ban_user_for_ad)
+        assert "transaction.atomic" in src
 
 
 # ---------------------------------------------------------------------------
-# Tests: DB-003 functional bulk operations
+# Tests: DB-003 transactional rollback for ban+audit-log writes
 # ---------------------------------------------------------------------------
 
 
@@ -328,3 +339,77 @@ class TestBulkOperations:
         # Second ad: skipped (DoesNotExist caught per-ad), unchanged
         ads[1].refresh_from_db()
         assert ads[1].status == AdStatus.ON_MODERATION
+
+
+# ---------------------------------------------------------------------------
+# Tests: DB-003 transactional rollback for ban+audit-log writes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestBanAtomicRollback:
+    """Verify ban_user_for_ad and bulk_ban_users roll back on audit-log
+    failure (DB-003)."""
+
+    def test_ban_user_for_ad_atomic_on_log_failure(
+        self, seller: User, category, city
+    ) -> None:
+        """log_ban_account failure rolls back the user.is_banned save (DB-003)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        moderator = User.objects.create(
+            telegram_id=900000212, chat_id=900000212, password="x"
+        )
+
+        with patch("apps.moderation.admin_actions.log_ban_account") as mock_log:
+            mock_log.side_effect = RuntimeError("simulated log failure")
+            with pytest.raises(RuntimeError, match="simulated log failure"):
+                ban_user_for_ad(ad, moderator.id, "policy violation")
+
+        # The user.save(is_banned=True) must have been rolled back — user
+        # remains unbanned in the DB.
+        seller.refresh_from_db()
+        assert seller.is_banned is False
+        mock_log.assert_called_once()
+
+    def test_bulk_ban_users_atomic_on_log_failure(
+        self, category, city
+    ) -> None:
+        """log_ban_account failure mid-loop rolls back the entire bulk update (DB-003)."""
+        user1 = User.objects.create(
+            telegram_id=900000213, chat_id=900000213, password="x"
+        )
+        user2 = User.objects.create(
+            telegram_id=900000214, chat_id=900000214, password="x"
+        )
+        user3 = User.objects.create(
+            telegram_id=900000215, chat_id=900000215, password="x"
+        )
+        for u in (user1, user2, user3):
+            create_test_ad(u, category, city, status=AdStatus.ON_MODERATION)
+
+        moderator = User.objects.create(
+            telegram_id=900000216, chat_id=900000216, password="x"
+        )
+
+        call_count = 0
+
+        def _fail_after_first(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:
+                raise RuntimeError("simulated log failure")
+
+        with patch(
+            "apps.moderation.admin_actions.log_ban_account",
+            side_effect=_fail_after_first,
+        ) as mock_log:
+            with pytest.raises(RuntimeError, match="simulated log failure"):
+                bulk_ban_users(Ad.objects.all(), moderator.id, "policy violation")
+
+        # No users should be banned — the atomic block rolled back everything,
+        # including the eventual User.objects.filter(...).update(is_banned=True).
+        for u in (user1, user2, user3):
+            u.refresh_from_db()
+            assert u.is_banned is False
+        # The first call succeeded before the failure was triggered.
+        assert mock_log.call_count >= 1
