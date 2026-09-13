@@ -13,12 +13,7 @@ id_prefix: "{PREFIX}"
 report_status: "draft"  # "draft" for raw phases; Phase 99 sets to "validated"
 severity_taxonomy: ".kilo/commands/audit/phases/{NN}-{phase-name}.md#severity-taxonomy"  # pointer to phase rubric, NOT hardcoded
 # Structural enforcement (replaces the buried ID-preservation comment):
-phase_99_invariant: "Finding IDs ({PREFIX}-NNN) MUST be preserved through Phase 99 validation. Phase 99 validators MUST NOT renumber to F-NN."
 ---
-
-<!-- WRITE-HYGIENE: Append findings one at a time. Keep each append <=100 lines. Offload long evidence (>3 blocks) to Section: Appendices. -->
-<!-- MODE: problems-only. If this phase finds zero problems, write ONLY "No problems found in this phase." (Section: Empty State) and STOP. Do NOT list "passed checks" or "correct configurations" as findings. -->
-<!-- ID SEQUENCE: Finding IDs must be sequential and unique within the phase: {PREFIX}-001, {PREFIX}-002, ... — no duplicates, no gaps. -->
 
 # Audit Findings — {PHASE_NAME}
 
