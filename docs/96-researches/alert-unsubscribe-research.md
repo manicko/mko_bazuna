@@ -71,9 +71,10 @@ Five areas:
 - Uses `MemoryStorage` (line 39) — **FSM state is ephemeral**. The ad-creation
   FSM survives restarts only via `Ad.DRAFT` ORM rows, not FSM state — lines 33-38.
   Note: the `/alerts` listing handler stores `user_id` in FSM state (see §2).
-- `Dispatcher` (line 40), `AccountStateMiddleware` registered on `dp.message`
-  only (line 43) — **not on `dp.callback_query`** (but the middleware extracts
-  `from_user.id` from callback events anyway, see §5).
+  `AccountStateMiddleware` backfills this on each update after state checks
+  pass — see §5.
+- `Dispatcher` (line 50), `AccountStateMiddleware` registered on `dp.update`
+  (line 62) — covers both Message and CallbackQuery events (see §5).
 - Routers included (lines 46-51): `login_router`, `ad_create_router`,
   `alerts_router`, `ad_copy_router`.
 - `dp.run_polling(bot)` (line 58). Bot runs as `python -m telegram_bot.main`
@@ -191,18 +192,21 @@ signed deep-link fallback token. This is consistent with the existing
   stable identifier.
 
 **AccountStateMiddleware** (`src/telegram_bot/middlewares/permissions.py`):
-- `BaseMiddleware` subclass (line 21). Registered on `dp.message` in `main.py:43`.
-- `_get_user(chat_id)` (lines 154-170) looks up by stable `chat_id`. If
+- `BaseMiddleware` subclass (line 24). Registered on `dp.update` in `main.py:62`.
+- `_get_user(chat_id)` (lines 194-210) looks up by stable `chat_id`. If
   `User.DoesNotExist`, returns `(True, "")` — treats unregistered users as
-  allowed (line 110-111).
-- For `callback_query` events (lines 60-66): extracts
+  allowed (line 136).
+- For `callback_query` events (lines 67-73): extracts
   `event.callback_query.message` if it is a `Message`, then uses
-  `message.from_user.id` as `chat_id` (line 75). So **callback-query events
+  `message.from_user.id` as `chat_id` (line 82). So **callback-query events
   ARE subject to account-state checks** via this middleware.
-- Block conditions checked (lines 113-123): `is_banned`, `is_deleted`,
-  `is_declined`, `consent_revoked_at is not None`.
-- Publish restriction (lines 127-152): `ads_auto_publish=False` blocks only
-  `/post`, allows other commands.
+- After state checks pass, backfills `user_id` into FSM state by stable `chat_id`
+  lookup via `_get_user` (line 109) and `state.update_data(user_id=user.id)`
+  (line 110) — recovers auth state after bot restart (MemoryStorage wipe).
+- Block conditions checked (`_check_user_state`, lines 140-159): `is_banned`,
+  `is_deleted`, `is_declined`, `consent_revoked_at is not None`.
+- Publish restriction (`_check_publish_permission`, lines 163-191):
+  `ads_auto_publish=False` blocks only `/post`, allows other commands.
 
 ### 6. Inline-button pattern (reference implementation)
 
