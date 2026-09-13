@@ -12,7 +12,7 @@ below check English substrings, matching the msgid source text.
 
 import itertools
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.types import Message, TelegramObject, Update
@@ -103,6 +103,16 @@ def _make_callback_update(chat_id: int) -> Update:
             data="test_action",
         ),
     )
+
+
+def _make_mock_fsm_context(data: dict[str, Any] | None = None) -> MagicMock:
+    """Build a mock FSMContext that simulates FSM state."""
+    state = MagicMock()
+    if data is None:
+        data = {}
+    state.get_data = AsyncMock(return_value=dict(data))
+    state.update_data = AsyncMock()
+    return state
 
 
 # ---------------------------------------------------------------------------
@@ -471,3 +481,155 @@ class TestCallPipeline:
 
         assert result == "proceed"
         handler.assert_awaited_once_with(update, {})
+
+
+# ---------------------------------------------------------------------------
+# user_id backfill via ORM lookup (AUT-001)
+#
+# MemoryStorage is ephemeral — after a bot restart, FSM state is wiped.
+# AccountStateMiddleware backfills user_id from the ORM by stable chat_id
+# so handlers (ad_create, ad_copy, alerts, language) that gate on
+# state.get_data()["user_id"] work transparently without code changes.
+# ---------------------------------------------------------------------------
+
+
+class TestUserIdBackfill:
+    """Tests for user_id backfill via ORM lookup (AUT-001)."""
+
+    @pytest.mark.asyncio
+    async def test_backfills_user_id_after_restart(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """After a restart (empty FSM state), backfill user_id from ORM via chat_id."""
+        chat_id = _BASE_CHAT_ID + 601
+        user = await _make_user(chat_id)
+
+        update = _make_message_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_awaited_once_with(user_id=user.id)
+
+    @pytest.mark.asyncio
+    async def test_no_backfill_when_user_id_present(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When FSM state already has user_id, backfill is suppressed (no DB lookup)."""
+        chat_id = _BASE_CHAT_ID + 602
+        user = await _make_user(chat_id)
+
+        update = _make_message_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({"user_id": user.id})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_backfill_for_unregistered_user(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An unregistered chat_id is not backfilled — handler's own gate rejects."""
+        chat_id = 999999998
+
+        update = _make_message_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_not_awaited()
+        mock_answer.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_backfill_skipped_for_banned_user(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A banned user is blocked before backfill — no handler call, no backfill."""
+        chat_id = _BASE_CHAT_ID + 603
+        await _make_user(chat_id, is_banned=True)
+
+        update = _make_message_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result is None
+        handler.assert_not_awaited()
+        state.update_data.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "restrict" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_backfill_works_for_callback_query(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Backfill fires for callback_query Update events, not just messages."""
+        chat_id = _BASE_CHAT_ID + 604
+        user = await _make_user(chat_id)
+
+        update = _make_callback_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_awaited_once_with(user_id=user.id)
+
+    @pytest.mark.asyncio
+    async def test_backfill_uses_stable_chat_id(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Backfill finds user by stable chat_id even when telegram_id is null (GDPR)."""
+        chat_id = _BASE_CHAT_ID + 605
+        user = await sync_to_async(User.objects.create)(
+            chat_id=chat_id,
+            telegram_id=None,
+            password="x",
+        )
+
+        update = _make_message_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_awaited_once_with(user_id=user.id)

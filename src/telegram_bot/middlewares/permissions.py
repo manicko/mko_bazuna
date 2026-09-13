@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 from aiogram import BaseMiddleware
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, TelegramObject, Update
 from asgiref.sync import sync_to_async
 from django.utils.translation import gettext as _
@@ -93,6 +94,22 @@ class AccountStateMiddleware(BaseMiddleware):
             if not can_publish:
                 await message.answer(publish_reason)
                 return None
+
+        # Backfill user_id from ORM for restart recovery (AUT-001).
+        # MemoryStorage is ephemeral — after a bot restart, FSM state is wiped
+        # and handlers (ad_create, ad_copy, alerts, language) that gate on
+        # state.get_data()["user_id"] would reject all users. The backfill
+        # recovers the user reference by stable chat_id lookup so handlers work
+        # transparently without code changes.
+        state: FSMContext | None = data.get("state")
+        if state is not None:
+            fsm_data = await state.get_data()
+            if "user_id" not in fsm_data:
+                try:
+                    user = await self._get_user(chat_id)
+                    await state.update_data(user_id=user.id)
+                except User.DoesNotExist:
+                    pass  # Unregistered user — handler auth gate will reject.
 
         return await handler(event, data)
 
