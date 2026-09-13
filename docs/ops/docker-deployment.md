@@ -802,6 +802,16 @@ generation process, and configuration options.
 - **Bot:** File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process alive + readiness marker freshness); lifecycle hooks in `telegram_bot/lifecycle.py` write the marker on startup and clean up the bot session on shutdown
 - **Database:** Healthcheck via `pg_isready`
 
+### Production Logging
+
+The production settings module (`config.settings.prod`) defines a `LOGGING` dict that
+configures a console `StreamHandler` on the root logger at `INFO` level. Application loggers
+for bot update processing, rate-limit hits, dedup suppression, and startup messages propagate
+to this root handler and therefore appear in the web/bot container stdout for log aggregation.
+
+This replaces Django's default logging (`DEFAULT_LOGGING`), which only configured the `django`
+logger and silently dropped application-level `INFO` records.
+
 ### Log Access
 
 ```bash

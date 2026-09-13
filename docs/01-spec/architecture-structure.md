@@ -201,7 +201,7 @@ see [ui-patterns.md](ui-patterns.md).
 | Service | Image / Command | Notes |
 |---------|----------------|-------|
 | `db` | `postgres:18-alpine` + volume + healthcheck (`pg_isready`) | — |
-| `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application --bind 0.0.0.0:8000` | Mounts `media_volume`; `env_file: .env`; `depends_on load_catalog` (completed successfully); port 8000 NOT published. |
+| `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application` | Gunicorn reads runtime settings from `gunicorn.conf.py` (auto-discovered at the project root, copied to `/app` in the image; CWD is `/app`). The `--bind 0.0.0.0:8000` flag and other server settings (workers, timeout, max_requests, graceful_timeout, loglevel, accesslog/errorlog, preload_app) now live in that file. Mounts `media_volume`; `env_file: .env`; `depends_on load_catalog` (completed successfully); port 8000 NOT published. |
 | `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on load_catalog` (completed successfully); `restart: unless-stopped`. File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process + readiness marker). |
 | `migrate` | Same image; one-shot migration | Runs `python src/backend/manage.py bootstrap_reference_data` — delegates to `migrate_locked.main`, which executes all three steps (`migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates`) inside a session-scoped advisory lock (ID 100). |
 | `create_admin` | Same image; one-shot admin creation | Runs `entrypoint-create-admin.sh`; session-scoped advisory lock ID 101. Idempotent. |
