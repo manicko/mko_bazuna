@@ -672,7 +672,7 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
 
     # Enforce per-seller upload burst limit (anti-abuse).
     user_id = data.get("user_id")
-    if user_id is not None and not check_upload_rate_limit(user_id):
+    if user_id is not None and not await check_upload_rate_limit(user_id):
         await message.answer("Uploading too fast, please wait a moment.")
         return
 

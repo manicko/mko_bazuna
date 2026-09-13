@@ -115,7 +115,7 @@ async def handle_contact_us_start(message: types.Message, bot: Bot) -> bool:
         return True
     if message.from_user.is_bot:
         return True  # OQ1: reject bots, never consume rate budget
-    if not check_contact_start_rate_limit(message.from_user.id):
+    if not await check_contact_start_rate_limit(message.from_user.id):
         await message.answer(CONTACT_US_RATE_LIMITED_MESSAGE)
         return True
     await message.answer(_CONTACT_US_GREETING, reply_markup=_contact_us_keyboard())

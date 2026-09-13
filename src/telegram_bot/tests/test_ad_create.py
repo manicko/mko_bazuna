@@ -239,7 +239,7 @@ class TestProcessPhotos:
 
         monkeypatch.setattr(
             "telegram_bot.handlers.ad_create.check_upload_rate_limit",
-            lambda user_id: False,
+            AsyncMock(return_value=False),
         )
 
         state = _build_state({"photos": [], "user_id": 900000001})
@@ -262,7 +262,7 @@ class TestProcessPhotos:
 
         monkeypatch.setattr(
             "telegram_bot.handlers.ad_create.check_upload_rate_limit",
-            lambda user_id: True,
+            AsyncMock(return_value=True),
         )
 
         state = _build_state({"photos": [], "user_id": 900000001})

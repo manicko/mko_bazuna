@@ -26,6 +26,7 @@ from typing import Any, Final
 import redis
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
+from asgiref.sync import sync_to_async
 from django.core.cache import cache
 from django_redis.exceptions import ConnectionInterrupted
 
@@ -55,7 +56,9 @@ class UpdateIdDedupMiddleware(BaseMiddleware):
         update_id: int = event.update_id
 
         try:
-            added = cache.add(f"bot_update:{update_id}", 1, timeout=DEDUP_TTL_SECONDS)
+            added = await sync_to_async(cache.add)(
+                f"bot_update:{update_id}", 1, timeout=DEDUP_TTL_SECONDS
+            )
         except (ConnectionInterrupted, redis.RedisError):
             logger.warning(
                 "Cache backend unavailable — skipping dedup guard for "

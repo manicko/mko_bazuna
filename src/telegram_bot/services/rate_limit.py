@@ -13,6 +13,7 @@ Both limiters mirror ``apps.search.services.rate_limit`` via the atomic
 import logging
 from typing import Final
 
+from asgiref.sync import sync_to_async
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ RATE_LIMIT_PERIOD: Final[int] = 60
 _RATE_LIMIT_KEY_PATTERN: Final[str] = "bot_upload_rl:{user_id}"
 
 
+@sync_to_async
 def check_upload_rate_limit(
     user_id: int,
     limit: int = RATE_LIMIT_REQUESTS,
@@ -78,6 +80,7 @@ CONTACT_RATE_LIMIT_PERIOD: Final[int] = 600
 _CONTACT_RATE_LIMIT_KEY_PATTERN: Final[str] = "bot_contact_rl:{user_id}"
 
 
+@sync_to_async
 def check_contact_start_rate_limit(
     user_id: int,
     limit: int = CONTACT_RATE_LIMIT_REQUESTS,

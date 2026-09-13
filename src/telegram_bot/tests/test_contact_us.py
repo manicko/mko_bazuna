@@ -108,14 +108,14 @@ class TestContactUsDeepLink:
         message.answer.assert_not_awaited()
         # A subsequent real (non-bot) call for the same id must NOT be rate
         # limited — the bot's invocation must not have consumed a slot.
-        assert check_contact_start_rate_limit(202) is True
+        assert await check_contact_start_rate_limit(202) is True
 
     @pytest.mark.asyncio
     async def test_rate_limited_sends_cooldown(self) -> None:
         """6th contact-start trigger within the window yields the cooldown message."""
         # Exhaust the per-user budget (default 5) before invoking the handler.
         for _ in range(5):
-            assert check_contact_start_rate_limit(203) is True
+            assert await check_contact_start_rate_limit(203) is True
 
         message = _mock_message(user_id=203)
         bot = MagicMock()
