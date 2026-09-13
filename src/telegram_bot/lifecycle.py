@@ -13,6 +13,7 @@ from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import close_old_connections, connections
 
@@ -56,8 +57,8 @@ async def _on_shutdown(*args: Any, **kwargs: Any) -> None:
             pass
         except OSError as exc:
             logger.warning("Could not remove liveness marker %s: %s", path, exc)
-    connections.close_all()
-    close_old_connections()
+    await sync_to_async(connections.close_all)()
+    await sync_to_async(close_old_connections)()
 
 
 class LivenessMiddleware(BaseMiddleware):
