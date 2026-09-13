@@ -338,3 +338,169 @@ class TestReactivationTextUpdated:
         ad.refresh_from_db()
         assert ad.title == new_title
         assert ad.description == new_description
+
+
+# ---------------------------------------------------------------------------
+# Test 6: PUBLISHED text-edit branch (Zone C2 — hide-on-text-edit)
+# ---------------------------------------------------------------------------
+
+
+class TestPublishedTextEdit:
+    """Verify the PUBLISHED text-edit branch in ``ad_edit`` (Zone C2).
+
+    Text edits on a PUBLISHED ad transition to ON_MODERATION and hide the ad
+    immediately. Price/photo-only edits stay PUBLISHED. Mixed edits follow the
+    text rule. ``auto_moderate`` is NOT invoked on this path — only
+    ``transition_to(ON_MODERATION)`` is called (documents current behavior gap).
+    """
+
+    def test_edit_published_text_edit_transitions_to_on_moderation(
+        self, client_, seller, category, city
+    ) -> None:
+        """PUBLISHED ad with text change -> ON_MODERATION, published_at preserved,
+        archived_at stays NULL, title/description updated, redirect to dashboard.
+
+        ``transition_to(ON_MODERATION)`` clears moderation_failed_at, rejected_at,
+        and archived_at — but NOT published_at. The original published_at value
+        must therefore be retained (not cleared).
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        original_published_at = ad.published_at
+        new_title = "Updated Published Title"
+        new_description = "Updated published description text."
+
+        response = client_.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": new_title,
+                "description": new_description,
+                "price_amount": "100",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
+        # archived_at must remain NULL (never set for a PUBLISHED ad)
+        assert ad.archived_at is None
+        # published_at is NOT cleared by transition_to(ON_MODERATION)
+        assert ad.published_at == original_published_at
+        assert ad.title == new_title
+        assert ad.description == new_description
+
+    def test_edit_published_price_only_stays_published(
+        self, client_, seller, category, city
+    ) -> None:
+        """PUBLISHED ad with price-only change -> stays PUBLISHED,
+        published_at unchanged, price_normalized_eur recomputed via PriceNormalizer.
+
+        Title and description are unchanged so ``has_text_change`` is False,
+        taking the price/photo-only branch (status preserved).
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        original_published_at = ad.published_at
+        new_price = Decimal("200")
+
+        response = client_.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": ad.title,
+                "description": ad.description,
+                "price_amount": str(new_price),
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        # published_at unchanged (no status transition)
+        assert ad.published_at == original_published_at
+        # price_normalized_eur recomputed via PriceNormalizer
+        expected_normalized = PriceNormalizer().normalize_to_eur(
+            new_price, CurrencyCode.EUR
+        )
+        assert ad.price_normalized_eur == expected_normalized
+        assert ad.price_amount == new_price
+
+    def test_edit_published_mixed_edit_transitions_to_on_moderation(
+        self, client_, seller, category, city
+    ) -> None:
+        """PUBLISHED ad with text + price change -> ON_MODERATION (text rule wins),
+        while price_normalized_eur is still updated.
+
+        The text-edit rule dominates the transition target, but the price change
+        is still applied within the same save before transitioning.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        original_published_at = ad.published_at
+        new_title = "Updated Mixed Title"
+        new_description = "Updated mixed description text."
+        new_price = Decimal("200")
+
+        response = client_.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": new_title,
+                "description": new_description,
+                "price_amount": str(new_price),
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        # Text rule wins -> ON_MODERATION
+        assert ad.status == AdStatus.ON_MODERATION
+        assert ad.published_at == original_published_at
+        # Price is still applied even though text rule controls the transition
+        expected_normalized = PriceNormalizer().normalize_to_eur(
+            new_price, CurrencyCode.EUR
+        )
+        assert ad.price_normalized_eur == expected_normalized
+        assert ad.title == new_title
+
+    def test_edit_published_text_edit_no_auto_moderate(
+        self, client_, seller, category, city
+    ) -> None:
+        """PUBLISHED text edit must NOT invoke ``auto_moderate``.
+
+        Documents the current behavior gap: the PUBLISHED text-edit branch calls
+        ``transition_to(ON_MODERATION)`` directly without running content
+        moderation, unlike the ARCHIVED reactivation path (which calls
+        ``auto_moderate``).
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        new_title = "Updated Auto Moderate Title"
+        new_description = "Updated auto moderate description."
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate"
+        ) as mock_moderate:
+            response = client_.post(
+                reverse("ads:edit", args=[ad.id]),
+                data={
+                    "title": new_title,
+                    "description": new_description,
+                    "price_amount": "100",
+                    "price_currency": CurrencyCode.EUR.value,
+                },
+            )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        mock_moderate.assert_not_called()
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
