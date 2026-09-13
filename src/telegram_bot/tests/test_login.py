@@ -21,6 +21,7 @@ import asyncio
 import hashlib
 from collections.abc import Awaitable, Callable
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from asgiref.sync import sync_to_async
@@ -171,6 +172,47 @@ class TestClaimLoginToken:
 
         # Assert
         assert second_claim is None, "Re-claim of a claimed token must be blocked"
+
+    @pytest.mark.asyncio
+    async def test_token_unclaimed_on_get_or_create_failure(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """If get_or_create raises a non-IntegrityError, the token claim rolls back.
+
+        After the DB-004 fix, the token claim and user get/create share a single
+        outer ``transaction.atomic()``. A ``RuntimeError`` (not ``IntegrityError``)
+        from ``get_or_create`` escapes the inner SAVEPOINT, propagates through the
+        outer ``atomic()`` (triggering ``ROLLBACK``), and the token reverts to its
+        unclaimed state — preventing a user lockout. Before the fix, the token
+        would remain claimed with no user created.
+        """
+        from apps.users.models import User
+        from telegram_bot.handlers.login import handle_login_orm
+
+        # Arrange
+        _raw_token, token = await login_token_factory()
+        token_hash = token.token_hash
+        telegram_id = 900000310
+
+        # Act + Assert: RuntimeError from get_or_create propagates, rolling back
+        # the outer transaction (including the token claim).
+        with patch.object(
+            User.objects, "get_or_create", side_effect=RuntimeError("boom")
+        ):
+            with pytest.raises(RuntimeError, match="boom"):
+                await handle_login_orm(
+                    token_hash=token_hash,
+                    telegram_id=telegram_id,
+                    username="race_user",
+                    first_name="Race",
+                    last_name="User",
+                )
+
+        # Assert: the token was rolled back — telegram_id and consumed_at are None
+        refreshed = await sync_to_async(LoginToken.objects.get)(id=token.id)
+        assert refreshed.telegram_id is None
+        assert refreshed.consumed_at is None
 
 
 # ---------------------------------------------------------------------------

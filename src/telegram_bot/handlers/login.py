@@ -178,38 +178,41 @@ async def handle_login_orm(
     def _handle() -> tuple[LoginToken | None, User | None, bool]:
         now = timezone.now()
 
-        # Atomic UPDATE ... RETURNING claim — single query, zero TOCTOU.
-        # token_hash is unique-indexed; the UPDATE row lock guarantees only
-        # one concurrent claimer wins. See docs/02-database/db-schema.md:84-85.
+        # Single transaction: claim token + create/retrieve user.
+        # If get_or_create raises a non-IntegrityError, the entire block
+        # rolls back, returning the token to an unclaimed state.
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             login_token = _claim_login_token(token_hash, telegram_id, now)
 
-        if login_token is None:
-            return None, None, False
+            if login_token is None:
+                return None, None, False
 
-        # Get or create user by stable chat_id (never nullified on withdraw)
-        try:
-            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-                user, created = User.objects.get_or_create(
-                    chat_id=telegram_id,
-                    defaults={
-                        "telegram_id": telegram_id,
-                        "chat_id": telegram_id,
-                        "username": username,
-                        "first_name": first_name,
-                        "last_name": last_name,
-                    },
-                )
-        except IntegrityError:
-            user = User.objects.get(chat_id=telegram_id)
-            created = False
-        else:
-            if created:
-                record_event(
-                    AnalyticsEventType.REGISTRATION_CREATED,
-                    user_id=user.id,
-                )
-                logger.info("Registration event recorded for user %s", user.id)
-        return login_token, user, created
+            # Get or create user by stable chat_id (never nullified on withdraw).
+            # The inner atomic() is a SAVEPOINT: it lets us catch IntegrityError
+            # (concurrent INSERT race on chat_id) and fall back to a plain get(),
+            # while keeping the token claim + user creation in the outer transaction.
+            try:
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+                    user, created = User.objects.get_or_create(
+                        chat_id=telegram_id,
+                        defaults={
+                            "telegram_id": telegram_id,
+                            "chat_id": telegram_id,
+                            "username": username,
+                            "first_name": first_name,
+                            "last_name": last_name,
+                        },
+                    )
+            except IntegrityError:
+                user = User.objects.get(chat_id=telegram_id)
+                created = False
+            else:
+                if created:
+                    record_event(
+                        AnalyticsEventType.REGISTRATION_CREATED,
+                        user_id=user.id,
+                    )
+                    logger.info("Registration event recorded for user %s", user.id)
+            return login_token, user, created
 
     return await _handle()
