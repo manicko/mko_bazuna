@@ -122,6 +122,8 @@ COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/pyproject.toml /app/uv.lock /app/
 # Copy collected static files
 COPY --from=builder --chown=app:app /app/staticfiles /app/staticfiles
+# Copy Gunicorn configuration (auto-discovered from CWD /app)
+COPY --chown=app:app gunicorn.conf.py /app/gunicorn.conf.py
 
 # Copy entrypoint scripts
 COPY --chown=app:app docker/entrypoint*.sh /app/
@@ -159,7 +161,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "config.wsgi:application"]
 
 
 ################################################################################
