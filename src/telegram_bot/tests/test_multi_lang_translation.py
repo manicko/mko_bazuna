@@ -24,7 +24,7 @@ from apps.core.services.translation import (
 )
 from telegram_bot.handlers.ad_create import translate_all_languages
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
+pytestmark = [pytest.mark.unit]
 
 # Patch target: translate_cached_generic in the shared translation module.
 # translate_text looks up this name at call-time from the module namespace,
@@ -61,6 +61,7 @@ class TestTranslateAllLanguages:
     # Happy path
     # ------------------------------------------------------------------
 
+    @pytest.mark.asyncio
     async def test_returns_dict_with_all_locale_codes(self) -> None:
         """Returns a dict containing all requested locale codes as keys."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -70,6 +71,7 @@ class TestTranslateAllLanguages:
         assert isinstance(result, dict)
         assert set(result) == {"ru", "bs", "en"}
 
+    @pytest.mark.asyncio
     async def test_translation_non_empty_for_valid_input(self) -> None:
         """Returns a non-empty translated string when the translator succeeds."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -78,6 +80,7 @@ class TestTranslateAllLanguages:
 
         assert result["ru"] == "привет"
 
+    @pytest.mark.asyncio
     async def test_translates_each_locale_independently(self) -> None:
         """Each locale receives the correct translation via parallel dispatch."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -92,6 +95,7 @@ class TestTranslateAllLanguages:
     # Fallback behaviour
     # ------------------------------------------------------------------
 
+    @pytest.mark.asyncio
     async def test_timeout_fallback_returns_original_text(self) -> None:
         """Returns original text when translation raises an exception."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -101,6 +105,7 @@ class TestTranslateAllLanguages:
         assert result["ru"] == "Original text"
         assert result["bs"] == "Original text"
 
+    @pytest.mark.asyncio
     async def test_partial_failure_falls_back_per_locale(self) -> None:
         """One failing locale does not prevent others from succeeding."""
 
@@ -121,6 +126,7 @@ class TestTranslateAllLanguages:
     # Edge cases
     # ------------------------------------------------------------------
 
+    @pytest.mark.asyncio
     async def test_empty_string_input(self) -> None:
         """Empty string input is passed through without calling translator."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -131,6 +137,7 @@ class TestTranslateAllLanguages:
         assert result["en"] == ""
         mock_translate.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_single_locale(self) -> None:
         """Works correctly with a single target locale."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -144,6 +151,7 @@ class TestTranslateAllLanguages:
     # Parity tests (circuit breaker & timeout in shared service)
     # ------------------------------------------------------------------
 
+    @pytest.mark.asyncio
     async def test_circuit_breaker_open_short_circuits(self) -> None:
         """After 3 translation failures the circuit opens and short-circuits."""
         with patch(_TRANSLATE_PATH, side_effect=_make_http_error(429)):
@@ -160,6 +168,7 @@ class TestTranslateAllLanguages:
             assert result["ru"] == "different text"
             mock_translate.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_timeout_fallback_returns_original(self) -> None:
         """Translation exceeding the (patched) timeout falls back to original text."""
 
@@ -175,6 +184,7 @@ class TestTranslateAllLanguages:
 
         assert result["ru"] == "original"
 
+    @pytest.mark.asyncio
     async def test_empty_string_returns_empty(self) -> None:
         """Empty input is returned as empty without calling the translator."""
         with patch(_TRANSLATE_PATH) as mock_translate:
@@ -183,6 +193,7 @@ class TestTranslateAllLanguages:
         assert result == {"ru": "", "en": ""}
         mock_translate.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_gather_return_exceptions_isolates_failure(self) -> None:
         """One locale's failure does not cancel translations in other locales."""
 

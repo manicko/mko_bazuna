@@ -21,7 +21,6 @@ from telegram_bot.services.rate_limit import (
 pytestmark = [
     pytest.mark.django_db,
     pytest.mark.integration,
-    pytest.mark.asyncio,
 ]
 
 
@@ -35,17 +34,20 @@ def _clear_cache() -> Iterator[None]:
 class TestContactStartRateLimit:
     """Tests for ``check_contact_start_rate_limit``."""
 
+    @pytest.mark.asyncio
     async def test_allows_under_limit(self) -> None:
         """First 5 contact-start triggers are allowed."""
         for _ in range(5):
             assert await check_contact_start_rate_limit(123) is True
 
+    @pytest.mark.asyncio
     async def test_blocks_after_threshold(self) -> None:
         """6th contact-start trigger within the window is rate-limited."""
         for _ in range(5):
             assert await check_contact_start_rate_limit(456) is True
         assert await check_contact_start_rate_limit(456) is False
 
+    @pytest.mark.asyncio
     async def test_independent_per_user(self) -> None:
         """Rate-limit counters are isolated per Telegram user_id."""
         for _ in range(5):
@@ -53,6 +55,7 @@ class TestContactStartRateLimit:
         # User 999 is unaffected by user 789's window.
         assert await check_contact_start_rate_limit(999) is True
 
+    @pytest.mark.asyncio
     async def test_custom_limit_and_period(self) -> None:
         """limit/period kwargs override the defaults."""
         for _ in range(3):

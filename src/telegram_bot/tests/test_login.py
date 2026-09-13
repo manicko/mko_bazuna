@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the Telegram bot login flow (deep-link authentication).
 
 Covers the atomic login-token claim implemented in
@@ -17,6 +17,7 @@ This file consolidates the previously duplicated ``test_claim_login_token.py``
 and ``test_login_claim.py`` into a single coherent suite.
 """
 
+import asyncio
 import hashlib
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -261,3 +262,91 @@ class TestTokenRejection:
         assert login_token is None
         assert user is None
         assert created is False
+
+
+# ---------------------------------------------------------------------------
+# Concurrent claim race
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentClaim:
+    """Concurrent claim of a single shared ``LoginToken`` via ``asyncio.gather``.
+
+    Reproduces the race condition described in audit finding TST-005: when
+    multiple concurrent claims arrive against a single unclaimed token, only
+    ONE must succeed (the token transitions to the claimed state) and the
+    remaining N-1 must fail gracefully without crashing.
+
+    ``handle_login_orm`` is async, so concurrency is achieved with
+    ``asyncio.gather`` â€” not threading â€” scheduling N coroutines that each
+    invoke the atomic ``UPDATE â€¦ RETURNING`` claim. The ``WHERE`` guard
+    (``telegram_id IS NULL AND consumed_at IS NULL AND expires_at > now``)
+    combined with PostgreSQL's row-level lock on the matched row guarantees
+    that only the first claimer to win the lock stamps its ``telegram_id``;
+    all others match zero rows and return ``None``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_login_token_race(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """N concurrent claims against one shared token â†’ exactly 1 winner.
+
+        Fires ``num_claimers`` simultaneous ``handle_login_orm`` calls via
+        ``asyncio.gather``. The atomic ``UPDATE â€¦ RETURNING`` claim ensures
+        only the first claimer to acquire the row lock succeeds; the rest
+        return ``None`` gracefully.
+        """
+        from telegram_bot.handlers.login import handle_login_orm
+
+        # Arrange: a single, unclaimed token shared by all claimers
+        _raw_token, token = await login_token_factory()
+        token_hash = token.token_hash
+
+        num_claimers = 5
+
+        # Act: fire N concurrent claims against the same token hash.
+        # Each claimer uses a distinct telegram_id so successful user creation
+        # never collides on the unique chat_id column.
+        results = await asyncio.gather(
+            *[
+                handle_login_orm(
+                    token_hash=token_hash,
+                    telegram_id=900000300 + i,
+                    username=f"concurrent_{i}",
+                    first_name=f"Concurrent{i}",
+                    last_name="User",
+                )
+                for i in range(num_claimers)
+            ]
+        )
+
+        # Assert: exactly one claim succeeded; the rest failed gracefully
+        successes = [r for r in results if r[0] is not None]
+        failures = [r for r in results if r[0] is None]
+
+        assert len(successes) == 1, (
+            f"Expected exactly 1 successful claim, got {len(successes)}"
+        )
+        assert len(failures) == num_claimers - 1, (
+            f"Expected {num_claimers - 1} failed claims, got {len(failures)}"
+        )
+
+        # Assert: the winner stamped its telegram_id onto the token and
+        # created a user
+        winner_token, winner_user, winner_created = successes[0]
+        assert winner_token is not None
+        assert winner_token.telegram_id is not None
+        assert winner_user is not None
+        assert winner_created is True
+
+        # Assert: the token row is now claimed (persisted to the DB)
+        refreshed = await sync_to_async(LoginToken.objects.get)(id=token.id)
+        assert refreshed.telegram_id == winner_token.telegram_id
+
+        # Assert: failed claims returned gracefully (no crash, no side effects)
+        for login_token, user, created in failures:
+            assert login_token is None
+            assert user is None
+            assert created is False
