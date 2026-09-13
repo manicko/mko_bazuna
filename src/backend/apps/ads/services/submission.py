@@ -178,12 +178,16 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         # Transition DRAFT -> ON_MODERATION (state machine requires this step)
         ad.transition_to(AdStatus.ON_MODERATION)
 
-    # Delegate to shared auto-moderation service
-    # Handles: banned_words, duplicate_title, all validations,
-    # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
-    from apps.moderation.services.auto_moderation import auto_moderate
+        # Delegate to shared auto-moderation service
+        # Handles: banned_words, duplicate_title, all validations,
+        # ModeratorActionLog, AnalyticsEvent (with enum member), status transitions
+        # DB-001: auto_moderate is inside the outer atomic() so its inner
+        # atomic() blocks become savepoints. If auto_moderate raises, the
+        # entire submit_ad transaction rolls back — the ad stays DRAFT
+        # (not committed in ON_MODERATION).
+        from apps.moderation.services.auto_moderation import auto_moderate
 
-    passed = auto_moderate(ad)
+        passed = auto_moderate(ad)
     if passed:
         return True, []
     else:
