@@ -36,7 +36,10 @@ from django.db import close_old_connections as django_close_old_connections
 
 import telegram_bot.middlewares.connection as connection_module
 from apps.users.models import User
-from telegram_bot.middlewares import DatabaseConnectionMiddleware
+from telegram_bot.middlewares import (
+    AccountStateMiddleware,
+    DatabaseConnectionMiddleware,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -152,14 +155,18 @@ class TestDatabaseConnectionMiddleware:
 class TestDatabaseConnectionMiddlewareRegistration:
     """Registration of the middleware on the production ``dp`` fixture."""
 
-    def test_middleware_registered_as_outer(self, dp: Any) -> None:
-        """``DatabaseConnectionMiddleware`` is registered on the OUTER update chain.
+    def test_state_middleware_registration(self, dp: Any) -> None:
+        """Verify middleware registration on the production ``dp`` fixture.
 
-        Outer middlewares wrap the entire update dispatch (including all routing),
-        so the ``finally`` runs even when a router raises; inner ``message``
-        middleware runs only for message events.
+        After AUT-003: ``AccountStateMiddleware`` moved from ``dp.message`` to
+        ``dp.update`` (inner chain).  ``DatabaseConnectionMiddleware`` remains on
+        the outer chain.
         """
         outer = dp.update.outer_middleware._middlewares
         inner = dp.update.middleware._middlewares
+        # DatabaseConnectionMiddleware wraps all inner middlewares (outer chain).
         assert any(isinstance(m, DatabaseConnectionMiddleware) for m in outer)
         assert not any(isinstance(m, DatabaseConnectionMiddleware) for m in inner)
+        # AccountStateMiddleware is on the inner chain (AUT-003 fix).
+        assert any(isinstance(m, AccountStateMiddleware) for m in inner)
+        assert not any(isinstance(m, AccountStateMiddleware) for m in outer)

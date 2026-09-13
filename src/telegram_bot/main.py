@@ -49,9 +49,6 @@ def main() -> None:
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    # Register account state middleware
-    dp.message.middleware(AccountStateMiddleware())
-
     # Register lifecycle hooks: startup writes the liveness marker,
     # shutdown removes it and closes DB connections, LivenessMiddleware
     # touches the marker on every inbound update for freshness.
@@ -59,6 +56,10 @@ def main() -> None:
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
+    # Register account state middleware on update-level so it receives Update
+    # events (Message + CallbackQuery), making the isinstance(event, Update)
+    # gate and event.message / event.callback_query access functional.
+    dp.update.middleware(AccountStateMiddleware())
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
     # Include routers

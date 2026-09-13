@@ -61,7 +61,6 @@ def dp() -> Dispatcher:
         UpdateIdDedupMiddleware,
     )
 
-    dp.message.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
     dp.include_router(login_router)
     dp.include_router(ad_create_router)
     dp.include_router(alerts_router)
@@ -76,6 +75,8 @@ def dp() -> Dispatcher:
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
+    # Register account state middleware on update-level (moved from dp.message)
+    dp.update.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
     return dp
