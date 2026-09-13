@@ -58,10 +58,14 @@ class Command(BaseCommand):
                     )
                     return
 
-                # Update status to ARCHIVED and set archived_at timestamp
+                # Deliberate bulk update path (bypasses transition_to() + save()):
+                # 1. queryset pre-filtered to PUBLISHED, matching ALLOWED_TRANSITIONS PUBLISHED -> ARCHIVED
+                # 2. archived_at set below, satisfying ck_ads_archived_at_if_archived
+                # 3. updated_at refreshed here because bulk update() does not call save() and so skips auto_now
                 updated_count = queryset.update(
                     status=AdStatus.ARCHIVED,
                     archived_at=timezone.now(),
+                    updated_at=timezone.now(),
                 )
 
                 logger.info(
