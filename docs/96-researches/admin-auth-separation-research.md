@@ -71,7 +71,7 @@ code (verified against the passing test suite — `test_logout.py`,
 | `django.contrib.auth.urls` | **NOT** included in `urlpatterns` | `config/urls.py:10-19` |
 | Admin login | Standard `/admin/login/` via `AdminAuthenticationForm` (password-based, requires `is_staff`) | `sites.py:414-449` |
 | Seller login | Two-phase Telegram token flow: `/login/issue/` → bot deep-link → `/login/status/?token=` → `auth_login()` | `consent.py:161-291` |
-| Token storage | Only SHA-256 hash persisted; raw token never stored; 5-min expiry; atomic claim via `UPDATE … RETURNING` | `models.py:119-157`, `login.py:97-130` |
+| Token storage | Only SHA-256 hash persisted; raw token never stored; 5-min expiry; atomic claim via `UPDATE … RETURNING` | `models.py:119-157`, `login.py:122-155` |
 | Admin user creation | `create_admin_user` management command; `telegram_id=-1` placeholder, `is_staff=True`, `is_superuser=True` | `create_admin_user.py:107-116` |
 | Staff gate on moderation views | `staff_required` decorator → 404 for non-staff | `decorators.py:17-31` |
 | Staff gate on analytics moderation | Separate `_staff_required` decorator (duplicated) | `moderation_dashboard.py:26-34` |
@@ -792,8 +792,8 @@ Each public template replaces its inline `<header>...</header>` block with:
 ### Supporting Approach B
 
 - The `LoginToken` model and bot-side claim logic already exist and work
-  atomically (`_claim_login_token`, `login.py:97-130`).
-- The bot handler `handle_login_deep_link` (login.py:32-90) already creates
+  atomically (`_claim_login_token`, `login.py:122-155`).
+- The bot handler `handle_login_deep_link` (login.py:34-119) already creates
   users via `get_or_create` by `chat_id`.
 
 ### Conflicting with Approach B
@@ -889,7 +889,7 @@ Each public template replaces its inline `<header>...</header>` block with:
 - `src/backend/templates/ads/list.html:18-25,56` — header + consent banner guard pattern
 - `src/backend/templates/ads/detail.html:20-27,106` — header + consent banner guard
 - `src/backend/templates/ads/edit.html:16-26` — header
-- `src/backend/telegram_bot/handlers/login.py:26,32,97-130` — bot login handler + atomic claim
+- `src/backend/telegram_bot/handlers/login.py:26,32,122-155` — bot login handler + atomic claim
 - `docs/01-spec/technical-specification.md:113-119` — decision H (Telegram login)
 - `docs/04-user-stories/admin-stories.md:50-51,36-38` — US-A1 admin auth
 - `docs/02-database/db-schema.md:54-57,75-87` — users table, login_tokens schema

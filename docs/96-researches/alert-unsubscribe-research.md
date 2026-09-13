@@ -95,9 +95,13 @@ tests for unsubscribe must register the callback router.
 - `LOGIN_PATTERN = re.compile(r"^login_([A-Za-z0-9_-]{32})$")` (line 26).
   Group 1 captures the 32-char raw token; the handler hashes it with SHA-256
   immediately (line 69).
-- `handle_login_orm` (lines 133-190) wraps the claim in `@sync_to_async` +
-  `transaction.atomic`. The atomic claim uses raw `UPDATE ... RETURNING`
-  (lines 112-130 in `_claim_login_token`) — PostgreSQL row lock, zero TOCTOU.
+- `handle_login_orm` (lines 158-218) wraps the token claim **and** user creation
+  in a single outer `@sync_to_async` + `transaction.atomic()`. The atomic claim
+  uses raw `UPDATE ... RETURNING` (lines 122-155 in `_claim_login_token`) —
+  PostgreSQL row lock, zero TOCTOU. An inner `transaction.atomic()` SAVEPOINT
+  wraps `get_or_create` to recover from `IntegrityError` on concurrent INSERT
+  races; a non-`IntegrityError` failure rolls back the entire outer transaction,
+  returning the token to an unclaimed state.
 - **Delegation pattern:** `login.py:57` calls `handle_contact_start(message,
   bot, deep_link)` **before** checking `LOGIN_PATTERN`. If it returns `True`
   (handled), login returns early; if `False`, login processing continues.
