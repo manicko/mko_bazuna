@@ -349,9 +349,10 @@ class TestPublishedTextEdit:
     """Verify the PUBLISHED text-edit branch in ``ad_edit`` (Zone C2).
 
     Text edits on a PUBLISHED ad transition to ON_MODERATION and hide the ad
-    immediately. Price/photo-only edits stay PUBLISHED. Mixed edits follow the
-    text rule. ``auto_moderate`` is NOT invoked on this path — only
-    ``transition_to(ON_MODERATION)`` is called (documents current behavior gap).
+    immediately, then ``auto_moderate`` is invoked: on pass the ad is promoted
+    back to PUBLISHED; on fail it stays ON_MODERATION and the edit form is
+    re-rendered with a seller-safe error. Price/photo-only edits stay
+    PUBLISHED (no auto-moderation). Mixed edits follow the text rule.
     """
 
     def test_edit_published_text_edit_transitions_to_on_moderation(
@@ -363,6 +364,10 @@ class TestPublishedTextEdit:
         ``transition_to(ON_MODERATION)`` clears moderation_failed_at, rejected_at,
         and archived_at — but NOT published_at. The original published_at value
         must therefore be retained (not cleared).
+
+        We mock ``auto_moderate`` to return ``True`` so the mock bypasses
+        ``_pass_moderation`` (which would set PUBLISHED), isolating the view's
+        transition ``PUBLISHED -> ON_MODERATION`` and verifying the redirect.
         """
         ad = create_test_ad(
             seller, category, city, status=AdStatus.PUBLISHED, price=100
@@ -371,15 +376,19 @@ class TestPublishedTextEdit:
         new_title = "Updated Published Title"
         new_description = "Updated published description text."
 
-        response = client_.post(
-            reverse("ads:edit", args=[ad.id]),
-            data={
-                "title": new_title,
-                "description": new_description,
-                "price_amount": "100",
-                "price_currency": CurrencyCode.EUR.value,
-            },
-        )
+        with patch(
+            "apps.ads.views.edit.auto_moderate",
+            return_value=True,
+        ):
+            response = client_.post(
+                reverse("ads:edit", args=[ad.id]),
+                data={
+                    "title": new_title,
+                    "description": new_description,
+                    "price_amount": "100",
+                    "price_currency": CurrencyCode.EUR.value,
+                },
+            )
 
         assert response.status_code == 302
         assert "dashboard" in response.url
@@ -437,7 +446,10 @@ class TestPublishedTextEdit:
         while price_normalized_eur is still updated.
 
         The text-edit rule dominates the transition target, but the price change
-        is still applied within the same save before transitioning.
+        is still applied within the same save before transitioning. We mock
+        ``auto_moderate`` to return ``True`` so the mock bypasses
+        ``_pass_moderation`` (which would set PUBLISHED), isolating the view's
+        transition to ON_MODERATION.
         """
         ad = create_test_ad(
             seller, category, city, status=AdStatus.PUBLISHED, price=100
@@ -447,15 +459,19 @@ class TestPublishedTextEdit:
         new_description = "Updated mixed description text."
         new_price = Decimal("200")
 
-        response = client_.post(
-            reverse("ads:edit", args=[ad.id]),
-            data={
-                "title": new_title,
-                "description": new_description,
-                "price_amount": str(new_price),
-                "price_currency": CurrencyCode.EUR.value,
-            },
-        )
+        with patch(
+            "apps.ads.views.edit.auto_moderate",
+            return_value=True,
+        ):
+            response = client_.post(
+                reverse("ads:edit", args=[ad.id]),
+                data={
+                    "title": new_title,
+                    "description": new_description,
+                    "price_amount": str(new_price),
+                    "price_currency": CurrencyCode.EUR.value,
+                },
+            )
 
         assert response.status_code == 302
         assert "dashboard" in response.url
@@ -470,24 +486,26 @@ class TestPublishedTextEdit:
         assert ad.price_normalized_eur == expected_normalized
         assert ad.title == new_title
 
-    def test_edit_published_text_edit_no_auto_moderate(
+    def test_edit_published_text_edit_calls_auto_moderate(
         self, client_, seller, category, city
     ) -> None:
-        """PUBLISHED text edit must NOT invoke ``auto_moderate``.
+        """PUBLISHED text edit invokes ``auto_moderate`` after the status
+        transition to ON_MODERATION.
 
-        Documents the current behavior gap: the PUBLISHED text-edit branch calls
-        ``transition_to(ON_MODERATION)`` directly without running content
-        moderation, unlike the ARCHIVED reactivation path (which calls
-        ``auto_moderate``).
+        We mock ``auto_moderate`` to return ``True`` so the mock bypasses
+        ``_pass_moderation`` (which would set PUBLISHED), isolating the view's
+        transition ``PUBLISHED -> ON_MODERATION`` and verifying
+        ``auto_moderate`` is invoked exactly once.
         """
         ad = create_test_ad(
             seller, category, city, status=AdStatus.PUBLISHED, price=100
         )
         new_title = "Updated Auto Moderate Title"
-        new_description = "Updated auto moderate description."
+        new_description = "Updated auto moderate description text."
 
         with patch(
-            "apps.moderation.services.auto_moderation.auto_moderate"
+            "apps.ads.views.edit.auto_moderate",
+            return_value=True,
         ) as mock_moderate:
             response = client_.post(
                 reverse("ads:edit", args=[ad.id]),
@@ -501,6 +519,76 @@ class TestPublishedTextEdit:
 
         assert response.status_code == 302
         assert "dashboard" in response.url
-        mock_moderate.assert_not_called()
+        mock_moderate.assert_called_once()
         ad.refresh_from_db()
         assert ad.status == AdStatus.ON_MODERATION
+
+    def test_edit_published_text_edit_passes_auto_moderation(
+        self, client_, seller, category, city, permissive_criteria
+    ) -> None:
+        """PUBLISHED text edit where content passes moderation -> redirect
+        to dashboard, status PUBLISHED, published_at set by _pass_moderation.
+
+        Uses the real ``auto_moderate`` (not mocked) with the
+        ``permissive_criteria`` fixture so the full end-to-end pass path runs,
+        including ``_pass_moderation`` -> ``set_published`` ->
+        ``transition_to(PUBLISHED)`` (which sets ``published_at``).
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        new_title = "Updated Pass Title"
+        new_description = "Updated pass description text."
+
+        response = client_.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": new_title,
+                "description": new_description,
+                "price_amount": "100",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+    def test_edit_published_text_edit_fails_auto_moderation(
+        self, client_, seller, category, city
+    ) -> None:
+        """PUBLISHED text edit where moderation fails -> re-renders edit.html
+        with error context (200), status stays ON_MODERATION.
+
+        We mock ``auto_moderate`` to return ``False``. Since the mock bypasses
+        the internal ``_fail_moderation`` (which would set ON_MODERATION_FAILED),
+        the ad remains at ON_MODERATION — the view only re-renders the edit
+        page on failure with a seller-safe error message.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        new_title = "Updated Fail Title"
+        new_description = "Updated fail description text."
+
+        with patch(
+            "apps.ads.views.edit.auto_moderate",
+            return_value=False,
+        ) as mock_moderate:
+            response = client_.post(
+                reverse("ads:edit", args=[ad.id]),
+                data={
+                    "title": new_title,
+                    "description": new_description,
+                    "price_amount": "100",
+                    "price_currency": CurrencyCode.EUR.value,
+                },
+            )
+
+        assert response.status_code == 200
+        mock_moderate.assert_called_once()
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
+        assert "error" in response.context
+        assert response.context["error"]

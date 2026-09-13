@@ -228,6 +228,26 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 # Use transition_to for status change to ON_MODERATION
                 ad.transition_to(AdStatus.ON_MODERATION)
                 logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
+
+                # Run auto-moderation on the edited text content (mirrors
+                # ad_reactivate which calls auto_moderate directly).
+                # auto_moderate runs its own atomic() (a SAVEPOINT inside this
+                # view's outer atomic); on pass it promotes to PUBLISHED, on fail
+                # to ON_MODERATION_FAILED. Branch on the bool return and reuse
+                # the seller-safe error message from the reactivation branch.
+                am_result = auto_moderate(ad)
+                if am_result:
+                    return redirect("ads:dashboard")
+
+                ad = Ad.objects.prefetch_related("images").get(id=ad_id)
+                return render(
+                    request,
+                    "ads/edit.html",
+                    {
+                        "ad": ad,
+                        "error": _("Ad failed moderation checks"),
+                    },
+                )
             else:
                 # Price/photo only edit: stay published; recompute normalized price.
                 ad = _apply_price_change(ad, price_amount_value, price_currency_value)
