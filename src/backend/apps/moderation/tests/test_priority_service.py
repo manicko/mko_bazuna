@@ -497,7 +497,7 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
         assert response.status_code == 401
-        assert response.headers["WWW-Authenticate"] == "Bearer"
+        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
 
     def test_requires_post_method(self) -> None:
         """GET request returns 405."""

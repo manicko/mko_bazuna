@@ -170,7 +170,7 @@ class TestStaffRequiredApi:
         response = view(request)
         assert response.status_code == 401
         assert json.loads(response.content) == {"error": "Authentication required"}
-        assert response.headers["WWW-Authenticate"] == "Bearer"
+        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
 
     def test_unauthenticated_get_returns_401(self) -> None:
         """An unauthenticated GET gets 401 (authn check precedes method check)."""
@@ -183,4 +183,4 @@ class TestStaffRequiredApi:
         response = view(request)
         assert response.status_code == 401
         assert json.loads(response.content) == {"error": "Authentication required"}
-        assert response.headers["WWW-Authenticate"] == "Bearer"
+        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
