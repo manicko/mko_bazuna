@@ -308,7 +308,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
+| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions, CSRF, password-reset) are invalidated. |
 | `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
 | `BOT_USERNAME` | Yes | Telegram bot username (without `@`) — used for contact deep-links and login QR codes |
@@ -334,6 +334,13 @@ containers. Do not set `DATABASE_URL` in `.env.docker` — the compose files bui
 individual database variables.
 
 *Required for automatic admin creation via `create_admin` service. Can be created manually if not set.
+
+### Deployment Checks
+
+Deployment configuration is validated via Django's `manage.py check --deploy`:
+- **CI:** The `test` job runs `check --deploy` with `continue-on-error: true` — deploy warnings (e.g., `security.W025` for a `SECRET_KEY` shorter than 50 characters) appear as CI annotations but never fail the build.
+- **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
+- This complements the `${VAR:?}` presence guards in `docker-compose.yml`; it cannot be bypassed by a non-empty placeholder key.
 
 ## Makefile Commands
 

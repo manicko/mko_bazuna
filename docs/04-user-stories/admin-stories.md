@@ -30,7 +30,7 @@ automatically during deployment when `ADMIN_PASSWORD` is set in the environment.
 | Field | Default | Environment Variable |
 |-------|---------|---------------------|
 | Username | `admin` | `ADMIN_USERNAME` |
-| Password | (must be set) | `ADMIN_PASSWORD` |
+| Password | (required for auto-creation; skipped if empty) | `ADMIN_PASSWORD` |
 | Telegram ID | `-1` | `ADMIN_TELEGRAM_ID` |
 
 **Important:** The User model uses `username` as the `USERNAME_FIELD` (not `telegram_id`). The Django
