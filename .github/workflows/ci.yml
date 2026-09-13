@@ -118,6 +118,15 @@ jobs:
           path: src/backend/coverage.xml
           retention-days: 30
 
+      - name: Django deploy checks (non-blocking)
+        continue-on-error: true
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py check --deploy
+        working-directory: src/backend
+
   lint:
     runs-on: ubuntu-latest
     steps:

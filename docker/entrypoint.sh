@@ -81,6 +81,15 @@ compile_messages() {
         || echo "WARNING: compilemessages failed (non-fatal, falling back to msgid strings)"
 }
 
+# Non-fatal Django deployment checks (W025, HSTS, secure cookies, etc.)
+# Surfaces config drift as warnings at boot. Must NOT abort startup
+# (set -e is active on line 5).
+deploy_check() {
+    echo "Running Django deploy checks..."
+    /opt/venv/bin/python /app/src/backend/manage.py check --deploy \
+        || echo "WARNING: manage.py check --deploy reported issues (non-fatal at boot)"
+}
+
 # Execute logic — only when run directly, not when sourced by one-shot entrypoints.
 # When sourced (e.g., by entrypoint-seed.sh), only the setup function definitions above
 # are loaded; the caller invokes them explicitly before exec-ing its command.
@@ -90,6 +99,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     wait_for_db
     wait_for_redis
     compile_messages
+    deploy_check
 
     exec "$@"
 fi
