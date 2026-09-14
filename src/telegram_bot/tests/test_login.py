@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for the Telegram bot login flow (deep-link authentication).
 
 Covers the atomic login-token claim implemented in
