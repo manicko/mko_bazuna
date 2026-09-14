@@ -143,9 +143,9 @@ category_name (VARCHAR, editable=False)             # zone D1 (hybrid C): denorm
 status (StrEnum — see AdStatus)                    # see db-enums.md
 source (StrEnum: TELEGRAM | SEED)                   # TELEGRAM = bot source (decision B); SEED = seed-generated demo data
 created_at / updated_at
-published_at (TIMESTAMP, nullable)                 # drives archive/delete timers; UPDATED on every PUBLISHED transition (timer reset)
+published_at (TIMESTAMP, nullable)                 # drives archive_sweep timer (60d); UPDATED on every PUBLISHED transition (timer reset)
 original_published_at (TIMESTAMP, nullable)        # set once on FIRST publish; IMMUTABLE, audit only
-archived_at (TIMESTAMP, nullable)
+archived_at (TIMESTAMP, nullable)                  # drives delete_sweep timer (60d from archive, AD-005)
 deleted_at (TIMESTAMP, nullable)
 moderation_failed_at (TIMESTAMP, nullable)         # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
 rejected_at (TIMESTAMP, nullable)                  # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
@@ -178,7 +178,7 @@ locale-specific column > Russian > original column.
 > Zone C4 / D12 (AD-001): Six `CheckConstraint`s enforce timestamp presence at the DB level:
 > `published_at` (PUBLISHED), `archived_at` (ARCHIVED), `rejected_at` (REJECTED),
 > `moderation_failed_at` (ON_MODERATION_FAILED), `deleted_at` (DELETED), and the mutual
-> exclusivity of `moderation_failed_at` and `rejected_at`. See [db-indexes.md > Check Constraints](db-indexes.md#check-constraints--ads-ad-001).
+> exclusivity of `moderation_failed_at` and `rejected_at`. See [db-indexes.md > Check Constraints](db-indexes.md#check-constraints--unique-constraints--ads-ad-001).
 
 > Zone D1 (hybrid C, decision O5): `category_name` is denormalized + indexed as described above; see [db-indexes.md](db-indexes.md) for the trigger SQL that syncs it.
 

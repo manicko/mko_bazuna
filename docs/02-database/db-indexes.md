@@ -62,9 +62,9 @@ models.Index(
 )  # archive @2mo
 models.Index(
     name="IX_ads_delete_sweep",
-    fields=["status", "published_at"],
+    fields=["status", "archived_at"],
     condition=Q(status=AdStatus.ARCHIVED),
-)  # delete @4mo
+)  # delete @60d (from archived_at)
 models.Index(
     name="IX_ads_purge_failed",
     fields=["status", "moderation_failed_at"],
@@ -75,8 +75,26 @@ models.Index(
     fields=["status", "rejected_at"],
     condition=Q(status=AdStatus.REJECTED),
 )  # REJECTED @90d (zone D4)
+models.Index(
+    name="IX_ads_draft_sweep",
+    fields=["status", "created_at"],
+    condition=Q(status=AdStatus.DRAFT),
+)  # sweep_drafts: delete DRAFT older than 30 min
 ```
 Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `listing_condition_id` by `IX_ads_pub_condition`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
+
+## Check Constraints & Unique Constraints — ads (AD-001)
+
+Six `CheckConstraint`s enforce timestamp presence at the DB level:
+- `ck_ads_published_at_if_published`: `PUBLISHED` → `published_at IS NOT NULL`
+- `ck_ads_archived_at_if_archived`: `ARCHIVED` → `archived_at IS NOT NULL`
+- `ck_ads_rejected_at_if_rejected`: `REJECTED` → `rejected_at IS NOT NULL`
+- `ck_ads_moderation_failed_at_if_failed`: `ON_MODERATION_FAILED` → `moderation_failed_at IS NOT NULL`
+- `ck_ads_deleted_at_if_deleted`: `DELETED` → `deleted_at IS NOT NULL`
+- `ck_ads_failed_and_rejected_mutually_exclusive`: `NOT (moderation_failed_at IS NOT NULL AND rejected_at IS NOT NULL)`
+
+Unique constraint:
+- `uq_ads_single_draft_per_user`: `UNIQUE (user_id) WHERE status='draft'` — enforces one in-progress DRAFT per user (AD-009). Created after a data-dedup migration (migration 0003) collapses any pre-existing per-user DRAFTs.
 
 ## Indexes — users
 ```python
