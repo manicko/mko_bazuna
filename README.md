@@ -22,7 +22,7 @@ Two long-lived processes share one Django project + one DB:
 
 ## Quick start
 ```bash
-# Configure .env.docker with your values (BOT_TOKEN, DJANGO_SECRET_KEY, POSTGRES_PASSWORD)
+# Configure .env.dev with your values (BOT_TOKEN, DJANGO_SECRET_KEY, POSTGRES_PASSWORD)
 make build                  # build Docker images (one-time)
 make up                     # start dev environment on :8000; runs db → migrate → load_cities → load_catalog → create_admin → seed → web, bot
 ```
@@ -70,7 +70,7 @@ cp localhost+2-key.pem privkey.pem
 
 Then run with nginx profile for HTTPS:
 ```bash
-COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
 
@@ -81,7 +81,7 @@ Web is served behind nginx (ports 80/443); the web container is not exposed dire
 ### PgBouncer (optional connection pooling)
 PgBouncer service is available for connection pooling via profile:
 ```bash
-COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml --profile pgbouncer up -d
 ```
 Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in production when:

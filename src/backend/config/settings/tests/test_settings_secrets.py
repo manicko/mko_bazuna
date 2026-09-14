@@ -6,7 +6,7 @@ Asserts that:
 - BOT_TOKEN empty with DEBUG=False (production) raises ImproperlyConfigured.
 - BOT_TOKEN empty with DEBUG=True (development) is permitted.
 - GOOGLE_TRANSLATE_API_KEY empty with DEBUG=False (production) raises
-  ImproperlyConfigured (the guard that fires when .env.docker omits the key,
+  ImproperlyConfigured (the guard that fires when .env.prod omits the key,
   causing the migrate container's bootstrap_reference_data command to be
   undiscoverable — see KeyError → ImproperlyConfigured cascade).
 
@@ -97,7 +97,7 @@ def test_google_translate_api_key_required_in_production() -> None:
     """GOOGLE_TRANSLATE_API_KEY empty with DEBUG=False (production) raises
     ImproperlyConfigured.
 
-    This guard fires when .env.docker omits the key. The failure cascades:
+    This guard fires when .env.prod omits the key. The failure cascades:
     settings load fails → django.setup() is never called → get_commands()
     returns only core Django commands (settings.configured is False) → the
     bootstrap_reference_data management command is undiscoverable → the

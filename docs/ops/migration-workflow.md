@@ -464,8 +464,8 @@ psycopg2.OperationalError: FATAL: role "postgres" does not exist
 FATAL: database "postgres" does not exist
 ```
 
-Check `.env.docker` — `POSTGRES_USER`, `POSTGRES_DB` must match the `db` service. In Docker the
-`DATABASE_URL` is built from those vars; **do not** set `DATABASE_URL` manually in `.env.docker`
+Check `.env.dev` — `POSTGRES_USER`, `POSTGRES_DB` must match the `db` service. In Docker the
+`DATABASE_URL` is built from those vars; **do not** set `DATABASE_URL` manually in `.env.dev`
 (see [Docker deployment](docker-deployment.md) → Database Configuration).
 
 ### After consolidation, new model changes don't generate a migration

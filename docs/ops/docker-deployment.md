@@ -60,12 +60,12 @@ and `uv_cache` volumes, prefixed by the project name.
 
 | Environment | Compose project name | Full invocation | Env file |
 |-------------|---------------------|-----------------|----------|
-| Dev | `mko-bazuna-dev` | `docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml <cmd>` | `.env.docker` |
-| Test | `mko-bazuna-test` | `docker compose -f docker-compose.yml -f docker-compose.test.yml <cmd>` | *(none — test vars are inline in the override)* |
+| Dev | `mko-bazuna-dev` | `docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml <cmd>` | `.env.dev` |
+| Test | `mko-bazuna-test` | `docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml <cmd>` | `.env.test` |
 
-> **Note:** The test recipes do **not** pass `--env-file .env.docker`. Test credentials and settings
-> are defined inline in `docker-compose.test.yml` (user: `postgres`, db: `mko_bazuna`, password:
-> `postgres`).
+> **Note:** Test recipes pass `--env-file .env.test` and services use `env_file: [.env.test]` in
+> `docker-compose.test.yml`. Test credentials and settings come from `.env.test` and are bind-mounted
+> into containers as `src/.env`.
 
 > **Warning:** A plain `docker compose up` (without `make` or `--env-file`) silently falls back to
 > the directory-name default project `mko_bazuna`. This causes a project-name mismatch with
@@ -76,11 +76,10 @@ and `uv_cache` volumes, prefixed by the project name.
 
 | File | Purpose | Tracked in git |
 |------|---------|----------------|
-| `.env.docker` | App secrets/creds; passed via `--env-file` and bind-mounted into containers as `src/.env` (also used via `env_file:` in compose) | No (runtime secrets, gitignored) |
-| `.env.docker.example` | Template for `.env.docker`; committed to git with placeholder values; copy to `.env.docker` and fill in real values | Yes (template, placeholders only) |
-| `.env` | Auto-loaded by Compose for `${VAR}` interpolation in YAML only; sets no `COMPOSE_PROJECT_NAME` | No (gitignored) |
+| `.env.dev` | App secrets/creds; passed via `--env-file` and bind-mounted into containers as `src/.env` (also used via `env_file:` in compose) | No (runtime secrets, gitignored) |
+| `.env.dev.example` | Template for `.env.dev`; committed to git with placeholder values; copy to `.env.dev` and fill in real values | Yes (template, placeholders only) |
 
-Never set `DATABASE_URL` in `.env.docker` — Compose constructs it from the `POSTGRES_*` variables so
+Never set `DATABASE_URL` in `.env.dev` — Compose constructs it from the `POSTGRES_*` variables so
 the inter-container hostname (`db`) is correct.
 
 ### Windows / non-`make` operation
@@ -101,17 +100,17 @@ the inter-container hostname (`db`) is correct.
   # These examples are single-line PowerShell-ready commands.
 
   # Start dev (equiv. to: make up)
-  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+  docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml up -d
 
   # Stop dev (equiv. to: make down)
-  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down
+  docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down
 
   # Rebuild images without cache (equiv. to: make build)
-  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+  docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
 
   # Full environment reset (equiv. to: make clean)
-  docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
-  docker compose -p mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down --rmi all -v
+  docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+  docker compose -p mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down --rmi all -v
   # Start test DB on host:5433 (equiv. to: make test-db)
   docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
 
@@ -165,7 +164,7 @@ db (healthy, pg_isready)
 ### Quick Start
 
 ```bash
-# Configure environment: copy .env.docker.example to .env.docker and fill in your real values
+# Configure environment: copy .env.dev.example to .env.dev and fill in your real values
 #   - BOT_TOKEN: your Telegram bot token from @BotFather
 #   - DJANGO_SECRET_KEY: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 #   - POSTGRES_PASSWORD: database password
@@ -187,20 +186,9 @@ Docker Compose automatically constructs `DATABASE_URL` from the `POSTGRES_*` var
 postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 ```
 
-**Important:** Do NOT set `DATABASE_URL` in `.env.docker` — the compose files build it from the
+**Important:** Do NOT set `DATABASE_URL` in `.env.dev` — the compose files build it from the
 individual database variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), ensuring the
 correct hostname (`db`) is used for inter-container communication.
-
-For local Django development outside Docker (using `uv run` directly), Django reads `src/.env`
-via `read_env(BASE_DIR / ".env")` where `BASE_DIR = src/`. The `uv run` command also implicitly
-injects `src/.env` into `os.environ` — both resolve to the same file. Place
-`DATABASE_URL=postgres://postgres:postgres@localhost:5432/mko_bazuna` there for local
-development pointing to `localhost`:
-
-```bash
-# Start Django locally (not in Docker)
-uv run python src/backend/manage.py runserver
-```
 
 ### Development Services
 
@@ -218,9 +206,9 @@ If you encounter stale containers or build issues:
 ```bash
 # 1. Stop and remove all dev containers and volumes
 # Windows: .\Makefile.ps1 down  — or single-line:
-#   docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v
+#   docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v
 
-make down    # or: docker compose --env-file .env.docker \
+make down    # or: docker compose --env-file .env.dev \
              #      -f docker-compose.yml -f docker-compose.dev.override.yml down -v
 
 # 2. Remove dangling images, containers, networks, and volumes
@@ -248,7 +236,7 @@ For full production parity with nginx TLS termination, see
 make up
 
 # Or run with nginx for production-like HTTPS (requires mkcert setup)
-COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.docker \
+COMPOSE_PROJECT_NAME=mko-bazuna-dev docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
 
@@ -259,7 +247,7 @@ Windows (PowerShell 5.1+) — single line, no `\` continuation:
 .\Makefile.ps1 up
 
 # Or with nginx for production-like HTTPS (requires mkcert setup):
-docker compose --project-name mko-bazuna-dev --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
+docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml --profile use-nginx up -d
 ```
 
 **Note:** Running with `--profile use-nginx` requires TLS certificates. Follow the mkcert setup
@@ -270,12 +258,12 @@ guide for local HTTPS development.
 ### Docker Compose Production
 
 ```bash
-# Copy .env.docker.example to .env.docker and fill in production values
+# Copy .env.prod.example to .env.prod and fill in production values
 # Then start services:
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Apply migrations (run once)
-docker compose --env-file .env.docker -f docker-compose.yml run --rm migrate
+docker compose --env-file .env.prod -f docker-compose.yml run --rm migrate
 ```
 
 ### Production Services
@@ -296,7 +284,7 @@ Mount TLS certificates at `/etc/nginx/certs/` in the nginx container:
 
 ```bash
 # Using Let's Encrypt certificates
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 The production override file (`docker-compose.prod.yml`) includes:
@@ -330,7 +318,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
-containers. Do not set `DATABASE_URL` in `.env.docker` — the compose files build it from the
+containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
 individual database variables.
 
 *Required for automatic admin creation via `create_admin` service. Can be created manually if not set.
@@ -409,9 +397,9 @@ simultaneously without service-name, network, or named-volume collisions.
 | Aspect | Dev (`mko-bazuna-dev`) | Test (`mko-bazuna-test`) |
 |--------|------------------------|--------------------------|
 | Compose files | `docker-compose.yml` + `docker-compose.dev.override.yml` | `docker-compose.yml` + `docker-compose.test.yml` |
-| Env file | `--env-file .env.docker` | *(none — test vars are inline in the override)* |
+| Env file | `--env-file .env.dev` | `--env-file .env.test` |
 | DB host port | *(not published)* | **5433** → container 5432 |
-| DB credentials | `POSTGRES_*` from `.env.docker` | `postgres` / `postgres` / `mko_bazuna` |
+| DB credentials | `POSTGRES_*` from `.env.dev` | `postgres` / `postgres` / `mko_bazuna` |
 | Persistent volume | `mko-bazuna-dev_postgres_data` | `mko-bazuna-test_postgres_data` |
 | Source binding | `.:/app` (hot-reload) | `.:/app` (no image rebuild needed) |
 | `DEBUG` | `True` | `True` |
@@ -549,7 +537,7 @@ make shell
 # then: python src/backend/manage.py archive_sweep
 
 # Or via docker compose directly
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py archive_sweep
 
@@ -604,7 +592,7 @@ location /protected-media/ {
 make backup
 
 # Manual
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   exec -T db pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -F c > backups/dump_$(date +%Y%m%d_%H%M%S).dump
 ```
@@ -656,7 +644,7 @@ The `create_admin` service runs after migrations complete and creates an admin u
 `ADMIN_PASSWORD` is set in the environment:
 
 ```bash
-# Set ADMIN_PASSWORD in .env.docker or environment
+# Set ADMIN_PASSWORD in .env.dev or environment
 # Then run:
 make up
 
@@ -680,7 +668,7 @@ password later, use the management command:
 make create-admin
 
 # Or manually via docker compose
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
@@ -688,7 +676,7 @@ docker compose --env-file .env.docker \
     --telegram-id -1
 
 # With custom values
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username myadmin \
@@ -702,7 +690,7 @@ docker compose --env-file .env.docker \
 Verify what would be created without making changes:
 
 ```bash
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
@@ -741,7 +729,7 @@ make create-admin
 If you need to use a different telegram_id for admin login:
 
 ```bash
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
@@ -749,7 +737,7 @@ docker compose --env-file .env.docker \
     --telegram-id -999
 ```
 
-Then set `ADMIN_TELEGRAM_ID=-999` in your `.env.docker` file and restart the services.
+Then set `ADMIN_TELEGRAM_ID=-999` in your `.env.dev` file and restart the services.
 
 ## Seed Data
 
@@ -770,7 +758,7 @@ make seed
 SEED_USERS=50 SEED_ADS=200 make seed
 
 # Production (explicit profile, seed does NOT auto-run):
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.prod.yml \
   --profile seed run --rm seed
 ```
@@ -826,7 +814,7 @@ logger and silently dropped application-level `INFO` records.
 make logs
 
 # Specific service
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml logs -f bot
 
 # Filter by pattern
@@ -847,7 +835,7 @@ make shell
 
 ```bash
 # Check database health
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   ps db
 
@@ -865,12 +853,12 @@ make migrate
 make logs | grep bot
 
 # Verify bot token
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   exec bot env | grep BOT_TOKEN
 
 # Check for Django setup errors
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   exec bot python -c "import django; django.setup(); print('OK')"
 ```
@@ -879,12 +867,12 @@ docker compose --env-file .env.docker \
 
 ```bash
 # Check media volume
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   exec web ls -la /app/media
 
 # Verify file ownership
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   exec web ls -la /app/media/root
 
@@ -896,12 +884,12 @@ make logs | grep nginx
 
 ```bash
 # Check for unapplied migrations
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py showmigrations
 
 # Check for missing migrations
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
 ```

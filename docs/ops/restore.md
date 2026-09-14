@@ -22,7 +22,7 @@ This document describes the procedure for restoring the Mko Bazuna database from
 
 - Backup file exists in `./backups/` directory
 - Docker compose environment is running (or can be started)
-- Environment variables `POSTGRES_USER`, `POSTGRES_DB` are configured in `.env`
+- Environment variables `POSTGRES_USER`, `POSTGRES_DB` are configured in `.env.dev`
 
 ## Automated Backup Service
 
@@ -83,8 +83,8 @@ docker compose stop web bot
 
 ```bash
 # Set environment variables for the restore
-export POSTGRES_USER=$(grep POSTGRES_USER .env | cut -d= -f2)
-export POSTGRES_DB=$(grep POSTGRES_DB .env | cut -d= -f2)
+export POSTGRES_USER=$(grep POSTGRES_USER .env.dev | cut -d= -f2)
+export POSTGRES_DB=$(grep POSTGRES_DB .env.dev | cut -d= -f2)
 
 # Perform the restore
 docker compose exec -T db pg_restore \

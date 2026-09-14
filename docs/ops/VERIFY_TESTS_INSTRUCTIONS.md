@@ -21,7 +21,7 @@ docker volume ls | Where-Object { $_ -like "*mko_bazuna*" }
 If stale containers exist (e.g. from dev compose), stop and remove them:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v
 ```
 
 The `-v` flag also removes anonymous volumes (including the ephemeral test DB volume if it was created).
@@ -44,7 +44,7 @@ CLI flag keeps the project package itself out (matching the non-test stages). Al
 changes to `pyproject.toml`, `uv.lock`, or the `Dockerfile`:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build db
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build db
 ```
 
 > If the image is unchanged and you only changed Python source, you can skip the rebuild. For `pyproject.toml`/`uv.lock`/`Dockerfile` changes, rebuild.
@@ -56,13 +56,13 @@ docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.de
 Start just the database in dev mode (web/bot will start too, but we'll focus on the test flow):
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d db
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml up -d db
 ```
 
 Wait for PostgreSQL to be healthy:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml ps db
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml ps db
 ```
 
 Look for `healthy` in the `State` column. The healthcheck tests `pg_isready`.
@@ -74,7 +74,7 @@ Look for `healthy` in the `State` column. The healthcheck tests `pg_isready`.
 Run migrations in a throwaway container that uses the dev override (bind-mounts source code so the latest migrations apply):
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm migrate
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm migrate
 ```
 
 Expected output: `Migrations complete` (or no output if already applied). The `migrate` service runs the `bootstrap_reference_data` management command (advisory lock ID 100), which delegates to `migrate_locked.main` to execute `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. Safe to re-run.
@@ -86,7 +86,7 @@ Expected output: `Migrations complete` (or no output if already applied). The `m
 Seed the category catalog into the DB:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
 ```
 
 This runs `entrypoint-catalog.sh` which calls `load_catalog.py`. If the `CATALOG_PATH` fix (`parents[2]`) is working, output will show category counts.
@@ -130,13 +130,13 @@ The one-shot `test` container will:
 Lint all changed Python files:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test ruff check src/backend/apps/seed/tests/test_seed.py src/backend/apps/categories/management/commands/load_catalog.py src/backend/apps/seed/services/seed_service.py src/backend/apps/core/utils/migrate_locked.py
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test ruff check src/backend/apps/seed/tests/test_seed.py src/backend/apps/categories/management/commands/load_catalog.py src/backend/apps/seed/services/seed_service.py src/backend/apps/core/utils/migrate_locked.py
 ```
 
 Type check all changed Python files:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test uv run basedpyright src/backend/apps/seed/tests/test_seed.py src/backend/apps/categories/management/commands/load_catalog.py src/backend/apps/seed/services/seed_service.py src/backend/apps/core/utils/migrate_locked.py
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps test uv run basedpyright src/backend/apps/seed/tests/test_seed.py src/backend/apps/categories/management/commands/load_catalog.py src/backend/apps/seed/services/seed_service.py src/backend/apps/core/utils/migrate_locked.py
 ```
 
 > The `test` service syncs dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`), so ruff/basedpyright/pytest are available. The `--no-deps` flag skips waiting for the DB healthcheck. If you get `--no-deps` issues, drop it and let the DB start first.
@@ -150,7 +150,7 @@ docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.de
 In the test container, verify the path resolution:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "from pathlib import Path; p = Path('/app/src/backend/apps/seed/tests/test_seed.py'); print(p.resolve().parents[2] / 'categories' / 'catalog' / 'categories.yaml'); print((p.resolve().parents[2] / 'categories' / 'catalog' / 'categories.yaml').exists())"
+docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "from pathlib import Path; p = Path('/app/src/backend/apps/seed/tests/test_seed.py'); print(p.resolve().parents[2] / 'categories' / 'catalog' / 'categories.yaml'); print((p.resolve().parents[2] / 'categories' / 'catalog' / 'categories.yaml').exists())"
 ```
 
 Expected: prints the full path and `True`.
@@ -179,7 +179,7 @@ Expected: `git status` shows nothing for `uv.lock` (it's tracked), and `exit: 1`
 The `migrate_locked.py` now uses `Path(__file__).resolve().parents[3]` to find `manage.py`. Run migrations from any directory (dev compose `migrate` service):
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python src/backend/manage.py bootstrap_reference_data
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python src/backend/manage.py bootstrap_reference_data
 ```
 
 Expected: the `bootstrap_reference_data` command executes successfully regardless of CWD (it delegates to `migrate_locked.main`, which resolves the `manage.py` path via `Path(__file__).resolve().parents[3]`). Note: `entrypoint-test.sh` calls `bootstrap_reference_data` directly (see Step 1 above). The conftest autouse fixture (`_restore_test_schema_post_db_setup`) then calls the same three steps in-process via `call_command` on `test_mko_bazuna`, because `migrate_locked.main()` spawns subprocesses that would connect to `mko_bazuna` instead of the test DB.
@@ -191,8 +191,8 @@ Expected: the `bootstrap_reference_data` command executes successfully regardles
 After verifying, stop and clean up ephemeral containers:
 
 ```pwsh
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.test.yml down -v
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v
+docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml down -v
 ```
 
 ---
@@ -201,7 +201,7 @@ docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.te
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| `ERROR: .env file not found` | Test service doesn't set `SKIP_ENV_CHECK` but compose vars are provided | Add `SKIP_ENV_CHECK=1` env var to test service, or ensure `.env.docker` is mounted |
+| `ERROR: .env file not found` | Test service doesn't set `SKIP_ENV_CHECK` but compose vars are provided | Add `SKIP_ENV_CHECK=1` env var to test service, or ensure `.env.test` is mounted |
 | `uv: command not found` | Image wasn't rebuilt after Dockerfile changes | Run `docker compose build` |
 | `uv sync --frozen` fails with lockfile out of date | `uv.lock` doesn't match `pyproject.toml` | Run `uv lock --upgrade` locally then commit |
 | `pytest not found` | `entrypoint-test.sh` does not sync dev deps | Verify `entrypoint-test.sh` runs `unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev` |
