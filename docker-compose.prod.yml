@@ -50,9 +50,9 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       - REDIS_URL=redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.prod
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.prod:/app/src/.env:ro
     depends_on:
       db:
         condition: service_healthy
