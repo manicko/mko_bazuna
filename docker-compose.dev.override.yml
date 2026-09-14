@@ -14,13 +14,13 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
       # Bind-mount entire repo for hot-reload (overrides image COPY)
       # Also bind-mount docker/entrypoint.sh since the :/app mount hides the image's copy
       - .:/app
       - ./docker/entrypoint.sh:/app/entrypoint.sh
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
     ports:
       - "8000:8000"
@@ -35,17 +35,17 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
       - REDIS_URL=
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
       - .:/app
       - ./docker/entrypoint.sh:/app/entrypoint.sh
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
 
   load_catalog:
     entrypoint: /app/entrypoint-catalog.sh
     environment:
       # migrate/load_catalog use prod settings (base compose); give them a dev
-      # SITE_URL so the prod SITE_URL guard is satisfied without editing .env.docker.
+      # SITE_URL so the prod SITE_URL guard is satisfied without editing .env.dev.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
     volumes:
       - .:/app
@@ -54,7 +54,7 @@ services:
       # so the source'd functions (check_env_file, wait_for_db, wait_for_redis) are defined
       # and the service does not fail with exit 127 ("command not found").
       - ./docker/entrypoint.sh:/app/entrypoint.sh
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
 
   migrate:
     environment:
@@ -79,7 +79,7 @@ services:
       # so the source'd functions (check_env_file, wait_for_db, wait_for_redis) are defined
       # and the service does not fail with exit 127 ("command not found").
       - ./docker/entrypoint.sh:/app/entrypoint.sh
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
 
   nginx:
