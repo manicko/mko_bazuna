@@ -109,7 +109,7 @@ class TestArchiveSweep:
 
 
 class TestDeleteSweep:
-    """Tests for delete_sweep command (advisory lock 2, 120-day window)."""
+    """Tests for delete_sweep command (advisory lock 2, 60-day window)."""
 
     def test_dry_run_does_not_delete(self, seller, category, city):
 
@@ -118,20 +118,20 @@ class TestDeleteSweep:
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=200),
+            archived_at=timezone.now() - timedelta(days=200),
         )
         AdImage.objects.create(ad=old, image="test-uuid.jpg")
         call_command("delete_sweep", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
 
-    def test_deletes_archived_older_than_120_days(self, seller, category, city):
+    def test_deletes_archived_older_than_60_days(self, seller, category, city):
 
         old = create_test_ad(
             seller,
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=200),
+            archived_at=timezone.now() - timedelta(days=200),
         )
         AdImage.objects.create(ad=old, image="test-uuid.jpg")
         recent = create_test_ad(
@@ -139,11 +139,28 @@ class TestDeleteSweep:
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=30),
+            archived_at=timezone.now() - timedelta(days=30),
         )
         call_command("delete_sweep")
         assert not Ad.objects.filter(pk=old.pk).exists()
         assert Ad.objects.filter(pk=recent.pk).exists()
+
+    def test_purges_manually_archived_recent_publish(self, seller, category, city):
+        """Manually-archived ad with recent published_at is still purged.
+
+        Proves delete_sweep anchors on archived_at (not published_at): an ad
+        published 10 days ago but archived 200 days ago must still be purged.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.ARCHIVED,
+            published_at=timezone.now() - timedelta(days=10),
+            archived_at=timezone.now() - timedelta(days=200),
+        )
+        call_command("delete_sweep")
+        assert not Ad.objects.filter(pk=ad.pk).exists()
 
     def test_cascades_ad_images(self, seller, category, city):
 
@@ -152,7 +169,7 @@ class TestDeleteSweep:
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=200),
+            archived_at=timezone.now() - timedelta(days=200),
         )
         img = AdImage.objects.create(ad=old, image="test-uuid.jpg")
         call_command("delete_sweep")
@@ -171,7 +188,7 @@ class TestDeleteSweep:
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=200),
+            archived_at=timezone.now() - timedelta(days=200),
         )
         img = AdImage.objects.create(
             ad=ad,
@@ -871,7 +888,7 @@ class TestConcurrentSweep:
             category,
             city,
             status=AdStatus.ARCHIVED,
-            published_at=timezone.now() - timedelta(days=200),
+            archived_at=timezone.now() - timedelta(days=200),
         )
         AdImage.objects.create(ad=old, image="test-uuid.jpg")
 

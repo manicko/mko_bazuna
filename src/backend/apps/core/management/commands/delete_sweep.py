@@ -1,7 +1,7 @@
 """
-Management command to delete archived ads after 4-month retention.
+Management command to delete archived ads after 60-day retention.
 
-Deletes ads with ARCHIVED status where published_at is older than 4 months.
+Deletes ads with ARCHIVED status where archived_at is older than 60 days.
 Uses advisory lock 2 for idempotent, safe concurrent execution.
 Images are CASCADE-deleted via ORM.
 """
@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """Delete archived ads after 4-month retention window."""
+    """Delete archived ads after 60-day retention window."""
 
-    help = "Delete ads with ARCHIVED status older than 4 months"
+    help = "Delete ads with ARCHIVED status older than 60 days"
 
     def add_arguments(self, parser) -> None:
         """Add dry-run argument to the command."""
@@ -43,19 +43,19 @@ class Command(BaseCommand):
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.DELETE_SWEEP):
                 # Query using the IX_ads_delete_sweep partial index
-                # Status is ARCHIVED, published_at older than 4 months
-                cutoff_date = timezone.now() - timedelta(days=120)
+                # Status is ARCHIVED, archived_at older than 60 days
+                cutoff_date = timezone.now() - timedelta(days=60)
 
                 queryset = Ad.objects.filter(
                     status=AdStatus.ARCHIVED,
-                    published_at__lt=cutoff_date,
+                    archived_at__lt=cutoff_date,
                 )
 
                 count = queryset.count()
 
                 if dry_run:
                     logger.info(
-                        "DRY RUN: Would delete %d ads with ARCHIVED status older than 4 months",
+                        "DRY RUN: Would delete %d ads with ARCHIVED status older than 60 days",
                         count,
                     )
                     return
@@ -78,7 +78,7 @@ class Command(BaseCommand):
             delete_photo(storage_key)
 
         logger.info(
-            "Deleted %d ads with ARCHIVED status older than 4 months. "
+            "Deleted %d ads with ARCHIVED status older than 60 days. "
             "Removed %d media files.",
             deleted_count,
             len(storage_keys),

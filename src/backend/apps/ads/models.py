@@ -298,7 +298,7 @@ class Ad(models.Model):
             ),
             models.Index(
                 name="IX_ads_delete_sweep",
-                fields=["status", "published_at"],
+                fields=["status", "archived_at"],
                 condition=Q(status=AdStatus.ARCHIVED),
             ),
             models.Index(
