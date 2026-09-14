@@ -141,13 +141,12 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environment files — all runtime env files are gitignored
 .env
 .env.dev
-.env.local
-.env.docker
-
-# .env.example, .env.dev.example, .env.docker.example are committed as templates
+.env.prod
+.env.test
+# Templates (.example files) are tracked in git
 .envrc
 .venv
 env/
