@@ -344,6 +344,11 @@ class Ad(models.Model):
                 | Q(rejected_at__isnull=True),
                 name="ck_ads_failed_and_rejected_mutually_exclusive",
             ),
+            models.UniqueConstraint(
+                fields=["user_id"],
+                name="uq_ads_single_draft_per_user",
+                condition=Q(status=AdStatus.DRAFT),
+            ),
         ]
 
     def __str__(self) -> str:
