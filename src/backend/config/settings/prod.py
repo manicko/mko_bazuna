@@ -30,11 +30,11 @@ LOGGING = {
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
-# placeholder values; the real token is provided at runtime via .env.docker.
+# placeholder values; the real token is provided at runtime via .env.prod.
 if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
     raise ImproperlyConfigured(
         "BOT_TOKEN must be set in production. "
-        "Provide it via the .env.docker runtime file."
+        "Provide it via the .env.prod runtime file."
     )
 
 # Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
@@ -42,7 +42,7 @@ if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
 if not GOOGLE_TRANSLATE_API_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
     raise ImproperlyConfigured(
         "GOOGLE_TRANSLATE_API_KEY must be set in production. "
-        "Provide it via the .env.docker runtime file."
+        "Provide it via the .env.prod runtime file."
     )
 
 # SITE_URL is required in production so Telegram alert links are absolute and
@@ -50,7 +50,7 @@ if not GOOGLE_TRANSLATE_API_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
 if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405
     raise ImproperlyConfigured(
         "SITE_URL must be set in production. "
-        "Provide it via the .env.docker runtime file."
+        "Provide it via the .env.prod runtime file."
     )
 
 # TLS-ready settings
