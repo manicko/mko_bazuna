@@ -7,23 +7,64 @@ services:
   web:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
+      - media_volume:/app/media
 
   # Override bot for production: use pre-built image from GHCR
   bot:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
+      - media_volume:/app/media
 
   # Override migrate for production: use pre-built image from GHCR
   migrate:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
 
   # Override create_admin for production: use pre-built image from GHCR
   create_admin:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
 
   # Override seed for production: use pre-built image from GHCR
   seed:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
+      - media_volume:/app/media
+
+  # Override load_cities for production: use pre-built image from GHCR
+  # Added to override inherited env_file: .env.dev and volumes bind-mount
+  load_cities:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
+
+  # Override load_catalog for production: use pre-built image from GHCR
+  # Added to override inherited env_file: .env.dev and volumes bind-mount
+  load_catalog:
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.prod
+    volumes:
+      - ./.env.prod:/app/src/.env:ro
 
   # Override nginx for production: TLS certificate mount
   nginx:
