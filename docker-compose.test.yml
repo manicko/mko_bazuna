@@ -11,14 +11,13 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    env_file:
+      - .env.test
+    volumes:
+      - ./.env.test:/app/src/.env:ro
     environment:
-      POSTGRES_DB: mko_bazuna
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
-      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-      DJANGO_SETTINGS_MODULE: config.settings.test
-      BOT_TOKEN: test-bot-token-for-testing
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
+      - DJANGO_SETTINGS_MODULE=config.settings.test
     ports:
       - "5433:5432"
     healthcheck:
@@ -29,15 +28,10 @@ services:
 
   # Override migrate service for test: uses test settings
   migrate:
+    env_file:
+      - .env.test
     environment:
-      POSTGRES_DB: mko_bazuna
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
-      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-      DJANGO_SETTINGS_MODULE: config.settings.test
-      BOT_TOKEN: test-bot-token-for-testing
-    env_file: []
+      - DJANGO_SETTINGS_MODULE=config.settings.test
 
   # Test service: one-shot run of migrate + pytest.
   # Source code is bind-mounted (.:/app) so test iteration needs no image rebuild.
@@ -53,14 +47,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env.test
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.test
-      - POSTGRES_DB=mko_bazuna
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
-      - DJANGO_SECRET_KEY=test-secret-key-for-testing-only
-      - BOT_TOKEN=test-bot-token-for-testing
       # Override Dockerfile's UV_NO_INSTALL_PROJECT=1 so uv sync installs dev deps
       - UV_NO_INSTALL_PROJECT=0
       # .env is not bind-mounted; entrypoint.sh skips its existence check (CR3 safety)
@@ -68,6 +58,7 @@ services:
     # Bind-mount source + entrypoint scripts for hot-reload; cache uv downloads.
     volumes:
       - .:/app
+      - ./.env.test:/app/src/.env:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./docker/entrypoint-test.sh:/app/entrypoint-test.sh
       - uv_cache:/root/.cache/uv
@@ -75,21 +66,16 @@ services:
     profiles: ["test"]
 
   # Override create_admin for test: provides hardcoded ADMIN_PASSWORD so config
-  # validation succeeds without a real .env.docker; uses test DB credentials
+  # validation succeeds without a real .env.dev; uses test DB credentials
   # matching the db/migrate overrides above.
   create_admin:
+    env_file:
+      - .env.test
     environment:
-      POSTGRES_DB: mko_bazuna
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      DATABASE_URL: postgres://postgres:postgres@db:5432/mko_bazuna
-      DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-      DJANGO_SETTINGS_MODULE: config.settings.test
-      BOT_TOKEN: test-bot-token-for-testing
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: "test-admin-password"
-      ADMIN_TELEGRAM_ID: "-1"
-    env_file: []
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=test-admin-password
+      - ADMIN_TELEGRAM_ID=-1
 
 volumes:
   uv_cache:
