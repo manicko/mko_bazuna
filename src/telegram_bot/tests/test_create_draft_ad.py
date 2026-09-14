@@ -84,3 +84,19 @@ class TestCreateDraftAd:
         # Verify no other status is set
         assert ad.status != AdStatus.PUBLISHED
         assert ad.status != AdStatus.ON_MODERATION
+
+    @pytest.mark.asyncio
+    async def test_create_draft_second_call_does_not_duplicate(self, user: object) -> None:
+        """Calling create_draft_ad twice leaves exactly one DRAFT for the user."""
+        from telegram_bot.handlers.ad_create import create_draft_ad
+
+        ad1 = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+        ad2 = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+
+        from apps.ads.models import Ad
+
+        count = await sync_to_async(Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count)()
+
+        assert count == 1
+        assert ad2.status == AdStatus.DRAFT
+        assert ad1.id != ad2.id
