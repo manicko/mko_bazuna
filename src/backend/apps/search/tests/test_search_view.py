@@ -184,6 +184,66 @@ class TestSearchViewPublishesFilter:
         ads_in_page = list(response.context["page_obj"])
         assert len(ads_in_page) == 2
 
+    def test_search_excludes_deactivated_category_ads(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A PUBLISHED ad whose category is deactivated does not appear in results.
+
+        The null-safe base queryset filters on ``category__is_active=True`` for
+        non-null categories, so deactivating the category should hide its ads.
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Active Category Ad",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # Deactivate the category
+        root_category.is_active = False
+        root_category.save(update_fields=["is_active"])
+
+        client = Client()
+        response = client.get("/search/")
+
+        assert response.status_code == 200
+        ads_in_page = list(response.context["page_obj"])
+        assert len(ads_in_page) == 0
+
+    def test_search_includes_null_category_published(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A PUBLISHED ad with ``category=None`` still appears in search results.
+
+        The null-safe base queryset uses
+        ``Q(category__isnull=True) | Q(category__is_active=True)`` so NULL-category
+        ads are never silently dropped by an INNER JOIN.
+        """
+        ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Null Category Ad",
+            status=AdStatus.PUBLISHED,
+        )
+        # Detach the ad from its category to simulate a NULL-category PUBLISHED ad
+        ad.category = None
+        ad.save(update_fields=["category"])
+
+        client = Client()
+        response = client.get("/search/")
+
+        assert response.status_code == 200
+        ads_in_page = list(response.context["page_obj"])
+        assert any(a.id == ad.id for a in ads_in_page)
+
 
 class TestSearchViewDescendantCategories:
     """Single-word queries matching a category expand to the descendant subtree."""

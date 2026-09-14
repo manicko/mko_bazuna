@@ -174,3 +174,28 @@ def test_view_hits_real_orm_and_renders_list_template(
     assert ad in response.context["page_obj"].object_list
     # Bounded query count: no N+1 leaks on the listing render path.
     assert len(ctx.captured_queries) <= 16
+
+
+def test_listings_excludes_deactivated_category_ads(
+    seller: Any, category: Any, city: Any
+) -> None:
+    """A PUBLISHED ad whose category is deactivated does not appear in listings.
+
+    The null-safe base queryset filters on ``category__is_active=True`` for
+    non-null categories; deactivating the category should hide its ads.
+    """
+    create_test_ad(
+        user=seller,
+        category=category,
+        city=city,
+        title="Deactivated Category Ad",
+        status=AdStatus.PUBLISHED,
+    )
+
+    # Deactivate the category
+    category.is_active = False
+    category.save(update_fields=["is_active"])
+
+    response = _get()
+    assert response.status_code == 200
+    assert response.context["has_results"] is False

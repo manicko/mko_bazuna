@@ -15,7 +15,7 @@ from typing import Final
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
@@ -63,6 +63,7 @@ def search(request: HttpRequest) -> HttpResponse:
     query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
     ads = (
         Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .filter(Q(category__isnull=True) | Q(category__is_active=True))
         .select_related("category", "city", "user")
         .prefetch_related("features")
     )

@@ -267,6 +267,7 @@ def listings(
     # Prefetch trust scores to avoid N+1 in render_trust_badge template tag.
     ads = (
         Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .filter(Q(category__isnull=True) | Q(category__is_active=True))
         .select_related("category", "city", "user")
         .prefetch_related("features", "user__trust_score")
     )
