@@ -18,6 +18,7 @@ from datetime import timedelta
 import pytest
 from django.apps import apps as django_apps
 from django.core.management import call_command
+from django.db import connection
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
@@ -236,7 +237,7 @@ class TestSweepDrafts:
         call_command("sweep_drafts", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
 
-    def test_deletes_drafts_older_than_30_minutes(self, seller, category, city):
+    def test_deletes_drafts_older_than_30_minutes(self, seller, category, city, user):
 
         old = create_test_ad(
             seller,
@@ -249,7 +250,7 @@ class TestSweepDrafts:
         )
         old.refresh_from_db()
         recent = create_test_ad(
-            seller,
+            user,
             category,
             city,
             status=AdStatus.DRAFT,
@@ -338,6 +339,14 @@ class TestSweepDrafts:
             city,
             status=AdStatus.DRAFT,
         )
+        # Drop the single-draft-per-user unique index so we can simulate the
+        # pre-migration state where duplicate DRAFTs existed for one user.
+        # In PostgreSQL, Django creates UniqueConstraint with a condition as a
+        # unique *index*, not a table-level constraint, so SET CONSTRAINTS
+        # cannot defer it. DROP INDEX is transactional: it is automatically
+        # restored when the test transaction rolls back (TestCase semantics).
+        with connection.cursor() as _cursor:
+            _cursor.execute("DROP INDEX uq_ads_single_draft_per_user")
         second = create_test_ad(
             seller,
             category,
