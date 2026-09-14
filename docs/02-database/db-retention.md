@@ -27,9 +27,9 @@ long each ad status is retained before permanent deletion.
 | `DELETED` | 120 days | `purge_deleted_ads` | `IX_ads_purge_deleted` |
 | `REJECTED` | 90 days | `purge_rejected_ads` | `IX_ads_rejected_sweep` |
 | `ON_MODERATION_FAILED` | 7 days | `purge_failed_ads` | `IX_ads_purge_failed` |
-| `ARCHIVED` | 4 months | `delete_sweep` | `IX_ads_delete_sweep` |
+| `ARCHIVED` | 2 months (from archived_at) | `delete_sweep` | `IX_ads_delete_sweep` |
 | `PUBLISHED` | 2 months (auto-archive) | `archive_sweep` | `IX_ads_archive_sweep` |
-| `DRAFT` | 7 days | `sweep_drafts` | *(no index — full scan)* |
+| `DRAFT` | 30 minutes | `sweep_drafts` (advisory lock 4) | `IX_ads_draft_sweep` |
 
 ### Soft-delete model
 
@@ -76,10 +76,10 @@ docker compose --env-file .env.docker \
 | Command | Env Var | Default | Description |
 |---------|---------|---------|-------------|
 | `archive_sweep` | `ARCHIVE_AGE_DAYS` | 60 | Archive PUBLISHED ads older than 2 months |
-| `delete_sweep` | `DELETE_AGE_DAYS` | 120 | Hard-delete ARCHIVED ads older than 4 months |
+| `delete_sweep` | *(none — hardcoded 60)* | 60 | Hard-delete ARCHIVED ads older than 60 days (from archived_at) |
 | `purge_failed_ads` | `PURGE_FAILED_DAYS` | 7 | Delete ON_MODERATION_FAILED ads older than 7 days |
 | `purge_rejected_ads` | `PURGE_REJECTED_DAYS` | 90 | Delete REJECTED ads older than 90 days |
-| `sweep_drafts` | *(none)* | 7 days | Delete DRAFT ads older than 7 days |
+| `sweep_drafts` | *(none — hardcoded 30m)* | 30 minutes | Delete DRAFT ads older than 30 minutes |
 | `consent_hard_delete` | `ERASURE_RETENTION_DAYS` | 30 | Hard-delete user PII after 30-day consent withdrawal |
 
 ## §3 Post-Withdrawal Data Retention
@@ -113,7 +113,7 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 # Environment variables (set in .env.docker)
 PURGE_DELETED_RETENTION_DAYS = 120  # days to keep soft-deleted ads before purging
 ARCHIVE_AGE_DAYS = 60  # days before auto-archiving published ads
-DELETE_AGE_DAYS = 120  # days before hard-deleting archived ads
+DELETE_AGE_DAYS = 60  # days before hard-deleting archived ads (from archived_at)
 PURGE_FAILED_DAYS = 7  # days to keep ON_MODERATION_FAILED ads
 PURGE_REJECTED_DAYS = 90  # days to keep REJECTED ads
 ERASURE_RETENTION_DAYS = 30  # days after consent withdrawal before hard-delete
