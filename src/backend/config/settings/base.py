@@ -40,7 +40,7 @@ if not env_path.exists():
         and not os.getenv("DJANGO_SECRET_KEY")
     ):
         logger.error(
-            "ERROR: .env file not found. Copy .env.example to .env and configure values."
+            "ERROR: .env file not found. Copy .env.dev.example to .env.dev and configure values."
         )
         sys.exit(1)
 else:
