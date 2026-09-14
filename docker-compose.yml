@@ -46,9 +46,9 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       BOT_TOKEN: ${BOT_TOKEN}
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
     # One-shot service: runs migrations with advisory lock (ID 100), then exits
     # Idempotent: advisory lock prevents concurrent runs
 
@@ -73,9 +73,9 @@ services:
       BOT_TOKEN: ${BOT_TOKEN}
       REDIS_URL: redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
     # One-shot service: loads cities.json into the cities table, then exits
     # Idempotent via CATALOG_LOAD (ID 104) advisory lock; NOT profile-gated
 
@@ -100,9 +100,9 @@ services:
       BOT_TOKEN: ${BOT_TOKEN}
       REDIS_URL: redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
     # One-shot service: loads categories.yaml into DB, then exits
     # Depends on load_cities completing successfully
 
@@ -126,9 +126,9 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID:--1}
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
     # One-shot service: runs once, then exits
     # Skipped if ADMIN_PASSWORD not set (empty string)
 
@@ -154,9 +154,9 @@ services:
       - SEED_ADS=${SEED_ADS:-600}
       - REDIS_URL=redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
     # One-shot service: run with `docker compose --profile seed run --rm seed`
     # Seeds database with demo data, then exits
@@ -181,9 +181,9 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
     restart: unless-stopped
     # Port 8000 NOT published - nginx proxies internally
@@ -208,9 +208,9 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
     env_file:
-      - .env.docker
+      - .env.dev
     volumes:
-      - ./.env.docker:/app/src/.env:ro
+      - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
     restart: unless-stopped
     healthcheck:
