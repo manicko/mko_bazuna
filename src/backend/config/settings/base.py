@@ -44,7 +44,13 @@ if not env_path.exists():
         )
         sys.exit(1)
 else:
-    environ.Env.read_env(env_path)
+    # In test environments, env vars are already injected via Docker Compose
+    # env_file: into os.environ. Skip read_env() to prevent the bind-mounted
+    # .env file from masking test cases that intentionally unset env vars
+    # (e.g., test_django_secret_key_required expects ImproperlyConfigured
+    # when DJANGO_SECRET_KEY is absent from os.environ).
+    if "test" not in os.getenv("DJANGO_SETTINGS_MODULE", ""):
+        environ.Env.read_env(env_path)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
