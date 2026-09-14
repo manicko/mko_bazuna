@@ -53,12 +53,12 @@ container restarts. Other sweeps use their own advisory lock IDs.
 python src/backend/manage.py purge_deleted_ads
 
 # Run inside Docker
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py purge_deleted_ads
 
 # Run with dry-run to preview deletions without executing
-docker compose --env-file .env.docker \
+docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py purge_deleted_ads --dry-run
 ```
@@ -110,7 +110,7 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 ## Configuration
 
 ```python
-# Environment variables (set in .env.docker)
+# Environment variables (set in .env.dev)
 PURGE_DELETED_RETENTION_DAYS = 120  # days to keep soft-deleted ads before purging
 ARCHIVE_AGE_DAYS = 60  # days before auto-archiving published ads
 DELETE_AGE_DAYS = 60  # days before hard-deleting archived ads (from archived_at)
