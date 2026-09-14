@@ -6,9 +6,11 @@
 
 # ====================== Settings ======================
 
-ENV_FILE := --env-file .env.docker
+ENV_FILE := --env-file .env.dev
 COMPOSE_FILES := $(ENV_FILE) -f docker-compose.yml -f docker-compose.dev.override.yml
-COMPOSE_TEST := -f docker-compose.yml -f docker-compose.test.yml
+COMPOSE_TEST := --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml
+ENV_PROD := --env-file .env.prod
+COMPOSE_PROD := \ -f docker-compose.yml -f docker-compose.prod.yml
 
 # Isolated Compose project names so `make up` (dev) and `make test` can run
 # simultaneously without colliding on service names, networks, or named volumes.
