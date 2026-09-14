@@ -10,6 +10,7 @@ Covers two concerns:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,25 @@ def test_mo_files_exist() -> None:
     for po_path in _po_files():
         mo_path = po_path.with_suffix(".mo")
         assert mo_path.exists(), f"Missing compiled file: {mo_path}"
+
+
+@pytest.mark.xfail(reason="POT-Creation-Date synced in I18N-007", strict=True)
+def test_pot_creation_date_sync() -> None:
+    """All three ``.po`` files must share the same ``POT-Creation-Date``.
+
+    ``makemessages`` runs with all locale flags in a single invocation
+    (Makefile line 173-174), so a fresh extraction produces a single
+    timestamp.  Tagged ``xfail`` until I18N-007 re-runs makemessages; once
+    the dates are synchronized, remove the decorator so the test passes.
+    """
+    dates: dict[str, str] = {}
+    for po_path in _po_files():
+        text = po_path.read_text(encoding="utf-8")
+        match = re.search(r'"POT-Creation-Date:\s*(.+?)\\n"', text, re.DOTALL)
+        assert match, f"{po_path}: no POT-Creation-Date header found"
+        dates[po_path.parent.parent.name] = match.group(1).strip()
+    unique_dates = set(dates.values())
+    assert len(unique_dates) == 1, f"POT-Creation-Date mismatch: {dates}"
 
 
 # ---------------------------------------------------------------------------
