@@ -8,7 +8,7 @@ enabling handler tests against the real PostgreSQL ORM (two-process contract).
 import hashlib
 import threading
 from collections.abc import Awaitable, Callable, Iterator
-from typing import Any
+from typing import Any, Final
 
 import pytest
 import pytest_asyncio
@@ -16,6 +16,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.core.cache import cache
 from django.db import connections
 from django.db.backends.signals import connection_created
 from django.utils import timezone
@@ -256,3 +257,48 @@ def _reap_stale_backends_session() -> Iterator[None]:
     _close_all_thread_connections()
     yield
     _close_all_thread_connections()
+
+
+# All editable ModerationCriteria fields (excludes id, updated_at, updated_by).
+_CRITERIA_FIELDS: Final[tuple[str, ...]] = (
+    "title_min_length",
+    "title_max_length",
+    "description_min_length",
+    "description_max_length",
+    "price_required",
+    "min_images",
+    "max_images",
+    "banned_words",
+    "max_ads_per_user",
+    "duplicate_title_threshold",
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_moderation_criteria():
+    """Restore all ModerationCriteria fields after each bot test (save-and-restore).
+
+    Save-and-restore pattern: snapshot every criteria field before the test
+    runs, then after ``yield`` call ``cache.clear()`` and restore the original
+    values via ``QuerySet.update()``. The ``cache.clear()`` is required because
+    ``update()`` bypasses the ``post_save`` signal
+    (``invalidate_criteria_cache_on_save``) that would normally invalidate the
+    LocMem cache, so without it ``_get_cached_criteria`` could return stale
+    values for up to the 5-minute TTL.
+
+    Bot tests live outside the ``src/backend/`` conftest discovery path, so the
+    root backend ``_clear_cache_between_tests`` fixture does not apply here;
+    ``cache.clear()`` is performed inline in this teardown instead.
+    """
+    from apps.moderation.models import ModerationCriteria
+
+    snapshot = dict(
+        ModerationCriteria.objects.filter(pk=1)
+        .values(*_CRITERIA_FIELDS)
+        .first()
+        or {}
+    )
+    yield
+    cache.clear()
+    if snapshot:
+        ModerationCriteria.objects.filter(pk=1).update(**snapshot)
