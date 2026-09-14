@@ -263,7 +263,7 @@ guide for local HTTPS development.
 docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Apply migrations (run once)
-docker compose --env-file .env.prod -f docker-compose.yml run --rm migrate
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 ```
 
 ### Production Services
@@ -758,7 +758,7 @@ make seed
 SEED_USERS=50 SEED_ADS=200 make seed
 
 # Production (explicit profile, seed does NOT auto-run):
-docker compose --env-file .env.dev \
+docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml \
   --profile seed run --rm seed
 ```
