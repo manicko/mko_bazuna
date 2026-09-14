@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for migration reproducibility and idempotency (TST-001).
 
 Verifies:
