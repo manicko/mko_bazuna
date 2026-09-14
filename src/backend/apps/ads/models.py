@@ -316,6 +316,11 @@ class Ad(models.Model):
                 fields=["status", "deleted_at"],
                 condition=Q(status=AdStatus.DELETED),
             ),
+            models.Index(
+                name="IX_ads_draft_sweep",
+                fields=["status", "created_at"],
+                condition=Q(status=AdStatus.DRAFT),
+            ),
         ]
         constraints = [
             models.CheckConstraint(
