@@ -12,9 +12,11 @@ execution (mutating) modes, and assertions verify idempotency and
 correct retention-window filtering.
 """
 
+import importlib
 from datetime import timedelta
 
 import pytest
+from django.apps import apps as django_apps
 from django.core.management import call_command
 from django.utils import timezone
 
@@ -31,6 +33,20 @@ from apps.users.models import LoginToken, User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+
+
+@pytest.fixture
+def collapse_per_user_drafts():
+    """Load the ``collapse_per_user_drafts`` forward function from migration 0003.
+
+    Test settings disable migration replay (``DisableMigrations``), so the
+    migration module is imported directly via ``importlib`` and invoked
+    against the live app registry (``django.apps.apps``).
+    """
+    migration_module = importlib.import_module(
+        "apps.ads.migrations.0003_dedup_per_user_drafts"
+    )
+    return migration_module.collapse_per_user_drafts
 
 
 class TestArchiveSweep:
@@ -289,6 +305,39 @@ class TestSweepDrafts:
 
     def test_lock_id_is_sweep_drafts(self):
         assert AdvisoryLockId.SWEEP_DRAFTS == 4
+
+    def test_dedup_migration_collapses_duplicate_drafts(
+        self, seller, category, city, collapse_per_user_drafts
+    ):
+        """Migration 0003 collapses per-user duplicate DRAFTs, keeping newest by id.
+
+        Addresses AD-009a: ``create_draft_ad`` has no existence check, so a user
+        can accumulate multiple DRAFT rows. The migration keeps the newest
+        (greatest id) and deletes the older ones.
+        """
+        first = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DRAFT,
+        )
+        second = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DRAFT,
+        )
+
+        assert Ad.objects.filter(user=seller, status=AdStatus.DRAFT).count() == 2
+
+        # Run the migration forward function directly.
+        collapse_per_user_drafts(django_apps, None)
+
+        remaining = Ad.objects.filter(user=seller, status=AdStatus.DRAFT)
+        assert remaining.count() == 1
+        # The newest (greatest id) survives; the older one is deleted.
+        assert remaining.get().pk == second.pk
+        assert not Ad.objects.filter(pk=first.pk).exists()
 
 
 class TestCleanupLoginTokens:
