@@ -15,8 +15,8 @@ param(
 $DevProject = "mko-bazuna-dev"
 $TestProject = "mko-bazuna-test"
 
-# Load environment variables from .env file
-$envContent = Get-Content -Path ".env" -ErrorAction SilentlyContinue
+# Load environment variables from .env.dev file
+$envContent = Get-Content -Path ".env.dev" -ErrorAction SilentlyContinue
 if ($envContent) {
     foreach ($line in $envContent) {
         if ($line -match "^([^#=]+)=(.*)$") {
@@ -76,42 +76,42 @@ function Show-Help {
 # Start development environment
 function Invoke-Up {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml rm -sf migrate load_catalog create_admin seed
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml up -d
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml rm -sf migrate load_catalog create_admin seed
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml up -d
     # Also start the long-running test PostgreSQL (host :5433) so the test
     # environment's DB is ready for `test`/`test-db` immediately. Idempotent.
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
 }
 
 # Rebuild images without cache (equiv. to: make build)
 function Invoke-Build {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
 }
 
 # Stop and remove containers
 function Invoke-Down {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down
 }
 
 # Start only the long-running test PostgreSQL (port 5433)
 function Invoke-TestDb {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
 }
 
 # Stop and remove the test environment (preserves the DB volume for --reuse-db)
 function Invoke-TestDown {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml down
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml down
 }
 
 # Follow test environment logs
 function Invoke-TestLogs {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml logs -f
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml logs -f
 }
 
 # Drop stale test databases (test_mko_bazuna + gw* shards) from the persistent
@@ -121,14 +121,14 @@ function Invoke-TestLogs {
 # stuck connections from crashed xdist workers.
 function Invoke-TestCleanDb {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
     # Terminate active connections to test databases (exclude this session)
-    docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname LIKE 'test_mko_bazuna%' AND pid <> pg_backend_pid();"
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname LIKE 'test_mko_bazuna%' AND pid <> pg_backend_pid();"
     # Generate DROP DATABASE IF EXISTS ... WITH (FORCE); statements and execute each
-    docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -t -A -c "SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE);', datname) FROM pg_database WHERE datname LIKE 'test_mko_bazuna%'" | ForEach-Object {
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -t -A -c "SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE);', datname) FROM pg_database WHERE datname LIKE 'test_mko_bazuna%'" | ForEach-Object {
         $stmt = $_.Trim()
         if ($stmt) {
-            docker compose -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c $stmt
+            docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml exec -T db psql -U postgres -d postgres -c $stmt
         }
     }
     Write-Host "Stale test databases dropped." -ForegroundColor Green
@@ -142,7 +142,7 @@ function Invoke-TestRecreate {
     # connections from crashed xdist workers before pytest spawns new ones).
     Invoke-TestCleanDb
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
 }
 
 # Run the fast test gate in the test container (auto-starts the test DB if not
@@ -152,17 +152,17 @@ function Invoke-TestRecreate {
 function Invoke-Test {
     $env:COMPOSE_PROJECT_NAME = $TestProject
     # Ensure the long-running test DB is up (idempotent) so --reuse-db can persist.
-    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
     # PYTEST_SKIP_MARKERS=seed appends -m "not (seed)" in entrypoint-test.sh.
-    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed" test
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed" test
 }
 
 # Run the COMPLETE test suite (includes the nightly `seed` suite, ~35min). Use
 # this only when a change touches seeding or image generation code paths.
 function Invoke-TestAll {
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml up -d db
-    docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm test
 }
 
 # Run linter inside web container
@@ -192,7 +192,7 @@ function Invoke-Shell {
 # Run migrations (one-shot service)
 function Invoke-Migrate {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker run --rm migrate
+    docker compose --env-file .env.dev run --rm migrate
 }
 
 # Create migrations from model changes
@@ -213,7 +213,7 @@ function Invoke-CreateAdmin {
     # PS 5.1-compatible defaults (the `||` operator is PowerShell 7+ only).
     $adminUser = if ($env:ADMIN_USERNAME) { $env:ADMIN_USERNAME } else { "admin" }
     $adminTg = if ($env:ADMIN_TELEGRAM_ID) { $env:ADMIN_TELEGRAM_ID } else { "-1" }
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py create_admin_user `
         --username $adminUser `
         --password $env:ADMIN_PASSWORD `
         --telegram-id $adminTg
@@ -240,7 +240,7 @@ function Invoke-Backup {
     $pgDb = $env:POSTGRES_DB
 
     if (-not $pgUser -or -not $pgDb) {
-        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env or environment" -ForegroundColor Red
+        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env.dev or environment" -ForegroundColor Red
         exit 1
     }
 
@@ -271,7 +271,7 @@ function Invoke-Restore {
     $pgDb = $env:POSTGRES_DB
 
     if (-not $pgUser -or -not $pgDb) {
-        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env or environment" -ForegroundColor Red
+        Write-Host "Error: POSTGRES_USER and POSTGRES_DB must be set in .env.dev or environment" -ForegroundColor Red
         exit 1
     }
 
@@ -298,7 +298,7 @@ function Invoke-PruneBackups {
 # Clean - stop containers and remove volumes
 function Invoke-Clean {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
     if (Test-Path "./backups") {
         Remove-Item "./backups/*.dump" -Force -ErrorAction SilentlyContinue
     }
@@ -311,7 +311,7 @@ function Invoke-Clean {
 function Invoke-FullClean {
     Write-Host "Stopping dev environment (wiping volumes)..." -ForegroundColor Cyan
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
 
     Write-Host "Stopping test environment (wiping volumes)..." -ForegroundColor Cyan
     $env:COMPOSE_PROJECT_NAME = $TestProject
