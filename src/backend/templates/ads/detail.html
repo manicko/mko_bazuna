@@ -7,11 +7,12 @@
 {% load price_tags %}
 {% load telegram_tags %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|lower }}" dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{ ad|get_title:LANGUAGE_CODE }} - {{ site_name }}</title>
+        {% include "components/locale_head.html" %}
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         <link rel="stylesheet"
               href="https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css">

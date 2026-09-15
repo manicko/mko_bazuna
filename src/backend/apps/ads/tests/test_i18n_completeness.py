@@ -14,8 +14,8 @@ fast-gate CI run:
 5. ``test_template_extraction_coverage`` — msgids extracted from
    templates (``{% trans %}``, ``{{ _("…") }}``, ``{% blocktrans %}``)
    each exist in all three ``.po`` files.
-6. ``test_hreflang_present`` — ``xfail`` until I18N-004 adds
-   ``<link rel="alternate" hreflang>`` tags.
+  6. ``test_hreflang_present`` — every page template renders
+    ``<link rel="alternate" hreflang>`` tags (I18N-004).
 7. ``test_plural_forms`` — each ``.po`` Plural-Forms header matches CLDR.
 8. ``test_locale_switch_re_render`` — ``{% trans %}`` re-renders in the
    active locale (bs/ru).
@@ -33,6 +33,8 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from django.template import Context, Template
+from django.template.loader import get_template
+from django.test import RequestFactory
 from django.utils import translation
 
 pytestmark = [pytest.mark.unit]
@@ -428,21 +430,21 @@ def test_template_extraction_coverage() -> None:
                 )
 
 
-@pytest.mark.xfail(reason="hreflang tags added in I18N-004", strict=True)
 def test_hreflang_present() -> None:
-    """All page templates must include ``<link rel="alternate" hreflang>`` tags.
+    """Every page template renders a ``<link rel="alternate" hreflang>`` link
+    for every configured language (I18N-004).
 
-    One alternate link per configured language (ru, bs, en) is required for
-    SEO correctness.  Tagged ``xfail`` until I18N-004 adds the tags; once
-    they are present, remove the decorator so the test runs normally.
+    The alternates live in the shared ``components/locale_head.html`` partial
+    (Option B), included by every page template.  Rendering the partial
+    confirms one ``hreflang`` alternate per language is emitted for each
+    available language.
     """
+    request = RequestFactory().get("/")
+    rendered = get_template("components/locale_head.html").render({"request": request})
     expected_langs = {code for code, _ in settings.LANGUAGES}
-    found_langs: set[str] = set()
-    for tpl_path in _collect_template_files():
-        content = tpl_path.read_text(encoding="utf-8")
-        for lang in expected_langs:
-            if f'hreflang="{lang}"' in content:
-                found_langs.add(lang)
+    found_langs = {
+        lang for lang in expected_langs if f'hreflang="{lang}"' in rendered
+    }
     missing = expected_langs - found_langs
     assert not missing, f"Missing hreflang tags for languages: {sorted(missing)}"
 

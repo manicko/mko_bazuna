@@ -4,11 +4,12 @@
 {% load i18n %}
 {% load localized_content %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|lower }}" dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{% trans "Moderate Ad" %} {{ ad.id }} - {{ site_name }} {% trans "Admin" %}</title>
+        {% include "components/locale_head.html" %}
         <link rel="stylesheet" href="{% static 'theme/css/output.css' %}">
         {% if consent_analytics and PLAUSIBLE_HOST %}
             <script defer
