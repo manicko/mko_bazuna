@@ -211,7 +211,13 @@ are always on.
 | `ANALYTICS` | anonymized traffic analytics (Plausible) | `consent_analytics` |
 | `PREFERENCES` | language + city settings | `consent_preferences` |
 
-> `CookieCategory` is defined in `apps/core/enums.py` (exported via `__all__`), but the
-> `categories` flags are still passed and stored as **plain string keys**
-> (`"analytics"`, `"preferences"`) in `ConsentSubmission` and `record_consent_action`.
-> The enum members are not referenced by runtime code.
+> `CookieCategory` members are used as dict keys throughout the consent
+> subsystem — `ConsentSubmission.categories()` (schemas.py) returns
+> `dict[CookieCategory, bool]`, `record_consent_action` (consent_record.py)
+> accepts `dict[CookieCategory, bool]`, and all three consent views
+> (consent_accept, consent_decline, consent_withdraw) pass
+> `{CookieCategory.ANALYTICS: ...}` / `{CookieCategory.PREFERENCES: ...}`.
+> The `JSONField` stores the StrEnum `.value` strings (`"analytics"`,
+> `"preferences"`) via StrEnum serialization — no string-literal code paths
+> exist. `ESSENTIAL` cookies are always-on and intentionally not stored in
+> the `categories` dict.

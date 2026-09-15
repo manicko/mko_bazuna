@@ -109,8 +109,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   **Partial:** the GLightbox CSS `<link>` and the `/privacy/` Plausible snippet load
   unconditionally (non-executable progressive-enhancement fallback). Granular cookies
   `consent_analytics` / `consent_preferences` are written on accept (read by `consent_state`);
-  `CookieCategory` exists in `apps/core/enums.py` as the category vocabulary but is not referenced
-  at runtime.
+  `CookieCategory` (in `apps/core/enums.py`) is the category vocabulary and IS referenced at runtime — its `ANALYTICS` and `PREFERENCES` members are used as dict keys in `ConsentSubmission.categories()` and `record_consent_action()` (see [db-enums.md](../02-database/db-enums.md#cookiecategory)).
 
 ### G. Content language, search, city match (US-B2/B3/B7, US-B9)
 - **Three UI languages:** Russian (ru), Bosnian (bs-latin), and English (en). Language preference detected via `LanguagePreMiddleware` which reads `?lang=X` query parameter, `lang_pref` cookie, or `Accept-Language` header (priority order), defaulting to Russian.
