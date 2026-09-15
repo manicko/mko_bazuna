@@ -98,26 +98,37 @@ class LanguagePreMiddleware(MiddlewareMixin):
     def _apply_lang_param(self, request: Any, lang: str) -> None:
         """Apply language from the ``?lang=X`` query parameter.
 
-        Validates the value, stores cookie intent on the request, updates
-        ``request.LANGUAGE_CODE``, and persists to session for authenticated users.
+        Normalizes language variants (e.g. ``en-US`` → ``en``) via
+        ``LanguageLocale.from_code`` and falls back to BOSNIAN for unsupported
+        codes, per spec (i18n-spec.md:63-64). The preference is persisted in
+        the cookie and session only when the code is explicitly supported —
+        a fallback resolution does not write ``lang_pref``.
         """
-        if not self._is_valid_language(lang):
-            logger.warning("Ignoring invalid lang parameter: %s", lang)
+        if not lang:
             self._set_language_code(request, settings.LANGUAGE_CODE)
             return
 
-        self._set_language_code(request, lang)
+        resolved = LanguageLocale.from_code(
+            lang, fallback=LanguageLocale.BOSNIAN
+        )
+        resolved_code = resolved.value
+        self._set_language_code(request, resolved_code)
 
-        # Store cookie value to be persisted in process_response.
-        request._lang_cookie_value = lang
+        # Persist preference only for explicitly supported codes (including
+        # normalized variants like en-US → en). Unsupported fallback does not
+        # persist — the user did not explicitly request the fallback language.
+        base = lang.split("-")[0].lower()
+        if base in LanguageLocale.values():
+            request._lang_cookie_value = resolved_code
+            if (
+                hasattr(request, "session")
+                and hasattr(request, "user")
+                and request.user.is_authenticated
+            ):
+                request.session["django_language"] = resolved_code
+        else:
+            logger.warning("Ignoring invalid lang parameter: %s", lang)
 
-        # Persist preference in session for authenticated users.
-        if (
-            hasattr(request, "session")
-            and hasattr(request, "user")
-            and request.user.is_authenticated
-        ):
-            request.session["django_language"] = lang
 
     def _set_language_code(self, request: Any, lang: str) -> None:
         """Activate the language for the current thread and sync the request.
@@ -133,18 +144,17 @@ class LanguagePreMiddleware(MiddlewareMixin):
     def _parse_accept_language(self, request: Any) -> str | None:
         """Extract the primary language tag from the Accept-Language header.
 
-        Returns the first language tag (e.g. ``"en"`` from ``"en-US,en;q=0.9"``)
-        if it is a supported locale, otherwise ``None``.
+        Returns the resolved language code (normalized via
+        ``LanguageLocale.from_code``) if a supported locale is found,
+        falling back to BOSNIAN for unsupported codes. Returns ``None``
+        only when no Accept-Language header is present, so that
+        ``process_request`` falls back to ``settings.LANGUAGE_CODE``.
         """
         accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
         if not accept_language:
             return None
-        lang = accept_language.split(",")[0].split("-")[0]
-        if self._is_valid_language(lang):
-            return lang
-        return None
-
-    @staticmethod
-    def _is_valid_language(lang: str) -> bool:
-        """Return ``True`` if *lang* is a supported ``LanguageLocale`` value."""
-        return lang in LanguageLocale.values()
+        first_tag = accept_language.split(",")[0]
+        resolved = LanguageLocale.from_code(
+            first_tag, fallback=LanguageLocale.BOSNIAN
+        )
+        return resolved.value

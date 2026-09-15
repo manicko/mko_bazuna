@@ -137,18 +137,19 @@ class TestLanguageEndToEnd:
         assert TITLE_BS.encode() not in response.content
         assert translation.get_language() == "en"
 
-    def test_invalid_lang_falls_back_to_english_and_does_not_persist(
+    def test_invalid_lang_falls_back_to_bosnian_and_does_not_persist(
         self, e2e_ad
     ) -> None:
-        """An unsupported ``?lang=fr`` falls back to ``settings.LANGUAGE_CODE``
-        (English in tests) and sets no cookie."""
+        """An unsupported ``?lang=fr`` falls back to BOSNIAN (per spec) and
+        sets no cookie."""
         client = Client()
         response = client.get(e2e_ad["detail_url"] + "?lang=fr")
         assert response.status_code == 200
-        assert TITLE_EN.encode() in response.content
+        assert TITLE_BS.encode() in response.content
+        assert TITLE_EN.encode() not in response.content
         assert TITLE_RU.encode() not in response.content
         assert "lang_pref" not in response.cookies
-        assert translation.get_language() == "en"
+        assert translation.get_language() == "bs"
 
     def test_listing_card_switches_language(self, e2e_ad) -> None:
         """The listing card renders the localized title too (F5)."""
