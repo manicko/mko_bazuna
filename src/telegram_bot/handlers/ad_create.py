@@ -104,19 +104,35 @@ async def cmd_post(message: types.Message, state: FSMContext) -> None:
 
 @router.message(Command("cancel"))
 async def cmd_cancel(message: types.Message, state: FSMContext) -> None:
-    """Cancel ad creation."""
+    """Cancel ad creation.
+
+    Only deletes photo files and removes the draft if the ad is still in
+    DRAFT status. If the ad has already been submitted (ON_MODERATION or
+    later) the FSM ``photos`` list is stale and must not be used to delete
+    files belonging to a submitted ad.
+    """
 
     data = await state.get_data()
 
     if "ad_id" in data:
-        # Clean up photo files from FSM state before deleting the draft
+        ad_status = await _get_ad_status(data["ad_id"])
 
-        photos = data.get("photos", [])
+        if ad_status == AdStatus.DRAFT:
+            # Clean up photo files from FSM state before deleting the draft
 
-        for photo in photos:
-            await asyncio.to_thread(delete_photo, photo["storage_key"])
+            photos = data.get("photos", [])
 
-        await delete_draft(data["ad_id"])
+            for photo in photos:
+                await asyncio.to_thread(delete_photo, photo["storage_key"])
+
+            await delete_draft(data["ad_id"])
+
+        else:
+            logger.info(
+                "Cancel skipped photo cleanup: ad %s is %s, not DRAFT",
+                data["ad_id"],
+                ad_status,
+            )
 
     await state.clear()
 
@@ -840,6 +856,8 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
                 "Ad submitted for moderation! You'll be notified when it's published."
             )
 
+            await state.clear()
+
         else:
             await message.answer(
                 "Ad failed moderation. Please check your content and try again."
@@ -893,6 +911,28 @@ async def create_draft_ad(user_id: int) -> Ad:
     return await _create()
 
 
+async def _get_ad_status(ad_id: int) -> AdStatus | None:
+    """Return the current ``AdStatus`` for *ad_id*, or ``None`` if it doesn't exist.
+
+    Uses ``sync_to_async`` to perform the lightweight DB lookup off
+    the bot's event loop, mirroring the TX-then-Filesystem pattern used
+    throughout this module.
+    """
+
+    from asgiref.sync import sync_to_async
+
+    @sync_to_async
+    def _get() -> AdStatus | None:
+        status_str = (
+            Ad.objects.filter(id=ad_id).values_list("status", flat=True).first()
+        )
+        if status_str is None:
+            return None
+        return AdStatus(status_str)
+
+    return await _get()
+
+
 async def delete_draft(ad_id: int) -> None:
     """Delete a draft ad and clean up its photo files."""
 
@@ -907,10 +947,11 @@ async def delete_draft(ad_id: int) -> None:
         except Ad.DoesNotExist:
             return
 
-        # Delete physical photo files for any AdImage records
+        # Delete physical photo files (original + all thumbnails) for any AdImage records
 
         for img in ad.images.all():
-            delete_photo(img.image)
+            for key in img.storage_keys():
+                delete_photo(key)
 
         ad.delete()
 
