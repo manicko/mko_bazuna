@@ -154,6 +154,7 @@ no_implicit_reexport = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+strict_config = true
 minversion = "8.4"
 asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]

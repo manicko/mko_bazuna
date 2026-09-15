@@ -467,6 +467,27 @@ class TestAutoModerateFunction:
         assert AnalyticsEventType.AD_PUBLISHED in event_types
         assert AnalyticsEventType.MODERATION_APPROVED in event_types
 
+    @patch("apps.moderation.services.auto_moderation.TrustCalculator")
+    def test_pass_moderation_survives_trust_calculator_failure(self, mock_tc):
+        """auto_moderate publishes the ad even when TrustCalculator.calculate_and_save raises.
+
+        The inner transaction.atomic() savepoint isolates the trust-score failure
+        so it does not roll back the PUBLISHED transition or suppress analytics events.
+        """
+        mock_tc.return_value.calculate_and_save.side_effect = RuntimeError("trust calc failed")
+        ad = _create_valid_ad(self.user, self.category, self.city)
+
+        result = auto_moderate(ad)
+
+        assert result is True
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+
+        event_types = set(AnalyticsEvent.objects.values_list("event_type", flat=True))
+        assert AnalyticsEventType.AD_PUBLISHED in event_types
+        assert AnalyticsEventType.MODERATION_APPROVED in event_types
+
     def test_auto_moderate_fail_sets_failed_status_and_analytics(self):
         """auto_moderate() on an invalid ad sets ON_MODERATION_FAILED + creates analytics."""
         ad = create_test_ad(
