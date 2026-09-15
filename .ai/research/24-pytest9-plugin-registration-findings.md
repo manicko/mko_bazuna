@@ -316,11 +316,40 @@ runs `django.setup()`). Top-level Django imports in the plugin module are safe.
 lives). Both `testpaths` (`src/backend`, `src/telegram_bot`) are sub-paths, so
 the root conftest.py is discovered before both trees.
 
-**Caveat:** The project currently has no root conftest.py — only
-`src/backend/conftest.py` and the bot test files don't use conftest.py. Creating
-a root conftest.py is a clean, minimal addition.
+**Caveat (MODULE SHADOWING):** A root-level `conftest.py` creates a Python module
+named `conftest` in `sys.modules`. Any test file that does
+`from conftest import create_test_ad` (55 files in this codebase) will resolve
+to the root conftest, not `src/backend/conftest.py`, producing
+`ImportError: cannot import name 'create_test_ad'`.
+
+**Shadowing-safe implementation:** Instead of a root conftest, add
+`pytest_plugins = ("testing.moderation_fixtures",)` to the **existing** conftest
+files that are already discovered by each test tree:
+- `src/backend/conftest.py` (discovered by all `src/backend` tests)
+- `src/telegram_bot/tests/conftest.py` (discovered by all bot tests)
+
+This avoids creating a new `conftest` module in `sys.modules` while still using
+the correct `pytest_plugins` registration mechanism (module-level variable in
+a conftest file, processed at step 6 — after `django.setup()`).
 
 #### Option B — `-p` in `addopts` + lazy imports (ALTERNATIVE)
+
+> **NOTE (post-commit verification):** Option B was implemented in commit `2d9e599`
+> (added `-p testing.moderation_fixtures` to `addopts` + lazy imports in
+> `moderation_fixtures.py`). However, the post-fix fast gate run
+> (1459 passed, 2 failed, 37 errors) shows this approach **does not work** under
+> the project's xdist configuration (`-n auto --dist loadgroup`).
+>
+> **Root cause of failure:** While the lazy imports correctly prevent `AppRegistryNotReady`
+> at the early plugin-loading phase, and `PYTHONPATH=/app/src:/app/src/backend` in the
+> Docker image makes the `testing` package importable, the `-p` plugin loading mechanism
+> does not reliably propagate fixture definitions to xdist worker processes under
+> `--dist loadgroup`. The plugin module imports successfully in the controller process,
+> but fixtures from controller-loaded `-p` plugins may not be broadcast to workers,
+> resulting in "fixture not found" errors during test collection.
+>
+> **Updated recommendation:** Use **Option A** (conftest-level `pytest_plugins`) instead.
+> See §6.2 Option A (revised) below for the shadowing-safe implementation.
 
 ```toml
 # pyproject.toml [tool.pytest.ini_options]
@@ -368,17 +397,25 @@ def permissive_criteria(monkeypatch):
     ...
 ```
 
-**Step 3** — Register via root `conftest.py`:
+**Step 3** — Register via conftest-level `pytest_plugins` (shadowing-safe):
 ```python
-# conftest.py (new, project root)
-"""Root conftest: registers shared test plugins."""
+# src/backend/conftest.py — add at module level:
+pytest_plugins = ("testing.moderation_fixtures",)
+
+# src/telegram_bot/tests/conftest.py — add at module level:
 pytest_plugins = ("testing.moderation_fixtures",)
 ```
 
+**Why not a root `conftest.py`:** 55 test files use `from conftest import create_test_ad`,
+which would resolve to the root conftest instead of `src/backend/conftest.py`, causing
+`ImportError` (see §6.2 Option A caveat above).
+
 This combination fixes both defects:
-- Defect A resolved: `pytest_plugins` is in the correct location (conftest.py, not ini)
+- Defect A resolved: `pytest_plugins` is in the correct location (conftest.py module-level, not ini)
 - Defect B resolved: lazy imports make the module import-safe at any phase
-- Defense-in-depth: even if someone later switches to `-p`, the module won't crash
+- xdist-safe: conftest-level `pytest_plugins` is discovered per-worker, unlike `-p` which
+  has propagation issues under `--dist loadgroup`
+- Shadowing-safe: both conftest files already exist; no new `conftest` module is created
 
 ---
 
@@ -427,8 +464,19 @@ This combination fixes both defects:
 ## 9. Action Items
 
 1. **[Fix Defect A]** Remove `pytest_plugins = ["testing.moderation_fixtures"]` from
-   `pyproject.toml:164` and move the registration to a root `conftest.py` as
-   `pytest_plugins = ("testing.moderation_fixtures",)`.
+   `pyproject.toml:164` and add `pytest_plugins = ("testing.moderation_fixtures",)` as
+   a module-level variable in **both** existing conftest files:
+   - `src/backend/conftest.py` (backend tree)
+   - `src/telegram_bot/tests/conftest.py` (bot tree)
+
+   **Why not root `conftest.py`:** 55 test files import `from conftest import create_test_ad`,
+   which would resolve to a root conftest instead of `src/backend/conftest.py`,
+   causing `ImportError`.
+
+   **Why not `-p` in addopts:** Post-fix verification (1459 passed, 2 failed, 37 errors)
+   shows that `-p testing.moderation_fixtures` does not reliably propagate fixtures
+   to xdist worker processes under `--dist loadgroup`. See
+   `.ai/research/25-fast-gate-analysis.md` for the full analysis.
 
 2. **[Fix Defect B]** Move the top-level `from apps.moderation.models import
    ModerationCriteria` in `moderation_fixtures.py:12` inside the fixture
@@ -450,6 +498,8 @@ This combination fixes both defects:
 
 ## 10. References
 
+- Post-fix analysis: `.ai/research/25-fast-gate-analysis.md` — why `-p` in addopts
+  fails under xdist and the shadowing-safe conftest approach
 - ISO-4 agent session transcript: `ses_f5bbc9f5affeM6FqtUys0QCBvg`
 - Gate 0 findings: `.ai/research/23-gate0-findings.md`
 - Plan: `.ai/plans/23-test-isolation-flakiness.md` (Block D — ISO-4, §613)
