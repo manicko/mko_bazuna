@@ -2,7 +2,7 @@
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
           lint format typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
-          backup restore prune-backups db-shell clean create-admin load-catalog seed
+           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed
 
 # ====================== Settings ======================
 
@@ -35,7 +35,7 @@ help:
 	@echo "  down           Stop and remove containers (preserves volumes/data)"
 	@echo "  reset          Stop and remove containers AND named volumes (destroy seed data)"
 	@echo "  restart        Restart web service"
-	@echo "  build          Rebuild images without cache"
+	@echo "  build          Rebuild Docker images"
 	@echo ""
 	@echo "Test Environment:"
 	@echo "  test           Run fast gate (skips nightly seed suite; reuses DB)"
@@ -77,10 +77,11 @@ help:
 	@echo "  down           Stop and remove containers (preserves volumes/data)"
 	@echo "  reset          Stop and remove containers AND named volumes (destroy seed data)"
 	@echo "  clean          Nuclear: remove containers, volumes, and local DB backups"
+	@echo "  fullclean      Full reset: stop dev+test, wipe volumes, prune images/networks/build cache"
 
 up:
 	docker compose $(COMPOSE_FILES) rm -sf migrate load_catalog create_admin seed
-	docker compose $(COMPOSE_FILES) up -d --wait
+	docker compose $(COMPOSE_FILES) up -d
 
 down:
 	# Stop and remove containers (preserves named volumes: postgres_data, media_volume)
@@ -91,7 +92,7 @@ reset:
 	docker compose $(COMPOSE_FILES) down -v --remove-orphans
 
 build:
-	docker compose $(COMPOSE_FILES) build --no-cache
+	docker compose $(COMPOSE_FILES) build
 
 restart:
 	docker compose $(COMPOSE_FILES) restart web
@@ -258,3 +259,14 @@ prune-backups:
 clean:
 	docker compose $(COMPOSE_FILES) down -v --remove-orphans
 	rm -rf $(BACKUPS_DIR)/*.dump
+
+fullclean:
+	# Nuclear: stop both dev + test projects (wiping volumes),
+	# then prune ALL unused images, volumes, and build cache system-wide.
+	# Equivalent to: .\\Makefile.ps1 fullclean
+	docker compose $(COMPOSE_FILES) down -v --remove-orphans
+	COMPOSE_PROJECT_NAME=mko-bazuna-test docker compose $(COMPOSE_TEST) down -v --remove-orphans
+	docker system prune -f --volumes
+	docker image prune -a -f
+	docker builder prune -a -f
+	@echo "Full clean completed. Run 'make build' and 'make up' to restart."

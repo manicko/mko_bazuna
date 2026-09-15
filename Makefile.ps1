@@ -44,7 +44,7 @@ function Show-Help {
     Write-Host "Targets:"
     Write-Host "  up             Start dev environment (web on :8000, hot-reload) + test DB on :5433"
     Write-Host "  down           Stop and remove containers"
-    Write-Host "  build          Rebuild Docker images without cache"
+    Write-Host "  build          Rebuild Docker images"
     Write-Host "  test           Run fast test gate: skips nightly 'seed' suite (~90s vs ~35min full); auto-starts test DB"
     Write-Host "  test-all       Run complete suite (includes nightly 'seed' tests, ~35min)"
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
@@ -84,10 +84,10 @@ function Invoke-Up {
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
 }
 
-# Rebuild images without cache (equiv. to: make build)
+# Rebuild Docker images (equiv. to: make build)
 function Invoke-Build {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build
 }
 
 # Stop and remove containers
