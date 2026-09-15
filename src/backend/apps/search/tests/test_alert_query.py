@@ -534,6 +534,46 @@ class TestSendAlertsCommand:
         assert "DRY RUN" in caplog.text
         assert "0 saved searches" in caplog.text
 
+    def test_format_digest_uses_user_language_en(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """``_format_digest`` with ``locale='en'`` renders English ad titles."""
+        from apps.search.management.commands.send_alerts import Command
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам велосипед",
+            title_en="Selling bicycle",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        cmd = Command()
+        message = cmd._format_digest([ad], locale="en")
+        assert "Selling bicycle" in message
+        assert "Продам велосипед" not in message
+
+    def test_format_digest_uses_user_language_bs(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """``_format_digest`` with ``locale='bs'`` renders Bosnian ad titles."""
+        from apps.search.management.commands.send_alerts import Command
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам велосипед",
+            title_bs="Prodajem bicikl",
+            description="Отличный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        cmd = Command()
+        message = cmd._format_digest([ad], locale="bs")
+        assert "Prodajem bicikl" in message
+        assert "Продам велосипед" not in message
+
 
 # ---------------------------------------------------------------------------
 # find_matching_saved_searches (ad-centric matcher, AL-001)

@@ -14,10 +14,11 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils.translation import gettext as _, override as translation_override
 
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdvisoryLockId, AnalyticsEventType
+from apps.core.enums import AdvisoryLockId, AnalyticsEventType, LanguageLocale
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
@@ -162,7 +163,8 @@ class Command(BaseCommand):
                 if not unique_ads:
                     continue
 
-                message = self._format_digest(unique_ads)
+                locale = getattr(user, "telegram_language", None) or LanguageLocale.RUSSIAN.value
+                message = self._format_digest(unique_ads, locale=locale)
 
                 try:
                     await bot.send_message(
@@ -182,16 +184,20 @@ class Command(BaseCommand):
         finally:
             await bot.session.close()
 
-    def _format_digest(self, ads: list) -> str:
-        """Format digest message for a user."""
-        lines = [f"New ads matching your saved searches ({len(ads)} found):\n"]
+    def _format_digest(self, ads: list, locale: str = LanguageLocale.RUSSIAN.value) -> str:
+        """Format digest message for a user in their preferred locale."""
+        with translation_override(locale):
+            lines = [
+                _("New ads matching your saved searches ({count} found):\n").format(
+                    count=len(ads)
+                )
+            ]
+            for ad in ads:
+                price_str = (
+                    f" - {format_price_value(ad.price_amount, ad.price_currency)}"
+                    if ad.price_amount is not None
+                    else ""
+                )
+                lines.append(f"• {ad.get_title(locale)[:50]}\n  {price_str}\n")
 
-        for ad in ads:
-            price_str = (
-                f" - {format_price_value(ad.price_amount, ad.price_currency)}"
-                if ad.price_amount is not None
-                else ""
-            )
-            lines.append(f"• {ad.title[:50]}\n  {price_str}\n")
-
-        return "\n".join(lines)
+            return "\n".join(lines)
