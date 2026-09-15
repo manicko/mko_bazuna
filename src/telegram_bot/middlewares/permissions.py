@@ -32,7 +32,7 @@ class AccountStateMiddleware(BaseMiddleware):
     Enforces four independent account flags:
     - is_banned: Admin action, blocks all bot interactions
     - is_deleted: GDPR withdrawal, blocks all bot interactions (telegram_id nulled)
-    - is_declined: User declined consent, blocks all bot interactions (browse-only)
+    - is_declined: User declined consent, blocks posting but allows contact deep-links (browse-only)
     - consent_revoked: Consent withdrawn, blocks all bot interactions (data erasing)
     - ads_auto_publish=False: Restricts /post command only
 
@@ -82,8 +82,18 @@ class AccountStateMiddleware(BaseMiddleware):
         chat_id = message.from_user.id
         text = message.text or ""
 
+        # Lazy import to avoid any circular dependency with handlers.
+        from telegram_bot.handlers.contact import classify_contact_deep_link
+
+        # Classify contact deep-links — DECLINE users may contact (browse-only).
+        # The contact R2 service (core/services/contact.py) re-enforces seller-side safety.
+        callback_data = event.callback_query.data if event.callback_query else None
+        is_contact_link = classify_contact_deep_link(text, callback_data) is not None
+
         # Check if user is banned, deleted, or has revoked consent
-        can_interact, state_reason = await self._check_user_state(chat_id)
+        can_interact, state_reason = await self._check_user_state(
+            chat_id, is_contact_link=is_contact_link
+        )
         if not can_interact:
             await message.answer(state_reason)
             return None
@@ -113,7 +123,9 @@ class AccountStateMiddleware(BaseMiddleware):
 
         return await handler(event, data)
 
-    async def _check_user_state(self, chat_id: int) -> tuple[bool, str]:
+    async def _check_user_state(
+        self, chat_id: int, is_contact_link: bool = False
+    ) -> tuple[bool, str]:
         """
         Check if user is banned, deleted, declined, or has revoked consent.
 
@@ -126,6 +138,10 @@ class AccountStateMiddleware(BaseMiddleware):
 
         Args:
             chat_id: Stable Telegram chat ID.
+            is_contact_link: True if the current event is a contact deep-link
+                (``/start contact_<ad_id>``, ``/start contact_us``, or the
+                inline ``contact_us`` callback).  DECLINE users are allowed
+                through contact deep-links only (browse-only consent).
 
         Returns:
             Tuple of (can_interact, rejection_message).
@@ -147,6 +163,8 @@ class AccountStateMiddleware(BaseMiddleware):
             return (False, _("Your account has been deleted."))
 
         if state.is_declined:
+            if is_contact_link:
+                return (True, "")  # DECLINE = browse-only; contact deep-link is allowed
             return (
                 False,
                 _(

@@ -21,6 +21,10 @@ from django.utils import timezone
 
 from apps.users.models import User
 from apps.users.services import can_login
+from telegram_bot.handlers.contact import (
+    ContactDeepLinkKind,
+    classify_contact_deep_link,
+)
 from telegram_bot.middlewares import AccountStateMiddleware
 
 pytestmark = [
@@ -76,7 +80,7 @@ def _make_message_update(chat_id: int, text: str = "") -> Update:
     )
 
 
-def _make_callback_update(chat_id: int) -> Update:
+def _make_callback_update(chat_id: int, callback_data: str = "test_action") -> Update:
     """Construct a real aiogram Update wrapping a CallbackQuery from a test user."""
     from aiogram.types import (
         CallbackQuery,
@@ -100,7 +104,7 @@ def _make_callback_update(chat_id: int) -> Update:
             from_user=user,
             message=msg,
             chat_instance="-1",
-            data="test_action",
+            data=callback_data,
         ),
     )
 
@@ -158,6 +162,23 @@ class TestCheckUserStateMessages:
 
         assert can_interact is False
         assert "browse" in message or "browsing" in message
+
+    @pytest.mark.asyncio
+    async def test_declined_user_contact_allowed(self) -> None:
+        """A declined user passes _check_user_state when is_contact_link=True.
+
+        Contact deep-links are the browse-only exception for DECLINE users.
+        """
+        chat_id = _BASE_CHAT_ID + 30
+        await _make_user(chat_id, is_declined=True)
+
+        middleware = AccountStateMiddleware()
+        can_interact, message = await middleware._check_user_state(
+            chat_id, is_contact_link=True
+        )
+
+        assert can_interact is True
+        assert message == ""
 
     @pytest.mark.asyncio
     async def test_consent_revoked_user(self) -> None:
@@ -383,6 +404,168 @@ class TestCallPipeline:
         handler.assert_not_awaited()
         mock_answer.assert_awaited_once()
         assert "browse" in mock_answer.call_args[0][0]
+
+    # --- PII-001: DECLINE users may reach contact deep-links (browse-only) ---
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_allowed_for_contact_ad_deep_link(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user sending /start contact_<ad_id> reaches the handler."""
+        chat_id = _BASE_CHAT_ID + 701
+        await _make_user(chat_id, is_declined=True)
+
+        update = _make_message_update(chat_id, "/start contact_42")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, {})
+        mock_answer.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_allowed_for_contact_us_deep_link(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user sending /start contact_us reaches the handler."""
+        chat_id = _BASE_CHAT_ID + 702
+        await _make_user(chat_id, is_declined=True)
+
+        update = _make_message_update(chat_id, "/start contact_us")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, {})
+        mock_answer.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_allowed_for_contact_us_callback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user triggering the contact_us callback reaches the handler."""
+        chat_id = _BASE_CHAT_ID + 703
+        await _make_user(chat_id, is_declined=True)
+
+        update = _make_callback_update(chat_id, callback_data="contact_us")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, {})
+        mock_answer.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_blocked_for_post(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user sending /post is still blocked (contact narrowing is specific)."""
+        chat_id = _BASE_CHAT_ID + 704
+        await _make_user(chat_id, is_declined=True)
+
+        update = _make_message_update(chat_id, "/post")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "browse" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_blocked_for_other_commands(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user sending /language is still blocked."""
+        chat_id = _BASE_CHAT_ID + 705
+        await _make_user(chat_id, is_declined=True)
+
+        update = _make_message_update(chat_id, "/language")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "browse" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_banned_user_blocked_for_contact(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A banned user sending /start contact_42 is blocked (DECLINE-only narrowing)."""
+        chat_id = _BASE_CHAT_ID + 706
+        await _make_user(chat_id, is_banned=True)
+
+        update = _make_message_update(chat_id, "/start contact_42")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "restrict" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_deleted_user_blocked_for_contact(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A deleted user sending /start contact_42 is blocked."""
+        chat_id = _BASE_CHAT_ID + 707
+        await _make_user(chat_id, is_deleted=True)
+
+        update = _make_message_update(chat_id, "/start contact_42")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "deleted" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_consent_revoked_user_blocked_for_contact(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A consent-revoked user sending /start contact_42 is blocked."""
+        chat_id = _BASE_CHAT_ID + 708
+        await _make_user(chat_id, consent_revoked=True)
+
+        update = _make_message_update(chat_id, "/start contact_42")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert (
+            "erased" in mock_answer.call_args[0][0]
+            or "withdrawn" in mock_answer.call_args[0][0]
+        )
 
     @pytest.mark.asyncio
     async def test_call_handles_callback_query_update(
@@ -633,3 +816,60 @@ class TestUserIdBackfill:
         assert result == "proceed"
         handler.assert_awaited_once_with(update, data)
         state.update_data.assert_awaited_once_with(user_id=user.id)
+
+
+# ---------------------------------------------------------------------------
+# Contact deep-link classifier (PII-001)
+# ---------------------------------------------------------------------------
+
+
+class TestContactDeepLinkClassifier:
+    """Unit tests for the shared classify_contact_deep_link classifier."""
+
+    def test_classify_seller_contact(self) -> None:
+        """/start contact_<ad_id> classifies as SELLER_CONTACT."""
+        result = classify_contact_deep_link("/start contact_42")
+
+        assert result is ContactDeepLinkKind.SELLER_CONTACT
+
+    def test_classify_support_desk_message(self) -> None:
+        """/start contact_us classifies as SUPPORT_DESK."""
+        result = classify_contact_deep_link("/start contact_us")
+
+        assert result is ContactDeepLinkKind.SUPPORT_DESK
+
+    def test_classify_support_desk_callback(self) -> None:
+        """Inline 'Contact us' callback_data classifies as SUPPORT_DESK."""
+        result = classify_contact_deep_link(None, callback_data="contact_us")
+
+        assert result is ContactDeepLinkKind.SUPPORT_DESK
+
+    def test_classify_non_contact(self) -> None:
+        """/start login_abc is not a contact deep-link."""
+        result = classify_contact_deep_link("/start login_abc")
+
+        assert result is None
+
+    def test_classify_empty_text(self) -> None:
+        """Empty text with no callback_data is not a contact deep-link."""
+        result = classify_contact_deep_link("")
+
+        assert result is None
+
+    def test_classify_none_text(self) -> None:
+        """None text with no callback_data is not a contact deep-link."""
+        result = classify_contact_deep_link(None)
+
+        assert result is None
+
+    def test_classify_no_args(self) -> None:
+        """/start with no payload is not a contact deep-link."""
+        result = classify_contact_deep_link("/start")
+
+        assert result is None
+
+    def test_classify_callback_non_contact(self) -> None:
+        """A non-contact callback_data with no text is not a contact deep-link."""
+        result = classify_contact_deep_link(None, callback_data="other_action")
+
+        assert result is None

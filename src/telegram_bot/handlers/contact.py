@@ -10,6 +10,7 @@ Implements zone R2 conditions and anonymous forwarding.
 
 import logging
 import re
+from enum import StrEnum
 from typing import Final
 
 from aiogram import Bot, F, Router, types
@@ -32,6 +33,42 @@ CONTACT_US_PATTERN = re.compile(r"^contact_us$")
 # Callback data for the inline "Contact us" button (shared with login.py's
 # no-arg /start greeting).
 CONTACT_US_CALLBACK: Final[str] = "contact_us"
+
+
+class ContactDeepLinkKind(StrEnum):
+    """Deep-link kinds that DECLINE users can access (browse-only contact)."""
+
+    SELLER_CONTACT = "seller_contact"  # /start contact_<ad_id>
+    SUPPORT_DESK = "support_desk"  # /start contact_us OR callback contact_us
+
+
+def classify_contact_deep_link(
+    text: str | None,
+    callback_data: str | None = None,
+) -> ContactDeepLinkKind | None:
+    """Classify whether an event is a contact deep-link accessible to DECLINE users.
+
+    Checks both message deep-links (``/start contact_<ad_id>``, ``/start contact_us``)
+    and the inline "Contact us" button callback_data.  Returns the deep-link kind if
+    it is a contact link, ``None`` otherwise.  Shared between the middleware and the
+    handler so the two never drift on what constitutes a contact deep-link.
+    """
+    # Callback query: inline "Contact us" button
+    if callback_data == CONTACT_US_CALLBACK:
+        return ContactDeepLinkKind.SUPPORT_DESK
+    # Message deep-link: /start <payload>
+    if text is None:
+        return None
+    args = text.split(maxsplit=1)
+    if len(args) < 2:
+        return None
+    deep_link = args[1]
+    if CONTACT_US_PATTERN.match(deep_link):
+        return ContactDeepLinkKind.SUPPORT_DESK
+    if CONTACT_PATTERN.match(deep_link):
+        return ContactDeepLinkKind.SELLER_CONTACT
+    return None
+
 
 # Greeting shown to buyers reaching the support desk (Russian, per contact.py
 # convention). Shared by the /start contact_us deep-link and the inline button
