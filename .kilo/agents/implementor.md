@@ -104,7 +104,7 @@ permission:
     "git update-ref -d*": ask
 
     # === ASK: potentially destructive filesystem ===
-    "*pip*": deny
+    "pip*": ask
     "rm -rf *": ask
     "rm -r *": ask
     "Remove-Item -Recurse -Force *": ask
