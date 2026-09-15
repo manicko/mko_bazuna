@@ -123,14 +123,12 @@ def test_mo_files_exist() -> None:
         assert mo_path.exists(), f"Missing compiled file: {mo_path}"
 
 
-@pytest.mark.xfail(reason="POT-Creation-Date synced in I18N-007", strict=True)
 def test_pot_creation_date_sync() -> None:
     """All three ``.po`` files must share the same ``POT-Creation-Date``.
 
     ``makemessages`` runs with all locale flags in a single invocation
     (Makefile line 173-174), so a fresh extraction produces a single
-    timestamp.  Tagged ``xfail`` until I18N-007 re-runs makemessages; once
-    the dates are synchronized, remove the decorator so the test passes.
+    timestamp.
     """
     dates: dict[str, str] = {}
     for po_path in _po_files():

@@ -1,12 +1,12 @@
 # English translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 10:29-0500\n"
+"POT-Creation-Date: 2026-09-14 16:59-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
@@ -16,24 +16,30 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-
 msgid ""
-"Cannot approve: the ad owner has reached the maximum number of active ads."
+"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"\n"
+"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"\n"
+"Для создания объявления используйте /post."
 msgstr ""
 
-msgid ""
-"Login successful! Your account has been created. You can now create ads "
-"with /post."
+msgid "Слишком много запросов в поддержку. Попробуйте позже."
 msgstr ""
 
-msgid ""
-"Welcome to %(site)s! To login, use a deep-link: /start login_<your_token>"
+msgid "Contact us"
 msgstr ""
 
-msgid ""
-"Your account has publishing restrictions. Contact support for assistance."
+msgid "Ошибка: не удалось определить отправителя"
 msgstr ""
 
+msgid "объявление больше недоступно"
+msgstr ""
+
+msgid "продавец больше недоступен для связи"
+msgstr ""
+
+#, python-format
 msgid ""
 "Новый запрос от покупателя!\n"
 "\n"
@@ -43,33 +49,13 @@ msgid ""
 "Напишите своё сообщение — оно будет переслано анонимно."
 msgstr ""
 
-msgid ""
-"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
-"\n"
-"Напишите ваш вопрос — мы ответим как можно скорее.\n"
-"\n"
-"Для создания объявления используйте /post."
+msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
 msgstr ""
 
-msgid "Consent declined: you can browse but cannot post. Contact still works."
-msgstr ""
-
-msgid "Consent withdrawn: your data is being erased."
-msgstr ""
-
-msgid "Invalid login link format. Expected: /start login_<token>"
-msgstr ""
-
-msgid "Language set to %(lang)s"
-msgstr ""
-
-msgid "Login successful! You can now create ads with /post."
+msgid "Покупатель"
 msgstr ""
 
 msgid "Please login first with /start login_<token>"
-msgstr ""
-
-msgid "Please login first."
 msgstr ""
 
 msgid "Select your preferred language:"
@@ -78,28 +64,46 @@ msgstr ""
 msgid "Unsupported language."
 msgstr ""
 
-msgid "Your account has been deleted."
+msgid "Please login first."
+msgstr ""
+
+#, python-format
+msgid "Language set to %(lang)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Welcome to %(site)s! To login, use a deep-link: /start login_<your_token>"
+msgstr ""
+
+msgid "Invalid login link format. Expected: /start login_<token>"
+msgstr ""
+
+msgid "This login link is invalid, expired, or already used."
+msgstr ""
+
+msgid ""
+"Login successful! Your account has been created. You can now create ads "
+"with /post."
+msgstr ""
+
+msgid "Login successful! You can now create ads with /post."
 msgstr ""
 
 msgid "Your account is restricted. Contact support for assistance."
 msgstr ""
 
-msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgid "Your account has been deleted."
 msgstr ""
 
-msgid "Ошибка: не удалось определить отправителя"
+msgid "Consent declined: you can browse but cannot post. Contact still works."
 msgstr ""
 
-msgid "Покупатель"
+msgid "Consent withdrawn: your data is being erased."
 msgstr ""
 
-msgid "Слишком много запросов в поддержку. Попробуйте позже."
-msgstr ""
-
-msgid "объявление больше недоступно"
-msgstr ""
-
-msgid "продавец больше недоступен для связи"
+msgid ""
+"Your account has publishing restrictions. Contact support for assistance."
 msgstr ""
 
 msgid "Free"
@@ -163,6 +167,23 @@ msgid "30 Days"
 msgstr ""
 
 msgid "7 Days"
+msgstr ""
+
+msgid "Contact Seller"
+msgstr ""
+
+msgid "Submit an ad"
+msgstr ""
+
+msgid "Login via Telegram"
+msgstr ""
+
+msgid ""
+"Cannot approve: the ad owner has reached the maximum number of active ads."
+msgstr ""
+
+#, python-brace-format
+msgid "New ads matching your saved searches ({count} found):\n"
 msgstr ""
 
 msgid "Ad"
@@ -326,6 +347,9 @@ msgstr ""
 msgid "Photo"
 msgstr ""
 
+msgid "Dashboard"
+msgstr ""
+
 msgid "Your Ads"
 msgstr ""
 
@@ -398,12 +422,6 @@ msgid "Category:"
 msgstr ""
 
 msgid "Published:"
-msgstr ""
-
-msgid "Contact Seller"
-msgstr ""
-
-msgid "Contact us"
 msgstr ""
 
 msgid "Seller unavailable for contact"
@@ -796,9 +814,6 @@ msgstr ""
 msgid "Cookie settings"
 msgstr ""
 
-msgid "Dashboard"
-msgstr ""
-
 msgid "Logout"
 msgstr ""
 
@@ -809,9 +824,6 @@ msgid "Account menu"
 msgstr ""
 
 msgid "Account"
-msgstr ""
-
-msgid "Submit an ad"
 msgstr ""
 
 msgid "Preferred city"
@@ -1054,9 +1066,6 @@ msgstr ""
 msgid "This link expires in 5 minutes."
 msgstr ""
 
-msgid "Login via Telegram"
-msgstr ""
-
 msgid "Waiting for Telegram confirmation..."
 msgstr ""
 
@@ -1067,9 +1076,6 @@ msgid "Get it here"
 msgstr ""
 
 msgid "Login successful! Redirecting..."
-msgstr ""
-
-msgid "This login link is invalid, expired, or already used."
 msgstr ""
 
 msgid "Error checking login status."
