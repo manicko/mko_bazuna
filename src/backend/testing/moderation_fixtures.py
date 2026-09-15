@@ -1,14 +1,22 @@
 """Shared moderation test fixtures for permissive/banning criteria.
 
-Registered as a pytest plugin via ``-p testing.moderation_fixtures`` in the
-``addopts`` array of ``pyproject.toml`` so that both the backend test tree
-(``src/backend``) and the bot test tree (``src/telegram_bot``) can resolve
-these fixtures without relying on conftest discovery (the two trees have
-separate conftest discovery boundaries).
+Registered as a pytest plugin via the module-level ``pytest_plugins`` variable
+in each test tree's conftest file:
 
-Imports of Django models are deferred to fixture-call time so the module
-can be loaded by pytest at the early ``-p`` plugin-loading phase, before
-``django.setup()`` completes.
+- ``src/backend/conftest.py`` (backend tree)
+- ``src/telegram_bot/tests/conftest.py`` (bot tree)
+
+This is the only mechanism pytest recognizes for in-tree plugin registration.
+The conftest-level ``pytest_plugins`` is processed during initial conftest
+loading — after ``django.setup()`` has completed (pytest-django's
+``pytest_load_initial_conftests`` hook with ``tryfirst=True`` runs before
+conftest import), making it safe for Django model imports.
+
+Imports of Django models are deferred to fixture-call time as defense-in-depth:
+the lazy-import pattern ensures the module is import-safe at any pytest startup
+phase, including the early ``-p`` / ``PYTEST_PLUGINS`` / ``pytest11`` loading
+paths, so migrating the registration mechanism in future requires no changes
+to this module's import structure.
 """
 
 from unittest.mock import MagicMock

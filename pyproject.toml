@@ -160,7 +160,7 @@ asyncio_mode = "strict"
 python_files = ["tests.py", "test_*.py"]
 pythonpath = ["src", "src/backend"]
 testpaths = ["src/backend", "src/telegram_bot"]
-addopts = ["--import-mode=importlib", "-ra", "-q", "-p", "testing.moderation_fixtures"]
+addopts = ["--import-mode=importlib", "-ra", "-q"]
 console_output_style = "classic"
 # register custom markers to avoid PytestUnknownMarkWarning
 markers = [
