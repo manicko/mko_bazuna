@@ -105,10 +105,10 @@ the inter-container hostname (`db`) is correct.
   # Stop dev (equiv. to: make down)
   docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down
 
-  # Rebuild images without cache (equiv. to: make build)
-  docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build --no-cache
+   # Rebuild Docker images (equiv. to: make build)
+   docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml build
 
-  # Full environment reset (equiv. to: make clean)
+   # Full environment reset (equiv. to: make clean for dev only; use `make fullclean` to also stop test project, wipe volumes, and prune all images + build cache)
   docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down -v --remove-orphans
   docker compose -p mko-bazuna-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml down --rmi all -v
   # Start test DB on host:5433 (equiv. to: make test-db)
@@ -199,6 +199,24 @@ correct hostname (`db`) is used for inter-container communication.
 | `db` | — | PostgreSQL 18 (internal, no host port) |
 | `nginx` | 80/443 | Optional; use `profiles: ["use-nginx"]` to enable |
 
+**Build cache:** `make build` now uses Docker's layer cache and the Dockerfile's
+`--mount=type=cache` mounts (for apt and uv) for faster incremental builds. Subsequent
+builds are significantly faster when only source code changes (the uv dependency layer is
+the primary win). Run `make fullclean` to clear the build cache if builds behave unexpectedly.
+
+**Bind-mount scope in dev:** The `.:/app` source bind-mount (hot-reload) is applied to
+`web`, `bot`, `load_catalog`, `seed`, and `nginx` via `docker-compose.dev.override.yml`.
+The one-shot services `migrate` and `create_admin` (defined in the base `docker-compose.yml`)
+only receive `./.env.dev:/app/src/.env:ro` — **no source code bind-mount**. Model changes,
+new migration files, and source code edits to these one-shot services are NOT picked up
+at runtime; `make build` is still required after changing code that affects them.
+
+**Startup behavior:** `make up` starts services in the background (`up -d`, non-blocking).
+The `depends_on` chain still enforces correct startup ordering (`db` → `migrate` →
+`load_catalog` → `create_admin` → `seed` → `web`, `bot`), but the command returns immediately
+without waiting for seed (600 ads) to finish. Use `make logs -f seed` or `docker compose ps`
+to check seed progress.
+
 ### Full environment reset
 
 If you encounter stale containers or build issues:
@@ -225,6 +243,16 @@ make build
 make up
 # Windows: .\Makefile.ps1 build ; .\Makefile.ps1 up
 ```
+
+Or use the single-command shortcut for a complete reset:
+
+```bash
+make fullclean
+```
+
+This stops both dev and test Compose projects (wiping volumes), then runs
+`docker system prune -f --volumes`, `docker image prune -a -f`, and
+`docker builder prune -a -f` — equivalent to steps 1-4 above.
 
 ### Production-like Development
 
@@ -343,9 +371,10 @@ directly unless you have set `COMPOSE_PROJECT_NAME` explicitly (see
 |--------|-------------|
 | `make up` | Start dev environment with hot-reload (port 8000) |
 | `make down` | Stop and remove dev containers |
-| `make build` | Rebuild Docker images without cache |
+| `make build` | Rebuild Docker images |
 | `make restart` | Restart the web service |
 | `make clean` | Stop containers and remove volumes (`down -v --remove-orphans`) |
+| `make fullclean` | Full reset: stop dev+test projects (wipe volumes), prune all unused images, volumes, and build cache |
 | `make logs` | Follow dev container logs |
 | `make backup` | Create database backup (7-day rotation) |
 | `make restore BACKUP_FILE=...` | Restore database from backup |
