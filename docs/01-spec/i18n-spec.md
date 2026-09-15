@@ -68,6 +68,14 @@ context processor (`apps/core/context_processors.py` L22-24).
 Templates read `LANGUAGE_CODE` to select the locale passed to the name-localization filters (see
 [Category / city name localization](#category-city-entity-name-localization)).
 
+> **Dynamic `<html>` language binding (I18N-006):** all 15 page templates replace the hardcoded
+> `<html lang="en">` with `<html lang="{{ LANGUAGE_CODE|lower }}" dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}">`,
+> driven by `LANGUAGE_CODE` (from the `apps.core.context_processors.language` processor) and
+> `LANGUAGE_BIDI` (from Django's built-in `django.template.context_processors.i18n`, enabled at
+> `config/settings/base.py`). The `dir` attribute renders `rtl` for Bosnian (`bs`) and `ltr` for all
+> other locales, so the page root element always matches the resolved content language and text
+> direction.
+
 ## Per-User Language (Telegram Bot)
 
 `User.telegram_language` (`apps/users/models.py` L102-107) is a required `CharField(max_length=5,
@@ -205,8 +213,17 @@ locale = getattr(user, "telegram_language", None) or LanguageLocale.RUSSIAN.valu
 ```
 
 Message content is then built with the ad and city rendered in that locale (`ad.get_title(locale)`,
-`ad.city.get_name(locale)`). This is the only path where `User.telegram_language` affects alert
-message rendering.
+`ad.city.get_name(locale)`). Immediate alerts and the daily digest are the two paths where
+`User.telegram_language` drives alert-message rendering.
+
+The **daily digest** path (`apps/search/management/commands/send_alerts.py`, I18N-001, run once
+daily via cron with an advisory lock for idempotency) mirrors the immediate-alert pattern.
+ `_format_digest` (L187-203) accepts a `locale` parameter, wraps its `gettext()` call in
+`translation_override(locale)`, and renders each ad title via `ad.get_title(locale)` (truncated to
+50 characters) instead of the Russian-only `ad.title`. The call site (`_send_user_digests`,
+L140-185) resolves `locale` per recipient from `user.telegram_language` (defaulting to
+`LanguageLocale.RUSSIAN.value`); the msgid `"New ads matching your saved searches ({count} found):\n"`
+is extracted and translated in all three `.po` files (ru, bs, en).
 
 > **`SavedSearch.language` vs. `User.telegram_language` — two distinct locale authorities:**
 > `SavedSearch.language` (see [`db-schema.md`](../02-database/db-schema.md) > SavedSearch) is the
@@ -235,9 +252,9 @@ Russian vector is built from this translated content,
 
 ## Python-side `gettext` Usage
 
-`gettext` / `gettext_lazy` is now used in production Python for the first time, covering 15
-user-facing strings across 6 files (UI labels, `HttpResponseForbidden` bodies, `TimeRange` and
-dashboard status labels). Runtime `gettext` is used for request-time strings; `gettext_lazy` for
+`gettext` / `gettext_lazy` is now used in production Python for the first time, covering 16
+user-facing strings across 7 files (UI labels, `HttpResponseForbidden` bodies, `TimeRange` and
+dashboard status labels, alert digest header). Runtime `gettext` is used for request-time strings; `gettext_lazy` for
 module/class-level constants. `Http404(...)` messages are intentionally left untranslated —
 Django's default 404 handler does not surface them to users in production.
 
@@ -249,6 +266,7 @@ Django's default 404 handler does not surface them to users in production.
 | `apps/ads/views/edit.py` | error + 3 × `HttpResponseForbidden` | `gettext` (runtime) |
 | `apps/ads/views/delete.py` | `HttpResponseForbidden` (1) | `gettext` (runtime) |
 | `apps/ads/views/listings.py` | `HttpResponseForbidden` (1) | `gettext` (runtime) |
+| `apps/search/management/commands/send_alerts.py` | "New ads matching your saved searches" (1) | `gettext` (runtime) |
 
 ## Development & CI Integration
 
@@ -272,14 +290,21 @@ Definition of Done on every fast-gate run:
 | `test_no_empty_msgstr` | `ru`/`bs` `msgstr` non-empty; `en` follows Django convention (empty = msgid is English) |
 | `test_no_raw_get_name_in_templates` | no raw `{{ obj.get_name }}` — must use `|get_category_name:LANGUAGE_CODE` / `|get_city_name:LANGUAGE_CODE` filters |
 | `test_mo_compiled` | `.mo` exists for every `.po` |
+| `test_template_extraction_coverage` | msgids extracted from `{% trans %}`/`{{ _("…") }}`/`{% blocktrans %}` templates each exist in all three `.po` files |
+| `test_hreflang_present` | every page template renders `<link rel="alternate" hreflang>` (via `components/locale_head.html` partial, I18N-004) |
+| `test_plural_forms` | each `.po` `Plural-Forms` header matches CLDR rules |
+| `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
 
 The scan scope excludes the `admin/` staff subtree, the analytics/moderation dashboards, and
 `components/feature_tag.html` (DB-based i18n via `get_lookup_name`). `test_i18n_pipeline.py` adds
-unit checks for `.po` existence, `msgstr` non-emptiness, and the `component_tag` template filter.
+unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` template filter, and
+`test_pot_creation_date_sync` — which asserts all three `.po` files share an identical
+`POT-Creation-Date` (since `makemessages` runs all locale flags in a single invocation).
 
 > **Definition of Done (automatable):** every new visible UI string wrapped in `{% trans %}`; all
-> `{% trans %}` msgids extracted into `ru`/`bs`/`en` `.po`; `bs`+`en` `msgstr` non-empty (`ru` may
-> equal `msgid`); `compilemessages` succeeds; no raw `.get_name` calls in templates. See
+> `{% trans %}` msgids extracted into `ru`/`bs`/`en` `.po`; `ru`+`bs` `msgstr` non-empty (`en`
+> follows Django convention — empty `msgstr` means the msgid is already English); `compilemessages`
+> succeeds; no raw `.get_name` calls in templates. See
 > [`../99-agent/i18n-definition-of-done-research.md`](../99-agent/i18n-definition-of-done-research.md)
 > for the full checklist — a pre-implementation research report whose identified gaps were
 > implemented in `f661532`; this spec is the authoritative current description.
