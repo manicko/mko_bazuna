@@ -127,7 +127,7 @@ def test_pot_creation_date_sync() -> None:
     """All three ``.po`` files must share the same ``POT-Creation-Date``.
 
     ``makemessages`` runs with all locale flags in a single invocation
-    (Makefile line 173-174), so a fresh extraction produces a single
+    (Makefile line 176-177), so a fresh extraction produces a single
     timestamp.
     """
     dates: dict[str, str] = {}
