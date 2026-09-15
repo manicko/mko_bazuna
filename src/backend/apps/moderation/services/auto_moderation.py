@@ -167,6 +167,9 @@ def auto_moderate(ad: Ad) -> bool:
     except MaxAdsExceeded:
         _fail_moderation(ad)
         return False
+    except Exception:
+        _fail_moderation(ad)
+        return False
     return True
 
 
@@ -265,9 +268,15 @@ def _pass_moderation(ad: Ad) -> None:
             ad_id=ad.id,
         )
 
-        TrustCalculator().calculate_and_save(ad.user)
-
-        logger.info(f"Auto-moderation passed for ad {ad.id}")
+        try:
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+                TrustCalculator().calculate_and_save(ad.user)
+        except Exception:
+            logger.warning(
+                "Trust score calculation failed for user %s; ad still PUBLISHED",
+                ad.user_id,
+                exc_info=True,
+            )
 
 
 def check(ad: Ad) -> tuple[bool, str | None]:
