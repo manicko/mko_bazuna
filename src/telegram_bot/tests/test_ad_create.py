@@ -1,0 +1,273 @@
+"""
+Tests for process_preview — original_language detection from Telegram user locale.
+
+Verifies that the ad's ``original_language`` is derived from
+``message.from_user.language_code`` via ``LanguageLocale.from_code``, with a
+fallback to ``BOSNIAN`` when the code is missing or unsupported.
+
+The full ``process_preview`` → ``submit_ad`` → ``auto_moderate``
+pipeline is exercised against the real PostgreSQL ORM.  ``translate_all_languages``
+is mocked to avoid hitting the Google Translate API.
+"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from asgiref.sync import sync_to_async
+
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.slow,
+    pytest.mark.integration,
+    pytest.mark.concurrent,
+]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def seller_id() -> int:
+    """Create a minimal seller user and return its ID."""
+    from apps.users.models import User
+
+    user = User.objects.create(
+        telegram_id=900000200,
+        chat_id=900000200,
+        username="lang_test_user",
+        first_name="Lang",
+        last_name="Tester",
+        password="x",
+    )
+    return user.id
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_message(language_code: str | None) -> MagicMock:
+    """Build a mock Telegram message for the preview/confirm step."""
+    user_mock = MagicMock()
+    user_mock.language_code = language_code
+    message = MagicMock()
+    message.text = "confirm"
+    message.from_user = user_mock
+    message.answer = AsyncMock()
+    return message
+
+
+def _build_state(data: dict) -> MagicMock:
+    """Build a mock FSMContext backed by the given state data."""
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value=data)
+    state.clear = AsyncMock()
+    return state
+
+
+async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str]:
+    """Return deterministic translations without hitting the real API."""
+    return {loc: f"{text}-{loc}" for loc in target_locales}
+
+
+def _build_photo_message() -> MagicMock:
+    """Build a mock Telegram message containing a single photo upload."""
+    photo_item = MagicMock()
+    photo_item.file_id = "test_file_id"
+    message = MagicMock()
+    message.text = None
+    message.photo = [photo_item]
+    message.answer = AsyncMock()
+    message.bot = MagicMock()
+    return message
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+class TestProcessPreviewLanguageDetection:
+    """Tests for original_language detection in process_preview."""
+
+    @pytest.mark.asyncio
+    async def test_original_language_detected_from_user(
+        self, seller_id: int, permissive_criteria: None
+    ) -> None:
+        """Ad original_language is set from the Telegram user's language_code."""
+        from telegram_bot.handlers.ad_create import create_draft_ad, process_preview
+
+        ad = await create_draft_ad(user_id=seller_id)
+
+        state = _build_state(
+            {
+                "ad_id": ad.id,
+                "title": "Valid Title",
+                "description": "Valid description text for the ad.",
+                "price_amount": 100,
+                "price_currency": "EUR",
+                "photos": [],
+                "user_id": seller_id,
+            }
+        )
+
+        message = _build_message("en-US")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.translate_all_languages",
+            _mock_translate,
+        ):
+            await process_preview(message, state)
+
+        from apps.ads.models import Ad
+
+        saved = await sync_to_async(Ad.objects.get)(id=ad.id)
+        assert saved.original_language == "en"
+
+    @pytest.mark.asyncio
+    async def test_original_language_falls_back_to_bosnian(
+        self, seller_id: int, permissive_criteria: None
+    ) -> None:
+        """Ad original_language falls back to BOSNIAN when language_code is None."""
+        from telegram_bot.handlers.ad_create import create_draft_ad, process_preview
+
+        ad = await create_draft_ad(user_id=seller_id)
+
+        state = _build_state(
+            {
+                "ad_id": ad.id,
+                "title": "Valid Title",
+                "description": "Valid description text for the ad.",
+                "price_amount": 100,
+                "price_currency": "EUR",
+                "photos": [],
+                "user_id": seller_id,
+            }
+        )
+
+        message = _build_message(None)
+
+        with patch(
+            "telegram_bot.handlers.ad_create.translate_all_languages",
+            _mock_translate,
+        ):
+            await process_preview(message, state)
+
+        from apps.ads.models import Ad
+
+        saved = await sync_to_async(Ad.objects.get)(id=ad.id)
+        assert saved.original_language == "bs"
+
+
+class TestProcessPhotos:
+    """Tests for process_photos — upload cap, rate limit, and done handling."""
+
+    @pytest.mark.asyncio
+    async def test_process_photos_rejects_after_five(self) -> None:
+        """5 photos already in state — a new photo upload is rejected with the cap message."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [{}, {}, {}, {}, {}], "user_id": 900000001})
+        message = _build_photo_message()
+
+        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+            await process_photos(message, state)
+
+        mock_download.assert_not_called()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at most 5" in answer_text
+
+    @pytest.mark.asyncio
+    async def test_done_with_zero_photos_shows_correct_message(self) -> None:
+        """'done' with 0 photos shows 'at least 1', not 'at most 5'."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        message = _build_message(None)
+        message.text = "done"
+
+        await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at least 1" in answer_text
+        assert "at most 5" not in answer_text
+
+    @pytest.mark.asyncio
+    async def test_done_with_six_photos_shows_correct_message(self) -> None:
+        """'done' with 6 photos shows 'at most 5', not 'at least 1'."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        state = _build_state({"photos": [{}] * 6, "user_id": 900000001})
+        message = _build_message(None)
+        message.text = "done"
+
+        await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "at most 5" in answer_text
+        assert "at least 1" not in answer_text
+
+    @pytest.mark.asyncio
+    async def test_process_photos_rate_limited(self, monkeypatch) -> None:
+        """Rate-limited uploads are rejected before download_photo."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            AsyncMock(return_value=False),
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        message = _build_photo_message()
+
+        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+            await process_photos(message, state)
+
+        mock_download.assert_not_called()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "too fast" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_process_photos_allows_when_not_rate_limited(
+        self, monkeypatch
+    ) -> None:
+        """When not rate-limited, the flow proceeds to download and save the photo."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        state.update_data = AsyncMock()
+        message = _build_photo_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.download_photo",
+                new=AsyncMock(return_value=b"fake_photo_bytes"),
+            ) as mock_download,
+            patch(
+                "telegram_bot.handlers.ad_create.save_photo",
+                new=AsyncMock(return_value="fake_storage_key"),
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.validate_photo",
+                return_value=(True, None),
+            ),
+        ):
+            await process_photos(message, state)
+
+        mock_download.assert_awaited_once()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "Photo saved" in answer_text
