@@ -1,15 +1,19 @@
 """Shared moderation test fixtures for permissive/banning criteria.
 
-Registered as a pytest plugin via ``pytest_plugins`` in ``pyproject.toml`` so
-that both the backend test tree (``src/backend``) and the bot test tree
-(``src/telegram_bot``) can resolve these fixtures without relying on conftest
-discovery (the two trees have separate conftest discovery boundaries).
+Registered as a pytest plugin via ``-p testing.moderation_fixtures`` in the
+``addopts`` array of ``pyproject.toml`` so that both the backend test tree
+(``src/backend``) and the bot test tree (``src/telegram_bot``) can resolve
+these fixtures without relying on conftest discovery (the two trees have
+separate conftest discovery boundaries).
+
+Imports of Django models are deferred to fixture-call time so the module
+can be loaded by pytest at the early ``-p`` plugin-loading phase, before
+``django.setup()`` completes.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
-
-from apps.moderation.models import ModerationCriteria
 
 # Tuple layout of the criteria returned by _get_cached_criteria() in
 # auto_moderation.py.  Positional order must match the unpacking site.
@@ -47,6 +51,8 @@ def permissive_criteria(monkeypatch) -> None:
         "apps.moderation.services.auto_moderation._is_duplicate_title",
         lambda title, user_id, ad_id, threshold: False,
     )
+    from apps.moderation.models import ModerationCriteria  # noqa: PLC0415
+
     _mock_criteria = MagicMock(spec=ModerationCriteria)
     _mock_criteria.max_ads_per_user = 100
     monkeypatch.setattr(
@@ -70,6 +76,8 @@ def banning_criteria(monkeypatch) -> None:
         "apps.moderation.services.auto_moderation._is_duplicate_title",
         lambda title, user_id, ad_id, threshold: False,
     )
+    from apps.moderation.models import ModerationCriteria  # noqa: PLC0415
+
     _mock_criteria = MagicMock(spec=ModerationCriteria)
     _mock_criteria.max_ads_per_user = 100
     monkeypatch.setattr(
