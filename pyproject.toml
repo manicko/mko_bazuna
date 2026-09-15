@@ -161,6 +161,7 @@ pythonpath = ["src", "src/backend"]
 testpaths = ["src/backend", "src/telegram_bot"]
 addopts = ["--import-mode=importlib", "-ra", "-q"]
 console_output_style = "classic"
+pytest_plugins = ["testing.moderation_fixtures"]
 # register custom markers to avoid PytestUnknownMarkWarning
 markers = [
   "unit: marks tests that require no database (pure unit tests)",

@@ -45,24 +45,6 @@ def seller_id() -> int:
     return user.id
 
 
-@pytest.fixture
-def permissive_criteria(monkeypatch) -> None:
-    """Monkeypatch moderation criteria so auto_moderate passes trivially."""
-    _permissive = (1, 200, 1, 2000, False, 0, 10, (), 100, 0)
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._get_cached_criteria",
-        lambda: _permissive,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._is_duplicate_title",
-        lambda title, user_id, ad_id, threshold: False,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

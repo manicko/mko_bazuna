@@ -24,64 +24,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def permissive_criteria(monkeypatch) -> None:
-    """
-    Monkeypatch _get_cached_criteria to return permissive values.
-
-    All criteria are set wide open so moderation passes trivially:
-    - title: 1-200 chars
-    - description: 1-2000 chars
-    - price not required
-    - 0-10 images allowed
-    - no banned words
-    - max 100 ads per user
-    - 0% duplicate threshold
-    """
-    _permissive = (1, 200, 1, 2000, False, 0, 10, (), 100, 0)
-
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._get_cached_criteria",
-        lambda: _permissive,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._is_duplicate_title",
-        lambda title, user_id, ad_id, threshold: False,
-    )
-
-
-@pytest.fixture
-def banning_criteria(monkeypatch) -> None:
-    """
-    Monkeypatch _get_cached_criteria to include a banned word.
-
-    The banned word "spam" will cause auto_moderate to fail.
-    """
-    _banning = (1, 200, 1, 2000, False, 0, 10, ("spam",), 100, 0)
-
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._get_cached_criteria",
-        lambda: _banning,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._is_duplicate_title",
-        lambda title, user_id, ad_id, threshold: False,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

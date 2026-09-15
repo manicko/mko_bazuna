@@ -36,49 +36,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
-def permissive_criteria(monkeypatch) -> None:
-    """Monkeypatch moderation criteria so the real auto_moderate passes.
-
-    Mirrors the ``permissive_criteria`` fixture in
-    ``telegram_bot/tests/test_ad_create.py``.  This lets the real
-    ``auto_moderate`` run end-to-end (including ``_pass_moderation``
-    which sets PUBLISHED), rather than mocking the whole function.
-
-    Also patches ``ModerationCriteria.get_singleton`` — used by
-    ``set_published()`` in ``moderation_log.py`` — to return a permissive
-    ``max_ads_per_user``.  This is necessary because ``set_published`` reads
-    the value directly from the database, bypassing the cache monkeypatch.
-    Under xdist with ``--reuse-db``, another worker may have lowered the
-    DB value (e.g. to 1) at just the wrong time, causing a spurious
-    ``MaxAdsExceeded``.  Monkeypatching the singleton avoids the race.
-    """
-    _permissive = (1, 200, 1, 2000, False, 0, 10, (), 100, 0)
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._get_cached_criteria",
-        lambda: _permissive,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._is_duplicate_title",
-        lambda title, user_id, ad_id, threshold: False,
-    )
-    # Also patch the DB-level read in set_published() to be race-safe.
-    from unittest.mock import MagicMock
-
-    from apps.moderation.models import ModerationCriteria
-
-    _mock_criteria = MagicMock(spec=ModerationCriteria)
-    _mock_criteria.max_ads_per_user = 100
-    monkeypatch.setattr(
-        "apps.moderation.services.moderation_log.ModerationCriteria.get_singleton",
-        lambda: _mock_criteria,
-    )
-
-
-@pytest.fixture
 def archived_ad(seller, category, city) -> Ad:
     """Create a PUBLISHED ad, then archive it so it can be reactivated."""
     ad = create_test_ad(
