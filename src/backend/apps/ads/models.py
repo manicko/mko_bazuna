@@ -628,6 +628,24 @@ class AdImage(models.Model):
                 name="ck_ad_images_thumb_large_key_format",
             ),
         ]
+        indexes = [
+            models.Index(
+                name="IX_adimages_image",
+                fields=["image"],
+            ),
+            models.Index(
+                name="IX_adimages_thumb_small",
+                fields=["thumbnail_small"],
+            ),
+            models.Index(
+                name="IX_adimages_thumb_medium",
+                fields=["thumbnail_medium"],
+            ),
+            models.Index(
+                name="IX_adimages_thumb_large",
+                fields=["thumbnail_large"],
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"AdImage {self.id} for Ad {self.ad_id}"

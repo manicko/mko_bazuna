@@ -37,6 +37,8 @@ models.Index(
     fields=["listing_condition_id"],
     condition=Q(status=AdStatus.PUBLISHED),
 )  # partial: catalog filter on listing_condition (Plan 12)
+# Advisory (§0.7): IX_ads_pub_condition is documented here but is NOT present in
+# Ad.Meta.indexes. Out of scope for B5 (different model). Do not add as part of this block.
 models.Index(name="IX_ads_user_status", fields=["user_id", "status"])
 models.Index(
     name="IX_ads_price_normalized_eur",
@@ -266,4 +268,12 @@ models.Index(
 ## Indexes — ad_images
 ```python
 models.Index(name="IX_adimages_sha256", fields=["sha256"])  # photo deduplication lookup
+# B-tree on each lookup field for media_gate's OR query across ``image`` /
+# ``thumbnail_small`` / ``thumbnail_medium`` / ``thumbnail_large``
+# (listings.py:169-174). PostgreSQL uses a bitmap scan across these indexes
+# for the OR condition, avoiding sequential scans on ad_images.
+models.Index(name="IX_adimages_image", fields=["image"])
+models.Index(name="IX_adimages_thumb_small", fields=["thumbnail_small"])
+models.Index(name="IX_adimages_thumb_medium", fields=["thumbnail_medium"])
+models.Index(name="IX_adimages_thumb_large", fields=["thumbnail_large"])
 ```
