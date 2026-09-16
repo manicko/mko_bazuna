@@ -48,9 +48,6 @@ def _walk_media_files(media_root: str) -> list[str]:
     files: list[str] = []
     for dirpath, _dirnames, filenames in os.walk(media_root):
         rel_dir = os.path.relpath(dirpath, media_root)
-        if rel_dir == ".":
-            if _SEED_SUBDIR in os.listdir(media_root):
-                pass  # not in the top-level dir, handled below
         # Skip seed directory (and any subdir starting with seed/)
         if rel_dir == _SEED_SUBDIR or rel_dir.startswith(f"{_SEED_SUBDIR}/"):
             continue
