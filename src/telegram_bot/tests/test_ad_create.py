@@ -105,10 +105,18 @@ async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str
     return {loc: f"{text}-{loc}" for loc in target_locales}
 
 
-def _build_photo_message() -> MagicMock:
-    """Build a mock Telegram message containing a single photo upload."""
+def _build_photo_message(file_size: int | None = 1024) -> MagicMock:
+    """Build a mock Telegram message containing a single photo upload.
+
+    Args:
+        file_size: The ``PhotoSize.file_size`` value to set on the mock photo.
+            Defaults to 1024 (within the 2 MB limit) so existing tests proceed
+            past the pre-check. Pass ``None`` to simulate Telegram omitting
+            the field, or an int above the limit to trigger rejection.
+    """
     photo_item = MagicMock()
     photo_item.file_id = "test_file_id"
+    photo_item.file_size = file_size
     message = MagicMock()
     message.text = None
     message.photo = [photo_item]
@@ -281,6 +289,104 @@ class TestProcessPhotos:
         state = _build_state({"photos": [], "user_id": 900000001})
         state.update_data = AsyncMock()
         message = _build_photo_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.download_photo",
+                new=AsyncMock(return_value=b"fake_photo_bytes"),
+            ) as mock_download,
+            patch(
+                "telegram_bot.handlers.ad_create.save_photo",
+                new=AsyncMock(return_value="fake_storage_key"),
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.validate_photo",
+                return_value=(True, None),
+            ),
+        ):
+            await process_photos(message, state)
+
+        mock_download.assert_awaited_once()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "Photo saved" in answer_text
+
+    @pytest.mark.asyncio
+    async def test_file_size_exceeds_limit_rejects_without_download(
+        self, monkeypatch
+    ) -> None:
+        """PhotoSize with file_size > 2MB is rejected before download_photo is called."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        message = _build_photo_message(file_size=3 * 1024 * 1024)
+
+        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+            await process_photos(message, state)
+
+        mock_download.assert_not_called()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "too large" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_file_size_none_falls_through_to_download(
+        self, monkeypatch
+    ) -> None:
+        """PhotoSize with file_size=None falls through to download + validate_photo."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        state.update_data = AsyncMock()
+        message = _build_photo_message(file_size=None)
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.download_photo",
+                new=AsyncMock(return_value=b"fake_photo_bytes"),
+            ) as mock_download,
+            patch(
+                "telegram_bot.handlers.ad_create.save_photo",
+                new=AsyncMock(return_value="fake_storage_key"),
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.validate_photo",
+                return_value=(True, None),
+            ) as mock_validate,
+        ):
+            await process_photos(message, state)
+
+        mock_download.assert_awaited_once()
+        mock_validate.assert_called_once()
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "Photo saved" in answer_text
+
+    @pytest.mark.asyncio
+    async def test_file_size_within_limit_proceeds_normally(
+        self, monkeypatch
+    ) -> None:
+        """PhotoSize with file_size <= 2MB proceeds to download and save."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": 900000001})
+        state.update_data = AsyncMock()
+        message = _build_photo_message(file_size=1024)
 
         with (
             patch(

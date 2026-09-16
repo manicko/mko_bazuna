@@ -46,6 +46,9 @@ from telegram_bot.states import AdCreateState
 
 logger = logging.getLogger(__name__)
 
+# 2 MB — matches the validate_photo limit in filesystem.py (MED-002).
+MAX_PHOTO_BYTES = 2 * 1024 * 1024
+
 
 router = Router()
 
@@ -690,6 +693,14 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
     user_id = data.get("user_id")
     if user_id is not None and not await check_upload_rate_limit(user_id):
         await message.answer("Uploading too fast, please wait a moment.")
+        return
+
+    # Pre-check Telegram-reported file_size before downloading to prevent
+    # memory exhaustion from oversized uploads (MED-002). The post-download
+    # validate_photo size check is retained as defense-in-depth.
+
+    if photo.file_size is not None and photo.file_size > MAX_PHOTO_BYTES:
+        await message.answer("Photo too large. Maximum size is approximately 2MB.")
         return
 
     # Download photo bytes for validation
