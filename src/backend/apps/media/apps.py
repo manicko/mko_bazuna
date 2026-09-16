@@ -24,3 +24,8 @@ class MediaConfig(AppConfig):
         # 2560 × 2560 × 2 = 13,107,200 — twice the max allowed dimension area,
         # allowing a small safety margin above the 2560×2560 policy ceiling.
         Image.MAX_IMAGE_PIXELS = 2560 * 2560 * 2
+
+        # Register signal handlers (pre_delete on AdImage → TX-then-FS file cleanup).
+        # Imported here (deferred to ready) to avoid circular-import issues during
+        # app loading — all apps are loaded by the time ready() is called.
+        import apps.media.signals  # noqa: F401
