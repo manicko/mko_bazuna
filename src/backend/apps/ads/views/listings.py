@@ -22,6 +22,7 @@ from django.http import (
     Http404,
     HttpRequest,
     HttpResponse,
+    HttpResponseBase,
     HttpResponseForbidden,
 )
 from django.shortcuts import render
@@ -103,7 +104,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     return render(request, "ads/detail.html", context)
 
 
-def _serve_image(image_key: str) -> HttpResponse:
+def _serve_image(image_key: str) -> HttpResponseBase:
     """Serve a media file directly (development fallback without nginx.
 
     Uses ``FileResponse`` to stream the file from ``MEDIA_ROOT``.  In production,
@@ -121,7 +122,7 @@ def _serve_image(image_key: str) -> HttpResponse:
     return FileResponse(open(file_path, "rb"), content_type="image/jpeg")
 
 
-def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:
+def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     """
     Media access gate for Ad images and thumbnails.
 
