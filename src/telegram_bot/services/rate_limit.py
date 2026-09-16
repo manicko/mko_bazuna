@@ -117,3 +117,53 @@ def check_contact_start_rate_limit(
         # Key expired between the add/incr calls — treat as a fresh start.
         cache.set(key, 1, timeout=period)
         return True
+
+
+# --- login deep-link limiter ------------------------------------------------
+
+# Maximum login claim attempts per user within the sliding window.
+LOGIN_RATE_LIMIT_REQUESTS: Final[int] = 10
+
+# Sliding window length in seconds.
+LOGIN_RATE_LIMIT_PERIOD: Final[int] = 60
+
+# Cache key pattern keyed by the stable Telegram user_id (cross-chat identity).
+_LOGIN_RATE_LIMIT_KEY_PATTERN: Final[str] = "bot_login_rl:{user_id}"
+
+
+@sync_to_async
+def check_login_rate_limit(
+    user_id: int,
+    limit: int = LOGIN_RATE_LIMIT_REQUESTS,
+    period: int = LOGIN_RATE_LIMIT_PERIOD,
+) -> bool:
+    """Return ``True`` if the user is within the login rate limit.
+
+    Per-user sliding-window limiter for ``/start login_<token>`` claims, using
+    the atomic ``cache.add`` + ``cache.incr`` idiom (identical to
+    ``check_upload_rate_limit`` and ``check_contact_start_rate_limit``).
+    Returns ``False`` when the limit is exceeded.
+
+    Args:
+        user_id: The Telegram user's id (``message.from_user.id``).
+        limit: Max login claims allowed in the window.
+        period: Window length in seconds.
+
+    Returns:
+        ``True`` if the login claim may proceed, ``False`` if rate-limited.
+    """
+    key = _LOGIN_RATE_LIMIT_KEY_PATTERN.format(user_id=user_id)
+
+    try:
+        added = cache.add(key, 1, timeout=period)
+        if added:
+            current = 1
+        else:
+            current = cache.incr(key)
+
+        return current <= limit
+
+    except ValueError:
+        # Key expired between the add/incr calls — treat as a fresh start.
+        cache.set(key, 1, timeout=period)
+        return True

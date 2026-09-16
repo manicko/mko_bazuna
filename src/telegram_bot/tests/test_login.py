@@ -19,15 +19,20 @@ and ``test_login_claim.py`` into a single coherent suite.
 
 import asyncio
 import hashlib
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.users.models import LoginToken
+from telegram_bot.services.rate_limit import (
+    LOGIN_RATE_LIMIT_REQUESTS,
+    check_login_rate_limit,
+)
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -36,6 +41,29 @@ pytestmark = [
     pytest.mark.concurrent,
 ]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
+
+# 32-char token matching LOGIN_PATTERN, used across login rate-limit tests.
+CONSENT_TEST_RAW_TOKEN = "abcdefghijklmnopqrstuvwxyz012345"
+
+
+def _mock_login_message(raw_token: str, user_id: int = 900000200) -> MagicMock:
+    """Build a ``Message`` double for ``handle_login_deep_link`` with a login deep-link."""
+    message = MagicMock()
+    message.text = f"/start login_{raw_token}"
+    message.from_user = MagicMock()
+    message.from_user.id = user_id
+    message.from_user.username = "test_user"
+    message.from_user.first_name = "Test"
+    message.from_user.last_name = "User"
+    message.answer = AsyncMock()
+    return message
+
+
+def _mock_state() -> AsyncMock:
+    """Build an ``FSMContext`` double with an async ``update_data``."""
+    state = AsyncMock()
+    state.update_data = AsyncMock()
+    return state
 
 
 # ---------------------------------------------------------------------------
@@ -392,3 +420,118 @@ class TestConcurrentClaim:
             assert login_token is None
             assert user is None
             assert created is False
+
+
+# ---------------------------------------------------------------------------
+# Login rate-limit integration tests (EXT-007)
+# ---------------------------------------------------------------------------
+
+
+class TestLoginRateLimit:
+    """Integration tests for the per-user login rate limit in ``handle_login_deep_link``."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self) -> Iterator[None]:
+        """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
+        cache.clear()
+        yield
+        cache.clear()
+
+    @pytest.mark.asyncio
+    async def test_login_rate_limit_allows_single_claim(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """A single login claim within the budget is not blocked.
+
+        Verifies the happy path: the rate-limit check passes, the token is
+        claimed, the user is created, and the success message (not the cooldown)
+        is sent.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        raw_token, _token = await login_token_factory(
+            raw_token=CONSENT_TEST_RAW_TOKEN
+        )
+
+        message = _mock_login_message(raw_token, user_id=900000200)
+        await handle_login_deep_link(
+            message=message, bot=MagicMock(), state=_mock_state()
+        )
+
+        # Not rate-limited — received the success message, not the cooldown.
+        message.answer.assert_awaited_once()
+        sent_text = message.answer.await_args.args[0]
+        assert "Too many login attempts" not in sent_text
+        assert "Login successful" in sent_text
+
+    @pytest.mark.asyncio
+    async def test_login_rate_limit_blocks_after_threshold(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """The 11th login claim within 60s is blocked with a cooldown message, no DB claim.
+
+        The first claim succeeds (token claimed, user created); claims 2--10 pass
+        the rate-limit check but fail at the DB claim (token already consumed).
+        The 11th claim is rate-limited *before* ``handle_login_orm`` is invoked,
+        so no DB claim occurs on that call.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        raw_token, _token = await login_token_factory(
+            raw_token=CONSENT_TEST_RAW_TOKEN
+        )
+
+        # Send 10 claims that all pass the rate-limit check.
+        for _ in range(LOGIN_RATE_LIMIT_REQUESTS):
+            msg = _mock_login_message(raw_token, user_id=900000200)
+            await handle_login_deep_link(
+                message=msg, bot=MagicMock(), state=_mock_state()
+            )
+
+        # 11th claim — rate-limited before reaching the ORM.
+        blocked_msg = _mock_login_message(raw_token, user_id=900000200)
+        await handle_login_deep_link(
+            message=blocked_msg, bot=MagicMock(), state=_mock_state()
+        )
+
+        # The 11th call received the cooldown message, not the claim result.
+        blocked_msg.answer.assert_awaited_once()
+        sent_text = blocked_msg.answer.await_args.args[0]
+        assert "Too many login attempts" in sent_text
+
+    @pytest.mark.asyncio
+    async def test_login_rate_limit_does_not_block_non_login_start(self) -> None:
+        """A ``/start`` without a ``login_`` deep-link does not consume the login budget.
+
+        After exhausting 10 login rate-limit slots, a plain ``/start`` (welcome
+        greeting path) is unaffected — it returns before the rate-limit check
+        and does not consume a slot.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        # Exhaust the login rate-limit budget directly.
+        for _ in range(LOGIN_RATE_LIMIT_REQUESTS):
+            assert await check_login_rate_limit(900000300) is True
+
+        # /start with no args → welcome greeting (returns before rate-limit check).
+        message = MagicMock()
+        message.text = "/start"
+        message.from_user = MagicMock()
+        message.from_user.id = 900000300
+        message.answer = AsyncMock()
+
+        with patch(
+            "telegram_bot.handlers.login.get_site_name_async",
+            new=AsyncMock(return_value="TestSite"),
+        ):
+            await handle_login_deep_link(
+                message=message, bot=MagicMock(), state=_mock_state()
+            )
+
+        # Not blocked — received the welcome greeting, not the cooldown.
+        message.answer.assert_awaited_once()
+        sent_text = message.answer.await_args.args[0]
+        assert "Too many login attempts" not in sent_text
+        assert "Welcome" in sent_text

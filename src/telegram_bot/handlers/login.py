@@ -22,6 +22,7 @@ from apps.core.enums import AnalyticsEventType
 from apps.core.services.analytics import record_event
 from apps.core.services.site_config import get_site_name_async
 from apps.users.models import LoginToken, User
+from telegram_bot.services.rate_limit import check_login_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,17 @@ async def handle_login_deep_link(
     if not match:
         await message.answer(
             _("Invalid login link format. Expected: /start login_<token>")
+        )
+        return
+
+    # Rate-limit login deep-link claims to prevent DB UPDATE flooding (EXT-007).
+    if not await check_login_rate_limit(message.from_user.id):
+        logger.warning(
+            "Login rate limit exceeded for telegram_id=%s",
+            message.from_user.id,
+        )
+        await message.answer(
+            _("Too many login attempts. Please wait a minute and try again.")
         )
         return
 
