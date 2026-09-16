@@ -4,12 +4,15 @@ Media filesystem utilities for image validation and storage.
 Validates photos and generates storage keys per spec.
 """
 
+import errno
 import io
 import logging
 import os
+import shutil
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from PIL import Image, ImageOps
@@ -24,11 +27,59 @@ JPEG_MAGIC_BYTES = [b"\xff\xd8\xff"]
 # Matches: <two-alnum><alnum-or-._->* optionally followed by
 # (/<two-alnum><alnum-or-._->*)* then .jpg
 # Examples: "abc12345-...-uuid.jpg", "seed/kvartiry_01.jpg",
-# "seed/kvartiry_01-small.jpg", "<uuid>-small.jpg"
+# "seed/kvartiry_01-small.jpg", "<uuid>-small.jpg",
+# "staging/<uuid>.jpg", "staging/<uuid>-small.jpg"
 KEY_FORMAT_REGEX = (
     r"^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9._-]*"
     r"(/[A-Za-z0-9][A-Za-z0-9._-]*)*\.jpg$"
 )
+
+# Staging subdirectory for in-flight uploads. Files live here between upload
+# and ad submission, protected from the orphan sweep by TTL reclamation.
+STAGING_SUBDIR = "staging"
+STAGING_PREFIX = f"{STAGING_SUBDIR}/"
+
+
+def move_staging_to_permanent(photos: list[dict[str, Any]]) -> None:
+    """Promote in-flight staging files to permanent MEDIA_ROOT storage.
+
+    Iterates every key field on each photo dict (``storage_key`` and all
+    ``thumbnail_*`` variants), strips the ``staging/`` prefix, and atomically
+    renames the file from ``staging/<key>`` to ``<key>``.  Keys that do not
+    carry the staging prefix (e.g. seed data or test fixtures that write
+    directly to permanent storage) are left untouched.
+
+    Uses ``os.replace`` (atomic on the same filesystem) with a
+    ``shutil.move`` fallback for the ``EXDEV`` cross-filesystem edge case.
+
+    The caller is responsible for running this *before* any
+    ``transaction.atomic()`` block so that a DB rollback leaves the permanent
+    files as unreferenced orphans (reclaimed by the normal orphan sweep)
+    rather than re-desynchronising the filesystem and database.
+
+    Args:
+        photos: List of photo dicts (as built by the FSM ``process_photos``
+            handler).  Modified **in place** — each staging key is replaced
+            with its permanent counterpart.
+    """
+    key_fields = ("storage_key", "thumbnail_small", "thumbnail_medium", "thumbnail_large")
+    for photo in photos:
+        for field in key_fields:
+            key = photo.get(field)
+            if not key or not key.startswith(STAGING_PREFIX):
+                continue
+            permanent_key = key.removeprefix(STAGING_PREFIX)
+            staging_path = os.path.join(settings.MEDIA_ROOT, key)
+            permanent_path = os.path.join(settings.MEDIA_ROOT, permanent_key)
+            if os.path.exists(staging_path):
+                try:
+                    os.replace(staging_path, permanent_path)
+                except OSError as exc:
+                    if exc.errno == errno.EXDEV:
+                        shutil.move(staging_path, permanent_path)
+                    else:
+                        raise
+            photo[field] = permanent_key
 
 
 def assert_storage_key_contained(storage_key: str) -> None:

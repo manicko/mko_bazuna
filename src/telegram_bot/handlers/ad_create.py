@@ -30,6 +30,7 @@ from apps.core.services.translation import translate_text
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.media.services.filesystem import (
+    STAGING_PREFIX,
     delete_photo,
     generate_storage_key,
     strip_photo_exif,
@@ -1034,6 +1035,11 @@ async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
 
     Strips EXIF/metadata and re-encodes the image before persisting to disk.
 
+    Files are written to the ``staging/`` subdirectory of ``MEDIA_ROOT`` so
+    that in-flight uploads are protected from the orphan sweep.  The returned
+    key carries the ``staging/`` prefix and is promoted to permanent storage
+    by ``submit_ad`` before AdImage rows are created.
+
     Uses ``os.open`` with ``O_CREAT|O_EXCL`` to guarantee atomic writes; on
 
     ``FileExistsError`` regenerates the storage key and retries.
@@ -1042,6 +1048,8 @@ async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
     Returns:
 
         The final storage key used (may differ from the input on collision).
+        The key carries the ``staging/`` prefix — ``submit_ad`` promotes it to
+        permanent storage before creating AdImage rows.
 
     """
 
@@ -1062,12 +1070,13 @@ async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
     key = storage_key
 
     while True:
-        media_path = os.path.join(settings.MEDIA_ROOT, key)
+        staging_key = f"{STAGING_PREFIX}{key}"
+        media_path = os.path.join(settings.MEDIA_ROOT, staging_key)
 
         try:
             await asyncio.to_thread(_write, media_path, photo_bytes)
 
-            return key
+            return staging_key
 
         except FileExistsError:
             logger.warning(f"Storage key collision: {key}, regenerating")

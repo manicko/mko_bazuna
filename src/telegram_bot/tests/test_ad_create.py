@@ -597,6 +597,66 @@ class TestCancelAfterSubmit:
             # Non-DRAFT path logs the skip
             assert "Cancel skipped" in caplog.text
 
+    @pytest.mark.asyncio
+    async def test_cancel_draft_deletes_staging_key(
+        self, seller_id: int, tmp_path
+    ) -> None:
+        """cmd_cancel on a DRAFT ad deletes staging files from FSM state.
+
+        When the seller aborts mid-flow, the staging keys stored in FSM state
+        are deleted via ``delete_photo`` — which is path-agnostic and handles
+        the ``staging/`` prefix.
+        """
+        from pathlib import Path
+
+        from django.test import override_settings
+
+        from apps.core.enums import AdStatus
+        from apps.media.services.filesystem import STAGING_PREFIX
+        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+
+        media_root = Path(str(tmp_path))
+
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            ad = await create_draft_ad(user_id=seller_id)
+            assert ad.status == AdStatus.DRAFT
+
+            # Create a staging file as if save_photo had written it
+            staging_file = media_root / STAGING_PREFIX / "test-photo.jpg"
+            staging_file.parent.mkdir(parents=True, exist_ok=True)
+            staging_file.write_bytes(b"staging data")
+
+            # FSM state with a staging key (as process_photos would store)
+            cancel_state = _build_state(
+                {
+                    "ad_id": ad.id,
+                    "photos": [
+                        {
+                            "storage_key": f"{STAGING_PREFIX}test-photo.jpg",
+                            "telegram_file_id": "test_file_id",
+                            "position": 0,
+                        }
+                    ],
+                }
+            )
+
+            cancel_msg = MagicMock()
+            cancel_msg.answer = AsyncMock()
+
+            await cmd_cancel(cancel_msg, cancel_state)
+
+            # Staging file was deleted by delete_photo
+            assert not staging_file.exists(), (
+                "staging file was not deleted by cmd_cancel"
+            )
+
+            # Ad was deleted from DB (delete_draft ran)
+            from apps.ads.models import Ad
+
+            assert not await sync_to_async(
+                lambda: Ad.objects.filter(id=ad.id).exists()
+            )()
+
 
 # ---------------------------------------------------------------------------
 # MED-001: delete_draft must clean up all storage_keys (image + thumbnails)

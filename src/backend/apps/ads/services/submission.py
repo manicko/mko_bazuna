@@ -28,6 +28,7 @@ from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
+from apps.media.services.filesystem import move_staging_to_permanent
 from apps.media.services.thumbnails import ThumbnailService
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,13 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
             photo["thumbnail_small"] = None
             photo["thumbnail_medium"] = None
             photo["thumbnail_large"] = None
+
+    # Promote staging files to permanent storage BEFORE the transaction.
+    # Thumbnailing already wrote staging/<uuid>-*.jpg variants; this moves the
+    # original + all thumbnails to permanent MEDIA_ROOT so AdImage rows (in the
+    # TX below) reference permanent keys.  On DB rollback the permanent files
+    # become unreferenced orphans reclaimed by the normal orphan sweep.
+    move_staging_to_permanent(input.photos)
 
     # DB transaction: save + images + status transition
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped

@@ -100,3 +100,25 @@ class TestSavePhotoExifStripping:
         assert written_bytes != jpeg_with_exif, (
             "EXIF was not stripped from written bytes"
         )
+
+    def test_save_photo_writes_to_staging_subdir(
+        self, tmp_path, jpeg_with_exif
+    ):
+        """save_photo writes to the staging/ subdir and returns a staging key."""
+        from apps.media.services.filesystem import STAGING_PREFIX
+
+        media_root = tmp_path / "media"
+        media_root.mkdir()
+        with override_settings(MEDIA_ROOT=str(media_root)):
+            storage_key = asyncio.run(
+                save_photo("test-stg.jpg", jpeg_with_exif)
+            )
+
+        # Returned key carries the staging prefix
+        assert storage_key == f"{STAGING_PREFIX}test-stg.jpg"
+
+        # File written inside staging/ subdir (not flat in MEDIA_ROOT)
+        assert (media_root / STAGING_PREFIX / "test-stg.jpg").exists()
+        assert not (media_root / "test-stg.jpg").exists(), (
+            "file should be in staging/, not flat in MEDIA_ROOT"
+        )

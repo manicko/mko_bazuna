@@ -162,3 +162,173 @@ class TestSavePhotoThumbnailsIntegration:
         assert ad_image.thumbnail_small is None
         assert ad_image.thumbnail_medium is None
         assert ad_image.thumbnail_large is None
+
+
+class TestSubmitAdStagingMove:
+    """submit_ad promotes staging files to permanent storage before the TX.
+
+    Files written by ``save_photo`` to ``MEDIA_ROOT/staging/`` must be moved
+    to permanent storage by ``submit_ad`` *before* the ``transaction.atomic()``
+    block, so that AdImage rows reference permanent keys (never staging keys).
+    On TX rollback, the permanent files become unreferenced orphans — the
+    normal orphan sweep reclaims them.
+    """
+
+    @pytest.mark.asyncio
+    async def test_submit_ad_moves_staging_to_permanent(
+        self, user, tmp_path
+    ) -> None:
+        """Staging files (original + thumbnails) are moved to permanent MEDIA_ROOT;
+        AdImage rows reference permanent keys."""
+        from apps.ads.models import AdImage
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import STAGING_PREFIX
+        from telegram_bot.handlers.ad_create import create_draft_ad
+
+        media_root = tmp_path
+
+        with override_settings(MEDIA_ROOT=str(media_root)):
+            ad = await create_draft_ad(user_id=user.id)
+
+            photo_bytes = _make_test_image(800, 600)
+            storage_key = f"{STAGING_PREFIX}photo.jpg"
+            staging_dir = media_root / STAGING_PREFIX
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            (staging_dir / "photo.jpg").write_bytes(photo_bytes)
+
+            photos = [
+                {
+                    "storage_key": storage_key,
+                    "telegram_file_id": "AgADBQ",
+                    "position": 0,
+                }
+            ]
+
+            with patch(
+                "apps.moderation.services.auto_moderation.auto_moderate",
+                return_value=True,
+            ):
+                passed, errors = await sync_to_async(submit_ad)(
+                    SubmitAdInput(
+                        ad_id=ad.id,
+                        title_ru="Title",
+                        desc_ru="Description",
+                        category_id=None,
+                        city_id=None,
+                        price_amount=100,
+                        price_currency=CurrencyCode.EUR,
+                        photos=photos,
+                        user_id=user.id,
+                    )
+                )
+
+            assert passed is True
+            assert errors == []
+
+            # Original moved from staging/ to permanent
+            assert (media_root / "photo.jpg").is_file(), (
+                "original not moved to permanent"
+            )
+            assert not (media_root / STAGING_PREFIX / "photo.jpg").exists(), (
+                "staging original still exists after move"
+            )
+
+            # All thumbnail variants also moved from staging/ to permanent
+            for suffix in ("small", "medium", "large"):
+                assert (media_root / f"photo-{suffix}.jpg").is_file(), (
+                    f"thumbnail {suffix} not moved to permanent"
+                )
+                assert not (
+                    media_root / STAGING_PREFIX / f"photo-{suffix}.jpg"
+                ).exists(), (
+                    f"staging thumbnail {suffix} still exists after move"
+                )
+
+            # AdImage references permanent keys (not staging)
+            ad_image = await sync_to_async(AdImage.objects.get)(ad=ad)
+            assert ad_image.image == "photo.jpg"
+            assert not ad_image.image.startswith(STAGING_PREFIX)
+            assert ad_image.thumbnail_small == "photo-small.jpg"
+            assert ad_image.thumbnail_medium == "photo-medium.jpg"
+            assert ad_image.thumbnail_large == "photo-large.jpg"
+
+    @pytest.mark.asyncio
+    async def test_submit_ad_rollback_leaves_permanent_orphans(
+        self, user, tmp_path
+    ) -> None:
+        """On TX rollback, permanent files are left as unreferenced orphans.
+
+        ``move_staging_to_permanent`` runs before ``transaction.atomic()``;
+        if the TX rolls back (e.g. auto_moderate raises), the permanent files
+        are already on disk but no AdImage rows were created.  The normal
+        orphan sweep would reclaim them.
+        """
+        from apps.ads.models import AdImage
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.core.enums import AdStatus
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import STAGING_PREFIX
+        from telegram_bot.handlers.ad_create import create_draft_ad
+
+        media_root = tmp_path
+
+        with override_settings(MEDIA_ROOT=str(media_root)):
+            ad = await create_draft_ad(user_id=user.id)
+
+            photo_bytes = _make_test_image(800, 600)
+            storage_key = f"{STAGING_PREFIX}photo.jpg"
+            staging_dir = media_root / STAGING_PREFIX
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            (staging_dir / "photo.jpg").write_bytes(photo_bytes)
+
+            photos = [
+                {
+                    "storage_key": storage_key,
+                    "telegram_file_id": "AgADBQ",
+                    "position": 0,
+                }
+            ]
+
+            with patch(
+                "apps.moderation.services.auto_moderation.auto_moderate",
+                side_effect=RuntimeError("simulated moderation failure"),
+            ):
+                with pytest.raises(RuntimeError, match="simulated moderation failure"):
+                    await sync_to_async(submit_ad)(
+                        SubmitAdInput(
+                            ad_id=ad.id,
+                            title_ru="Title",
+                            desc_ru="Description",
+                            category_id=None,
+                            city_id=None,
+                            price_amount=100,
+                            price_currency=CurrencyCode.EUR,
+                            photos=photos,
+                            user_id=user.id,
+                        )
+                    )
+
+            # Permanent files exist on disk (moved before TX, TX rolled back)
+            assert (media_root / "photo.jpg").is_file(), (
+                "permanent original should exist after rollback"
+            )
+            assert not (media_root / STAGING_PREFIX / "photo.jpg").exists(), (
+                "staging original should have been moved before TX rollback"
+            )
+
+            # Thumbnail files also moved to permanent (orphans after rollback)
+            for suffix in ("small", "medium", "large"):
+                assert (media_root / f"photo-{suffix}.jpg").is_file(), (
+                    f"permanent thumbnail {suffix} should exist after rollback"
+                )
+
+            # No AdImage rows created (TX rolled back)
+            count = await sync_to_async(
+                lambda: AdImage.objects.filter(ad=ad).count()
+            )()
+            assert count == 0, "AdImage rows should not exist after rollback"
+
+            # Ad stays DRAFT (status transition was inside the TX)
+            await sync_to_async(ad.refresh_from_db)()
+            assert ad.status == "DRAFT" or ad.status == AdStatus.DRAFT

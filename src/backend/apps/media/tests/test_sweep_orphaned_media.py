@@ -13,6 +13,7 @@ Uses an isolated temporary MEDIA_ROOT with real files on disk.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -24,6 +25,7 @@ from django.test import override_settings
 
 from apps.ads.models import AdImage
 from apps.core.enums import AdStatus
+from apps.media.services.filesystem import STAGING_SUBDIR
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -156,3 +158,53 @@ class TestSweepOrphanedMedia:
         # File still exists because the spy is a no-op (real delete_photo
         # would have removed it)
         assert (isolated_media_root / key).exists()
+
+    def test_staging_file_survives_sweep(
+        self, seller, category, city, isolated_media_root
+    ):
+        """In-flight uploads in staging/ are protected from the orphan sweep."""
+        staging_dir = isolated_media_root / STAGING_SUBDIR
+        staging_dir.mkdir()
+        staging_file = staging_dir / "in-flight.jpg"
+        staging_file.write_bytes(b"in-flight")
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media")
+
+        # Staging file is NOT deleted (excluded from the orphan sweep)
+        assert staging_file.exists(), "staging file was deleted by the sweep"
+        assert staging_file.read_bytes() == b"in-flight"
+
+    def test_stale_staging_file_reclaimed(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Staging files older than the 2-hour TTL are reclaimed by the sweep."""
+        staging_dir = isolated_media_root / STAGING_SUBDIR
+        staging_dir.mkdir()
+        stale_file = staging_dir / "stale.jpg"
+        stale_file.write_bytes(b"stale")
+
+        # Set mtime to 3 hours ago (beyond the 2-hour TTL)
+        stale_mtime = os.path.getmtime(stale_file) - (3 * 60 * 60)
+        os.utime(stale_file, (stale_mtime, stale_mtime))
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media")
+
+        # Stale staging file IS deleted (beyond TTL)
+        assert not stale_file.exists(), "stale staging file was not reclaimed"
+
+    def test_fresh_staging_file_preserved(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Fresh staging files (within TTL) are preserved by the sweep."""
+        staging_dir = isolated_media_root / STAGING_SUBDIR
+        staging_dir.mkdir()
+        fresh_file = staging_dir / "fresh.jpg"
+        fresh_file.write_bytes(b"fresh")
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media")
+
+        # Fresh staging file IS preserved (within TTL)
+        assert fresh_file.exists(), "fresh staging file was incorrectly reclaimed"
