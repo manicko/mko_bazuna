@@ -15,7 +15,6 @@ translation service — search runs per-language on pre-translated FTS vectors
 """
 
 import hashlib
-import hmac
 import logging
 import secrets
 from datetime import timedelta
@@ -386,10 +385,6 @@ def login_status(request: HttpRequest) -> HttpResponse:
         try:
             token = LoginToken.objects.get(token_hash=token_hash)
         except LoginToken.DoesNotExist:
-            return HttpResponse(status=410)
-
-        # Constant-time comparison (spec: spec-index.md:75, db-schema.md:86)
-        if not hmac.compare_digest(token.token_hash, token_hash):
             return HttpResponse(status=410)
 
         # Token expired or already consumed — gone

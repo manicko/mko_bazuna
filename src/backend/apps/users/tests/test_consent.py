@@ -319,6 +319,13 @@ class TestLoginStatusNoPii:
         # Masked value should be present for log correlation
         assert "tg_" in caplog.text
 
+    def test_invalid_token_returns_410(self) -> None:
+        """A random token whose hash matches no DB row returns 410 (DoesNotExist)."""
+        client = Client()
+        response = client.post("/login/status/", {"token": "z" * 32})
+
+        assert response.status_code == 410
+
 
 # ---------------------------------------------------------------------------
 # Tests: consent banner guard for deleted users (PII-009)
