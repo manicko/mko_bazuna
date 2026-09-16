@@ -111,18 +111,52 @@ class Command(BaseCommand):
         "multi-language ad search vectors"
     )
 
+    def add_arguments(self, parser) -> None:
+        """Register the ``--backfill`` opt-in flag.
+
+        When set, the command runs a one-time ``UPDATE ads SET title = title``
+        after installing the DDL so that any pre-existing rows with NULL search
+        vectors are recomputed by the trigger.
+        """
+        parser.add_argument(
+            "--backfill",
+            action="store_true",
+            default=False,
+            help="After installing triggers, backfill NULL search vectors for existing rows.",
+        )
+
     def handle(self, *args, **options) -> None:
         """Execute all DDL statements against the database.
 
         Each statement is wrapped in its own transaction savepoint so that a
         failure aborts only the offending statement while earlier ones remain
         committed (raw DDL via ``connection.cursor``).
+
+        When ``--backfill`` is set, an ``UPDATE ads SET title = title`` is run
+        after the DDL so the trigger recomputes any NULL per-language search
+        vectors for existing rows.
         """
         for label, sql in DDL_STATEMENTS:
             with connection.cursor() as cursor:
                 cursor.execute(sql)
             logger.info("Installed %s", label)
             self.stdout.write(self.style.SUCCESS(f"Installed {label}"))
+
+        if options["backfill"]:
+            backfill_sql = (
+                "UPDATE ads "
+                "SET title = title "
+                "WHERE search_vector_ru IS NULL "
+                "OR search_vector_bs IS NULL "
+                "OR search_vector_en IS NULL"
+            )
+            with connection.cursor() as cursor:
+                cursor.execute(backfill_sql)
+                updated = cursor.rowcount
+            logger.info("Backfilled search vectors for %d rows", updated)
+            self.stdout.write(
+                self.style.SUCCESS(f"Backfilled search vectors for {updated} rows")
+            )
 
         self.stdout.write(
             self.style.SUCCESS(

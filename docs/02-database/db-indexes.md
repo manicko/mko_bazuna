@@ -182,9 +182,15 @@ CREATE TRIGGER on_category_name_update
 > category renames / `name_i18n` edits. The trigger fires on `name_i18n` updates so localized
 > category name changes re-index all affected ads.
 
-**Migration notes:** one-time `UPDATE ads SET title = title` to backfill the per-language vectors
-for existing rows (seed uses `bulk_create`, bypassing the trigger). O(n_ads) per category rename —
-acceptable for ~30-50 categories.
+**Migration notes:** after installing the trigger DDL, run the backfill opt-in to recompute NULL per-language vectors for pre-existing rows (seed uses `bulk_create`, bypassing the trigger):
+
+```bash
+python manage.py setup_search_triggers --backfill
+```
+
+This runs `UPDATE ads SET title = title WHERE search_vector_ru IS NULL OR search_vector_bs IS NULL OR search_vector_en IS NULL`, which fires the `ads_search_vector_fn` trigger to repopulate any NULL vectors. The `--backfill` flag is opt-in (default off) so that `migrate_locked.py` — which calls `setup_search_triggers` without arguments — remains DDL-only during normal bootstrapping.
+
+**Fallback (manual):** for environments where the management command is unavailable, the equivalent raw SQL is `UPDATE ads SET title = title` (no `WHERE` clause re-indexes all rows). O(n_ads) per category rename — acceptable for ~30-50 categories.
 
 ## Indexes — analytics_events
 ```python
