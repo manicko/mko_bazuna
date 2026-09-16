@@ -220,6 +220,9 @@ __marimo__/
 docker/nginx/certs/*.pem
 !docker/nginx/certs/.gitkeep
 
+# Local test/dev artifacts (mkcert dev certs, tmp files, etc.) — never commit private keys
+.tmp/
+
 # Script-specific config with API keys (never commit)
 scripts/seed-images-config.json
 src/backend/apps/seed/fixtures/images/*.jpg
