@@ -1,13 +1,12 @@
 """Shared moderation test fixtures for permissive/banning criteria.
 
-Registered as a pytest plugin via the module-level ``pytest_plugins`` variable
-in each test tree's conftest file:
-
-- ``src/backend/conftest.py`` (backend tree)
-- ``src/telegram_bot/tests/conftest.py`` (bot tree)
+Registered as a pytest plugin via the ``pytest_plugins`` variable in the
+root ``conftest.py`` (project root), making it available to both the
+backend (``src/backend``) and bot (``src/telegram_bot``) test trees
+regardless of which ``testpaths`` are collected.
 
 This is the only mechanism pytest recognizes for in-tree plugin registration.
-The conftest-level ``pytest_plugins`` is processed during initial conftest
+The root-conftest-level ``pytest_plugins`` is processed during initial conftest
 loading — after ``django.setup()`` has completed (pytest-django's
 ``pytest_load_initial_conftests`` hook with ``tryfirst=True`` runs before
 conftest import), making it safe for Django model imports.

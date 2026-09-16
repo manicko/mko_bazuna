@@ -8,8 +8,6 @@ in ``test_rate_limit_service.py``.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
 import pytest
 from django.core.cache import cache
 
@@ -18,15 +16,7 @@ from telegram_bot.services.rate_limit import (
     check_login_rate_limit,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.django_db]
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache() -> Iterator[None]:
-    """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
-    cache.clear()
-    yield
-    cache.clear()
+pytestmark = [pytest.mark.unit]
 
 
 class TestCheckLoginRateLimit:

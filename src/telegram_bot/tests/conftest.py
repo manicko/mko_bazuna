@@ -8,7 +8,7 @@ enabling handler tests against the real PostgreSQL ORM (two-process contract).
 import hashlib
 import threading
 from collections.abc import Awaitable, Callable, Iterator
-from typing import Any, Final
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -259,46 +259,35 @@ def _reap_stale_backends_session() -> Iterator[None]:
     _close_all_thread_connections()
 
 
-# All editable ModerationCriteria fields (excludes id, updated_at, updated_by).
-_CRITERIA_FIELDS: Final[tuple[str, ...]] = (
-    "title_min_length",
-    "title_max_length",
-    "description_min_length",
-    "description_max_length",
-    "price_required",
-    "min_images",
-    "max_images",
-    "banned_words",
-    "max_ads_per_user",
-    "duplicate_title_threshold",
-)
+# ---------------------------------------------------------------------------
+# Cache isolation between bot tests
+#
+# Bot tests live outside the ``src/backend/`` conftest discovery path (tree
+# ancestors: src/telegram_bot/tests -> src/telegram_bot -> src -> root, none
+# of which is src/backend), so the backend root conftest's
+# ``_clear_cache_between_tests`` does not apply here.  This re-implements the
+# same DB-free pattern: ``cache.clear()`` before and after each test.
+#
+# The LocMem cache (test settings, config/settings/test.py) is process-level
+# and NOT transactional — it survives pytest-django's per-test rollback/TRUNCATE,
+# so cache state must be cleared explicitly.  Unlike the save-and-restore
+# pattern previously used here (``_reset_moderation_criteria``), this fixture
+# performs NO database I/O, making it safe for unit tests marked
+# ``pytest.mark.unit`` without ``@pytest.mark.django_db``.  The ModerationCriteria
+# save-and-restore was redundant: pytest-django's TestCase (savepoint rollback)
+# and TransactionTestCase (TRUNCATE) both restore DB state; only cache
+# invalidation is essential.
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
-def _reset_moderation_criteria():
-    """Restore all ModerationCriteria fields after each bot test (save-and-restore).
+def _clear_cache_between_tests() -> Iterator[None]:
+    """Clear the LocMem cache before and after each bot test.
 
-    Save-and-restore pattern: snapshot every criteria field before the test
-    runs, then after ``yield`` call ``cache.clear()`` and restore the original
-    values via ``QuerySet.update()``. The ``cache.clear()`` is required because
-    ``update()`` bypasses the ``post_save`` signal
-    (``invalidate_criteria_cache_on_save``) that would normally invalidate the
-    LocMem cache, so without it ``_get_cached_criteria`` could return stale
-    values for up to the 5-minute TTL.
-
-    Bot tests live outside the ``src/backend/`` conftest discovery path, so the
-    root backend ``_clear_cache_between_tests`` fixture does not apply here;
-    ``cache.clear()`` is performed inline in this teardown instead.
+    Re-implements the backend root conftest's DB-free
+    ``_clear_cache_between_tests`` for the bot test tree, which cannot
+    inherit it due to conftest directory-tree isolation.
     """
-    from apps.moderation.models import ModerationCriteria
-
-    snapshot = dict(
-        ModerationCriteria.objects.filter(pk=1)
-        .values(*_CRITERIA_FIELDS)
-        .first()
-        or {}
-    )
+    cache.clear()
     yield
     cache.clear()
-    if snapshot:
-        ModerationCriteria.objects.filter(pk=1).update(**snapshot)

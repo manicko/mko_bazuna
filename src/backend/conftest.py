@@ -28,8 +28,6 @@ from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
 
-pytest_plugins = ("testing.moderation_fixtures",)
-
 # ---------------------------------------------------------------------------
 # i18n testing standard (Spec 07)
 #

@@ -24,11 +24,6 @@ pytestmark = [
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def seller_id() -> int:
     """Create a minimal seller user and return its ID."""
@@ -43,37 +38,6 @@ def seller_id() -> int:
         password="x",
     )
     return user.id
-
-
-@pytest.fixture
-def permissive_criteria(monkeypatch) -> None:
-    """Monkeypatch moderation criteria so ``auto_moderate`` passes trivially.
-
-    Mirrors the plugin-provided fixture from ``testing.moderation_fixtures``
-    so this test module runs standalone when collected with a file path
-    (bot tests live outside ``src/backend/`` and do not inherit the root
-    conftest's ``pytest_plugins`` directive).
-    """
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._get_cached_criteria",
-        lambda: (1, 200, 1, 2000, False, 0, 10, (), 100, 0),
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
-    )
-    monkeypatch.setattr(
-        "apps.moderation.services.auto_moderation._is_duplicate_title",
-        lambda title, user_id, ad_id, threshold: False,
-    )
-    from apps.moderation.models import ModerationCriteria  # noqa: PLC0415
-
-    _mock_criteria = MagicMock(spec=ModerationCriteria)
-    _mock_criteria.max_ads_per_user = 100
-    monkeypatch.setattr(
-        "apps.moderation.services.moderation_log.ModerationCriteria.get_singleton",
-        lambda: _mock_criteria,
-    )
 
 
 # ---------------------------------------------------------------------------
