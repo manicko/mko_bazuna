@@ -23,9 +23,9 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
   and re-derivable via the advisory-locked `recompute_normalized_prices` management command. Both
   processes read rates from the shared DB. See
-  [`db-schema`](../../02-database/db-schema.md) ([`db-enums`](../../02-database/db-enums.md),
-  [`db-indexes`](../../02-database/db-indexes.md)).
-- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. See [migration-workflow](../../ops/migration-workflow.md).
+  [`db-schema`](../02-database/db-schema.md) ([`db-enums`](../02-database/db-enums.md),
+  [`db-indexes`](../02-database/db-indexes.md)).
+- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. See [migration-workflow](../ops/migration-workflow.md).
 
 ## Commands
 
@@ -72,7 +72,7 @@ Docker Compose processes environment variables in two phases that are frequently
 1. **Parse-time interpolation** (`--env-file` CLI flag): The `--env-file .env.test` /
    `.env.dev` / `.env.prod` flag supplies values for `${VAR}` substitution **in the Compose YAML
    itself**. For example, `DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`
-   in [`docker-compose.yml`](../docker-compose.yml) is resolved to a literal string at parse
+   in [`docker-compose.yml`](../../docker-compose.yml) is resolved to a literal string at parse
    time. `--env-file` values are **NOT** injected into the container's runtime environment — they
    only feed interpolation of `${VAR}` placeholders in `environment:` blocks. The `Makefile`
    wires this per tier (e.g. line 11: `COMPOSE_TEST := --env-file .env.test -f

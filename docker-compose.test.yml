@@ -20,9 +20,17 @@
 #   - When merging compose files, `env_file:` lists are concatenated: the base
 #     compose's `env_file:` entries and this override's `.env.test` are both
 #     loaded, with the later file winning on key conflicts. `environment:` keys
-#     take precedence over `env_file:` keys. `volumes:` lists are also
-#     concatenated -- use `!override` (as done for migrate/bot/web/seed below) to
-#     replace them rather than append onto the base volumes.
+#     take precedence over `env_file:` keys. `volumes:` entries are merged by
+#     target path — a bind-mount with the same target in the override replaces
+#     the base entry. This is why the `!override` tag is used for migrate,
+#     create_admin, bot, web, load_cities, load_catalog, and seed: it forces
+#     full replacement of the base `volumes:` list so the `.env.dev` bind-mount
+#     is never retained.
+#   - Advisory: `env_file:` lists also concatenate (.env.dev + .env.test). This is
+#     safe today because variable names are identical in both files and `environment:`
+#     keys take precedence. For stricter isolation, each service could use
+#     `env_file: !override [.env.test]` to load only the test file. Not applied
+#     here to avoid changing established merge behavior.
 
 services:
   # Override db service for test: long-running, persistent PostgreSQL.
