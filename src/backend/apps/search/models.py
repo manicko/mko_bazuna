@@ -73,7 +73,10 @@ class SavedSearch(models.Model):
     query = models.TextField(
         blank=True,
         null=True,
-        help_text="FTS query string (translated to Russian if Bosnian input)",
+        help_text=(
+            "FTS query string stored in the user's language; matched against "
+            "the per-language search vector (no query-time translation)"
+        ),
     )
     city = models.ForeignKey(
         "locations.City",

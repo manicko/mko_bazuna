@@ -63,7 +63,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **City:** seller picks from a preset closed list of Montenegro cities. Unrecognized city → "general / no city", not searchable by city.
 - **Categories are NOT user-defined.** Closed tree set by admin (django-mptt is the single source of truth). Bot suggests top 3–5 by keyword, requires explicit seller confirmation. Free-text as new category is **rejected**; choice only from suggested or full tree.
 - i18n names (zone D2): `name` in Russian; Montenegrin in `name_i18n` JSONB — see column detail in [db-schema.md](../02-database/db-schema.md). UI uses `get_name(locale)` with Russian fallback.
-- **Category-name search is REQUIRED in phase 1 (zone D1 / O5, hybrid C):** `category_name` is denormalized into `ads.category_name` and included in `search_vector` (weight 'C') + app-level fuzzy detect (`difflib`) sets `category_id` filter for single-word queries. Montenegrin query is translated to Russian before search, so it matches the Russian category name.
+- **Category-name search is REQUIRED in phase 1 (zone D1 / O5, hybrid C):** `category_name` is denormalized into `ads.category_name` and included in `search_vector` (weight 'C') + app-level fuzzy detect (`difflib`) sets `category_id` filter for single-word queries. The query matches the locale-appropriate category name directly (via `Category.get_name(locale)` in the per-language FTS vector at weight 'C') — no query-time translation (see zone G).
 - Preset tree (recommendation):
   - **Goods:** Electronics, Clothing, Children, Furniture, Tools, Sport, Books, Other
   - **Services:** Repair, Translation, Tutors, Courses, Beauty, Transport, Freelance, Other

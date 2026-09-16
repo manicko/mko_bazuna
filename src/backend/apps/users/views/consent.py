@@ -6,11 +6,12 @@ Implements decision F/K consent states (zone R3):
 - Decline (browse-only): sets ads_auto_publish=False, no deletion
 
 Data flow disclosure — translation egress:
-Ad title/description (on creation) and search queries (on lookup) are
-sent to Google Translate via the Google Cloud Translation API (direct httpx call)
-for language normalization. This is a best-effort, non-identifying content transfer;
-no user PII (telegram_id, username, IP) is included in the request.
-See also section G in docs/01-spec/technical-specification.md.
+Ad title/description (on creation) are sent to Google Translate via the Google Cloud
+Translation API (direct httpx call) for language normalization at publication time.
+This is a best-effort, non-identifying content transfer; no user PII (telegram_id,
+username, IP) is included in the request. Buyer search queries are NOT sent to any
+translation service — search runs per-language on pre-translated FTS vectors
+(section G in docs/01-spec/technical-specification.md).
 """
 
 import hashlib
