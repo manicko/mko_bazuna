@@ -135,6 +135,17 @@ def _create_ad_with_image(
 
 
 class TestMediaAccessControl:
+    """Media access gate (MED-001) — unpublished/withdrawn ad photos blocked.
+
+    Tests run with DEBUG=False to exercise the production X-Accel-Redirect path
+    (the dev FileResponse path requires physical files on disk and is not what
+    these assertions target).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _debug_false(self):
+        with override_settings(DEBUG=False):
+            yield
     """Media access gate (MED-001) — unpublished/withdrawn ad photos blocked."""
 
     def test_published_ad_returns_redirect(
@@ -472,6 +483,15 @@ class TestPathTraversalRejection:
 
 
 class TestMediaGateThumbnailResolution:
+    """media_gate resolves thumbnail keys via thumbnail_* fields (ARCH-001).
+
+    Tests run with DEBUG=False to exercise the production X-Accel-Redirect path.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _debug_false(self):
+        with override_settings(DEBUG=False):
+            yield
     """media_gate resolves thumbnail keys via thumbnail_* fields (ARCH-001)."""
 
     def _create_ad_with_thumbnail(
@@ -620,3 +640,138 @@ class TestMediaGateThumbnailResolution:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 404
+
+
+class TestMediaGateCacheControl:
+    """B9/LOW-004: Cache-Control + Vary headers on media_gate responses.
+
+    Production (DEBUG=False) responses get a long cache TTL (1 year, immutable).
+    Dev (DEBUG=True) responses get no-cache to prevent stale image serving
+    during development.  403 and 404 responses never receive Cache-Control.
+    """
+
+    def test_prod_200_cache_control_long_ttl(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Production (DEBUG=False) 200: Cache-Control long TTL + X-Accel-Redirect."""
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+        assert response.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
+        assert "authorization" in response.headers.get("Vary", "").lower()
+
+    def test_prod_staff_200_cache_control_long_ttl(
+        self, seller, staff_user, category, city, isolated_media_root
+    ):
+        """Production (DEBUG=False) staff 200: Cache-Control long TTL + X-Accel-Redirect."""
+        key = generate_storage_key()
+        _create_ad_with_image(
+            seller, category, city, image_key=key, status=AdStatus.DRAFT
+        )
+        client = Client()
+        client.force_login(staff_user)
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+        assert response.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
+        assert "authorization" in response.headers.get("Vary", "").lower()
+
+    def test_dev_200_cache_control_no_cache(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Dev (DEBUG=True) 200: FileResponse with Cache-Control: no-cache."""
+        key = generate_storage_key()
+        _create_ad_with_image(
+            seller,
+            category,
+            city,
+            image_key=key,
+            file_bytes=b"\xff\xd8\xff\xe0" + b"fake-jpeg-data",
+            media_root=isolated_media_root,
+        )
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=isolated_media_root, DEBUG=True):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert isinstance(response, FileResponse)
+        assert response.headers.get("Cache-Control") == "no-cache"
+        assert "authorization" in response.headers.get("Vary", "").lower()
+
+    def test_dev_staff_200_cache_control_no_cache(
+        self, seller, staff_user, category, city, isolated_media_root
+    ):
+        """Dev (DEBUG=True) staff 200: FileResponse with Cache-Control: no-cache."""
+        key = generate_storage_key()
+        _create_ad_with_image(
+            seller,
+            category,
+            city,
+            image_key=key,
+            file_bytes=b"\xff\xd8\xff\xe0" + b"fake-jpeg-data",
+            media_root=isolated_media_root,
+            status=AdStatus.DRAFT,
+        )
+        client = Client()
+        client.force_login(staff_user)
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=isolated_media_root, DEBUG=True):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert isinstance(response, FileResponse)
+        assert response.headers.get("Cache-Control") == "no-cache"
+        assert "authorization" in response.headers.get("Vary", "").lower()
+
+    # ------------------------------------------------------------------
+    # Vary + Cache-Control on error responses
+    # ------------------------------------------------------------------
+
+    def test_403_has_vary_but_no_cache_control(
+        self, seller, category, city, isolated_media_root
+    ):
+        """403 Forbidden: Vary: Authorization present, NO Cache-Control.
+
+        A cached 403 would block users after an ad transitions to PUBLISHED
+        (or vice-versa for DRAFT), so access-denied responses must never be cached.
+        """
+        key = generate_storage_key()
+        _create_ad_with_image(
+            seller, category, city, image_key=key, status=AdStatus.DRAFT
+        )
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 403
+        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert response.headers.get("Cache-Control") is None
+
+    def test_404_has_no_cache_control(self, isolated_media_root):
+        """404 response must NOT receive Cache-Control."""
+        client = Client()
+        url = "/media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 404
+        assert response.headers.get("Cache-Control") is None
+
+    # ------------------------------------------------------------------
+    # _serve_image is NOT modified — media_gate wraps its return value
+    # ------------------------------------------------------------------
+
+    def test_serve_image_does_not_set_cache_control(self, isolated_media_root):
+        """_serve_image itself must NOT set Cache-Control (media_gate wraps it)."""
+        key = generate_storage_key()
+        file_path = isolated_media_root / key
+        file_path.write_bytes(b"\xff\xd8\xff\xe0" + b"fake-jpeg-data")
+        with override_settings(MEDIA_ROOT=isolated_media_root):
+            response = _serve_image(key)
+        assert isinstance(response, FileResponse)
+        assert response.headers.get("Cache-Control") is None

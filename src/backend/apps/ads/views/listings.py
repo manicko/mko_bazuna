@@ -27,6 +27,7 @@ from django.http import (
 )
 from django.shortcuts import render
 from django.utils.translation import gettext as _
+from django.views.decorators.vary import vary_on_headers
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -122,6 +123,7 @@ def _serve_image(image_key: str) -> HttpResponseBase:
     return FileResponse(open(file_path, "rb"), content_type="image/jpeg")
 
 
+@vary_on_headers("Authorization")
 def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     """
     Media access gate for Ad images and thumbnails.
@@ -184,9 +186,12 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     # Staff users (moderators/admins) can view any image regardless of status
     if request.user.is_staff:
         if settings.DEBUG:
-            return _serve_image(image_key)
+            response = _serve_image(image_key)
+            response["Cache-Control"] = "no-cache"
+            return response
         response = HttpResponse()
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
+        response["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
 
     # Non-staff users: only serve images referenced by a PUBLISHED ad. A shared
@@ -196,10 +201,13 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         return HttpResponseForbidden(_("Access denied"))
 
     if settings.DEBUG:
-        return _serve_image(image_key)
+        response = _serve_image(image_key)
+        response["Cache-Control"] = "no-cache"
+        return response
 
     response = HttpResponse()
     response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
+    response["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 
