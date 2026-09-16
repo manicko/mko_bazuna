@@ -8,9 +8,17 @@ then sends consolidated digests to users via Telegram.
 
 import asyncio
 import logging
+from typing import Final
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import (
+    AiogramError,
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+    TelegramServerError,
+)
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -24,6 +32,9 @@ from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
 
 logger = logging.getLogger(__name__)
+
+# Capped backoff base (seconds) for transient retries (429/network/5xx).
+_BACKOFF_BASE: Final[float] = 0.5
 
 
 class Command(BaseCommand):
@@ -58,7 +69,10 @@ class Command(BaseCommand):
                 self._persist_alerts(notifications_to_create, analytics_events)
 
         # Send messages outside the transaction (network I/O)
-        asyncio.run(self._send_user_digests(settings.BOT_TOKEN, user_ads))
+        try:
+            asyncio.run(self._send_user_digests(settings.BOT_TOKEN, user_ads))
+        except AiogramError as exc:
+            logger.error("Daily alert send failed: %s", exc)
 
     def _dry_run_check(self) -> None:
         """Log counts of users, saved searches, and potential matches."""
@@ -174,6 +188,27 @@ class Command(BaseCommand):
                     )
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logger.warning("Failed to send alert to user %d: %s", user_id, e)
+                except (
+                    TelegramRetryAfter,
+                    TelegramServerError,
+                    TelegramNetworkError,
+                ) as e:
+                    # Transient — retry once with capped backoff.
+                    if isinstance(e, TelegramRetryAfter) and e.retry_after:
+                        backoff: float = float(e.retry_after)
+                    else:
+                        backoff = _BACKOFF_BASE
+                    await asyncio.sleep(backoff)
+                    try:
+                        await bot.send_message(
+                            chat_id=user.chat_id,
+                            text=message,
+                            parse_mode="HTML",
+                        )
+                    except AiogramError as retry_exc:
+                        logger.warning(
+                            "Alert retry failed to user %d: %s", user_id, retry_exc
+                        )
 
             total_ads = sum(len(ads) for ads in user_ads.values())
             logger.info(
