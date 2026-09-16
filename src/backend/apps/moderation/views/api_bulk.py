@@ -41,9 +41,12 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
     """
     try:
         payload = BulkModerationRequest.model_validate_json(request.body)
-    except ValidationError:
+    except ValidationError as exc:
         logger.warning("Invalid bulk moderation request body")
-        return JsonResponse({"error": "Invalid request body"}, status=400)
+        return JsonResponse(
+            {"error": "Invalid request body", "errors": exc.errors()},
+            status=422,
+        )
 
     action_enum = payload.action
     ad_ids: list[int] = payload.selected_items

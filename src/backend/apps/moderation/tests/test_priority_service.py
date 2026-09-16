@@ -608,8 +608,8 @@ class TestBulkModerationActionView:
         assert len(data["errors"]) == 1
         assert data["errors"][0]["id"] == 99999
 
-    def test_unknown_action_returns_400(self) -> None:
-        """Unknown action type is rejected with 400 before any item is processed."""
+    def test_unknown_action_returns_422(self) -> None:
+        """Unknown action type is rejected with 422 before any item is processed."""
         client = Client()
         client.force_login(self.staff_user)
         response = client.post(
@@ -618,7 +618,7 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["error"] == "Invalid request body"
 
@@ -639,8 +639,8 @@ class TestBulkModerationActionView:
 
     # ── Finding 02: bulk API guards against malformed JSON ─────────────────
 
-    def test_malformed_json_body_returns_400(self) -> None:
-        """POST with malformed JSON body returns 400 with error message."""
+    def test_malformed_json_body_returns_422(self) -> None:
+        """POST with malformed JSON body returns 422 with error message."""
         client = Client()
         client.force_login(self.staff_user)
         response = client.post(
@@ -649,12 +649,12 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["error"] == "Invalid request body"
 
-    def test_empty_body_returns_400(self) -> None:
-        """POST with empty body returns 400 with error message."""
+    def test_empty_body_returns_422(self) -> None:
+        """POST with empty body returns 422 with error message."""
         client = Client()
         client.force_login(self.staff_user)
         response = client.post(
@@ -663,11 +663,11 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["error"] == "Invalid request body"
 
-    def test_extra_key_returns_400(self) -> None:
+    def test_extra_key_returns_422(self) -> None:
         """POST with an unknown key is rejected by extra='forbid'."""
         client = Client()
         client.force_login(self.staff_user)
@@ -683,11 +683,11 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["error"] == "Invalid request body"
 
-    def test_selected_items_type_mismatch_returns_400(self) -> None:
+    def test_selected_items_type_mismatch_returns_422(self) -> None:
         """POST with selected_items as a non-list is rejected by type validation."""
         client = Client()
         client.force_login(self.staff_user)
@@ -703,9 +703,31 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["error"] == "Invalid request body"
+
+    def test_validation_error_includes_error_details(self) -> None:
+        """422 response body includes structured Pydantic error list under 'errors'."""
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": "unknown",
+                    "selected_items": [1],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 422
+        data = response.json()
+        assert data["error"] == "Invalid request body"
+        assert "errors" in data
+        assert isinstance(data["errors"], list)
+        assert len(data["errors"]) > 0
 
     # ── Finding 14: bulk API sanitizes error messages ──────────────────────
 
