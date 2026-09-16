@@ -90,7 +90,7 @@ consumed_at (TIMESTAMP, nullable)       # filled by WEB on login completion
 Two-phase atomic claim (each = one UPDATE under transaction):
 1. Bot: `UPDATE login_tokens SET telegram_id=<tg> WHERE token_hash=? AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > now()`
 2. Web: `UPDATE login_tokens SET consumed_at=now() WHERE token_hash=? AND telegram_id IS NOT NULL AND consumed_at IS NULL AND expires_at > now()`
-Both check `expires_at > now()`; token compare via `hmac.compare_digest` (constant time). Background task deletes expired/consumed tokens. Session cookies: `SECURE` + `HTTPONLY` + `SAMESITE=Lax`.
+Token validation: SHA-256 hash stored (raw token never persisted). Claim via atomic `UPDATE ... RETURNING` with `WHERE token_hash = %s AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > %s` — only first valid claimer wins (zero-TOCTOU). 192-bit token entropy makes brute-force infeasible. Background task deletes expired/consumed tokens. Session cookies: `SECURE` + `HTTPONLY` + `SAMESITE=Lax`.
 Token consumption is POST-only (token submitted in request body, never as a URL query parameter) and guarded by CSRF protection.
 
 ---
