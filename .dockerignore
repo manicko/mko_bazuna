@@ -2,7 +2,9 @@
 .venv
 venv
 env
+# Environment files — NEVER bake into images
 .env*
+**/.env*
 
 # Python cache and temporary files
 __pycache__/

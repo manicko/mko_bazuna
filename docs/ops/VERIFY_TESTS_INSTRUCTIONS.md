@@ -108,9 +108,16 @@ container that executes `entrypoint-test.sh`. You can also invoke the equivalent
 manually (single-line PowerShell):
 
 ```pwsh
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml up -d db
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed test
+docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
+docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed test
 ```
+
+> **Note:** `--env-file .env.test` **must** always be passed to test compose commands.
+> The base `docker-compose.yml` uses `${VAR:?}` interpolation for required variables
+> (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DJANGO_SECRET_KEY`). In Docker
+> Compose, `${VAR:?}` is a **hard error** (exit code 1, no configuration is produced) when
+> the variable is unset — it is not a warning. Without `--env-file .env.test`, Compose
+> cannot resolve these variables and fails before any container starts.
 
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
@@ -160,7 +167,7 @@ Expected: prints the full path and `True`.
 The test entrypoint syncs dev dependencies with `unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`. In the test container, verify pytest is available:
 
 ```pwsh
-docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "import pytest; print(pytest.__version__)"
+docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps test python -c "import pytest; print(pytest.__version__)"
 ```
 
 Expected: prints a version number (e.g. `8.3.4`).

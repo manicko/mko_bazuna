@@ -168,25 +168,25 @@ function Invoke-TestAll {
 # Run linter inside web container
 function Invoke-Lint {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check src/
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check src/
 }
 
 # Run type checker inside web container
 function Invoke-Typecheck {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run basedpyright src/
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run basedpyright src/
 }
 
 # Run linter with auto-fix inside web container
 function Invoke-Format {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
 }
 
 # Open shell in web container
 function Invoke-Shell {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web /bin/bash
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web /bin/bash
 }
 
 # Run migrations (one-shot service)
@@ -198,13 +198,13 @@ function Invoke-Migrate {
 # Create migrations from model changes
 function Invoke-Makemigrations {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py makemigrations
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run python src/backend/manage.py makemigrations
 }
 
 # Load categories.yaml into DB (one-shot)
 function Invoke-LoadCatalog {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm load_catalog
 }
 
 # Create admin user manually
@@ -222,7 +222,7 @@ function Invoke-CreateAdmin {
 # Follow logs from all services
 function Invoke-Logs {
     $env:COMPOSE_PROJECT_NAME = $DevProject
-    docker compose -f docker-compose.yml -f docker-compose.dev.override.yml logs -f
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml logs -f
 }
 
 # Create database backup with 7-day rotation
@@ -315,7 +315,7 @@ function Invoke-FullClean {
 
     Write-Host "Stopping test environment (wiping volumes)..." -ForegroundColor Cyan
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose -f docker-compose.yml -f docker-compose.test.yml down -v --remove-orphans
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml down -v --remove-orphans
 
     Write-Host "Removing dangling containers, networks, and volumes..." -ForegroundColor Yellow
     docker system prune -f --volumes

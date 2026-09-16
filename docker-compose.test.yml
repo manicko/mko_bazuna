@@ -1,23 +1,42 @@
 # Test override for docker-compose.yml
-# Ephemeral PostgreSQL for CI-compatible testing (NOT SQLite)
-# Uses postgres:18-alpine with no persistent volume - DB destroyed after run
+# PostgreSQL test database (NOT SQLite): postgres:18-alpine with a persistent
+# `postgres_data` volume inherited from the base compose (project-prefixed).
+# Persists between local `make test` runs; CI destroys the project + volume post-run.
+#
+# env_file behavior notes (ENV-004):
+#   - `env_file` values are applied to the container's environment at runtime.
+#     The `env_file:` directive itself is NOT visible in `docker compose config`
+#     output -- Compose resolves it by merging the file contents into the
+#     service's `environment:` section during config rendering. Running
+#     `docker compose config` shows a flat `environment:` list; it does not
+#     indicate which `.env` file a given variable originated from.
+#   - The `--env-file .env.test` CLI flag is a SEPARATE concern: it feeds
+#     `${VAR}` interpolation in the Compose YAML itself (e.g. `${POSTGRES_USER}`),
+#     not the container's runtime environment. Do not confuse it with the
+#     service-level `env_file:` directive, which injects file contents into
+#     the container.
+#   - To verify which `.env` file is bind-mounted for each service, inspect the
+#     `volumes:` section in `docker compose config` output -- not `environment:`.
+#   - When merging compose files, `env_file:` lists are concatenated: the base
+#     compose's `env_file:` entries and this override's `.env.test` are both
+#     loaded, with the later file winning on key conflicts. `environment:` keys
+#     take precedence over `env_file:` keys. `volumes:` lists are also
+#     concatenated -- use `!override` (as done for migrate/bot/web/seed below) to
+#     replace them rather than append onto the base volumes.
 
 services:
   # Override db service for test: long-running, persistent PostgreSQL.
-  # `volumes` is NOT overridden here, so the base `postgres_data` volume applies
-  # (prefixed by the project name -> mko-bazuna-test_postgres_data). This keeps
-  # the container alive between `make test` runs. Port 5433 on the host allows
-  # debugging with psql / GUI tools.
+  # No `volumes:` section is present, so `postgres_data` is inherited from the
+  # base compose via volume name merging -- the base db service's mount
+  # (`postgres_data:/var/lib/postgresql`) and the base top-level `volumes:`
+  # declaration are both preserved (project-prefixed -> mko-bazuna-test_postgres_data).
+  # This keeps the container alive between `make test` runs. Port 5433 on the host
+  # allows debugging with psql / GUI tools.
   db:
     image: postgres:18-alpine
     restart: unless-stopped
-    env_file:
-      - .env.test
-    volumes:
-      - ./.env.test:/app/src/.env:ro
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna
-      - DJANGO_SETTINGS_MODULE=config.settings.test
     ports:
       - "5433:5432"
     healthcheck:
@@ -30,6 +49,7 @@ services:
   migrate:
     env_file:
       - .env.test
+    volumes: !override ["./.env.test:/app/src/.env:ro"]
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.test
 
@@ -53,7 +73,8 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.test
       # Override Dockerfile's UV_NO_INSTALL_PROJECT=1 so uv sync installs dev deps
       - UV_NO_INSTALL_PROJECT=0
-      # .env is not bind-mounted; entrypoint.sh skips its existence check (CR3 safety)
+      # .env.test is bind-mounted at /app/src/.env; SKIP_ENV_CHECK=1 bypasses the
+      # entrypoint's .env existence check (CR3 safety)
       - SKIP_ENV_CHECK=1
     # Bind-mount source + entrypoint scripts for hot-reload; cache uv downloads.
     volumes:
@@ -65,17 +86,72 @@ services:
     # One-shot service: exits with pytest exit code
     profiles: ["test"]
 
-  # Override create_admin for test: provides hardcoded ADMIN_PASSWORD so config
-  # validation succeeds without a real .env.dev; uses test DB credentials
-  # matching the db/migrate overrides above.
+  # Override create_admin for test: .env.test is bind-mounted at /app/src/.env
+  # (volumes: !override) and loaded via env_file; DJANGO_SETTINGS_MODULE is set
+  # to test. ADMIN_USERNAME/ADMIN_PASSWORD/ADMIN_TELEGRAM_ID are provided
+  # explicitly, with values consistent with .env.test.
   create_admin:
     env_file:
       - .env.test
+    volumes: !override ["./.env.test:/app/src/.env:ro"]
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.test
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=test-admin-password
       - ADMIN_TELEGRAM_ID=-1
+
+  # Override bot for test: .env.test env_file, test settings, .env.test bind-mount.
+  # DJANGO_SECRET_KEY and BOT_TOKEN come from env_file (.env.test) since the base
+  # bot environment section does not include them (unlike load_cities/load_catalog).
+  bot:
+    env_file:
+      - .env.test
+    volumes: !override
+      - ./.env.test:/app/src/.env:ro
+      - media_volume:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+
+  # Override web for test: same pattern as bot.
+  web:
+    env_file:
+      - .env.test
+    volumes: !override
+      - ./.env.test:/app/src/.env:ro
+      - media_volume:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+
+  # Override load_cities for test: DJANGO_SECRET_KEY and BOT_TOKEN are in the
+  # base environment section (interpolated from --env-file .env.test); env_file
+  # override ensures any remaining vars (e.g. SITE_URL, GOOGLE_*) come from .env.test.
+  load_cities:
+    env_file:
+      - .env.test
+    volumes: !override
+      - ./.env.test:/app/src/.env:ro
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+
+  # Override load_catalog for test: same pattern as load_cities.
+  load_catalog:
+    env_file:
+      - .env.test
+    volumes: !override
+      - ./.env.test:/app/src/.env:ro
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.test
+
+  # Override seed for test: profiles: ["seed"] inherited from base so it only
+  # starts with --profile seed; env_file override ensures .env.test values.
+  seed:
+    env_file:
+      - .env.test
+    volumes: !override
+      - ./.env.test:/app/src/.env:ro
+      - media_volume:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.test
 
 volumes:
   uv_cache:

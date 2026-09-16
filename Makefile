@@ -185,10 +185,11 @@ compilemessages:
 		--locale ru --locale bs --locale en
 
 create-admin:
+	set -a; . .env.dev; set +a; \
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py create_admin_user \
-		--username "${ADMIN_USERNAME:-admin}" \
-		--password "${ADMIN_PASSWORD}" \
-		--telegram-id "${ADMIN_TELEGRAM_ID:--1}"
+		--username "$${ADMIN_USERNAME:-admin}" \
+		--password "$${ADMIN_PASSWORD}" \
+		--telegram-id "$${ADMIN_TELEGRAM_ID:--1}"
 
 load-catalog:
 	docker compose $(COMPOSE_FILES) run --rm load_catalog
@@ -217,7 +218,8 @@ shell:
 	docker compose $(COMPOSE_FILES) run --rm web /bin/bash
 
 db-shell:
-	docker compose $(COMPOSE_FILES) exec db psql -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+	set -a; . .env.dev; set +a; \
+	docker compose $(COMPOSE_FILES) exec db psql -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
 
 logs:
 	docker compose $(COMPOSE_FILES) logs -f
@@ -228,9 +230,10 @@ BACKUPS_DIR := ./backups
 
 backup:
 	@mkdir -p $(BACKUPS_DIR)
-	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
+	@set -a; . .env.dev; set +a; \
+	TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
 		docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
-			pg_dump -U $${POSTGRES_USER} -d $${POSTGRES_DB} -F c \
+			pg_dump -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -F c \
 			> $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump && \
 		echo "✓ Backup created: $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump"
 	@$(MAKE) prune-backups
@@ -245,8 +248,9 @@ restore:
 		echo "Error: file $(BACKUP_FILE) not found"; \
 		exit 1; \
 	fi
+	@set -a; . .env.dev; set +a; \
 	docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
-		pg_restore -U $${POSTGRES_USER} -d $${POSTGRES_DB} --clean --if-exists $(BACKUP_FILE)
+		pg_restore -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" --clean --if-exists $(BACKUP_FILE)
 	@echo "✓ Restore completed from $(BACKUP_FILE)"
 
 prune-backups:
