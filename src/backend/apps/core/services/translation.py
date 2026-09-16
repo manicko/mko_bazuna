@@ -104,23 +104,6 @@ class TranslationCircuitBreaker:
 _CIRCUIT_BREAKER: Final[TranslationCircuitBreaker] = TranslationCircuitBreaker()
 
 
-@lru_cache(maxsize=128)
-def translate_cached(query: str) -> str:
-    """
-    Cached translation function.
-
-    Uses lru_cache with maxsize=128 to cache translations.
-    The cache is invalidated by clearing on criteria change or after 5 minutes.
-
-    Args:
-        query: The search query to translate
-
-    Returns:
-        Translated query in Russian
-    """
-    return _translate_via_api(query, "bs", "ru")
-
-
 @lru_cache(maxsize=256)
 def translate_cached_generic(query: str, source_locale: str, target_locale: str) -> str:
     """

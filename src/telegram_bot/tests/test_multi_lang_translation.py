@@ -18,7 +18,6 @@ import pytest
 
 from apps.core.services.translation import (
     _CIRCUIT_BREAKER,
-    translate_cached,
     translate_cached_generic,
     translate_text,
 )
@@ -50,7 +49,6 @@ def _reset_translation_state() -> None:
     """Reset circuit-breaker and lru_cache before every test."""
     _CIRCUIT_BREAKER._failure_count = 0
     _CIRCUIT_BREAKER._last_failure_time = 0.0
-    translate_cached.cache_clear()
     translate_cached_generic.cache_clear()
 
 
