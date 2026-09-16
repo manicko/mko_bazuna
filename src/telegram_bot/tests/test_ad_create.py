@@ -45,6 +45,37 @@ def seller_id() -> int:
     return user.id
 
 
+@pytest.fixture
+def permissive_criteria(monkeypatch) -> None:
+    """Monkeypatch moderation criteria so ``auto_moderate`` passes trivially.
+
+    Mirrors the plugin-provided fixture from ``testing.moderation_fixtures``
+    so this test module runs standalone when collected with a file path
+    (bot tests live outside ``src/backend/`` and do not inherit the root
+    conftest's ``pytest_plugins`` directive).
+    """
+    monkeypatch.setattr(
+        "apps.moderation.services.auto_moderation._get_cached_criteria",
+        lambda: (1, 200, 1, 2000, False, 0, 10, (), 100, 0),
+    )
+    monkeypatch.setattr(
+        "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
+        lambda user_id, max_ads: True,
+    )
+    monkeypatch.setattr(
+        "apps.moderation.services.auto_moderation._is_duplicate_title",
+        lambda title, user_id, ad_id, threshold: False,
+    )
+    from apps.moderation.models import ModerationCriteria  # noqa: PLC0415
+
+    _mock_criteria = MagicMock(spec=ModerationCriteria)
+    _mock_criteria.max_ads_per_user = 100
+    monkeypatch.setattr(
+        "apps.moderation.services.moderation_log.ModerationCriteria.get_singleton",
+        lambda: _mock_criteria,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -271,3 +302,252 @@ class TestProcessPhotos:
         message.answer.assert_awaited_once()
         answer_text = message.answer.await_args[0][0]
         assert "Photo saved" in answer_text
+
+
+# ---------------------------------------------------------------------------
+# Helpers for CR-001 / MED-001 regression tests (cancel-after-submit,
+# delete_draft storage_keys)
+# ---------------------------------------------------------------------------
+
+
+def _make_test_image() -> bytes:
+    """Create a minimal valid 800x600 RGB JPEG for thumbnail generation."""
+    import io
+
+    from PIL import Image
+
+    image = Image.new("RGB", (800, 600), color=(64, 128, 192))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=95)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# CR-001: Cancel after submit must not destroy ad media
+# ---------------------------------------------------------------------------
+
+
+class TestCancelAfterSubmit:
+    """Tests for CR-001: /cancel after submit must protect submitted ad media.
+
+    After ``submit_ad`` transitions a DRAFT ad to PUBLISHED, the FSM
+    ``photos`` list is stale — photos have been promoted to AdImage rows.
+    ``cmd_cancel`` must detect the non-DRAFT status via ``_get_ad_status``
+    and skip both ``delete_photo`` and ``delete_draft``, so that media
+    belonging to a submitted ad is never destroyed.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cancel_after_submit_preserves_files(
+        self, seller_id: int, permissive_criteria: None, tmp_path
+    ) -> None:
+        """After submit to PUBLISHED, /cancel leaves files + AdImage rows intact."""
+        from decimal import Decimal
+        from pathlib import Path
+
+        from django.test import override_settings
+
+        from apps.ads.models import AdImage
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.core.enums import AdStatus
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import generate_storage_key
+        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+
+        media_root = Path(str(tmp_path))
+
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            # Create a DRAFT ad
+            ad = await create_draft_ad(user_id=seller_id)
+
+            # Write a real image so submit_ad can generate thumbnails
+            storage_key = generate_storage_key()
+            (media_root / storage_key).write_bytes(_make_test_image())
+
+            photo = {
+                "storage_key": storage_key,
+                "telegram_file_id": "test_file_id",
+                "position": 0,
+            }
+
+            # Submit — DRAFT -> ON_MODERATION -> PUBLISHED
+            is_valid, errors = await sync_to_async(submit_ad)(
+                SubmitAdInput(
+                    ad_id=ad.id,
+                    title_ru="Test Ad",
+                    desc_ru="A valid test description for the ad.",
+                    category_id=None,
+                    city_id=None,
+                    price_amount=Decimal("100"),
+                    price_currency=CurrencyCode.EUR,
+                    photos=[photo],
+                    user_id=seller_id,
+                    original_language="en",
+                )
+            )
+            assert is_valid, f"submit_ad should pass moderation: {errors}"
+
+            await sync_to_async(ad.refresh_from_db)()
+            assert ad.status == AdStatus.PUBLISHED
+
+            # AdImage + physical thumbnail files exist on disk
+            ad_image = await sync_to_async(AdImage.objects.get)(ad=ad)
+            for key in ad_image.storage_keys():
+                assert (media_root / key).is_file(), f"File missing after submit: {key}"
+
+            # Call /cancel — ad is PUBLISHED, cleanup must be skipped
+            cancel_msg = MagicMock()
+            cancel_msg.answer = AsyncMock()
+            cancel_state = _build_state({"ad_id": ad.id})
+
+            await cmd_cancel(cancel_msg, cancel_state)
+
+            # AdImage row still exists (not deleted by cancel)
+            assert await sync_to_async(
+                lambda: AdImage.objects.filter(ad=ad).count()
+            )() == 1
+            await sync_to_async(ad_image.refresh_from_db)()
+
+            # All physical files still present on disk
+            for key in ad_image.storage_keys():
+                assert (media_root / key).is_file(), f"File deleted after cancel: {key}"
+
+            # User was informed
+            cancel_msg.answer.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cancel_after_submit_logs_skip(
+        self,
+        seller_id: int,
+        permissive_criteria: None,
+        tmp_path,
+        caplog,
+    ) -> None:
+        """Non-DRAFT ad: cmd_cancel skips delete_photo and logs the skip."""
+        import logging
+        from decimal import Decimal
+        from pathlib import Path
+
+        from django.test import override_settings
+
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.core.enums import AdStatus
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import generate_storage_key
+        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+
+        media_root = Path(str(tmp_path))
+
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            ad = await create_draft_ad(user_id=seller_id)
+
+            storage_key = generate_storage_key()
+            (media_root / storage_key).write_bytes(_make_test_image())
+
+            photo = {
+                "storage_key": storage_key,
+                "telegram_file_id": "test_file_id",
+                "position": 0,
+            }
+
+            # Submit -> PUBLISHED
+            is_valid, _ = await sync_to_async(submit_ad)(
+                SubmitAdInput(
+                    ad_id=ad.id,
+                    title_ru="Test Ad",
+                    desc_ru="A valid test description for the ad.",
+                    category_id=None,
+                    city_id=None,
+                    price_amount=Decimal("100"),
+                    price_currency=CurrencyCode.EUR,
+                    photos=[photo],
+                    user_id=seller_id,
+                    original_language="en",
+                )
+            )
+            assert is_valid
+
+            await sync_to_async(ad.refresh_from_db)()
+            assert ad.status != AdStatus.DRAFT
+
+            # Patch delete_photo — it must NOT be called for a non-DRAFT ad
+            with patch(
+                "telegram_bot.handlers.ad_create.delete_photo"
+            ) as mock_delete:
+                caplog.set_level(
+                    logging.INFO,
+                    logger="telegram_bot.handlers.ad_create",
+                )
+                cancel_msg = MagicMock()
+                cancel_msg.answer = AsyncMock()
+                cancel_state = _build_state({"ad_id": ad.id})
+
+                await cmd_cancel(cancel_msg, cancel_state)
+
+            mock_delete.assert_not_called()
+            cancel_msg.answer.assert_awaited_once()
+
+            # Non-DRAFT path logs the skip
+            assert "Cancel skipped" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# MED-001: delete_draft must clean up all storage_keys (image + thumbnails)
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteDraftStorageKeys:
+    """Tests for MED-001: delete_draft deletes all storage_keys.
+
+    ``AdImage.storage_keys()`` returns the original image key plus all
+    non-empty thumbnail keys (small, medium, large).  ``delete_draft``
+    must call ``delete_photo`` for every key, not just ``img.image``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_delete_draft_uses_storage_keys(
+        self, seller_id: int, tmp_path
+    ) -> None:
+        """delete_draft calls delete_photo for all storage_keys (img + 3 thumbs)."""
+
+        from django.test import override_settings
+
+        from apps.ads.models import Ad, AdImage
+        from apps.media.services.filesystem import generate_storage_key
+        from telegram_bot.handlers.ad_create import create_draft_ad, delete_draft
+
+        ad = await create_draft_ad(user_id=seller_id)
+
+        image_key = generate_storage_key()
+        stem = image_key.rsplit(".jpg", 1)[0]
+        thumb_small = f"{stem}-small.jpg"
+        thumb_medium = f"{stem}-medium.jpg"
+        thumb_large = f"{stem}-large.jpg"
+        all_keys = [image_key, thumb_small, thumb_medium, thumb_large]
+
+        # Create AdImage with all thumbnail fields populated
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            await sync_to_async(AdImage.objects.create)(
+                ad=ad,
+                image=image_key,
+                thumbnail_small=thumb_small,
+                thumbnail_medium=thumb_medium,
+                thumbnail_large=thumb_large,
+            )
+
+        # Patch delete_photo to spy on calls (avoid real filesystem deletion)
+        with patch(
+            "telegram_bot.handlers.ad_create.delete_photo"
+        ) as mock_delete:
+            await delete_draft(ad.id)
+
+        # delete_photo must be called for ALL 4 keys, not just img.image
+        called_keys = [call.args[0] for call in mock_delete.call_args_list]
+        assert len(called_keys) == 4
+        assert sorted(called_keys) == sorted(all_keys)
+
+        # Ad should be deleted from the database
+        assert not await sync_to_async(
+            lambda: Ad.objects.filter(id=ad.id).exists()
+        )()
