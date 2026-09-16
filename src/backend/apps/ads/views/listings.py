@@ -17,7 +17,13 @@ from difflib import get_close_matches
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import F, Q
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseForbidden,
+)
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
@@ -112,9 +118,7 @@ def _serve_image(image_key: str) -> HttpResponse:
     file_path = settings.MEDIA_ROOT / image_key
     if not file_path.exists():
         raise Http404("Image not found")
-    with open(file_path, "rb") as f:
-        data = f.read()
-    return HttpResponse(data, content_type="image/jpeg")
+    return FileResponse(open(file_path, "rb"), content_type="image/jpeg")
 
 
 def media_gate(request: HttpRequest, image_key: str) -> HttpResponse:

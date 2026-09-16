@@ -18,10 +18,12 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from django.http import FileResponse
 from django.test import Client, override_settings
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
+from apps.ads.views.listings import _serve_image
 from apps.core.enums import AdStatus
 from apps.media.services.filesystem import (
     delete_photo,
@@ -263,6 +265,21 @@ class TestMediaAccessControl:
             response = client.get(url)
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+
+    def test_serve_image_returns_fileresponse(self, isolated_media_root):
+        """_serve_image returns a FileResponse (streams from disk), not HttpResponse.
+
+        The docstring claims FileResponse streaming; this verifies the code matches
+        by asserting the concrete return type is FileResponse (not a bare
+        HttpResponse that buffers the whole file into memory).
+        """
+        key = generate_storage_key()
+        file_path = isolated_media_root / key
+        file_path.write_bytes(b"\xff\xd8\xff\xe0" + b"fake-jpeg-data")
+        with override_settings(MEDIA_ROOT=isolated_media_root):
+            response = _serve_image(key)
+        assert isinstance(response, FileResponse)
+        assert response.headers["Content-Type"] == "image/jpeg"
 
 
 class TestExifStripping:
