@@ -206,6 +206,7 @@ def strip_photo_exif(photo_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(photo_bytes))
     img = ImageOps.exif_transpose(img)
     img.info.pop("exif", None)
+    img.info.pop("icc_profile", None)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", optimize=True)
     return buf.getvalue()

@@ -308,6 +308,25 @@ class TestExifStripping:
         img = Image.open(io.BytesIO(cleaned))
         img.verify()  # This raises on corrupt data
 
+    def test_strip_photo_exif_removes_icc_profile(self) -> None:
+        """ICC profile is removed after strip_photo_exif."""
+        import io
+
+        from PIL import Image
+
+        img = Image.new("RGB", (100, 100), color="green")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", icc_profile=b"fake-icc-profile-data")
+        jpeg_with_icc = buf.getvalue()
+
+        # Verify the ICC profile is present before stripping
+        pre_img = Image.open(io.BytesIO(jpeg_with_icc))
+        assert "icc_profile" in pre_img.info
+
+        cleaned = strip_photo_exif(jpeg_with_icc)
+        result = Image.open(io.BytesIO(cleaned))
+        assert "icc_profile" not in result.info
+
 
 class TestPhysicalDeletion:
     """Physical file deletion (MED-003) — delete_photo removes files from disk."""
