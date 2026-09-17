@@ -132,15 +132,22 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 2. **`make makemessages`** (`Makefile:167`) — extracts strings into `.po` files for `ru`, `bs`, `en` via `manage.py makemessages -l ru -l bs -l en --no-location`
 3. **Edit `.po` files** — fill `msgstr` for `ru` and `bs` (non-empty); `en` may be empty (msgid is English)
 4. **`make compilemessages`** (`Makefile:170`) — compiles `.po` → `.mo` with ignore patterns: `--ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc'`
-5. **Runtime:** `LanguagePreMiddleware` activates the locale; gettext reads `.mo` catalogs under `LOCALE_PATHS` (`src/backend/locale/`)
+5. **Runtime:** the web `LanguagePreMiddleware` activates the locale per request; the bot `LanguageMiddleware` (`telegram_bot/middlewares/language.py`, FQ-001) activates per-user locale (`User.telegram_language`) around bot handler dispatch, before `AccountStateMiddleware`. In both, gettext reads `.mo` catalogs under `LOCALE_PATHS` (`src/backend/locale/`)
 
 ### Completeness gate
 
-`apps/ads/tests/test_i18n_completeness.py` (4 tests, marked `@pytest.mark.unit`) enforces the multilingual Definition of Done:
+`apps/ads/tests/test_i18n_completeness.py` (11 tests, marked `@pytest.mark.unit`) enforces the multilingual Definition of Done. The gate was extended (QLT-005) to also AST-scan `telegram_bot/handlers/*.py` for unwrapped user-facing bot strings:
 - `test_no_hardcoded_visible_text` — scans public/seller-facing templates for visible text not wrapped in `{% trans %}`
 - `test_extraction_completeness` — every `{% trans %}` / `{{ _("…") }}` msgid exists in all 3 `.po` files
 - `test_no_empty_msgstr` — `ru` and `bs` have 0 empty `msgstr` for non-header entries
+- `test_no_raw_get_name_in_templates` — no raw `{{ obj.get_name }}` — must use `|get_category_name:LANGUAGE_CODE` / `|get_city_name:LANGUAGE_CODE` filters
 - `test_mo_compiled` — `.mo` files exist for all 3 locales
+- `test_template_extraction_coverage` — msgids extracted from `{% trans %}` / `{{ _("…") }}` / `{% blocktrans %}` templates each exist in all 3 `.po` files
+- `test_hreflang_present` — every page template renders `<link rel="alternate" hreflang>` (I18N-004)
+- `test_plural_forms` — each `.po` `Plural-Forms` header matches CLDR rules
+- `test_locale_switch_re_render` — `?lang=bs` content re-renders in the Bosnian locale
+- `test_bot_no_hardcoded_messages` — (QLT-005, new) AST-scans bot handler files for user-facing Bot/API method calls (`.answer()`, `.reply()`, etc.) whose text argument is a bare string literal or f-string rather than a `_()` call
+- `test_no_cyrillic_msgids` — (QLT-005, new) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English
 
 A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 

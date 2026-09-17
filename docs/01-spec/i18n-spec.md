@@ -93,6 +93,16 @@ Telegram users set it through the bot:
   through `LanguageLocale`, then `_set_user_language` updates `User.telegram_language` via
   `User.objects.filter(id=...).update(telegram_language=...)` (no full model save).
 
+**Runtime activation (FQ-001):** `LanguageMiddleware` (`telegram_bot/middlewares/language.py`) is
+registered in `telegram_bot/main.py` (and in the bot test conftest) as an update-level middleware
+that runs **before** `AccountStateMiddleware`. It resolves `event.from_user.id` to the user's
+`telegram_language` via the ORM (using `sync_to_async`), calls `translation.activate(lang)` before
+handler dispatch, and calls `translation.deactivate()` in a `finally` block to prevent locale
+leakage between updates on the same asgiref worker thread. Anonymous or unregistered users (no
+`telegram_id`) fall back to `settings.LANGUAGE_CODE`. This ensures all `_()`-wrapped strings in bot
+handlers — including denial messages from `AccountStateMiddleware` — render in the user's preferred
+language.
+
 The stored language drives per-user message localization in bot notifications (see
 [Localized notifications](#localized-notifications)) and is exposed to the web context for
 alert content.
@@ -268,6 +278,12 @@ Django's default 404 handler does not surface them to users in production.
 | `apps/ads/views/listings.py` | `HttpResponseForbidden` (1) | `gettext` (runtime) |
 | `apps/search/management/commands/send_alerts.py` | "New ads matching your saved searches" (1) | `gettext` (runtime) |
 
+QLT-005 extended `_()` wrapping to the five Telegram bot handler modules under
+`telegram_bot/handlers/` (`alerts.py`, `ad_create.py`, `ad_copy.py`, `contact.py`,
+`login.py`). These are runtime `gettext` calls activated per-update by
+`LanguageMiddleware` (FQ-001), which resolves `User.telegram_language` and calls
+`translation.activate()` before handler dispatch.
+
 ## Development & CI Integration
 
 The static extraction/compile pipeline (Makefile targets, Dockerfile + entrypoint
@@ -294,6 +310,12 @@ Definition of Done on every fast-gate run:
 | `test_hreflang_present` | every page template renders `<link rel="alternate" hreflang>` (via `components/locale_head.html` partial, I18N-004) |
 | `test_plural_forms` | each `.po` `Plural-Forms` header matches CLDR rules |
 | `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
+| `test_bot_no_hardcoded_messages` | (QLT-005) AST-scans `telegram_bot/handlers/*.py` for user-facing Bot/API method calls (`.answer()`, `.reply()`, `.edit_text()`, etc.) whose text arg is a bare string literal or f-string rather than a `_()` call |
+| `test_no_cyrillic_msgids` | (QLT-005) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English |
+
+The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of `test_i18n_completeness.py`
+AST-scans `telegram_bot/handlers/*.py` to enforce that all user-facing bot strings are wrapped in
+`_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
 
 The scan scope excludes the `admin/` staff subtree, the analytics/moderation dashboards, and
 `components/feature_tag.html` (DB-based i18n via `get_lookup_name`). `test_i18n_pipeline.py` adds
