@@ -103,6 +103,14 @@ services:
         condition: service_completed_successfully
       load_catalog:
         condition: service_completed_successfully
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-256m}
+    cpus: ${SCHEDULER_CPUS:-0.5}
     restart: unless-stopped
     profiles:
       - scheduler
@@ -138,6 +146,13 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${BACKUP_MEM_LIMIT:-256m}
+    cpus: ${BACKUP_CPUS:-0.5}
     profiles:
       - backup
 
@@ -164,3 +179,10 @@ services:
       retries: 5
     profiles:
       - pgbouncer
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${PGBOUNCER_MEM_LIMIT:-128m}
+    cpus: ${PGBOUNCER_CPUS:-0.5}
