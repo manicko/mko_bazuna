@@ -353,7 +353,7 @@ class TestPublishedTextEdit:
         new_description = "Updated published description text."
 
         with patch(
-            "apps.ads.views.edit.auto_moderate",
+            "apps.moderation.services.auto_moderation.auto_moderate",
             return_value=True,
         ):
             response = client_.post(
@@ -436,7 +436,7 @@ class TestPublishedTextEdit:
         new_price = Decimal("200")
 
         with patch(
-            "apps.ads.views.edit.auto_moderate",
+            "apps.moderation.services.auto_moderation.auto_moderate",
             return_value=True,
         ):
             response = client_.post(
@@ -480,7 +480,7 @@ class TestPublishedTextEdit:
         new_description = "Updated auto moderate description text."
 
         with patch(
-            "apps.ads.views.edit.auto_moderate",
+            "apps.moderation.services.auto_moderation.auto_moderate",
             return_value=True,
         ) as mock_moderate:
             response = client_.post(
@@ -549,7 +549,7 @@ class TestPublishedTextEdit:
         new_description = "Updated fail description text."
 
         with patch(
-            "apps.ads.views.edit.auto_moderate",
+            "apps.moderation.services.auto_moderation.auto_moderate",
             return_value=False,
         ) as mock_moderate:
             response = client_.post(
