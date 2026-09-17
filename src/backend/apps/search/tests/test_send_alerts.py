@@ -21,6 +21,8 @@ from aiogram.exceptions import (
     TelegramServerError,
 )
 
+from apps.users.models import User
+
 pytestmark = [pytest.mark.unit]
 
 _MODULE = "apps.search.management.commands.send_alerts"
@@ -64,9 +66,9 @@ class TestTransientErrorHandling:
 
             user_ads = {123: [MagicMock(id=1)]}
 
-            with patch("apps.users.models.User") as mock_user_cls:
-                mock_user_cls.objects.aget = AsyncMock(return_value=mock_user_obj)
-                mock_user_cls.DoesNotExist = Exception
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
 
                 with patch(
                     f"{_MODULE}.asyncio.sleep", new=AsyncMock()
@@ -103,9 +105,9 @@ class TestTransientErrorHandling:
 
             user_ads = {456: [MagicMock(id=1)]}
 
-            with patch("apps.users.models.User") as mock_user_cls:
-                mock_user_cls.objects.aget = AsyncMock(return_value=mock_user_obj)
-                mock_user_cls.DoesNotExist = Exception
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
 
                 with patch(
                     f"{_MODULE}.asyncio.sleep", new=AsyncMock()
@@ -144,9 +146,9 @@ class TestTransientErrorHandling:
 
             user_ads = {789: [MagicMock(id=1)]}
 
-            with patch("apps.users.models.User") as mock_user_cls:
-                mock_user_cls.objects.aget = AsyncMock(return_value=mock_user_obj)
-                mock_user_cls.DoesNotExist = Exception
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
 
                 with patch(
                     f"{_MODULE}.asyncio.sleep", new=AsyncMock()
@@ -182,9 +184,9 @@ class TestTransientErrorHandling:
 
             user_ads = {111: [MagicMock(id=1)]}
 
-            with patch("apps.users.models.User") as mock_user_cls:
-                mock_user_cls.objects.aget = AsyncMock(return_value=mock_user_obj)
-                mock_user_cls.DoesNotExist = Exception
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
 
                 with patch(
                     f"{_MODULE}.asyncio.sleep", new=AsyncMock()
@@ -228,9 +230,9 @@ class TestBotSafety:
 
             user_ads = {222: [MagicMock(id=1)]}
 
-            with patch("apps.users.models.User") as mock_user_cls:
-                mock_user_cls.objects.aget = AsyncMock(return_value=mock_user_obj)
-                mock_user_cls.DoesNotExist = Exception
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
 
                 with patch(f"{_MODULE}.asyncio.sleep", new=AsyncMock()):
                     await cmd._send_user_digests("test-token", user_ads)
