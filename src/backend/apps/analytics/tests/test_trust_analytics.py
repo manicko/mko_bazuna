@@ -24,9 +24,6 @@ from apps.trust.models import SellerVerification
 from apps.users.models import User
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
@@ -51,6 +48,8 @@ def _make_user(telegram_id: int = 990010001, **overrides: object) -> User:
 
 class TestCalculateSellerTrustScore:
     """Tests for the trust score calculation algorithm."""
+
+    pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
     def test_base_score_no_ads_no_verification(self, category, city) -> None:
         """A seller with no ads and no verification gets the base score of 50."""
@@ -202,6 +201,8 @@ class TestCalculateSellerTrustScore:
 class TestGetTrustLevel:
     """Tests for mapping numeric trust scores to TrustLevel enum."""
 
+    pytestmark = [pytest.mark.unit]
+
     def test_unverified_at_zero(self) -> None:
         """Score 0 maps to UNVERIFIED."""
         assert get_trust_level(0) == TrustLevel.UNVERIFIED
@@ -250,6 +251,8 @@ class TestGetTrustLevel:
 
 class TestRecordTrustEvent:
     """Tests for recording trust-related analytics events."""
+
+    pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
     def test_creates_analytics_event(self) -> None:
         """record_trust_event creates an AnalyticsEvent with correct data."""
@@ -347,6 +350,8 @@ def daily_metrics_data(category, city):
 
 class TestGetSellerDailyMetrics:
     """Tests for querying daily aggregated ad metrics."""
+
+    pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
     def test_returns_metrics_for_seller(self, daily_metrics_data) -> None:
         """Returns only DailyAdMetrics for the specified seller's ads."""

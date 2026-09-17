@@ -10,7 +10,7 @@ import pytest
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 
-pytestmark = [pytest.mark.django_db, pytest.mark.unit]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture

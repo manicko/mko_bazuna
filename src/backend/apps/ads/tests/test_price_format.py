@@ -4,11 +4,14 @@ Tests for the shared ``format_price`` display helper (spec Task 7 / T-11).
 
 from decimal import Decimal
 
+import pytest
 from django.utils.translation import override
 
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price, format_price_value
 from apps.currencies.enums import CurrencyCode
+
+pytestmark = [pytest.mark.unit]
 
 
 def test_format_price_value_renders_amount_and_currency() -> None:
