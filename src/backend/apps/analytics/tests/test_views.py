@@ -434,3 +434,38 @@ class TestModerationAnalyticsView:
         assert response.context["stats"]["approved"] == 1
         assert response.context["stats"]["rejected"] == 0
         assert response.context["stats"]["flagged"] == 0
+
+    def test_moderation_dashboard_end_to_end(self, seller, category, city) -> None:
+        """End-to-end test: moderation stats reflect real AnalyticsEvent rows.
+
+        Unlike other tests in this class, this test does NOT patch
+        get_moderation_stats. It creates real AnalyticsEvent rows and
+        verifies the view returns the actual aggregated count.
+        """
+        from django.test import Client
+
+        # Establish a clean baseline: the autouse _setup fixture (via
+        # moderation_context) pre-creates 1 MODERATION_APPROVED event;
+        # remove it so the expected count is fully determined by this test.
+        AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.MODERATION_APPROVED,
+        ).delete()
+
+        # Create a published ad and 3 moderation-approved events.
+        ad = create_test_ad(
+            seller, category, city, title="End-to-End Ad", status=AdStatus.PUBLISHED
+        )
+        for _ in range(3):
+            AnalyticsEvent.objects.create(
+                event_type=AnalyticsEventType.MODERATION_APPROVED,
+                ad=ad,
+                timestamp=timezone.now() - timedelta(hours=2),
+            )
+
+        client = Client()
+        client.force_login(self.ctx["staff_user"])
+        # Do NOT patch get_moderation_stats — exercise the real implementation.
+        response = client.get(self.ctx["url"])
+
+        assert response.status_code == 200
+        assert response.context["stats"]["approved"] == 3
