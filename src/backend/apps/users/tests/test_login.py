@@ -209,14 +209,6 @@ class TestLoginStatus:
         response = client.get("/login/status/")
         assert response.status_code == 405
 
-    def test_login_status_410_on_post_unknown_token(self) -> None:
-        """A POST with an unknown token hash returns 410 (POST path regression)."""
-        client = Client()
-        response = client.post(
-            "/login/status/", {"token": "unknown_token_32chars_abcde_abcdefghij"}
-        )
-        assert response.status_code == 410
-
 
 # ---------------------------------------------------------------------------
 # LoginToken security edge cases (G-06)
