@@ -5,7 +5,6 @@ Tests the Ad.transition_to() state machine directly, including:
 - Transition matrix validation (valid and invalid transitions)
 - ON_MODERATION_FAILED -> REJECTED (new matrix edge)
 - ARCHIVED -> REJECTED (forbidden)
-- CheckConstraints enforcing status-timestamp consistency
 
 All tests use the real ORM against PostgreSQL.
 """
@@ -13,10 +12,7 @@ All tests use the real ORM against PostgreSQL.
 from __future__ import annotations
 
 import pytest
-from django.db import IntegrityError, transaction
-from django.utils import timezone
 
-from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
@@ -88,66 +84,3 @@ class TestTransitionMatrixEdges:
 
         ad.refresh_from_db()
         assert ad.status == AdStatus.ARCHIVED
-
-
-# ---------------------------------------------------------------------------
-# Tests: CheckConstraints (new)
-# ---------------------------------------------------------------------------
-
-
-class TestCheckConstraints:
-    """Verify database-level CheckConstraints on the ads table."""
-
-    def test_checkconstraint_published_requires_published_at(
-        self, seller, category, city
-    ):
-        """Bulk-update to PUBLISHED without published_at raises IntegrityError."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-
-        with pytest.raises(IntegrityError):
-            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
-                Ad.objects.filter(id=ad.id).update(status=AdStatus.PUBLISHED)
-
-        # Original row must be untouched (savepoint rollback)
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.DRAFT
-
-    def test_checkconstraint_archived_requires_archived_at(
-        self, seller, category, city
-    ):
-        """Bulk-update to ARCHIVED without archived_at raises IntegrityError."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-
-        with pytest.raises(IntegrityError):
-            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
-                Ad.objects.filter(id=ad.id).update(status=AdStatus.ARCHIVED)
-
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.DRAFT
-
-    def test_checkconstraint_mutual_exclusivity(self, seller, category, city):
-        """Setting both moderation_failed_at and rejected_at raises IntegrityError."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-
-        with pytest.raises(IntegrityError):
-            with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
-                Ad.objects.filter(id=ad.id).update(
-                    moderation_failed_at=timezone.now(),
-                    rejected_at=timezone.now(),
-                )
-
-        ad.refresh_from_db()
-        assert ad.moderation_failed_at is None
-        assert ad.rejected_at is None
-
-
-def test_transition_after_concurrent_hard_delete_raises(seller, category, city):
-    """DB-003: refresh_from_db in transition_to must raise DoesNotExist
-    if a concurrent sweep hard-deleted the row between fetch and transition."""
-    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-    # Simulate a concurrent hard-delete sweep removing the row
-    with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
-        Ad.objects.filter(pk=ad.id).delete()
-    # transition_to should now raise Ad.DoesNotExist via refresh_from_db
-    with pytest.raises(Ad.DoesNotExist):
-        ad.transition_to(AdStatus.ON_MODERATION)

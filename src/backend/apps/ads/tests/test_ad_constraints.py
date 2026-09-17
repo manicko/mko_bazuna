@@ -13,8 +13,10 @@ Each test creates a valid DRAFT ad, then uses ``Ad.objects.filter().update()``
 inside ``transaction.atomic()`` to bypass model ``save()`` and trigger the
 database-level constraint.  A rollback verifies the original row is untouched.
 
-Complements the 3 constraint tests in ``test_ad_lifecycle.py`` with the
-remaining 3 + additional mutual-exclusivity paths.
+Also includes a concurrency test
+(``test_transition_after_concurrent_hard_delete_raises``) verifying that
+``transition_to`` raises ``Ad.DoesNotExist`` when a concurrent hard-delete
+removes the row between fetch and refresh.
 """
 
 from __future__ import annotations
@@ -178,3 +180,15 @@ class TestMutualExclusivityConstraint:
         ad.refresh_from_db()
         assert ad.rejected_at is not None
         assert ad.moderation_failed_at is None
+
+
+def test_transition_after_concurrent_hard_delete_raises(seller, category, city):
+    """DB-003: refresh_from_db in transition_to must raise DoesNotExist
+    if a concurrent sweep hard-deleted the row between fetch and transition."""
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    # Simulate a concurrent hard-delete sweep removing the row
+    with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+        Ad.objects.filter(pk=ad.id).delete()
+    # transition_to should now raise Ad.DoesNotExist via refresh_from_db
+    with pytest.raises(Ad.DoesNotExist):
+        ad.transition_to(AdStatus.ON_MODERATION)
