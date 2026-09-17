@@ -36,9 +36,10 @@ from enum import StrEnum
 from typing import Final, cast
 
 from django import template
+from django.utils.functional import Promise
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.services.site_config import get_bot_username
 
@@ -61,7 +62,7 @@ class TelegramDeepLinkCommand(StrEnum):
 
 
 # Visible label + aria-label (translatable; extracted by makemessages).
-_LABELS: dict[TelegramDeepLinkCommand, str] = {
+_LABELS: dict[TelegramDeepLinkCommand, str | Promise] = {
     TelegramDeepLinkCommand.CONTACT: _("Contact Seller"),
     TelegramDeepLinkCommand.CONTACT_US: _("Contact us"),
     TelegramDeepLinkCommand.CREATE_AD: _("Submit an ad"),

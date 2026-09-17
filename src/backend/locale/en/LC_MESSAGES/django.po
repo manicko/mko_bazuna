@@ -1,12 +1,12 @@
 # English translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-14 16:59-0500\n"
+"POT-Creation-Date: 2026-09-15 15:43-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
@@ -15,6 +15,31 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid ""
+"We need your consent to process the Telegram name and username you provided "
+"for account identification and ad publishing.\n"
+"\n"
+"Essential functions (login, contact) always work. Declining consent means "
+"browse-only mode: you can browse ads and contact sellers but cannot publish."
+msgstr ""
+
+msgid "Login successful! You can now create ads with /post."
+msgstr ""
+
+msgid ""
+"Login successful! Browse-only mode is active: you can browse ads and contact "
+"sellers, but cannot publish."
+msgstr ""
+
+msgid "Accept"
+msgstr ""
+
+msgid "Decline"
+msgstr ""
+
+msgid "User not found. Please try logging in again."
+msgstr ""
 
 msgid ""
 "👋 Привет! Вы связались со службой поддержки Bazuna.\n"
@@ -85,9 +110,6 @@ msgstr ""
 msgid ""
 "Login successful! Your account has been created. You can now create ads "
 "with /post."
-msgstr ""
-
-msgid "Login successful! You can now create ads with /post."
 msgstr ""
 
 msgid "Your account is restricted. Contact support for assistance."
@@ -791,9 +813,6 @@ msgid "language and city selection"
 msgstr ""
 
 msgid "Privacy details"
-msgstr ""
-
-msgid "Accept"
 msgstr ""
 
 msgid "Reject non-essential"

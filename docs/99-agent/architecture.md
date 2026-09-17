@@ -25,7 +25,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   processes read rates from the shared DB. See
   [`db-schema`](../02-database/db-schema.md) ([`db-enums`](../02-database/db-enums.md),
   [`db-indexes`](../02-database/db-indexes.md)).
-- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence. See [migration-workflow](../ops/migration-workflow.md).
+- **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence, with an optional `backfill_translations` step included when `RUN_TRANSLATION_BACKFILL=true`. See [migration-workflow](../ops/migration-workflow.md).
 
 ## Commands
 

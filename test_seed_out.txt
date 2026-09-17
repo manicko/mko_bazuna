@@ -1,0 +1,49 @@
+ Container mko-bazuna-test-db-1 Running 
+ Container mko-bazuna-test-db-1 Waiting 
+ Container mko-bazuna-test-db-1 Healthy 
+ Container mko-bazuna-test-test-run-0b1e4f662139 Creating 
+ Container mko-bazuna-test-test-run-0b1e4f662139 Created 
+Fixing media volume permissions...
+No REDIS_URL configured, skipping Redis wait
+Compiling translations...
+File “/app/src/backend/locale/en/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/bs/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/ru/LC_MESSAGES/django.po” is already compiled and up to date.
+Running Django deploy checks...
+System check identified some issues:
+
+WARNINGS:
+?: (security.W008) Your SECURE_SSL_REDIRECT setting is not set to True. Unless your site should be available over both SSL and non-SSL connections, you may want to either set this setting True or configure a load balancer or reverse-proxy server to redirect all connections to HTTPS.
+?: (security.W009) Your SECRET_KEY has less than 50 characters, less than 5 unique characters, or it's prefixed with 'django-insecure-' indicating that it was generated automatically by Django. Please generate a long and random value, otherwise many of Django's security-critical features will be vulnerable to attack.
+?: (security.W012) SESSION_COOKIE_SECURE is not set to True. Using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.
+?: (security.W016) You have 'django.middleware.csrf.CsrfViewMiddleware' in your MIDDLEWARE, but you have not set CSRF_COOKIE_SECURE to True. Using a secure-only CSRF cookie makes it more difficult for network traffic sniffers to steal the CSRF token.
+?: (security.W018) You should not have DEBUG set to True in deployment.
+?: (security.W021) You have not set the SECURE_HSTS_PRELOAD setting to True. Without this, your site cannot be submitted to the browser preload list.
+
+System check identified 6 issues (0 silenced).
+Bytecode compiled 4129 files in 1.18s
+Bytecode compiled 4129 files in 1.32s
+Operations to perform:
+  Synchronize unmigrated apps: admin, ads, analytics, auth, cabinet, categories, contenttypes, core, currencies, django_htmx, locations, lookups, media, messages, moderation, mptt, search, seed, sessions, staticfiles, tailwind, theme, trust, users
+  Apply all migrations: (none)
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  No migrations to apply.
+Installed function ads_search_vector_fn
+Installed function categories_name_propagate
+Installed trigger ads_search_vector_update
+Installed trigger on_category_name_update
+Search-vector trigger infrastructure installed successfully
+Updated EUR: rate_to_eur=1.0
+Updated BAM: rate_to_eur=0.512
+Updated RSD: rate_to_eur=0.0105
+Exchange rates loaded: 0 created, 3 updated
+Bootstrap reference data completed successfully
+Running tests...
+Bytecode compiled 4129 files in 1.18s
+
+ERROR: Wrong expression passed to '-k': 'test_seed_filter_by_feature_returns_results': at column 1: expected not OR left parenthesis OR identifier; got string literal
+
+

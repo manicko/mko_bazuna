@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from apps.ads.models import Ad
 from apps.core.enums import BulkModerationAction
+from apps.core.utils.sanitize import pydantic_errors_json
 from apps.moderation.admin_actions import approve_ad, reject_ad
 from apps.moderation.schemas import BulkModerationRequest
 from apps.moderation.services.priority import PriorityService
@@ -42,9 +43,9 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
     try:
         payload = BulkModerationRequest.model_validate_json(request.body)
     except ValidationError as exc:
-        logger.warning("Invalid bulk moderation request body")
+        logger.warning("Invalid bulk moderation request body: %s", exc)
         return JsonResponse(
-            {"error": "Invalid request body", "errors": exc.errors()},
+            {"error": "Invalid request body", "errors": pydantic_errors_json(exc)},
             status=422,
         )
 

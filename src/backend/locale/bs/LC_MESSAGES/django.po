@@ -1,12 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-14 16:59-0500\n"
+"POT-Creation-Date: 2026-09-15 15:43-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -16,6 +16,39 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid ""
+"We need your consent to process the Telegram name and username you provided "
+"for account identification and ad publishing.\n"
+"\n"
+"Essential functions (login, contact) always work. Declining consent means "
+"browse-only mode: you can browse ads and contact sellers but cannot publish."
+msgstr ""
+"Potreban nam je vaš pristanak da obradimo Telegram ime i korisničko ime "
+"koje ste naveli za identifikaciju naloga i objavljivanje oglasa.\n"
+"\n"
+"Osnovne funkcije (prijava, kontakt) uvijek rade. Odbijanje pristanka znači "
+"samo za pregledanje: možete pregledavati oglase i kontaktirati prodače, "
+"ali ne možete objavljivati."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
+
+msgid ""
+"Login successful! Browse-only mode is active: you can browse ads and contact "
+"sellers, but cannot publish."
+msgstr ""
+"Prijava usječna! Aktivan je režim samo za pregledanje: možete pregledavati "
+"oglase i kontaktirati prodače, ali ne možete objavljivati."
+
+msgid "Accept"
+msgstr "Prihvati"
+
+msgid "Decline"
+msgstr "Odbij"
+
+msgid "User not found. Please try logging in again."
+msgstr "Korisnik nije pronađen. Pokušajte ponovo da se prijavite."
 
 msgid ""
 "👋 Привет! Вы связались со службой поддержки Bazuna.\n"
@@ -101,9 +134,6 @@ msgid ""
 "with /post."
 msgstr ""
 "Prijava usječna! Vaš nalog je kreiran. Sada možete kreirati oglase sa /post."
-
-msgid "Login successful! You can now create ads with /post."
-msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
 
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Vaš nalog je ograničen. Kontaktirajte podršku za pomoć."
@@ -203,8 +233,7 @@ msgstr ""
 #, python-brace-format
 msgid "New ads matching your saved searches ({count} found):\n"
 msgstr ""
-"Novi oglasi koji odgovaraju vašim sačuvanim pretragama "
-"({count} pronađeno):\n"
+"Novi oglasi koji odgovaraju vašim sačuvanim pretragama ({count} pronađeno):\n"
 
 msgid "Ad"
 msgstr "Oglas"
@@ -830,9 +859,6 @@ msgstr "izbor jezika i grada"
 
 msgid "Privacy details"
 msgstr "Detalji o privatnosti"
-
-msgid "Accept"
-msgstr "Prihvati"
 
 msgid "Reject non-essential"
 msgstr "Odbij neophodne"

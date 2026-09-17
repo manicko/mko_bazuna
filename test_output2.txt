@@ -1,0 +1,637 @@
+ Container mko-bazuna-test-db-1 Running 
+ Container mko-bazuna-test-db-1 Waiting 
+ Container mko-bazuna-test-db-1 Healthy 
+ Container mko-bazuna-test-test-run-ef8f7eb227e2 Creating 
+ Container mko-bazuna-test-test-run-ef8f7eb227e2 Created 
+Fixing media volume permissions...
+No REDIS_URL configured, skipping Redis wait
+Compiling translations...
+File “/app/src/backend/locale/bs/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/ru/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/en/LC_MESSAGES/django.po” is already compiled and up to date.
+Running Django deploy checks...
+System check identified some issues:
+
+WARNINGS:
+?: (security.W008) Your SECURE_SSL_REDIRECT setting is not set to True. Unless your site should be available over both SSL and non-SSL connections, you may want to either set this setting True or configure a load balancer or reverse-proxy server to redirect all connections to HTTPS.
+?: (security.W009) Your SECRET_KEY has less than 50 characters, less than 5 unique characters, or it's prefixed with 'django-insecure-' indicating that it was generated automatically by Django. Please generate a long and random value, otherwise many of Django's security-critical features will be vulnerable to attack.
+?: (security.W012) SESSION_COOKIE_SECURE is not set to True. Using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.
+?: (security.W016) You have 'django.middleware.csrf.CsrfViewMiddleware' in your MIDDLEWARE, but you have not set CSRF_COOKIE_SECURE to True. Using a secure-only CSRF cookie makes it more difficult for network traffic sniffers to steal the CSRF token.
+?: (security.W018) You should not have DEBUG set to True in deployment.
+?: (security.W021) You have not set the SECURE_HSTS_PRELOAD setting to True. Without this, your site cannot be submitted to the browser preload list.
+
+System check identified 6 issues (0 silenced).
+Bytecode compiled 4129 files in 1.17s
+Bytecode compiled 4129 files in 1.30s
+Operations to perform:
+  Synchronize unmigrated apps: admin, ads, analytics, auth, cabinet, categories, contenttypes, core, currencies, django_htmx, locations, lookups, media, messages, moderation, mptt, search, seed, sessions, staticfiles, tailwind, theme, trust, users
+  Apply all migrations: (none)
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  No migrations to apply.
+Installed function ads_search_vector_fn
+Installed function categories_name_propagate
+Installed trigger ads_search_vector_update
+Installed trigger on_category_name_update
+Search-vector trigger infrastructure installed successfully
+Updated EUR: rate_to_eur=1.0
+Updated BAM: rate_to_eur=0.512
+Updated RSD: rate_to_eur=0.0105
+Exchange rates loaded: 0 created, 3 updated
+Bootstrap reference data completed successfully
+Running tests...
+Bytecode compiled 4129 files in 1.10s
+...........................................................................................................................................................................................................................................................................................................................................FF...........................................................................................................................................................................................................................FFFFFFFF.....................FF..........................................E.E............................................................................................................................................................................................................................................................................................................................F....F..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................F...................................................................................
+==================================== ERRORS ====================================
+_ ERROR at setup of TestAdsPublishedMetric.test_per_ad_stats_includes_all_ads __
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(613) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(613) already exists.
+_ ERROR at setup of TestAdsPublishedMetric.test_ads_published_counts_only_published _
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(615) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(615) already exists.
+=================================== FAILURES ===================================
+E   assert 'Разместить объявление' in '\n\n\n\n<!DOCTYPE html>\n<html lang="ru" dir="ltr">\n    <head>\n        <meta charset="UTF-8">\n        <meta name="...);</script>\n</footer>\n\n        <script src="/static/theme/js/filter-dropdowns.js"></script>\n    </body>\n</html>\n'
+/app/src/backend/apps/ads/tests/test_auth_nav.py:83: assert 'Разместить объявление' in '\n\n\n\n<!DOCTYPE html>\n<html lang="ru" dir="ltr">\n    <head>\n        <meta charset="UTF-8">\n        <meta name="...);</script>\n</footer>\n\n        <script src="/static/theme/js/filter-dropdowns.js"></script>\n    </body>\n</html>\n'
+E   assert 'Разместить объявление' in '\n\n\n\n\n\n\n\n<!DOCTYPE html>\n<html lang="ru" dir="ltr">\n    <head>\n        <meta charset="UTF-8">\n        <met...rict\'; document.cookie = "js=true; SameSite=Lax; Secure; path=/"; })();</script>\n</footer>\n\n    </body>\n</html>\n'
+/app/src/backend/apps/ads/tests/test_auth_nav.py:96: assert 'Разместить объявление' in '\n\n\n\n\n\n\n\n<!DOCTYPE html>\n<html lang="ru" dir="ltr">\n    <head>\n        <meta charset="UTF-8">\n        <met...rict\'; document.cookie = "js=true; SameSite=Lax; Secure; path=/"; })();</script>\n</footer>\n\n    </body>\n</html>\n'
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(509) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(509) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(513) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(513) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(517) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(517) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(521) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(521) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(525) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(525) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(529) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(529) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(533) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(533) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(537) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(537) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(570) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(570) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(580) already exists.
+
+The above exception was the direct cause of the following exception:
+E   django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+    DETAIL:  Key (user_id)=(580) already exists.
+/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py:117: django.db.utils.IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for BulkModerationRequest
+      Invalid JSON: EOF while parsing a value at line 1 column 0 [type=json_invalid, input_value=b'', input_type=bytes]
+        For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+
+During handling of the above exception, another exception occurred:
+E   TypeError: Object of type bytes is not JSON serializable
+    when serializing dict item 'input'
+    when serializing list item 0
+    when serializing dict item 'errors'
+------------------------------ Captured log call -------------------------------
+WARNING  apps.moderation.views.api_bulk:api_bulk.py:45 Invalid bulk moderation request body
+ERROR    django.request:log.py:253 Internal Server Error: /moderation/api/v1/bulk-action/
+Traceback (most recent call last):
+  File "/app/src/backend/apps/moderation/views/api_bulk.py", line 43, in bulk_moderation_action
+    payload = BulkModerationRequest.model_validate_json(request.body)
+  File "/opt/venv/lib/python3.14/site-packages/pydantic/main.py", line 782, in model_validate_json
+    return cls.__pydantic_validator__.validate_json(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        json_data, strict=strict, extra=extra, context=context, by_alias=by_alias, by_name=by_name
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for BulkModerationRequest
+  Invalid JSON: EOF while parsing a value at line 1 column 0 [type=json_invalid, input_value=b'', input_type=bytes]
+    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/app/src/backend/apps/moderation/views/decorators.py", line 55, in wrapper
+    return view_func(request, *args, **kwargs)
+  File "/app/src/backend/apps/moderation/views/api_bulk.py", line 46, in bulk_moderation_action
+    return JsonResponse(
+        {"error": "Invalid request body", "errors": exc.errors()},
+        status=422,
+    )
+  File "/opt/venv/lib/python3.14/site-packages/django/http/response.py", line 762, in __init__
+    data = json.dumps(data, cls=encoder, **json_dumps_params)
+  File "/usr/local/lib/python3.14/json/__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "/usr/local/lib/python3.14/json/encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/local/lib/python3.14/json/encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "/opt/venv/lib/python3.14/site-packages/django/core/serializers/json.py", line 114, in default
+    return super().default(o)
+           ~~~~~~~~~~~~~~~^^^
+  File "/usr/local/lib/python3.14/json/encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type bytes is not JSON serializable
+when serializing dict item 'input'
+when serializing list item 0
+when serializing dict item 'errors'
+/usr/local/lib/python3.14/json/encoder.py:182: TypeError: Object of type bytes is not JSON serializable
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for BulkModerationRequest
+      Invalid JSON: expected ident at line 1 column 2 [type=json_invalid, input_value=b'not-json', input_type=bytes]
+        For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+
+During handling of the above exception, another exception occurred:
+E   TypeError: Object of type bytes is not JSON serializable
+    when serializing dict item 'input'
+    when serializing list item 0
+    when serializing dict item 'errors'
+------------------------------ Captured log call -------------------------------
+WARNING  apps.moderation.views.api_bulk:api_bulk.py:45 Invalid bulk moderation request body
+ERROR    django.request:log.py:253 Internal Server Error: /moderation/api/v1/bulk-action/
+Traceback (most recent call last):
+  File "/app/src/backend/apps/moderation/views/api_bulk.py", line 43, in bulk_moderation_action
+    payload = BulkModerationRequest.model_validate_json(request.body)
+  File "/opt/venv/lib/python3.14/site-packages/pydantic/main.py", line 782, in model_validate_json
+    return cls.__pydantic_validator__.validate_json(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        json_data, strict=strict, extra=extra, context=context, by_alias=by_alias, by_name=by_name
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for BulkModerationRequest
+  Invalid JSON: expected ident at line 1 column 2 [type=json_invalid, input_value=b'not-json', input_type=bytes]
+    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/app/src/backend/apps/moderation/views/decorators.py", line 55, in wrapper
+    return view_func(request, *args, **kwargs)
+  File "/app/src/backend/apps/moderation/views/api_bulk.py", line 46, in bulk_moderation_action
+    return JsonResponse(
+        {"error": "Invalid request body", "errors": exc.errors()},
+        status=422,
+    )
+  File "/opt/venv/lib/python3.14/site-packages/django/http/response.py", line 762, in __init__
+    data = json.dumps(data, cls=encoder, **json_dumps_params)
+  File "/usr/local/lib/python3.14/json/__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "/usr/local/lib/python3.14/json/encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/local/lib/python3.14/json/encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "/opt/venv/lib/python3.14/site-packages/django/core/serializers/json.py", line 114, in default
+    return super().default(o)
+           ~~~~~~~~~~~~~~~^^^
+  File "/usr/local/lib/python3.14/json/encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type bytes is not JSON serializable
+when serializing dict item 'input'
+when serializing list item 0
+when serializing dict item 'errors'
+/usr/local/lib/python3.14/json/encoder.py:182: TypeError: Object of type bytes is not JSON serializable
+E   Failed: Pending migrations detected.
+    stdout: Migrations for 'search':
+      src/backend/apps/search/migrations/0002_alter_savedsearch_query.py
+        ~ Alter field query on savedsearch
+    
+    stderr:
+/app/src/backend/apps/core/tests/test_migrations.py:115: Failed: Pending migrations detected.
+=============================== warnings summary ===============================
+src/backend/apps/search/tests/test_autocomplete.py: 13 warnings
+src/backend/apps/ads/tests/test_detail_render.py: 2 warnings
+src/backend/apps/ads/tests/test_listings_sort.py: 4 warnings
+src/backend/apps/ads/tests/test_search_triggers.py: 3 warnings
+src/backend/apps/search/tests/test_preferred_city_readback.py: 14 warnings
+src/backend/apps/ads/tests/test_breadcrumbs_render.py: 4 warnings
+src/backend/apps/search/tests/test_search_view.py: 16 warnings
+src/backend/apps/moderation/tests/test_moderation_views.py: 23 warnings
+src/backend/apps/ads/tests/test_favorites.py: 8 warnings
+src/backend/apps/users/tests/test_consent.py: 21 warnings
+src/backend/apps/core/tests/test_site_config.py: 1 warning
+src/backend/apps/search/tests/test_preferred_city.py: 13 warnings
+src/backend/apps/cabinet/tests/test_cabinet_sections.py: 6 warnings
+src/backend/apps/core/tests/test_privacy.py: 3 warnings
+src/backend/apps/ads/tests/test_auth_nav.py: 9 warnings
+src/backend/apps/users/tests/test_login.py: 21 warnings
+src/backend/apps/ads/tests/test_listings_context.py: 8 warnings
+src/backend/apps/ads/tests/test_ad_detail_queries.py: 2 warnings
+src/backend/apps/ads/tests/test_catalog_filters.py: 33 warnings
+src/backend/apps/ads/tests/test_script_gating.py: 3 warnings
+src/backend/apps/ads/tests/test_i18n_category_city.py: 5 warnings
+src/backend/apps/categories/tests/test_submenu.py: 7 warnings
+src/backend/apps/ads/tests/test_edit.py: 12 warnings
+src/backend/apps/search/tests/test_saved_search_create.py: 2 warnings
+src/backend/apps/ads/tests/test_dashboard_stats.py: 16 warnings
+src/backend/apps/ads/tests/test_media_security.py: 25 warnings
+src/backend/apps/cabinet/tests/test_favorites_badge.py: 3 warnings
+src/backend/apps/analytics/tests/test_views.py: 22 warnings
+src/backend/apps/users/tests/test_consent_records.py: 5 warnings
+src/backend/apps/core/tests/test_contact_rate_limit.py: 5 warnings
+src/backend/apps/moderation/tests/test_priority_service.py: 28 warnings
+src/backend/apps/ads/tests/test_gallery_markup.py: 12 warnings
+src/backend/apps/users/tests/test_logout.py: 4 warnings
+src/backend/apps/core/tests/test_language_end_to_end.py: 8 warnings
+src/backend/apps/core/tests/test_csp_report.py: 3 warnings
+  /opt/venv/lib/python3.14/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /app/staticfiles/
+    mw_instance = middleware(adapted_handler)
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_analytics
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:21.031273) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_with_analytics
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:43.105684) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:23.255924) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:45.315097) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:24.739026) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_idempotent
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:46.788040) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_force_skips_prompt
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:29.929879) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_force_skips_prompt
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:51.943338) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:32.154531) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:54.152752) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:42:50.363525) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:33.637631) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:55.625694) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_recovers_from_orphaned_users
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:42:51.454258) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_produces_seed_source
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:35.862283) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommand::test_seed_produces_seed_source
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:37:57.835108) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:39.570035) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:01.517464) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:42:55.817190) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:01.242088) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:43.277788) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:05.199820) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:42:58.544023) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:01.391074) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:46.985540) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:08.882176) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:01.270856) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:01.540060) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:50.693293) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:12.564532) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:03.997688) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:01.689046) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:54.401046) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:16.246888) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:06.724521) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:01.838032) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:25:58.850348) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:20.665715) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:09.996720) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:02.016815) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:02.558101) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:24.348072) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:12.723553) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:02.165802) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:05.524303) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:27.293957) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:14.905019) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:02.284990) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_seed_produces_multi_language_ads
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:08.490505) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_seed_produces_multi_language_ads
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:30.239841) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:10.715157) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:32.449255) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:15.164459) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCommandEnhanced::test_media_cleanup
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:36.868082) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:29.995470) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:51.597507) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:32.902115) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:03.268299) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-10-21 00:33:43.174419) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2021-06-24 07:38:15.518613) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2025-10-31 17:27:04.512762) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2022-11-01 20:42:36.026839) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2026-06-04 05:00:20.936980) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2022-07-20 05:35:57.377086) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:33.703222) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:38:55.279863) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:35.628947) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2020-03-14 00:51:03.417285) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-10-21 00:33:46.754517) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_full_seed_with_builder_categories
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:42.601828) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestSeedCategoryIntegration::test_full_seed_with_builder_categories
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:39:04.117517) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestUserGenerator::test_bulk_create_works
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-22 14:26:47.792681) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestUserGenerator::test_bulk_create_works
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2024-12-10 03:39:09.272816) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/seed/tests/test_seed.py::TestUserGenerator::test_bulk_create_works
+  /opt/venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1671: RuntimeWarning: DateTimeField User.consent_given_at received a naive datetime (2023-08-29 17:43:45.990911) while time zone support is active.
+    warnings.warn(
+
+src/backend/apps/ads/tests/test_detail_context.py::test_detail_context_contains_breadcrumb_category
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='128483491924352'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::test_detail_context_contains_ad
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='128483612002688'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::test_detail_context_contains_bot_username
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='128483495254000'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::test_detail_prefetch_includes_trust_score
+  /opt/venv/lib/python3.14/site-packages/django/core/cache/backends/base.py:119: CacheKeyWarning: Cache key contains characters that will cause errors if used with memcached: ":1:lookup:resolved_features:<MagicMock name='Ad.objects.select_related().prefetch_related().get().category.id' id='128483499803712'>"
+    warnings.warn(warning, CacheKeyWarning)
+
+src/backend/apps/ads/tests/test_detail_context.py::test_separator_preserved
+  /app:0: PytestWarning: Error when trying to teardown test databases: OperationalError('database "test_mko_bazuna" is being accessed by other users\nDETAIL:  There is 1 other session using the database.')
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR src/backend/apps/analytics/tests/test_ads_published.py::TestAdsPublishedMetric::test_per_ad_stats_includes_all_ads
+ERROR src/backend/apps/analytics/tests/test_ads_published.py::TestAdsPublishedMetric::test_ads_published_counts_only_published
+FAILED src/backend/apps/ads/tests/test_auth_nav.py::TestAnonymousHeader::test_home_renders_catalog_header
+FAILED src/backend/apps/ads/tests/test_auth_nav.py::TestAnonymousHeader::test_detail_renders_catalog_header
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_feature_returns_results
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_condition_returns_results
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_no_ad_has_both_new_and_used_features
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_filter_by_purpose_returns_results
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_condition
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_charity_has_no_features
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_listing_purpose
+FAILED src/backend/apps/seed/tests/test_seed.py::TestSeedFilterCoverage::test_seed_populates_features
+FAILED src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_full_seed_coverage
+FAILED src/backend/apps/seed/tests/test_seed.py::TestAdGeneratorLeafOnly::test_no_non_leaf_category_assigned
+FAILED src/backend/apps/moderation/tests/test_priority_service.py::TestBulkModerationActionView::test_empty_body_returns_422
+FAILED src/backend/apps/moderation/tests/test_priority_service.py::TestBulkModerationActionView::test_malformed_json_body_returns_422
+FAILED src/backend/apps/core/tests/test_migrations.py::test_makemigrations_check
+

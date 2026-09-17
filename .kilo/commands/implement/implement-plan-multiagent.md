@@ -33,6 +33,7 @@ Provide:
 - Whether the plan matches the current implementation
 - Relevant architecture, dependencies, and constraints
 - Important discrepancies or risks
+DO NOT CHANGE CODE
 <original_prompt>
 Save the concise result as `{code_context}`.
 
@@ -54,6 +55,7 @@ Provide:
   - **Planner** — detailed pre-implementation design, architecture, testing, or complex execution
   - **Validator** — independent plan review when implementation risk is high
 - Important: Never change code, you only plan
+DO NOT CHANGE CODE
 <original_prompt>
 
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.

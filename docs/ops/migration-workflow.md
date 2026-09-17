@@ -53,7 +53,7 @@ db  →  migrate  →  load_cities  →  load_catalog  →  web (gunicorn)
 ```
 
 - `db` is a `postgres:18-alpine` container with a `pg_isready` healthcheck.
-- `migrate` runs `migrate_locked.main` (all 3 steps under advisory lock), then exits.
+- `migrate` runs `migrate_locked.main` (3 required steps + 1 optional backfill under advisory lock), then exits.
 - `load_cities` loads `cities.json` (15 ME cities) into the DB, then exits.
 - `load_catalog` loads `categories.yaml` into the DB, then exits. `web` and `bot` both
   block on `load_catalog` completing successfully (transitively on `load_cities`).
@@ -80,26 +80,32 @@ migrate:
 
 It runs the `bootstrap_reference_data` management command (which delegates to `migrate_locked.main`
 in the `prod` settings, internally executing `migrate --run-syncdb`, `setup_search_triggers`, and
-`load_exchange_rates`), so the same image path used in production is exercised in dev.
+`load_exchange_rates`, with an optional `backfill_translations` step when `RUN_TRANSLATION_BACKFILL=true`
+as a single atomic sequence. The optional backfill step runs inside the same advisory lock so that
+operators can trigger a one-time translation backfill during bootstrap without it running by default),
+so the same image path used in production is exercised in dev.
 
 ### Advisory lock (`migrate_locked.py`)
 
 `apps/core/utils/migrate_locked.py` wraps the full post-migration sequence in a PostgreSQL **session-scoped** advisory lock
 (ID `AdvisoryLockId.MIGRATE = 100`, defined in `apps/core/enums.py`). Inside the lock it runs
-all three steps as an atomic sequence — `migrate --run-syncdb`, `setup_search_triggers`, and
+all three required steps as an atomic sequence — `migrate --run-syncdb`, `setup_search_triggers`, and
 `load_exchange_rates` — replacing the previous `&&`-chained shell command that released the lock
-between steps:
+between steps. A fourth optional step, `backfill_translations`, is included only when the
+`RUN_TRANSLATION_BACKFILL` environment variable is set to `"true"`, allowing operators to trigger a
+one-time translation backfill during bootstrap without it running by default.
+
+The step list is built by `_build_steps()` (see `apps/core/utils/migrate_locked.py`), which always
+includes the three required steps and conditionally appends `backfill_translations`:
 
 ```python
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
+from apps.core.utils.migrate_locked import _build_steps
 
 with advisory_lock(AdvisoryLockId.MIGRATE, session=True):
-    steps = (
-        ("migrate", "--noinput", "--run-syncdb"),
-        ("setup_search_triggers",),
-        ("load_exchange_rates",),
-    )
+    # _build_steps() returns 3 or 4 tuples depending on RUN_TRANSLATION_BACKFILL
+    steps = _build_steps()
     for argv in steps:
         subprocess.run([sys.executable, str(manage_py), *argv])
 ```
@@ -302,7 +308,8 @@ These are invoked by the Docker compose one-shot chain after `migrate` completes
 (see `docker-compose.yml` lines 31-194):
 
 1. `bootstrap_reference_data` — acquires `AdvisoryLockId.MIGRATE` (100) and runs:
-   `migrate --run-syncdb` → `load_exchange_rates` → `setup_search_triggers`
+   `migrate --run-syncdb` → `load_exchange_rates` → `setup_search_triggers`,
+   with an optional `backfill_translations` step included when `RUN_TRANSLATION_BACKFILL=true`
 2. `manage.py load_cities` (ENT-031) — loads 15 Montenegro cities from
    `apps/seed/fixtures/cities.json`, acquires `AdvisoryLockId.CATALOG_LOAD` (104)
 3. `manage.py load_catalog --no-rewrite` — loads the category tree, lookups, and
@@ -370,8 +377,9 @@ The canonical app list (10 apps) and their current migration inventory, as verif
 | **Total** | **10** | — | — | |
 
 **Post-consolidation state:** 1 `0001_initial.py` per app (10 files total), `backfill_translations`
-available as a management command (replacing the extracted `0006_backfill_translations` migration), and
-catalog loading via `load_catalog` using `apps.get_model()`.
+available as a management command (replacing the extracted `0006_backfill_translations` migration)
+and wired into the `bootstrap_reference_data` sequence via the `RUN_TRANSLATION_BACKFILL` env-gated
+step in `migrate_locked.py`, and catalog loading via `load_catalog` using `apps.get_model()`.
 
 The seed data pipeline that depends on migrations is documented separately in
 [the seed data workflow](seed-workflow.md) — categories are loaded via the catalog builder and cities

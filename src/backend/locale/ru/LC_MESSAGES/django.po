@@ -1,12 +1,12 @@
 # Russian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-14 16:59-0500\n"
+"POT-Creation-Date: 2026-09-15 15:43-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Russian <ru@li.org>\n"
@@ -16,6 +16,41 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid ""
+"We need your consent to process the Telegram name and username you provided "
+"for account identification and ad publishing.\n"
+"\n"
+"Essential functions (login, contact) always work. Declining consent means "
+"browse-only mode: you can browse ads and contact sellers but cannot publish."
+msgstr ""
+"Нам необходимо ваше согласие на обработку имени и имени пользователя "
+"Telegram, которые вы предоставили для идентификации аккаунта и "
+"публикации объявлений.\n"
+"\n"
+"Основные функции (вход, контакты) всегда работают. Отказ от согласия "
+"означает режим просмотра только: вы можете просматривать объявления и "
+"связываться с продавцами, но не можете публиковать."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr ""
+"Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
+
+msgid ""
+"Login successful! Browse-only mode is active: you can browse ads and contact "
+"sellers, but cannot publish."
+msgstr ""
+"Вход выполнен успешно! Режим только для просмотра: вы можете просматривать "
+"объявления и связываться с продавцами, но не можете публиковать."
+
+msgid "Accept"
+msgstr "Принять"
+
+msgid "Decline"
+msgstr "Отклонить"
+
+msgid "User not found. Please try logging in again."
+msgstr "Пользователь не найден. Попробуйте войти снова."
 
 msgid ""
 "👋 Привет! Вы связались со службой поддержки Bazuna.\n"
@@ -102,10 +137,6 @@ msgid ""
 msgstr ""
 "Вход выполнен успешно! Ваш аккаунт создан. Теперь вы можете создавать "
 "объявления с помощью /post."
-
-msgid "Login successful! You can now create ads with /post."
-msgstr ""
-"Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
 
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Ваш аккаунт ограничен. Обратитесь в поддержку для получения помощи."
@@ -206,8 +237,8 @@ msgstr ""
 #, python-brace-format
 msgid "New ads matching your saved searches ({count} found):\n"
 msgstr ""
-"Новые объявления, соответствующие вашим сохранённым поискам "
-"({count} найдено):\n"
+"Новые объявления, соответствующие вашим сохранённым поискам ({count} "
+"найдено):\n"
 
 msgid "Ad"
 msgstr "Объявление"
@@ -835,9 +866,6 @@ msgstr "выбор языка и города"
 
 msgid "Privacy details"
 msgstr "Подробности о конфиденциальности"
-
-msgid "Accept"
-msgstr "Принять"
 
 msgid "Reject non-essential"
 msgstr "Отклонить необязательные"

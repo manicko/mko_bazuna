@@ -504,6 +504,7 @@ class AdGenerator(BaseGenerator):
             )
             ads.append(ad)
 
+        self._deduplicate_drafts(ads, statuses, weights)
         return ads
 
     def _normalize_weights(
@@ -540,6 +541,73 @@ class AdGenerator(BaseGenerator):
     ) -> AdStatus:
         """Select a status using weighted random selection."""
         return self._rng.choices(statuses, weights=weights, k=1)[0]
+
+    def _set_status_timestamp(self, ad: Ad, status: AdStatus, now: datetime) -> None:
+        """Set timestamp field(s) on an Ad instance consistent with its status.
+
+        Used when reassigning a DRAFT ad's status during post-generation
+        deduplication. Mirrors the inline timestamp logic in ``generate()``.
+        DRAFT ads have all timestamp fields as ``None``; only the fields
+        relevant to the new status are populated.
+        """
+        if status == AdStatus.PUBLISHED:
+            ad.published_at = self._random_date(now - timedelta(days=60), now)
+        elif status == AdStatus.ARCHIVED:
+            ad.published_at = self._random_date(
+                now - timedelta(days=90), now - timedelta(days=61)
+            )
+            ad.archived_at = self._random_date(
+                now - timedelta(days=30), now - timedelta(days=1)
+            )
+        elif status == AdStatus.ON_MODERATION:
+            ad.published_at = now
+        elif status == AdStatus.REJECTED:
+            ad.rejected_at = self._random_date(now - timedelta(days=30), now)
+        elif status == AdStatus.ON_MODERATION_FAILED:
+            ad.moderation_failed_at = self._random_date(now - timedelta(days=30), now)
+
+    def _deduplicate_drafts(
+        self,
+        ads: list[Ad],
+        statuses: list[AdStatus],
+        weights: list[float],
+    ) -> None:
+        """Ensure at most one DRAFT per user before bulk_create.
+
+        The ``uq_ads_single_draft_per_user`` partial unique index forbids
+        two DRAFT ads for the same user. The generator assigns user and status
+        independently via the RNG, so collisions are statistically guaranteed
+        with many users and a non-zero draft weight.
+
+        Excess DRAFTs (second+ per user) are re-assigned to a non-DRAFT status
+        drawn from the same weighted distribution (excluding DRAFT), preserving
+        the overall status mix. Uses ``self._rng`` so determinism (faker_seed)
+        is preserved.
+        """
+        now = datetime.now(UTC)
+        non_draft_statuses = [s for s in statuses if s != AdStatus.DRAFT]
+        non_draft_weights = [
+            w for s, w in zip(statuses, weights, strict=True) if s != AdStatus.DRAFT
+        ]
+
+        # Fallback when the distribution is DRAFT-only: promote to PUBLISHED
+        # rather than crashing on empty population (mirrors _normalize_weights).
+        if not non_draft_statuses:
+            non_draft_statuses = [AdStatus.PUBLISHED]
+            non_draft_weights = [1.0]
+
+        seen_draft_users: set[int] = set()
+        for ad in ads:
+            if ad.status == AdStatus.DRAFT and ad.user_id is not None:
+                if ad.user_id in seen_draft_users:
+                    # Reassign to a non-DRAFT status
+                    ad.status = self._rng.choices(
+                        non_draft_statuses, weights=non_draft_weights, k=1
+                    )[0]
+                    # Set timestamps consistent with the new status
+                    self._set_status_timestamp(ad, ad.status, now)
+                else:
+                    seen_draft_users.add(ad.user_id)
 
     def _generate_price(
         self,

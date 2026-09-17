@@ -139,8 +139,9 @@ db (healthy, pg_isready)
 
 - **`db`** — PostgreSQL 18 with a `pg_isready` healthcheck. `web` and `bot` both block on
   downstream one-shot services completing successfully.
-- **`migrate`** — runs `apps.core.utils.migrate_locked.main` (all three steps — `migrate --run-syncdb`,
-  `setup_search_triggers`, `load_exchange_rates` — under a session-scoped advisory lock ID 100) so
+- **`migrate`** — runs `apps.core.utils.migrate_locked.main` (all three required steps — `migrate --run-syncdb`,
+  `setup_search_triggers`, `load_exchange_rates` — plus an optional `backfill_translations` step
+  when `RUN_TRANSLATION_BACKFILL=true` — under a session-scoped advisory lock ID 100) so
   concurrent runs are serialized. Exits 0 on success (including a fresh DB with no pending
   migrations). See [the migration workflow](migration-workflow.md) for details.
 - **`load_catalog`** — loads the category tree from `apps/categories/catalog/categories.yaml`.
@@ -299,7 +300,7 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 | Service | Image/Command | Notes |
 |---------|---------------|-------|
 | `db` | `postgres:18-alpine` | Persistent volume `postgres_data` |
-| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100 |
+| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100, with optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true` |
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
 | `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |

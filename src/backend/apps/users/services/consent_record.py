@@ -38,7 +38,7 @@ def record_consent_action(
     user: User | None,
     choice: ConsentChoice,
     categories: dict[CookieCategory, bool],
-    request: HttpRequest,
+    request: HttpRequest | None = None,
     consent_version: str = "1.0",
 ) -> ConsentRecord:
     """Create a ``ConsentRecord`` for a consent action.
@@ -46,22 +46,36 @@ def record_consent_action(
     ``user`` may be ``None`` for anonymous cookie-based consent; an anonymous
     record is identified by the request's ``session_key`` instead.
 
+    When ``request`` is ``None`` the action is recorded without HTTP-layer
+    context (e.g. from the Telegram bot /start entry point). ``session_key``,
+    ``ip_address`` and ``user_agent`` are left blank in that case.
+
     Args:
         user: The acting user, or ``None`` for anonymous visitors.
         choice: The ``ConsentChoice`` made (ACCEPTED / DECLINED / WITHDRAWN).
         categories: Map of ``CookieCategory`` to whether it was accepted.
         request: The HTTP request carrying the session, IP, and user agent.
+            When ``None`` (bot entry point), HTTP-layer fields are blanked.
         consent_version: Banner version the user was shown.
 
     Returns:
         The newly created ``ConsentRecord``.
     """
+    if request is not None:
+        session_key = request.session.session_key
+        ip_address = _anonymize_ip(request.META.get("REMOTE_ADDR") or None)
+        user_agent = (request.META.get("HTTP_USER_AGENT") or "")[:500]
+    else:
+        session_key = None
+        ip_address = None
+        user_agent = ""
+
     return ConsentRecord.objects.create(
         user=user if user is not None and user.is_authenticated else None,
-        session_key=request.session.session_key,
+        session_key=session_key,
         consent_version=consent_version,
         choice=choice,
         categories=categories,
-        ip_address=_anonymize_ip(request.META.get("REMOTE_ADDR") or None),
-        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:500],
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

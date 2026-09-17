@@ -35,13 +35,13 @@ def _locmem_cache():
 
 @pytest.fixture
 def seller_ads(seller, category, city):
-    """Create 3 published + 2 draft + 1 rejected ads for the seller."""
+    """Create 3 published + 1 draft + 2 rejected ads for the seller."""
     for i in range(3):
         create_test_ad(
             seller, category, city, title=f"Published {i}", status=AdStatus.PUBLISHED
         )
     create_test_ad(seller, category, city, title="Draft Ad", status=AdStatus.DRAFT)
-    create_test_ad(seller, category, city, title="Another Draft", status=AdStatus.DRAFT)
+    create_test_ad(seller, category, city, title="Rejected Ad 2", status=AdStatus.REJECTED)
     create_test_ad(
         seller, category, city, title="Rejected Ad", status=AdStatus.REJECTED
     )
@@ -68,5 +68,5 @@ class TestAdsPublishedMetric:
     def test_per_ad_stats_includes_all_ads(self, seller_ads, seller: object) -> None:
         """Per-ad stats should include all user ads regardless of status."""
         stats = SellerStats(user_id=seller.id).get_stats()
-        # 3 published + 2 drafts + 1 rejected = 6 total ads
+        # 3 published + 1 draft + 2 rejected = 6 total ads
         assert len(stats["per_ad_stats"]) == 6

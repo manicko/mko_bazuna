@@ -29,13 +29,13 @@ The orchestrator must delegate analysis to specialized agents and synthesize the
 
 Start the required test environment and verify that required services are running.
 
-If the environment cannot be started, document the reason and continue with static analysis where possible.
+If the environment cannot be started, document the reason and stop  analysis.
 
 ---
 
-## Step 1. Analyze Current Architecture and Test Conventions
+## Step 1. Analyze Current Architecture, Test Conventions and Partition Tests
 
-**Goal:** Establish the current implementation and determine what tests should be considered valid.
+**Goal:** Establish the current implementation, determine what tests should be considered valid, and partition the test suite into manageable blocks.
 
 **Launch Agent:** `researcher`
 
@@ -45,21 +45,28 @@ Inspect:
 - relevant models, APIs, services, and workflows;
 - project testing conventions;
 - relevant specifications and documentation;
-- existing test configuration and fixtures.
+- existing test configuration and fixtures;
+- full test suite structure (directories, files, suites).
 
 Identify current contracts and important business behaviors that tests should verify.
 
-Return a concise structured report.
+**Partition the test suite** into concrete, non-overlapping blocks (by directory, module, feature area, or logical groups of files).  
+For each block return:
+- list of exact file paths / test modules belonging to the block;
+- short rationale for the grouping;
+- estimated size / complexity.
 
+Return a concise structured report containing the architecture summary **and** the explicit list of test blocks.
+ DO NOT CHANGE CODE
 ---
 
-## Step 2. Audit Test Quality
+## Step 2. Audit Test Quality (per block)
 
 **Goal:** Identify tests that provide insufficient value or conflict with the current implementation.
 
-**Launch Agent:** `test-engineer`
+**Launch Agent:** `test-engineer` (one independent run per test block identified in Step 1)
 
-Analyze the test suite against the current architecture and conventions.
+For each block, analyze only the tests belonging to that block against the current architecture and conventions.
 
 Look for:
 
@@ -78,19 +85,19 @@ Look for:
 - superficial tests with little verification value;
 - tests that fail or require production changes because their assumptions are obsolete.
 
-Identify missing coverage for important business flows, negative cases, boundaries, and side effects.
+Identify missing coverage for important business flows, negative cases, boundaries, and side effects **within the block**.
 
-Return findings grouped by root cause.
-
+Return findings grouped by root cause, scoped to the current block.
+ DO NOT CHANGE CODE
 ---
 
-## Step 3. Validate Findings
+## Step 3. Validate Findings (per block)
 
 **Goal:** Confirm that proposed test changes are justified by the current system behavior.
 
-**Launch Agent:** `researcher`
+**Launch Agent:** `researcher` (one independent run per block)
 
-For each significant finding, verify:
+For each significant finding in the block, verify:
 
 - what the test currently expects;
 - what the current implementation actually does;
@@ -106,7 +113,7 @@ Classify each finding as:
 - `[DOC-UPDATE]` — test and implementation agree, but documentation/specification is outdated or incorrect.
 
 Do not assume that a failing or outdated-looking test should be deleted without validating the intended behavior.
-
+ DO NOT CHANGE CODE
 ---
 
 ## Step 4. Produce the Audit Report
@@ -115,10 +122,12 @@ Do not assume that a failing or outdated-looking test should be deleted without 
 
 **Launch Agent:** `auditor`
 
-Synthesize the findings into a report containing:
+Synthesize findings from **all** validated blocks into a single report containing:
 
+```
 | FilePath | TestName | Type | Problem | Recommendation |
-|----------|----------|------|---------|----------------|
+| -------- | -------- | ---- | ------- | -------------- |
+```
 
 Include:
 
@@ -136,7 +145,7 @@ Output path:
 `.ai/audit/tests/audit_report_<number>.md`
 
 Use the next available report number.
-
+ DO NOT CHANGE CODE
 ---
 
 ## Step 5. Create the Implementation Plan
@@ -168,7 +177,7 @@ Do not modify tests, production code, or configuration.
 Output path:
 
 `.ai/plans`
-
+ DO NOT CHANGE CODE
 ---
 
 # Constraints
@@ -183,6 +192,7 @@ Output path:
 - Prefer testing observable behavior and business rules over implementation details.
 - Mark uncertain cases explicitly rather than guessing.
 - Base recommendations on evidence from the codebase, tests, and current project documentation.
+- Always process test blocks independently; never overload a single auditor with the entire suite.
 
 ---
 
