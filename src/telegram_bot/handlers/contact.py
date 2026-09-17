@@ -74,14 +74,14 @@ def classify_contact_deep_link(
 # Greeting shown to buyers reaching the support desk (English source). Shared
 # by the /start contact_us deep-link and the inline button so both entry
 # points produce identical output.
-_CONTACT_US_GREETING: Final[str] = gettext_lazy(
+_CONTACT_US_GREETING: Final = gettext_lazy(
     "👋 Hi! You have reached Bazuna support.\n\n"
     "Write your question — we will answer as soon as possible.\n\n"
     "To create an ad, use /post."
 )
 
 # Shown when a user exceeds the contact-start rate limit (OQ1).
-CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = gettext_lazy(
+CONTACT_US_RATE_LIMITED_MESSAGE: Final = gettext_lazy(
     "Too many requests to support. Please try again later."
 )
 
