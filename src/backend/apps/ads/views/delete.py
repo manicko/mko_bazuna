@@ -41,13 +41,16 @@ def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
     # Authorization check: must own the ad
     if ad.user_id != request.user.id:
         logger.warning(
-            f"User {request.user.id} attempted to delete ad {ad_id} owned by {ad.user_id}"
+            "User %s attempted to delete ad %s owned by %s",
+            request.user.id,
+            ad_id,
+            ad.user_id,
         )
         return HttpResponseForbidden(_("You do not have permission to delete this ad."))
 
     # Transition to DELETED (transition_to handles deleted_at timestamp)
     if ad.status != AdStatus.DELETED:
         ad.transition_to(AdStatus.DELETED)
-        logger.info(f"Ad {ad_id} deleted by user {request.user.id}")
+        logger.info("Ad %s deleted by user %s", ad_id, request.user.id)
 
     return redirect("ads:dashboard")

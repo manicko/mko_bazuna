@@ -121,6 +121,7 @@ select = [
     "I",  # isort: import sorting (ruff built-in; replaces standalone isort tool)
     "B",  # bugbear (best practices)
     "UP", # pyupgrade rules
+    "G",  # flake8-logging-format (G004: f-string in logging → lazy %s)
 ]
 # We ignore line length because Black enforces it
 ignore = [

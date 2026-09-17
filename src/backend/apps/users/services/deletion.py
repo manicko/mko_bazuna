@@ -63,8 +63,9 @@ def decline_consent(user: User) -> None:
     user.save(update_fields=["ads_auto_publish", "is_declined", "consent_given_at"])
 
     logger.info(
-        f"User {user.id} declined consent - browse-only mode: "
-        f"ads_auto_publish=False, is_declined=True"
+        "User %s declined consent - browse-only mode: "
+        "ads_auto_publish=False, is_declined=True",
+        user.id,
     )
 
 
@@ -111,7 +112,7 @@ def withdraw_consent(user: User) -> list[str]:
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         if user.is_deleted:
-            logger.info(f"User {user.id} already soft-deleted — skipping withdrawal")
+            logger.info("User %s already soft-deleted — skipping withdrawal", user.id)
             return []
 
         now = timezone.now()
@@ -158,7 +159,7 @@ def withdraw_consent(user: User) -> list[str]:
     for storage_key in storage_keys:
         delete_photo(storage_key)
 
-    logger.info(f"User {user.id} withdrew consent - soft-delete triggered")
+    logger.info("User %s withdrew consent - soft-delete triggered", user.id)
     return storage_keys
 
 
@@ -217,7 +218,7 @@ def soft_delete_user_ads(user: User) -> list[str]:
         deleted_at=now,
     )
 
-    logger.info(f"Soft-deleted {ads_deleted} ads for user {user.id}")
+    logger.info("Soft-deleted %s ads for user %s", ads_deleted, user.id)
     return draft_storage_keys
 
 
@@ -261,4 +262,4 @@ def give_consent(user: User) -> None:
         ]
     )
 
-    logger.info(f"User {user.id} gave consent - consent_given_at set")
+    logger.info("User %s gave consent - consent_given_at set", user.id)

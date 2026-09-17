@@ -163,7 +163,7 @@ def validate_photo(
                 f"Photo too large. Maximum dimensions: {max_width}x{max_height} pixels.",
             )
     except Exception as e:
-        logger.warning(f"Failed to open image for validation: {e}")
+        logger.warning("Failed to open image for validation: %s", e)
         return False, "Failed to process image."
 
     return True, None
@@ -199,23 +199,30 @@ def delete_photo(storage_key: str) -> None:
     for attempt in range(DELETE_PHOTO_MAX_ATTEMPTS):
         try:
             os.remove(path)
-            logger.info(f"Deleted photo: {storage_key}")
+            logger.info("Deleted photo: %s", storage_key)
             return
         except FileNotFoundError:
-            logger.warning(f"Photo not found (already deleted): {storage_key}")
+            logger.warning("Photo not found (already deleted): %s", storage_key)
             return
         except OSError as exc:
             if attempt < DELETE_PHOTO_MAX_ATTEMPTS - 1:
                 delay = DELETE_PHOTO_BASE_DELAY * (2**attempt)
                 logger.warning(
-                    f"Retryable error deleting photo {storage_key} "
-                    f"(attempt {attempt + 1}/{DELETE_PHOTO_MAX_ATTEMPTS}): {exc}"
+                    "Retryable error deleting photo %s "
+                    "(attempt %s/%s): %s",
+                    storage_key,
+                    attempt + 1,
+                    DELETE_PHOTO_MAX_ATTEMPTS,
+                    exc,
                 )
                 time.sleep(delay)
             else:
                 logger.error(
-                    f"Failed to delete photo {storage_key} after "
-                    f"{DELETE_PHOTO_MAX_ATTEMPTS} attempts: {exc}"
+                    "Failed to delete photo %s after "
+                    "%s attempts: %s",
+                    storage_key,
+                    DELETE_PHOTO_MAX_ATTEMPTS,
+                    exc,
                 )
                 _record_deletion_error(storage_key, exc)
                 return

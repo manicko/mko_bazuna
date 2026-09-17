@@ -40,7 +40,7 @@ def approve_ad(ad: Ad, moderator_id: int) -> None:
         return
 
     set_published(ad, moderator_id=moderator_id)
-    logger.info(f"Ad {ad.id} approved by moderator {moderator_id}")
+    logger.info("Ad %s approved by moderator %s", ad.id, moderator_id)
 
 
 def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -60,7 +60,7 @@ def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
         return
 
     set_rejected(ad, moderator_id=moderator_id, reason=reason)
-    logger.info(f"Ad {ad.id} rejected by moderator {moderator_id}")
+    logger.info("Ad %s rejected by moderator %s", ad.id, moderator_id)
 
 
 def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -84,7 +84,9 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
                 reason=reason,
             )
         logger.info(
-            f"User {mask_telegram_id(user.telegram_id)} banned by moderator {moderator_id}"
+            "User %s banned by moderator %s",
+            mask_telegram_id(user.telegram_id),
+            moderator_id,
         )
 
 
@@ -111,7 +113,7 @@ def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
             moderator_id=moderator_id,
             reason=reason,
         )
-    logger.info(f"Ad {ad.id} deleted by moderator {moderator_id}")
+    logger.info("Ad %s deleted by moderator %s", ad.id, moderator_id)
 
 
 def bulk_approve(queryset, moderator_id: int) -> int:

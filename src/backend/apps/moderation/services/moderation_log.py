@@ -38,7 +38,7 @@ def log_auto_fail(ad_id: int, user_id: int) -> ModeratorActionLog:
         action_type=ModeratorActionType.OTHER,
         reason="Auto-moderation failed",
     )
-    logger.info(f"Logged auto-moderation failure for ad {ad_id}")
+    logger.info("Logged auto-moderation failure for ad %s", ad_id)
     return log
 
 
@@ -69,7 +69,7 @@ def log_manual_reject(
         action_type=ModeratorActionType.REJECT,
         reason=reason,
     )
-    logger.info(f"Logged manual rejection for ad {ad_id} by moderator {moderator_id}")
+    logger.info("Logged manual rejection for ad %s by moderator %s", ad_id, moderator_id)
     return log
 
 
@@ -92,7 +92,7 @@ def log_auto_publish(ad_id: int, user_id: int) -> ModeratorActionLog:
         action_type=ModeratorActionType.OTHER,
         reason="Auto-published",
     )
-    logger.info(f"Logged auto-publish for ad {ad_id}")
+    logger.info("Logged auto-publish for ad %s", ad_id)
     return log
 
 
@@ -114,7 +114,7 @@ def log_manual_publish(ad_id: int, moderator_id: int) -> ModeratorActionLog:
         action_type=ModeratorActionType.OTHER,
         reason="Manually published by moderator",
     )
-    logger.info(f"Logged manual publish for ad {ad_id} by moderator {moderator_id}")
+    logger.info("Logged manual publish for ad %s by moderator %s", ad_id, moderator_id)
     return log
 
 
@@ -137,7 +137,7 @@ def log_ban_account(user_id: int, moderator_id: int, reason: str) -> ModeratorAc
         action_type=ModeratorActionType.BAN_ACCOUNT,
         reason=reason,
     )
-    logger.info(f"Logged ban account for user {user_id} by moderator {moderator_id}")
+    logger.info("Logged ban account for user %s by moderator %s", user_id, moderator_id)
     return log
 
 
@@ -164,7 +164,7 @@ def log_soft_delete(
         action_type=ModeratorActionType.SOFT_DELETE,
         reason=reason,
     )
-    logger.info(f"Logged soft delete for ad {ad_id} by moderator {moderator_id}")
+    logger.info("Logged soft delete for ad %s by moderator %s", ad_id, moderator_id)
     return log
 
 

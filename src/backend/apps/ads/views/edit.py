@@ -105,7 +105,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     # Authorization check: must own the ad (returns 403 Forbidden)
     if ad.user_id != request.user.id:
         logger.warning(
-            f"User {request.user.id} attempted to edit ad {ad_id} owned by {ad.user_id}"
+            "User %s attempted to edit ad %s owned by %s",
+            request.user.id,
+            ad_id,
+            ad.user_id,
         )
         return HttpResponseForbidden(_("You do not have permission to edit this ad."))
 
@@ -227,7 +230,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
                 # Use transition_to for status change to ON_MODERATION
                 ad.transition_to(AdStatus.ON_MODERATION)
-                logger.info(f"Ad {ad_id} text edited, moved to ON_MODERATION")
+                logger.info("Ad %s text edited, moved to ON_MODERATION", ad_id)
 
                 # Run auto-moderation on the edited text content (mirrors
                 # ad_reactivate which calls auto_moderate directly).
@@ -259,7 +262,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         "updated_at",
                     ]
                 )
-                logger.info(f"Ad {ad_id} price/photo edited, stays PUBLISHED")
+                logger.info("Ad %s price/photo edited, stays PUBLISHED", ad_id)
 
             return redirect("ads:dashboard")
 
@@ -278,7 +281,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     "updated_at",
                 ]
             )
-            logger.info(f"Ad {ad_id} edited in status {ad.status}")
+            logger.info("Ad %s edited in status %s", ad_id, ad.status)
 
             return redirect("ads:dashboard")
 
@@ -303,7 +306,10 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         # Authorization check
         if ad.user_id != request.user.id:
             logger.warning(
-                f"User {request.user.id} attempted to archive ad {ad_id} owned by {ad.user_id}"
+                "User %s attempted to archive ad %s owned by %s",
+                request.user.id,
+                ad_id,
+                ad.user_id,
             )
             return HttpResponseForbidden(
                 _("You do not have permission to archive this ad.")
@@ -311,7 +317,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
 
         if ad.status == AdStatus.PUBLISHED:
             ad.transition_to(AdStatus.ARCHIVED)
-            logger.info(f"Ad {ad_id} archived by user {request.user.id}")
+            logger.info("Ad %s archived by user %s", ad_id, request.user.id)
 
     return redirect("ads:dashboard")
 
@@ -337,7 +343,10 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
         # Authorization check
         if ad.user_id != request.user.id:
             logger.warning(
-                f"User {request.user.id} attempted to reactivate ad {ad_id} owned by {ad.user_id}"
+                "User %s attempted to reactivate ad %s owned by %s",
+                request.user.id,
+                ad_id,
+                ad.user_id,
             )
             return HttpResponseForbidden(
                 _("You do not have permission to reactivate this ad.")
@@ -350,6 +359,6 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
             # Run auto-moderation check
             auto_moderate(ad)
 
-            logger.info(f"Ad {ad_id} reactivation initiated by user {request.user.id}")
+            logger.info("Ad %s reactivation initiated by user %s", ad_id, request.user.id)
 
     return redirect("ads:dashboard")

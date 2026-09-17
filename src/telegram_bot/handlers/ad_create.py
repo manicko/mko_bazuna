@@ -1024,7 +1024,7 @@ async def download_photo(file_id: str, bot: Bot) -> bytes | None:
         return file.read() if file else None
 
     except Exception as e:
-        logger.error(f"Failed to download photo {file_id}: {e}")
+        logger.error("Failed to download photo %s: %s", file_id, e)
 
         return None
 
@@ -1079,7 +1079,7 @@ async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
             return staging_key
 
         except FileExistsError:
-            logger.warning(f"Storage key collision: {key}, regenerating")
+            logger.warning("Storage key collision: %s, regenerating", key)
 
             key = generate_storage_key()
 

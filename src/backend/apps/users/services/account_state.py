@@ -66,15 +66,15 @@ def can_publish_ad(user: User) -> bool:
     state = get_account_state(user)
 
     if state.is_banned:
-        logger.info(f"User {user.id} cannot publish: banned")
+        logger.info("User %s cannot publish: banned", user.id)
         return False
 
     if state.is_deleted:
-        logger.info(f"User {user.id} cannot publish: deleted")
+        logger.info("User %s cannot publish: deleted", user.id)
         return False
 
     if not state.ads_auto_publish:
-        logger.info(f"User {user.id} cannot publish: ads_auto_publish=False")
+        logger.info("User %s cannot publish: ads_auto_publish=False", user.id)
         return False
 
     return True
@@ -96,11 +96,11 @@ def can_login(user: User) -> bool:
     state = get_account_state(user)
 
     if state.is_banned:
-        logger.info(f"User {user.id} cannot login: banned")
+        logger.info("User %s cannot login: banned", user.id)
         return False
 
     if state.is_declined:
-        logger.info(f"User {user.id} cannot login: declined consent")
+        logger.info("User %s cannot login: declined consent", user.id)
         return False
 
     return True

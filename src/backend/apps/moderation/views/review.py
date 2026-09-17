@@ -98,7 +98,7 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
             )
             return redirect(reverse("moderation:review", kwargs={"ad_id": ad_id}))
 
-        logger.info(f"Admin {request.user.id} approved ad {ad_id}")
+        logger.info("Admin %s approved ad %s", request.user.id, ad_id)
 
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
@@ -137,7 +137,7 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
 
         do_reject(ad, request.user.id, reason)
 
-    logger.info(f"Admin {request.user.id} rejected ad {ad_id}")
+    logger.info("Admin %s rejected ad %s", request.user.id, ad_id)
 
     return redirect("/admin/ads/ad/?status__exact=on_moderation")
 
@@ -165,6 +165,6 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
         request.user.id,
         request.POST.get("ban_reason", "No reason provided") or "No reason provided",
     )
-    logger.info(f"Admin {request.user.id} banned user via ad {ad_id}")
+    logger.info("Admin %s banned user via ad %s", request.user.id, ad_id)
 
     return redirect("/admin/ads/ad/?status__exact=on_moderation")

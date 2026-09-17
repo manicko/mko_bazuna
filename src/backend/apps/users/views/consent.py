@@ -164,7 +164,7 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )
-    logger.info(f"User {getattr(user, 'id', 'anonymous')} accepted consent via web")
+    logger.info("User %s accepted consent via web", getattr(user, 'id', 'anonymous'))
     return response
 
 
@@ -213,7 +213,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
         request=request,
         consent_version=submission.consent_version if submission else "1.0",
     )
-    logger.info(f"User {getattr(user, 'id', 'anonymous')} declined consent via web")
+    logger.info("User %s declined consent via web", getattr(user, 'id', 'anonymous'))
     return response
 
 
@@ -251,7 +251,7 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
         categories={CookieCategory.ANALYTICS: False, CookieCategory.PREFERENCES: False},
         request=request,
     )
-    logger.info(f"User {user.id} withdrew consent via web - soft-delete triggered")
+    logger.info("User %s withdrew consent via web - soft-delete triggered", user.id)
     return response
 
 
@@ -310,7 +310,7 @@ def login_issue(request: HttpRequest) -> HttpResponse:
 
     bot_username = get_bot_username()
 
-    logger.info(f"Issued login token hash={token_hash[:8]}...")
+    logger.info("Issued login token hash=%s...", token_hash[:8])
 
     return render(
         request,
@@ -410,7 +410,9 @@ def login_status(request: HttpRequest) -> HttpResponse:
             return HttpResponse(status=410)
 
     logger.info(
-        f"Login token {token_hash[:8]} consumed by telegram_id={mask_telegram_id(token.telegram_id)}"
+        "Login token %s consumed by telegram_id=%s",
+        token_hash[:8],
+        mask_telegram_id(token.telegram_id),
     )
 
     # Look up the user by telegram_id
@@ -418,14 +420,16 @@ def login_status(request: HttpRequest) -> HttpResponse:
         user = User.objects.get(telegram_id=token.telegram_id)
     except User.DoesNotExist:
         logger.error(
-            f"User not found for telegram_id={mask_telegram_id(token.telegram_id)}"
+            "User not found for telegram_id=%s",
+            mask_telegram_id(token.telegram_id),
         )
         return HttpResponse(status=410)
 
     # Check if user is banned
     if not can_login(user):
         logger.warning(
-            f"Login denied for telegram_id={mask_telegram_id(token.telegram_id)}: banned"
+            "Login denied for telegram_id=%s: banned",
+            mask_telegram_id(token.telegram_id),
         )
         return HttpResponse(status=410)
 
@@ -438,7 +442,9 @@ def login_status(request: HttpRequest) -> HttpResponse:
     _reconcile_preferred_city_on_login(request, user)
 
     logger.info(
-        f"Web session established for user {user.id} (telegram_id={mask_telegram_id(token.telegram_id)})"
+        "Web session established for user %s (telegram_id=%s)",
+        user.id,
+        mask_telegram_id(token.telegram_id),
     )
 
     return HttpResponse(status=200)
