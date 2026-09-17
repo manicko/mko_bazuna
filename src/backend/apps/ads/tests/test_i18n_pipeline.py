@@ -19,58 +19,9 @@ from django.conf import settings
 from django.template import Context
 
 from apps.lookups.models import LookupItem
+from testing.i18n_helpers import _parse_po_entries
 
 pytestmark = [pytest.mark.unit]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _parse_po_entries(text: str) -> list[tuple[str, str]]:
-    """Parse ``.po`` text into ``(msgid, msgstr)`` tuples.
-
-    Handles multi-line quoted strings and skips the header entry (empty
-    ``msgid``).
-    """
-    entries: list[tuple[str, str]] = []
-    cur_msgid: list[str] = []
-    cur_msgstr: list[str] = []
-    in_msgstr = False
-
-    def _unescape(s: str) -> str:
-        s = s.strip()
-        if s.startswith('"') and s.endswith('"'):
-            s = s[1:-1]
-        return s.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
-
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("msgid "):
-            if in_msgstr:
-                entries.append(("".join(cur_msgid), "".join(cur_msgstr)))
-                cur_msgid = []
-                cur_msgstr = []
-            in_msgstr = False
-            cur_msgid = [_unescape(stripped[len("msgid ") :])]
-        elif stripped.startswith("msgstr "):
-            in_msgstr = True
-            cur_msgstr = [_unescape(stripped[len("msgstr ") :])]
-        elif stripped.startswith('"') and in_msgstr:
-            cur_msgstr.append(_unescape(stripped))
-        elif stripped.startswith('"') and cur_msgid:
-            cur_msgid.append(_unescape(stripped))
-        elif stripped == "" and in_msgstr:
-            entries.append(("".join(cur_msgid), "".join(cur_msgstr)))
-            cur_msgid = []
-            cur_msgstr = []
-            in_msgstr = False
-
-    if in_msgstr:
-        entries.append(("".join(cur_msgid), "".join(cur_msgstr)))
-
-    return entries
 
 
 def _po_files() -> list[Path]:
