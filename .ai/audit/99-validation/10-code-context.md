@@ -1,338 +1,342 @@
 # Code Context — Code Quality Findings (Phase 10 Audit)
 
+> **Status: LIVE working-tree state, 2026-09-17.** This document supersedes the
+> prior `10-code-context.md` (which described a *pre-refactor* "NEEDS ACTION"
+> state). The working tree has since implemented Blocks B–E, so every finding
+> below is updated against the **current** source. Findings that remain
+> unaddressed are explicitly flagged.
+
+## Working-tree state (READ THIS FIRST — gates commit risk)
+
+The refactor is **implemented but NOT committed**. `git status --short` shows:
+
+- **Committed** (in `7ec80c7 chore plans`): Block A ruff G004/I001 pass on
+  `apps/common/models/ad.py`; the 4 legacy `apps/ads/services/*.py` were created in
+  that commit; the prior `10-code-context.md` + plan `22-code-quality-fixes.md`
+  + test-audit docs were added.
+- **Uncommitted — Block B–E implementations** (`git status` = ` M` / `??`):
+
+| Change type | Files | Block |
+|---|---|---|
+| new (untracked) | `src/telegram_bot/services/ad_data.py` (533) | C |
+| new (untracked) | `src/telegram_bot/schemas/callbacks.py` (29) | C |
+| new (untracked) | `src/telegram_bot/middlewares/language.py` (80) | B/FQ-001 |
+| new (untracked) | `src/backend/apps/ads/services/listings_query.py` (263) | D |
+| modified | `src/telegram_bot/handlers/ad_create.py` (1393→926) | C |
+| modified | `src/backend/apps/ads/services/submission.py` (+`AdEditInput`) | E |
+| modified | `src/backend/apps/ads/views/edit.py`, `listings.py`, `search/views/search.py` | D,E |
+| modified | `src/telegram_bot/{main.py, middlewares/__init__.py, handlers/{contact,alerts,language,ad_copy,login}.py, tests/conftest.py, tests/test_*.py}` | B,C |
+| modified | `src/backend/locale/{ru,bs,en}/LC_MESSAGES/django.po`, `tests/test_i18n_completeness.py` | B |
+| deleted (wrote-tree) | `.ai/audit/99-validation/10-code-context.md`, `10-failing-tests-root-cause-audit.md` | — |
+
+**Implication:** All Block B–E status = "structurally implemented in working tree
+**and runtime-verified green**" (fast gate: 1576 passed, 0 failed). Commit gated on
+clearing the QLT-007 pyright findings (§Runtime Verification) and the QLT-002
+`contact_us` token-consolidation advisory.
+
 ## Scope
 
-Validated audit report: `.ai/audit/99-validation/10-code-quality-validated-findings.md` (7 findings, QLT-001–QLT-007) + new prerequisite finding FQ-001.
+The 7 code-quality findings mapped to `docs/99-agent/architecture.md` and plan
+`.ai/plans/22-code-quality-fixes.md` (block gates A–E + FQ-001):
 
-**Verification method:** live `uv run ruff check --select G004`, source reads via `read`/`grep` tools, `git log`, and `Get-Content -ReadCount 0` line counting (PowerShell `Measure-Object -Line` was found unreliable for these files — it under-reported `ad_create.py` as 896; the true count is 1393 per both the `read` tool and `-ReadCount 0`).
+| Plan block | Finding ID | Type | Subject |
+|---|---|---|---|
+| A | QLT-006 | BEST-PRACTICE | ruff `G` (G004) gate |
+| B | FQ-001 | SPEC-DEVIATION | bot per-user locale middleware |
+| B | QLT-005 | BEST-PRACTICE | i18n wrapping + `.po` completeness |
+| C | QLT-001 | BEST-PRACTICE | bot `ad_create.py` god-module extraction |
+| C | QLT-002 | BEST-PRACTICE | callback-token centralization |
+| C | QLT-007 | BEST-PRACTICE | `# type: ignore` hygiene + StrEnum models |
+| D | QLT-003 | BEST-PRACTICE | listings/search queryset extraction |
+| E | QLT-004 | BEST-PRACTICE | ad-edit `AdEditInput` DTO |
 
-**Two-process model:** web (gunicorn sync WSGI, Django 5.2) + bot (aiogram 3.x, `django.setup()` + shared ORM). Two DB-backed processes sharing ORM models — extraction of bot data helpers must respect the bot→backend direction (backend never imports the bot).
+## Verification method
 
-## Finding Status (verified against current code + git log)
+- `uv run ruff check src/backend src/telegram_bot` → **All checks passed** (read-only).
+- Source reads + `grep` for token/registration absence.
+- `git status` / `git show` for commit vs. work-tree attribution.
+- `.po` grep `^msgstr ""$` per locale.
+- Compose `test` service (fast-gate, `PYTEST_SKIP_MARKERS=seed`) launched against the
+  running `mko-bazuna-test-db-1` (postgres:18-alpine) — results in §Runtime Verification.
 
-| ID | Severity | Type | Status | Current Action |
-|----|----------|------|--------|----------------|
-| QLT-001 | HIGH | BEST-PRACTICE | Validated | **PARTIAL** — Stage 1 (submit_ad extraction) DONE; 15 inline sync_to_async ORM helpers remain |
-| QLT-002 | HIGH | BEST-PRACTICE | Validated (narrower) | **NEEDS ACTION** — all token pairs still raw literals; callbacks.py absent |
-| QLT-003 | MEDIUM | BEST-PRACTICE | Validated | **NEEDS ACTION** — listings() still fat; search.py still duplicates |
-| QLT-004 | MEDIUM | BEST-PRACTICE | Validated | **NEEDS ACTION** — edit POST still unvalidated except reactivation |
-| QLT-005 | MEDIUM | BEST-PRACTICE | Validated (+ FQ-001) | **NEEDS ACTION** — unwrapped strings; Russian msgids; gate template-only |
-| QLT-006 | LOW | BEST-PRACTICE | Validated (count drift corrected) | **NEEDS ACTION** — G004 not enabled; live count 48 (audit: 49) |
-| QLT-007 | LOW | BEST-PRACTICE | Validated (count nuance) | **NEEDS ACTION** — 9 bare annotations; Cyrillic comment |
-| FQ-001 | MEDIUM | SPEC-DEVIATION | Validated (new) | **NEEDS ACTION** (prerequisite of QLT-005) |
+## Two-process model
 
----
+Web (gunicorn sync WSGI, HTMX MPA) + bot (aiogram 3.x). Both call `django.setup()`
+and share the ORM over one PostgreSQL. Direction is **bot → backend only**:
+`ad_data.py`, `ad_create.py`, `language.py` import `apps.*`; no `apps.*` module
+imports `telegram_bot.*` (verified: reverse import would be cyclic — see plan
+§5.4). All extraction targets below respect this.
 
-## QLT-001 — Bot `ad_create.py` (1393 lines) god-module
+## Finding status (updated vs. prior audit)
 
-**File:** `src/telegram_bot/handlers/ad_create.py` — 1393 lines (audit: 1311; +82 drift).
-
-### What is already implemented
-- **Stage 1 DONE** — `submit_ad` + `SubmitAdInput` extracted to `apps/ads/services/submission.py` (commit `bb2ccdb refactor(qlt-001): extract inert submission.py`). Confirmed:
-  - `ad_create.py:25` → `from apps.ads.services.submission import SubmitAdInput, submit_ad`
-  - `ad_create.py:841` → `is_valid, errors = await sync_to_async(submit_ad)(...)`
-  - `submit_ad` now invoked from both bot (`:841`, via `sync_to_async`) and web edit reactivation (`edit.py:178`, sync). Commit log confirms QLT-001 follow-ups: `9bc5c4c` (rewire process_preview → submit_ad, delete update_ad_and_moderate), `a4586c4` (route ad_edit reactivation through submit_ad). Per `git log`, `ad_create.py` is the most-churned handler file.
-- `telegram_bot/services/` contains `rate_limit.py` + `__init__.py` only (no `ad_data.py` yet).
-
-### What STILL matches the plan (not done)
-- **15 sync_to_async ORM helpers still inlined** in the handler (audit said 14). **Drift: one new helper `_get_ad_status` (line 926) was added after the audit.** Helper section now `# Helper functions using sync_to_async` at **line 889** (audit: 859; +30 shift), running 889–1393.
-  - Full list of sync_to_async-wrapped ORM helpers:
-    | # | Function | Line | Notes |
-    |---|----------|------|-------|
-    | 1 | `create_draft_ad` | 892 | ORM (Ad DRAFT upsert) |
-    | 2 | `_get_ad_status` | 926 | **NEW** (not in audit's 14) — ORM (Ad read) |
-    | 3 | `delete_draft` | 948 | ORM |
-    | 4 | `search_categories` | 973 | ORM (Category) |
-    | 5 | `get_city_by_name` | 988 | ORM (City) |
-    | 6 | `get_all_cities` | 1005 | ORM (City) |
-    | 7 | `get_category` | 1087 | ORM |
-    | 8 | `get_city` | 1104 | ORM |
-    | 9 | `get_resolved_purposes` | 1169 | sync_to_async BUT delegates to `CategoryLookupResolver` |
-    | 10 | `get_resolved_features` | 1194 | delegates (same) |
-    | 11 | `get_resolved_conditions` | 1219 | delegates (same) |
-    | 12 | `get_default_purpose` | 1239 | ORM |
-    | 13 | `get_lookup_item_by_slug` | 1263 | ORM |
-    | 14 | `get_lookup_item` | 1282 | ORM |
-    | 15 | `get_feature_names` | 1304 | ORM |
-  - **Nuance not caught by audit:** `download_photo` (1018) and `save_photo` (1032) do NOT use `sync_to_async` — `download_photo` is natively `await bot.download()`; `save_photo` uses `asyncio.to_thread` (1077). `translate_all_languages` (1121) uses `asyncio.gather`. The audit's "media helpers (download_photo, save_photo)" as sync_to_async was slightly inaccurate; they are still inlined non-ORM helpers nonetheless.
-- **Keyboard builders still inlined** in helper section: `build_purpose_keyboard` (1330), `build_condition_keyboard` (1354), `build_feature_keyboard` (1368); plus `build_currency_keyboard` (526) sitting outside the helper section (near the price handler).
-- **`except ValueError, Exception:` still present** at **line 620** (audit: 600; +20 shift). Verified parses as implicit tuple; redundant since `Exception ⊃ ValueError`.
-
-### Affected test files (import coupling)
-11 test files import/ patch handlers from `ad_create` — **the blockiest risk for the QLT-001 extraction**:
-- `test_ad_create.py` — imports `create_draft_ad, process_preview, cmd_cancel, delete_draft, process_photos, translate_all_languages`; patches `telegram_bot.handlers.ad_create.download_photo`, `.save_photo`, `.validate_photo`, `.check_upload_rate_limit`, `.delete_photo`, `.translate_all_languages`.
-- `test_ad_create_condition.py` — imports `AdCreateForm, process_condition, build_feature_keyboard`.
-- `test_multi_lang_translation.py` — imports `translate_all_languages`.
-- `test_price_payload.py` — imports `AdCreateForm, process_price_currency`.
-- `test_create_draft_ad.py` — imports `create_draft_ad, delete_draft`.
-- `test_site_name_greeting.py` — imports `cmd_post`; patches `ad_create.create_draft_ad`, `ad_create.get_site_name_async`.
-- `test_save_photo_integration.py` — imports `create_draft_ad`.
-
-**Risk:** Moving the 15 helpers into `telegram_bot/services/ad_data.py` breaks 7 test files' direct imports + 5 patch targets (`mock.patch("telegram_bot.handlers.ad_create.X")`) unless either (a) re-exports are left in `ad_create.py`, or (b) every test import/patch path is updated. `test_site_name_greeting.py`'s patch of `get_site_name_async` is a false positive in the audit's concern it patches an unrelated symbol.
-
-### Discrepancies vs audit
-- Audit helper-section start `859-1311` → **now 889-1393**. All audit line citations for this file are **+20 to +78 stale** (early handlers +20; helper-section keyboard builders +44–78).
-- Audit counted "14 sync_to_async ORM helpers" → **now 15** (`_get_ad_status` added post-audit).
-- Audit cited orphan `telegram_bot/services/__pycache__/media.cpython-314.pyc` → **already absent** (the `__pycache__` now holds only `__init__` + `rate_limit`). The stale-bytecode hazard is resolved; no pruning needed.
+| ID | Severity | Type | Prior | **Live** | Evidence |
+|---|---|---|---|---|---|
+| QLT-006 | LOW | BEST-PRACTICE | NEEDS ACTION | **IMPLEMENTED** | pyproject `select` has `"G"` (124); ruff clean |
+| FQ-001 | MEDIUM | SPEC-DEVIATION | NEEDS ACTION | **IMPLEMENTED** | `language.py:27`; `main.py:62` before `AccountStateMiddleware` @66; conftest:81 |
+| QLT-005 | MEDIUM | BEST-PRACTICE | NEEDS ACTION | **IMPLEMENTED** | ru/bs 0 empty msgstr (394 msgids); `ad_create.py` `_()`; `test_i18n_completeness.py` modified |
+| QLT-001 | HIGH | BEST-PRACTICE | PARTIAL (Stage 1) | **IMPLEMENTED** | `ad_data.py` (533) holds all extracted helpers; `ad_create.py` 1393→926 |
+| QLT-002 | HIGH | BEST-PRACTICE | NEEDS ACTION | **IMPLEMENTED (ad_create)** | `callbacks.py` StrEnum; 0 raw tokens in `ad_create.py`; §Gap: `contact_us` duplicated |
+| QLT-007 | LOW | BEST-PRACTICE | NEEDS ACTION | **PARTIAL — NOT VERIFIED** | `# pyright: ignore` remains in `edit.py:124,285,322`; `basedpyright` not run this pass |
+| QLT-003 | MEDIUM | BEST-PRACTICE | NEEDS ACTION | **IMPLEMENTED** | `ListingsQuery` (263) + `listings.py`/`search.py` thin |
+| QLT-004 | MEDIUM | BEST-PRACTICE | NEEDS ACTION | **IMPLEMENTED** | `AdEditInput` (submission.py:59); `edit.py:135` |
 
 ---
 
-## QLT-002 — Callback-data tokens & locale list are raw string literals
+## Block A — QLT-006: ruff `G` (G004) gate
 
-### Current state (confirmed, all still raw literals)
-**Token pairs still present at BOTH filter and builder sites** (line numbers shifted +20 on filters, +44–78 on builders vs audit):
+**Plan acceptance (22 §3.2):** `"G"` in `[tool.ruff.lint] select`;
+`ruff check src/backend src/telegram_bot` → 0 errors.
 
-| Token | Filter site | Builder site(s) | Audit cited |
-|-------|-------------|-----------------|-------------|
-| `purpose:` | 320 `c.data.startswith("purpose:")` | 1347 `f"purpose:{purpose.slug}"` | 300 / 1265 |
-| `condition:` | 350 `startswith("condition:")` | 1363 `f"condition:{condition.slug}"` | 330 / 1281 |
-| `feature:` | 396 `startswith("feature:")` | 1387 `f"feature:{feature.id}"` | 376 / 1305 |
-| `price_currency:` | 568 `startswith("price_currency:")` | 531/533/535 `"price_currency:EUR"` etc. | 548 / 511-515 |
-| `price_free` | 556 `callback.data == "price_free"` | 537 `callback_data="price_free"` | 536 / 517 |
-| `features_done` | 385 `callback.data == "features_done"` | 1389 `callback_data="features_done"` | 365 / 1389 |
+**Live evidence:**
+- `pyproject.toml:124` → `"G",  # flake8-logging-format (G004: f-string in logging → lazy %s)`
+- `uv run ruff check src/backend src/telegram_bot` → **`All checks passed!`**
+- `apps/common/models/ad.py` carries the committed G004 fix from `7ec80c7`.
 
-**New drift not in audit:** `price_currency:` builder at 531/533/535 are **plain string literals** (not f-strings), and line 569 does a third raw copy via `callback.data.replace("price_currency:", "")` — a 3-way duplication the audit under-counted. `price_free` and `features_done` filters use `==`, not `startswith`, so the "filter/builder" frame holds but the comparison differs.
-
-### Already centralized (audit's scope-narrowing confirmed)
-- `language.py:27` → `LANG_CALLBACK_PREFIX = "lang:"`; reused at filter `language.py:50` (`F.data.startswith(LANG_CALLBACK_PREFIX)`) and builder `language.py:98` (`f"{LANG_CALLBACK_PREFIX}{locale.value}"`).
-- `alerts.py:31` → `UNSUB_ON_PREFIX = "unsub_on:"`; reused at `alerts.py:141` (filter) and `alerts.py:162` (`f"{UNSUB_ON_PREFIX}{token}"`).
-- `alerts.py:21` → `from apps.search.services.immediate_alerts import UNSUB_CALLBACK_PREFIX`; used at `alerts.py:103` (filter).
-
-### Locale list drift
-- `ad_create.py:832, 836` → `translate_all_languages(original_title, ["ru", "bs", "en"])` (audit: 804/808; +28 shift).
-- `ad_create.py:27` → `from apps.core.enums import AdStatus, LanguageLocale` — `LanguageLocale` IS imported but **only used** for `LanguageLocale.from_code` (850) and `LanguageLocale.BOSNIAN` (852); `.values()` is never called. Confirmed genuine unused-enum violation.
-- `core/enums.py:190` → `class LanguageLocale(StrEnum)`; `:198` → `def values(cls) -> list[str]`. Confirmed method exists.
-
-### login.py drift
-- `login.py:62` → `callback_data="contact_us"` (audit: 61; +1 shift), duplicating `contact.py:35` → `CONTACT_US_CALLBACK: Final[str] = "contact_us"` (which is itself used at `contact.py:57, 162`).
-
-### `callbacks.py` does NOT exist
-- `src/telegram_bot/schemas/` holds only `__init__.py`, `message_payloads.py`, `saved_search.py`. No `callbacks.py`. The recommendation targets a genuinely new module.
-
-### Affected test files
-- `test_ad_create_condition.py` — imports `build_feature_keyboard` (uses `feature:` token).
-- `test_ad_create.py`, `test_multi_lang_translation.py` — exercise `translate_all_languages` (the `["ru","bs","en"]` literal).
-- No test directly asserts on `purpose:`/`condition:`/`feature:`/`price_free`/`features_done`/`contact_us` literals (filters are matched at runtime via `lambda c: c.data.startswith(...)`).
+**Status:** IMPLEMENTED / committed. No further action.
 
 ---
 
-## QLT-003 — Web `listings.py` (522 lines) fat view
+## Block B — FQ-001 + QLT-005: per-user locale + i18n
 
-**File:** `src/backend/apps/ads/views/listings.py` — 522 lines (audit: 508; +14 drift).
+**Plan acceptance (22 §4):** FQ-001 — `LanguageMiddleware` in `telegram_bot/middlewares/`,
+exported from `__init__.py`, registered in `main.py` on `dp.update.middleware` **before**
+`AccountStateMiddleware`; also wired in `conftest.py` atomically. QLT-005 — bot strings
+wrapped in `_()`; `ru`/`bs` msgstrs non-empty.
 
-### Current state (confirmed, still fat)
-- `listings()` function now starts at **line 214** (audit: 201; +13 shift). Body runs 214–~474 (Paginator at 453, context assembly 466–474), ~260 lines. Module total 522.
-- Inline filter/sort/pagination confirmed at current lines:
-  - `category.get_descendants(include_self=True)` — 302 (audit 288)
-  - `suggest_city` did-you-mean — 311-330
-  - manual `int(min_price)`/`Decimal` coercion swallowing `ValueError`/`TypeError` with bare `pass` — 338-364 (audit 338-364)
-  - `ads.filter(listing_purpose__slug=...)` — 384 (audit 384)
-  - `ads.filter(features__slug=slug)` — 401 (audit 401)
-  - `if/elif` sort against `AdSort` — 415-427
-  - `annotate_favorites` — 431-435
-  - `Paginator(ads, PER_PAGE)` — 453 (audit 439)
-  - context assembly — 466-474
-- `listings.py` has **0 G004 hits** (confirmed — it logs plain `logger.warning("...")`/`logger.info("...")` literals). The audit's corrected file set stands.
+**Live evidence:**
+- **New file** `src/telegram_bot/middlewares/language.py` (80 lines):
+  `LanguageMiddleware(BaseMiddleware)` (`language.py:27`). Activates
+  `translation.activate(lang)` around handler dispatch; `event.from_user.id` →
+  `User.telegram_language` via `_resolve_user_language` (`language.py:62`,
+  `@sync_to_async`); falls back to `settings.LANGUAGE_CODE` when no user / no
+  `from_user`. `deactivate()` in `finally` prevents thread-local locale leakage
+  across updates on a shared asgiref worker (correct two-process concern).
+- **`middlewares/__init__.py`** (13 lines) exports `LanguageMiddleware` (4, `__all__` 11).
+- **`main.py:62`** → `dp.update.middleware(LanguageMiddleware())`, comment at 60
+  ("must run before AccountStateMiddleware"), `AccountStateMiddleware` @66. ✓ order.
+- **`tests/conftest.py:81`** mirrors the same ordering (dispatcher fixture mirrors
+  production). `conftest.py:83` → `AccountStateMiddleware` after; the `# pyright: ignore`
+  at conftest:83 is test-only. ✓ both files edited atomically (status ` M`).
+- Token source: `ad_create.py` (bot handlers) and `listings.py`/`search.py` (web) were
+  wrapped in `gettext as _` (web already used `gettext`).
+- **`.po` completeness** (grep `^msgstr ""$`):
+  - msgids (excl. header) across `ru`/`bs`/`en`: **394**.
+  - `ru`: 0 empty non-header `msgstr` (only the file header at LC line 6).
+  - `bs`: 0 empty non-header `msgstr`.
+  - `en`: per spec §16 may be empty (msgid = English); not gated.
 
-### search.py reimplementations confirmed (parallel filter logic)
-`src/backend/apps/search/views/search.py` (374 lines) re-implements the same predicates (audit cited 78/105/131/147/255/257; **current lines shifted +1**):
-- `get_descendants(include_self=True)` — 79 (and 203)
-- `price_normalized_eur__gte=int(min_price)` — 106 (audit 105)
-- `price_normalized_eur__lte=int(max_price)` — 111
-- `listing_purpose__slug` — 132 (audit 131)
-- `features__slug=slug` — 148 (audit 147)
-- `order_by(F("price_normalized_eur").asc(...))` / `.desc(...)` — 256/258 (audit 255/257)
+**Note / minor caveat:** `LanguageLocale.from_code("invalid")` raises — plan §5.3 flags
+invalid-code handling; no new test added in working tree. `ru`/`bs` translation of the
+newly-wrapped bot strings is complete.
 
-### Thin-service precedent confirmed
-- `apps/search/services/alert_query.py` — 228 lines, contains `get_descendants` + `price_normalized_eur__gte` filters (the pattern QLT-003's recommendation says to mirror).
-
-### Affected test files
-- `apps/ads/tests/test_listings.py` (if it asserts on `listings()` output or inline filter behavior). The extraction to `ListingsQuery` must preserve the exact queryset/filter semantics or these tests break.
-
----
-
-## QLT-004 — Web edit POST bypasses Pydantic
-
-**File:** `src/backend/apps/ads/views/edit.py` — 355 lines (audit: ~334; +21 drift). Imports include `SubmitAdInput` already.
-
-### Current state (confirmed, still bypassed except reactivation)
-- `ad_edit` POST path:
-  - Lines 134-137: reads `request.POST.get("title")`, `("description")`, `("price_amount")`, `("price_currency")` directly.
-  - Lines 142-147: `price_amount_value = Decimal("0")` with silent `except Exception: price_amount_value = Decimal("0")` fallback to Free (audit cited 142-147 — unchanged).
-  - Lines 149-159: currency coercion with `CurrencyCode()` + `except ValueError: pass` (audit 158-159 → now 158-159; `+0` — the surrounding comments shifted the block but the except lines held). **Currency-fallback-on-invalid semantics preserved** (audit's architectural note confirmed).
-  - Reactivation branch at **line 178**: `passed, errors = submit_ad(SubmitAdInput(ad_id=ad_id, title_ru=new_title, ...))` — validates via Pydantic DTO (audit confirmed; unchanged).
-  - Unvalidated `ad.save(update_fields=[...])` branches: 217-226 (text edit), 254-261 (price-only), 271-280 (else/other-status) — all still bypass any DTO (audit cited 217-226, 234-241, 253-261, 271-280).
-- Helpers present (not previously cited by audit): `_text_fields_changed` and `_apply_price_change` are module-level private functions (def at top of grep output) — partial extraction already happened for price/text diffing, but the POST values themselves are still parsed ad-hoc, not via a DTO.
-
-### Affected test files
-- `apps/ads/tests/test_edit.py` — audit commit log shows `a4586c4 refactor(qlt-001): add test_edit.py baseline`. Any `AdEditInput` DTO refactor must preserve: (a) currency-fallback-on-invalid (lines 149-159), (b) unconditional title/description overwrite (214-215, 268-269 — a latent validation gap a DTO would surface), (c) the `auto_moderate` bool-branch (238) that renders `_("Ad failed moderation checks")`.
+**Status:** IMPLEMENTED.
 
 ---
 
-## QLT-005 — Bot i18n inconsistent
+## Block C — QLT-001 + QLT-002 + QLT-007: bot god-module extraction + token centralization
 
-### Current state (confirmed)
-**`alerts.py`** (247 lines) — imports lines 1-35, **no `gettext`/`_`** (imports: `logging, re, aiogram, sync_to_async, SavedSearch, UNSUB_CALLBACK_PREFIX`). Raw user-facing literals:
-- English: 50 (`"Please login first with /start login_<token>"`), 57-58 (`"You have no saved searches.\n..."`), 62 (`"Your saved searches:"`), 64, 84 (`"...Reply with number to toggle, or /cancel to exit."`).
-- Russian: 119 (`"Не удалось отключить уведомления"`), 127 (button `"Включить уведомления"`), 138 (`"Уведомления отключены"`), 153 (`"Не удалось включить уведомления"`), 161 (button `"🔕 Отключить этот поиск"`), 172 (`"Уведомления включены"`), 199 (`"Эта ссылка недействительна..."`), 203-204 (`"Уведомления отключены для этого сохранённого поиска..."` / `"Чтобы включить их снова, используйте /alerts."`).
-- (Audit cited older lines 119/138/153/161/172/199/203-204 — all confirmed, shifted.)
+### QLT-001 — `ad_create.py` (1393 → 926 lines) extraction
 
-**`ad_create.py`** — imports lines 10-47, **no `gettext`/`_`** (confirmed). Hardcoded Russian fallback at **line 167**: `"Top-level categories: Товары, Услуги, Недвижимость"` (audit: 147; +20 shift). Other bot messages throughout (e.g. 583, 867-869, 874-876, 886) are raw English literals — also unwrapped.
+**Plan acceptance (22 §5):** `telegram_bot/services/ad_data.py` contains all 15
+extracted `sync_to_async` ORM helpers **+ `download_photo` + `save_photo` +
+`translate_all_languages` + 4 keyboard builders**; bot→backend import direction only.
 
-**`contact.py`** (284 lines) — imports `from django.utils.translation import gettext as _` (line 19). Uses **Russian as msgid** (Django convention violation):
-- 200: `_("Ошибка: не удалось определить отправителя")` (audit: 175)
-- 212: `_("объявление больше недоступно")` (audit: 175)
-- 216: `_("продавец больше недоступен для связи")` (audit: 188)
-- 235: `_("Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате.")` (audit: 247 region)
-- 284: `ANONYMOUS_BUYER_LABEL = _("Покупатель")` (audit: 247)
-- 133: `_("Contact us")` — English msgid, OK (contrast).
+**Live evidence:**
+- **New file** `src/telegram_bot/services/ad_data.py` (533 lines):
+  - `__all__` (51–55) lists `"download_photo"`, `"save_photo"`, and `translate_all_languages`.
+  - `download_photo` @182 (`async def`, fetches via `Bot`).
+  - `save_photo` @196 (`async def`, writes staging).
+  - `translate_all_languages` @270 (`async def`).
+  - sync_to_async ORM-helper block ~80–443 (nested `_create`/`_get`/`_search`/
+    `_delete`/`_write` closures inside `@sync_to_async` funcs — the "15" target set).
+  - 4 builders: `build_currency_keyboard` @444, `build_purpose_keyboard` @462,
+    `build_condition_keyboard` @488, `build_feature_keyboard` @506.
+  - All builders consume `BotCallbackPrefix` (grep: 25 `BotCallbackPrefix` references in
+    `ad_data.py` + `ad_create.py` + `callbacks.py`).
+- **`ad_create.py` slimmed 1393→926 lines.** Imports now:
+  - `from apps.ads.services.submission import SubmitAdInput, submit_ad` (23)
+  - `from telegram_bot.schemas.callbacks import BotCallbackPrefix` (33)
+  - `from telegram_bot.services.ad_data import (...)` (40)
+  - `class AdCreateForm(StatesGroup)` (76) retained.
+- **`submit_ad` now shared:** called from bot `process_preview` (via `sync_to_async`,
+  `ad_create.py:23` import) **and** web edit reactivation (`edit.py:163`).
+  `submission.py` docstring (1–13) documents the currency-coercion divergence (Path 2).
 
-**i18n completeness gate** — `apps/ads/tests/test_i18n_completeness.py`:
-- `_collect_template_files()` (117-134): iterates `settings.TEMPLATES` DIRs, `rglob("*.html")`, excludes `admin/`, `analytics/moderation_dashboard.html`, `components/feature_tag.html` (DB-based i18n, exempt). **Scans templates only — never `src/telegram_bot/**/*.py`**. Confirmed template-only by construction (audit's wording nuance confirmed).
+**Status:** IMPLEMENTED. Extraction targets all present in `ad_data.py`.
 
-### What is already implemented
-- Nothing for bot i18n wrapping. `contact.py`/`login.py`/`language.py` are the ONLY bot files using `_()` (contact.py, login.py partially). `alerts.py` and `ad_create.py` have zero wrapping.
+### QLT-002 — callback-token centralization
 
-### Affected test files
-- `test_multi_lang_translation.py` — imports `translate_all_languages`; the only bot test touching translation. After adding `_()` + FQ-001 activation, this test must assert per-user locale rendering.
-- `test_i18n_completeness.py` — gate must be extended to scan `telegram_bot/handlers/` for bare user-facing literals and non-English msgids (audit's advisory recommendation).
+**Plan acceptance (22 §6):** no raw callback tokens in `ad_create.py`; `callbacks.py`
+defines `BotCallbackPrefix`.
 
----
+**Live evidence:**
+- **New file** `src/telegram_bot/schemas/callbacks.py` (29 lines):
+  `class BotCallbackPrefix(StrEnum)` with 8 members — `PURPOSE, CONDITION, FEATURE,
+  PRICE_CURRENCY, PRICE_FREE, FEATURES_DONE, CONTACT_US` (20–26). `__all__` (29).
+- **`ad_create.py` raw-token scan** (grep for
+  `purpose:|condition:|feature:|price_currency:|price_free|features_done|contact_us`)
+  → **0 raw callback literals**. The 3 matches are benign: `default_purpose` var (238),
+  a `# Single purpose:` comment (254), and `_("Select item condition:")` (303).
+  All 10 token usages route through `BotCallbackPrefix.*` (filter lambdas:
+  ad_create.py 357/365/388/395/423/434/435/578/590/591; builders via `ad_data.py`).
 
-## QLT-006 — Pervasive f-string logging (G004 not enforced)
+**Gap (advisory):** `BotCallbackPrefix.CONTACT_US` (callbacks.py:26) is **defined but
+unused**. `src/telegram_bot/handlers/contact.py:35` declares its own
+`CONTACT_US_CALLBACK: Final[str] = "contact_us"` and `CONTACT_US_PATTERN` (31) — the
+same sentinel, duplicated outside the StrEnum. QLT-002's acceptance only scopes
+`ad_create.py` (which is clean), so this is a **consistency** gap, not a regression.
+*Recommendation:* route `contact.py` through `BotCallbackPrefix.CONTACT_US` (trivial,
+but touches the contact deep-link regex — verify `test_contact_us.py` after).
+(Out of scope for QLT-002 as written; flagged for follow-up.)
 
-### Current state (confirmed via live `ruff --select G004`)
-- `pyproject.toml:118-124` → `select = ["E","F","I","B","UP"]`, `ignore = ["E501"]`. **`G` is absent** → G004 unguarded (audit confirmed; unchanged).
-- **LIVE total: 48 G004 hits** (audit + cache `.cache/ruff_g004.txt` said 49; **-1 drift since audit**).
-- **Per-file (current):**
-  | File | Hits |
-  |------|------|
-  | `ads/views/edit.py` | **8** |
-  | `users/views/consent.py` | **8** |
-  | `moderation/services/moderation_log.py` | 6 |
-  | `media/services/filesystem.py` | 5 |
-  | `users/services/account_state.py` | 5 |
-  | `users/services/deletion.py` | 5 |
-  | `moderation/admin_actions.py` | 4 |
-  | `moderation/views/review.py` | 3 |
-  | `ads/views/delete.py` | 2 |
-  | `telegram_bot/handlers/ad_create.py` | 2 |
-  | `ads/views/listings.py` | 0 |
-  | **Total** | **48** |
-- **edit.py G004 exact current lines: 108, 230, 262, 281, 306, 314, 340, 353.** The audit's QLT-006 validation note cited "108, 230, 242, 261, 286, 294, 320, 333" — **only 108 and 230 still match; the other 6 are stale by +14 to +22** (edit.py grew from audit's ~334 to 355 lines). Anyone using the audit's edit.py line citations will look ~20 lines too early.
-- ad_create.py G004 hits: `save_photo` warning at **1082** (`logger.warning(f"Storage key collision: {key}, regenerating")`), `download_photo` error at **1027** (`logger.error(f"Failed to download photo {file_id}: {e}")`).
-- `%s` lazy-format contrast still confirmed: `core/services/contact.py` (logger.info("...%s", ...)).
+**Status:** IMPLEMENTED for `ad_create.py` / `ad_data.py`.
 
-### Drift / risk
-- **Default `ruff check src/backend src/telegram_bot` is NOT clean** — reports `Found 2 errors`, both `I001` (import block un-sorted/un-formatted) in two auto-generated migrations:
-  - `apps/ads/migrations/0005_remove_ad_ix_ads_delete_sweep_ad_ix_ads_delete_sweep.py:3`
-  - `apps/ads/migrations/0006_ad_ix_ads_draft_sweep.py:3`
-  - These migrations are from the DB-001/DB-002 indexing work (commit `750edbe`). **Audit V-01 claimed "PASS (clean)" — the gate has deteriorated post-audit.** Enabling `G004` will surface the 48 hits; these 2 I001 hits are a separate pre-existing gate failure that will block `ruff check --fix` until resolved.
+### QLT-007 — `# type: ignore` / StrEnum model annotations
 
----
+**Plan acceptance (22 §5, staging table row C):** QLT-007 in Block C scope.
 
-## QLT-007 — Bare `dict`/`list`/`set` annotations; Cyrillic comment
+**Live evidence:**
+- **NOT verified in working tree.** `basedpyright` was not executed (ruff does not
+  cover type-ignores). Remaining `# pyright: ignore[...]` directives in live source:
+  - `edit.py:124`, `edit.py:285`, `edit.py:322` → `# pyright: ignore[reportGeneralTypeIssues]`
+    (all on `with transaction.atomic():` — caused by `django-stubs` not installed).
+  - `conftest.py:83` (bot tests) → `# pyright: ignore[reportAbstractUsage]`.
+  - `listings_query.py` / `submission.py` / `ad_data.py` — no type-ignores observed.
+- The plan's "9 bare `# type:` annotations in `apps/common/models/ad.py`" target file
+  is **not in the working-tree `M` set** — `ad.py` is unchanged since `7ec80c7`, so
+  any pre-existing bare annotations there remain.
 
-### Current state (confirmed, all 9 still bare — audit count correct)
-Bare annotations now at **shifted lines** (audit's 721/767/1087/1112/1137/1157/1249/1272/1287 → current):
-
-| Audit line | Current line | Signature |
-|-----------|--------------|-----------|
-| 721 | **749** | `show_preview(message, data: dict)` |
-| 767 | **795** | `_format_preview_price(data: dict)` |
-| 1087 | **1169** | `get_resolved_purposes(...) -> list` |
-| 1112 | **1194** | `get_resolved_features(...) -> list` |
-| 1137 | **1219** | `get_resolved_conditions(...) -> list` |
-| 1157 | **1239** | `get_default_purpose(..., purposes: list)` |
-| 1249 | **1331** | `build_purpose_keyboard(..., purposes: list)` |
-| 1272 | **1354** | `build_condition_keyboard(conditions: list)` |
-| 1287 | **1369** | `build_feature_keyboard(features: list, selected_ids: set)` |
-
-- Audit's "8 signatures" enumeration omitted `build_purpose_keyboard` (1249); the validation note reconciled this to "9 locations." All 9 confirmed bare. Note the audit's line list cited 9 lines but the enumerated signatures listed 8 — the validation note correctly flagged `build_purpose_keyboard` as the 9th.
-- `translate_all_languages` (1121-1123) is **NOT bare** — uses parameterized `target_locales: list[str]` / `-> dict[str, str]`. (Audit did not claim it was bare; this confirms the audit's line-citations 1112/1137 refer to `get_resolved_features`/`get_resolved_conditions`, not translate_all_languages.)
-- Cyrillic comment confirmed at `alerts.py:30`: `# Re-enable callback prefix (complements the "Отключить" button).`
-
-### Affected test files
-- `test_ad_create.py`, `test_ad_create_condition.py` — import `build_feature_keyboard` (signature `features: list, selected_ids: set`), which is in the same helper section targeted by QLT-001 extraction. Audit's note to fold QLT-007 parameterizing into the QLT-001 pass is correct — avoids duplicate churn.
+**Status:** PARTIAL / NOT VERIFIED. *Recommendation:* run
+`uv run basedpyright src/backend/apps/ads/views/edit.py src/telegram_bot/services/ad_data.py
+src/telegram_bot/services/language.py` and remediate the `transaction.atomic()`
+suppressions (install `django-stubs` or annotate the `Atomic` context manager) to
+close QLT-007. Do **not** touch `apps/common/models/ad.py` StrEnum fields until
+pyright confirms the current state.
 
 ---
 
-## FQ-001 — Bot never activates per-user locale (prerequisite of QLT-005)
+## Block D — QLT-003: listings/search queryset extraction
 
-### Current state (confirmed — still a genuine gap)
-- **Zero `translation.activate` / `translation.override` calls in `src/telegram_bot/`** (grep across the whole tree: no matches).
-- `language.py` (230 lines) persists the user's choice but never activates it:
-  - `language.py:42` → `current_lang = await _get_user_language(user_id)` (READS the stored code, then... nothing).
-  - `language.py:106` → `def _get_user_language(user_id) -> str` (reads `User.telegram_language`, line 118).
-  - `language.py:116` → `def _set_user_language(...)` (writes `User.telegram_language`, line 118).
-  - The read value at line 42 is **not** piped into any `translation.activate()`.
-- **Bot middleware registration (`main.py`, 91 lines, read in full):**
-  - `main.py:22-26` imports `AccountStateMiddleware, DatabaseConnectionMiddleware, UpdateIdDedupMiddleware` (+ `LivenessMiddleware` from lifecycle).
-  - `main.py:57-63` registers: `UpdateIdDedupMiddleware`, `LivenessMiddleware`, `AccountStateMiddleware` (all `dp.update.middleware`), `DatabaseConnectionMiddleware` as `outer_middleware`. **No locale middleware.**
-  - Routers included (75-80): `login_router, ad_create_router, alerts_router, ad_copy_router, language_router, contact_router`.
-- **Web activation exists (web-only):** `core/middleware/language.py:141` → `translation.activate(lang)` (inside `_set_language_code`, called by `LanguagePreMiddleware`). Confirmed web-only — the bot imports nothing from this module.
-- **`conftest.py` `dp` fixture** (`src/telegram_bot/tests/conftest.py:44-83`) mirrors `main.py`'s middleware stack (lines 77-81): `UpdateIdDedupMiddleware`, `LivenessMiddleware`, `AccountStateMiddleware`, `DatabaseConnectionMiddleware`. **No locale middleware** in tests either. **DISCREPANCY:** the fixture omits `ad_copy_router` and `language_router` that `main.py` includes (lines 78-80) — a test/production wiring drift that also means any new i18n middleware added to `main.py` would NOT be exercised by the `dp` fixture unless explicitly added to `conftest.py:77-81`.
+**Plan acceptance (22 §8):** `ListingsQuery` class in
+`apps/ads/services/listings_query.py`; `ListingsQueryParams` Pydantic DTO validates
+all filter params (no silent `except: pass`); `listings()` + `search()` delegate;
+queryset semantics identical.
 
-### Wiring implication for the fix
-A bot-side per-user locale activator must be registered on `dp.update.middleware` in **two** places:
-1. `main.py` — add a new middleware class import (line 22-26) + registration (after line 62, before/around `AccountStateMiddleware`).
-2. `telegram_bot/tests/conftest.py` `dp` fixture (line 77-81) — same registration, so bot i18n behavior is testable.
+**Live evidence:**
+- **New file** `src/backend/apps/ads/services/listings_query.py` (263 lines):
+  - `ListingsQueryParams(BaseModel)` (40–105) — `category_slug, city_slug,
+    min_price, max_price, purpose_slug, condition_slug, feature_slugs, sort, user_id,
+    page, per_page`; three `@field_validator(mode="before")`:
+    `_coerce_int_or_none` (64), `_coerce_sort` (77), `_coerce_page` (92). Invalid
+    inputs coerce to safe defaults — **replaces the old silent `except: pass`**
+    (docstring 43–47).
+  - `ListingsQuery` (107–263): `PER_PAGE = 24`; `build_queryset` (118–192) preserves
+    the original pipeline order (PUBLISHED base → category-subtree → city → price →
+    purpose → condition → features AND+distinct → sort → `annotate_favorites`);
+    `_apply_sort` (195–204); `active_price_range` (207–218);
+    `resolve_filter_options` (221–263).
+- **`apps/ads/views/listings.py` (271 lines):** `listings()` (207–262) now thin —
+  `params = ListingsQueryParams(...)` (235–242) → `ListingsQuery.build_queryset(params)`
+  (243) + `resolve_filter_options` (245) + `active_price_range` (251). Still owns
+  request-scoped concerns: rate limit (218), did-you-mean city/category, HTMX partial
+  selection.
+- **`apps/search/views/search.py` (296 lines):** `search()` (39–170) same delegation;
+  FTS (`_apply_fts`, 173–233) intentionally stays view-level (docstring
+  `listings_query.py:14`: "the FTS branch (`q` param …)`). `LanguageLocale.from_code`
+    (182) + per-language `SearchQuery`/`SearchRank` preserved.
+- `ListingsQueryParams` field names **diverge** from form-query-param names
+  (`purpose_slug` vs `listing_purpose`, `condition_slug` vs `condition`) — mapping done
+  in each view (listings.py:238, search.py:89/90). Semantics preserved.
 
-### Affected test files
-- `test_multi_lang_translation.py` — the only existing bot i18n test; mocks the content-translation path (`override_settings`), not activation. Must be extended to assert per-user `translation.activate` is invoked and renders in the user's `telegram_language`.
-- All bot handler tests (via the `dp` fixture) will exercise the new middleware once added to `conftest.py`.
+**Test coverage note:** no file literally named `test_listings.py` exists in the tree
+(`test_listings.py` was not present in `git status`), but listings queryset is covered
+by `test_listings_context.py` + `test_listings_sort.py`, and search by
+`test_search_view.py` (see Block E test-audit findings). Accept.
+
+**Status:** IMPLEMENTED / verified (§Runtime Verification). `test_listings_context.py`,
+`test_listings_sort.py`, `test_search_view.py` all green in the fast gate.
 
 ---
 
-## Cross-Finding: Shared `ad_create.py` remediation surface (rollout sequencing)
+## Block E — QLT-004: ad-edit `AdEditInput` DTO
 
-The audit's dependency chain (lines 367-370) is **current and accurate**:
-1. **QLT-001 → QLT-002:** keyboard builders (`build_purpose/condition/feature/currency_keyboard`) are at 526/1330/1354/1368 — extracting them (QLT-001) without centralizing their tokens (QLT-002) relocates raw literals into `services/ad_data.py`. → Introduce `BotCallbackPrefix` StrEnum **within** the QLT-001 keyboard-builder extraction.
-2. **QLT-002 → QLT-005:** the same `build_*` keyboard functions are where button **labels** would be wrapped in `_()`. Do i18n wrapping in the same pass.
-3. **FQ-001 → QLT-005:** wrapping is a no-op without per-user `translation.activate()`.
+**Plan acceptance (22 §7):** `AdEditInput` Pydantic DTO in
+`apps/ads/services/submission.py`, **sibling to `SubmitAdInput`** (not a modification);
+`test_edit.py` passes (behavior preserved); `SubmitAdInput` unchanged (bot flow).
 
-**Additional coupling discovered during verification (beyond the audit's stated chain):** `build_currency_keyboard` (526) sits OUTSIDE the helper section (near `process_price_currency`, line 547) — it must be co-relocated with the inline `price_currency:`/`price_free` filter+builder extraction, or the token-centralization pass will miss its literals at 531/533/535/537/569.
+**Live evidence:**
+- **`submission.py` (256 lines)** now hosts both DTOs:
+  - `SubmitAdInput(BaseModel)` (37–56) — unchanged shape (ad_id, title_ru/desc_ru,
+    price_amount, price_currency, photos, feature_ids, listing_condition_id, …).
+  - `AdEditInput(BaseModel)` (59–110) — NEW. Fields `title=""`, `description=""`,
+    `price_amount=Decimal("0")`, `price_currency: CurrencyCode | None = None`.
+    Validators model the web-edit divergences explicitly:
+    - `_coerce_price_amount` (90–99): empty/unparseable → `Decimal("0")` (Free) —
+      preserves old `except Exception` fallback (plan §7.2 line 852).
+    - `_coerce_price_currency` (101–110): invalid/blank → `None` — preserves old
+      `except ValueError: pass` "keep current currency" behavior (plan §7.1 line 850).
+    - `_strip_text` (83–88) for title/description.
+    - `TODO(QLT-004)` (72–75): blank title/description still overwrite (intent preserved,
+      not closed this pass — matches plan's "preserve blanket-overwrite, defer").
+  - `submit_ad` (113–256) documented currency-coercion divergence (Path 2, 123–133).
+- **`edit.py` (346 lines):** `ad_edit` POST now `dto = AdEditInput.model_validate(request.POST)`
+  (135) before any `.save()`; `_text_fields_changed` (66–77) + `_apply_price_change`
+  (30–63) pure helpers; `submit_ad(SubmitAdInput(...))` for reactivation (163);
+  `transaction.atomic()` + `select_for_update()` around POST (124–125, DB-003 row lock).
+- `SubmitAdInput` consumers unchanged: bot `ad_create.py:23` (still `from …import
+  SubmitAdInput, submit_ad`). ✓ bot flow unaffected.
 
-## Discrepancies vs. Validated Findings Doc (summary)
+**Status:** IMPLEMENTED (DTO is a new sibling; `SubmitAdInput` untouched).
 
-| # | Audit claim | Current reality | Impact |
-|---|-------------|-----------------|--------|
-| 1 | QLT-001 helper section `859-1311`, file 1311 lines, 14 helpers | Helper section `889-1393`, file **1393** lines, **15** helpers (`_get_ad_status` added) | Audit line citations all +20 to +78 stale; count +1 |
-| 2 | QLT-006 edit.py G004 at "108, 230, 242, 261, 286, 294, 320, 333" | Actual: **108, 230, 262, 281, 306, 314, 340, 353** | 6 of 8 citations stale (+14 to +22) |
-| 3 | QLT-006 "Found 49 errors" | **Live: 48 errors** (-1 since audit) | One G004 fix landed post-audit |
-| 4 | Audit V-01: `ruff check src/backend src/telegram_bot` → "PASS (clean)" | **Now: Found 2 errors** (I001 in migrations 0005, 0006) | Default gate deteriorated; blocks `ruff --fix` rollout |
-| 5 | Orphan `telegram_bot/services/__pycache__/media.cpython-314.pyc` | **Already absent** | Stale-bytecode hazard resolved; no pruning needed |
-| 6 | QLT-002 `price_currency:` builder = 511-515, price_free = 536/517 | Builder is **plain literals at 531/533/535** + `.replace("price_currency:", "")` at 569 (3-way dup) | Slightly worse drift than audit stated |
-| 7 | QLT-005 `contact.py:175,179,188,247` Russian msgids | Shifted to **200, 212, 216, 235, 284** | Audit citations stale (+23 to +37) |
-| 8 | QLT-001 "media helpers (download_photo, save_photo)" as sync_to_async | `download_photo` uses `await bot.download`; `save_photo` uses `asyncio.to_thread` | Mislabeling; they're still inlined, just not sync_to_async |
-| 9 | conftest `dp` fixture mirrors main.py routers | Fixture OMITS `ad_copy_router` + `language_router` (main includes them) | Test/prod wiring drift; new middleware must hit both files |
-| 10 | `pyproject.toml:118-124` (ruff select) | Now `118-124` still (select at 118-124) — **matches**; E501 ignore at 127 | No drift in config location |
+---
 
-## Affected Files & Test Inventory (consolidated)
+## Cross-cutting runtime model notes (for downstream gates)
 
-**Production files requiring change per the plan:**
-- `src/telegram_bot/handlers/ad_create.py` — QLT-001 (extract 15 helpers + 4 keyboards), QLT-002 (tokens), QLT-005 (wrap ~10 messages), QLT-006 (2 G004), QLT-007 (9 annotations)
-- `src/telegram_bot/handlers/alerts.py` — QLT-005 (wrap ~13 Russian + 5 English), QLT-007 (Cyrillic comment)
-- `src/telegram_bot/handlers/contact.py` — QLT-005 (5 Russian msgids → English)
-- `src/telegram_bot/handlers/login.py:62` — QLT-002 (import CONTACT_US_CALLBACK)
-- `src/telegram_bot/schemas/callbacks.py` — QLT-002 (NEW)
-- `src/telegram_bot/services/ad_data.py` — QLT-001 (NEW extraction target)
-- `src/telegram_bot/main.py` + `src/telegram_bot/tests/conftest.py` — FQ-001 (new locale middleware both places)
-- `src/backend/apps/ads/views/edit.py` — QLT-004 (AdEditInput DTO), QLT-006 (8 G004 @ 108,230,262,281,306,314,340,353)
-- `src/backend/apps/ads/views/listings.py` — QLT-003 (ListingsQuery service)
-- `src/backend/apps/search/views/search.py` — QLT-003 (share query object)
-- `src/backend/apps/users/views/consent.py` — QLT-006 (8 G004)
-- `src/backend/apps/...` (6 more files) — QLT-006 (remaining 28 G004 hits)
-- `pyproject.toml` — QLT-006 (add `G` to select)
-- `apps/ads/tests/test_i18n_completeness.py` — QLT-005 (extend gate to bot .py)
+- **Bot FSM persistence:** ad dialog kept as an `Ad` row in `DRAFT` (spec); `submit_ad`
+  transitions DRAFT→ON_MODERATION then `auto_moderate`→PUBLISHED/FAILED (submission.py
+  240–252). `edit.py` reactivation ARCHIVED→ON_MODERATION via `submit_ad`.
+- **Postgres FTS:** per-language vectors; `setup_search_triggers` mgmt command
+  (entrypoint runs it before pytest). `SearchRank`/`SearchQuery(websearch)` in search.
+- **Two-process DB sharing:** both gunicorn workers and bot call `django.setup()`;
+  migrations run once before both start. The `LanguageMiddleware._resolve_user_language`
+  DB hit per update is the documented optional-cache concern (plan §4.2 line 358) —
+  **not** implemented (simple dict cache) — acceptable for sequential-per-chat bot.
 
-**Test files affected by QLT-001 extraction (import/patch coupling):**
-`test_ad_create.py`, `test_ad_create_condition.py`, `test_multi_lang_translation.py`, `test_price_payload.py`, `test_create_draft_ad.py`, `test_site_name_greeting.py`, `test_save_photo_integration.py` — 7 files, ~30 import/patch sites against `telegram_bot.handlers.ad_create.*` symbols (`create_draft_ad`, `delete_draft`, `process_photos`, `process_preview`, `cmd_cancel`, `cmd_post`, `build_feature_keyboard`, `translate_all_languages`, `AdCreateForm`, `process_price_currency`, `process_condition` + patches on `download_photo`/`save_photo`/`validate_photo`/`check_upload_rate_limit`/`delete_photo`/`get_site_name_async`).
+## Discrepancies & gaps (must resolve before commit)
 
-**Test files for QLT-005/FQ-001:** `test_multi_lang_translation.py`, `test_i18n_completeness.py`, plus the `dp` fixture in `conftest.py`.
+1. **QLT-007 unverified** — `basedpyright` not run; 3 `transaction.atomic()` pyright
+   suppressions in `edit.py` + 1 in `conftest`. (ADVISORY)
+2. **QLT-002 partial** — `contact.py:35` duplicates `BotCallbackPrefix.CONTACT_US`
+   rather than importing it. (ADVISORY)
+3. **Runtime gate (Block D/E):** the fast-gate run resolved green —
+   **1576 passed, 0 failed, 0 errors (104.74s)**; `testpaths = ["src/backend",
+   "src/telegram_bot"]` (pyproject:163) so both backend and bot trees exercised the
+   extraction. See §Runtime Verification.
+4. **Test-audit block findings** (`docs/99-agent/test-audit-block-{a..g}-findings.md`,
+   untracked) are **static-analysis only** ("bash blocked globally") and pre-date the
+   B–E extraction. Several cite mock-target / patch-path fragility that the extraction
+   may have invalidated (e.g. `test_edit.py` patches
+   `apps.ads.views.edit.auto_moderate` — still valid today since `edit.py:25` still
+   imports it, but reactivation now also calls `submit_ad`). Reconcile before merging.
 
-## Rollout-safety notes
-- QLT-004 currency-fallback-on-invalid (edit.py:149-159) and unconditional title/description overwrite (214-215, 268-269) are undocumented edge semantics — `AdEditInput` must model them or `test_edit.py` regresses.
-- QLT-001 extraction direction (bot→backend) must not create an import cycle: backend apps must not import `telegram_bot`.
-- The 2 I001 migration errors (Discrepancy #4) mean the **default** `ruff check` gate is not clean — enabling `G004` and running `ruff check --fix` will auto-resolve both the G004 hits and these I001 hits (the `I` rule is already enabled, so `--fix` covers both). They are a separate pre-existing gate failure, not a blocker, but contradict the audit's V-01 "PASS (clean)" claim.
-- FQ-001 middleware must be added under `dp.update.middleware` (so it wraps both Message and CallbackQuery) in both `main.py:57-63` and `conftest.py:77-81`.
+## Runtime verification
+
+- **Lint gate (Block A):** `uv run ruff check src/backend src/telegram_bot` →
+  `All checks passed!` (ruff `select` includes `"G"`, pyproject:124). ✅
+- **Test gate:** compose `test` service (`--env-file .env.test`,
+  `PYTEST_SKIP_MARKERS=seed`) against the running `mko-bazuna-test-db-1`
+  (postgres:18-alpine, healthy). `pyproject.toml:163` →
+  `testpaths = ["src/backend", "src/telegram_bot"]` (both test trees collected).
+  ```
+  1576 passed, 371 warnings in 104.74s (0:01:44)   — 0 failed, 0 errors
+  ```
+  Modules exercising the B–E refactor that collected & passed (per warnings summary):
+  `test_edit.py`, `test_search_view.py`, `test_listings_context.py`,
+  `test_listings_sort.py`, `test_i18n_completeness.py`,
+  `test_multi_lang_translation.py`, `test_ad_create.py`, `test_create_draft_ad.py`,
+  `test_contact_us.py`, `test_unsubscribe.py` → Blocks B, C, D, E gates satisfied. ✅
+- **Typecheck gate:** `basedpyright` not executed (QLT-007 still open). ⏳
+- **Noise (non-blocking):** 6 Django security WARNINGS (W008/W009/W012/W016/W018/W021)
+  — pre-existing test env (`DEBUG=True`, test `SECRET_KEY`); plus a
+  `CacheKeyWarning` in `test_detail_context.py` from a `MagicMock`-keyed cache
+  assertion (pre-existing; Block A test-audit §5). Not failures.

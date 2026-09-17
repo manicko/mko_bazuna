@@ -102,7 +102,8 @@ class TestProcessPreviewLanguageDetection:
         self, seller_id: int, permissive_criteria: None
     ) -> None:
         """Ad original_language is set from the Telegram user's language_code."""
-        from telegram_bot.handlers.ad_create import create_draft_ad, process_preview
+        from telegram_bot.handlers.ad_create import process_preview
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=seller_id)
 
@@ -136,7 +137,8 @@ class TestProcessPreviewLanguageDetection:
         self, seller_id: int, permissive_criteria: None
     ) -> None:
         """Ad original_language falls back to BOSNIAN when language_code is None."""
-        from telegram_bot.handlers.ad_create import create_draft_ad, process_preview
+        from telegram_bot.handlers.ad_create import process_preview
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=seller_id)
 
@@ -423,7 +425,8 @@ class TestCancelAfterSubmit:
         from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import generate_storage_key
-        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+        from telegram_bot.handlers.ad_create import cmd_cancel
+        from telegram_bot.services.ad_data import create_draft_ad
 
         media_root = Path(str(tmp_path))
 
@@ -505,7 +508,8 @@ class TestCancelAfterSubmit:
         from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import generate_storage_key
-        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+        from telegram_bot.handlers.ad_create import cmd_cancel
+        from telegram_bot.services.ad_data import create_draft_ad
 
         media_root = Path(str(tmp_path))
 
@@ -577,7 +581,8 @@ class TestCancelAfterSubmit:
 
         from apps.core.enums import AdStatus
         from apps.media.services.filesystem import STAGING_PREFIX
-        from telegram_bot.handlers.ad_create import cmd_cancel, create_draft_ad
+        from telegram_bot.handlers.ad_create import cmd_cancel
+        from telegram_bot.services.ad_data import create_draft_ad
 
         media_root = Path(str(tmp_path))
 
@@ -645,7 +650,7 @@ class TestDeleteDraftStorageKeys:
 
         from apps.ads.models import Ad, AdImage
         from apps.media.services.filesystem import generate_storage_key
-        from telegram_bot.handlers.ad_create import create_draft_ad, delete_draft
+        from telegram_bot.services.ad_data import create_draft_ad, delete_draft
 
         ad = await create_draft_ad(user_id=seller_id)
 
@@ -668,7 +673,7 @@ class TestDeleteDraftStorageKeys:
 
         # Patch delete_photo to spy on calls (avoid real filesystem deletion)
         with patch(
-            "telegram_bot.handlers.ad_create.delete_photo"
+            "telegram_bot.services.ad_data.delete_photo"
         ) as mock_delete:
             await delete_draft(ad.id)
 

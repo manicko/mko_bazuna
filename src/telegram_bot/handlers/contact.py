@@ -2,7 +2,7 @@
 Anonymous contact handler for Telegram bot.
 
 Handles buyer-to-seller contact via deep-link without PII exposure.
-The seller notification uses a fixed anonymous label ("Покупатель")
+The seller notification uses a fixed anonymous label ("Buyer")
 instead of the buyer's real name. The buyer may disclose their identity
 voluntarily in the free-text message.
 Implements zone R2 conditions and anonymous forwarding.
@@ -16,8 +16,9 @@ from typing import Final
 from aiogram import Bot, F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
 
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -28,11 +29,11 @@ router = Router()
 # /start contact_<ad_id> — anonymous buyer-to-seller contact.
 CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 # /start contact_us — support desk deep-link for logged-out Telegram-bypass buyers.
-CONTACT_US_PATTERN = re.compile(r"^contact_us$")
+CONTACT_US_PATTERN = re.compile(rf"^{BotCallbackPrefix.CONTACT_US}$")
 
 # Callback data for the inline "Contact us" button (shared with login.py's
 # no-arg /start greeting).
-CONTACT_US_CALLBACK: Final[str] = "contact_us"
+CONTACT_US_CALLBACK: Final[BotCallbackPrefix] = BotCallbackPrefix.CONTACT_US
 
 
 class ContactDeepLinkKind(StrEnum):
@@ -70,18 +71,18 @@ def classify_contact_deep_link(
     return None
 
 
-# Greeting shown to buyers reaching the support desk (Russian, per contact.py
-# convention). Shared by the /start contact_us deep-link and the inline button
-# so both entry points produce identical output.
-_CONTACT_US_GREETING: Final[str] = _(
-    "👋 Привет! Вы связались со службой поддержки Bazuna.\n\n"
-    "Напишите ваш вопрос — мы ответим как можно скорее.\n\n"
-    "Для создания объявления используйте /post."
+# Greeting shown to buyers reaching the support desk (English source). Shared
+# by the /start contact_us deep-link and the inline button so both entry
+# points produce identical output.
+_CONTACT_US_GREETING: Final[str] = gettext_lazy(
+    "👋 Hi! You have reached Bazuna support.\n\n"
+    "Write your question — we will answer as soon as possible.\n\n"
+    "To create an ad, use /post."
 )
 
 # Shown when a user exceeds the contact-start rate limit (OQ1).
-CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = _(
-    "Слишком много запросов в поддержку. Попробуйте позже."
+CONTACT_US_RATE_LIMITED_MESSAGE: Final[str] = gettext_lazy(
+    "Too many requests to support. Please try again later."
 )
 
 
@@ -106,8 +107,8 @@ async def handle_contact_start(
         - seller.consent_revoked_at IS NULL
 
     Bot messages (contact_<ad_id> branch):
-        - ad missing/not PUBLISHED -> "объявление больше недоступно"
-        - seller unavailable -> "продавец больше недоступен для связи"
+        - ad missing/not PUBLISHED -> "the ad is no longer available"
+        - seller unavailable -> "the seller is no longer available for contact"
     """
     if CONTACT_US_PATTERN.match(deep_link):
         return await handle_contact_us_start(message, bot)
@@ -179,7 +180,7 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     """
     Handle contact deep-link for anonymous buyer-seller communication.
 
-    The seller notification uses a fixed anonymous label ("Покупатель")
+    The seller notification uses a fixed anonymous label ("Buyer")
     instead of the buyer's real name. The buyer may disclose their identity
     voluntarily in the free-text message.
 
@@ -193,11 +194,11 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     Returns True if contact was handled, False if not available.
 
     Bot messages:
-        - ad missing/not PUBLISHED -> "объявление больше недоступно"
-        - seller unavailable -> "продавец больше недоступен для связи"
+        - ad missing/not PUBLISHED -> "the ad is no longer available"
+        - seller unavailable -> "the seller is no longer available for contact"
     """
     if not message.from_user:
-        await message.answer(_("Ошибка: не удалось определить отправителя"))
+        await message.answer(_("Error: could not determine the sender"))
         return True
 
     buyer_telegram_id = message.from_user.id
@@ -209,11 +210,11 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
     )
 
     if not is_available:
-        await message.answer(_("объявление больше недоступно"))
+        await message.answer(_("The ad is no longer available."))
         return True
 
     if seller_telegram_id is None:
-        await message.answer(_("продавец больше недоступен для связи"))
+        await message.answer(_("The seller is no longer available for contact."))
         return True
 
     # Send anonymous message to seller
@@ -221,10 +222,10 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
         chat_id=seller_telegram_id,
         text=(
             _(
-                "Новый запрос от покупателя!\n\n"
-                "Покупатель: %(buyer)s\n"
+                "New request from a buyer!\n\n"
+                "Buyer: %(buyer)s\n"
                 "Ad ID: %(ad_id)s\n\n"
-                "Напишите своё сообщение — оно будет переслано анонимно."
+                "Write your message — it will be forwarded anonymously."
             )
             % {"buyer": ANONYMOUS_BUYER_LABEL, "ad_id": ad_id}
         ),
@@ -232,7 +233,8 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
 
     # Confirm to buyer
     await message.answer(
-        _("Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате.")
+        _("Your request has been sent to the seller anonymously. "
+          "Wait for a reply in this chat.")
     )
     return True
 
@@ -281,4 +283,4 @@ async def handle_contact_orm(
     return await _handle()
 
 
-ANONYMOUS_BUYER_LABEL = _("Покупатель")
+ANONYMOUS_BUYER_LABEL = _("Buyer")

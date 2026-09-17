@@ -1,22 +1,16 @@
 """
-
 Listings view for Mko Bazuna.
 
-
-
 Public browsing of PUBLISHED ads with category subtree, city, price range filters.
-
 HTMX-compatible MPA (no login required).
-
 """
 
 import logging
-from decimal import Decimal
 from difflib import get_close_matches
 
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import F, Q
+from django.db.models import Q
 from django.http import (
     FileResponse,
     Http404,
@@ -30,6 +24,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.vary import vary_on_headers
 
 from apps.ads.models import Ad, AdImage
+from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus, AnalyticsEventType
@@ -38,8 +33,6 @@ from apps.core.services.contact_rate_limit import check_deep_link_render_rate_li
 from apps.core.services.site_config import get_bot_username
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
-from apps.lookups.enums import LookupGroupCode
-from apps.lookups.models import LookupItem
 from apps.media.services.filesystem import assert_storage_key_contained
 
 logger = logging.getLogger(__name__)
@@ -106,7 +99,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
 
 
 def _serve_image(image_key: str) -> HttpResponseBase:
-    """Serve a media file directly (development fallback without nginx.
+    """Serve a media file directly (development fallback without nginx).
 
     Uses ``FileResponse`` to stream the file from ``MEDIA_ROOT``.  In production,
     the ``media_gate`` view returns an ``X-Accel-Redirect`` header that nginx
@@ -216,307 +209,63 @@ def listings(
     category_slug: str | None = None,
     city_slug: str | None = None,
 ) -> HttpResponse:
+    """Public listings view for PUBLISHED ads.
+
+    Filters: category subtree, city (with did-you-mean), price range.
+    Sorting: ?sort= (DATE_NEW default).  Pagination: 24/page, HTMX partial.
     """
-
-    Public listings view for PUBLISHED ads.
-
-
-
-    Filters:
-
-        - Category: Shows ads in category subtree (get_descendants)
-
-        - City: Exact match with did-you-mean suggestion
-
-        - Price range: min_price and max_price query params
-
-
-
-    Sorting:
-
-        - ?sort=date_desc (default): newest first
-
-        - ?sort=date_asc: oldest first
-
-        - ?sort=price_asc: lowest price first
-
-        - ?sort=price_desc: highest price first
-
-
-
-    Pagination:
-
-        - 24 ads per page via Django Paginator
-
-        - HTMX partial renders only the ad grid fragment
-
-
-
-    Args:
-
-        request: HTTP request with optional query params
-
-        category_slug: Optional category slug for filtering
-
-        city_slug: Optional city slug for filtering
-
-
-
-    Returns:
-
-        Rendered listings page (full or HTMX partial)
-
-    """
-    # Only full-page renders carry contact deep-links (footer + header_catalog);
-    # the HTMX partial (ad_list.html) renders none and is excluded (CR-10).
-    if not request.headers.get("HX-Request"):
-        if not check_deep_link_render_rate_limit(request):
-            logger.warning("Deep-link render rate limit exceeded (listings)")
-            return HttpResponse(status=429)
-
-    PER_PAGE = 24
-
-    # Start with only published ads
-    # Prefetch trust scores to avoid N+1 in render_trust_badge template tag.
-    ads = (
-        Ad.objects.filter(status=AdStatus.PUBLISHED)
-        .filter(Q(category__isnull=True) | Q(category__is_active=True))
-        .select_related("category", "city", "user")
-        .prefetch_related("features", "user__trust_score")
-    )
-
-    # Category filter (subtree)
-
+    # Rate limit (CR-10)
+    if not request.headers.get("HX-Request") and not check_deep_link_render_rate_limit(request):
+        logger.warning("Deep-link render rate limit exceeded (listings)")
+        return HttpResponse(status=429)
+    # City: did-you-mean (F-6); service handles filtering
+    effective_city = getattr(request, "current_city", None) or getattr(request, "preferred_city", None)
+    suggested_city = suggest_city(effective_city) if effective_city and getattr(
+        request, "current_city", None
+    ) and not City.objects.filter(slug=effective_city).exists() else None
+    # Category: breadcrumb + did-you-mean
+    breadcrumb_category = Category.objects.filter(slug=category_slug, is_active=True).first() if category_slug else None
     suggested_category = None
-
-    breadcrumb_category = None
-
     if category_slug:
-        try:
-            category = Category.objects.get(slug=category_slug, is_active=True)
-
-            breadcrumb_category = category
-
-            # Get all descendants including self
-
-            descendant_ids = category.get_descendants(include_self=True).values_list(
-                "id", flat=True
-            )
-
-            ads = ads.filter(category_id__in=descendant_ids)
-
-        except Category.DoesNotExist:
-            # Category not found - no filter applied
-
+        if not breadcrumb_category:
             suggested_category = _suggest_category(category_slug)
-
     elif request.GET.get("category"):
-        # Try to suggest category for invalid slug
-
         suggested_category = _suggest_category(request.GET.get("category", ""))
-
-    # City filter with did-you-mean. Priority: the middleware-resolved
-    # ``request.current_city`` (explicit URL city: ``/city/<slug>/`` or
-    # ``?city=``) wins, then the persisted preferred city as the *default*
-    # filter (R-06). Only an unknown slug yields a did-you-mean suggestion
-    # (F-6). ``city_slug`` (URL param) is no longer parsed here —
-    # CityResolutionMiddleware exposes the resolved slug as
-    # ``request.current_city`` before the view runs.
-    suggested_city = None
-    effective_city = getattr(request, "current_city", None)
-    if effective_city:
-        try:
-            city = City.objects.get(slug=effective_city)
-            ads = ads.filter(city_id=city.id)
-        except City.DoesNotExist:
-            # Invalid slug: did-you-mean banner, no filter (F-6).
-            suggested_city = suggest_city(effective_city)
-    else:
-        # Default fallback to the preferred city (middleware-validated slug).
-        preferred_city = getattr(request, "preferred_city", None)
-        if preferred_city:
-            effective_city = preferred_city
-            try:
-                city = City.objects.get(slug=preferred_city)
-                ads = ads.filter(city_id=city.id)
-            except City.DoesNotExist:
-                # Second line of defense for a stale preference: no filter.
-                pass
-
-    # Price range filter
-
-    min_price = request.GET.get("min_price")
-
-    max_price = request.GET.get("max_price")
-
-    if min_price:
-        try:
-            ads = ads.filter(price_normalized_eur__gte=int(min_price))
-
-        except ValueError:
-            pass  # Invalid price, ignore filter
-
-    if max_price:
-        try:
-            ads = ads.filter(price_normalized_eur__lte=int(max_price))
-
-        except ValueError:
-            pass  # Invalid price, ignore filter
-
-    # Parse active price range for display in the filter summary (§6.6)
-    active_price_min: Decimal | None = None
-    active_price_max: Decimal | None = None
-    if min_price:
-        try:
-            active_price_min = Decimal(min_price)
-        except (ValueError, TypeError):
-            pass
-    if max_price:
-        try:
-            active_price_max = Decimal(max_price)
-        except (ValueError, TypeError):
-            pass
-
-    # Listing purpose filter (F4) — single-select exact slug match
-    listing_purpose_slug = request.GET.get("listing_purpose")
-
-    if listing_purpose_slug:
-        ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
-
-    # Listing condition filter — single-select exact slug match
-    condition_slug = request.GET.get("condition")
-
-    if condition_slug:
-        ads = ads.filter(listing_condition__slug=condition_slug)
-
-    # Features filter (F5) — multi-select AND semantics.
-    # An ad matches only if it possesses ALL selected features. Django's
-    # filter() chains with AND, so each call to ``features__slug=<slug>``
-    # adds a JOIN constraint requiring that specific feature. ``distinct()``
-    # prevents duplicate rows from the multiple M2M JOINs.
-    feature_slugs = request.GET.getlist("features") or []
-
-    if feature_slugs:
-        for slug in feature_slugs:
-            ads = ads.filter(features__slug=slug)
-        ads = ads.distinct()
-
-    # Resolve category-constrained filter options (F4/F5). When a category is
-    # active, use the cached resolver; otherwise show the full active sets.
-    if breadcrumb_category:
-        resolved_purposes = CategoryLookupResolver.get_resolved_purposes(
-            breadcrumb_category
-        )
-        resolved_features = CategoryLookupResolver.get_resolved_features(
-            breadcrumb_category
-        )
-        resolved_conditions = CategoryLookupResolver.get_resolved_conditions(
-            breadcrumb_category
-        )
-    else:
-        resolved_purposes = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_PURPOSE, is_active=True
-        ).order_by("sort_order")
-        resolved_features = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
-        ).order_by("sort_order")
-        resolved_conditions = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_CONDITION, is_active=True
-        ).order_by("sort_order")
-
-    # Sorting
-
-    sort = request.GET.get("sort", AdSort.DATE_NEW)
-
-    if sort == AdSort.DATE_OLD:
-        ads = ads.order_by("published_at")
-
-    elif sort == AdSort.PRICE_LOW:
-        ads = ads.order_by(F("price_normalized_eur").asc(nulls_last=True))
-
-    elif sort == AdSort.PRICE_HIGH:
-        ads = ads.order_by(F("price_normalized_eur").desc(nulls_last=True))
-
-    else:  # date_desc (default)
-        ads = ads.order_by("-published_at")
-
-    # Annotate favorite state for the card hearts (FT-001)
-
-    from apps.ads.views.favorite import annotate_favorites
-
-    ads = annotate_favorites(
-        ads, request.user.id if request.user.is_authenticated else None
+    # Params DTO + shared queryset
+    params = ListingsQueryParams(
+        category_slug=category_slug, city_slug=effective_city,
+        min_price=request.GET.get("min_price"), max_price=request.GET.get("max_price"),
+        purpose_slug=request.GET.get("listing_purpose"), condition_slug=request.GET.get("condition"),
+        feature_slugs=request.GET.getlist("features"), sort=request.GET.get("sort", AdSort.DATE_NEW),
+        user_id=request.user.id if request.user.is_authenticated else None,
+        page=request.GET.get("page", 1), per_page=ListingsQuery.PER_PAGE,
     )
-
-    # Paginate results
-
-    paginator = Paginator(ads, PER_PAGE)
-
-    page_number = request.GET.get("page", 1)
-
-    page_obj = paginator.get_page(page_number)
-
-    total_count = int(paginator.count)
-
-    has_results = total_count > 0
-
-    if not has_results:
+    ads = ListingsQuery.build_queryset(params)
+    # Filter options (F4/F5)
+    resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
+    # Pagination
+    paginator = Paginator(ads, params.per_page)
+    page_obj = paginator.get_page(params.page)
+    if not paginator.count:
         logger.info("Empty listing results")
-
-    context = {
-        "page_obj": page_obj,
-        "query": None,
-        "suggested_category": suggested_category,
-        "suggested_city": suggested_city,
-        "breadcrumb_category": breadcrumb_category,
-        "current_category": category_slug,
-        "current_city": effective_city,
-        "current_sort": sort,
-        "min_price": min_price,
-        "max_price": max_price,
-        "active_price_min": active_price_min,
-        "active_price_max": active_price_max,
-        "current_listing_purpose": listing_purpose_slug,
-        "current_features": feature_slugs,
-        "current_condition": condition_slug,
-        "resolved_purposes": resolved_purposes,
-        "resolved_features": resolved_features,
-        "resolved_conditions": resolved_conditions,
-        "has_results": has_results,
-        "show_filters": True,
-    }
-
-    # HTMX partial rendering support
-
-    if request.headers.get("HX-Request"):
-        return render(request, "ads/partials/ad_list.html", context)
-
-    return render(request, "ads/list.html", context)
+    active_price_lo, active_price_hi = ListingsQuery.active_price_range(params)
+    return render(request, "ads/partials/ad_list.html" if request.headers.get("HX-Request") else "ads/list.html", {
+        "page_obj": page_obj, "query": None, "suggested_category": suggested_category,
+        "suggested_city": suggested_city, "breadcrumb_category": breadcrumb_category,
+        "current_category": category_slug, "current_city": effective_city, "current_sort": params.sort,
+        "min_price": request.GET.get("min_price"), "max_price": request.GET.get("max_price"),
+        "active_price_min": active_price_lo, "active_price_max": active_price_hi,
+        "current_listing_purpose": request.GET.get("listing_purpose"),
+        "current_features": request.GET.getlist("features"), "current_condition": request.GET.get("condition"),
+        "resolved_purposes": resolved_purposes, "resolved_features": resolved_features,
+        "resolved_conditions": resolved_conditions, "has_results": paginator.count > 0, "show_filters": True,
+    })
 
 
 def _suggest_category(slug: str) -> str | None:
-    """
-
-    Suggest similar category slug using difflib.
-
-
-
-    Args:
-
-        slug: The slug to find suggestions for
-
-
-
-    Returns:
-
-        Suggested slug or None
-
-    """
-
+    """Suggest similar category slug using difflib."""
     all_slugs = list(
         Category.objects.filter(is_active=True).values_list("slug", flat=True)
     )
-
     matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
-
     return matches[0] if matches else None

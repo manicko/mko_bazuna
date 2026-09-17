@@ -1,7 +1,7 @@
 ---
 id: code-quality-fixes
 domain: plan
-status: "8 findings (QLT-001–007) + 1 prerequisite (FQ-001) · Stage 1 of QLT-001 already done · 5 execution blocks · 0 committed"
+status: "8 findings (QLT-001–007) + 1 prerequisite (FQ-001) · 5 execution blocks · A: COMMITTED at HEAD 7ec80c7 (G004/I001 fix in de0df4f) · B–E: IMPLEMENTED-UNCOMMITTED in working tree (fast gate 1576 passed) · QLT-007: NOT VERIFIED (basedpyright not run) · 2 residual fixes before atomic commit (QLT-007 typecheck + QLT-002 contact.py sentinel consolidation)"
 source: .ai/audit/99-validation/10-code-quality-validated-findings.md
 code_context: .ai/audit/99-validation/10-code-context.md
 task_template: .ai/tasks/templates/task_template.yaml
@@ -1007,3 +1007,170 @@ uv run ruff check src/backend src/telegram_bot
    literals, not builder labels.
 5. **Block E:** Blank title/description overwrite — **preserve current
    behavior** (documented gap), do NOT close the validation gap in this pass.
+
+---
+
+## 10. Working-Tree Status Reconciliation (2026-09-17)
+
+> **Source of truth:** `.ai/audit/99-validation/10-code-context.md` (live,
+> 2026-09-17). HEAD = `7ec80c7 chore plans`. The refactor is **implemented but
+> not committed** (except Block A). This section supersedes §0–§9's
+> forward-looking sequencing: Blocks B–E are already in the working tree, so the
+> remaining work is two residual fixes → one atomic commit, not a sequential
+> block rollout.
+
+### 10.1 Current working-tree state
+
+`git status` (READ FIRST — gates commit risk):
+
+- **Block A — COMMITTED** (reachable from HEAD `7ec80c7`). The G004/I001 lint-gate
+  fix lives in parent commit `de0df4f` (`fix(quality): enable ruff G004 rule…`,
+  immediate parent of HEAD). `ruff check src/backend src/telegram_bot` → clean.
+- **Blocks B–E — IMPLEMENTED-UNCOMMITTED.** All target files are ` M` (modified)
+  or `??` (untracked); no Block B–E change is in any commit.
+  - 4 new (untracked): `src/telegram_bot/services/ad_data.py` (533),
+    `src/telegram_bot/schemas/callbacks.py` (29),
+    `src/telegram_bot/middlewares/language.py` (80),
+    `src/backend/apps/ads/services/listings_query.py` (263).
+  - ~20 modified files spanning B (locale `.po`×3, `alerts.py`, `ad_copy.py`,
+    `contact.py`, `login.py`, `main.py`, `middlewares/__init__.py`,
+    `tests/conftest.py`, bot `test_*.py`, `test_i18n_completeness.py`) and
+    C/D/E (`ad_create.py` 1393→926, `submission.py`, `edit.py`, `listings.py`,
+    `search.py`, + test path updates).
+- **Runtime gate (fast gate):** `1576 passed, 0 failed, 0 errors (104.74s)`
+  against `mko-bazuna-test-db-1` (postgres:18-alpine). `testpaths`
+  (`pyproject.toml:163`) = `["src/backend", "src/telegram_bot"]` — both trees
+  exercised; the B–E refactor is green.
+- **Typecheck gate:** `basedpyright` NOT executed (QLT-007 open). ⏳
+
+#### Per-block status
+
+| Block | Finding(s) | Live status | Evidence |
+|---|---|---|---|
+| A | QLT-006 | **committed** (HEAD `7ec80c7`; fix `de0df4f`) | `"G"` in `pyproject.toml select`; ruff clean; I001 migrations fixed |
+| B | FQ-001, QLT-005 | **implemented-uncommitted** | `middlewares/language.py`; `main.py` + `conftest.py` register it before `AccountStateMiddleware`; ru/bs 0 empty non-header `msgstr` (394 msgids); bot strings `_()`-wrapped |
+| C | QLT-001, QLT-002 | **implemented-uncommitted** | `ad_data.py` (533) holds 15 helpers + 4 builders + media/translation; `callbacks.py` `BotCallbackPrefix`; `ad_create.py` 1393→926; 0 raw callback tokens |
+| C | QLT-007 (typecheck) | **partial / not-verified** | 4 `# pyright: ignore` suppressions remain; basedpyright not run |
+| D | QLT-003 | **implemented-uncommitted** | `ListingsQuery` (263) + `ListingsQueryParams` DTO; `listings()`/`search()` thin |
+| E | QLT-004 | **implemented-uncommitted** | `AdEditInput` Pydantic DTO sibling to `SubmitAdInput` in `submission.py`; `edit.py` POST validates via DTO before `save()` |
+
+### 10.2 Residual fixes (must clear before commit is safe)
+
+Per the code-context §Discrepancies & gaps, two items remain before the working
+tree can be committed as the code-quality-fixes commit:
+
+1. **QLT-007 — run `basedpyright` + remediate suppressions.** Not covered by ruff.
+   Remaining `# pyright: ignore` directives in live source:
+   - `src/backend/apps/ads/views/edit.py:124, 285, 322` →
+     `# pyright: ignore[reportGeneralTypeIssues]` on `with transaction.atomic():`
+     (root cause: `django-stubs` not installed → `Atomic.__enter__/__exit__`
+     untyped).
+   - `src/telegram_bot/tests/conftest.py:83` →
+     `# pyright: ignore[reportAbstractUsage]` on `AccountStateMiddleware()`.
+   - **Remediation:** install `django-stubs` and/or annotate the `Atomic`
+     context manager to clear the 3 `transaction.atomic()` suppressions;
+     restructure the conftest registration to drop the `reportAbstractUsage`
+     suppression. **Do not** touch `apps/common/models/ad.py` StrEnum fields
+     until pyright confirms current state (no ignores there today, but the plan's
+     9-bare-annotation target is stale — `ad.py` is unchanged since `7ec80c7`).
+   - **Note on path:** code-context §QLT-007 recommendation cites
+     `src/telegram_bot/services/language.py` for the typecheck run — that is a
+     **path typo**. The actual file is `src/telegram_bot/middlewares/language.py`
+     (untracked, confirmed). The corrected 3-file typecheck scope is
+     `edit.py` + `ad_data.py` + `middlewares/language.py`; `conftest.py:83` is
+     the additional test-only suppression to clear.
+
+2. **QLT-002 gap — `contact.py` sentinel consolidation.** `contact.py:35` declares
+   `CONTACT_US_CALLBACK: Final[str] = "contact_us"`, duplicating
+   `BotCallbackPrefix.CONTACT_US = "contact_us"` (`schemas/callbacks.py:26`).
+   QLT-002's acceptance scopes only `ad_create.py` (which is clean), so this is a
+   **consistency** gap, not a regression — but it must be closed before commit:
+   route `contact.py` through `BotCallbackPrefix.CONTACT_US` (update
+   `CONTACT_US_PATTERN` + `login.py` deep-link too) and re-run
+   `test_contact_us.py`.
+
+### 10.3 Dependency verification (inter-block deps satisfied)
+
+Verified from `10-code-context.md` + direct source grep:
+
+- **FQ-001 → QLT-005 (Block B):** ✓. `LanguageMiddleware` registered in
+  `main.py` on `dp.update.middleware` before `AccountStateMiddleware`; mirrored in
+  `tests/conftest.py:81` before `AccountStateMiddleware` (`conftest.py:83`), with
+  comment "Locale middleware must run before AccountStateMiddleware (FQ-001)".
+  ru/bs `.po` have 0 empty non-header `msgstr` (394 msgids). Bot strings wrapped
+  in `_()`.
+- **B→C keyboard label wrapping (QLT-002→QLT-005):** ✓. All 4 keyboard builders
+  relocated to `ad_data.py`; currency builder uses
+  `text=_("🆓 Free"), callback_data=BotCallbackPrefix.PRICE_FREE`
+  (`ad_data.py:455`); features builder uses
+  `text=_("✔️ Done"), callback_data=BotCallbackPrefix.FEATURES_DONE`
+  (`ad_data.py:529`); all builders consume `BotCallbackPrefix` (25 refs across
+  `ad_data.py` + `ad_create.py` + `callbacks.py`). 0 raw callback tokens in
+  `ad_create.py`.
+- **Import direction (two-process model):** ✓. bot→backend only
+  (`ad_data.py`, `ad_create.py`, `language.py` import `apps.*`); no `apps.*`
+  module imports `telegram_bot.*`. No cyclic risk.
+
+### 10.4 Commit strategy (NOT a sequential rollout)
+
+Because Blocks B–E are already implemented and green, the work is **two residual
+fixes → one atomic commit**, not phased block execution:
+
+1. Fix QLT-007 (run `basedpyright`, clear the 4 `pyright: ignore` suppressions).
+2. Fix QLT-002 gap (route `contact.py` through `BotCallbackPrefix.CONTACT_US`;
+   re-run `test_contact_us.py`).
+3. Re-verify: `ruff check` clean → `basedpyright` clean (3 files + conftest) →
+   fast-gate `1576 passed, 0 failed`.
+4. **Single atomic commit** of all Block B–E sources + the 2 residual fixes.
+
+#### Commit scoping (staging must be selective — risk if `git add -A` is used)
+
+The working tree contains files **NOT** part of plan 22 that must be excluded:
+
+- **6 DELETED (staged or unstaged) — exclude entirely** (belong to other
+  already-completed/superseded plans):
+  - `.ai/audit/99-validation/10-failing-tests-root-cause-audit.md` (test-audit doc)
+  - `.ai/audit/99-validation/11-failing-tests-solution-decisions.md` (test-audit doc)
+  - `.ai/plans/19-pii-consent-middleware-fix.md` (PII consent plan — superseded)
+  - `.ai/plans/21-external-api-findings.md` (external-API plan — superseded)
+  - `.kilo/plans/phase-06-pii-consent-execution-dag.md` (PII consent exec DAG)
+  - `scripts/run-profile.sh` (one-off profiling script)
+- **4 NEW untracked — exclude** (`.ai/context/test-audit-code-context.md`,
+  `.ai/plans/23-test-quality-audit-execution.md`, and the 7
+  `docs/99-agent/test-audit-*-findings.md` / `test-audit-*.md` artifacts are
+  standalone test-audit deliverables, not plan-22 scope).
+- **Include only:** the 4 plan-22 new files (`ad_data.py`, `callbacks.py`,
+  `language.py`, `listings_query.py`) + the plan-22 modified source/test/locale
+  files listed in §10.1 + the 2 residual-fix edits. (`.ai/audit/99-validation/10-code-context.md`
+  itself is ` M` in the tree — it is audit documentation, not a source artifact;
+  leave it out of the source commit or fold in only if the maintainer wants the
+  audit doc's own diff captured alongside. It is **not** a prerequisite for
+  plan-22 code to compile or tests to pass.)
+
+### 10.5 Verification checklist (pre-commit gate)
+
+| # | Check | Command | Target |
+|---|---|---|---|
+| 1 | ruff clean | `uv run ruff check src/backend src/telegram_bot` | 0 errors (incl. `G`/`G004` + `I`/`I001`) |
+| 2 | basedpyright clean | `uv run basedpyright src/backend/apps/ads/views/edit.py src/telegram_bot/services/ad_data.py src/telegram_bot/middlewares/language.py` | 0 type errors; 4 `pyright: ignore` suppressions (edit.py:124/285/322 + conftest.py:83) remediated |
+| 3 | test suite green | docker compose `test` service (fast gate, `PYTEST_SKIP_MARKERS=seed`) | `1576 passed, 0 failed, 0 errors` |
+
+**Post-residual re-run targets:** `-k test_edit`, `-k test_contact_us`,
+`-k test_i18n_completeness`, `-k test_ad_create`, `-k test_listings_sort`,
+`-k test_search_view`, `-k test_multi_lang_translation`,
+`-k test_save_photo` — all green before the atomic commit.
+
+### 10.6 Accuracy notes on `10-code-context.md`
+
+- The "4 legacy `apps/ads/services/*.py` created in `7ec80c7`" claim is a minor
+  misstatement: `git ls-tree 7ec80c7 -- src/backend/apps/ads/services/` shows
+  `copy_service.py`, `images.py`, `submission.py` (3 files), and these appear in
+  much older history (not created by `7ec80c7`). Does not affect the
+  **Block-A-committed** conclusion.
+- The code-context §QLT-007 recommendation path `services/language.py` is a typo
+  for `middlewares/language.py` (corrected above).
+- The code-context §Block C "keyboard label wrapping deferred to C" observation is
+  confirmed live in `ad_data.py` (labels already `_()`-wrapped at :455, :529).
+- The code-context §QLT-007 recommendation omits `conftest.py:83` from its 3-file
+  basedpyright scope; that suppression is test-only but in-scope for QLT-007
+  remediation — tracked explicitly in §10.2 item 1.

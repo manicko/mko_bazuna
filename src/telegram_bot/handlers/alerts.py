@@ -16,6 +16,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+from django.utils.translation import gettext as _
 
 from apps.search.models import SavedSearch
 from apps.search.services.immediate_alerts import UNSUB_CALLBACK_PREFIX
@@ -27,7 +28,7 @@ router = Router()
 # Deep-link pattern: unsub_<32-char-token>
 UNSUB_DEEPLINK_PATTERN = re.compile(r"^unsub_([A-Za-z0-9_-]{32})$")
 
-# Re-enable callback prefix (complements the "Отключить" button).
+# Re-enable callback prefix (complements the "Disable" button).
 UNSUB_ON_PREFIX = "unsub_on:"
 
 
@@ -47,26 +48,31 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
     user_id = data.get("user_id")
 
     if not user_id:
-        await message.answer("Please login first with /start login_<token>")
+        await message.answer(
+            _("Please login first with /start login_<token>")
+        )
         return
 
     saved_searches = await get_user_saved_searches(user_id)
 
     if not saved_searches:
         await message.answer(
-            "You have no saved searches.\n"
-            "Saved searches will appear here once created via the web interface."
+            _(
+                "You have no saved searches.\n"
+                "Saved searches will appear here once created via the web "
+                "interface."
+            )
         )
         return
 
-    lines = ["Your saved searches:"]
+    lines = [_("Your saved searches:")]
     for i, ss in enumerate(saved_searches, 1):
-        status = "ON" if ss.is_active else "OFF"
-        query_display = ss.query or "any"
-        city_display = ss.city.name if ss.city else "any"
-        cat_display = ss.category.name if ss.category else "any"
+        status = _("ON") if ss.is_active else _("OFF")
+        query_display = ss.query or _("any")
+        city_display = ss.city.name if ss.city else _("any")
+        cat_display = ss.category.name if ss.category else _("any")
 
-        price_display = "any"
+        price_display = _("any")
         if ss.min_price or ss.max_price:
             parts = []
             if ss.min_price:
@@ -81,7 +87,7 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
             f"Price: {price_display}"
         )
 
-    lines.append("\nReply with number to toggle, or /cancel to exit.")
+    lines.append(_("\nReply with number to toggle, or /cancel to exit."))
     await message.answer("\n".join(lines))
 
 
@@ -116,7 +122,9 @@ async def handle_unsubscribe_callback(
 
     saved_search = await resolve_unsubscribe(token, chat_id)
     if saved_search is None:
-        await callback.answer("Не удалось отключить уведомления")
+        await callback.answer(
+            _("Failed to disable notifications")
+        )
         return
 
     if callback.message is not None:
@@ -124,7 +132,7 @@ async def handle_unsubscribe_callback(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="Включить уведомления",
+                        text=_("Enable notifications"),
                         callback_data=f"{UNSUB_ON_PREFIX}{token}",
                     ),
                 ],
@@ -135,7 +143,7 @@ async def handle_unsubscribe_callback(
             message_id=callback.message.message_id,
             reply_markup=keyboard,
         )
-    await callback.answer("Уведомления отключены")
+    await callback.answer(_("Notifications disabled"))
 
 
 @router.callback_query(F.data.startswith(UNSUB_ON_PREFIX))
@@ -150,7 +158,9 @@ async def handle_reenable_callback(
 
     saved_search = await resolve_reenable(token, chat_id)
     if saved_search is None:
-        await callback.answer("Не удалось включить уведомления")
+        await callback.answer(
+            _("Failed to enable notifications")
+        )
         return
 
     if callback.message is not None:
@@ -158,7 +168,7 @@ async def handle_reenable_callback(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="🔕 Отключить этот поиск",
+                        text=_("🔕 Disable this search"),
                         callback_data=f"{UNSUB_CALLBACK_PREFIX}{token}",
                     ),
                 ],
@@ -169,7 +179,7 @@ async def handle_reenable_callback(
             message_id=callback.message.message_id,
             reply_markup=keyboard,
         )
-    await callback.answer("Уведомления включены")
+    await callback.answer(_("Notifications enabled"))
 
 
 # ---------------------------------------------------------------------------
@@ -196,12 +206,16 @@ async def handle_unsubscribe_start(
     saved_search = await resolve_unsubscribe(token, chat_id) if chat_id else None
     if saved_search is None:
         await message.answer(
-            "Эта ссылка недействительна или не относится к вашим поискам."
+            _(
+                "This link is invalid or does not belong to your searches."
+            )
         )
     else:
         await message.answer(
-            "Уведомления отключены для этого сохранённого поиска.\n"
-            "Чтобы включить их снова, используйте /alerts."
+            _(
+                "Notifications have been disabled for this saved search.\n"
+                "To re-enable them, use /alerts."
+            )
         )
     return True
 

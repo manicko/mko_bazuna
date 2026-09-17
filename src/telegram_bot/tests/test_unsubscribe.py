@@ -11,6 +11,7 @@ Covers:
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.utils import translation
 
 from apps.search.models import SavedSearch
 from apps.users.models import User
@@ -118,11 +119,12 @@ class TestUnsubscribeDeepLink:
             from_user = FakeFrom()
 
             async def answer(self, text: str) -> None:
-                messages.append(text)
+                messages.append(str(text))
 
-        handled = await handle_unsubscribe_start(
-            FakeMessage(), None, f"unsub_{ss.unsubscribe_token}"
-        )
+        with translation.override("ru"):
+            handled = await handle_unsubscribe_start(
+                FakeMessage(), None, f"unsub_{ss.unsubscribe_token}"
+            )
 
         assert handled is True
         assert any("отключены" in m for m in messages)
@@ -143,12 +145,13 @@ class TestUnsubscribeDeepLink:
             from_user = FakeFrom()
 
             async def answer(self, text: str) -> None:
-                messages.append(text)
+                messages.append(str(text))
 
         # A well-formed 32-char token that is not in the DB must be rejected.
-        handled = await handle_unsubscribe_start(
-            FakeMessage(), None, "unsub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        )
+        with translation.override("ru"):
+            handled = await handle_unsubscribe_start(
+                FakeMessage(), None, "unsub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
 
         assert handled is True
         assert any("недействительна" in m for m in messages)

@@ -41,7 +41,7 @@ from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.media.services.filesystem import generate_storage_key
 from apps.media.services.thumbnails import ThumbnailService
 from conftest import create_test_ad
-from telegram_bot.handlers.ad_create import save_photo
+from telegram_bot.services.ad_data import save_photo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

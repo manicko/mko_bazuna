@@ -16,7 +16,7 @@ from django.test import override_settings
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
-from telegram_bot.handlers.ad_create import save_photo
+from telegram_bot.services.ad_data import save_photo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 

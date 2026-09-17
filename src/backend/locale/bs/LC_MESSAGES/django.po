@@ -1,12 +1,12 @@
 # Bosnian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-15 15:43-0500\n"
+"POT-Creation-Date: 2026-09-17 08:10-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Bosnian <bs@li.org>\n"
@@ -17,45 +17,332 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
+msgid "Please login first with /start login_<token>"
+msgstr "Prvo se prijavite sa /start login_<token>"
+
+msgid "Usage: /copy <ad_id>"
+msgstr "Upotreba: /copy <ad_id>"
+
+msgid "Invalid ad ID. Usage: /copy <ad_id>"
+msgstr "Nevalidni ID oglasa. Upotreba: /copy <ad_id>"
+
+msgid "You can only copy your own ads."
+msgstr "Možeš kopirati samo svoje oglase."
+
+#, python-brace-format
+msgid "Failed to copy ad: {error}"
+msgstr "Ne uslovi kopiranje oglasa: {error}"
+
+#, python-format
 msgid ""
-"We need your consent to process the Telegram name and username you provided "
-"for account identification and ad publishing.\n"
+"✅ Ad #%(ad_id)s copied to draft #%(new_id)s.\n"
 "\n"
-"Essential functions (login, contact) always work. Declining consent means "
-"browse-only mode: you can browse ads and contact sellers but cannot publish."
+"Title: %(title)s\n"
+"Category: %(category)s\n"
+"\n"
+"You can now change the listing purpose, price, title, and description.\n"
+"Send /cancel to abort.\n"
+"\n"
+"Use /post to start fresh or continue editing."
 msgstr ""
-"Potreban nam je vaš pristanak da obradimo Telegram ime i korisničko ime "
-"koje ste naveli za identifikaciju naloga i objavljivanje oglasa.\n"
+"✅ Oglas #%(ad_id)s kopiran u nacrt #%(new_id)s.\n"
 "\n"
-"Osnovne funkcije (prijava, kontakt) uvijek rade. Odbijanje pristanka znači "
-"samo za pregledanje: možete pregledavati oglase i kontaktirati prodače, "
-"ali ne možete objavljivati."
+"Naslov: %(title)s\n"
+"Kategorija: %(category)s\n"
+"\n"
+"Sada možeš promeniti svrhu oglasa, cenu, naslov i opis.\n"
+"Pošalji /cancel za otkazivanje.\n"
+"\n"
+"Koristi /post da započneš svež ili nastavi uređivanje."
 
-msgid "Login successful! You can now create ads with /post."
-msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
+msgid "N/A"
+msgstr "N/D"
 
+#, python-format
 msgid ""
-"Login successful! Browse-only mode is active: you can browse ads and contact "
-"sellers, but cannot publish."
+"Welcome to %(site)s! Creating new ad. Please select a category.\n"
+"Send a keyword to search, or use /cancel to abort."
 msgstr ""
-"Prijava usječna! Aktivan je režim samo za pregledanje: možete pregledavati "
-"oglase i kontaktirati prodače, ali ne možete objavljivati."
+"Dobrodošao u %(site)s! Kreiranje oglasa. Izaberi kategoriju.\n"
+"Pošalji ključnu reč za pretragu, ili koristi /cancel za otkazivanje."
 
-msgid "Accept"
-msgstr "Prihvati"
+msgid "Ad creation cancelled."
+msgstr "Kreiranje oglasa otkazano."
 
-msgid "Decline"
-msgstr "Odbij"
-
-msgid "User not found. Please try logging in again."
-msgstr "Korisnik nije pronađen. Pokušajte ponovo da se prijavite."
+msgid "Please send a category keyword or name."
+msgstr "Pošalji ključnu riječ ili naziv kategorije."
 
 msgid ""
-"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
+"No categories found. Please try another keyword. Top-level categories: "
+"Goods, Services, Real Estate"
+msgstr ""
+"Kategorije nisu pronađene. Pokušaj drugu ključnu riječ.\n"
+"Glavne kategorije: Proizvodi, Usluge, Nedvigi"
+
+#, python-format
+msgid ""
+"Please choose a category:\n"
+"%(suggestions)s\n"
+"Reply with the number or full category name."
+msgstr ""
+"Izaberi kategoriju:\n"
+"%(suggestions)s\n"
+"Odgovori brojem ili punim nazivom kategorije."
+
+msgid ""
+"No listing purposes configured for this category. Please contact support."
+msgstr "Za ovu kategoriju nije podešena svrha oglasa. Kontaktiraj podršku."
+
+#, python-format
+msgid ""
+"Category: %(name)s\n"
+"Select the purpose of your listing:"
+msgstr ""
+"Kategorija: %(name)s\n"
+"Izaberi svrhu svog oglasa:"
+
+msgid "Select item condition:"
+msgstr "Izaberi stanje stavke:"
+
+msgid ""
+"Select features for your listing (optional):\n"
+"Tap to toggle, then tap Done."
+msgstr ""
+"Izaberi karakteristike svog oglasa (opcionalno):\n"
+"Dotakni za prebacivanje, zatim tapni Gotovo."
+
+msgid "Now select a city. Send a city name."
+msgstr "Sada izaberi grad. Pošalji naziv grada."
+
+msgid "Purpose not found."
+msgstr "Svrha nije pronađena."
+
+msgid "Condition not found."
+msgstr "Stanje nije pronađeno."
+
+msgid "Please send a city name."
+msgstr "Pošalji naziv grada."
+
+msgid ""
+"City not found. Please send an exact city name.\n"
+"Available cities: Podgorica, Nikšić, Bar, etc."
+msgstr ""
+"Grad nije pronađen. Pošalji tačan naziv grada.\n"
+"Dostupni gradovi: Podgorica, Nikšić, Bar, itd."
+
+#, python-format
+msgid ""
+"City: %(name)s\n"
+"Now enter the ad title (5-200 characters)."
+msgstr ""
+"Grad: %(name)s\n"
+"Sada unesi naslov oglasa (5-200 znakova)."
+
+msgid "Please send the ad title."
+msgstr "Pošalji naslov oglasa."
+
+#, python-brace-format
+msgid "Invalid title: {error}"
+msgstr "Nevažeći naslov: {error}"
+
+msgid ""
+"Title saved.\n"
+"Now enter the ad description (10-2000 characters)."
+msgstr ""
+"Naslov sačuvan.\n"
+"Sada unesi opis oglasa (10-2000 znakova)."
+
+msgid "Please send the ad description."
+msgstr "Pošalji opis oglasa."
+
+#, python-brace-format
+msgid "Invalid description: {error}"
+msgstr "Nevažeći opis: {error}"
+
+msgid ""
+"Description saved.\n"
+"Now choose the price currency, or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+"Opis sačuvan.\n"
+"Sada izaberi valutu cene, ili izaberi 'Besplatno' za besplatni (blagovita) "
+"oglas."
+
+msgid "🆓 Free"
+msgstr "Besplatno"
+
+msgid "Invalid currency."
+msgstr "Nevažeća valuta."
+
+#, python-format
+msgid ""
+"Currency: %(currency)s\n"
+"Now enter the price amount as a number."
+msgstr ""
+"Valuta: %(currency)s\n"
+"Sada unesi cenu kao broj."
+
+msgid ""
+"Please choose a currency first or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+"Izaberi valutu prvo ili izaberi 'Besplatno' za besplatni (blagovita) oglas."
+
+msgid ""
+"Please send the price amount as a number, or select 'Free' on the keyboard."
+msgstr "Pošalji cenu kao broj, ili izaberi 'Besplatno' na tastaturi."
+
+msgid "Invalid price. Enter a number."
+msgstr "Nevažeća cena. Unesi broj."
+
+msgid ""
+"Price saved.\n"
+"Send 1-5 photos (JPEG only). Each photo under ~2MB, max 2560x2560 pixels.\n"
+"Send 'done' when finished."
+msgstr ""
+"Cena sačuvana.\n"
+"Pošalji 1-5 fotografija (samo JPEG). Svaka fotografija do ~2MB, maksimum "
+"2560×2560 piksela.\n"
+"Pošalji 'done' kad završiš."
+
+msgid "Please send at least 1 photo before finishing."
+msgstr "Pošalji bar 1 fotografiju pre završetka."
+
+#, python-brace-format
+msgid "You can upload at most 5 photos (you have {count})."
+msgstr "Možeš otpremi najviše 5 fotografija (imaš {count})."
+
+msgid "Please send a photo (JPEG only) or 'done' to finish."
+msgstr "Pošalji fotografiju (samo JPEG) ili 'done' za završetak."
+
+#, python-brace-format
+msgid "You already have {count} photos. You can upload at most 5 photos."
+msgstr "Već imaš {count} fotografija. Možeš otpremi najviše 5 fotografija."
+
+msgid "Uploading too fast, please wait a moment."
+msgstr "Previše brzo otpremanje, sačekaj trenutak."
+
+msgid "Photo too large. Maximum size is approximately 2MB."
+msgstr "Fotografija je prevelika. Maksimalna veličina je oko 2MB."
+
+msgid "Failed to download photo. Try again."
+msgstr "Ne uslovi preuzimanje fotografije. Pokušaj ponovo."
+
+#, python-brace-format
+msgid "Invalid: {error}"
+msgstr "Nevažeće: {error}"
+
+#, python-brace-format
+msgid ""
+"Photo saved ({count}/5).\n"
+"Send more or 'done' to finish."
+msgstr ""
+"Fotografija sačuvana ({count}/5).\n"
+"Pošalji još ili 'done' za završetak."
+
+msgid "None"
+msgstr "Nijedan"
+
+#, python-format
+msgid ""
+"Ad Preview:\n"
 "\n"
-"Напишите ваш вопрос — мы ответим как можно скорее.\n"
+"Title: %(title)s\n"
+"Description: %(description)s...\n"
+"Price: %(price)s\n"
+"Category: %(category)s\n"
+"Purpose: %(purpose)s\n"
+"Condition: %(condition)s\n"
+"Features: %(features)s\n"
+"City: %(city)s\n"
+msgstr ""
+"Pregled oglasa:\n"
 "\n"
-"Для создания объявления используйте /post."
+"Naslov: %(title)s\n"
+"Opis: %(description)s...\n"
+"Cena: %(price)s\n"
+"Kategorija: %(category)s\n"
+"Svrha: %(purpose)s\n"
+"Stanje: %(condition)s\n"
+"Karakteristike: %(features)s\n"
+"Grad: %(city)s\n"
+
+msgid "Send 'confirm' to submit for moderation or 'cancel' to abort."
+msgstr "Pošalji 'confirm' za moderaciju ili 'cancel' za otkazivanje."
+
+msgid "Ad submitted for moderation! You'll be notified when it's published."
+msgstr "Oglas poslat na moderaciju! Bićeš obavešten kad bude objavljen."
+
+msgid "Ad failed moderation. Please check your content and try again."
+msgstr "Oglas nije prošao moderaciju. Proveri sadržaj i pokušaj ponovo."
+
+msgid "Send 'confirm' to submit or 'cancel' to abort."
+msgstr "Pošalji 'confirm' za slanje ili 'cancel' za otkazivanje."
+
+msgid "✔️ Done"
+msgstr "Gotovo"
+
+msgid ""
+"You have no saved searches.\n"
+"Saved searches will appear here once created via the web interface."
+msgstr ""
+"Nemaš sačuvanih pretraga.\n"
+"Sačuvane pretrage pojaviće se ovde nakon što ih kreirate preko veb "
+"interfejsa."
+
+msgid "Your saved searches:"
+msgstr "Tvoje sačuvane pretrage:"
+
+msgid "ON"
+msgstr "UKLJUČENO"
+
+msgid "OFF"
+msgstr "ISKLJUČENO"
+
+msgid "any"
+msgstr "bilo koje"
+
+msgid ""
+"\n"
+"Reply with number to toggle, or /cancel to exit."
+msgstr ""
+"\n"
+"Odgovori brojem da prebaciš, ili /cancel da izadješ."
+
+msgid "Failed to disable notifications"
+msgstr "Ne uslovi isključivanje obaveštenja"
+
+msgid "Enable notifications"
+msgstr "Omogući obaveštenja"
+
+msgid "Notifications disabled"
+msgstr "Obaveštenja isključena"
+
+msgid "Failed to enable notifications"
+msgstr "Ne uslovi uključivanje obaveštenja"
+
+msgid "🔕 Disable this search"
+msgstr "🔕 Onemogući ovu pretragu"
+
+msgid "Notifications enabled"
+msgstr "Obaveštenja uključena"
+
+msgid "This link is invalid or does not belong to your searches."
+msgstr "Ovaj link je nevažeći ili ne pripada vašim pretragama."
+
+msgid ""
+"Notifications have been disabled for this saved search.\n"
+"To re-enable them, use /alerts."
+msgstr ""
+"Obaveštenja za ovu sačuvanu pretragu su isključena.\n"
+"Da ponovo uključiš, koristi /alerts."
+
+msgid ""
+"👋 Hi! You have reached Bazuna support.\n"
+"\n"
+"Write your question — we will answer as soon as possible.\n"
+"\n"
+"To create an ad, use /post."
 msgstr ""
 "👋 Zdravo! Kontaktirao si podršku Bazune.\n"
 "\n"
@@ -63,29 +350,29 @@ msgstr ""
 "\n"
 "Za kreiranje oglasа користи /post."
 
-msgid "Слишком много запросов в поддержку. Попробуйте позже."
+msgid "Too many requests to support. Please try again later."
 msgstr "Previše zahtjeva za podrškom. Pokušaj kasnije."
 
 msgid "Contact us"
 msgstr "Kontaktiraj nas"
 
-msgid "Ошибка: не удалось определить отправителя"
+msgid "Error: could not determine the sender"
 msgstr "Greška: nije moguće odrediti pošiljaoca"
 
-msgid "объявление больше недоступно"
+msgid "The ad is no longer available."
 msgstr "Oglas više nije dostupan"
 
-msgid "продавец больше недоступен для связи"
+msgid "The seller is no longer available for contact."
 msgstr "Prodavac više nije dostupan za kontakt"
 
 #, python-format
 msgid ""
-"Новый запрос от покупателя!\n"
+"New request from a buyer!\n"
 "\n"
-"Покупатель: %(buyer)s\n"
+"Buyer: %(buyer)s\n"
 "Ad ID: %(ad_id)s\n"
 "\n"
-"Напишите своё сообщение — оно будет переслано анонимно."
+"Write your message — it will be forwarded anonymously."
 msgstr ""
 "Novi zahtjev od kupca!\n"
 "\n"
@@ -94,14 +381,13 @@ msgstr ""
 "\n"
 "Napiši poruku — biće proslijeđena anonimno."
 
-msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgid ""
+"Your request has been sent to the seller anonymously. Wait for a reply in "
+"this chat."
 msgstr "Tvoj zahtjev je anonimno poslan prodavcu. Čekaj odgovor u ovom čatovu."
 
-msgid "Покупатель"
+msgid "Buyer"
 msgstr "Kupac"
-
-msgid "Please login first with /start login_<token>"
-msgstr "Prvo se prijavite sa /start login_<token>"
 
 msgid "Select your preferred language:"
 msgstr "Odaberite željeni jezik:"
@@ -126,6 +412,9 @@ msgstr ""
 msgid "Invalid login link format. Expected: /start login_<token>"
 msgstr "Neispravan format login linka. Očekivano: /start login_<token>"
 
+msgid "Too many login attempts. Please wait a minute and try again."
+msgstr "Previše pokušaja prijave. Sačekaj minutu i pokušaj ponovo."
+
 msgid "This login link is invalid, expired, or already used."
 msgstr "Ovaj link za prijavu je nevažeći, istekao ili već korišćen."
 
@@ -134,6 +423,9 @@ msgid ""
 "with /post."
 msgstr ""
 "Prijava usječna! Vaš nalog je kreiran. Sada možete kreirati oglase sa /post."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
 
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Vaš nalog je ograničen. Kontaktirajte podršku za pomoć."
@@ -243,9 +535,6 @@ msgstr "Cijena nije navedena"
 
 msgid "View ad"
 msgstr "Pogledaj oglas"
-
-msgid "🔕 Disable this search"
-msgstr "🔕 Onemogući ovu pretragu"
 
 msgid "Moderation Queue"
 msgstr "Red modulacije"
@@ -860,6 +1149,9 @@ msgstr "izbor jezika i grada"
 msgid "Privacy details"
 msgstr "Detalji o privatnosti"
 
+msgid "Accept"
+msgstr "Prihvati"
+
 msgid "Reject non-essential"
 msgstr "Odbij neophodne"
 
@@ -1168,6 +1460,34 @@ msgstr "Prijava uspešna! Preusmeravanje..."
 
 msgid "Error checking login status."
 msgstr "Greška pri proveri statusa prijave."
+
+#~ msgid ""
+#~ "We need your consent to process the Telegram name and username you "
+#~ "provided for account identification and ad publishing.\n"
+#~ "\n"
+#~ "Essential functions (login, contact) always work. Declining consent means "
+#~ "browse-only mode: you can browse ads and contact sellers but cannot "
+#~ "publish."
+#~ msgstr ""
+#~ "Potreban nam je vaš pristanak da obradimo Telegram ime i korisničko ime "
+#~ "koje ste naveli za identifikaciju naloga i objavljivanje oglasa.\n"
+#~ "\n"
+#~ "Osnovne funkcije (prijava, kontakt) uvijek rade. Odbijanje pristanka "
+#~ "znači samo za pregledanje: možete pregledavati oglase i kontaktirati "
+#~ "prodače, ali ne možete objavljivati."
+
+#~ msgid ""
+#~ "Login successful! Browse-only mode is active: you can browse ads and "
+#~ "contact sellers, but cannot publish."
+#~ msgstr ""
+#~ "Prijava usječna! Aktivan je režim samo za pregledanje: možete "
+#~ "pregledavati oglase i kontaktirati prodače, ali ne možete objavljivati."
+
+#~ msgid "Decline"
+#~ msgstr "Odbij"
+
+#~ msgid "User not found. Please try logging in again."
+#~ msgstr "Korisnik nije pronađen. Pokušajte ponovo da se prijavite."
 
 #~ msgid "Mko Bazuna"
 #~ msgstr "Mko Bazuna"

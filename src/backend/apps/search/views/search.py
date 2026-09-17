@@ -9,26 +9,22 @@ One-word queries trigger fuzzy category detection.
 
 import logging
 import re
-from decimal import Decimal
 from difflib import get_close_matches
 from typing import Final
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
-from django.db.models import F, Q
+from django.db.models import F, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from apps.ads.models import Ad
+from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
-from apps.categories.services.lookup_resolution import CategoryLookupResolver
-from apps.core.enums import AdSort, AdStatus, AnalyticsEventType, LanguageLocale
+from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
 from apps.core.utils.sanitize import sanitize_query_for_log
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
-from apps.lookups.enums import LookupGroupCode
-from apps.lookups.models import LookupItem
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.search_history import record_search_history
 
@@ -58,30 +54,7 @@ def search(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered search results page (full or HTMX partial)
     """
-    PER_PAGE = 24
-
     query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
-    ads = (
-        Ad.objects.filter(status=AdStatus.PUBLISHED)
-        .filter(Q(category__isnull=True) | Q(category__is_active=True))
-        .select_related("category", "city", "user")
-        .prefetch_related("features")
-    )
-
-    # Category filter (by slug) — applies in addition to FTS
-    current_category = request.GET.get("category")
-    suggested_category = None
-    breadcrumb_category = None
-    if current_category:
-        try:
-            category = Category.objects.get(slug=current_category, is_active=True)
-            breadcrumb_category = category
-            descendant_ids = category.get_descendants(include_self=True).values_list(
-                "id", flat=True
-            )
-            ads = ads.filter(category_id__in=descendant_ids)
-        except Category.DoesNotExist:
-            suggested_category = current_category
 
     # City filter (by slug). An explicit URL city (``request.current_city``,
     # resolved by CityResolutionMiddleware from ``/city/<slug>/`` or
@@ -93,83 +66,49 @@ def search(request: HttpRequest) -> HttpResponse:
     suggested_city = None
     if current_city:
         try:
-            city = City.objects.get(slug=current_city)
-            ads = ads.filter(city_id=city.id)
+            City.objects.get(slug=current_city)
         except City.DoesNotExist:
             suggested_city = suggest_city(current_city)
 
-    # Price range filter (EUR-equivalent values, CR-10)
+    # Category filter (by slug) — applies in addition to FTS
+    current_category = request.GET.get("category")
+    suggested_category = None
+    breadcrumb_category = None
+    if current_category:
+        try:
+            breadcrumb_category = Category.objects.get(
+                slug=current_category, is_active=True
+            )
+        except Category.DoesNotExist:
+            suggested_category = current_category
+
+    # Build validated params and delegate queryset construction to the shared
+    # ListingsQuery service (filter + sort + annotate_favorites).
     min_price = request.GET.get("min_price")
     max_price = request.GET.get("max_price")
-    if min_price:
-        try:
-            ads = ads.filter(price_normalized_eur__gte=int(min_price))
-        except ValueError:
-            pass
-    if max_price:
-        try:
-            ads = ads.filter(price_normalized_eur__lte=int(max_price))
-        except ValueError:
-            pass
-
-    # Parse active price range for display in the filter summary (§6.6)
-    active_price_min: Decimal | None = None
-    active_price_max: Decimal | None = None
-    if min_price:
-        try:
-            active_price_min = Decimal(min_price)
-        except ValueError, TypeError:
-            pass
-    if max_price:
-        try:
-            active_price_max = Decimal(max_price)
-        except ValueError, TypeError:
-            pass
-
-    # Listing purpose filter (F4) — single-select exact slug match
     listing_purpose_slug = request.GET.get("listing_purpose")
-    if listing_purpose_slug:
-        ads = ads.filter(listing_purpose__slug=listing_purpose_slug)
-
-    # Listing condition filter — single-select exact slug match
     condition_slug = request.GET.get("condition")
-    if condition_slug:
-        ads = ads.filter(listing_condition__slug=condition_slug)
+    feature_slugs = request.GET.getlist("features")
+    params = ListingsQueryParams(
+        category_slug=current_category,
+        city_slug=current_city,
+        min_price=min_price,
+        max_price=max_price,
+        purpose_slug=listing_purpose_slug,
+        condition_slug=condition_slug,
+        feature_slugs=feature_slugs,
+        sort=request.GET.get("sort", AdSort.DATE_NEW),
+        user_id=request.user.id if request.user.is_authenticated else None,
+        page=request.GET.get("page", 1),
+        per_page=ListingsQuery.PER_PAGE,
+    )
+    ads = ListingsQuery.build_queryset(params)
 
-    # Features filter (F5) — multi-select AND semantics.
-    # An ad matches only if it possesses ALL selected features. Django's
-    # filter() chains with AND, so each call to ``features__slug=<slug>``
-    # adds a JOIN constraint requiring that specific feature. ``distinct()``
-    # prevents duplicate rows from the multiple M2M JOINs.
-    feature_slugs = request.GET.getlist("features") or []
+    if query:
+        ads = _apply_fts(ads, query, params, request)
 
-    if feature_slugs:
-        for slug in feature_slugs:
-            ads = ads.filter(features__slug=slug)
-        ads = ads.distinct()
-
-    # Resolve category-constrained filter options (F4/F5). When a category is
-    # active, use the cached resolver; otherwise show the full active sets.
-    if breadcrumb_category:
-        resolved_purposes = CategoryLookupResolver.get_resolved_purposes(
-            breadcrumb_category
-        )
-        resolved_features = CategoryLookupResolver.get_resolved_features(
-            breadcrumb_category
-        )
-        resolved_conditions = CategoryLookupResolver.get_resolved_conditions(
-            breadcrumb_category
-        )
-    else:
-        resolved_purposes = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_PURPOSE, is_active=True
-        ).order_by("sort_order")
-        resolved_features = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_FEATURE, is_active=True
-        ).order_by("sort_order")
-        resolved_conditions = LookupItem.objects.filter(
-            group__code=LookupGroupCode.LISTING_CONDITION, is_active=True
-        ).order_by("sort_order")
+    # Resolve category-constrained filter options (F4/F5).
+    resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
 
     # Resolve the current city/category filters to object ids so the
     # save-search modal can prefill its selects (FT-002).
@@ -184,91 +123,12 @@ def search(request: HttpRequest) -> HttpResponse:
         breadcrumb_category.id if breadcrumb_category else None
     )
 
-    # Sort (parsed for context + pagination URL preservation; FTS branch keeps -rank)
-    current_sort = request.GET.get("sort", AdSort.DATE_NEW)
-
-    if query:
-        # Resolve locale from the request's UI language preference. The query is
-        # searched in its original language against the matching vector column;
-        # no external translator runs on the search critical path.
-        locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
-        vector_field = locale.fts_vector_field
-        config = locale.fts_config
-
-        # One-word queries: apply fuzzy category detection (locale-aware)
-        if _is_single_word(query):
-            category_filter = _fuzzy_category_match(query, locale)
-            if category_filter:
-                # Expand to category subtree (consistent with listings.py)
-                descendant_ids = category_filter.get_descendants(
-                    include_self=True
-                ).values_list("id", flat=True)
-                ads = ads.filter(category_id__in=descendant_ids)
-
-        # FTS search on the locale's per-language vector
-        search_query = SearchQuery(query, search_type="websearch", config=config)
-        ads = ads.annotate(rank=SearchRank(F(vector_field), search_query)).filter(
-            **{vector_field: search_query}
-        )
-
-        # Sort FTS results by the requested key, keeping relevance (-rank) as
-        # a secondary tiebreaker so buyers still see relevant results first
-        # within their chosen sort (PO-2=A).
-        if current_sort == AdSort.PRICE_LOW:
-            ads = ads.order_by(
-                F("price_normalized_eur").asc(nulls_last=True),
-                "-rank",
-                "-published_at",
-                "-id",
-            )
-        elif current_sort == AdSort.PRICE_HIGH:
-            ads = ads.order_by(
-                F("price_normalized_eur").desc(nulls_last=True),
-                "-rank",
-                "-published_at",
-                "-id",
-            )
-        elif current_sort == AdSort.DATE_OLD:
-            ads = ads.order_by("published_at", "-rank", "-id")
-        else:  # DATE_NEW — relevance-first default: -rank, -published_at, -id
-            ads = ads.order_by("-rank", "-published_at", "-id")
-
-        # Record search event (analytics) after successful execution
-        record_event(
-            AnalyticsEventType.SEARCH_PERFORMED,
-            user_id=request.user.id if request.user.is_authenticated else None,
-        )
-
-        # Record popular search and user history for autocomplete.
-        # Anonymous users get session-scoped, deduped, capped history.
-        increment_popular_search(query)
-        record_search_history(
-            request.user.id if request.user.is_authenticated else None,
-            query,
-            session=request.session,
-        )
-    else:
-        # No FTS query: apply the requested sort ordering so buyers can
-        # browse by date or price even on an unfiltered /search/ page.
-        if current_sort == AdSort.DATE_OLD:
-            ads = ads.order_by("published_at")
-        elif current_sort == AdSort.PRICE_LOW:
-            ads = ads.order_by(F("price_normalized_eur").asc(nulls_last=True))
-        elif current_sort == AdSort.PRICE_HIGH:
-            ads = ads.order_by(F("price_normalized_eur").desc(nulls_last=True))
-        else:  # DATE_NEW — default, newest first
-            ads = ads.order_by("-published_at")
+    # Active price range for filter summary (§6.6)
+    active_price_min, active_price_max = ListingsQuery.active_price_range(params)
 
     # Paginate results
-    from apps.ads.views.favorite import annotate_favorites
-
-    ads = annotate_favorites(
-        ads, request.user.id if request.user.is_authenticated else None
-    )
-    paginator = Paginator(ads, PER_PAGE)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-
+    paginator = Paginator(ads, params.per_page)
+    page_obj = paginator.get_page(params.page)
     total_count = int(paginator.count)
     has_results = total_count > 0
     if query and not has_results:
@@ -282,7 +142,7 @@ def search(request: HttpRequest) -> HttpResponse:
         "has_results": has_results,
         "current_category": current_category,
         "current_city": current_city,
-        "current_sort": current_sort,
+        "current_sort": params.sort,
         "min_price": min_price,
         "max_price": max_price,
         "active_price_min": active_price_min,
@@ -307,8 +167,70 @@ def search(request: HttpRequest) -> HttpResponse:
     # HTMX partial rendering support
     if request.headers.get("HX-Request"):
         return render(request, "ads/partials/ad_list.html", context)
-
     return render(request, "ads/list.html", context)
+
+
+def _apply_fts(
+    queryset: QuerySet, query: str, params: ListingsQueryParams, request: HttpRequest
+) -> QuerySet:
+    """Apply per-language FTS filtering, relevance sort, and analytics.
+
+    Adds ``SearchRank`` annotation + TSVector filter on the locale's vector
+    column, overrides sort to keep ``-rank`` as a tiebreaker, and records
+    the search event + popular search / history entries.
+    """
+    locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
+    vector_field = locale.fts_vector_field
+    config = locale.fts_config
+
+    # One-word queries: apply fuzzy category detection (locale-aware)
+    if _is_single_word(query):
+        category_filter = _fuzzy_category_match(query, locale)
+        if category_filter:
+            descendant_ids = category_filter.get_descendants(
+                include_self=True
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(category_id__in=descendant_ids)
+
+    # FTS search on the locale's per-language vector
+    search_query = SearchQuery(query, search_type="websearch", config=config)
+    queryset = queryset.annotate(
+        rank=SearchRank(F(vector_field), search_query)
+    ).filter(**{vector_field: search_query})
+
+    # Sort FTS results by the requested key, keeping relevance (-rank)
+    # as a secondary tiebreaker (PO-2=A). Replaces the service's base
+    # sort because order_by() overwrites previous ordering.
+    if params.sort == AdSort.PRICE_LOW:
+        queryset = queryset.order_by(
+            F("price_normalized_eur").asc(nulls_last=True),
+            "-rank", "-published_at", "-id",
+        )
+    elif params.sort == AdSort.PRICE_HIGH:
+        queryset = queryset.order_by(
+            F("price_normalized_eur").desc(nulls_last=True),
+            "-rank", "-published_at", "-id",
+        )
+    elif params.sort == AdSort.DATE_OLD:
+        queryset = queryset.order_by("published_at", "-rank", "-id")
+    else:  # DATE_NEW — relevance-first default
+        queryset = queryset.order_by("-rank", "-published_at", "-id")
+
+    # Record search event (analytics) after successful execution
+    record_event(
+        AnalyticsEventType.SEARCH_PERFORMED,
+        user_id=request.user.id if request.user.is_authenticated else None,
+    )
+
+    # Record popular search and user history for autocomplete.
+    increment_popular_search(query)
+    record_search_history(
+        request.user.id if request.user.is_authenticated else None,
+        query,
+        session=request.session,
+    )
+
+    return queryset
 
 
 def _is_single_word(text: str) -> bool:

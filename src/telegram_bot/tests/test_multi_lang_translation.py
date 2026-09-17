@@ -15,13 +15,18 @@ from unittest.mock import patch
 
 import httpx
 import pytest
+from asgiref.sync import sync_to_async
+from django.conf import settings
+from django.utils import translation
+from django.utils.translation import gettext as _
 
 from apps.core.services.translation import (
     _CIRCUIT_BREAKER,
     translate_cached_generic,
     translate_text,
 )
-from telegram_bot.handlers.ad_create import translate_all_languages
+from telegram_bot.middlewares.language import _resolve_user_language
+from telegram_bot.services.ad_data import translate_all_languages
 
 pytestmark = [pytest.mark.unit]
 
@@ -284,3 +289,90 @@ class TestTranslateTextRetry:
 
         assert result == "hello"
         assert mock_translate.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Per-user locale activation (FQ-001)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.django_db(transaction=True)
+class TestPerUserLocaleActivation:
+    """Verify that ``_resolve_user_language`` + ``translation.activate``
+    renders gettext strings in the user's preferred locale.
+
+    DB-backed: creates real ``User`` rows and exercises the ``sync_to_async``
+    ORM lookup path in ``LanguageMiddleware._resolve_user_language``.
+    Uses ``transaction=True`` (bot-test convention) to avoid deadlock
+    against leaked worker-thread connections.
+    """
+
+    @pytest.mark.asyncio
+    async def test_ru_user_resolves_and_translates(self) -> None:
+        """A user with ``telegram_language='ru'`` gets Russian gettext output."""
+        from apps.users.models import User
+
+        user = await sync_to_async(User.objects.create)(
+            telegram_id=900000301,
+            chat_id=900000301,
+            username="ru_user",
+            telegram_language="ru",
+        )
+        try:
+            lang = await _resolve_user_language(user.telegram_id)
+            assert lang == "ru"
+
+            translation.activate(lang)
+            try:
+                assert _("Contact us") == "Связаться с нами"
+            finally:
+                translation.deactivate()
+        finally:
+            await sync_to_async(user.delete)()
+
+    @pytest.mark.asyncio
+    async def test_bs_user_resolves_and_translates(self) -> None:
+        """A user with ``telegram_language='bs'`` gets Bosnian gettext output."""
+        from apps.users.models import User
+
+        user = await sync_to_async(User.objects.create)(
+            telegram_id=900000302,
+            chat_id=900000302,
+            username="bs_user",
+            telegram_language="bs",
+        )
+        try:
+            lang = await _resolve_user_language(user.telegram_id)
+            assert lang == "bs"
+
+            translation.activate(lang)
+            try:
+                assert _("Contact us") == "Kontaktiraj nas"
+            finally:
+                translation.deactivate()
+        finally:
+            await sync_to_async(user.delete)()
+
+    @pytest.mark.asyncio
+    async def test_unknown_user_falls_back_to_default(self) -> None:
+        """A non-existent Telegram ID falls back to ``settings.LANGUAGE_CODE``."""
+        lang = await _resolve_user_language(999_999_999)
+        assert lang == settings.LANGUAGE_CODE
+
+    @pytest.mark.asyncio
+    async def test_null_language_falls_back_to_default(self) -> None:
+        """A user with ``telegram_language=""`` falls back to ``LANGUAGE_CODE``."""
+        from apps.users.models import User
+
+        user = await sync_to_async(User.objects.create)(
+            telegram_id=900000303,
+            chat_id=900000303,
+            username="no_lang_user",
+            telegram_language="",
+        )
+        try:
+            lang = await _resolve_user_language(user.telegram_id)
+            assert lang == settings.LANGUAGE_CODE
+        finally:
+            await sync_to_async(user.delete)()

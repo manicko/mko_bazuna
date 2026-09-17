@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-15 15:43-0500\n"
+"POT-Creation-Date: 2026-09-17 08:10-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: English <en@li.org>\n"
@@ -16,71 +16,310 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Please login first with /start login_<token>"
+msgstr ""
+
+msgid "Usage: /copy <ad_id>"
+msgstr ""
+
+msgid "Invalid ad ID. Usage: /copy <ad_id>"
+msgstr ""
+
+msgid "You can only copy your own ads."
+msgstr ""
+
+#, python-brace-format
+msgid "Failed to copy ad: {error}"
+msgstr ""
+
+#, python-format
 msgid ""
-"We need your consent to process the Telegram name and username you provided "
-"for account identification and ad publishing.\n"
+"✅ Ad #%(ad_id)s copied to draft #%(new_id)s.\n"
 "\n"
-"Essential functions (login, contact) always work. Declining consent means "
-"browse-only mode: you can browse ads and contact sellers but cannot publish."
+"Title: %(title)s\n"
+"Category: %(category)s\n"
+"\n"
+"You can now change the listing purpose, price, title, and description.\n"
+"Send /cancel to abort.\n"
+"\n"
+"Use /post to start fresh or continue editing."
 msgstr ""
 
-msgid "Login successful! You can now create ads with /post."
+msgid "N/A"
+msgstr ""
+
+#, python-format
+msgid ""
+"Welcome to %(site)s! Creating new ad. Please select a category.\n"
+"Send a keyword to search, or use /cancel to abort."
+msgstr ""
+
+msgid "Ad creation cancelled."
+msgstr ""
+
+msgid "Please send a category keyword or name."
 msgstr ""
 
 msgid ""
-"Login successful! Browse-only mode is active: you can browse ads and contact "
-"sellers, but cannot publish."
+"No categories found. Please try another keyword. Top-level categories: "
+"Goods, Services, Real Estate"
 msgstr ""
 
-msgid "Accept"
-msgstr ""
-
-msgid "Decline"
-msgstr ""
-
-msgid "User not found. Please try logging in again."
+#, python-format
+msgid ""
+"Please choose a category:\n"
+"%(suggestions)s\n"
+"Reply with the number or full category name."
 msgstr ""
 
 msgid ""
-"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
-"\n"
-"Напишите ваш вопрос — мы ответим как можно скорее.\n"
-"\n"
-"Для создания объявления используйте /post."
+"No listing purposes configured for this category. Please contact support."
 msgstr ""
 
-msgid "Слишком много запросов в поддержку. Попробуйте позже."
+#, python-format
+msgid ""
+"Category: %(name)s\n"
+"Select the purpose of your listing:"
+msgstr ""
+
+msgid "Select item condition:"
+msgstr ""
+
+msgid ""
+"Select features for your listing (optional):\n"
+"Tap to toggle, then tap Done."
+msgstr ""
+
+msgid "Now select a city. Send a city name."
+msgstr ""
+
+msgid "Purpose not found."
+msgstr ""
+
+msgid "Condition not found."
+msgstr ""
+
+msgid "Please send a city name."
+msgstr ""
+
+msgid ""
+"City not found. Please send an exact city name.\n"
+"Available cities: Podgorica, Nikšić, Bar, etc."
+msgstr ""
+
+#, python-format
+msgid ""
+"City: %(name)s\n"
+"Now enter the ad title (5-200 characters)."
+msgstr ""
+
+msgid "Please send the ad title."
+msgstr ""
+
+#, python-brace-format
+msgid "Invalid title: {error}"
+msgstr ""
+
+msgid ""
+"Title saved.\n"
+"Now enter the ad description (10-2000 characters)."
+msgstr ""
+
+msgid "Please send the ad description."
+msgstr ""
+
+#, python-brace-format
+msgid "Invalid description: {error}"
+msgstr ""
+
+msgid ""
+"Description saved.\n"
+"Now choose the price currency, or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+
+msgid "🆓 Free"
+msgstr ""
+
+msgid "Invalid currency."
+msgstr ""
+
+#, python-format
+msgid ""
+"Currency: %(currency)s\n"
+"Now enter the price amount as a number."
+msgstr ""
+
+msgid ""
+"Please choose a currency first or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+
+msgid ""
+"Please send the price amount as a number, or select 'Free' on the keyboard."
+msgstr ""
+
+msgid "Invalid price. Enter a number."
+msgstr ""
+
+msgid ""
+"Price saved.\n"
+"Send 1-5 photos (JPEG only). Each photo under ~2MB, max 2560x2560 pixels.\n"
+"Send 'done' when finished."
+msgstr ""
+
+msgid "Please send at least 1 photo before finishing."
+msgstr ""
+
+#, python-brace-format
+msgid "You can upload at most 5 photos (you have {count})."
+msgstr ""
+
+msgid "Please send a photo (JPEG only) or 'done' to finish."
+msgstr ""
+
+#, python-brace-format
+msgid "You already have {count} photos. You can upload at most 5 photos."
+msgstr ""
+
+msgid "Uploading too fast, please wait a moment."
+msgstr ""
+
+msgid "Photo too large. Maximum size is approximately 2MB."
+msgstr ""
+
+msgid "Failed to download photo. Try again."
+msgstr ""
+
+#, python-brace-format
+msgid "Invalid: {error}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Photo saved ({count}/5).\n"
+"Send more or 'done' to finish."
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+#, python-format
+msgid ""
+"Ad Preview:\n"
+"\n"
+"Title: %(title)s\n"
+"Description: %(description)s...\n"
+"Price: %(price)s\n"
+"Category: %(category)s\n"
+"Purpose: %(purpose)s\n"
+"Condition: %(condition)s\n"
+"Features: %(features)s\n"
+"City: %(city)s\n"
+msgstr ""
+
+msgid "Send 'confirm' to submit for moderation or 'cancel' to abort."
+msgstr ""
+
+msgid "Ad submitted for moderation! You'll be notified when it's published."
+msgstr ""
+
+msgid "Ad failed moderation. Please check your content and try again."
+msgstr ""
+
+msgid "Send 'confirm' to submit or 'cancel' to abort."
+msgstr ""
+
+msgid "✔️ Done"
+msgstr ""
+
+msgid ""
+"You have no saved searches.\n"
+"Saved searches will appear here once created via the web interface."
+msgstr ""
+
+msgid "Your saved searches:"
+msgstr ""
+
+msgid "ON"
+msgstr ""
+
+msgid "OFF"
+msgstr ""
+
+msgid "any"
+msgstr ""
+
+msgid ""
+"\n"
+"Reply with number to toggle, or /cancel to exit."
+msgstr ""
+
+msgid "Failed to disable notifications"
+msgstr ""
+
+msgid "Enable notifications"
+msgstr ""
+
+msgid "Notifications disabled"
+msgstr ""
+
+msgid "Failed to enable notifications"
+msgstr ""
+
+msgid "🔕 Disable this search"
+msgstr ""
+
+msgid "Notifications enabled"
+msgstr ""
+
+msgid "This link is invalid or does not belong to your searches."
+msgstr ""
+
+msgid ""
+"Notifications have been disabled for this saved search.\n"
+"To re-enable them, use /alerts."
+msgstr ""
+
+msgid ""
+"👋 Hi! You have reached Bazuna support.\n"
+"\n"
+"Write your question — we will answer as soon as possible.\n"
+"\n"
+"To create an ad, use /post."
+msgstr ""
+
+msgid "Too many requests to support. Please try again later."
 msgstr ""
 
 msgid "Contact us"
 msgstr ""
 
-msgid "Ошибка: не удалось определить отправителя"
+msgid "Error: could not determine the sender"
 msgstr ""
 
-msgid "объявление больше недоступно"
+msgid "The ad is no longer available."
 msgstr ""
 
-msgid "продавец больше недоступен для связи"
+msgid "The seller is no longer available for contact."
 msgstr ""
 
 #, python-format
 msgid ""
-"Новый запрос от покупателя!\n"
+"New request from a buyer!\n"
 "\n"
-"Покупатель: %(buyer)s\n"
+"Buyer: %(buyer)s\n"
 "Ad ID: %(ad_id)s\n"
 "\n"
-"Напишите своё сообщение — оно будет переслано анонимно."
+"Write your message — it will be forwarded anonymously."
 msgstr ""
 
-msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgid ""
+"Your request has been sent to the seller anonymously. Wait for a reply in "
+"this chat."
 msgstr ""
 
-msgid "Покупатель"
-msgstr ""
-
-msgid "Please login first with /start login_<token>"
+msgid "Buyer"
 msgstr ""
 
 msgid "Select your preferred language:"
@@ -104,12 +343,18 @@ msgstr ""
 msgid "Invalid login link format. Expected: /start login_<token>"
 msgstr ""
 
+msgid "Too many login attempts. Please wait a minute and try again."
+msgstr ""
+
 msgid "This login link is invalid, expired, or already used."
 msgstr ""
 
 msgid ""
 "Login successful! Your account has been created. You can now create ads "
 "with /post."
+msgstr ""
+
+msgid "Login successful! You can now create ads with /post."
 msgstr ""
 
 msgid "Your account is restricted. Contact support for assistance."
@@ -215,9 +460,6 @@ msgid "Price not specified"
 msgstr ""
 
 msgid "View ad"
-msgstr ""
-
-msgid "🔕 Disable this search"
 msgstr ""
 
 msgid "Moderation Queue"
@@ -813,6 +1055,9 @@ msgid "language and city selection"
 msgstr ""
 
 msgid "Privacy details"
+msgstr ""
+
+msgid "Accept"
 msgstr ""
 
 msgid "Reject non-essential"

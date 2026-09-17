@@ -22,6 +22,7 @@ from apps.core.enums import AnalyticsEventType
 from apps.core.services.analytics import record_event
 from apps.core.services.site_config import get_site_name_async
 from apps.users.models import LoginToken, User
+from telegram_bot.handlers.contact import CONTACT_US_CALLBACK
 from telegram_bot.services.rate_limit import check_login_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -58,9 +59,9 @@ async def handle_login_deep_link(
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
-                        InlineKeyboardButton(
-                            text="Contact us", callback_data="contact_us"
-                        ),
+                InlineKeyboardButton(
+                    text=_("Contact us"), callback_data=CONTACT_US_CALLBACK
+                ),
                     ],
                 ],
             ),
@@ -228,3 +229,4 @@ async def handle_login_orm(
             return login_token, user, created
 
     return await _handle()
+

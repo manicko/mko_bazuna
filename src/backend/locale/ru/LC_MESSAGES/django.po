@@ -1,12 +1,12 @@
 # Russian translations for Mko Bazuna.
 # Copyright (C) 2026 Mko Bazuna
 # This file is distributed under the same license as the Mko Bazuna package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Mko Bazuna\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-15 15:43-0500\n"
+"POT-Creation-Date: 2026-09-17 08:10-0500\n"
 "PO-Revision-Date: 2026-08-23 00:00+0200\n"
 "Last-Translator: Mko Bazuna <translations@mko-bazuna>\n"
 "Language-Team: Russian <ru@li.org>\n"
@@ -17,77 +17,369 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
+msgid "Please login first with /start login_<token>"
+msgstr "Пожалуйста, войдите с помощью /start login_<token>"
+
+msgid "Usage: /copy <ad_id>"
+msgstr "Использование: /copy <ad_id>"
+
+msgid "Invalid ad ID. Usage: /copy <ad_id>"
+msgstr "Недопустимый ID объявления. Использование: /copy <ad_id>"
+
+msgid "You can only copy your own ads."
+msgstr "Вы можете копировать только свои объявления."
+
+#, python-brace-format
+msgid "Failed to copy ad: {error}"
+msgstr "Не удалось скопировать объявление: {error}"
+
+#, python-format
 msgid ""
-"We need your consent to process the Telegram name and username you provided "
-"for account identification and ad publishing.\n"
+"✅ Ad #%(ad_id)s copied to draft #%(new_id)s.\n"
 "\n"
-"Essential functions (login, contact) always work. Declining consent means "
-"browse-only mode: you can browse ads and contact sellers but cannot publish."
-msgstr ""
-"Нам необходимо ваше согласие на обработку имени и имени пользователя "
-"Telegram, которые вы предоставили для идентификации аккаунта и "
-"публикации объявлений.\n"
+"Title: %(title)s\n"
+"Category: %(category)s\n"
 "\n"
-"Основные функции (вход, контакты) всегда работают. Отказ от согласия "
-"означает режим просмотра только: вы можете просматривать объявления и "
-"связываться с продавцами, но не можете публиковать."
-
-msgid "Login successful! You can now create ads with /post."
+"You can now change the listing purpose, price, title, and description.\n"
+"Send /cancel to abort.\n"
+"\n"
+"Use /post to start fresh or continue editing."
 msgstr ""
-"Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
+"✅ Объявление #%(ad_id)s скопировано в черновик #%(new_id)s.\n"
+"\n"
+"Заголовок: %(title)s\n"
+"Категория: %(category)s\n"
+"\n"
+"Теперь вы можете изменить цель объявления, цену, заголовок и описание.\n"
+"Отправьте /cancel для отмены.\n"
+"\n"
+"Используйте /post для создания нового или продолжите редактирование."
+
+msgid "N/A"
+msgstr "Н/Д"
+
+#, python-format
+msgid ""
+"Welcome to %(site)s! Creating new ad. Please select a category.\n"
+"Send a keyword to search, or use /cancel to abort."
+msgstr ""
+"Добро пожаловать в %(site)s! Создание объявления. Пожалуйста, выберите "
+"категорию.\n"
+"Отправьте ключевое слово для поиска, или используйте /cancel для отмены."
+
+msgid "Ad creation cancelled."
+msgstr "Создание объявления отменено."
+
+msgid "Please send a category keyword or name."
+msgstr "Пожалуйста, отправьте ключевое слово или название категории."
 
 msgid ""
-"Login successful! Browse-only mode is active: you can browse ads and contact "
-"sellers, but cannot publish."
+"No categories found. Please try another keyword. Top-level categories: "
+"Goods, Services, Real Estate"
 msgstr ""
-"Вход выполнен успешно! Режим только для просмотра: вы можете просматривать "
-"объявления и связываться с продавцами, но не можете публиковать."
+"Категории не найдены. Попробуйте другое ключевое слово.\n"
+"Ключевые категории: Товары, Услуги, Недвижимость"
 
-msgid "Accept"
-msgstr "Принять"
-
-msgid "Decline"
-msgstr "Отклонить"
-
-msgid "User not found. Please try logging in again."
-msgstr "Пользователь не найден. Попробуйте войти снова."
+#, python-format
+msgid ""
+"Please choose a category:\n"
+"%(suggestions)s\n"
+"Reply with the number or full category name."
+msgstr ""
+"Пожалуйста, выберите категорию:\n"
+"%(suggestions)s\n"
+"Ответьте номером или полным названием категории."
 
 msgid ""
+"No listing purposes configured for this category. Please contact support."
+msgstr ""
+"Для этой категории не настроены цели объявления. Обратитесь в поддержку."
+
+#, python-format
+msgid ""
+"Category: %(name)s\n"
+"Select the purpose of your listing:"
+msgstr ""
+"Категория: %(name)s\n"
+"Выберите цель вашего объявления:"
+
+msgid "Select item condition:"
+msgstr "Выберите состояние товара:"
+
+msgid ""
+"Select features for your listing (optional):\n"
+"Tap to toggle, then tap Done."
+msgstr ""
+"Выберите особенности вашего объявления (необязательно):\n"
+"Нажимайте для переключения, затем нажмите Готово."
+
+msgid "Now select a city. Send a city name."
+msgstr "Теперь выберите город. Отправьте название города."
+
+msgid "Purpose not found."
+msgstr "Цель не найдена."
+
+msgid "Condition not found."
+msgstr "Состояние не найдено."
+
+msgid "Please send a city name."
+msgstr "Пожалуйста, отправьте название города."
+
+msgid ""
+"City not found. Please send an exact city name.\n"
+"Available cities: Podgorica, Nikšić, Bar, etc."
+msgstr ""
+"Город не найден. Пожалуйста, отправьте точное название города.\n"
+"Доступные города: Подгорица, Никшич, Бар и др."
+
+#, python-format
+msgid ""
+"City: %(name)s\n"
+"Now enter the ad title (5-200 characters)."
+msgstr ""
+"Город: %(name)s\n"
+"Теперь введите заголовок объявления (5-200 символов)."
+
+msgid "Please send the ad title."
+msgstr "Пожалуйста, отправьте заголовок объявления."
+
+#, python-brace-format
+msgid "Invalid title: {error}"
+msgstr "Недопустимый заголовок: {error}"
+
+msgid ""
+"Title saved.\n"
+"Now enter the ad description (10-2000 characters)."
+msgstr ""
+"Заголовок сохранён.\n"
+"Теперь введите описание объявления (10-2000 символов)."
+
+msgid "Please send the ad description."
+msgstr "Пожалуйста, отправьте описание объявления."
+
+#, python-brace-format
+msgid "Invalid description: {error}"
+msgstr "Недопустимое описание: {error}"
+
+msgid ""
+"Description saved.\n"
+"Now choose the price currency, or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+"Описание сохранено.\n"
+"Теперь выберите валюту цены, или выберите 'Бесплатно' для бесплатного "
+"(благотворительного) объявления."
+
+msgid "🆓 Free"
+msgstr "Бесплатно"
+
+msgid "Invalid currency."
+msgstr "Недопустимая валюта."
+
+#, python-format
+msgid ""
+"Currency: %(currency)s\n"
+"Now enter the price amount as a number."
+msgstr ""
+"Валюта: %(currency)s\n"
+"Теперь введите цену в виде числа."
+
+msgid ""
+"Please choose a currency first or select 'Free' for a zero-price (Charity) "
+"ad."
+msgstr ""
+"Пожалуйста, сначала выберите валюту или выберите 'Бесплатно' для бесплатного "
+"(благотворительного) объявления."
+
+msgid ""
+"Please send the price amount as a number, or select 'Free' on the keyboard."
+msgstr ""
+"Пожалуйста, отправьте цену в виде числа, или выберите 'Бесплатно' на "
+"клавиатуре."
+
+msgid "Invalid price. Enter a number."
+msgstr "Недопустимая цена. Введите число."
+
+msgid ""
+"Price saved.\n"
+"Send 1-5 photos (JPEG only). Each photo under ~2MB, max 2560x2560 pixels.\n"
+"Send 'done' when finished."
+msgstr ""
+"Цена сохранена.\n"
+"Отправьте 1-5 фото (только JPEG). Каждое фото до ~2МБ, максимум 2560×2560 "
+"пикселей.\n"
+"Отправьте 'done' когда закончите."
+
+msgid "Please send at least 1 photo before finishing."
+msgstr "Пожалуйста, отправьте хотя бы 1 фото перед завершением."
+
+#, python-brace-format
+msgid "You can upload at most 5 photos (you have {count})."
+msgstr "Вы можете загрузить максимум 5 фото (у вас {count})."
+
+msgid "Please send a photo (JPEG only) or 'done' to finish."
+msgstr "Пожалуйста, отправьте фото (только JPEG) или 'done' для завершения."
+
+#, python-brace-format
+msgid "You already have {count} photos. You can upload at most 5 photos."
+msgstr "У вас уже есть {count} фото. Вы можете загрузить максимум 5 фото."
+
+msgid "Uploading too fast, please wait a moment."
+msgstr "Слишком быстрая загрузка, подождите немного."
+
+msgid "Photo too large. Maximum size is approximately 2MB."
+msgstr "Фото слишком большое. Максимальный размер около 2МБ."
+
+msgid "Failed to download photo. Try again."
+msgstr "Не удалось загрузить фото. Попробуйте снова."
+
+#, python-brace-format
+msgid "Invalid: {error}"
+msgstr "Недопустимо: {error}"
+
+#, python-brace-format
+msgid ""
+"Photo saved ({count}/5).\n"
+"Send more or 'done' to finish."
+msgstr ""
+"Фото сохранено ({count}/5).\n"
+"Отправьте ещё или 'done' для завершения."
+
+msgid "None"
+msgstr "Нет"
+
+#, python-format
+msgid ""
+"Ad Preview:\n"
+"\n"
+"Title: %(title)s\n"
+"Description: %(description)s...\n"
+"Price: %(price)s\n"
+"Category: %(category)s\n"
+"Purpose: %(purpose)s\n"
+"Condition: %(condition)s\n"
+"Features: %(features)s\n"
+"City: %(city)s\n"
+msgstr ""
+"Предпросмотр объявления:\n"
+"\n"
+"Заголовок: %(title)s\n"
+"Описание: %(description)s...\n"
+"Цена: %(price)s\n"
+"Категория: %(category)s\n"
+"Цель: %(purpose)s\n"
+"Состояние: %(condition)s\n"
+"Особенности: %(features)s\n"
+"Город: %(city)s\n"
+
+msgid "Send 'confirm' to submit for moderation or 'cancel' to abort."
+msgstr "Отправьте 'confirm' для отправки на модерацию или 'cancel' для отмены."
+
+msgid "Ad submitted for moderation! You'll be notified when it's published."
+msgstr ""
+"Объявление отправлено на модерацию! Вы будете уведомлены, когда оно "
+"опубликовано."
+
+msgid "Ad failed moderation. Please check your content and try again."
+msgstr ""
+"Объявление не прошло модерацию. Проверьте содержимое и попробуйте снова."
+
+msgid "Send 'confirm' to submit or 'cancel' to abort."
+msgstr "Отправьте 'confirm' для отправки или 'cancel' для отмены."
+
+msgid "✔️ Done"
+msgstr "Готово"
+
+msgid ""
+"You have no saved searches.\n"
+"Saved searches will appear here once created via the web interface."
+msgstr ""
+"У вас нет сохранённых поисков.\n"
+"Сохранённые поиски появятся здесь после создания через веб-интерфейс."
+
+msgid "Your saved searches:"
+msgstr "Ваши сохранённые поиска:"
+
+msgid "ON"
+msgstr "ВКЛ"
+
+msgid "OFF"
+msgstr "ВЫКЛ"
+
+msgid "any"
+msgstr "любое"
+
+msgid ""
+"\n"
+"Reply with number to toggle, or /cancel to exit."
+msgstr ""
+"\n"
+"Ответьте номером для переключения, или /cancel для выхода."
+
+msgid "Failed to disable notifications"
+msgstr "Не удалось отключить уведомления"
+
+msgid "Enable notifications"
+msgstr "Включить уведомления"
+
+msgid "Notifications disabled"
+msgstr "Уведомления отключены"
+
+msgid "Failed to enable notifications"
+msgstr "Не удалось включить уведомления"
+
+msgid "🔕 Disable this search"
+msgstr "🔕 Отключить этот поиск"
+
+msgid "Notifications enabled"
+msgstr "Уведомления включены"
+
+msgid "This link is invalid or does not belong to your searches."
+msgstr "Эта ссылка недействительна или не принадлежит вашим поискам."
+
+msgid ""
+"Notifications have been disabled for this saved search.\n"
+"To re-enable them, use /alerts."
+msgstr ""
+"Уведомления для этого сохранённого поиска отключены.\n"
+"Чтобы включить их снова, используйте /alerts."
+
+msgid ""
+"👋 Hi! You have reached Bazuna support.\n"
+"\n"
+"Write your question — we will answer as soon as possible.\n"
+"\n"
+"To create an ad, use /post."
+msgstr ""
 "👋 Привет! Вы связались со службой поддержки Bazuna.\n"
 "\n"
 "Напишите ваш вопрос — мы ответим как можно скорее.\n"
 "\n"
 "Для создания объявления используйте /post."
-msgstr ""
-"👋 Привет! Вы связались со службой поддержки Bazuna.\n"
-"\n"
-"Напишите ваш вопрос — мы ответим как можно скорее.\n"
-"\n"
-"Для создания объявления используйте /post."
 
-msgid "Слишком много запросов в поддержку. Попробуйте позже."
+msgid "Too many requests to support. Please try again later."
 msgstr "Слишком много запросов в поддержку. Попробуйте позже."
 
 msgid "Contact us"
 msgstr "Связаться с нами"
 
-msgid "Ошибка: не удалось определить отправителя"
+msgid "Error: could not determine the sender"
 msgstr "Ошибка: не удалось определить отправителя"
 
-msgid "объявление больше недоступно"
+msgid "The ad is no longer available."
 msgstr "объявление больше недоступно"
 
-msgid "продавец больше недоступен для связи"
+msgid "The seller is no longer available for contact."
 msgstr "продавец больше недоступен для связи"
 
 #, python-format
 msgid ""
-"Новый запрос от покупателя!\n"
+"New request from a buyer!\n"
 "\n"
-"Покупатель: %(buyer)s\n"
+"Buyer: %(buyer)s\n"
 "Ad ID: %(ad_id)s\n"
 "\n"
-"Напишите своё сообщение — оно будет переслано анонимно."
+"Write your message — it will be forwarded anonymously."
 msgstr ""
 "Новый запрос от покупателя!\n"
 "\n"
@@ -96,14 +388,13 @@ msgstr ""
 "\n"
 "Напишите своё сообщение — оно будет переслано анонимно."
 
-msgid "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
+msgid ""
+"Your request has been sent to the seller anonymously. Wait for a reply in "
+"this chat."
 msgstr "Ваш запрос отправлен продавцу анонимно. Ожидайте ответа в этом чате."
 
-msgid "Покупатель"
+msgid "Buyer"
 msgstr "Покупатель"
-
-msgid "Please login first with /start login_<token>"
-msgstr "Пожалуйста, войдите с помощью /start login_<token>"
 
 msgid "Select your preferred language:"
 msgstr "Выберите предпочитаемый язык:"
@@ -128,6 +419,9 @@ msgstr ""
 msgid "Invalid login link format. Expected: /start login_<token>"
 msgstr "Неверный формат login-ссылки. Ожидалось: /start login_<token>"
 
+msgid "Too many login attempts. Please wait a minute and try again."
+msgstr "Слишком много попыток войти. Подождите минуту и попробойте снова."
+
 msgid "This login link is invalid, expired, or already used."
 msgstr "Эта ссылка для входа недействительна, истекла или уже использована."
 
@@ -137,6 +431,10 @@ msgid ""
 msgstr ""
 "Вход выполнен успешно! Ваш аккаунт создан. Теперь вы можете создавать "
 "объявления с помощью /post."
+
+msgid "Login successful! You can now create ads with /post."
+msgstr ""
+"Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
 
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Ваш аккаунт ограничен. Обратитесь в поддержку для получения помощи."
@@ -248,9 +546,6 @@ msgstr "Цена не указана"
 
 msgid "View ad"
 msgstr "Просмотреть объявление"
-
-msgid "🔕 Disable this search"
-msgstr "🔕 Отключить этот поиск"
 
 msgid "Moderation Queue"
 msgstr "Очередь модерации"
@@ -867,6 +1162,9 @@ msgstr "выбор языка и города"
 msgid "Privacy details"
 msgstr "Подробности о конфиденциальности"
 
+msgid "Accept"
+msgstr "Принять"
+
 msgid "Reject non-essential"
 msgstr "Отклонить необязательные"
 
@@ -1180,6 +1478,36 @@ msgstr "Вход выполнен успешно! Перенаправление
 
 msgid "Error checking login status."
 msgstr "Ошибка проверки статуса входа."
+
+#~ msgid ""
+#~ "We need your consent to process the Telegram name and username you "
+#~ "provided for account identification and ad publishing.\n"
+#~ "\n"
+#~ "Essential functions (login, contact) always work. Declining consent means "
+#~ "browse-only mode: you can browse ads and contact sellers but cannot "
+#~ "publish."
+#~ msgstr ""
+#~ "Нам необходимо ваше согласие на обработку имени и имени пользователя "
+#~ "Telegram, которые вы предоставили для идентификации аккаунта и публикации "
+#~ "объявлений.\n"
+#~ "\n"
+#~ "Основные функции (вход, контакты) всегда работают. Отказ от согласия "
+#~ "означает режим просмотра только: вы можете просматривать объявления и "
+#~ "связываться с продавцами, но не можете публиковать."
+
+#~ msgid ""
+#~ "Login successful! Browse-only mode is active: you can browse ads and "
+#~ "contact sellers, but cannot publish."
+#~ msgstr ""
+#~ "Вход выполнен успешно! Режим только для просмотра: вы можете "
+#~ "просматривать объявления и связываться с продавцами, но не можете "
+#~ "публиковать."
+
+#~ msgid "Decline"
+#~ msgstr "Отклонить"
+
+#~ msgid "User not found. Please try logging in again."
+#~ msgstr "Пользователь не найден. Попробуйте войти снова."
 
 #~ msgid "Mko Bazuna"
 #~ msgstr "Mko Bazuna"

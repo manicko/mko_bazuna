@@ -27,6 +27,7 @@ No third-party deps: reuses the ``_parse_po_entries`` parser approach
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -492,3 +493,132 @@ def test_locale_switch_re_render() -> None:
     with translation.override("ru"):
         rendered = tpl.render(Context({}))
     assert "Панель управления" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Part C — bot handler i18n gate tests
+# ---------------------------------------------------------------------------
+
+# Bot-handler methods whose first positional arg or ``text`` keyword carries
+# user-visible text that must be wrapped in ``gettext`` (``_``).
+_BOT_USER_FACING_METHODS = frozenset({
+    "answer", "reply", "edit_text", "edit_caption", "send_message",
+})
+
+# Method names that accept a ``text`` keyword carrying user-visible text.
+_BOT_KEYWORD_TEXT_METHODS = frozenset({"button"})
+
+# Token set for strings that are intentionally left un-translated.
+# Reuses the same set as above.
+_NON_TRANSLATABLE = frozenset({"EUR", "RSD", "BAM"})
+
+
+def _collect_bot_handler_files() -> list[Path]:
+    """Return every ``*.py`` file under ``src/telegram_bot/handlers/``."""
+    handlers_dir = settings.BASE_DIR / "telegram_bot" / "handlers"
+    return sorted(handlers_dir.rglob("*.py"))
+
+
+def _is_gettext_wrapped(node: ast.AST) -> bool:
+    """Return True if *node* is a ``_()`` call wrapping a string."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_"
+        and len(node.args) >= 1
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    )
+
+
+def _is_translatable_text(value: str) -> bool:
+    """Skip strings with no words (emoji-only) or known non-translatable tokens."""
+    cleaned = re.sub(r"\W+", "", value, flags=re.UNICODE)
+    if not cleaned:
+        return False
+    return cleaned.upper() not in _NON_TRANSLATABLE
+
+
+def _find_untranslated(node: ast.AST) -> bool:
+    """Return True if *node* is a bare string constant that should be wrapped."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return _is_translatable_text(node.value)
+    # f-strings — also user-visible but not wrapped in gettext
+    if isinstance(node, ast.JoinedStr):
+        return True
+    return False
+
+
+def _check_call_for_unwrapped(call: ast.Call, source: str, lineno: int) -> list[str]:
+    """Inspect a single Call node for an unwrapped user-facing string."""
+    violations: list[str] = []
+    func = call.func
+
+    # message.answer("text") — first positional arg
+    if (
+        isinstance(func, ast.Attribute)
+        and func.attr in _BOT_USER_FACING_METHODS
+        and call.args
+    ):
+        arg = call.args[0]
+        if _find_untranslated(arg) and not _is_gettext_wrapped(arg):
+            violations.append(
+                f"{source}:{lineno}: unwrapped user-facing string passed to "
+                f".{func.attr}() — wrap in _()"
+            )
+
+    # builder.button(text="text") — text keyword arg
+    if isinstance(func, ast.Attribute) and func.attr in _BOT_KEYWORD_TEXT_METHODS:
+        for kw in call.keywords:
+            if kw.arg == "text" and _find_untranslated(kw.value) and not _is_gettext_wrapped(kw.value):
+                violations.append(
+                    f"{source}:{lineno}: unwrapped button text — wrap in _()"
+                )
+
+    return violations
+
+
+def test_bot_no_hardcoded_messages() -> None:
+    """Bot handler user-facing strings must be wrapped in ``gettext``.
+
+    AST-scans every ``.py`` file under ``telegram_bot/handlers/`` for calls to
+    user-facing Bot/API methods (``answer``, ``reply``, ``edit_text``,
+    ``edit_caption``, ``send_message``, ``KeyboardBuilder.button``) whose text
+    argument is a bare string constant or f-string rather than a ``_()`` call.
+    """
+    all_violations: list[str] = []
+
+    for py_file in _collect_bot_handler_files():
+        source = str(py_file.relative_to(settings.BASE_DIR))
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=source)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                all_violations.extend(
+                    _check_call_for_unwrapped(node, source, node.lineno)
+                )
+
+    assert not all_violations, (
+        "Unwrapped user-facing strings in bot handlers:\n"
+        + "\n".join(all_violations)
+    )
+
+
+def test_no_cyrillic_msgids() -> None:
+    """No ``msgid`` in any ``.po`` file may contain Cyrillic characters.
+
+    Russian-as-msgid is forbidden — msgids must be English (project rule #16,
+    spec I18N-004).  ``msgstr`` values for ru/bs are naturally Cyrillic and
+    exempt.
+    """
+    cyrillic_re = re.compile(r"[\u0400-\u04FF]")
+
+    for po_path in _po_files():
+        text = po_path.read_text(encoding="utf-8")
+        for msgid, _ in _parse_po_entries(text):
+            if msgid and cyrillic_re.search(msgid):
+                rel = po_path.relative_to(settings.BASE_DIR)
+                pytest.fail(
+                    f"{rel}: msgid contains Cyrillic (Russian-as-msgid): "
+                    f"{msgid[:80]!r}"
+                )

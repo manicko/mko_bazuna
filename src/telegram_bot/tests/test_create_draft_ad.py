@@ -26,7 +26,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_creates_draft_ad(self, user: object) -> None:
         """create_draft_ad creates an Ad with DRAFT status."""
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
 
@@ -37,7 +37,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_draft_persisted_in_database(self, user: object) -> None:
         """The created Ad is persisted in the database and queryable."""
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
 
@@ -53,7 +53,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_delete_draft_removes_ad(self, user: object) -> None:
         """delete_draft removes the draft Ad from the database."""
-        from telegram_bot.handlers.ad_create import create_draft_ad, delete_draft
+        from telegram_bot.services.ad_data import create_draft_ad, delete_draft
 
         ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
         ad_id = ad.id
@@ -68,7 +68,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_delete_draft_missing_succeeds(self) -> None:
         """delete_draft succeeds silently for a non-existent ad ID."""
-        from telegram_bot.handlers.ad_create import delete_draft
+        from telegram_bot.services.ad_data import delete_draft
 
         # Should not raise
         await delete_draft(99999999)
@@ -76,7 +76,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_draft_default_status(self, user: object) -> None:
         """Newly created ad has DRAFT status by default."""
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
 
@@ -88,7 +88,7 @@ class TestCreateDraftAd:
     @pytest.mark.asyncio
     async def test_create_draft_second_call_does_not_duplicate(self, user: object) -> None:
         """Calling create_draft_ad twice leaves exactly one DRAFT for the user."""
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         ad1 = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
         ad2 = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]

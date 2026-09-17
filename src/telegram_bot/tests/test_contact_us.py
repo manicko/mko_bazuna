@@ -25,6 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from django.core.cache import cache
+from django.utils import translation
 
 from telegram_bot.handlers.contact import (
     _CONTACT_US_GREETING,
@@ -83,18 +84,19 @@ class TestContactUsDeepLink:
         message = _mock_message(user_id=201)
         bot = MagicMock()
 
-        result = await handle_contact_us_start(message, bot)
+        with translation.override("ru"):
+            result = await handle_contact_us_start(message, bot)
 
-        assert result is True
-        message.answer.assert_awaited_once()
-        sent_text = message.answer.await_args.args[0]
-        # Identical-output contract: the deep-link uses the shared greeting.
-        assert sent_text == _CONTACT_US_GREETING
-        assert "службой поддержки" in sent_text
-        reply_markup = message.answer.await_args.kwargs["reply_markup"]
-        button = reply_markup.inline_keyboard[0][0]
-        assert button.callback_data == "contact_us"
-        assert button.text == "Contact us"
+            assert result is True
+            message.answer.assert_awaited_once()
+            sent_text = message.answer.await_args.args[0]
+            # Identical-output contract: the deep-link uses the shared greeting.
+            assert str(sent_text) == str(_CONTACT_US_GREETING)
+            assert "службой поддержки" in str(sent_text)
+            reply_markup = message.answer.await_args.kwargs["reply_markup"]
+            button = reply_markup.inline_keyboard[0][0]
+            assert button.callback_data == "contact_us"
+            assert str(button.text) == "Связаться с нами"
 
     @pytest.mark.asyncio
     async def test_is_bot_skipped_without_budget(self) -> None:
@@ -152,16 +154,17 @@ class TestContactUsCallback:
         callback = _mock_callback("contact_us")
         bot = MagicMock()
 
-        await handle_contact_us_callback(callback, bot)
+        with translation.override("ru"):
+            await handle_contact_us_callback(callback, bot)
 
-        callback.answer.assert_awaited_once()  # spinner dismissed first
-        callback.message.edit_text.assert_awaited_once()
-        sent_text = callback.message.edit_text.await_args.args[0]
-        assert sent_text == _CONTACT_US_GREETING
-        reply_markup = callback.message.edit_text.await_args.kwargs["reply_markup"]
-        button = reply_markup.inline_keyboard[0][0]
-        assert button.callback_data == "contact_us"
-        assert button.text == "Contact us"
+            callback.answer.assert_awaited_once()  # spinner dismissed first
+            callback.message.edit_text.assert_awaited_once()
+            sent_text = callback.message.edit_text.await_args.args[0]
+            assert str(sent_text) == str(_CONTACT_US_GREETING)
+            reply_markup = callback.message.edit_text.await_args.kwargs["reply_markup"]
+            button = reply_markup.inline_keyboard[0][0]
+            assert button.callback_data == "contact_us"
+            assert str(button.text) == "Связаться с нами"
 
     @pytest.mark.asyncio
     async def test_no_message_is_noop(self) -> None:

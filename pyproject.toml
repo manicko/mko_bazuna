@@ -195,6 +195,12 @@ reportAttributeAccessIssue = "none"  # Django adds 'id' at runtime via metaclass
 reportMissingImports = "none"  # Django apps namespace imports resolved at runtime
 reportOperatorIssue = "none"  # Django Q objects support |/~ at runtime but not type-checked
 reportCallIssue = "none"  # Django model methods and pathlib/str mixing in save()
+# django-stubs is intentionally NOT installed: it would cascade hundreds of new
+# type errors across the codebase.  Django ORM objects that lack type stubs
+# (e.g. django.db.transaction.Atomic context-manager protocol) trigger
+# reportGeneralTypeIssues at the specific call site.  These sites carry an
+# inline `# pyright: ignore[reportGeneralTypeIssues]` comment rather than a
+# global suppression.
 
 [tool.uv]
 default-groups = []

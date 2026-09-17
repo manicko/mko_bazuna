@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import logging
 import os
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.conf import settings
 from django.db import transaction
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
@@ -54,6 +54,60 @@ class SubmitAdInput(BaseModel):
     listing_purpose_id: int | None = None
     feature_ids: list[int] | None = None
     listing_condition_id: int | None = None
+
+
+class AdEditInput(BaseModel):
+    """DTO validating ad-edit POST data before any ORM write (QLT-004).
+
+    Models the web-edit path's divergent semantics that ``SubmitAdInput``
+    does not cover:
+
+    - *Currency-fallback-on-invalid:* an invalid/blank ``price_currency``
+      yields ``None``; the view then preserves the ad's current currency
+      (matching the original ``except ValueError: pass`` behavior — see
+      Block E design §"Currency-fallback-on-invalid").
+    - *Invalid price → Free:* an unparseable ``price_amount`` yields
+      ``Decimal("0")`` (matching the original ``except Exception`` fallback).
+
+    TODO(QLT-004): Blank title/description still overwrite the ad's values
+    (matching the original view logic where missing POST keys → ``""``).
+    Consider rejecting blanks or requiring an explicit clear signal in a
+    future pass.
+    """
+
+    title: str = ""
+    description: str = ""
+    price_amount: Decimal = Decimal("0")
+    price_currency: CurrencyCode | None = None
+
+    @field_validator("title", "description", mode="before")
+    @classmethod
+    def _strip_text(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
+
+    @field_validator("price_amount", mode="before")
+    @classmethod
+    def _coerce_price_amount(cls, v: Any) -> Decimal:
+        """Empty or unparseable price → Decimal("0") (Free)."""
+        if v is None or v == "":
+            return Decimal("0")
+        try:
+            return Decimal(str(v))
+        except (InvalidOperation, ValueError):
+            return Decimal("0")
+
+    @field_validator("price_currency", mode="before")
+    @classmethod
+    def _coerce_price_currency(cls, v: Any) -> CurrencyCode | None:
+        """Invalid/blank currency → None (view preserves ad's current currency)."""
+        if v is None or v == "":
+            return None
+        try:
+            return CurrencyCode(str(v))
+        except ValueError:
+            return None
 
 
 def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:

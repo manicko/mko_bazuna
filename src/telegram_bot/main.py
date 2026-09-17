@@ -22,6 +22,7 @@ from telegram_bot.lifecycle import (  # noqa: E402
 from telegram_bot.middlewares import (  # noqa: E402
     AccountStateMiddleware,
     DatabaseConnectionMiddleware,
+    LanguageMiddleware,
     UpdateIdDedupMiddleware,
 )
 
@@ -56,6 +57,9 @@ def main() -> None:
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
+    # Locale middleware must run before AccountStateMiddleware so denial
+    # messages render in the user's preferred language (FQ-001).
+    dp.update.middleware(LanguageMiddleware())
     # Register account state middleware on update-level so it receives Update
     # events (Message + CallbackQuery), making the isinstance(event, Update)
     # gate and event.message / event.callback_query access functional.

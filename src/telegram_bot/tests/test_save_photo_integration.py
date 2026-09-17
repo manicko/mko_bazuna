@@ -70,7 +70,7 @@ class TestSavePhotoThumbnailsIntegration:
         """Successful generation populates all three ``thumbnail_*`` fields."""
         from apps.ads.models import AdImage
         from apps.ads.services.submission import SubmitAdInput, submit_ad
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         category = await _make_category()
         city = await _make_city()
@@ -119,7 +119,7 @@ class TestSavePhotoThumbnailsIntegration:
         """When ``generate_thumbnails`` raises, all three ``thumbnail_*`` stay null."""
         from apps.ads.models import AdImage
         from apps.ads.services.submission import SubmitAdInput, submit_ad
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         category = await _make_category()
         city = await _make_city()
@@ -184,7 +184,7 @@ class TestSubmitAdStagingMove:
         from apps.ads.services.submission import SubmitAdInput, submit_ad
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         media_root = tmp_path
 
@@ -269,7 +269,7 @@ class TestSubmitAdStagingMove:
         from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
-        from telegram_bot.handlers.ad_create import create_draft_ad
+        from telegram_bot.services.ad_data import create_draft_ad
 
         media_root = tmp_path
 

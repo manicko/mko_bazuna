@@ -59,6 +59,7 @@ def dp() -> Dispatcher:
     from telegram_bot.middlewares import (
         AccountStateMiddleware,
         DatabaseConnectionMiddleware,
+        LanguageMiddleware,
         UpdateIdDedupMiddleware,
     )
 
@@ -76,8 +77,10 @@ def dp() -> Dispatcher:
     dp.shutdown.register(_on_shutdown)
     dp.update.middleware(UpdateIdDedupMiddleware())
     dp.update.middleware(LivenessMiddleware())
+    # Locale middleware must run before AccountStateMiddleware (FQ-001).
+    dp.update.middleware(LanguageMiddleware())
     # Register account state middleware on update-level (moved from dp.message)
-    dp.update.middleware(AccountStateMiddleware())  # pyright: ignore[reportAbstractUsage]
+    dp.update.middleware(AccountStateMiddleware())
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
     return dp

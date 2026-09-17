@@ -197,7 +197,7 @@ class TestBotConditionStep:
         self, condition_lookup, feature_lookup
     ) -> None:
         """The features keyboard never emits ``feature:`` buttons for new/used."""
-        from telegram_bot.handlers.ad_create import build_feature_keyboard
+        from telegram_bot.services.ad_data import build_feature_keyboard
 
         items = [
             condition_lookup["new"],

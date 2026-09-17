@@ -18,11 +18,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
 from apps.ads.models import Ad
-from apps.ads.services.submission import SubmitAdInput, submit_ad
+from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
-from apps.moderation.services.auto_moderation import auto_moderate
 
 logger = logging.getLogger(__name__)
 
@@ -63,22 +62,18 @@ def _apply_price_change(
     return ad
 
 
-def _text_fields_changed(request: HttpRequest, ad: Ad) -> bool:
+def _text_fields_changed(dto: AdEditInput, ad: Ad) -> bool:
     """
-    Check if text fields (title/description) were changed in the request.
+    Check if text fields (title/description) were changed in the edit.
 
     Args:
-        request: HTTP request with POST data
-        ad: The ad being edited
+        dto: Validated edit input from the POST form.
+        ad: The ad being edited.
 
     Returns:
-        True if title or description was changed, False otherwise
+        True if title or description differs from the ad's current values.
     """
-    new_title = (request.POST.get("title") or "").strip()
-    new_description = (request.POST.get("description") or "").strip()
-
-    # Check if either field changed (compare with current values)
-    return new_title != ad.title or new_description != ad.description
+    return dto.title != ad.title or dto.description != ad.description
 
 
 @login_required
@@ -125,7 +120,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     # status-driven branch below and the subsequent transition_to() operate
     # on a locked, consistent row. The GET path returns before this block, so
     # the lock is scoped to POST mutations only (mirrors review.py reject_ad).
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Determine if this is a reactivation request
@@ -133,36 +128,22 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             "reactivate"
         )
 
-        # Get form data - use empty string defaults to ensure non-None values
-        new_title = (request.POST.get("title") or "").strip()
-        new_description = (request.POST.get("description") or "").strip()
-        new_price_amount = request.POST.get("price_amount")
-        new_price_currency = request.POST.get("price_currency")
+        # Validate POST data via DTO before any ad.save() call (QLT-004).
+        # AdEditInput models the web-edit path's currency-fallback-on-invalid
+        # and price-fallback-to-Free semantics via field validators.
+        dto = AdEditInput.model_validate(request.POST)
 
-        # Parse the price amount. Empty input means "Free" (Decimal("0"));
-        # invalid input also falls back to Free, since the model field is
-        # non-null with default=0 (spec §5.2 R-MM-01).
-        price_amount_value = Decimal("0")
-        if new_price_amount not in (None, ""):
-            try:
-                price_amount_value = Decimal(new_price_amount)
-            except Exception:
-                price_amount_value = Decimal("0")
-
-        # Parse the currency; fall back to the ad's current currency when
-        # unset/invalid. Do not coerce to None — a price (incl. Free=0) keeps
-        # a valid currency for normalized_eur computation.
-        price_currency_value: CurrencyCode | None = (
-            CurrencyCode(ad.price_currency) if ad.price_currency else None
-        )
-        if new_price_currency:
-            try:
-                price_currency_value = CurrencyCode(new_price_currency)
-            except ValueError:
-                pass  # Keep the ad's current currency (already set above)
+        # Currency-fallback-on-invalid: None means preserve the ad's current
+        # currency (web-specific behavior that diverges from the bot flow).
+        if dto.price_currency is not None:
+            price_currency_value = dto.price_currency
+        else:
+            price_currency_value = (
+                CurrencyCode(ad.price_currency) if ad.price_currency else None
+            )
 
         # Determine edit type
-        has_text_change = _text_fields_changed(request, ad)
+        has_text_change = _text_fields_changed(dto, ad)
 
         if is_reactivation:
             # Route through the shared submission orchestrator.
@@ -181,11 +162,11 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             passed, errors = submit_ad(
                 SubmitAdInput(
                     ad_id=ad_id,
-                    title_ru=new_title,
-                    desc_ru=new_description,
+                    title_ru=dto.title,
+                    desc_ru=dto.description,
                     category_id=ad.category_id,
                     city_id=ad.city_id,
-                    price_amount=price_amount_value,
+                    price_amount=dto.price_amount,
                     price_currency=price_currency_value,
                     photos=[],
                     user_id=ad.user_id,
@@ -214,9 +195,9 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             # Mixed edit -> follows text rule
             if has_text_change:
                 # Text edit: go to moderation
-                ad.title = new_title
-                ad.description = new_description
-                ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+                ad.title = dto.title
+                ad.description = dto.description
+                ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
                 ad.save(
                     update_fields=[
                         "title",
@@ -238,6 +219,8 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 # view's outer atomic); on pass it promotes to PUBLISHED, on fail
                 # to ON_MODERATION_FAILED. Branch on the bool return and reuse
                 # the seller-safe error message from the reactivation branch.
+                from apps.moderation.services.auto_moderation import auto_moderate
+
                 am_result = auto_moderate(ad)
                 if am_result:
                     return redirect("ads:dashboard")
@@ -253,7 +236,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 )
             else:
                 # Price/photo only edit: stay published; recompute normalized price.
-                ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+                ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
                 ad.save(
                     update_fields=[
                         "price_amount",
@@ -268,9 +251,9 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
         else:
             # Other statuses (ON_MODERATION, ON_MODERATION_FAILED): direct save
-            ad.title = new_title
-            ad.description = new_description
-            ad = _apply_price_change(ad, price_amount_value, price_currency_value)
+            ad.title = dto.title
+            ad.description = dto.description
+            ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
             ad.save(
                 update_fields=[
                     "title",
@@ -300,7 +283,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Authorization check
@@ -337,7 +320,7 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
         ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
         # Authorization check
@@ -357,6 +340,8 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
             ad.transition_to(AdStatus.ON_MODERATION)
 
             # Run auto-moderation check
+            from apps.moderation.services.auto_moderation import auto_moderate
+
             auto_moderate(ad)
 
             logger.info("Ad %s reactivation initiated by user %s", ad_id, request.user.id)
