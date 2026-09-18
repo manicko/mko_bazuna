@@ -20,8 +20,8 @@ from apps.core.services.contact import (
 )
 from conftest import create_test_ad
 
-# Contact deep-link pattern inlined from telegram_bot/handlers/contact.py:CONTACT_PATTERN
-# to keep core tests free of bot-side imports.
+# Contact deep-link pattern, inlined to keep core tests free of bot-side imports.
+# Source: telegram_bot.handlers.contact.CONTACT_PATTERN
 _CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
