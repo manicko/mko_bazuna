@@ -294,3 +294,42 @@ class TestRunSendExceptionNarrowing:
 
             with pytest.raises(RuntimeError, match="unexpected"):
                 _run_send([])
+
+
+# ---------------------------------------------------------------------------
+# build_alert_message keyboard callback_data (CR9 / AL-002)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildAlertMessageKeyboard:
+    """The per-ad alert keyboard carries an unsubscribe inline button.
+
+    The button's ``callback_data`` binds the search's opaque unsubscribe token
+    so a tap can route the deep-link back to the bot (AL-002).
+    """
+
+    def test_build_alert_message_unsubscribe_callback(self) -> None:
+        """Button callback_data is ``unsub:<saved_search.unsubscribe_token>``."""
+        from apps.search.services.immediate_alerts import (
+            UNSUB_CALLBACK_PREFIX,
+            build_alert_message,
+        )
+
+        ad = MagicMock()
+        ad.get_title.return_value = "Test Ad"
+        ad.city.get_name.return_value = "Тестград"
+        ad.price_amount = 0
+        ad.price_currency = "EUR"
+        ad.get_absolute_url.return_value = "https://example.com/ads/1/"
+
+        saved_search = MagicMock()
+        saved_search.unsubscribe_token = "opaque_token_123"
+
+        _text, keyboard = build_alert_message(ad, saved_search, locale="en")
+
+        button = keyboard.inline_keyboard[0][0]
+        assert button.callback_data == (
+            f"{UNSUB_CALLBACK_PREFIX}{saved_search.unsubscribe_token}"
+        )
+        assert button.callback_data.startswith("unsub:")
+        assert button.callback_data.endswith("opaque_token_123")

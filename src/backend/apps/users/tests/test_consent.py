@@ -362,3 +362,44 @@ class TestConsentBannerGuard:
 
         assert response.status_code == 200
         assert b"consent-banner" in response.content
+
+
+# ---------------------------------------------------------------------------
+# consent_withdraw idempotency on already-deleted user (decision F)
+# ---------------------------------------------------------------------------
+
+
+class TestConsentWithdrawIdempotency:
+    """withdraw_consent is a no-op for already soft-deleted users.
+
+    When ``user.is_deleted`` is already True the service returns ``[]``
+    immediately: no LoginToken deletion, no PII nulling, no ad soft-delete,
+    and no filesystem removal (the row was already withdrawn).
+    """
+
+    def test_consent_withdraw_idempotent_on_deleted_user(
+        self, deleted_user: User
+    ) -> None:
+        """withdraw_consent on a deleted user returns [] and leaves PII/tokens."""
+        from apps.users.services.deletion import withdraw_consent
+
+        # A pre-existing login token must survive the idempotent no-op.
+        LoginToken.objects.create(
+            token_hash="0" * 64,
+            telegram_id=deleted_user.telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        result = withdraw_consent(deleted_user)
+
+        # No-op contract: empty result, no side effects.
+        assert result == []
+
+        # PII preserved (telegram_id not re-nulled).
+        deleted_user.refresh_from_db()
+        assert deleted_user.telegram_id == 900000031
+
+        # Login token survives the idempotent no-op.
+        assert LoginToken.objects.filter(
+            telegram_id=deleted_user.telegram_id
+        ).exists()

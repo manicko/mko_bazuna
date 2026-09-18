@@ -166,3 +166,53 @@ class TestSearchHistorySection:
 
         resp = client.get("/cabinet/search-history/?lang=ru")
         assert "Нет истории поиска" in resp.content.decode()
+
+
+# ---------------------------------------------------------------------------
+# Anonymous POST gate on mutating cabinet endpoints (CAB-002/3/4 auth guard)
+# ---------------------------------------------------------------------------
+
+
+class TestCabinetAnonymousGate:
+    """Every mutating cabinet POST is ``@login_required``.
+
+    Anonymous POSTs receive a 302 redirect to ``/login/issue/?next=...``
+    rather than touching the DB row (pk is irrelevant — login_required
+    short-circuits before the view body runs).
+    """
+
+    def test_anon_post_saved_search_toggle_redirects(self) -> None:
+        """POST /cabinet/saved-searches/<pk>/toggle/ anonymous → 302 login gate."""
+        client = Client()
+        response = client.post("/cabinet/saved-searches/1/toggle/")
+
+        assert response.status_code == 302
+        assert response.url.startswith("/login/issue/")
+        assert "next=" in response.url
+
+    def test_anon_post_saved_search_edit_redirects(self) -> None:
+        """POST /cabinet/saved-searches/<pk>/edit/ anonymous → 302 login gate."""
+        client = Client()
+        response = client.post("/cabinet/saved-searches/1/edit/")
+
+        assert response.status_code == 302
+        assert response.url.startswith("/login/issue/")
+        assert "next=" in response.url
+
+    def test_anon_post_saved_search_delete_redirects(self) -> None:
+        """POST /cabinet/saved-searches/<pk>/delete/ anonymous → 302 login gate."""
+        client = Client()
+        response = client.post("/cabinet/saved-searches/1/delete/")
+
+        assert response.status_code == 302
+        assert response.url.startswith("/login/issue/")
+        assert "next=" in response.url
+
+    def test_anon_post_search_history_clear_redirects(self) -> None:
+        """POST /cabinet/search-history/clear/ anonymous → 302 login gate."""
+        client = Client()
+        response = client.post("/cabinet/search-history/clear/")
+
+        assert response.status_code == 302
+        assert response.url.startswith("/login/issue/")
+        assert "next=" in response.url

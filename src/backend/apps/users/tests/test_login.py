@@ -423,3 +423,44 @@ class TestLoginPreferredCitySync:
 
         user.refresh_from_db()
         assert user.preferred_city_id is None
+
+
+# ---------------------------------------------------------------------------
+# login_rate_limit_check (AUT-009 rate-limit contract)
+# ---------------------------------------------------------------------------
+
+
+class TestLoginRateLimitCheck:
+    """login_rate_limit_check enforces 10 requests / 60s / IP.
+
+    Uses the atomic ``cache.add`` (first hit) → ``cache.incr`` (subsequent)
+    pattern so the counter is initialised at 1 and incremented per request.
+    """
+
+    def test_login_rate_limit_check(self) -> None:
+        """First 10 calls return True; the 11th is throttled (False).
+
+        Proves the add→incr pattern: the cache key holds the incremented
+        counter (1 init + 10 subsequent + the throttled 11th == 11).
+        """
+        from django.core.cache import cache
+        from django.http import HttpRequest
+
+        from apps.users.services.login_rate_limit import (
+            RATE_LIMIT_REQUESTS,
+            login_rate_limit_check,
+        )
+
+        request = HttpRequest()
+        request.META = {"REMOTE_ADDR": "127.0.0.1"}
+
+        # Calls 1-10: cache.add creates the key (value=1) on the first hit,
+        # then cache.incr advances it to 10 — each <= RATE_LIMIT_REQUESTS.
+        for _ in range(RATE_LIMIT_REQUESTS):
+            assert login_rate_limit_check(request) is True
+
+        # Call 11: cache.incr advances the counter to 11 > 10 → throttled.
+        assert login_rate_limit_check(request) is False
+
+        # Counter reflects 11 increments: 1 (init) + 10 + the throttled attempt.
+        assert cache.get("login_rl:127.0.0.1") == RATE_LIMIT_REQUESTS + 1
