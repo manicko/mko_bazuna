@@ -624,14 +624,29 @@ make backup
 # Manual
 docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
-  exec -T db pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -F c > backups/dump_$(date +%Y%m%d_%H%M%S).dump
+  exec -T db pg_dump --no-sync -U $POSTGRES_USER -d $POSTGRES_DB -F c > backups/dump_$(date +%Y%m%d_%H%M%S).dump
 ```
+
+> **Note:** `pg_dump --no-sync` is used in both the Makefile `backup` target and the production backup
+> service (`docker-compose.prod.yml`). The `--no-sync` flag is a `pg_dump`-only optimization that
+> skips `fsync` calls during the dump for faster backups; it is **not** valid for `pg_restore`
+> (which has no such flag). Backups use custom format (`-F c`), compressed. See
+> [Restore Runbook](restore.md) for restore and restore-test procedures.
 
 ### Restore
 
 ```bash
 make restore BACKUP_FILE=./backups/dump_20250719_143022.dump
 ```
+
+For non-production backup validation and DR drills, use the isolated restore-test target:
+
+```bash
+make restore-test BACKUP_FILE=./backups/dump_20250719_143022.dump
+```
+
+This restores into a throwaway PostgreSQL container (separate volume, separate DB) and never
+touches the live production database. See [Restore Runbook](restore.md) for full details.
 
 ### Migration Management
 

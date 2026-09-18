@@ -2,7 +2,7 @@
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
           lint format typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
-           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed
+           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test
 
 # ====================== Settings ======================
 
@@ -71,6 +71,7 @@ help:
 	@echo "  logs           Follow logs"
 	@echo "  backup         Create database backup"
 	@echo "  restore        Restore database (make restore BACKUP_FILE=...)"
+	@echo "  restore-test   Restore backup into an isolated DB (make restore-test BACKUP_FILE=...)"
 	@echo "  prune-backups  Delete old backups (7+ days)"
 	@echo ""
 	@echo "Cleanup:"
@@ -233,7 +234,7 @@ backup:
 	@set -a; . .env.dev; set +a; \
 	TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
 		docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
-			pg_dump -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -F c \
+			pg_dump --no-sync -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -F c \
 			> $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump && \
 		echo "✓ Backup created: $(BACKUPS_DIR)/dump_$${TIMESTAMP}.dump"
 	@$(MAKE) prune-backups
@@ -252,6 +253,68 @@ restore:
 	docker compose $(ENV_FILE) -f docker-compose.yml exec -T db \
 		pg_restore -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" --clean --if-exists $(BACKUP_FILE)
 	@echo "✓ Restore completed from $(BACKUP_FILE)"
+
+# restore-test: Restore a backup into a fully isolated PostgreSQL instance (separate
+# volume, separate network, separate DB) so the live production database is never
+# touched. Uses `docker run` directly (not `docker compose`) for complete isolation.
+restore-test:
+	@if [ -z "$(BACKUP_FILE)" ]; then \
+		echo "Error: BACKUP_FILE not specified"; \
+		echo "Example: make restore-test BACKUP_FILE=./backups/dump_20250719_143022.dump"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(BACKUP_FILE)" ]; then \
+		echo "Error: file $(BACKUP_FILE) not found"; \
+		exit 1; \
+	fi
+	@set -e; \
+	RESTORE_TS=$$(date +%Y%m%d_%H%M%S) && \
+	RESTORE_VOL="mko-bazuna-restore-$$RESTORE_TS" && \
+	RESTORE_NET="mko-bazuna-restore-net-$$RESTORE_TS" && \
+	BACKUP_NAME=$$(basename "$(BACKUP_FILE)") && \
+	cleanup() { \
+		echo "→ Tearing down isolated resources..."; \
+		docker stop restore-db 2>/dev/null || true; \
+		docker rm -f restore-db 2>/dev/null || true; \
+		docker volume rm $$RESTORE_VOL 2>/dev/null || true; \
+		docker network rm $$RESTORE_NET 2>/dev/null || true; \
+		echo "✓ Isolated restore-test environment cleaned up"; \
+	}; \
+	trap cleanup EXIT; \
+	echo "→ Creating isolated restore volume: $$RESTORE_VOL" && \
+	docker volume create $$RESTORE_VOL && \
+	echo "→ Creating isolated network: $$RESTORE_NET" && \
+	docker network create $$RESTORE_NET && \
+	echo "→ Starting isolated postgres:18-alpine (db=bazuna_restore, user=restore_user)" && \
+	docker run --rm -d \
+		--name restore-db \
+		--network $$RESTORE_NET \
+		-v $$RESTORE_VOL:/var/lib/postgresql \
+		-v $(CURDIR)/backups:/backups:ro \
+		-e POSTGRES_DB=bazuna_restore \
+		-e POSTGRES_USER=restore_user \
+		-e POSTGRES_PASSWORD=restore_pass \
+		-e POSTGRES_HOST_AUTH_METHOD=trust \
+		postgres:18-alpine && \
+	echo "→ Waiting for postgres readiness..." && \
+	_i=0; until docker exec restore-db pg_isready -U restore_user -d bazuna_restore; do \
+		sleep 1; _i=$$((_i + 1)); \
+		if [ $$_i -ge 30 ]; then echo "Error: postgres did not become ready in 30s"; exit 1; fi; \
+	done && \
+	echo "→ Restoring backup into isolated DB: $(BACKUP_FILE)" && \
+	docker exec restore-db pg_restore --clean --if-exists -U restore_user -d bazuna_restore -F c /backups/$$BACKUP_NAME && \
+	echo "→ Smoke test 1/4: pg_isready (connectivity)" && \
+	docker exec restore-db pg_isready -U restore_user -d bazuna_restore && \
+	echo "  ✓ Connectivity OK" && \
+	echo "→ Smoke test 2/4: table count (schema present)" && \
+	echo "  Tables: $$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
+		"SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")" && \
+	echo "→ Smoke test 3/4: row count in ads_ad (data present)" && \
+	echo "  ads_ad rows: $$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
+		"SELECT count(*) FROM ads_ad;")" && \
+	echo "→ Smoke test 4/4: schema list" && \
+	docker exec restore-db psql -U restore_user -d bazuna_restore -c "\dn" && \
+	echo "✓ Restore-test completed successfully from $(BACKUP_FILE)"
 
 prune-backups:
 	@find $(BACKUPS_DIR) -name "dump_*.dump" -mtime +7 -delete -print
