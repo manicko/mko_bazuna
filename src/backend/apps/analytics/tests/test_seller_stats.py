@@ -1,8 +1,8 @@
 """
 Unit tests for SellerStats analytics service (TASK_041).
 
-Tests cover time range filtering, cache key generation, empty data handling,
-and stats aggregation.
+Tests cover time range filtering, cache hit/miss behavior, cache key generation,
+empty data handling, and stats aggregation.
 
 Requires a working PostgreSQL database per project spec.
 """
@@ -10,6 +10,7 @@ Requires a working PostgreSQL database per project spec.
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.test import override_settings
@@ -18,6 +19,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.analytics.services import SellerStats
+from apps.analytics.services.seller_stats import CACHE_TTL
 from apps.core.enums import AdStatus, AnalyticsEventType, TimeRange
 from apps.users.models import User
 from conftest import create_test_ad
@@ -225,3 +227,48 @@ class TestSellerStats:
         assert len(stats["per_ad_stats"]) == 1
         assert stats["per_ad_stats"][0]["views"] == 0
         assert stats["per_ad_stats"][0]["contacts"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: caching behavior (cache hit / miss, TTL)
+# ---------------------------------------------------------------------------
+
+
+class TestSellerStatsCache:
+    """Cache hit/miss behavior for ``SellerStats`` (5-minute TTL)."""
+
+    def test_cache_ttl_is_300(self) -> None:
+        """``CACHE_TTL`` constant equals 300 seconds (5 minutes)."""
+        assert CACHE_TTL == 300
+
+    def test_cache_miss_invokes_compute(self, seller_with_ads) -> None:
+        """First call (cache miss) invokes ``_compute`` exactly once."""
+        seller = seller_with_ads["seller"]
+        svc = SellerStats(user_id=seller.id)
+        with patch.object(SellerStats, "_compute", wraps=svc._compute) as spy:
+            result = svc.get_stats(TimeRange.ALL_TIME)
+            assert spy.call_count == 1
+        assert result["total_views"] == 6
+
+    def test_cache_hit_returns_cached_without_compute(self, seller_with_ads) -> None:
+        """Second call returns cached result without invoking ``_compute``."""
+        seller = seller_with_ads["seller"]
+        svc = SellerStats(user_id=seller.id)
+        # Prime the cache (cache miss → _compute invoked)
+        first = svc.get_stats(TimeRange.ALL_TIME)
+        # Second call must hit the cache
+        with patch.object(SellerStats, "_compute") as mock_compute:
+            second = svc.get_stats(TimeRange.ALL_TIME)
+            assert mock_compute.call_count == 0
+        assert second == first
+
+    def test_result_stored_in_cache_after_first_call(self, seller_with_ads) -> None:
+        """After the first call, the result is stored under the expected key."""
+        from django.core.cache import cache
+
+        seller = seller_with_ads["seller"]
+        svc = SellerStats(user_id=seller.id)
+        svc.get_stats(TimeRange.ALL_TIME)
+        cached = cache.get(f"seller_stats:{seller.id}:all_time")
+        assert cached is not None
+        assert cached["total_views"] == 6

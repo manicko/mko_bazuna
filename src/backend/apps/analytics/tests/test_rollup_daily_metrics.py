@@ -2,8 +2,8 @@
 Tests for the rollup_daily_metrics management command (TASK_059).
 
 Covers dry-run mode (no DB mutations), actual metrics aggregation with
-existing events, advisory lock acquisition, and idempotency (running twice
-produces the same result).
+existing events, advisory lock acquisition, idempotency (running twice
+produces the same result), and seed-source event exclusion.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
@@ -48,6 +48,7 @@ def _make_event(
     *,
     user=None,
     hours_ago: int = 6,
+    source: AdSource | None = None,
 ) -> AnalyticsEvent:
     """Create an AnalyticsEvent for yesterday (the command's target date)."""
     yesterday = timezone.now().date() - timedelta(days=1)
@@ -58,6 +59,7 @@ def _make_event(
         user=user,
         event_type=event_type.value,
         timestamp=timestamp,
+        source=source,
     )
 
 
@@ -307,3 +309,88 @@ class TestRollupDailyMetricsIdempotency:
 
         records = DailyAdMetrics.objects.filter(date=yesterday)
         assert records.count() == 2
+
+
+# ---------------------------------------------------------------------------
+# Tests: seed-source exclusion
+# ---------------------------------------------------------------------------
+
+
+class TestRollupDailyMetricsSeedExclusion:
+    """Seed-source events are excluded from rollup by ``SeedService._clean``.
+
+    The rollup command itself does NOT filter by ``source``; seed events are
+    removed beforehand via ``AnalyticsEvent.objects.filter(source=AdSource.SEED)``.
+    These tests verify that flow: seed events coexist with production events,
+    ``_clean`` purges seed events, and the rollup counts production events only.
+    """
+
+    @pytest.fixture
+    def seed_exclusion_data(self, seller, category, city):
+        """Create an ad with both seed-source and production events for yesterday.
+
+        - 2 production AD_VIEWED, 1 production CONTACT_INITIATED,
+          1 production CONTACT_COMPLETED
+        - 2 seed AD_VIEWED, 1 seed CONTACT_INITIATED, 1 seed CONTACT_COMPLETED
+        """
+        ad = create_test_ad(
+            seller, category, city, title="Seed Exclusion Ad", status=AdStatus.PUBLISHED
+        )
+
+        # Production events (source=None = production)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=10)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=8)
+        _make_event(ad, AnalyticsEventType.CONTACT_INITIATED, hours_ago=6)
+        _make_event(ad, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=4)
+
+        # Seed-source events (source=AdSource.SEED) — should be excluded after _clean
+        _make_event(
+            ad, AnalyticsEventType.AD_VIEWED, hours_ago=5, source=AdSource.SEED
+        )
+        _make_event(
+            ad, AnalyticsEventType.AD_VIEWED, hours_ago=3, source=AdSource.SEED
+        )
+        _make_event(
+            ad,
+            AnalyticsEventType.CONTACT_INITIATED,
+            hours_ago=4,
+            source=AdSource.SEED,
+        )
+        _make_event(
+            ad,
+            AnalyticsEventType.CONTACT_COMPLETED,
+            hours_ago=2,
+            source=AdSource.SEED,
+        )
+
+        return {"ad": ad}
+
+    def test_seed_events_excluded_after_clean(self, seed_exclusion_data) -> None:
+        """After ``_clean`` removes seed events, rollup counts production only."""
+        ad = seed_exclusion_data["ad"]
+
+        # Simulate SeedService._clean() purging seed-source events
+        AnalyticsEvent.objects.filter(source=AdSource.SEED).delete()
+
+        call_command("rollup_daily_metrics")
+
+        yesterday = timezone.now().date() - timedelta(days=1)
+        metrics = DailyAdMetrics.objects.get(ad=ad, date=yesterday)
+        assert metrics.views_count == 2
+        assert metrics.contacts_count == 2
+
+    def test_seed_events_counted_without_clean(self, seed_exclusion_data) -> None:
+        """Without ``_clean``, seed events inflate rollup counts (proves cleanup needed).
+
+        The rollup command does not filter by ``source``, so seed events ARE
+        counted when present — confirming that ``_clean`` is the exclusion
+        mechanism.
+        """
+        ad = seed_exclusion_data["ad"]
+
+        call_command("rollup_daily_metrics")
+
+        yesterday = timezone.now().date() - timedelta(days=1)
+        metrics = DailyAdMetrics.objects.get(ad=ad, date=yesterday)
+        assert metrics.views_count == 4
+        assert metrics.contacts_count == 4

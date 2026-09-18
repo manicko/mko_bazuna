@@ -10,6 +10,7 @@ Verifies:
 No database interaction required — pure unit tests.
 """
 
+import errno
 import io
 import logging
 import re
@@ -22,8 +23,11 @@ from PIL import Image
 
 from apps.media.services.filesystem import (
     DELETE_PHOTO_MAX_ATTEMPTS,
+    assert_storage_key_contained,
     delete_photo,
     generate_storage_key,
+    move_staging_to_permanent,
+    strip_photo_exif,
     validate_jpeg_bytes,
     validate_photo,
 )
@@ -317,3 +321,280 @@ class TestDeletePhoto:
         assert error.storage_key == "locked.jpg"
         assert error.error_type == "PermissionError"
         assert error.attempts == DELETE_PHOTO_MAX_ATTEMPTS
+
+
+# ---------------------------------------------------------------------------
+# Test — strip_photo_exif
+# ---------------------------------------------------------------------------
+
+
+class TestStripPhotoExif:
+    """``strip_photo_exif`` — EXIF/ICC profile removal and JPEG re-encoding."""
+
+    def test_strips_exif_data(self) -> None:
+        """EXIF metadata is removed from the output."""
+        img = Image.new("RGB", (200, 200), color="red")
+        exif = Image.Exif()
+        exif[270] = "Test description"  # ImageDescription
+        exif[271] = "Test make"  # Make
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", exif=exif.tobytes())
+        jpeg_with_exif = buf.getvalue()
+
+        # Verify EXIF is present before stripping
+        original_img = Image.open(io.BytesIO(jpeg_with_exif))
+        assert len(original_img.getexif()) > 0
+
+        cleaned = strip_photo_exif(jpeg_with_exif)
+        cleaned_img = Image.open(io.BytesIO(cleaned))
+        assert len(cleaned_img.getexif()) == 0
+        assert "exif" not in cleaned_img.info
+
+    def test_strips_icc_profile(self) -> None:
+        """ICC profile is removed from the output."""
+        img = Image.new("RGB", (100, 100), color="blue")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", icc_profile=b"fake-icc-profile-data")
+        jpeg_with_icc = buf.getvalue()
+
+        cleaned = strip_photo_exif(jpeg_with_icc)
+        cleaned_img = Image.open(io.BytesIO(cleaned))
+        assert "icc_profile" not in cleaned_img.info
+
+    def test_strips_both_exif_and_icc(self) -> None:
+        """Both EXIF and ICC profile are stripped simultaneously."""
+        img = Image.new("RGB", (150, 150), color="green")
+        exif = Image.Exif()
+        exif[270] = "Test description"
+        buf = io.BytesIO()
+        img.save(
+            buf,
+            format="JPEG",
+            exif=exif.tobytes(),
+            icc_profile=b"fake-icc-profile",
+        )
+        jpeg_with_exif_and_icc = buf.getvalue()
+
+        cleaned = strip_photo_exif(jpeg_with_exif_and_icc)
+        cleaned_img = Image.open(io.BytesIO(cleaned))
+        assert len(cleaned_img.getexif()) == 0
+        assert "icc_profile" not in cleaned_img.info
+
+    def test_output_is_valid_jpeg(self, valid_jpeg_bytes: bytes) -> None:
+        """Output passes JPEG magic-byte validation."""
+        cleaned = strip_photo_exif(valid_jpeg_bytes)
+        assert validate_jpeg_bytes(cleaned) is True
+
+    def test_preserves_image_dimensions(self, valid_jpeg_bytes: bytes) -> None:
+        """Output image retains the original pixel dimensions."""
+        original_img = Image.open(io.BytesIO(valid_jpeg_bytes))
+        original_size = original_img.size
+
+        cleaned = strip_photo_exif(valid_jpeg_bytes)
+        cleaned_img = Image.open(io.BytesIO(cleaned))
+        assert cleaned_img.size == original_size
+
+    def test_no_disk_write(self, valid_jpeg_bytes: bytes, tmp_path: Path) -> None:
+        """strip_photo_exif operates purely in memory — no file is created."""
+        before = set(tmp_path.iterdir())
+        strip_photo_exif(valid_jpeg_bytes)
+        after = set(tmp_path.iterdir())
+        assert before == after
+
+
+# ---------------------------------------------------------------------------
+# Test — assert_storage_key_contained
+# ---------------------------------------------------------------------------
+
+
+class TestAssertStorageKeyContained:
+    """``assert_storage_key_contained`` — path traversal security validation."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_media_root(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Redirect MEDIA_ROOT to a temp dir for deterministic realpath checks."""
+        monkeypatch.setattr(
+            "apps.media.services.filesystem.settings",
+            SimpleNamespace(MEDIA_ROOT=tmp_path),
+        )
+
+    def test_rejects_nul_byte(self) -> None:
+        """A NUL byte in the storage key raises ValueError."""
+        with pytest.raises(ValueError, match="NUL byte"):
+            assert_storage_key_contained("evil\x00key.jpg")
+
+    def test_rejects_absolute_path(self) -> None:
+        """An absolute path (leading '/') raises ValueError."""
+        with pytest.raises(ValueError, match="absolute"):
+            assert_storage_key_contained("/etc/passwd.jpg")
+
+    def test_rejects_parent_directory(self) -> None:
+        """A leading '..' segment raises ValueError."""
+        with pytest.raises(ValueError, match="parent-directory"):
+            assert_storage_key_contained("../evil.jpg")
+
+    def test_rejects_nested_parent_directory(self) -> None:
+        """A '..' segment anywhere in the path raises ValueError."""
+        with pytest.raises(ValueError, match="parent-directory"):
+            assert_storage_key_contained("subdir/../../etc/passwd.jpg")
+
+    def test_accepts_valid_relative_key(self) -> None:
+        """A simple UUID-like key passes all checks."""
+        assert_storage_key_contained("abc12345-6789-0123-4567-89abcdef0123.jpg")
+
+    def test_accepts_subdirectory_key(self) -> None:
+        """A key with subdirectories (no '..') passes."""
+        assert_storage_key_contained("thumbnails/uuid.jpg")
+
+    def test_rejects_symlink_escape(self, tmp_path: Path) -> None:
+        """A symlink that resolves outside MEDIA_ROOT raises ValueError."""
+        # Create target outside MEDIA_ROOT
+        target = tmp_path.parent / "escape_target.jpg"
+        target.write_bytes(b"secret")
+        # Create symlink inside MEDIA_ROOT pointing outside
+        link = tmp_path / "escape.jpg"
+        link.symlink_to(target)
+
+        with pytest.raises(ValueError, match="resolves outside"):
+            assert_storage_key_contained("escape.jpg")
+
+
+# ---------------------------------------------------------------------------
+# Test — move_staging_to_permanent
+# ---------------------------------------------------------------------------
+
+
+class TestMoveStagingToPermanent:
+    """``move_staging_to_permanent`` — staging prefix removal and file promotion."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_media_root(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Redirect MEDIA_ROOT to a temp dir and create the staging subdir."""
+        monkeypatch.setattr(
+            "apps.media.services.filesystem.settings",
+            SimpleNamespace(MEDIA_ROOT=tmp_path),
+        )
+        (tmp_path / "staging").mkdir()
+
+    def test_strips_staging_prefix_from_all_fields(self, tmp_path: Path) -> None:
+        """Staging prefix is stripped from storage_key and all thumbnail fields."""
+        staging_dir = tmp_path / "staging"
+        for name in [
+            "uuid.jpg",
+            "uuid-small.jpg",
+            "uuid-medium.jpg",
+            "uuid-large.jpg",
+        ]:
+            (staging_dir / name).write_bytes(b"staged")
+
+        photos = [
+            {
+                "storage_key": "staging/uuid.jpg",
+                "thumbnail_small": "staging/uuid-small.jpg",
+                "thumbnail_medium": "staging/uuid-medium.jpg",
+                "thumbnail_large": "staging/uuid-large.jpg",
+            }
+        ]
+
+        move_staging_to_permanent(photos)
+
+        assert photos[0]["storage_key"] == "uuid.jpg"
+        assert photos[0]["thumbnail_small"] == "uuid-small.jpg"
+        assert photos[0]["thumbnail_medium"] == "uuid-medium.jpg"
+        assert photos[0]["thumbnail_large"] == "uuid-large.jpg"
+
+        # Files physically moved to permanent location
+        assert (tmp_path / "uuid.jpg").exists()
+        assert (tmp_path / "uuid-small.jpg").exists()
+        assert (tmp_path / "uuid-medium.jpg").exists()
+        assert (tmp_path / "uuid-large.jpg").exists()
+
+    def test_leaves_non_staging_keys_untouched(self, tmp_path: Path) -> None:
+        """Keys without the staging prefix are not modified."""
+        (tmp_path / "permanent.jpg").write_bytes(b"data")
+        (tmp_path / "permanent-small.jpg").write_bytes(b"data")
+
+        photos = [
+            {
+                "storage_key": "permanent.jpg",
+                "thumbnail_small": "permanent-small.jpg",
+                "thumbnail_medium": "perm-medium.jpg",
+                "thumbnail_large": "perm-large.jpg",
+            }
+        ]
+
+        move_staging_to_permanent(photos)
+
+        assert photos[0]["storage_key"] == "permanent.jpg"
+        assert photos[0]["thumbnail_small"] == "permanent-small.jpg"
+        assert photos[0]["thumbnail_medium"] == "perm-medium.jpg"
+        assert photos[0]["thumbnail_large"] == "perm-large.jpg"
+
+    def test_updates_key_even_if_file_missing(self) -> None:
+        """The key is updated even when the staging file does not exist on disk."""
+        photos = [{"storage_key": "staging/missing.jpg"}]
+
+        move_staging_to_permanent(photos)
+
+        assert photos[0]["storage_key"] == "missing.jpg"
+
+    def test_exdev_falls_back_to_shutil_move(self, tmp_path: Path) -> None:
+        """OSError(EXDEV) from os.replace triggers the shutil.move fallback."""
+        staging_file = tmp_path / "staging" / "uuid.jpg"
+        staging_file.write_bytes(b"test-data")
+
+        photos = [{"storage_key": "staging/uuid.jpg"}]
+
+        with (
+            patch(
+                "apps.media.services.filesystem.os.replace",
+                side_effect=OSError(errno.EXDEV, "cross-device"),
+            ) as mock_replace,
+            patch("apps.media.services.filesystem.shutil.move") as mock_move,
+        ):
+            move_staging_to_permanent(photos)
+
+        mock_replace.assert_called_once()
+        mock_move.assert_called_once()
+        assert photos[0]["storage_key"] == "uuid.jpg"
+
+    def test_non_exdev_oserror_reraises(self, tmp_path: Path) -> None:
+        """Non-EXDEV OSError from os.replace is re-raised to the caller."""
+        staging_file = tmp_path / "staging" / "uuid.jpg"
+        staging_file.write_bytes(b"test-data")
+
+        photos = [{"storage_key": "staging/uuid.jpg"}]
+
+        with patch(
+            "apps.media.services.filesystem.os.replace",
+            side_effect=OSError(errno.EACCES, "permission denied"),
+        ):
+            with pytest.raises(OSError, match="permission denied"):
+                move_staging_to_permanent(photos)
+
+        # Key must NOT be updated when os.replace raises
+        assert photos[0]["storage_key"] == "staging/uuid.jpg"
+
+    def test_multiple_photos_processed(self, tmp_path: Path) -> None:
+        """Each photo dict in the list is processed independently."""
+        staging_dir = tmp_path / "staging"
+        for name in ["a.jpg", "b.jpg"]:
+            (staging_dir / name).write_bytes(b"data")
+
+        photos = [
+            {"storage_key": "staging/a.jpg", "thumbnail_small": None},
+            {"storage_key": "staging/b.jpg", "thumbnail_small": None},
+        ]
+
+        move_staging_to_permanent(photos)
+
+        assert photos[0]["storage_key"] == "a.jpg"
+        assert photos[1]["storage_key"] == "b.jpg"
