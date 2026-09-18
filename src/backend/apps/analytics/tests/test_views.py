@@ -18,7 +18,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AdStatus, AnalyticsEventType
+from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
+from apps.trust.models import SellerVerification
 from apps.users.models import User
 from conftest import create_test_ad
 
@@ -159,7 +160,12 @@ class TestSellerTrustDashboardView:
         assert "analytics/seller_dashboard.html" in [t.name for t in response.templates]
 
     def test_trust_score_in_context(self, dashboard_seller) -> None:
-        """Trust score value is present in the response context."""
+        """Trust score is present in the response context and matches formula.
+
+        The dashboard_seller fixture has exactly one published ad, no admin
+        verification, and no rejected ads, so the score is the base 50 plus
+        one published ad (+10) = 60.
+        """
         from django.test import Client
 
         seller = dashboard_seller["seller"]
@@ -168,10 +174,13 @@ class TestSellerTrustDashboardView:
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "trust_score" in response.context
         assert response.context["trust_score"] is not None
-        assert isinstance(response.context["trust_score"], float)
+        assert response.context["trust_score"] == 50 + 10
 
     def test_trust_level_in_context(self, dashboard_seller) -> None:
-        """Trust level is present in the response context."""
+        """Trust level is present in the response context and matches expected.
+
+        A trust score of 60 falls in the VERIFIED band (31-60).
+        """
         from django.test import Client
 
         seller = dashboard_seller["seller"]
@@ -179,15 +188,10 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "trust_level" in response.context
-        assert str(response.context["trust_level"]) in [
-            "unverified",
-            "verified",
-            "trusted",
-            "pro",
-        ]
+        assert response.context["trust_level"] == TrustLevel.VERIFIED
 
     def test_daily_metrics_in_context(self, dashboard_seller) -> None:
-        """Daily metrics list is present in context."""
+        """Daily metrics list is present in context (empty without records)."""
         from django.test import Client
 
         seller = dashboard_seller["seller"]
@@ -195,10 +199,10 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "daily_metrics" in response.context
-        assert isinstance(response.context["daily_metrics"], list)
+        assert response.context["daily_metrics"] == []
 
     def test_total_views_in_context(self, dashboard_seller) -> None:
-        """Total views count is present in context."""
+        """Total views count is present in context (0 without metrics)."""
         from django.test import Client
 
         seller = dashboard_seller["seller"]
@@ -206,10 +210,10 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "total_views" in response.context
-        assert isinstance(response.context["total_views"], int)
+        assert response.context["total_views"] == 0
 
     def test_total_contacts_in_context(self, dashboard_seller) -> None:
-        """Total contacts count is present in context."""
+        """Total contacts count is present in context (0 without metrics)."""
         from django.test import Client
 
         seller = dashboard_seller["seller"]
@@ -217,7 +221,7 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
         response = client.get(reverse("analytics:seller_trust_dashboard"))
         assert "total_contacts" in response.context
-        assert isinstance(response.context["total_contacts"], int)
+        assert response.context["total_contacts"] == 0
 
     def test_daily_metrics_reflects_actual_data(self, dashboard_seller) -> None:
         """Daily metrics in context matches created DailyAdMetrics records."""
@@ -280,6 +284,61 @@ class TestSellerTrustDashboardView:
         assert response.context["total_views"] == 0
         assert response.context["total_contacts"] == 0
         assert response.context["daily_metrics"] == []
+
+    def test_trust_score_scales_with_published_ads(
+        self, dashboard_seller, category, city
+    ) -> None:
+        """Trust score increases by the per-ad bonus with more published ads.
+
+        The dashboard_seller fixture creates 1 published ad; adding 2 more
+        yields 3 published ads, so the score is 50 (base) + 10 * 3 = 80,
+        which maps to the TRUSTED band (61-85).
+        """
+        from django.test import Client
+
+        seller = dashboard_seller["seller"]
+        for i in range(2):
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Scale Ad {i}",
+                status=AdStatus.PUBLISHED,
+            )
+
+        client = Client()
+        client.force_login(seller)
+        response = client.get(reverse("analytics:seller_trust_dashboard"))
+        assert response.context["trust_score"] == 50 + 30
+        assert response.context["trust_level"] == TrustLevel.TRUSTED
+
+    def test_trust_score_clamped_with_verification(
+        self, dashboard_seller, category, city
+    ) -> None:
+        """Trust score is clamped to 100 and reaches PRO with verification.
+
+        Starting from the fixture's 1 published ad, add 3 more (4 total →
+        +40), then admin verification (+20): 50 + 40 + 20 = 110, clamped to
+        the max of 100, which maps to the PRO band (86-100).
+        """
+        from django.test import Client
+
+        seller = dashboard_seller["seller"]
+        for i in range(3):
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Clamp Ad {i}",
+                status=AdStatus.PUBLISHED,
+            )
+        SellerVerification.objects.create(user=seller, verified_by_admin=True)
+
+        client = Client()
+        client.force_login(seller)
+        response = client.get(reverse("analytics:seller_trust_dashboard"))
+        assert response.context["trust_score"] == 100.0
+        assert response.context["trust_level"] == TrustLevel.PRO
 
 
 # ---------------------------------------------------------------------------
