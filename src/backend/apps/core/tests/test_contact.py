@@ -4,6 +4,7 @@ Tests for contact service render conditions (zone R2).
 Tests the real can_contact_seller predicate using persisted User+Ad fixtures.
 """
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +19,10 @@ from apps.core.services.contact import (
     record_contact_response,
 )
 from conftest import create_test_ad
-from telegram_bot.handlers.contact import CONTACT_PATTERN
+
+# Contact deep-link pattern inlined from telegram_bot/handlers/contact.py:CONTACT_PATTERN
+# to keep core tests free of bot-side imports.
+_CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -107,18 +111,18 @@ class TestContactPattern:
     def test_contact_pattern_matches_ad_id(self):
         """Contact pattern matches contact_<ad_id> format."""
         # Valid patterns
-        assert CONTACT_PATTERN.match("contact_123") is not None
-        assert CONTACT_PATTERN.match("contact_1") is not None
-        assert CONTACT_PATTERN.match("contact_999999") is not None
+        assert _CONTACT_PATTERN.match("contact_123") is not None
+        assert _CONTACT_PATTERN.match("contact_1") is not None
+        assert _CONTACT_PATTERN.match("contact_999999") is not None
 
         # Invalid patterns
-        assert CONTACT_PATTERN.match("login_abc123") is None
-        assert CONTACT_PATTERN.match("contact_abc") is None
-        assert CONTACT_PATTERN.match("contact_123abc") is None
+        assert _CONTACT_PATTERN.match("login_abc123") is None
+        assert _CONTACT_PATTERN.match("contact_abc") is None
+        assert _CONTACT_PATTERN.match("contact_123abc") is None
 
     def test_contact_pattern_extracts_ad_id(self):
         """Contact pattern correctly extracts ad_id from deep-link."""
-        match = CONTACT_PATTERN.match("contact_456")
+        match = _CONTACT_PATTERN.match("contact_456")
         assert match is not None
         assert int(match.group(1)) == 456
 

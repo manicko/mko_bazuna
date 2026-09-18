@@ -1,22 +1,21 @@
 """
-Integration test for the full ``save_photo`` -> disk -> ``generate_thumbnails``
+Integration test for the full ``strip_photo_exif`` -> disk -> ``generate_thumbnails``
 -> ``AdImage`` thumbnail pipeline (coverage gap C-09).
 
 No test previously exercises this *entire* chain:
 
-* ``test_save_photo_exif.py`` tests ``save_photo`` EXIF stripping only (no
+* ``test_save_photo_exif.py`` tests EXIF stripping only (no
   thumbnails are produced).
 * ``test_save_photo_integration.py`` (telegram_bot/tests) tests the
   ``generate_thumbnails`` -> ``AdImage`` path via ``submit_ad`` but
-  *bypasses* ``save_photo`` -- it writes the bytes manually to ``tmp_path``.
+  *bypasses* EXIF stripping -- it writes the bytes manually to ``tmp_path``.
 
-This module calls ``save_photo`` for real (an EXIF-bearing JPEG in, an
-EXIF-free JPEG persisted to ``MEDIA_ROOT``), then reads that file back from
-disk and runs it through the real ``ThumbnailService``, then persists the
-returned storage keys on an ``AdImage`` row via ``AdImageService.create_or_skip``
--- mirroring the production finalisation path in
-``telegram_bot/handlers/ad_create.py`` (photo written at the collection step,
-then read + thumbnailed + persisted at finalisation).
+This module strips EXIF, writes the cleaned bytes to ``MEDIA_ROOT``, then reads
+that file back from disk and runs it through the real ``ThumbnailService``,
+then persists the returned storage keys on an ``AdImage`` row via
+``AdImageService.create_or_skip`` -- mirroring the production finalisation path
+in ``telegram_bot/handlers/ad_create.py`` (photo stripped at the collection
+step, then read + thumbnailed + persisted at finalisation).
 
 Lives under ``apps/media/tests/`` so it reuses the canonical ``seller`` /
 ``category`` / ``city`` fixtures and ``create_test_ad`` helper from the root
@@ -26,7 +25,6 @@ under ``src/backend/``).
 
 from __future__ import annotations
 
-import asyncio
 import io
 from collections.abc import Generator
 from pathlib import Path
@@ -38,16 +36,20 @@ from PIL import Image
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
-from apps.media.services.filesystem import generate_storage_key
+from apps.media.services.filesystem import (
+    STAGING_PREFIX,
+    generate_storage_key,
+    strip_photo_exif,
+)
 from apps.media.services.thumbnails import ThumbnailService
 from conftest import create_test_ad
-from telegram_bot.services.ad_data import save_photo
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 # EXIF Orientation tag (0x0112 = 274). Embedding it in the input image lets us
-# prove that ``save_photo`` strips metadata *before* the thumbnail pipeline sees
-# the bytes, and that no Orientation tag leaks into the thumbnails.
+# prove that ``strip_photo_exif`` removes metadata *before* the thumbnail
+# pipeline sees the bytes, and that no Orientation tag leaks into the
+# thumbnails.
 _ORIENTATION_TAG = 0x0112
 
 
@@ -63,15 +65,20 @@ def _make_jpeg_with_exif(width: int = 800, height: int = 600) -> bytes:
 
 
 def _save_and_thumbnail(media_root, photo_bytes):
-    """Drive the full ``save_photo`` -> disk -> ``generate_thumbnails`` chain.
+    """Drive the full ``strip_photo_exif`` -> disk -> ``generate_thumbnails`` chain.
+
+    Strips EXIF from *photo_bytes*, writes the result to the ``staging/``
+    subdir of *media_root*, then runs it through ``ThumbnailService``.
 
     Returns ``(storage_key, on_disk_bytes, thumbnail_keys)``.
     """
-    storage_key = asyncio.run(save_photo(generate_storage_key(), photo_bytes))
+    storage_key = f"{STAGING_PREFIX}{generate_storage_key()}"
+    stripped = strip_photo_exif(photo_bytes)
+    staging_path = media_root / storage_key
+    staging_path.parent.mkdir(parents=True, exist_ok=True)
+    staging_path.write_bytes(stripped)
 
-    original_path = media_root / storage_key
-    assert original_path.exists(), "save_photo did not persist the file to disk"
-    on_disk_bytes = original_path.read_bytes()
+    on_disk_bytes = staging_path.read_bytes()
 
     service = ThumbnailService(str(media_root))
     thumbnail_keys = service.generate_thumbnails(on_disk_bytes, storage_key)
@@ -80,7 +87,7 @@ def _save_and_thumbnail(media_root, photo_bytes):
 
 
 class TestSavePhotoThumbnailIntegration:
-    """End-to-end: ``save_photo`` -> disk -> thumbnails -> ``AdImage``."""
+    """End-to-end: strip_photo_exif -> disk -> thumbnails -> ``AdImage``."""
 
     @pytest.fixture
     def media_root(self, tmp_path) -> Generator[Path]:
@@ -93,24 +100,22 @@ class TestSavePhotoThumbnailIntegration:
     def test_save_photo_persists_exif_free_file_then_thumbnails_generated(
         self, media_root
     ) -> None:
-        """``save_photo`` writes an EXIF-free JPEG the thumbnailer reads from disk."""
+        """An EXIF-free JPEG is persisted to disk for the thumbnailer to read."""
         photo_bytes = _make_jpeg_with_exif(800, 600)
 
         storage_key, on_disk_bytes, thumbnail_keys = _save_and_thumbnail(
             media_root, photo_bytes
         )
 
-        # 1. save_photo persisted the EXIF-stripped file to disk.
+        # 1. EXIF-stripped file persisted to disk via strip_photo_exif + staging write.
         assert on_disk_bytes.startswith(b"\xff\xd8\xff"), (
             "written file is not a valid JPEG"
         )
-        assert on_disk_bytes != photo_bytes, (
-            "save_photo did not re-encode/strip the input"
-        )
+        assert on_disk_bytes != photo_bytes, "input was not stripped/re-encoded"
 
         img = Image.open(io.BytesIO(on_disk_bytes))
         exif = img.getexif()
-        assert _ORIENTATION_TAG not in exif, "EXIF Orientation survived save_photo"
+        assert _ORIENTATION_TAG not in exif, "EXIF Orientation survived stripping"
         assert img.format == "JPEG"
 
         # 2. generate_thumbnails produced a key for every ThumbnailSizeStrEnum member.
@@ -133,7 +138,7 @@ class TestSavePhotoThumbnailIntegration:
     def test_full_chain_populates_adimage_thumbnail_fields(
         self, seller, category, city, media_root
     ) -> None:
-        """``save_photo`` -> ``generate_thumbnails`` keys land on ``AdImage.thumbnail_*``."""
+        """``strip_photo_exif`` -> ``generate_thumbnails`` keys land on ``AdImage.thumbnail_*``."""
         ad: Ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         photo_bytes = _make_jpeg_with_exif(1920, 1080)
 
