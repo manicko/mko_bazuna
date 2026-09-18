@@ -24,7 +24,7 @@ from apps.core.enums import AdStatus, AnalyticsEventType, TimeRange
 from apps.users.models import User
 from conftest import create_test_ad, make_user
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

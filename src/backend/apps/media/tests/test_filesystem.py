@@ -14,11 +14,12 @@ import errno
 import io
 import logging
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from django.test import override_settings
 from PIL import Image
 
 from apps.media.services.filesystem import (
@@ -220,20 +221,17 @@ class TestDeletePhoto:
     def _isolate_media_root(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         caplog: pytest.LogCaptureFixture,
-    ) -> None:
+    ) -> Iterator[None]:
         """Redirect MEDIA_ROOT to a temp dir and capture WARNING+ logs.
 
-        Keeps these tests as pure unit tests: ``delete_photo`` only reads
-        ``settings.MEDIA_ROOT`` (lazily evaluated), so swapping the module-level
-        ``settings`` reference avoids any Django configuration dependency.
+        Uses ``override_settings`` instead of a ``SimpleNamespace`` monkeypatch
+        so the real Django settings object is preserved (other attributes remain
+        accessible) and only ``MEDIA_ROOT`` is overridden.
         """
         caplog.set_level(logging.WARNING)
-        monkeypatch.setattr(
-            "apps.media.services.filesystem.settings",
-            SimpleNamespace(MEDIA_ROOT=tmp_path),
-        )
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            yield
 
     def test_delete_photo_file_not_found_silent(
         self, caplog: pytest.LogCaptureFixture
@@ -414,13 +412,10 @@ class TestAssertStorageKeyContained:
     def _isolate_media_root(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    ) -> Iterator[None]:
         """Redirect MEDIA_ROOT to a temp dir for deterministic realpath checks."""
-        monkeypatch.setattr(
-            "apps.media.services.filesystem.settings",
-            SimpleNamespace(MEDIA_ROOT=tmp_path),
-        )
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            yield
 
     def test_rejects_nul_byte(self) -> None:
         """A NUL byte in the storage key raises ValueError."""
@@ -475,14 +470,11 @@ class TestMoveStagingToPermanent:
     def _isolate_media_root(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    ) -> Iterator[None]:
         """Redirect MEDIA_ROOT to a temp dir and create the staging subdir."""
-        monkeypatch.setattr(
-            "apps.media.services.filesystem.settings",
-            SimpleNamespace(MEDIA_ROOT=tmp_path),
-        )
-        (tmp_path / "staging").mkdir()
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            (tmp_path / "staging").mkdir()
+            yield
 
     def test_strips_staging_prefix_from_all_fields(self, tmp_path: Path) -> None:
         """Staging prefix is stripped from storage_key and all thumbnail fields."""

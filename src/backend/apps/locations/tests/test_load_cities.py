@@ -20,7 +20,6 @@ from apps.locations.models import City
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-EXPECTED_CITY_COUNT = 15
 EXPECTED_SLUGS = {
     "podgorica",
     "niksic",
@@ -38,6 +37,7 @@ EXPECTED_SLUGS = {
     "danilovgrad",
     "mojkovac",
 }
+EXPECTED_CITY_COUNT = len(EXPECTED_SLUGS)
 
 
 class TestLoadCities:

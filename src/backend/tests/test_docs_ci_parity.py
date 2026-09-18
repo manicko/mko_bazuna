@@ -193,8 +193,14 @@ def test_makefile_has_test_clean_db() -> None:
 def test_makefile_phony_includes_test_clean_db() -> None:
     """test-clean-db must be declared in .PHONY."""
     text = _MAKEFILE.read_text()
-    phony_line = text.split(".PHONY")[1].split("\n")[0]
-    assert "test-clean-db" in phony_line
+    # Collect all .PHONY lines (robust to content after the tag changing)
+    # rather than relying on a brittle positional split(".PHONY")[1].
+    phony_lines = [line for line in text.splitlines() if ".PHONY" in line]
+    assert phony_lines, ".PHONY declaration must exist in Makefile"
+    phony_content = "\n".join(phony_lines)
+    assert "test-clean-db" in phony_content, (
+        "test-clean-db must be declared as a .PHONY target"
+    )
 
 
 def test_makefile_test_recreate_depends_on_clean_db() -> None:

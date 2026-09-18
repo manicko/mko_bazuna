@@ -15,6 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from asgiref.sync import sync_to_async
 
+from apps.users.models import User
+
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.slow,
@@ -23,21 +25,16 @@ pytestmark = [
 ]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
+# Telegram user_id for mock-only (non-DB) photo pipeline tests.
+# References the bot-conftest seller ID range (900000100), not the
+# root-conftest range (900000001).
+_TEST_SELLER_ID = 900000100
+
 
 @pytest.fixture
-def seller_id() -> int:
-    """Create a minimal seller user and return its ID."""
-    from apps.users.models import User
-
-    user = User.objects.create(
-        telegram_id=900000200,
-        chat_id=900000200,
-        username="lang_test_user",
-        first_name="Lang",
-        last_name="Tester",
-        password="x",
-    )
-    return user.id
+def seller_id(seller: User) -> int:
+    """Return the ID of the shared bot-conftest seller fixture (telegram_id 900000100)."""
+    return seller.id
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +173,9 @@ class TestProcessPhotos:
         """5 photos already in state — a new photo upload is rejected with the cap message."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [{}, {}, {}, {}, {}], "user_id": 900000001})
+        state = _build_state(
+            {"photos": [{}, {}, {}, {}, {}], "user_id": _TEST_SELLER_ID}
+        )
         message = _build_photo_message()
 
         with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
@@ -192,7 +191,7 @@ class TestProcessPhotos:
         """'done' with 0 photos shows 'at least 1', not 'at most 5'."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [], "user_id": 900000001})
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         message = _build_message(None)
         message.text = "done"
 
@@ -208,7 +207,7 @@ class TestProcessPhotos:
         """'done' with 6 photos shows 'at most 5', not 'at least 1'."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [{}] * 6, "user_id": 900000001})
+        state = _build_state({"photos": [{}] * 6, "user_id": _TEST_SELLER_ID})
         message = _build_message(None)
         message.text = "done"
 
@@ -229,7 +228,7 @@ class TestProcessPhotos:
             AsyncMock(return_value=False),
         )
 
-        state = _build_state({"photos": [], "user_id": 900000001})
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         message = _build_photo_message()
 
         with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
@@ -252,7 +251,7 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": 900000001})
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         message = _build_photo_message(file_size=3 * 1024 * 1024)
 
         with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
@@ -264,7 +263,9 @@ class TestProcessPhotos:
         assert "too large" in answer_text.lower()
 
     @pytest.mark.asyncio
-    async def test_process_photos_integration_real_jpg(self, monkeypatch, tmp_path) -> None:
+    async def test_process_photos_integration_real_jpg(
+        self, monkeypatch, tmp_path
+    ) -> None:
         """Full download → validate → strip-EXIF save pipeline with a real JPEG.
 
         Stubs only the network-bound ``download_photo`` and the rate-limit
@@ -290,7 +291,7 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": 900000001})
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         state.update_data = AsyncMock()
         message = _build_photo_message(file_size=1024)
 
@@ -429,9 +430,10 @@ class TestCancelAfterSubmit:
             await cmd_cancel(cancel_msg, cancel_state)
 
             # AdImage row still exists (not deleted by cancel)
-            assert await sync_to_async(
-                lambda: AdImage.objects.filter(ad=ad).count()
-            )() == 1
+            assert (
+                await sync_to_async(lambda: AdImage.objects.filter(ad=ad).count())()
+                == 1
+            )
             await sync_to_async(ad_image.refresh_from_db)()
 
             # All physical files still present on disk
@@ -498,9 +500,7 @@ class TestCancelAfterSubmit:
             assert ad.status != AdStatus.DRAFT
 
             # Patch delete_photo — it must NOT be called for a non-DRAFT ad
-            with patch(
-                "telegram_bot.handlers.ad_create.delete_photo"
-            ) as mock_delete:
+            with patch("telegram_bot.handlers.ad_create.delete_photo") as mock_delete:
                 caplog.set_level(
                     logging.INFO,
                     logger="telegram_bot.handlers.ad_create",
@@ -624,9 +624,7 @@ class TestDeleteDraftStorageKeys:
             )
 
         # Patch delete_photo to spy on calls (avoid real filesystem deletion)
-        with patch(
-            "telegram_bot.services.ad_data.delete_photo"
-        ) as mock_delete:
+        with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
             await delete_draft(ad.id)
 
         # delete_photo must be called for ALL 4 keys, not just img.image
@@ -635,6 +633,4 @@ class TestDeleteDraftStorageKeys:
         assert sorted(called_keys) == sorted(all_keys)
 
         # Ad should be deleted from the database
-        assert not await sync_to_async(
-            lambda: Ad.objects.filter(id=ad.id).exists()
-        )()
+        assert not await sync_to_async(lambda: Ad.objects.filter(id=ad.id).exists())()

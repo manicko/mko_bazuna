@@ -90,6 +90,13 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
+
+# Trusted origins for CSRF protection (Origin/Referer header validation).
+# Required in production behind a TLS-terminating proxy (SECURE_PROXY_SSL_HEADER
+# is set). Django has no W-series system check for this setting; the fail-fast
+# guard in prod.py compensates by refusing to start without it.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True

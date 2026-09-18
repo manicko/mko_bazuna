@@ -25,47 +25,15 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 def jpeg_with_exif() -> bytes:
     """Generate a small JPEG image with embedded EXIF metadata.
 
-    Uses manual TIFF IFD construction because Pillow 12.x's ``Exif.tobytes()``
-    requires a file pointer that is not available on in-memory images.
+    Uses Pillow's native ``Image.Exif()`` API to build a well-formed EXIF
+    segment, avoiding brittle hand-rolled TIFF IFD byte construction.
     """
-    import struct
-
-    tiff_header = b"II\x2a\x00\x08\x00\x00\x00"
-    make_str = b"CameraMaker\x00"
-    model_str = b"CameraModel\x00"
-
-    num_entries = 3
-    ifd_size = 2 + num_entries * 12 + 4
-    data_offset = 8 + ifd_size
-
-    make_offset = data_offset
-    model_offset = make_offset + len(make_str)
-    gps_ifd_offset = model_offset + len(model_str)
-
-    def _tiff_tag(tag_id: int, data_type: int, count: int, value: int) -> bytes:
-        return struct.pack("<HHLL", tag_id, data_type, count, value)
-
-    entries = b""
-    entries += _tiff_tag(ExifBase.Make, 2, len(make_str), make_offset)
-    entries += _tiff_tag(ExifBase.Model, 2, len(model_str), model_offset)
-    entries += _tiff_tag(ExifBase.GPSInfo, 4, 1, gps_ifd_offset)
-
-    gps_ifd = struct.pack("<H", 0) + struct.pack("<L", 0)
-
-    exif_data = (
-        tiff_header
-        + struct.pack("<H", num_entries)
-        + entries
-        + struct.pack("<L", 0)
-        + make_str
-        + model_str
-        + gps_ifd
-    )
-    exif_segment = b"Exif\x00\x00" + exif_data
-
+    exif = Image.Exif()
+    exif[ExifBase.Make] = "CameraMaker"
+    exif[ExifBase.Model] = "CameraModel"
     buf = io.BytesIO()
     img = Image.new("RGB", (100, 100), color="red")
-    img.save(buf, format="JPEG", exif=exif_segment)
+    img.save(buf, format="JPEG", exif=exif.tobytes())
     return buf.getvalue()
 
 
@@ -101,18 +69,14 @@ class TestSavePhotoExifStripping:
             "EXIF was not stripped from written bytes"
         )
 
-    def test_save_photo_writes_to_staging_subdir(
-        self, tmp_path, jpeg_with_exif
-    ):
+    def test_save_photo_writes_to_staging_subdir(self, tmp_path, jpeg_with_exif):
         """save_photo writes to the staging/ subdir and returns a staging key."""
         from apps.media.services.filesystem import STAGING_PREFIX
 
         media_root = tmp_path / "media"
         media_root.mkdir()
         with override_settings(MEDIA_ROOT=str(media_root)):
-            storage_key = asyncio.run(
-                save_photo("test-stg.jpg", jpeg_with_exif)
-            )
+            storage_key = asyncio.run(save_photo("test-stg.jpg", jpeg_with_exif))
 
         # Returned key carries the staging prefix
         assert storage_key == f"{STAGING_PREFIX}test-stg.jpg"

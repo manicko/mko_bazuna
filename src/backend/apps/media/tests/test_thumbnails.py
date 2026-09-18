@@ -54,9 +54,19 @@ class TestThumbnailService:
         service = ThumbnailService(storage_dir=str(tmp_path))
         result = service.generate_thumbnails(photo_bytes, "abc123.jpg")
 
-        assert result[ThumbnailSizeStrEnum.SMALL] == "abc123-small.jpg"
-        assert result[ThumbnailSizeStrEnum.MEDIUM] == "abc123-medium.jpg"
-        assert result[ThumbnailSizeStrEnum.LARGE] == "abc123-large.jpg"
+        stem = "abc123"
+        assert (
+            result[ThumbnailSizeStrEnum.SMALL]
+            == f"{stem}-{ThumbnailSizeStrEnum.SMALL.value}.jpg"
+        )
+        assert (
+            result[ThumbnailSizeStrEnum.MEDIUM]
+            == f"{stem}-{ThumbnailSizeStrEnum.MEDIUM.value}.jpg"
+        )
+        assert (
+            result[ThumbnailSizeStrEnum.LARGE]
+            == f"{stem}-{ThumbnailSizeStrEnum.LARGE.value}.jpg"
+        )
 
     def test_storage_key_with_multi_part_extension(self, tmp_path: Path) -> None:
         """Storage key handles multi-part extensions like .tar.gz correctly."""

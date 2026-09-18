@@ -15,7 +15,7 @@ from apps.analytics.services import SellerStats
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # Use locmem cache so SellerStats cache tests are deterministic and isolated.
 

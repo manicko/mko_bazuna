@@ -25,7 +25,7 @@ from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
 from conftest import create_test_ad, make_user
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def _make_moderation_event(
