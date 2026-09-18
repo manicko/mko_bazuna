@@ -135,7 +135,7 @@ services:
         until pg_isready -h $$POSTGRES_HOST -p $$POSTGRES_PORT; do sleep 5; done;
         while true; do
           date=$$(date +%Y%m%d);
-          pg_dump -h $$POSTGRES_HOST -p $$POSTGRES_PORT
+          pg_dump --no-sync -h $$POSTGRES_HOST -p $$POSTGRES_PORT
             -U $$POSTGRES_USER -d $$POSTGRES_DB -F c
             -f /backups/dump_$$date.dump;
           echo "Backup completed: dump_$$date.dump";
@@ -146,6 +146,7 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    cap_drop: ["ALL"]
     read_only: true
     tmpfs:
       - /tmp
@@ -179,6 +180,7 @@ services:
       retries: 5
     profiles:
       - pgbouncer
+    cap_drop: ["ALL"]
     read_only: true
     tmpfs:
       - /tmp

@@ -65,6 +65,14 @@ services:
       - .env.dev
     volumes:
       - ./.env.dev:/app/src/.env:ro
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${MIGRATE_MEM_LIMIT:-256m}
+    cpus: ${MIGRATE_CPUS:-0.5}
     # One-shot service: runs migrations with advisory lock (ID 100), then exits
     # Idempotent: advisory lock prevents concurrent runs
 
@@ -92,6 +100,14 @@ services:
       - .env.dev
     volumes:
       - ./.env.dev:/app/src/.env:ro
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${LOAD_CITIES_MEM_LIMIT:-256m}
+    cpus: ${LOAD_CITIES_CPUS:-0.5}
     # One-shot service: loads cities.json into the cities table, then exits
     # Idempotent via CATALOG_LOAD (ID 104) advisory lock; NOT profile-gated
 
@@ -119,6 +135,14 @@ services:
       - .env.dev
     volumes:
       - ./.env.dev:/app/src/.env:ro
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${LOAD_CATALOG_MEM_LIMIT:-256m}
+    cpus: ${LOAD_CATALOG_CPUS:-0.5}
     # One-shot service: loads categories.yaml into DB, then exits
     # Depends on load_cities completing successfully
 
@@ -145,6 +169,14 @@ services:
       - .env.dev
     volumes:
       - ./.env.dev:/app/src/.env:ro
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${CREATE_ADMIN_MEM_LIMIT:-256m}
+    cpus: ${CREATE_ADMIN_CPUS:-0.5}
     # One-shot service: runs once, then exits
     # Skipped if ADMIN_PASSWORD not set (empty string)
 
@@ -174,6 +206,14 @@ services:
     volumes:
       - ./.env.dev:/app/src/.env:ro
       - media_volume:/app/media
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${SEED_MEM_LIMIT:-512m}
+    cpus: ${SEED_CPUS:-1.0}
     # One-shot service: run with `docker compose --profile seed run --rm seed`
     # Seeds database with demo data, then exits
 
@@ -211,7 +251,7 @@ services:
     mem_limit: ${WEB_MEM_LIMIT:-512m}
     cpus: ${WEB_CPUS:-1.5}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ready/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -237,6 +277,7 @@ services:
       - POSTGRES_HOST=db
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
+      - BOT_HEALTH_STALE_SECONDS=120
     env_file:
       - .env.dev
     volumes:

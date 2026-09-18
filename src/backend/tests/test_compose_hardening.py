@@ -15,7 +15,6 @@ from pathlib import Path
 import pytest
 
 pytestmark = [pytest.mark.unit]
-
 # Resolve repository root by searching upward for pyproject.toml.
 # Robust to varying CWD in Docker (WORKDIR=/app or /app/src/backend) and
 # local development (from repo root).
@@ -145,19 +144,65 @@ def test_scheduler_hardened_in_prod() -> None:
 
 
 def test_backup_hardened_in_prod() -> None:
-    """backup (prod-only) must have read_only + tmpfs + security_opt + limits."""
+    """backup (prod-only) must have full hardening including cap_drop."""
     block = _service_block(_PROD_COMPOSE, "backup")
+    assert 'cap_drop: ["ALL"]' in block, 'backup must have cap_drop: ["ALL"]'
     for key in _HARDENING_KEYS:
         assert key in block, f"backup must have {key}"
-    # backup intentionally has NO cap_drop (runs pg_dump as postgres user)
-    assert "cap_drop" not in block
 
 
 def test_pgbouncer_hardened_in_prod() -> None:
-    """pgbouncer (prod-only) must have read_only + tmpfs + security_opt + limits."""
+    """pgbouncer (prod-only) must have full hardening including cap_drop."""
     block = _service_block(_PROD_COMPOSE, "pgbouncer")
+    assert 'cap_drop: ["ALL"]' in block, 'pgbouncer must have cap_drop: ["ALL"]'
     for key in _HARDENING_KEYS:
         assert key in block, f"pgbouncer must have {key}"
+
+
+# --- one-shot services (hardening gap in OPS-001) -------------------------
+
+
+def test_migrate_has_hardening() -> None:
+    """migrate (one-shot) must have full CIS hardening with cap_drop."""
+    block = _service_block(_COMPOSE, "migrate")
+    assert 'cap_drop: ["ALL"]' in block, 'migrate must have cap_drop: ["ALL"]'
+    for key in _HARDENING_KEYS:
+        assert key in block, f"migrate must have {key}"
+
+
+def test_load_cities_has_hardening() -> None:
+    """load_cities (one-shot) must have full CIS hardening with cap_drop."""
+    block = _service_block(_COMPOSE, "load_cities")
+    assert 'cap_drop: ["ALL"]' in block, 'load_cities must have cap_drop: ["ALL"]'
+    for key in _HARDENING_KEYS:
+        assert key in block, f"load_cities must have {key}"
+
+
+def test_load_catalog_has_hardening() -> None:
+    """load_catalog (one-shot) must have full CIS hardening with cap_drop."""
+    block = _service_block(_COMPOSE, "load_catalog")
+    assert 'cap_drop: ["ALL"]' in block, 'load_catalog must have cap_drop: ["ALL"]'
+    for key in _HARDENING_KEYS:
+        assert key in block, f"load_catalog must have {key}"
+
+
+def test_create_admin_has_hardening() -> None:
+    """create_admin (one-shot) must have full CIS hardening with cap_drop."""
+    block = _service_block(_COMPOSE, "create_admin")
+    assert 'cap_drop: ["ALL"]' in block, 'create_admin must have cap_drop: ["ALL"]'
+    for key in _HARDENING_KEYS:
+        assert key in block, f"create_admin must have {key}"
+
+
+def test_seed_has_hardening() -> None:
+    """seed (one-shot) must have full CIS hardening with cap_drop and higher limits."""
+    block = _service_block(_COMPOSE, "seed")
+    assert 'cap_drop: ["ALL"]' in block, 'seed must have cap_drop: ["ALL"]'
+    for key in _HARDENING_KEYS:
+        assert key in block, f"seed must have {key}"
+    # seed generates demo data — should use higher defaults than other one-shots
+    assert "SEED_MEM_LIMIT:-512m" in block, "seed must default to 512m mem_limit"
+    assert "SEED_CPUS:-1.0" in block, "seed must default to 1.0 cpus"
 
 
 # --- resource limits use env substitution ---------------------------------
