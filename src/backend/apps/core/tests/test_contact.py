@@ -9,10 +9,12 @@ from types import SimpleNamespace
 import pytest
 from django.utils import timezone
 
-from apps.core.enums import AdStatus
+from apps.analytics.models import AnalyticsEvent
+from apps.core.enums import AdStatus, AnalyticsEventType
 from apps.core.services.contact import (
     can_contact_seller,
     get_seller_for_contact,
+    record_contact_initiated,
     record_contact_response,
 )
 from conftest import create_test_ad
@@ -355,3 +357,65 @@ class TestContactCombinatorial:
 
         assert is_available is True
         assert result_seller == seller
+
+
+# ---------------------------------------------------------------------------
+# record_contact_initiated — analytics event recording
+# ---------------------------------------------------------------------------
+
+
+class TestRecordContactInitiated:
+    """Tests for ``record_contact_initiated`` service function.
+
+    The function records a CONTACT_INITIATED analytics event, optionally
+    resolving the buyer's ``user_id`` from a Telegram ID. Each call
+    creates a new event row (no deduplication).
+    """
+
+    def test_record_contact_initiated_creates_event(self, seller) -> None:
+        """Calling record_contact_initiated creates an AnalyticsEvent row."""
+        record_contact_initiated(buyer_telegram_id=seller.telegram_id)
+
+        event = AnalyticsEvent.objects.get(
+            event_type=AnalyticsEventType.CONTACT_INITIATED
+        )
+        assert event.user_id == seller.id
+
+    def test_record_contact_initiated_resolves_user_id(self, seller) -> None:
+        """A known buyer_telegram_id resolves to the correct user_id on the event."""
+        record_contact_initiated(buyer_telegram_id=seller.telegram_id)
+
+        event = AnalyticsEvent.objects.get(
+            event_type=AnalyticsEventType.CONTACT_INITIATED
+        )
+        assert event.user_id == seller.id
+        assert event.ad_id is None  # contact-initiated has no ad association
+
+    def test_record_contact_initiated_anonymous(self) -> None:
+        """With buyer_telegram_id=None, the event is created with user_id=None."""
+        record_contact_initiated(buyer_telegram_id=None)
+
+        event = AnalyticsEvent.objects.get(
+            event_type=AnalyticsEventType.CONTACT_INITIATED
+        )
+        assert event.user_id is None
+
+    def test_record_contact_initiated_nonexistent_user(self) -> None:
+        """A non-existent telegram_id still creates an event with user_id=None."""
+        record_contact_initiated(buyer_telegram_id=999999999)
+
+        event = AnalyticsEvent.objects.get(
+            event_type=AnalyticsEventType.CONTACT_INITIATED
+        )
+        assert event.user_id is None
+
+    def test_record_contact_initiated_creates_each_call(self, seller) -> None:
+        """Each call creates a new event row (no idempotency / deduplication)."""
+        record_contact_initiated(buyer_telegram_id=seller.telegram_id)
+        record_contact_initiated(buyer_telegram_id=seller.telegram_id)
+
+        events = AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.CONTACT_INITIATED
+        )
+        assert events.count() == 2
+        assert all(e.user_id == seller.id for e in events)

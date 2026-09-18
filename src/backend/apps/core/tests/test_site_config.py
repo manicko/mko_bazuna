@@ -16,12 +16,13 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
 
 from apps.core.models import SiteConfig
-from apps.core.services.site_config import get_site_name
+from apps.core.services.site_config import get_site_name, get_site_name_async
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -127,3 +128,41 @@ def test_privacy_page_renders_site_name_in_title() -> None:
     response = Client().get(reverse("core:privacy"))
     assert response.status_code == 200
     assert "TestBrandXYZ" in response.content.decode()
+
+
+# ---------------------------------------------------------------------------
+# get_site_name_async() service tests
+# ---------------------------------------------------------------------------
+
+
+def test_get_site_name_async_returns_configured_name() -> None:
+    """get_site_name_async() returns the configured name via async wrapper."""
+    config = SiteConfig.get_singleton()
+    config.name = "AsyncSiteName"
+    config.save()
+
+    result = async_to_sync(get_site_name_async)()
+    assert result == "AsyncSiteName"
+
+
+def test_get_site_name_async_falls_back_on_db_error() -> None:
+    """get_site_name_async() returns 'Bazuna' when the DB layer raises."""
+    with patch.object(SiteConfig, "get_singleton", side_effect=RuntimeError("db down")):
+        result = async_to_sync(get_site_name_async)()
+    assert result == "Bazuna"
+
+
+def test_get_site_name_async_reads_from_cache() -> None:
+    """get_site_name_async() returns the cached value without hitting the DB."""
+    config = SiteConfig.get_singleton()
+    config.name = "AsyncCachedName"
+    config.save()
+
+    # Prime the cache
+    assert async_to_sync(get_site_name_async)() == "AsyncCachedName"
+
+    # Second call should hit the cache, not the DB
+    with patch.object(SiteConfig, "get_singleton") as mock_get_singleton:
+        result = async_to_sync(get_site_name_async)()
+    mock_get_singleton.assert_not_called()
+    assert result == "AsyncCachedName"

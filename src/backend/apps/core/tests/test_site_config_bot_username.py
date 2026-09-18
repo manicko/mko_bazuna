@@ -13,10 +13,11 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.core.cache import cache
 
 from apps.core.models import SiteConfig
-from apps.core.services.site_config import get_bot_username
+from apps.core.services.site_config import get_bot_username, get_bot_username_async
 from apps.core.utils.cache import (
     BOT_USERNAME_CACHE_KEY,
     get_cached_bot_username,
@@ -94,6 +95,44 @@ def test_save_invalidates_bot_username_cache() -> None:
 
     # Next read should reflect the updated username, not the stale cache
     assert get_bot_username() == "second_bot"
+
+
+# ---------------------------------------------------------------------------
+# get_bot_username_async() service tests
+# ---------------------------------------------------------------------------
+
+
+def test_get_bot_username_async_returns_configured_username() -> None:
+    """get_bot_username_async() returns the configured username via async wrapper."""
+    config = SiteConfig.get_singleton()
+    config.bot_username = "async_test_bot"
+    config.save()
+
+    result = async_to_sync(get_bot_username_async)()
+    assert result == "async_test_bot"
+
+
+def test_get_bot_username_async_falls_back_on_db_error() -> None:
+    """get_bot_username_async() returns 'bazuna_bot' when the DB layer raises."""
+    with patch.object(SiteConfig, "get_singleton", side_effect=RuntimeError("db down")):
+        result = async_to_sync(get_bot_username_async)()
+    assert result == "bazuna_bot"
+
+
+def test_get_bot_username_async_reads_from_cache() -> None:
+    """get_bot_username_async() returns the cached value without hitting the DB."""
+    config = SiteConfig.get_singleton()
+    config.bot_username = "async_cached_bot"
+    config.save()
+
+    # Prime the cache
+    assert async_to_sync(get_bot_username_async)() == "async_cached_bot"
+
+    # Second call should hit the cache, not the DB
+    with patch.object(SiteConfig, "get_singleton") as mock_get_singleton:
+        result = async_to_sync(get_bot_username_async)()
+    mock_get_singleton.assert_not_called()
+    assert result == "async_cached_bot"
 
 
 def test_cache_key_is_distinct_from_site_name() -> None:
