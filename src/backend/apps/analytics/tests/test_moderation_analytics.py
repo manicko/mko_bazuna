@@ -20,56 +20,12 @@ from apps.analytics.services.moderation_analytics import (
     get_pending_queue_size,
     get_rejection_reasons,
 )
-from apps.categories.models import Category
 from apps.core.enums import AdStatus, AnalyticsEventType, ModeratorActionType
-from apps.locations.models import City
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-# ---------------------------------------------------------------------------
-# Test helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990020001, **overrides: object) -> User:
-    """Create a User with sensible defaults for analytics tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)  # type: ignore[arg-type]
-
-
-def _make_category(slug: str = "mod-cat") -> Category:
-    """Create a Category with sensible defaults."""
-    return Category.objects.create(name="Mod Category", slug=slug)
-
-
-def _make_city(slug: str = "mod-city") -> City:
-    """Create a City with sensible defaults."""
-    return City.objects.create(
-        country_code="ME",
-        name="Mod City",
-        region="Mod Region",
-        slug=slug,
-    )
-
-
-def _make_moderator(telegram_id: int = 990020001, **overrides: object) -> User:
-    """Create a User representing a moderator for analytics tests."""
-    return _make_user(telegram_id=telegram_id, **overrides)
-
-
-def _make_seller(telegram_id: int = 990020101, **overrides: object) -> User:
-    """Create a User representing a seller for analytics tests."""
-    return _make_user(telegram_id=telegram_id, **overrides)
 
 
 def _make_moderation_event(
@@ -118,12 +74,10 @@ def _make_action_log(
 
 
 @pytest.fixture
-def moderation_stats_data():
+def moderation_stats_data(category, city):
     """Create shared fixtures for moderation stats tests."""
-    category = _make_category()
-    city = _make_city()
-    seller = _make_seller(telegram_id=990020201)
-    moderator = _make_moderator(telegram_id=990020202)
+    seller = make_user(telegram_id=990020201)
+    moderator = make_user(telegram_id=990020202)
 
     now = timezone.now()
 
@@ -212,7 +166,7 @@ def moderation_stats_data():
 @pytest.fixture
 def pending_queue_data(seller, category, city):
     """Create ads for pending queue size tests."""
-    seller_local = _make_seller(telegram_id=990020301)
+    seller_local = make_user(telegram_id=990020301)
 
     # 2 ads on moderation
     create_test_ad(
@@ -235,16 +189,14 @@ def pending_queue_data(seller, category, city):
 
 
 @pytest.fixture
-def moderator_performance_data():
+def moderator_performance_data(category, city):
     """Create ads and events for moderator performance tests."""
-    category = _make_category("perf-cat")
-    city = _make_city("perf-city")
-    seller = _make_seller(telegram_id=990020401)
+    seller = make_user(telegram_id=990020401)
 
     now = timezone.now()
 
-    mod_a = _make_moderator(telegram_id=990020402)
-    mod_b = _make_moderator(telegram_id=990020403)
+    mod_a = make_user(telegram_id=990020402)
+    mod_b = make_user(telegram_id=990020403)
 
     # Moderator A: 2 approvals, 1 rejection
     ad = create_test_ad(
@@ -304,12 +256,10 @@ def moderator_performance_data():
 
 
 @pytest.fixture
-def rejection_reasons_data():
+def rejection_reasons_data(category, city):
     """Create ads and action logs for rejection reasons tests."""
-    category = _make_category("reject-cat")
-    city = _make_city("reject-city")
-    moderator = _make_moderator(telegram_id=990020501)
-    seller = _make_seller(telegram_id=990020502)
+    moderator = make_user(telegram_id=990020501)
+    seller = make_user(telegram_id=990020502)
 
     now = timezone.now()
 
@@ -482,18 +432,18 @@ class TestGetModeratorPerformance:
         perf = get_moderator_performance(days=0)
         assert perf == []
 
-    def test_old_actions_excluded_by_days(self, moderator_performance_data) -> None:
+    def test_old_actions_excluded_by_days(
+        self, moderator_performance_data, category, city
+    ) -> None:
         """Actions older than the days parameter are excluded."""
-        old_cat = _make_category("old-perf-cat")
-        old_city = _make_city("old-perf-city")
-        old_mod = _make_moderator(telegram_id=990020404)
-        old_seller = _make_seller(telegram_id=990020405)
+        old_mod = make_user(telegram_id=990020404)
+        old_seller = make_user(telegram_id=990020405)
         now = timezone.now()
 
         ad = create_test_ad(
             old_seller,
-            old_cat,
-            old_city,
+            category,
+            city,
             title="Old Action",
             status=AdStatus.PUBLISHED,
             published_by=old_mod,

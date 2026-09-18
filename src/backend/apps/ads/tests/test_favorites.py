@@ -27,16 +27,6 @@ from conftest import create_test_ad
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def buyer() -> User:
-    """Create a registered buyer user."""
-    return User.objects.create(
-        telegram_id=920000201,
-        chat_id=920000201,
-        password="y",
-    )
-
-
 # ---------------------------------------------------------------------------
 # Heart toggle endpoint
 # ---------------------------------------------------------------------------

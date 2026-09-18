@@ -21,25 +21,7 @@ from apps.analytics.services.trust_analytics import (
 )
 from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerVerification
-from apps.users.models import User
-from conftest import create_test_ad
-
-# ---------------------------------------------------------------------------
-# Test helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990010001, **overrides: object) -> User:
-    """Create a User with sensible defaults for trust analytics tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)  # type: ignore[arg-type]
-
+from conftest import create_test_ad, make_user
 
 # ---------------------------------------------------------------------------
 # Tests: calculate_seller_trust_score
@@ -53,13 +35,13 @@ class TestCalculateSellerTrustScore:
 
     def test_base_score_no_ads_no_verification(self, category, city) -> None:
         """A seller with no ads and no verification gets the base score of 50."""
-        user = _make_user(telegram_id=990010101)
+        user = make_user(telegram_id=990010101)
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 50.0) < 0.01
 
     def test_published_ads_increase_score(self, category, city) -> None:
         """Each published ad adds +10, up to a maximum of +50 (5 ads)."""
-        user = _make_user(telegram_id=990010102)
+        user = make_user(telegram_id=990010102)
 
         # 2 published ads → +20
         for i in range(2):
@@ -71,7 +53,7 @@ class TestCalculateSellerTrustScore:
 
     def test_published_ads_capped_at_five(self, category, city) -> None:
         """More than 5 published ads still caps the bonus at +50."""
-        user = _make_user(telegram_id=990010103)
+        user = make_user(telegram_id=990010103)
 
         # 10 published ads → bonus capped at +50
         for i in range(10):
@@ -83,7 +65,7 @@ class TestCalculateSellerTrustScore:
 
     def test_admin_verification_adds_bonus(self, category, city) -> None:
         """Admin-verified seller gets +20."""
-        user = _make_user(telegram_id=990010104)
+        user = make_user(telegram_id=990010104)
         SellerVerification.objects.create(user=user, verified_by_admin=True)
 
         score = calculate_seller_trust_score(user.id)
@@ -93,7 +75,7 @@ class TestCalculateSellerTrustScore:
         self, category, city
     ) -> None:
         """SellerVerification exists but verified_by_admin is False → no bonus."""
-        user = _make_user(telegram_id=990010105)
+        user = make_user(telegram_id=990010105)
         SellerVerification.objects.create(user=user, verified_by_admin=False)
 
         score = calculate_seller_trust_score(user.id)
@@ -101,7 +83,7 @@ class TestCalculateSellerTrustScore:
 
     def test_rejected_ads_reduce_score(self, category, city) -> None:
         """Each rejected ad subtracts 10, floored at 0."""
-        user = _make_user(telegram_id=990010106)
+        user = make_user(telegram_id=990010106)
 
         # 6 rejected ads → -60, floor at 0 (base 50 - 60 = -10 → 0)
         for i in range(6):
@@ -117,7 +99,7 @@ class TestCalculateSellerTrustScore:
 
     def test_combined_published_rejected_and_verified(self, category, city) -> None:
         """Mix of published (+30), verified (+20), and rejected (-20)."""
-        user = _make_user(telegram_id=990010107)
+        user = make_user(telegram_id=990010107)
 
         # 3 published ads → +30
         for i in range(3):
@@ -140,7 +122,7 @@ class TestCalculateSellerTrustScore:
 
     def test_score_clamped_at_100(self, category, city) -> None:
         """Score cannot exceed 100 even with high bonuses."""
-        user = _make_user(telegram_id=990010108)
+        user = make_user(telegram_id=990010108)
 
         # 5 published → +50
         for i in range(5):
@@ -157,7 +139,7 @@ class TestCalculateSellerTrustScore:
 
     def test_score_not_below_zero(self, category, city) -> None:
         """Score cannot go below 0 even with many rejections."""
-        user = _make_user(telegram_id=990010109)
+        user = make_user(telegram_id=990010109)
 
         # Many rejected ads
         for i in range(20):
@@ -170,8 +152,8 @@ class TestCalculateSellerTrustScore:
 
     def test_other_users_ads_do_not_affect_score(self, category, city) -> None:
         """Only the given user's ads are counted."""
-        user = _make_user(telegram_id=990010110)
-        other = _make_user(telegram_id=990010111)
+        user = make_user(telegram_id=990010110)
+        other = make_user(telegram_id=990010111)
 
         # Other user has many published ads
         for i in range(5):
@@ -187,7 +169,7 @@ class TestCalculateSellerTrustScore:
         self, category, city
     ) -> None:
         """Missing SellerVerification row is handled gracefully."""
-        user = _make_user(telegram_id=990010112)
+        user = make_user(telegram_id=990010112)
         # No SellerVerification created
         score = calculate_seller_trust_score(user.id)
         assert abs(score - 50.0) < 0.01
@@ -256,7 +238,7 @@ class TestRecordTrustEvent:
 
     def test_creates_analytics_event(self) -> None:
         """record_trust_event creates an AnalyticsEvent with correct data."""
-        user = _make_user(telegram_id=990010201)
+        user = make_user(telegram_id=990010201)
         record_trust_event(user.id, AnalyticsEventType.SELLER_VERIFIED)
 
         events = AnalyticsEvent.objects.filter(user_id=user.id)
@@ -267,7 +249,7 @@ class TestRecordTrustEvent:
 
     def test_creates_event_without_ad(self) -> None:
         """Trust events are created without an associated ad."""
-        user = _make_user(telegram_id=990010202)
+        user = make_user(telegram_id=990010202)
         record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
 
         event = AnalyticsEvent.objects.get(user_id=user.id)
@@ -275,7 +257,7 @@ class TestRecordTrustEvent:
 
     def test_creates_multiple_events_independently(self) -> None:
         """Multiple calls create separate events."""
-        user = _make_user(telegram_id=990010203)
+        user = make_user(telegram_id=990010203)
         record_trust_event(user.id, AnalyticsEventType.SELLER_VERIFIED)
         record_trust_event(user.id, AnalyticsEventType.TRUST_LEVEL_UPDATED)
 
@@ -295,8 +277,8 @@ class TestRecordTrustEvent:
 @pytest.fixture
 def daily_metrics_data(category, city):
     """Create DailyAdMetrics records for two sellers across multiple dates."""
-    user = _make_user(telegram_id=990010301)
-    other = _make_user(telegram_id=990010302)
+    user = make_user(telegram_id=990010301)
+    other = make_user(telegram_id=990010302)
 
     ad = create_test_ad(
         user, category, city, title="Metrics Ad", status=AdStatus.PUBLISHED
@@ -397,7 +379,7 @@ class TestGetSellerDailyMetrics:
 
     def test_empty_when_no_metrics(self) -> None:
         """A seller with no metrics returns an empty list."""
-        empty_user = _make_user(telegram_id=990010303)
+        empty_user = make_user(telegram_id=990010303)
         metrics = get_seller_daily_metrics(empty_user.id)
         assert metrics == []
 

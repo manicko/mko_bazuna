@@ -9,6 +9,8 @@ import hashlib
 import pytest
 from django.utils import timezone
 
+from apps.ads.models import AdImage
+from apps.core.enums import AdStatus
 from apps.users.models import LoginToken, User
 from apps.users.services.deletion import (
     decline_consent,
@@ -136,23 +138,8 @@ class TestDeclineConsentDoesNotInvalideTokens:
 class TestWithdrawConsentSoftDeletesAds:
     """Tests for ad soft-deletion on consent withdrawal (P11.3)."""
 
-    def test_withdraw_soft_deletes_user_ads(self, user: User):
+    def test_withdraw_soft_deletes_user_ads(self, user: User, category, city):
         """withdraw_consent soft-deletes all user ads."""
-        from apps.categories.models import Category
-        from apps.core.enums import AdStatus
-        from apps.locations.models import City
-
-        category = Category.objects.create(
-            name="Test Category",
-            slug="test-category",
-        )
-        city = City.objects.create(
-            country_code="ME",
-            name="Test City",
-            region="Test Region",
-            slug="test-city",
-        )
-
         # Create user ads
         ad1 = create_test_ad(
             user,
@@ -195,25 +182,14 @@ class TestWithdrawConsentSoftDeletesAds:
         assert user.last_name == ""
         assert user.email == ""
 
-    def test_withdraw_returns_all_thumbnail_storage_keys(self, user: User, monkeypatch):
+    def test_withdraw_returns_all_thumbnail_storage_keys(
+        self, user: User, monkeypatch, category, city
+    ):
         """withdraw_consent returns all 4 storage keys for an AdImage with thumbnails.
 
         Covers PC-004: storage_keys() collects image + thumbnail_small/medium/large
         so no thumbnail derivatives are orphaned on disk.
         """
-        from apps.ads.models import AdImage
-        from apps.categories.models import Category
-        from apps.core.enums import AdStatus
-        from apps.locations.models import City
-
-        category = Category.objects.create(name="Test Category", slug="test-category")
-        city = City.objects.create(
-            country_code="ME",
-            name="Test City",
-            region="Test Region",
-            slug="test-city",
-        )
-
         draft_ad = create_test_ad(
             user,
             category,
@@ -325,21 +301,10 @@ class TestWithdrawConsentAtomicity:
         assert user.telegram_id is not None  # not nulled (rolled back)
         assert user.consent_revoked_at is None
 
-    def test_withdraw_returns_storage_keys(self, user: User, monkeypatch):
+    def test_withdraw_returns_storage_keys(
+        self, user: User, monkeypatch, category, city
+    ):
         """withdraw_consent returns list[str] of DRAFT-ad storage keys."""
-        from apps.ads.models import AdImage
-        from apps.categories.models import Category
-        from apps.core.enums import AdStatus
-        from apps.locations.models import City
-
-        category = Category.objects.create(name="Test Category", slug="test-category")
-        city = City.objects.create(
-            country_code="ME",
-            name="Test City",
-            region="Test Region",
-            slug="test-city",
-        )
-
         draft_ad = create_test_ad(
             user,
             category,
@@ -395,21 +360,10 @@ class TestWithdrawConsentAtomicity:
         # No extra token deletion on second call (already gone)
         assert not LoginToken.objects.filter(pk=token.pk).exists()
 
-    def test_soft_delete_user_ads_returns_keys_not_count(self, user: User, monkeypatch):
+    def test_soft_delete_user_ads_returns_keys_not_count(
+        self, user: User, monkeypatch, category, city
+    ):
         """soft_delete_user_ads is DB-only: returns list[str], never calls delete_photo."""
-        from apps.ads.models import AdImage
-        from apps.categories.models import Category
-        from apps.core.enums import AdStatus
-        from apps.locations.models import City
-
-        category = Category.objects.create(name="Test Category", slug="test-category")
-        city = City.objects.create(
-            country_code="ME",
-            name="Test City",
-            region="Test Region",
-            slug="test-city",
-        )
-
         draft_ad = create_test_ad(
             user,
             category,

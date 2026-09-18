@@ -23,15 +23,6 @@ from conftest import create_test_ad
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def buyer() -> User:
-    return User.objects.create(
-        telegram_id=950000201,
-        chat_id=950000201,
-        password="y",
-    )
-
-
 class TestFavoritesCountBadge:
     def test_anonymous_returns_outline_heart(self) -> None:
         resp = Client().get("/cabinet/favorites/count/?lang=ru")

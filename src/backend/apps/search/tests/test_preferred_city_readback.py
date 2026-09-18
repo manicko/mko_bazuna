@@ -30,16 +30,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
-def buyer() -> User:
-    """A registered buyer (for AC-1 DB-wins scenario)."""
-    return User.objects.create(
-        telegram_id=940000601,
-        chat_id=940000601,
-        password="y",
-    )
-
-
-@pytest.fixture
 def podgorica() -> City:
     return City.objects.create(
         country_code="ME",

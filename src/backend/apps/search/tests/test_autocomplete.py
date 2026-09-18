@@ -40,16 +40,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
-def buyer() -> User:
-    """Create a registered buyer user."""
-    return User.objects.create(
-        telegram_id=900000021,
-        chat_id=900000021,
-        password="y",
-    )
-
-
-@pytest.fixture
 def root_category() -> Category:
     """Create a root-level category."""
     return Category.objects.create(name="Транспорт", slug="transport")

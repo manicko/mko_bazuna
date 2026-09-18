@@ -21,35 +21,9 @@ from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerVerification
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_user(
-    telegram_id: int = 990300001,
-    *,
-    is_staff: bool = False,
-    **overrides: object,
-) -> User:
-    """Create a User with sensible defaults for view tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    user = User.objects.create(**defaults)  # type: ignore[arg-type]
-    if is_staff:
-        user.is_staff = True
-        user.save(update_fields=["is_staff"])
-    return user
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +43,7 @@ def dashboard_seller(seller, category, city) -> dict:
 @pytest.fixture
 def moderation_context(seller, category, city) -> dict:
     """Create moderation test data: a staff user, superuser, and a moderation event."""
-    staff_user = _make_user(telegram_id=990302002, is_staff=True)
+    staff_user = make_user(telegram_id=990302002, is_staff=True)
     superuser = User.objects.create_superuser(
         username="super",
         email="super@example.com",
@@ -77,7 +51,7 @@ def moderation_context(seller, category, city) -> dict:
         chat_id=990302003,
         password="x",
     )
-    other_user = _make_user(telegram_id=990302004)
+    other_user = make_user(telegram_id=990302004)
 
     now = timezone.now()
     approved_ad = create_test_ad(
@@ -256,7 +230,7 @@ class TestSellerTrustDashboardView:
         client.force_login(seller)
 
         other_ad = create_test_ad(
-            _make_user(990301099),
+            make_user(990301099),
             category,
             city,
             title="Other Ad",

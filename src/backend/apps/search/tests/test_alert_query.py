@@ -35,16 +35,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.fixture
-def buyer() -> User:
-    """Create a buyer user with saved searches."""
-    return User.objects.create(
-        telegram_id=910000201,
-        chat_id=910000201,
-        password="y",
-    )
-
-
-@pytest.fixture
 def subcategory(category: Category) -> Category:
     """Create a child category under root."""
     return Category.objects.create(name="Велосипеды", slug="bicycles", parent=category)

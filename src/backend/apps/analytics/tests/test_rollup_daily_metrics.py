@@ -18,7 +18,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.core.enums import AdSource, AdStatus, AnalyticsEventType
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -26,20 +26,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990050001, **overrides: object):
-    """Create a User with sensible defaults for rollup tests."""
-    from apps.users.models import User
-
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)
 
 
 def _make_event(
@@ -78,7 +64,7 @@ def rollup_data(seller, category, city):
     - Today events and non-target event types are noise.
     """
     seller1 = seller
-    seller2 = _make_user(telegram_id=990050102)
+    seller2 = make_user(telegram_id=990050102)
 
     ad1 = create_test_ad(
         seller1, category, city, title="Rollup Ad 1", status=AdStatus.PUBLISHED
@@ -344,12 +330,8 @@ class TestRollupDailyMetricsSeedExclusion:
         _make_event(ad, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=4)
 
         # Seed-source events (source=AdSource.SEED) — should be excluded after _clean
-        _make_event(
-            ad, AnalyticsEventType.AD_VIEWED, hours_ago=5, source=AdSource.SEED
-        )
-        _make_event(
-            ad, AnalyticsEventType.AD_VIEWED, hours_ago=3, source=AdSource.SEED
-        )
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=5, source=AdSource.SEED)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=3, source=AdSource.SEED)
         _make_event(
             ad,
             AnalyticsEventType.CONTACT_INITIATED,

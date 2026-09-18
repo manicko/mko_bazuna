@@ -19,15 +19,6 @@ from apps.users.models import User
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def buyer() -> User:
-    return User.objects.create(
-        telegram_id=940000201,
-        chat_id=940000201,
-        password="y",
-    )
-
-
 def _login(buyer: User) -> Client:
     client = Client()
     client.force_login(buyer)

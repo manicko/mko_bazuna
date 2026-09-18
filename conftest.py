@@ -31,10 +31,14 @@ pytest_plugins = ("testing.moderation_fixtures",)
 def __getattr__(name: str):
     """Lazily re-export test helpers from the backend conftest.
 
-    Only ``create_test_ad`` and ``create_test_ads_bulk`` are re-exported —
-    the functions test modules import via ``from conftest import ...``.
+    Test modules import helpers via ``from conftest import ...``, which
+    resolves to *this* root file (the project root is ahead of ``src/backend``
+    in ``sys.path``).  This ``__getattr__`` defers the backend-conftest import
+    to call-time (Django is fully set up by pytest-django before any test
+    module is collected), so no Django models are imported at this module's
+    load time — preserving the import-safety guarantee stated above.
     """
-    if name in ("create_test_ad", "create_test_ads_bulk"):
+    if name in ("create_test_ad", "create_test_ads_bulk", "make_user"):
         import backend.conftest as _backend_conftest
 
         _value = getattr(_backend_conftest, name)

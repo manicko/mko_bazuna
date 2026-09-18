@@ -22,7 +22,7 @@ from apps.analytics.services import SellerStats
 from apps.analytics.services.seller_stats import CACHE_TTL
 from apps.core.enums import AdStatus, AnalyticsEventType, TimeRange
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
@@ -43,18 +43,6 @@ def _locmem_cache():
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990000001, **overrides: object) -> User:
-    """Create a User with sensible defaults for analytics tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)
 
 
 def _make_event(
@@ -92,7 +80,7 @@ def seller_with_ads(seller, category, city):
 
     Returns a dict with ``seller``, ``ad_a``, ``ad_b``, ``other_user``, ``other_ad``.
     """
-    other_user = _make_user(telegram_id=990001002)
+    other_user = make_user(telegram_id=990001002)
 
     ad_a = create_test_ad(
         seller, category, city, title="Ad A", status=AdStatus.PUBLISHED
@@ -213,7 +201,7 @@ class TestSellerStats:
 
     def test_empty_data_handling(self, seller, category, city) -> None:
         """Seller with no analytics events returns zeroed stats."""
-        empty_user = _make_user(telegram_id=990001003)
+        empty_user = make_user(telegram_id=990001003)
         # One ad but zero events
         create_test_ad(
             empty_user, category, city, title="Lonely Ad", status=AdStatus.PUBLISHED

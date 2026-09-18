@@ -191,6 +191,16 @@ def user() -> User:
 
 
 @pytest.fixture
+def buyer() -> User:
+    """Create a generic buyer user (password 'y', next ID after user)."""
+    return User.objects.create(
+        telegram_id=900000003,
+        chat_id=900000003,
+        password="y",
+    )
+
+
+@pytest.fixture
 def category() -> Category:
     """Create a generic root category."""
     return Category.objects.create(name="Транспорт", slug="transport")
@@ -205,6 +215,39 @@ def city() -> City:
         region="Central",
         slug="test-grad",
     )
+
+
+# ---------------------------------------------------------------------------
+# User creation helper — factory for tests needing distinct telegram_ids
+# ---------------------------------------------------------------------------
+
+
+def make_user(
+    telegram_id: int,
+    *,
+    is_staff: bool = False,
+    **overrides: object,
+) -> User:
+    """Create a ``User`` with sensible defaults for tests.
+
+    ``telegram_id`` is required — callers always supply an explicit value
+    (different per test module to avoid PK/unique conflicts). ``chat_id``
+    mirrors ``telegram_id``, ``password`` defaults to ``"x"``, and
+    ``username`` to ``None``. Pass ``is_staff=True`` to elevate to a staff
+    user, or supply additional fields via ``**overrides``.
+    """
+    defaults: dict[str, Any] = {
+        "telegram_id": telegram_id,
+        "chat_id": telegram_id,
+        "username": None,
+        "password": "x",
+    }
+    defaults.update(overrides)
+    user = User.objects.create(**defaults)  # type: ignore[arg-type]
+    if is_staff:
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+    return user
 
 
 # ---------------------------------------------------------------------------

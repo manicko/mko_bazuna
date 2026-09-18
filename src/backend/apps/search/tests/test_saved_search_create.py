@@ -21,15 +21,6 @@ from apps.users.models import User
 pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
 
 
-@pytest.fixture
-def buyer() -> User:
-    return User.objects.create(
-        telegram_id=930000201,
-        chat_id=930000201,
-        password="y",
-    )
-
-
 def test_save_search_url_resolves():
     """search:save-search resolves to a view (CR17)."""
     url = reverse("search:save-search")
