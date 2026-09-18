@@ -20,25 +20,13 @@ from apps.locations.models import City
 from apps.trust.models import SellerTrustScore, SellerVerification
 from apps.trust.services.trust_calculator import TrustCalculator
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990010001, **overrides: object) -> User:
-    """Create a User with sensible defaults for trust tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)  # type: ignore[arg-type]
 
 
 def _make_category(slug: str = "trust-test-cat") -> Category:
@@ -102,16 +90,10 @@ class TestTrustCalculator:
         self.calculator = TrustCalculator()
         self.category = _make_category()
         self.city = _make_city()
-        self.user = _make_user(telegram_id=990010001)
-        self.verified_user = _make_user(
-            telegram_id=990010002,
-            username="verified_seller",
-        )
+        self.user = make_user(990010001)
+        self.verified_user = make_user(990010002, username="verified_seller")
         _make_verification(self.verified_user, verified_by_admin=True)
-        self.premium_user = _make_user(
-            telegram_id=990010003,
-            telegram_premium=True,
-        )
+        self.premium_user = make_user(990010003, telegram_premium=True)
 
     # ── helpers ────────────────────────────────────────────────────────
 
@@ -123,7 +105,7 @@ class TestTrustCalculator:
 
     def test_score_with_zero_ads(self) -> None:
         """Seller with no ads receives minimum score and UNVERIFIED level."""
-        empty_user = _make_user(telegram_id=990011001)
+        empty_user = make_user(990011001)
         score = self._score(empty_user)
 
         assert score.score == 0
@@ -137,7 +119,7 @@ class TestTrustCalculator:
 
     def test_score_with_published_ads(self) -> None:
         """Each published ad contributes 5 activity points (quality score from non-rejected ads)."""
-        user = _make_user(telegram_id=990012001)
+        user = make_user(990012001)
 
         # Create 3 published ads → activity = 3 * 5 = 15
         for i in range(3):
@@ -161,7 +143,7 @@ class TestTrustCalculator:
 
     def test_score_caps_at_activity_max(self) -> None:
         """Activity score is capped at 40 (8+ published ads)."""
-        user = _make_user(telegram_id=990013001)
+        user = make_user(990013001)
 
         # Create 10 published ads → activity = min(10 * 5, 40) = 40
         for i in range(10):
@@ -188,7 +170,7 @@ class TestTrustCalculator:
     def test_verification_bonus_admin(self) -> None:
         """Admin-verified seller with low score gets VERIFIED floor."""
         # User with 1 published ad and admin verification
-        user = _make_user(telegram_id=990014001)
+        user = make_user(990014001)
         _make_verification(user, verified_by_admin=True)
 
         create_test_ad(
@@ -209,7 +191,7 @@ class TestTrustCalculator:
 
     def test_verification_bonus_admin_floor(self) -> None:
         """Admin-verified seller with very low score still gets VERIFIED."""
-        user = _make_user(telegram_id=990014002)
+        user = make_user(990014002)
         _make_verification(user, verified_by_admin=True)
 
         # Create 1 published and 5 rejected ads to drive quality down
@@ -239,10 +221,7 @@ class TestTrustCalculator:
 
     def test_verification_bonus_premium(self) -> None:
         """Telegram Premium seller with low score gets VERIFIED floor."""
-        user = _make_user(
-            telegram_id=990015001,
-            telegram_premium=True,
-        )
+        user = make_user(990015001, telegram_premium=True)
 
         # Create 1 published and 5 rejected ads to drive quality down
         create_test_ad(
@@ -270,7 +249,7 @@ class TestTrustCalculator:
 
     def test_rejection_penalty(self) -> None:
         """Rejected ads reduce quality score proportionally."""
-        user = _make_user(telegram_id=990016001)
+        user = make_user(990016001)
 
         # 2 published + 2 rejected = 4 non-draft ads
         for i in range(2):
@@ -309,7 +288,7 @@ class TestTrustCalculator:
 
     def test_full_rejection_all_rejected(self) -> None:
         """Seller with all ads rejected gets quality score of zero."""
-        user = _make_user(telegram_id=990017001)
+        user = make_user(990017001)
 
         for i in range(3):
             create_test_ad(
@@ -330,7 +309,7 @@ class TestTrustCalculator:
 
     def test_mixed_rejected_and_moderation_failed(self) -> None:
         """Both REJECTED and ON_MODERATION_FAILED count as rejected for quality."""
-        user = _make_user(telegram_id=990018001)
+        user = make_user(990018001)
 
         create_test_ad(
             user,
@@ -358,7 +337,7 @@ class TestTrustCalculator:
 
     def test_rejection_rate_persistence(self) -> None:
         """Rejection rate is persisted as a percentage in SellerTrustScore."""
-        user = _make_user(telegram_id=990019001)
+        user = make_user(990019001)
 
         # 3 published, 1 rejected, 1 moderation_failed = 5 non-draft, 2 rejected
         for i in range(3):
@@ -393,7 +372,7 @@ class TestTrustCalculator:
 
     def test_trust_level_unverified(self) -> None:
         """Score below VERIFIED_THRESHOLD (31) maps to UNVERIFIED (without verification)."""
-        user = _make_user(telegram_id=990020001)
+        user = make_user(990020001)
 
         # Create 1 published, 5 rejected to keep score low
         create_test_ad(
@@ -419,7 +398,7 @@ class TestTrustCalculator:
 
     def test_trust_level_verified_threshold(self) -> None:
         """Score at VERIFIED_THRESHOLD (31) maps to VERIFIED."""
-        user = _make_user(telegram_id=990021001)
+        user = make_user(990021001)
 
         # Need score >= 31
         # 5 published → activity = 25
@@ -455,7 +434,7 @@ class TestTrustCalculator:
 
     def test_trust_level_trusted_threshold(self) -> None:
         """Score at TRUSTED_THRESHOLD (61) maps to TRUSTED."""
-        user = _make_user(telegram_id=990022001)
+        user = make_user(990022001)
 
         # Need score >= 61
         # 8 published → activity = 40 (capped)
@@ -478,7 +457,7 @@ class TestTrustCalculator:
 
     def test_trust_level_pro_threshold(self) -> None:
         """Score at PRO_THRESHOLD (86) maps to PRO."""
-        user = _make_user(telegram_id=990023001)
+        user = make_user(990023001)
 
         # Need score >= 86
         # 8 published → activity = 40
@@ -498,7 +477,7 @@ class TestTrustCalculator:
 
         # Add a global contact-initiated event so response calc denominator > 0
         contact_init_ad = create_test_ad(
-            _make_user(telegram_id=990023099),
+            make_user(990023099),
             self.category,
             self.city,
             title="Contact Trigger Ad",
@@ -519,7 +498,7 @@ class TestTrustCalculator:
 
     def test_response_score_with_no_contacts(self) -> None:
         """Response score is 0 when there are no contact-initiated events."""
-        user = _make_user(telegram_id=990024001)
+        user = make_user(990024001)
 
         create_test_ad(
             user,
@@ -536,8 +515,8 @@ class TestTrustCalculator:
 
     def test_response_score_with_contacts(self) -> None:
         """Response score is proportional to user's responses vs total contacts."""
-        user = _make_user(telegram_id=990025001)
-        other_user = _make_user(telegram_id=990025099)
+        user = make_user(990025001)
+        other_user = make_user(990025099)
 
         # Create a shared ad to attach events to
         shared_ad = create_test_ad(
@@ -573,7 +552,7 @@ class TestTrustCalculator:
 
     def test_calculate_and_save_updates_existing(self) -> None:
         """Calling calculate_and_save twice updates the existing row."""
-        user = _make_user(telegram_id=990026001)
+        user = make_user(990026001)
 
         # First call — no ads
         score1 = self._score(user)
@@ -599,7 +578,7 @@ class TestTrustCalculator:
 
     def test_calculate_and_save_records_trust_event(self) -> None:
         """calculate_and_save records a TRUST_LEVEL_UPDATED analytics event."""
-        user = _make_user(telegram_id=990027001)
+        user = make_user(990027001)
         self._score(user)
 
         events = AnalyticsEvent.objects.filter(
@@ -610,7 +589,7 @@ class TestTrustCalculator:
 
     def test_calculate_and_save_records_on_update(self) -> None:
         """Calling calculate_and_save twice records two TRUST_LEVEL_UPDATED events."""
-        user = _make_user(telegram_id=990028001)
+        user = make_user(990028001)
         self._score(user)
         self._score(user)
 
@@ -698,7 +677,7 @@ class TestTrustLevelFloor:
     def test_score_zero_admin_verified_floors_to_verified(self) -> None:
         """score=0 + admin-verified seller -> VERIFIED (floor, not UNVERIFIED)."""
         calculator = TrustCalculator()
-        user = _make_user(telegram_id=990090001)
+        user = make_user(990090001)
         SellerVerification.objects.create(user=user, verified_by_admin=True)
 
         score = calculator.calculate_and_save(user)
@@ -709,7 +688,7 @@ class TestTrustLevelFloor:
     def test_score_zero_premium_floors_to_verified(self) -> None:
         """score=0 + Telegram Premium seller -> VERIFIED (floor)."""
         calculator = TrustCalculator()
-        user = _make_user(telegram_id=990090002, telegram_premium=True)
+        user = make_user(990090002, telegram_premium=True)
 
         score = calculator.calculate_and_save(user)
 
@@ -719,7 +698,7 @@ class TestTrustLevelFloor:
     def test_score_zero_no_verification_is_unverified(self) -> None:
         """score=0 + no admin verification nor Premium -> UNVERIFIED."""
         calculator = TrustCalculator()
-        user = _make_user(telegram_id=990090003)
+        user = make_user(990090003)
 
         score = calculator.calculate_and_save(user)
 

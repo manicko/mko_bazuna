@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from apps.users.models import User
 from apps.users.services import can_login
+from conftest import make_user
 from telegram_bot.handlers.contact import (
     ContactDeepLinkKind,
     classify_contact_deep_link,
@@ -34,30 +35,6 @@ pytestmark = [
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 _BASE_CHAT_ID = 900000200
-
-
-async def _make_user(
-    chat_id: int,
-    *,
-    is_banned: bool = False,
-    is_deleted: bool = False,
-    is_declined: bool = False,
-    ads_auto_publish: bool = True,
-    consent_revoked: bool = False,
-) -> User:
-    """Create a User with specific account-state flags via sync_to_async."""
-    kwargs: dict[str, Any] = {
-        "telegram_id": chat_id,
-        "chat_id": chat_id,
-        "password": "x",
-        "is_banned": is_banned,
-        "is_deleted": is_deleted,
-        "is_declined": is_declined,
-        "ads_auto_publish": ads_auto_publish,
-    }
-    if consent_revoked:
-        kwargs["consent_revoked_at"] = timezone.now()
-    return await sync_to_async(User.objects.create)(**kwargs)
 
 
 _next_update_id = itertools.count(42)
@@ -131,7 +108,7 @@ class TestCheckUserStateMessages:
     async def test_banned_user(self) -> None:
         """Banned user is blocked with a restriction message."""
         chat_id = _BASE_CHAT_ID + 1
-        await _make_user(chat_id, is_banned=True)
+        await sync_to_async(make_user)(chat_id, is_banned=True)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -143,7 +120,7 @@ class TestCheckUserStateMessages:
     async def test_deleted_user(self) -> None:
         """Deleted user is blocked with a deletion message."""
         chat_id = _BASE_CHAT_ID + 2
-        await _make_user(chat_id, is_deleted=True)
+        await sync_to_async(make_user)(chat_id, is_deleted=True)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -155,7 +132,7 @@ class TestCheckUserStateMessages:
     async def test_declined_user(self) -> None:
         """Declined user is blocked with a browse-only message."""
         chat_id = _BASE_CHAT_ID + 3
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -170,7 +147,7 @@ class TestCheckUserStateMessages:
         Contact deep-links are the browse-only exception for DECLINE users.
         """
         chat_id = _BASE_CHAT_ID + 30
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(
@@ -184,7 +161,7 @@ class TestCheckUserStateMessages:
     async def test_consent_revoked_user(self) -> None:
         """Consent-withdrawn user is blocked with an erasure message."""
         chat_id = _BASE_CHAT_ID + 4
-        await _make_user(chat_id, consent_revoked=True)
+        await sync_to_async(make_user)(chat_id, consent_revoked=True)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -196,7 +173,7 @@ class TestCheckUserStateMessages:
     async def test_normal_user(self) -> None:
         """A user with no restriction flags can interact without a message."""
         chat_id = _BASE_CHAT_ID + 5
-        await _make_user(chat_id)
+        await sync_to_async(make_user)(chat_id)
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -254,7 +231,7 @@ class TestCrossPredicateAgreement:
         the predicate used in ``get_account_state`` / the AccountState NamedTuple.
         """
         chat_id = _BASE_CHAT_ID + 100 + row
-        await _make_user(
+        await sync_to_async(make_user)(
             chat_id,
             is_banned=is_banned,
             is_deleted=is_deleted,
@@ -292,7 +269,7 @@ class TestCrossPredicateAgreement:
         blocks a superset of the login predicate).
         """
         chat_id = _BASE_CHAT_ID + 200 + row
-        user = await _make_user(
+        user = await sync_to_async(make_user)(
             chat_id,
             is_banned=is_banned,
             is_declined=is_declined,
@@ -310,7 +287,7 @@ class TestCrossPredicateAgreement:
     async def test_normal_user_allows_when_can_login_allows(self) -> None:
         """A normal user passes both can_login and _check_user_state."""
         chat_id = _BASE_CHAT_ID + 300
-        user = await _make_user(chat_id)
+        user = await sync_to_async(make_user)(chat_id)
 
         assert can_login(user) is True
 
@@ -353,7 +330,7 @@ class TestCallPipeline:
         receives Update events, the gate passes, and the handler is invoked.
         """
         chat_id = _BASE_CHAT_ID + 501
-        await _make_user(chat_id)
+        await sync_to_async(make_user)(chat_id)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -371,7 +348,7 @@ class TestCallPipeline:
     ) -> None:
         """A banned user is blocked — handler NOT called, restriction message sent."""
         chat_id = _BASE_CHAT_ID + 502
-        await _make_user(chat_id, is_banned=True)
+        await sync_to_async(make_user)(chat_id, is_banned=True)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -391,7 +368,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user is blocked — handler NOT called, browse-only message sent."""
         chat_id = _BASE_CHAT_ID + 503
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -413,7 +390,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user sending /start contact_<ad_id> reaches the handler."""
         chat_id = _BASE_CHAT_ID + 701
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_message_update(chat_id, "/start contact_42")
         handler = AsyncMock(return_value="proceed")
@@ -432,7 +409,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user sending /start contact_us reaches the handler."""
         chat_id = _BASE_CHAT_ID + 702
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_message_update(chat_id, "/start contact_us")
         handler = AsyncMock(return_value="proceed")
@@ -451,7 +428,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user triggering the contact_us callback reaches the handler."""
         chat_id = _BASE_CHAT_ID + 703
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_callback_update(chat_id, callback_data="contact_us")
         handler = AsyncMock(return_value="proceed")
@@ -470,7 +447,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user sending /post is still blocked (contact narrowing is specific)."""
         chat_id = _BASE_CHAT_ID + 704
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_message_update(chat_id, "/post")
         handler = AsyncMock(return_value="proceed")
@@ -490,7 +467,7 @@ class TestCallPipeline:
     ) -> None:
         """A declined user sending /language is still blocked."""
         chat_id = _BASE_CHAT_ID + 705
-        await _make_user(chat_id, is_declined=True)
+        await sync_to_async(make_user)(chat_id, is_declined=True)
 
         update = _make_message_update(chat_id, "/language")
         handler = AsyncMock(return_value="proceed")
@@ -510,7 +487,7 @@ class TestCallPipeline:
     ) -> None:
         """A banned user sending /start contact_42 is blocked (DECLINE-only narrowing)."""
         chat_id = _BASE_CHAT_ID + 706
-        await _make_user(chat_id, is_banned=True)
+        await sync_to_async(make_user)(chat_id, is_banned=True)
 
         update = _make_message_update(chat_id, "/start contact_42")
         handler = AsyncMock(return_value="proceed")
@@ -530,7 +507,7 @@ class TestCallPipeline:
     ) -> None:
         """A deleted user sending /start contact_42 is blocked."""
         chat_id = _BASE_CHAT_ID + 707
-        await _make_user(chat_id, is_deleted=True)
+        await sync_to_async(make_user)(chat_id, is_deleted=True)
 
         update = _make_message_update(chat_id, "/start contact_42")
         handler = AsyncMock(return_value="proceed")
@@ -550,7 +527,7 @@ class TestCallPipeline:
     ) -> None:
         """A consent-revoked user sending /start contact_42 is blocked."""
         chat_id = _BASE_CHAT_ID + 708
-        await _make_user(chat_id, consent_revoked=True)
+        await sync_to_async(make_user)(chat_id, consent_revoked=True)
 
         update = _make_message_update(chat_id, "/start contact_42")
         handler = AsyncMock(return_value="proceed")
@@ -573,7 +550,7 @@ class TestCallPipeline:
     ) -> None:
         """A normal registered user's callback_query Update reaches the handler."""
         chat_id = _BASE_CHAT_ID + 504
-        await _make_user(chat_id)
+        await sync_to_async(make_user)(chat_id)
 
         update = _make_callback_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -591,7 +568,7 @@ class TestCallPipeline:
     ) -> None:
         """A normal registered user proceeds — handler called, no rejection message."""
         chat_id = _BASE_CHAT_ID + 505
-        await _make_user(chat_id)
+        await sync_to_async(make_user)(chat_id)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -653,7 +630,7 @@ class TestCallPipeline:
         exception, with the handler still invoked.
         """
         chat_id = _BASE_CHAT_ID + 508
-        await _make_user(chat_id)
+        await sync_to_async(make_user)(chat_id)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -685,7 +662,7 @@ class TestUserIdBackfill:
     ) -> None:
         """After a restart (empty FSM state), backfill user_id from ORM via chat_id."""
         chat_id = _BASE_CHAT_ID + 601
-        user = await _make_user(chat_id)
+        user = await sync_to_async(make_user)(chat_id)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -707,7 +684,7 @@ class TestUserIdBackfill:
     ) -> None:
         """When FSM state already has user_id, backfill is suppressed (no DB lookup)."""
         chat_id = _BASE_CHAT_ID + 602
-        user = await _make_user(chat_id)
+        user = await sync_to_async(make_user)(chat_id)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -751,7 +728,7 @@ class TestUserIdBackfill:
     ) -> None:
         """A banned user is blocked before backfill — no handler call, no backfill."""
         chat_id = _BASE_CHAT_ID + 603
-        await _make_user(chat_id, is_banned=True)
+        await sync_to_async(make_user)(chat_id, is_banned=True)
 
         update = _make_message_update(chat_id)
         handler = AsyncMock(return_value="proceed")
@@ -775,7 +752,7 @@ class TestUserIdBackfill:
     ) -> None:
         """Backfill fires for callback_query Update events, not just messages."""
         chat_id = _BASE_CHAT_ID + 604
-        user = await _make_user(chat_id)
+        user = await sync_to_async(make_user)(chat_id)
 
         update = _make_callback_update(chat_id)
         handler = AsyncMock(return_value="proceed")

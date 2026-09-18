@@ -18,7 +18,7 @@ from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType, TimeRange
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -26,18 +26,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 991000001, **overrides: object) -> User:
-    """Create a User with sensible defaults for dashboard tests."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)
 
 
 def _make_event(
@@ -67,8 +55,8 @@ def dashboard_seller(category, city):
 
     Also creates another seller (noise) whose events should not appear.
     """
-    seller = _make_user(telegram_id=991001001)
-    other_user = _make_user(telegram_id=991001002)
+    seller = make_user(991001001)
+    other_user = make_user(991001002)
 
     ad_a = create_test_ad(
         seller, category, city, title="Ad Alpha", status=AdStatus.PUBLISHED
@@ -312,7 +300,7 @@ class TestDashboardEdgeCases:
 
     def test_empty_stats_when_no_events(self, category, city) -> None:
         """Seller with no events gets zeroed stats."""
-        empty_user = _make_user(telegram_id=991001003)
+        empty_user = make_user(991001003)
         client = Client()
         client.force_login(empty_user)
         create_test_ad(

@@ -28,7 +28,7 @@ from apps.moderation.models import AdModerationPriority, ModerationCriteria
 from apps.moderation.services.priority import PriorityService
 from apps.moderation.views.api_bulk import MAX_BULK_ACTIONS
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -36,18 +36,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_user(telegram_id: int = 990030001, **overrides: object) -> User:
-    """Create a User with sensible defaults."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "username": None,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)
 
 
 def _make_staff_user(telegram_id: int = 990030002) -> User:
@@ -91,7 +79,7 @@ def _banned_words_setup(*words: str) -> None:
 @pytest.fixture
 def priority_seller(category, city):
     """Provide a seller with category/city for priority service tests."""
-    return _make_user(telegram_id=990030010)
+    return make_user(990030010)
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +92,7 @@ class TestPriorityService:
 
     def test_calculate_and_save_creates_priority_record(self, category, city) -> None:
         """calculate_and_save creates a new AdModerationPriority record."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city)
         service = PriorityService()
 
@@ -117,7 +105,7 @@ class TestPriorityService:
 
     def test_calculate_and_save_updates_existing_record(self, category, city) -> None:
         """calculate_and_save updates an existing record instead of creating duplicate."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city)
         service = PriorityService()
 
@@ -129,7 +117,7 @@ class TestPriorityService:
     def test_calculate_and_save_with_banned_words(self, category, city) -> None:
         """calculate_and_save correctly computes score with banned words."""
         _banned_words_setup("spam", "scam")
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city, title="spam offer")
         service = PriorityService()
 
@@ -140,7 +128,7 @@ class TestPriorityService:
 
     def test_get_queued_ads_returns_moderation_ads(self, category, city) -> None:
         """get_queued_ads returns ads with ON_MODERATION status."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city)
         service = PriorityService()
         service.calculate_and_save(ad)
@@ -151,7 +139,7 @@ class TestPriorityService:
 
     def test_get_queued_ads_excludes_published_ads(self, category, city) -> None:
         """get_queued_ads excludes published ads."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
         service = PriorityService()
         service.calculate_and_save(ad)
@@ -162,7 +150,7 @@ class TestPriorityService:
 
     def test_get_queued_ads_excludes_archived_ads(self, category, city) -> None:
         """get_queued_ads excludes archived ads."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(user, category, city, status=AdStatus.ARCHIVED)
         service = PriorityService()
         service.calculate_and_save(ad)
@@ -174,7 +162,7 @@ class TestPriorityService:
     def test_get_queued_ads_filters_by_priority(self, category, city) -> None:
         """get_queued_ads filters by priority level when filter is provided."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         service = PriorityService()
 
         high_ad = create_test_ad(
@@ -200,7 +188,7 @@ class TestPriorityService:
     ) -> None:
         """get_queued_ads with priority_filter=None returns ads of every priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         service = PriorityService()
 
         high_ad = create_test_ad(
@@ -227,7 +215,7 @@ class TestPriorityService:
     def test_get_priority_counts_counts_correctly(self, category, city) -> None:
         """get_priority_counts returns correct counts per priority level."""
         _banned_words_setup("spam", "scam", "cheap", "fake", "counterfeit")
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         service = PriorityService()
 
         high_ad = create_test_ad(
@@ -250,7 +238,7 @@ class TestPriorityService:
         self, category, city
     ) -> None:
         """get_priority_counts excludes ads that are not in moderation status."""
-        user = _make_user(telegram_id=990030010)
+        user = make_user(990030010)
         ad = create_test_ad(
             user, category, city, title="spam scam cheap", status=AdStatus.PUBLISHED
         )
@@ -271,7 +259,7 @@ class TestCalculateAdPrioritySignal:
 
     def test_signal_creates_priority_on_moderation_status(self, category, city) -> None:
         """Signal creates AdModerationPriority when ad is saved with ON_MODERATION status."""
-        user = _make_user(telegram_id=990030020)
+        user = make_user(990030020)
         ad = create_test_ad(user, category, city)
 
         ad.refresh_from_db()
@@ -280,7 +268,7 @@ class TestCalculateAdPrioritySignal:
 
     def test_signal_does_not_create_priority_for_draft(self, category, city) -> None:
         """Signal does NOT create priority for DRAFT ads."""
-        user = _make_user(telegram_id=990030020)
+        user = make_user(990030020)
         ad = create_test_ad(user, category, city, status=AdStatus.DRAFT)
 
         ad.refresh_from_db()
@@ -290,7 +278,7 @@ class TestCalculateAdPrioritySignal:
         self, category, city
     ) -> None:
         """Signal does NOT create priority for PUBLISHED ads."""
-        user = _make_user(telegram_id=990030020)
+        user = make_user(990030020)
         ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
 
         ad.refresh_from_db()
@@ -300,7 +288,7 @@ class TestCalculateAdPrioritySignal:
         self, category, city
     ) -> None:
         """Signal does NOT recalculate priority if record already exists."""
-        user = _make_user(telegram_id=990030020)
+        user = make_user(990030020)
         ad = create_test_ad(user, category, city)
         ad.refresh_from_db()
 
@@ -322,7 +310,7 @@ class TestModerationQueueView:
 
     @pytest.fixture(autouse=True)
     def _setup(self, category, city):
-        self.user = _make_user(telegram_id=990030030)
+        self.user = make_user(990030030)
         self.staff_user = _make_staff_user(telegram_id=990030031)
         self.queue_url = reverse("moderation:queue")
 
@@ -468,7 +456,7 @@ class TestBulkModerationActionView:
 
     @pytest.fixture(autouse=True)
     def _setup(self, category, city):
-        self.user = _make_user(telegram_id=990030040)
+        self.user = make_user(990030040)
         self.staff_user = _make_staff_user(telegram_id=990030041)
         self.bulk_url = reverse("moderation:bulk_action")
         assert self.bulk_url == "/moderation/api/v1/bulk-action/"

@@ -14,19 +14,9 @@ from django.template import Context, Template
 from apps.core.enums import TrustLevel
 from apps.trust.models import SellerTrustScore, SellerVerification
 from apps.users.models import User
+from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-def _make_user(telegram_id: int, **overrides: object) -> User:
-    """Create a User with sensible defaults."""
-    defaults: dict = {
-        "telegram_id": telegram_id,
-        "chat_id": telegram_id,
-        "password": "x",
-    }
-    defaults.update(overrides)
-    return User.objects.create(**defaults)
 
 
 def _render(user) -> str:
@@ -39,14 +29,14 @@ def _render(user) -> str:
 @pytest.fixture
 def trust_users():
     """Create users at each trust level for badge rendering tests."""
-    user = _make_user(990100001)
+    user = make_user(990100001)
     SellerTrustScore.objects.create(
         user=user,
         trust_level=TrustLevel.UNVERIFIED,
         score=15,
     )
 
-    verified_user = _make_user(990100002)
+    verified_user = make_user(990100002)
     SellerVerification.objects.create(user=verified_user, verified_by_admin=True)
     SellerTrustScore.objects.create(
         user=verified_user,
@@ -54,14 +44,14 @@ def trust_users():
         score=35,
     )
 
-    trusted_user = _make_user(990100003)
+    trusted_user = make_user(990100003)
     SellerTrustScore.objects.create(
         user=trusted_user,
         trust_level=TrustLevel.TRUSTED,
         score=65,
     )
 
-    pro_user = _make_user(990100004)
+    pro_user = make_user(990100004)
     SellerTrustScore.objects.create(
         user=pro_user,
         trust_level=TrustLevel.PRO,

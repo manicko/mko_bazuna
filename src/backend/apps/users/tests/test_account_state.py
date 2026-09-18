@@ -18,6 +18,7 @@ from apps.users.services import (
     get_account_state,
     get_state_badge,
 )
+from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -25,26 +26,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-def _make_user(
-    telegram_id: int,
-    *,
-    is_banned: bool = False,
-    is_deleted: bool = False,
-    is_declined: bool = False,
-    ads_auto_publish: bool = True,
-) -> User:
-    """Create a user with specific account-state flags."""
-    return User.objects.create(
-        telegram_id=telegram_id,
-        chat_id=telegram_id,
-        password="x",
-        is_banned=is_banned,
-        is_deleted=is_deleted,
-        is_declined=is_declined,
-        ads_auto_publish=ads_auto_publish,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -68,25 +49,25 @@ class TestGetAccountState:
 
     def test_banned_user(self) -> None:
         """Banned user has is_banned=True."""
-        u = _make_user(900001001, is_banned=True)
+        u = make_user(900001001, is_banned=True)
         state = get_account_state(u)
         assert state.is_banned is True
 
     def test_deleted_user(self) -> None:
         """Deleted user has is_deleted=True."""
-        u = _make_user(900001002, is_deleted=True)
+        u = make_user(900001002, is_deleted=True)
         state = get_account_state(u)
         assert state.is_deleted is True
 
     def test_declined_user(self) -> None:
         """Declined user has is_declined=True."""
-        u = _make_user(900001003, is_declined=True)
+        u = make_user(900001003, is_declined=True)
         state = get_account_state(u)
         assert state.is_declined is True
 
     def test_restricted_user(self) -> None:
         """Restricted user has ads_auto_publish=False."""
-        u = _make_user(900001004, ads_auto_publish=False)
+        u = make_user(900001004, ads_auto_publish=False)
         state = get_account_state(u)
         assert state.ads_auto_publish is False
 
@@ -114,42 +95,42 @@ class TestCanPublishAd:
 
     def test_banned_user_cannot_publish(self) -> None:
         """Banned user cannot publish regardless of other flags."""
-        u = _make_user(900001010, is_banned=True)
+        u = make_user(900001010, is_banned=True)
         assert can_publish_ad(u) is False
 
     def test_banned_and_restricted_cannot_publish(self) -> None:
         """Banned + restricted still cannot publish (banned takes priority in check order)."""
-        u = _make_user(900001011, is_banned=True, ads_auto_publish=False)
+        u = make_user(900001011, is_banned=True, ads_auto_publish=False)
         assert can_publish_ad(u) is False
 
     def test_banned_and_deleted_cannot_publish(self) -> None:
         """Banned + deleted cannot publish."""
-        u = _make_user(900001012, is_banned=True, is_deleted=True)
+        u = make_user(900001012, is_banned=True, is_deleted=True)
         assert can_publish_ad(u) is False
 
     def test_deleted_user_cannot_publish(self) -> None:
         """Deleted user cannot publish."""
-        u = _make_user(900001013, is_deleted=True)
+        u = make_user(900001013, is_deleted=True)
         assert can_publish_ad(u) is False
 
     def test_deleted_and_restricted_cannot_publish(self) -> None:
         """Deleted + restricted cannot publish."""
-        u = _make_user(900001014, is_deleted=True, ads_auto_publish=False)
+        u = make_user(900001014, is_deleted=True, ads_auto_publish=False)
         assert can_publish_ad(u) is False
 
     def test_restricted_user_cannot_publish(self) -> None:
         """User with ads_auto_publish=False cannot publish."""
-        u = _make_user(900001015, ads_auto_publish=False)
+        u = make_user(900001015, ads_auto_publish=False)
         assert can_publish_ad(u) is False
 
     def test_declined_user_can_publish(self) -> None:
         """Declined user CAN publish (decline only blocks login, not publishing)."""
-        u = _make_user(900001016, is_declined=True)
+        u = make_user(900001016, is_declined=True)
         assert can_publish_ad(u) is True
 
     def test_all_flags_cannot_publish(self) -> None:
         """All restriction flags together still cannot publish."""
-        u = _make_user(
+        u = make_user(
             900001017,
             is_banned=True,
             is_deleted=True,
@@ -173,17 +154,17 @@ class TestCanLogin:
 
     def test_banned_user_cannot_login(self) -> None:
         """Banned user cannot login."""
-        u = _make_user(900001020, is_banned=True)
+        u = make_user(900001020, is_banned=True)
         assert can_login(u) is False
 
     def test_declined_user_cannot_login(self) -> None:
         """User who declined consent cannot login."""
-        u = _make_user(900001021, is_declined=True)
+        u = make_user(900001021, is_declined=True)
         assert can_login(u) is False
 
     def test_banned_and_declined_cannot_login(self) -> None:
         """Banned + declined cannot login."""
-        u = _make_user(900001022, is_banned=True, is_declined=True)
+        u = make_user(900001022, is_banned=True, is_declined=True)
         assert can_login(u) is False
 
     def test_deleted_user_can_login_by_flag(self) -> None:
@@ -193,12 +174,12 @@ class TestCanLogin:
         authenticate because their telegram_id is nulled, but the gating function
         treats them as eligible. This is intentional per the docstring.
         """
-        u = _make_user(900001023, is_deleted=True)
+        u = make_user(900001023, is_deleted=True)
         assert can_login(u) is True
 
     def test_restricted_user_can_login(self) -> None:
         """User with ads_auto_publish=False can still login."""
-        u = _make_user(900001024, ads_auto_publish=False)
+        u = make_user(900001024, ads_auto_publish=False)
         assert can_login(u) is True
 
 
@@ -216,27 +197,27 @@ class TestGetStateBadge:
 
     def test_banned_badge(self) -> None:
         """Banned user shows 'banned'."""
-        u = _make_user(900001030, is_banned=True)
+        u = make_user(900001030, is_banned=True)
         assert get_state_badge(u) == "banned"
 
     def test_deleted_badge(self) -> None:
         """Deleted user shows 'deleted'."""
-        u = _make_user(900001031, is_deleted=True)
+        u = make_user(900001031, is_deleted=True)
         assert get_state_badge(u) == "deleted"
 
     def test_declined_badge(self) -> None:
         """Declined user shows 'declined'."""
-        u = _make_user(900001032, is_declined=True)
+        u = make_user(900001032, is_declined=True)
         assert get_state_badge(u) == "declined"
 
     def test_restricted_badge(self) -> None:
         """Restricted user shows 'restricted'."""
-        u = _make_user(900001033, ads_auto_publish=False)
+        u = make_user(900001033, ads_auto_publish=False)
         assert get_state_badge(u) == "restricted"
 
     def test_all_flags_combined_badge(self) -> None:
         """All flags together show comma-separated badges."""
-        u = _make_user(
+        u = make_user(
             900001034,
             is_banned=True,
             is_deleted=True,
@@ -251,5 +232,5 @@ class TestGetStateBadge:
 
     def test_no_badge_for_default_user(self) -> None:
         """User with default flags returns empty string."""
-        u = _make_user(900001035)
+        u = make_user(900001035)
         assert get_state_badge(u) == ""

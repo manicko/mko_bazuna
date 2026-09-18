@@ -226,6 +226,7 @@ def make_user(
     telegram_id: int,
     *,
     is_staff: bool = False,
+    consent_revoked: bool = False,
     **overrides: object,
 ) -> User:
     """Create a ``User`` with sensible defaults for tests.
@@ -234,7 +235,8 @@ def make_user(
     (different per test module to avoid PK/unique conflicts). ``chat_id``
     mirrors ``telegram_id``, ``password`` defaults to ``"x"``, and
     ``username`` to ``None``. Pass ``is_staff=True`` to elevate to a staff
-    user, or supply additional fields via ``**overrides``.
+    user, ``consent_revoked=True`` to set ``consent_revoked_at`` to the
+    current time, or supply additional fields via ``**overrides``.
     """
     defaults: dict[str, Any] = {
         "telegram_id": telegram_id,
@@ -242,6 +244,8 @@ def make_user(
         "username": None,
         "password": "x",
     }
+    if consent_revoked:
+        defaults["consent_revoked_at"] = timezone.now()
     defaults.update(overrides)
     user = User.objects.create(**defaults)  # type: ignore[arg-type]
     if is_staff:
