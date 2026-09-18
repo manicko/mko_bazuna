@@ -3,6 +3,7 @@ Production settings for Mko Bazuna.
 Imports base settings and applies production safety configuration.
 """
 
+import logging
 import os
 
 from django.core.exceptions import ImproperlyConfigured
@@ -11,21 +12,72 @@ from .base import *  # noqa: F403, F401
 
 DEBUG = False
 
-# Console logging for production (INFO-level root logger so application
-# loggers propagate to stdout for log aggregation).
+# Structured JSON logging for production (JSONL to stdout for log aggregation).
+# Sensitive field values are redacted by RedactingJsonFormatter.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "apps.core.utils.json_logging.RedactingJsonFormatter",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "json",
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "telegram_bot": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
+# Error tracking via Sentry (optional — only if SENTRY_DSN is configured).
+# Guarded with try/except ImportError so a missing sentry-sdk dependency
+# does not crash the application boot.
+if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,  # noqa: F405
+            send_default_pii=False,
+            traces_sample_rate=0.1,
+        )
+        logging.getLogger(__name__).info("Sentry error tracking initialized")
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "sentry-sdk not installed — error tracking disabled"
+        )
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
@@ -73,3 +125,12 @@ STATICFILES_STORAGE = "theme.storage.ThemeStaticFilesStorage"
 # Allow hosts from environment (required)
 if not ALLOWED_HOSTS:  # noqa: F405
     raise ValueError("ALLOWED_HOSTS must be set in production")
+
+# Fail fast: CSRF_TRUSTED_ORIGINS is required in production behind a
+# TLS-terminating proxy. Without it, Django rejects all POST requests with a
+# valid CSRF token (HTTP 403) because the Origin/Referer header is not in the
+# allow-list. Skip during Docker build (DJANGO_BUILD=1) so collectstatic
+# succeeds with placeholder values; the real origins are provided at runtime
+# via .env.prod.
+if not CSRF_TRUSTED_ORIGINS and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+    raise ValueError("CSRF_TRUSTED_ORIGINS must be set in production")
