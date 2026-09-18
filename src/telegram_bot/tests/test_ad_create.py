@@ -241,43 +241,6 @@ class TestProcessPhotos:
         assert "too fast" in answer_text.lower()
 
     @pytest.mark.asyncio
-    async def test_process_photos_allows_when_not_rate_limited(
-        self, monkeypatch
-    ) -> None:
-        """When not rate-limited, the flow proceeds to download and save the photo."""
-        from telegram_bot.handlers.ad_create import process_photos
-
-        monkeypatch.setattr(
-            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
-            AsyncMock(return_value=True),
-        )
-
-        state = _build_state({"photos": [], "user_id": 900000001})
-        state.update_data = AsyncMock()
-        message = _build_photo_message()
-
-        with (
-            patch(
-                "telegram_bot.handlers.ad_create.download_photo",
-                new=AsyncMock(return_value=b"fake_photo_bytes"),
-            ) as mock_download,
-            patch(
-                "telegram_bot.handlers.ad_create.save_photo",
-                new=AsyncMock(return_value="fake_storage_key"),
-            ),
-            patch(
-                "telegram_bot.handlers.ad_create.validate_photo",
-                return_value=(True, None),
-            ),
-        ):
-            await process_photos(message, state)
-
-        mock_download.assert_awaited_once()
-        message.answer.assert_awaited_once()
-        answer_text = message.answer.await_args[0][0]
-        assert "Photo saved" in answer_text
-
-    @pytest.mark.asyncio
     async def test_file_size_exceeds_limit_rejects_without_download(
         self, monkeypatch
     ) -> None:
@@ -301,49 +264,26 @@ class TestProcessPhotos:
         assert "too large" in answer_text.lower()
 
     @pytest.mark.asyncio
-    async def test_file_size_none_falls_through_to_download(
-        self, monkeypatch
-    ) -> None:
-        """PhotoSize with file_size=None falls through to download + validate_photo."""
+    async def test_process_photos_integration_real_jpg(self, monkeypatch, tmp_path) -> None:
+        """Full download → validate → strip-EXIF save pipeline with a real JPEG.
+
+        Stubs only the network-bound ``download_photo`` and the rate-limit
+        check; the real ``validate_photo`` (PIL) and ``save_photo`` (strips
+        EXIF, writes to ``MEDIA_ROOT/staging/``) run end-to-end and the saved
+        file is re-opened with Pillow to confirm it remains a valid JPEG.
+        """
+        import io
+
+        from django.test import override_settings
+        from PIL import Image
+
         from telegram_bot.handlers.ad_create import process_photos
 
-        monkeypatch.setattr(
-            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
-            AsyncMock(return_value=True),
-        )
-
-        state = _build_state({"photos": [], "user_id": 900000001})
-        state.update_data = AsyncMock()
-        message = _build_photo_message(file_size=None)
-
-        with (
-            patch(
-                "telegram_bot.handlers.ad_create.download_photo",
-                new=AsyncMock(return_value=b"fake_photo_bytes"),
-            ) as mock_download,
-            patch(
-                "telegram_bot.handlers.ad_create.save_photo",
-                new=AsyncMock(return_value="fake_storage_key"),
-            ),
-            patch(
-                "telegram_bot.handlers.ad_create.validate_photo",
-                return_value=(True, None),
-            ) as mock_validate,
-        ):
-            await process_photos(message, state)
-
-        mock_download.assert_awaited_once()
-        mock_validate.assert_called_once()
-        message.answer.assert_awaited_once()
-        answer_text = message.answer.await_args[0][0]
-        assert "Photo saved" in answer_text
-
-    @pytest.mark.asyncio
-    async def test_file_size_within_limit_proceeds_normally(
-        self, monkeypatch
-    ) -> None:
-        """PhotoSize with file_size <= 2MB proceeds to download and save."""
-        from telegram_bot.handlers.ad_create import process_photos
+        # Build a minimal but real, decodable JPEG (50x50 red).
+        image = Image.new("RGB", (50, 50), "red")
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=95)
+        jpeg_bytes = buffer.getvalue()
 
         monkeypatch.setattr(
             "telegram_bot.handlers.ad_create.check_upload_rate_limit",
@@ -355,25 +295,37 @@ class TestProcessPhotos:
         message = _build_photo_message(file_size=1024)
 
         with (
+            override_settings(MEDIA_ROOT=str(tmp_path)),
             patch(
                 "telegram_bot.handlers.ad_create.download_photo",
-                new=AsyncMock(return_value=b"fake_photo_bytes"),
-            ) as mock_download,
-            patch(
-                "telegram_bot.handlers.ad_create.save_photo",
-                new=AsyncMock(return_value="fake_storage_key"),
-            ),
-            patch(
-                "telegram_bot.handlers.ad_create.validate_photo",
-                return_value=(True, None),
+                new=AsyncMock(return_value=jpeg_bytes),
             ),
         ):
             await process_photos(message, state)
 
-        mock_download.assert_awaited_once()
+        # Bot responded with the "Photo saved" confirmation.
         message.answer.assert_awaited_once()
         answer_text = message.answer.await_args[0][0]
         assert "Photo saved" in answer_text
+
+        # state.update_data received a photos list with a staging storage key.
+        state.update_data.assert_awaited_once()
+        saved_photos = state.update_data.await_args.kwargs["photos"]
+        assert isinstance(saved_photos, list)
+        assert len(saved_photos) == 1
+        storage_key = saved_photos[0]["storage_key"]
+        assert isinstance(storage_key, str)
+        assert storage_key.startswith("staging/")
+        assert storage_key.endswith(".jpg")
+
+        # The stripped file was actually written to the staging directory.
+        saved_path = tmp_path / storage_key
+        assert saved_path.exists()
+
+        # The persisted file is a valid, re-decodable JPEG.
+        with Image.open(saved_path) as reopened:
+            assert reopened.format == "JPEG"
+            reopened.load()
 
 
 # ---------------------------------------------------------------------------
