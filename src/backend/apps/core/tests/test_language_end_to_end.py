@@ -37,7 +37,7 @@ DESC_RU = "Русское описание"
 DESC_EN = "English desc"
 DESC_BS = "Bosnian opis"
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

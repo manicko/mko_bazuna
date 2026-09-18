@@ -3,6 +3,7 @@
 import json
 import logging
 
+from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -38,22 +39,55 @@ def privacy_policy(request: HttpRequest) -> HttpResponse:
     )
 
 
-def health_check(request):
-    """Health check endpoint for container orchestration.
+def liveness_check(request: HttpRequest) -> JsonResponse:
+    """Liveness probe — process is alive. No DB or cache dependency."""
+    return JsonResponse({"status": "alive"})
 
-    Returns HTTP 200 with status if healthy, HTTP 503 if unhealthy.
-    Includes database connectivity check.
+
+def readiness_check(request: HttpRequest) -> JsonResponse:
+    """Readiness probe — verifies database and Redis cache are reachable.
+
+    Returns 200 with check details when all dependencies are healthy,
+    503 when any dependency fails. Bot health is verified separately
+    via the bot container's own healthcheck (healthcheck-bot.sh).
     """
+    checks = {"database": "ok", "cache": "ok"}
+
     db_healthy = True
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
     except Exception:
         db_healthy = False
+        checks["database"] = "fail"
 
-    if db_healthy:
-        return JsonResponse({"status": "healthy"})
-    return JsonResponse({"status": "unhealthy"}, status=503)
+    cache_healthy = True
+    try:
+        cache.set("health_readiness_probe", "ok", timeout=30)
+        if cache.get("health_readiness_probe") != "ok":
+            cache_healthy = False
+            checks["cache"] = "fail"
+    except Exception:
+        cache_healthy = False
+        checks["cache"] = "fail"
+
+    if db_healthy and cache_healthy:
+        return JsonResponse(
+            {"version": 1, "status": "ready", "checks": checks}
+        )
+    return JsonResponse(
+        {"version": 1, "status": "not_ready", "checks": checks},
+        status=503,
+    )
+
+
+def health_check(request: HttpRequest) -> JsonResponse:
+    """Backward-compatible alias for readiness_check.
+
+    Kept so existing monitors pointing at /health/ continue to work.
+    Returns the readiness response (includes dependency checks).
+    """
+    return readiness_check(request)
 
 
 def csp_report(request: HttpRequest) -> JsonResponse:

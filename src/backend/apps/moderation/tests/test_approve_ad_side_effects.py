@@ -24,7 +24,7 @@ from apps.moderation.admin_actions import approve_ad
 from apps.moderation.models import AdModerationPriority
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # Sentinel used to verify the on_commit callback actually ran.
 _ALERT_SEND_CALLED = "deliver_immediate_alerts_send"

@@ -30,7 +30,7 @@ from apps.core.enums import AdStatus
 from apps.users.models import User
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # Maps an AdStatus to the timestamp field the DB constraint requires.
 _STATUS_TIMESTAMP: dict[AdStatus, str] = {

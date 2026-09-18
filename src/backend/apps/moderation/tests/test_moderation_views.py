@@ -28,7 +28,7 @@ from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

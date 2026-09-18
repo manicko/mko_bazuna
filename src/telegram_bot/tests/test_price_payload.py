@@ -28,7 +28,6 @@ from telegram_bot.schemas.message_payloads import PricePayload
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
-    pytest.mark.slow,
     pytest.mark.integration,
     pytest.mark.concurrent,
 ]

@@ -28,7 +28,7 @@ from apps.ads.models import AdImage
 from apps.media.services.filesystem import generate_storage_key
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

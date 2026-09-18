@@ -22,7 +22,6 @@ import pytest
 logger = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.slow,
     pytest.mark.settings,
     pytest.mark.xdist_group("migrations"),
 ]
@@ -97,6 +96,7 @@ _MIGRATION_IDEMPOTENCY_SCRIPT = textwrap.dedent(
 )
 
 
+@pytest.mark.slow
 def test_makemigrations_check() -> None:
     """Assert that makemigrations --check --dry-run produces no pending migrations.
 
@@ -120,6 +120,7 @@ def test_makemigrations_check() -> None:
     logger.info("makemigrations --check --dry-run: no pending migrations.")
 
 
+@pytest.mark.slow
 def test_migration_idempotency() -> None:
     """Assert that re-applying migrations is a no-op (idempotent).
 

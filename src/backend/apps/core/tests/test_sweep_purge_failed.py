@@ -17,7 +17,7 @@ from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, AdvisoryLockId
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestPurgeFailedAds:

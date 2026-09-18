@@ -14,7 +14,7 @@ from apps.core.enums import AnalyticsEventType
 from apps.core.services.contact import record_contact_response
 from apps.users.models import User
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestRecordContactResponse:

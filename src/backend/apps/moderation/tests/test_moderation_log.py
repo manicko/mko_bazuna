@@ -15,7 +15,7 @@ from apps.moderation.services.moderation_log import set_published
 from apps.users.models import User
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from apps.core.enums import ConsentChoice
 from apps.users.models import ConsentRecord
 from apps.users.services.consent_record import _anonymize_ip
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestConsentRecords:

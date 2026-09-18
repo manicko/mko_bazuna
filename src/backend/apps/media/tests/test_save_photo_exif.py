@@ -18,7 +18,7 @@ from PIL.ExifTags import Base as ExifBase
 
 from apps.media.services.filesystem import STAGING_PREFIX, strip_photo_exif
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def _save_to_staging(media_root: Path, filename: str, photo_bytes: bytes) -> str:

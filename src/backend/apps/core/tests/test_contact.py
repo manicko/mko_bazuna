@@ -24,7 +24,7 @@ from conftest import create_test_ad
 # to keep core tests free of bot-side imports.
 _CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestCanContactSellerLogic:

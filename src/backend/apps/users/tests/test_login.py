@@ -17,7 +17,7 @@ from django.utils import timezone
 from apps.locations.models import City
 from apps.users.models import LoginToken, User
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

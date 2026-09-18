@@ -34,7 +34,6 @@ from apps.locations.models import City
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
-    pytest.mark.slow,
     pytest.mark.integration,
     pytest.mark.concurrent,
 ]

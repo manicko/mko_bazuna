@@ -15,7 +15,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestLogoutContract:

@@ -79,6 +79,7 @@ class TestAdvisoryLockIdReferences:
     unexpected integer at ``getattr`` rather than raising ``ValueError``.
     """
 
+    @pytest.mark.slow
     def test_all_references_are_valid_members(self) -> None:
         """Every ``AdvisoryLockId.*`` reference in ``src/backend/`` and
         ``src/telegram_bot/`` must reference a member defined on the enum.

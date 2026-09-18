@@ -18,7 +18,7 @@ from apps.locations.models import City
 from apps.search.models import SavedSearch
 from apps.users.models import User
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def test_save_search_url_resolves():

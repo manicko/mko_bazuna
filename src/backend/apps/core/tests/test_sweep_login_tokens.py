@@ -16,7 +16,7 @@ from django.utils import timezone
 from apps.core.enums import AdvisoryLockId
 from apps.users.models import LoginToken
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestCleanupLoginTokens:

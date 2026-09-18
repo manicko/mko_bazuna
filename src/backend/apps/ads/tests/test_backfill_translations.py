@@ -23,7 +23,7 @@ from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # Patch target: ``_translate_text`` lazy-imports ``translate_cached_generic``
 # from this module at call time, so patching the module-level attribute is

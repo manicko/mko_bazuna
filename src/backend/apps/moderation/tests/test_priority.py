@@ -25,7 +25,7 @@ from apps.moderation.services.priority import PriorityService
 from apps.moderation.services.priority_calculator import PriorityCalculator
 from conftest import create_test_ad, create_test_ads_bulk
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 # ---------------------------------------------------------------------------

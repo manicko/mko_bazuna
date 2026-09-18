@@ -24,7 +24,7 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # locale -> (vector field, FTS config) used by the trigger and search view.
 LOCALE_CONFIG = {

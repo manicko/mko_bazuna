@@ -18,7 +18,7 @@ from apps.core.enums import AdStatus, AdvisoryLockId, ModeratorActionType
 from apps.moderation.models import ModeratorActionLog
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestPurgeRejectedAds:

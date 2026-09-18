@@ -65,6 +65,7 @@ def _prod_env_overrides(**overrides: str) -> dict[str, str]:
     return env
 
 
+@pytest.mark.slow
 def test_sentry_initialized_when_dsn_configured() -> None:
     """prod settings with SENTRY_DSN set and DEBUG=False initializes sentry_sdk."""
     env = _prod_env_overrides(SENTRY_DSN="https://test@example.com/42")

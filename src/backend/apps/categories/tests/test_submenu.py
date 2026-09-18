@@ -14,7 +14,7 @@ from django.test import Client
 from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture

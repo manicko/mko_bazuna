@@ -44,7 +44,7 @@ from apps.media.services.filesystem import (
 from apps.media.services.thumbnails import ThumbnailService
 from conftest import create_test_ad
 
-pytestmark = [pytest.mark.django_db, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # EXIF Orientation tag (0x0112 = 274). Embedding it in the input image lets us
 # prove that ``strip_photo_exif`` removes metadata *before* the thumbnail
