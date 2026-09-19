@@ -256,11 +256,6 @@ BOT_USERNAME = env("BOT_USERNAME", default="")
 # See src/telegram_bot/lifecycle.py and docker/healthcheck-bot.sh (ENT-005).
 BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive")
 
-# Staleness threshold for bot healthcheck (seconds). 0 = disabled (matches
-# healthcheck-bot.sh shell default). Set to 120 in production compose environment.
-# See docker/healthcheck-bot.sh and src/telegram_bot/lifecycle.py.
-BOT_HEALTH_STALE_SECONDS = env.int("BOT_HEALTH_STALE_SECONDS", default=0)
-
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.
