@@ -34,16 +34,32 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         to prevent the autocommit-release bug (DB-001).
 
     Lock ID allocation (see AdvisoryLockId enum in apps.core.enums):
-        - Phase 4 jobs: 1-5 (archive_sweep, delete_sweep, consent_hard_delete,
-                             sweep_drafts, cleanup_login_tokens)
-        - Phase 2 jobs: 6-7 (purge_failed_ads, purge_rejected_ads)
-        - migrate service: 100 (session-scoped, runs pre-PgBouncer)
-        - create_admin_user: 101 (session-scoped)
-    - backfill_thumbnails: 102 (session-scoped)
-    - sweep_orphaned_media: 103 (session-scoped)
-    - catalog_load: 104 (session-scoped)
-    - seed service: 110 (session-scoped)
-        - test schema setup: 111 (session-scoped, serializes xdist workers)
+
+    Transaction-scoped (pg_advisory_xact_lock; safe under PgBouncer, held
+    inside transaction.atomic()):
+          1  ARCHIVE_SWEEP                archive sweep
+          2  DELETE_SWEEP                 hard-delete sweep
+          3  CONSENT_HARD_DELETE          consent hard delete
+          4  SWEEP_DRAFTS                 draft sweep
+          5  CLEANUP_LOGIN_TOKENS         login-token cleanup
+          6  PURGE_FAILED_ADS             failed-ad purge
+          7  PURGE_REJECTED_ADS           rejected-ad purge
+          8  ROLLUP_DAILY_METRICS         daily metrics rollup
+          9  ALERT_DELIVERY_TASK          search-alert delivery (production path)
+         11  PURGE_DELETED_ADS            deleted-ad purge
+         12  RECOMPUTE_NORMALIZED_PRICES  price normalization
+
+    Session-scoped (pg_advisory_lock; spans the connection, pre-PgBouncer):
+        100  MIGRATE                      post-migration setup (runs pre-PgBouncer)
+        101  CREATE_ADMIN                 admin creation
+        102  BACKFILL_THUMBNAILS          thumbnail backfill
+        103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
+        104  CATALOG_LOAD                 catalog load
+        110  SEED                         seed service
+        111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
+
+    ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
+    was removed in DB-007. IDs 13-99 are reserved for future scheduled jobs.
     """
     if not session:
         if not transaction.get_connection().in_atomic_block:
