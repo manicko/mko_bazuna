@@ -1,5 +1,6 @@
 """Telegram bot entrypoint - aiogram 3.x with Django ORM."""
 
+import json
 import logging
 import os
 
@@ -12,6 +13,7 @@ django.setup()
 
 from aiogram import Bot, Dispatcher  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
+from aiogram.fsm.storage.redis import RedisStorage  # noqa: E402
 from django.conf import settings  # noqa: E402
 
 from telegram_bot.lifecycle import (  # noqa: E402
@@ -41,13 +43,23 @@ def main() -> None:
         logger.warning("BOT_TOKEN not set - skipping bot startup (development mode)")
         return
 
-    # Storage: MemoryStorage (FSM state in memory, Ad.DRAFT in ORM)
-    # NOTE: MemoryStorage is ephemeral — FSM state is cleared on bot restart.
-    # There is no cross-process broadcast: if the bot is restarted while a user
-    # is mid-FSM, the in-progress dialog is lost. The Ad.DRAFT row in the ORM
-    # survives, but the FSM state machine state does not.
-    # Future: switch to RedisStorage for persistent FSM across restarts.
-    storage = MemoryStorage()
+    # Storage: RedisStorage (persistent FSM across restarts) with MemoryStorage fallback.
+    # In production, RedisStorage.from_url(settings.REDIS_URL, ...) persists FSM
+    # state in Redis — surviving bot container restarts. json_dumps uses
+    # default=str to serialize Decimal values (price_amount).
+    # In dev/test (REDIS_URL empty), MemoryStorage is used as an ephemeral
+    # fallback — FSM state is cleared on restart but the Ad.DRAFT row in the
+    # ORM survives for resumability.
+    redis_url = getattr(settings, "REDIS_URL", "") or ""
+
+    if redis_url:
+        storage = RedisStorage.from_url(
+            redis_url,
+            json_dumps=lambda obj: json.dumps(obj, default=str),
+        )
+    else:
+        logger.warning("REDIS_URL not set — using MemoryStorage (ephemeral FSM)")
+        storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
     # Register lifecycle hooks: startup writes the liveness marker,
