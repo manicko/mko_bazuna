@@ -503,7 +503,7 @@ class TestLoginRateLimit:
         sent_text = blocked_msg.answer.await_args.args[0]
         assert "Too many login attempts" in sent_text
 
-        # PII-002: raw telegram_id must not leak in logs; masked value present
+        # PII-001: raw telegram_id must not leak in logs; masked value present
         assert str(blocked_msg.from_user.id) not in caplog.text
         assert "tg_" in caplog.text
 

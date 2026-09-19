@@ -23,7 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 def user_link(obj: Ad) -> str:
-    """Display user telegram_id as link."""
+    """Display user telegram_id as link (INTERNAL ONLY — staff-only).
+
+    This column is rendered in ``AdAdmin.list_display`` and is restricted to
+    staff/superuser via ``AdAdmin.has_view_permission`` and
+    ``AdAdmin.has_change_permission``. Erased accounts render blank because
+    ``withdraw_consent`` nulls ``telegram_id`` (``deletion.py:132``) inside
+    ``transaction.atomic()``.
+    """
     if obj.user:
         return str(obj.user.telegram_id)
     return "-"
@@ -65,6 +72,9 @@ class AdAdmin(admin.ModelAdmin):
     Ad admin with listing filters and reject/ban moderation actions.
 
     Failed-ads list shows rejection reason (INTERNAL ONLY, never to seller).
+    The ``user_link`` column in ``list_display`` (raw ``telegram_id``) is
+    staff-only INTERNAL ONLY — access is gated by ``has_view_permission`` /
+    ``has_change_permission`` (``is_staff or is_superuser`` only).
     """
 
     list_display = [
