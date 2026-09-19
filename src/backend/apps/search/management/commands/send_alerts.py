@@ -56,8 +56,9 @@ class Command(BaseCommand):
         dry_run: bool = options["dry_run"]
 
         if dry_run:
-            with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK, session=True):
-                self._dry_run_check()
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+                with advisory_lock(AdvisoryLockId.ALERT_DELIVERY_TASK):
+                    self._dry_run_check()
             return
 
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped

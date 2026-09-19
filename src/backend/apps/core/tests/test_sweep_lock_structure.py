@@ -31,8 +31,9 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 # (management command name, AdvisoryLockId member acquired on the production
 # path). send_alerts is run without --dry-run so the transaction-wrapped lock
-# path is exercised; the dry-run path uses a session-scoped lock outside
-# atomic and is intentionally not asserted here.
+# path is exercised; the dry-run path now also uses a transaction-scoped lock
+# (matching the production path) but is not exercised by the spy because
+# call_command does not pass --dry-run.
 SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("archive_sweep", AdvisoryLockId.ARCHIVE_SWEEP),
     ("delete_sweep", AdvisoryLockId.DELETE_SWEEP),
