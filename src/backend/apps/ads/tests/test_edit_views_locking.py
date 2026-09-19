@@ -88,6 +88,14 @@ class TestEditViewsLocking:
         assert "transaction.atomic" in source
         assert "select_for_update" in source
 
+    def test_ad_delete_uses_select_for_update_and_atomic(self) -> None:
+        """ad_delete source contains select_for_update inside transaction.atomic."""
+        from apps.ads.views import delete
+
+        source = inspect.getsource(delete.ad_delete)
+        assert "transaction.atomic" in source
+        assert "select_for_update" in source
+
     def test_submit_ad_uses_select_for_update_and_atomic(self) -> None:
         """submit_ad source contains select_for_update inside transaction.atomic."""
         from apps.ads.services.submission import submit_ad

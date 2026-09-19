@@ -11,6 +11,7 @@ Implements US-S6 self-delete ad flow:
 import logging
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext as _
@@ -36,21 +37,22 @@ def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    ad = get_object_or_404(Ad, id=ad_id)
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
+        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-    # Authorization check: must own the ad
-    if ad.user_id != request.user.id:
-        logger.warning(
-            "User %s attempted to delete ad %s owned by %s",
-            request.user.id,
-            ad_id,
-            ad.user_id,
-        )
-        return HttpResponseForbidden(_("You do not have permission to delete this ad."))
+        # Authorization check: must own the ad
+        if ad.user_id != request.user.id:
+            logger.warning(
+                "User %s attempted to delete ad %s owned by %s",
+                request.user.id,
+                ad_id,
+                ad.user_id,
+            )
+            return HttpResponseForbidden(_("You do not have permission to delete this ad."))
 
-    # Transition to DELETED (transition_to handles deleted_at timestamp)
-    if ad.status != AdStatus.DELETED:
-        ad.transition_to(AdStatus.DELETED)
-        logger.info("Ad %s deleted by user %s", ad_id, request.user.id)
+        # Transition to DELETED (transition_to handles deleted_at timestamp)
+        if ad.status != AdStatus.DELETED:
+            ad.transition_to(AdStatus.DELETED)
+            logger.info("Ad %s deleted by user %s", ad_id, request.user.id)
 
     return redirect("ads:dashboard")
