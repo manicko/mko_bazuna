@@ -230,6 +230,7 @@ services:
     environment:
       - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB must be set}
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER must be set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -271,6 +272,7 @@ services:
     environment:
       - UV_PROJECT_ENVIRONMENT=/opt/venv
       - DJANGO_SETTINGS_MODULE=config.settings.prod
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB must be set}
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER must be set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}

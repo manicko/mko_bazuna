@@ -24,6 +24,8 @@ from pathlib import Path
 import environ
 import pytest
 
+from config.settings.tests.test_prod_logging import _prod_env_overrides
+
 pytestmark = [pytest.mark.unit, pytest.mark.settings]
 
 
@@ -55,6 +57,24 @@ def test_django_secret_key_required() -> None:
         "import django; django.setup()",
     )
     assert "ImproperlyConfigured" in stderr
+
+
+def test_django_secret_key_rejects_empty() -> None:
+    """Importing prod settings with DJANGO_SECRET_KEY='' (present-but-empty) raises
+    ImproperlyConfigured.
+
+    django-environ's env() returns "" for an empty-but-present value (only raises
+    when the var is unset). The prod.py SECRET_KEY guard must reject this at import
+    time so a misconfigured .env.prod fails fast instead of booting with an empty
+    signing key.
+    """
+    env = _prod_env_overrides(DJANGO_SECRET_KEY="")
+    stderr = _run_in_subprocess(
+        env,
+        "import django; django.setup()",
+    )
+    assert "ImproperlyConfigured" in stderr
+    assert "SECRET_KEY" in stderr
 
 
 def test_bot_token_allowed_empty_in_debug() -> None:

@@ -79,6 +79,21 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
             "sentry-sdk not installed — error tracking disabled"
         )
 
+# Fail fast: SECRET_KEY is required in production and must be non-empty.
+# base.py's env("DJANGO_SECRET_KEY") (no default) returns "" for a
+# present-but-empty value — django-environ only raises when the var is
+# unset, so an empty key would boot Django until first access raises
+# ImproperlyConfigured inside a request (web process 500s on first CSRF
+# read; the bot runs silently with an empty signing key). Fail at import.
+# Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
+# the build-placeholder value; the real key is provided at runtime via
+# .env.prod.
+if not SECRET_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be set and non-empty in production. "
+        "Provide it via the .env.prod runtime file."
+    )
+
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
