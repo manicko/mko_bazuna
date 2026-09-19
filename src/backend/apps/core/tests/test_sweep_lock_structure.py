@@ -46,6 +46,7 @@ SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("rollup_daily_metrics", AdvisoryLockId.ROLLUP_DAILY_METRICS),
     ("backfill_thumbnails", AdvisoryLockId.BACKFILL_THUMBNAILS),
     ("send_alerts", AdvisoryLockId.ALERT_DELIVERY_TASK),
+    ("recompute_normalized_prices", AdvisoryLockId.RECOMPUTE_NORMALIZED_PRICES),
 ]
 
 # Every sweep command binds ``advisory_lock`` through
@@ -65,6 +66,7 @@ _LOCK_TARGET_MODULES: tuple[str, ...] = (
     "apps.media.management.commands.backfill_thumbnails",
     "apps.media.management.commands.sweep_orphaned_media",
     "apps.search.management.commands.send_alerts",
+    "apps.currencies.management.commands.recompute_normalized_prices",
 )
 
 
