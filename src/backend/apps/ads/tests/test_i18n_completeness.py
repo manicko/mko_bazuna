@@ -413,6 +413,27 @@ def test_plural_forms() -> None:
         )
 
 
+def test_all_languages_ltr() -> None:
+    """Every configured language must be LTR (left-to-right).
+
+    Guards the I18N-006 invariant: the spec's claim that Bosnian renders
+    ``dir="rtl"`` is incorrect — Django's ``LANGUAGE_BIDI`` is ``False`` for
+    ru, bs, and en, so the ``{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}`` template
+    expression renders ``ltr`` for all three.  Activating each locale via
+    ``translation.override`` and asserting ``get_language_bidi()`` is ``False``
+    documents and enforces the LTR-only invariant at runtime.
+    """
+    lang_codes = [code for code, _ in settings.LANGUAGES]
+    assert lang_codes == ["ru", "bs", "en"], (
+        f"unexpected LANGUAGES: {lang_codes}"
+    )
+    for lang in lang_codes:
+        with translation.override(lang):
+            assert not translation.get_language_bidi(), (
+                f"{lang}: expected LTR (LANGUAGE_BIDI=False)"
+            )
+
+
 def test_locale_switch_re_render() -> None:
     """Rendering a ``{% trans %}`` tag re-renders content in the active locale.
 
