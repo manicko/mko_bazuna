@@ -26,6 +26,9 @@ dependencies = [
     "ruamel.yaml>=0.19.1",
     "faker>=40.35.0",
     "pydantic>=2.13.4",
+    "sentry-sdk>=2.15.0",
+    "django-prometheus>=2.5.0",
+    "prometheus-client>=0.26.0",
 ]
 
 
@@ -211,7 +214,8 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
-    "pytest-django>=4.12.0",
+     "pytest-django>=4.12.0",
+    "locust>=2.20.0",
     "pytest-randomly>=3.16.0",
     "pytest-rerunfailures>=15.0.0",
     "pytest-timeout>=2.3.0",
@@ -219,6 +223,7 @@ dev = [
     "ruff>=0.16.0",
     "coverage>=7.15.2",
     "djlint>=1.44.2",
+    "pip-audit>=2.7.0",
 ]
 
 # Django template linter configuration.

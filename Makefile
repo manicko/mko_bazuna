@@ -2,7 +2,7 @@
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
           lint format typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
-           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test
+           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test load
 
 # ====================== Settings ======================
 
@@ -60,6 +60,9 @@ help:
 	@echo "  create-admin   Create admin user manually"
 	@echo "  load-catalog   Load categories.yaml into DB (one-shot)"
 	@echo "  seed           Re-run seed manually (dev: also auto-runs on `make up`)"
+	@echo ""
+	@echo "Performance:"
+	@echo "  load           Run locust load tests against dev server (make up first)"
 	@echo ""
 	@echo "Consolidation:"
 	@echo "  consolidate        Consolidate migrations (threshold: \$$(CONSOLIDATE_THRESHOLD))"
@@ -337,3 +340,30 @@ fullclean:
 	docker image prune -a -f
 	docker builder prune -a -f
 	@echo "Full clean completed. Run 'make build' and 'make up' to restart."
+
+# ====================== Performance (PERF-002) ======================
+# Run locust load tests against the running dev server.
+# Assumes `make up` has started the dev environment (web server on :8000).
+# Override defaults via environment: LOCUST_USERS=100 LOCUST_SPAWN_RATE=5 make load
+
+LOCUST_HOST ?= http://localhost:8000
+LOCUST_USERS ?= 50
+LOCUST_SPAWN_RATE ?= 10
+LOCUST_RUN_TIME ?= 60s
+
+load:
+	docker compose $(COMPOSE_FILES) exec web uv run locust -f src/benchmark/locustfile.py \
+		--headless --host $(LOCUST_HOST) \
+		--users $(LOCUST_USERS) --spawn-rate $(LOCUST_SPAWN_RATE) \
+		--run-time $(LOCUST_RUN_TIME) -L info
+
+# Run the cProfile-based search-endpoint profiling harness.
+# Assumes `make up` has started the dev environment.
+# Override defaults: ITERATIONS=200 make profile
+# Sort key: SORT=cumulative|time|calls|filename (default: cumulative)
+profile:
+	ITERATIONS=$(or $(ITERATIONS),50) \
+	TOP=$(or $(TOP),30) \
+	SORT=$(or $(SORT),cumulative) \
+	docker compose $(COMPOSE_FILES) exec -T web uv run python scripts/profile_search.py \
+		--iterations $${ITERATIONS} --top $${TOP} --sort $${SORT}

@@ -32,6 +32,23 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
           cache-to: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
 
+      - name: Scan Docker image for vulnerabilities
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mko-bazuna:ci
+          exit-code: 0
+          format: sarif
+          output: trivy-image-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Docker image scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image-results.sarif
+          category: trivy-image
+
   test:
     runs-on: ubuntu-latest
     env:
@@ -118,8 +135,7 @@ jobs:
           path: src/backend/coverage.xml
           retention-days: 30
 
-      - name: Django deploy checks (non-blocking)
-        continue-on-error: true
+      - name: Django deploy checks
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
@@ -260,3 +276,62 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
         run: uv run pytest apps/ads/tests/test_i18n_completeness.py apps/ads/tests/test_i18n_pipeline.py -v
         working-directory: src/backend
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      # --- Dependency vulnerability scanning ---
+      - name: Run pip-audit (dependency vulnerabilities)
+        continue-on-error: true
+        run: uv run pip-audit
+        working-directory: src/backend
+
+      # --- Filesystem vulnerability + config scanning ---
+      - name: Run Trivy vulnerability scanner in fs mode
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: 0
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      # --- Secret scanning ---
+      - name: Run gitleaks secret scan
+        continue-on-error: true
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.27.2/gitleaks_8.27.2_linux_x64.tar.gz | tar xz
+          ./gitleaks detect --source . --exit-code 0 --report-format sarif --report-path gitleaks-results.sarif
+
+      # --- SARIF uploads (runs even if scans find issues) ---
+      - name: Upload Trivy SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+      - name: Upload gitleaks SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks
