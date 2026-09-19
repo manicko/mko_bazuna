@@ -1,4 +1,4 @@
-version = 2
+version: 2
 updates:
   # GitHub Actions versions in .github/workflows/*.yml
   - package-ecosystem: "github-actions"
@@ -10,8 +10,8 @@ updates:
         patterns:
           - "*"
 
-  # Python dependencies in pyproject.toml
-  - package-ecosystem: "pip"
+  # Python dependencies in pyproject.toml + uv.lock
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"

@@ -1,7 +1,7 @@
 # Makefile for Mko Bazuna Docker workflow
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
-          lint format typecheck lint-templates shell makemigrations makemessages compilemessages migrate logs \
+          lint format typecheck lock-check lint-templates shell makemigrations makemessages compilemessages migrate logs \
            backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test load
 
 # ====================== Settings ======================
@@ -122,6 +122,9 @@ format:
 
 typecheck:
 	docker compose $(COMPOSE_FILES) run --rm web uv run basedpyright src/
+
+lock-check: ## Check uv.lock is in sync with pyproject.toml
+	uv lock --check
 
 lint-templates:
 	docker compose $(COMPOSE_FILES) run --rm web uv run djlint src/backend/templates/
