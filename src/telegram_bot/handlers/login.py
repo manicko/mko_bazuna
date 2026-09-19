@@ -21,6 +21,7 @@ from django.utils.translation import gettext as _
 from apps.core.enums import AnalyticsEventType
 from apps.core.services.analytics import record_event
 from apps.core.services.site_config import get_site_name_async
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
 from telegram_bot.handlers.contact import CONTACT_US_CALLBACK
 from telegram_bot.services.rate_limit import check_login_rate_limit
@@ -94,7 +95,7 @@ async def handle_login_deep_link(
     if not await check_login_rate_limit(message.from_user.id):
         logger.warning(
             "Login rate limit exceeded for telegram_id=%s",
-            message.from_user.id,
+            mask_telegram_id(message.from_user.id),
         )
         await message.answer(
             _("Too many login attempts. Please wait a minute and try again.")

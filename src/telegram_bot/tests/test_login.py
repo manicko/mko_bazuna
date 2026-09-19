@@ -19,6 +19,7 @@ and ``test_login_claim.py`` into a single coherent suite.
 
 import asyncio
 import hashlib
+import logging
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -468,6 +469,7 @@ class TestLoginRateLimit:
     async def test_login_rate_limit_blocks_after_threshold(
         self,
         login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+        caplog,
     ) -> None:
         """The 11th login claim within 60s is blocked with a cooldown message, no DB claim.
 
@@ -491,14 +493,19 @@ class TestLoginRateLimit:
 
         # 11th claim — rate-limited before reaching the ORM.
         blocked_msg = _mock_login_message(raw_token, user_id=900000200)
-        await handle_login_deep_link(
-            message=blocked_msg, bot=MagicMock(), state=_mock_state()
-        )
+        with caplog.at_level(logging.WARNING):
+            await handle_login_deep_link(
+                message=blocked_msg, bot=MagicMock(), state=_mock_state()
+            )
 
         # The 11th call received the cooldown message, not the claim result.
         blocked_msg.answer.assert_awaited_once()
         sent_text = blocked_msg.answer.await_args.args[0]
         assert "Too many login attempts" in sent_text
+
+        # PII-002: raw telegram_id must not leak in logs; masked value present
+        assert str(blocked_msg.from_user.id) not in caplog.text
+        assert "tg_" in caplog.text
 
     @pytest.mark.asyncio
     async def test_login_rate_limit_does_not_block_non_login_start(self) -> None:
