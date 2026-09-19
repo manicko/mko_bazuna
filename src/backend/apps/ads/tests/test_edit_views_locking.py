@@ -88,6 +88,37 @@ class TestEditViewsLocking:
         assert "transaction.atomic" in source
         assert "select_for_update" in source
 
+    def test_submit_ad_uses_select_for_update_and_atomic(self) -> None:
+        """submit_ad source contains select_for_update inside transaction.atomic."""
+        from apps.ads.services.submission import submit_ad
+
+        source = inspect.getsource(submit_ad)
+        assert "select_for_update" in source
+        assert "transaction.atomic" in source
+
+    def test_submit_ad_fetches_inside_atomic(self) -> None:
+        """The plain Ad.objects.get() fetch must be replaced by a locked
+        select_for_update() fetch inside the transaction.atomic() block.
+
+        Verifies DB-004: the unlocked ``Ad.objects.get(id=input.ad_id)`` at the
+        top of ``submit_ad`` is gone, and the ``select_for_update`` re-fetch now
+        appears inside (after) the ``transaction.atomic()`` block.
+        """
+        from apps.ads.services.submission import submit_ad
+
+        source = inspect.getsource(submit_ad)
+        # The plain unlocked fetch must not appear anywhere in the source
+        assert "Ad.objects.get(id=input.ad_id)" not in source
+        # The locked fetch must be present
+        assert "Ad.objects.select_for_update()" in source
+        # The select_for_update fetch must appear inside/after the atomic block
+        atomic_idx = source.index("transaction.atomic")
+        sfu_idx = source.index("select_for_update")
+        assert sfu_idx > atomic_idx, (
+            "select_for_update fetch must appear inside the transaction.atomic() "
+            "block, not before it"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Tests: Concurrency — select_for_update blocks concurrent delete

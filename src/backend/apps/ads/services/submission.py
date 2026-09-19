@@ -132,61 +132,6 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         no-op for the edit path.  Do not remove this defensive check without
         verifying the bot flow still guards against raw-string currencies.
     """
-    try:
-        ad = Ad.objects.get(id=input.ad_id)
-    except Ad.DoesNotExist:
-        return False, ["Ad not found"]
-
-    # Update ad fields — Russian remains the base content
-    ad.title = input.title_ru
-    ad.description = input.desc_ru
-    ad.category_id = input.category_id
-    ad.city_id = input.city_id
-    ad.price_amount = input.price_amount
-
-    # Currency coercion
-    currency: CurrencyCode | None = None
-    if input.price_currency is not None:
-        try:
-            currency = (
-                input.price_currency
-                if isinstance(input.price_currency, CurrencyCode)
-                else CurrencyCode(str(input.price_currency))
-            )
-        except ValueError:
-            logger.warning(
-                "Invalid price_currency %r for ad %s", input.price_currency, input.ad_id
-            )
-    ad.price_currency = currency.value if currency else None
-
-    # Price normalization (BR-03)
-    if currency is not None:
-        try:
-            ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
-                input.price_amount, currency
-            )
-        except Exception:
-            logger.exception("Failed to normalize price for ad %s", input.ad_id)
-            ad.price_normalized_eur = None
-    else:
-        ad.price_normalized_eur = None
-
-    # Multi-language fields
-    if input.title_bs:
-        ad.title_bs = input.title_bs
-    if input.desc_bs:
-        ad.description_bs = input.desc_bs
-    if input.title_en:
-        ad.title_en = input.title_en
-    if input.desc_en:
-        ad.description_en = input.desc_en
-    if input.original_language:
-        ad.original_language = input.original_language
-
-    # Listing purpose
-    if input.listing_purpose_id:
-        ad.listing_purpose_id = input.listing_purpose_id
-
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.
     for photo in input.photos:
@@ -218,6 +163,61 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
 
     # DB transaction: save + images + status transition
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+        try:
+            ad = Ad.objects.select_for_update().get(id=input.ad_id)
+        except Ad.DoesNotExist:
+            return False, ["Ad not found"]
+
+        # Update ad fields — Russian remains the base content
+        ad.title = input.title_ru
+        ad.description = input.desc_ru
+        ad.category_id = input.category_id
+        ad.city_id = input.city_id
+        ad.price_amount = input.price_amount
+
+        # Currency coercion
+        currency: CurrencyCode | None = None
+        if input.price_currency is not None:
+            try:
+                currency = (
+                    input.price_currency
+                    if isinstance(input.price_currency, CurrencyCode)
+                    else CurrencyCode(str(input.price_currency))
+                )
+            except ValueError:
+                logger.warning(
+                    "Invalid price_currency %r for ad %s", input.price_currency, input.ad_id
+                )
+        ad.price_currency = currency.value if currency else None
+
+        # Price normalization (BR-03)
+        if currency is not None:
+            try:
+                ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
+                    input.price_amount, currency
+                )
+            except Exception:
+                logger.exception("Failed to normalize price for ad %s", input.ad_id)
+                ad.price_normalized_eur = None
+        else:
+            ad.price_normalized_eur = None
+
+        # Multi-language fields
+        if input.title_bs:
+            ad.title_bs = input.title_bs
+        if input.desc_bs:
+            ad.description_bs = input.desc_bs
+        if input.title_en:
+            ad.title_en = input.title_en
+        if input.desc_en:
+            ad.description_en = input.desc_en
+        if input.original_language:
+            ad.original_language = input.original_language
+
+        # Listing purpose
+        if input.listing_purpose_id:
+            ad.listing_purpose_id = input.listing_purpose_id
+
         ad.listing_condition_id = input.listing_condition_id
         ad.save()
 
