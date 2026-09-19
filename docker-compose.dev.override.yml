@@ -5,7 +5,7 @@
 services:
   web:
     command: >
-      sh -c "tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify &&
+      sh -c "tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/theme/css/output.css --minify || echo 'WARNING: tailwindcss rebuild skipped — using pre-built CSS from image build' ;
              python src/backend/manage.py runserver 0.0.0.0:8000"
     environment:
       - DEBUG=True
@@ -49,6 +49,7 @@ services:
       # are satisfied without editing .env.dev.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
     volumes:
       - .:/app
       - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
@@ -61,9 +62,11 @@ services:
   migrate:
     environment:
       # migrate uses prod settings (base compose); give it dev values so the
-      # prod guard checks for SITE_URL and GOOGLE_TRANSLATE_API_KEY are satisfied.
+      # prod guard checks for SITE_URL, GOOGLE_TRANSLATE_API_KEY, and
+      # CSRF_TRUSTED_ORIGINS are satisfied without editing .env.dev.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
 
   # Dev: seed runs automatically after load_catalog completes.
   # profiles: !reset [] replaces the ["seed"] profile gate from base compose,

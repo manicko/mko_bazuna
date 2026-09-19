@@ -29,7 +29,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
-    command: redis-server --save "" --appendonly no
+    user: redis
+    command: redis-server --save "" --appendonly no --dir /tmp
     cap_drop: ["ALL"]
     read_only: true
     tmpfs:
