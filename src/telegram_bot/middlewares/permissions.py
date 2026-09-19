@@ -106,11 +106,13 @@ class AccountStateMiddleware(BaseMiddleware):
                 return None
 
         # Backfill user_id from ORM for restart recovery (AUT-001).
-        # MemoryStorage is ephemeral — after a bot restart, FSM state is wiped
-        # and handlers (ad_create, ad_copy, alerts, language) that gate on
+        # In production with RedisStorage, FSM state survives bot container restarts.
+        # In dev/test with MemoryStorage (REDIS_URL empty), FSM state is cleared on
+        # restart and handlers (ad_create, ad_copy, alerts, language) that gate on
         # state.get_data()["user_id"] would reject all users. The backfill
         # recovers the user reference by stable chat_id lookup so handlers work
-        # transparently without code changes.
+        # transparently without code changes — serving as defense-in-depth even
+        # when RedisStorage preserves state.
         state: FSMContext | None = data.get("state")
         if state is not None:
             fsm_data = await state.get_data()

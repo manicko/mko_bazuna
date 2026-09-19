@@ -842,7 +842,7 @@ def _format_preview_price(data: dict[str, Any]) -> str:
 
     currency = data.get("price_currency")
 
-    label = currency.value if currency else ""
+    label = str(currency) if currency else ""
 
     return f"{amount} {label}".strip()
 

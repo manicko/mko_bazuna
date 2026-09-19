@@ -646,10 +646,12 @@ class TestCallPipeline:
 # ---------------------------------------------------------------------------
 # user_id backfill via ORM lookup (AUT-001)
 #
-# MemoryStorage is ephemeral — after a bot restart, FSM state is wiped.
-# AccountStateMiddleware backfills user_id from the ORM by stable chat_id
-# so handlers (ad_create, ad_copy, alerts, language) that gate on
-# state.get_data()["user_id"] work transparently without code changes.
+# In production, RedisStorage persists FSM state across bot restarts.
+# In dev/test, MemoryStorage is used as an ephemeral fallback (REDIS_URL
+# is empty). AccountStateMiddleware backfills user_id from the ORM by
+# stable chat_id so handlers (ad_create, ad_copy, alerts, language) that
+# gate on state.get_data()["user_id"] work transparently without code
+# changes — serving as defense-in-depth even with Redis persistence.
 # ---------------------------------------------------------------------------
 
 

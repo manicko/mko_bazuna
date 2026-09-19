@@ -278,6 +278,12 @@ PLAUSIBLE_HOST = env("PLAUSIBLE_HOST", default="")
 # sentry-sdk is initialized in prod.py to capture unhandled exceptions.
 SENTRY_DSN = env("SENTRY_DSN", default="")
 
+# Redis URL for shared caching and bot FSM storage.
+# Production: REDIS_URL=redis://redis:6379/0 (set via env, single source of truth).
+# Dev/test: REDIS_URL="" (empty) — CACHES is overridden in dev/test settings and
+# main.py falls back to MemoryStorage when this is falsy.
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+
 # Cache configuration — shared cache via Redis (django-redis).
 # Production and Docker environments use Redis so that cache keys and rate-limit
 # counters are shared across gunicorn workers and the separate bot process.
@@ -285,7 +291,7 @@ SENTRY_DSN = env("SENTRY_DSN", default="")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/0"),
+        "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
