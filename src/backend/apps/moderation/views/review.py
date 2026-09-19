@@ -159,12 +159,17 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
     if request.method != "POST":
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
-    ad = get_object_or_404(Ad, id=ad_id)
-    ban_user_for_ad(
-        ad,
-        request.user.id,
-        request.POST.get("ban_reason", "No reason provided") or "No reason provided",
-    )
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+        ad = get_object_or_404(
+            Ad.objects.select_for_update(),
+            id=ad_id,
+        )
+        ban_user_for_ad(
+            ad,
+            request.user.id,
+            request.POST.get("ban_reason", "No reason provided") or "No reason provided",
+        )
+
     logger.info("Admin %s banned user via ad %s", request.user.id, ad_id)
 
     return redirect("/admin/ads/ad/?status__exact=on_moderation")

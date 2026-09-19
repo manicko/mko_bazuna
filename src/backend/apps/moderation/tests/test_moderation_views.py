@@ -589,3 +589,11 @@ class TestModerationReviewLocking:
         source = inspect.getsource(review.reject_ad)
         assert "transaction.atomic" in source
         assert "select_for_update" in source
+
+    def test_ban_user_uses_select_for_update_and_atomic(self) -> None:
+        """ban_user source contains select_for_update inside transaction.atomic."""
+        from apps.moderation.views import review
+
+        source = inspect.getsource(review.ban_user)
+        assert "transaction.atomic" in source
+        assert "select_for_update" in source

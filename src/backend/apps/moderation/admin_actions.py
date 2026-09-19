@@ -72,9 +72,18 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
         moderator_id: Moderator user ID performing the action
         reason: Ban reason (INTERNAL ONLY)
     """
-    user = ad.user
-    if user and not user.is_banned:
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+        try:
+            user = User.objects.select_for_update().get(id=ad.user_id)
+        except User.DoesNotExist:
+            logger.info(
+                "ban_user_for_ad: user %s for ad %s already deleted, skipping",
+                ad.user_id,
+                ad.id,
+            )
+            return
+
+        if not user.is_banned:
             user.is_banned = True
             user.save(update_fields=["is_banned"])
 
@@ -83,11 +92,11 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
                 moderator_id=moderator_id,
                 reason=reason,
             )
-        logger.info(
-            "User %s banned by moderator %s",
-            mask_telegram_id(user.telegram_id),
-            moderator_id,
-        )
+            logger.info(
+                "User %s banned by moderator %s",
+                mask_telegram_id(user.telegram_id),
+                moderator_id,
+            )
 
 
 def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:

@@ -254,6 +254,7 @@ class TestBulkLockingStructure:
         """ban_user_for_ad must wrap ban+audit-log writes in transaction.atomic() (DB-003)."""
         src = inspect.getsource(ban_user_for_ad)
         assert "transaction.atomic" in src
+        assert "select_for_update" in src  # added — User row must be locked
 
 
 # ---------------------------------------------------------------------------
