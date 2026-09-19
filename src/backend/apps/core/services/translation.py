@@ -198,7 +198,7 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                 sanitize_query_for_log(text),
                 source_locale,
                 target_locale,
-                e,
+                type(e).__name__,
             )
             if attempt + 1 < TRANSLATION_MAX_ATTEMPTS:
                 time.sleep(TRANSLATION_BACKOFF_BASE * (2 ** attempt))
@@ -216,7 +216,7 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                     sanitize_query_for_log(text),
                     source_locale,
                     target_locale,
-                    e,
+                    str(e.request.url.copy_with(params={})),
                 )
                 time.sleep(TRANSLATION_BACKOFF_BASE * (2 ** attempt))
             else:
@@ -226,7 +226,7 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                     sanitize_query_for_log(text),
                     source_locale,
                     target_locale,
-                    e,
+                    str(e.request.url.copy_with(params={})),
                 )
                 break
 

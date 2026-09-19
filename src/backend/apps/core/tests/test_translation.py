@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+import logging
 import time
 from unittest.mock import patch
 
@@ -147,6 +148,52 @@ class TestTranslateTextFallback:
             result = translate_text(original, "en", "ru")
             assert result == original
             mock_api.assert_not_called()
+
+    def test_translation_error_log_does_not_leak_api_key(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An HTTPStatusError whose URL carries ?key=<SECRET> is logged without
+        the secret appearing in the formatted log message.
+
+        Regression test for CFG-002: translation.py must log a query-stripped URL
+        (or exception type) rather than str(e), and RedactingJsonFormatter must
+        redact any surviving key=VALUE pattern.
+        """
+        from django.core.management import (
+            call_command,  # noqa: F401  (ensures settings configured)
+        )
+
+        from apps.core.utils.json_logging import RedactingJsonFormatter
+
+        secret = "yaGOOGLE_TRANSLATE_API_KEY-secret-1234567890abcdef"
+        url = httpx.URL(
+            f"https://translation.googleapis.com/language/translate/v2?key={secret}"
+        )
+        request = httpx.Request("POST", url)
+        response = httpx.Response(401, request=request)
+        http_error = httpx.HTTPStatusError(
+            "Client error '401 Unauthorized' for url ...",
+            request=request,
+            response=response,
+        )
+
+        formatter = RedactingJsonFormatter()
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=http_error,
+        ), patch("apps.core.services.translation.time.sleep", return_value=None), \
+             caplog.at_level(logging.WARNING, logger="apps.core.services.translation"):
+            translate_text("Hello", "en", "ru")
+
+        # Primary fix: the secret must not appear in any captured log record.
+        for record in caplog.records:
+            formatted = formatter.format(record)
+            assert secret not in formatted
+        # Defense-in-depth: the stripped URL should appear (proves URL, not exception, is logged).
+        assert "translation.googleapis.com" in formatter.format(caplog.records[-1])
+        assert "key=" not in formatter.format(caplog.records[-1]).replace(
+            "key=REDACTED", "", 1
+        )
 
     def test_translate_text_empty_returns_input(self) -> None:
         """Empty or whitespace-only input is returned unchanged (no API call)."""
