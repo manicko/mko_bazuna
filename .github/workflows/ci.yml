@@ -37,7 +37,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mko-bazuna:ci
-          exit-code: 0
+          exit-code: 1
           format: sarif
           output: trivy-image-results.sarif
           severity: CRITICAL,HIGH
@@ -321,29 +321,26 @@ jobs:
 
       # --- Dependency vulnerability scanning ---
       - name: Run pip-audit (dependency vulnerabilities)
-        continue-on-error: true
         run: uv run pip-audit
         working-directory: src/backend
 
       # --- Filesystem vulnerability + config scanning ---
       - name: Run Trivy vulnerability scanner in fs mode
-        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
-          exit-code: 0
+          exit-code: 1
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
       # --- Secret scanning ---
       - name: Run gitleaks secret scan
-        continue-on-error: true
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.27.2/gitleaks_8.27.2_linux_x64.tar.gz | tar xz
-          ./gitleaks detect --source . --exit-code 0 --report-format sarif --report-path gitleaks-results.sarif
+          ./gitleaks detect --source . --exit-code 1 --report-format sarif --report-path gitleaks-results.sarif
 
       # --- SARIF uploads (runs even if scans find issues) ---
       - name: Upload Trivy SARIF results
