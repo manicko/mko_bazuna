@@ -72,9 +72,11 @@ Templates read `LANGUAGE_CODE` to select the locale passed to the name-localizat
 > `<html lang="en">` with `<html lang="{{ LANGUAGE_CODE|lower }}" dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}">`,
 > driven by `LANGUAGE_CODE` (from the `apps.core.context_processors.language` processor) and
 > `LANGUAGE_BIDI` (from Django's built-in `django.template.context_processors.i18n`, enabled at
-> `config/settings/base.py`). The `dir` attribute renders `rtl` for Bosnian (`bs`) and `ltr` for all
-> other locales, so the page root element always matches the resolved content language and text
-> direction.
+> `config/settings/base.py`). All three configured languages (Russian, Bosnian, English) use
+> left-to-right scripts, so the `dir` attribute renders `ltr` for all locales. The
+> `dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}"` pattern is forward-compatible: if an RTL-script
+> language is ever added to `LANGUAGES` and Django's `LANGUAGES_BIDI`, the attribute will
+> automatically render `rtl` for that language.
 
 ## Per-User Language (Telegram Bot)
 
