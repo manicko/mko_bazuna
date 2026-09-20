@@ -58,15 +58,28 @@ class Command(BaseCommand):
                     )
                     return
 
-                # Deliberate bulk update path (bypasses transition_to() + save()):
-                # 1. queryset pre-filtered to PUBLISHED, matching ALLOWED_TRANSITIONS PUBLISHED -> ARCHIVED
-                # 2. archived_at set below, satisfying ck_ads_archived_at_if_archived
-                # 3. updated_at refreshed here because bulk update() does not call save() and so skips auto_now
-                updated_count = queryset.update(
-                    status=AdStatus.ARCHIVED,
-                    archived_at=timezone.now(),
-                    updated_at=timezone.now(),
-                )
+                # Per-row transition via transition_to(ARCHIVED):
+                # 1. Enforces ALLOWED_TRANSITIONS matrix (PUBLISHED -> ARCHIVED
+                #    is valid; AD-002: previously bypassed by bulk update()).
+                # 2. Sets archived_at automatically (transition_to side-effect).
+                # 3. Refreshes updated_at via save() -> auto_now.
+                # 4. Fires post_save -> bump_search_cache_on_ad_change (AD-002),
+                #    invalidating stale buyer-visible search results.
+                # 5. refresh_from_db() guard defeats stale-state races with
+                #    concurrent moderators who may have already changed the
+                #    ad's status; invalid transitions raise ValueError and are
+                #    skipped (logged at WARN).
+                updated_count = 0
+                for ad in queryset.order_by("pk"):
+                    try:
+                        ad.transition_to(AdStatus.ARCHIVED)
+                    except (ValueError, Ad.DoesNotExist):
+                        logger.warning(
+                            "Skipping ad %s: no longer eligible for ARCHIVE transition",
+                            ad.id,
+                        )
+                        continue
+                    updated_count += 1
 
                 logger.info(
                     "Archived %d ads with PUBLISHED status older than 2 months",

@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, AdvisoryLockId
+from apps.search.services.cache import get_search_version
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -77,3 +78,28 @@ class TestArchiveSweep:
 
     def test_lock_id_is_archive_sweep(self):
         assert AdvisoryLockId.ARCHIVE_SWEEP == 1
+
+    def test_archive_sweep_bumps_search_cache(self, seller, category, city):
+        """archive_sweep calls transition_to() per-row, which fires post_save
+        and bumps the search content version (AD-002).
+
+        Previously the sweep used queryset.update() (bypassing save() and
+        post_save), so the search cache version was not invalidated when
+        published ads were archived.
+        """
+        stale = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now() - timedelta(days=90),
+        )
+        # create_test_ad already bumps the cache version once (post_save on PUBLISHED);
+        # record the baseline so we can assert the sweep causes a *second* bump.
+        version_before = get_search_version()
+
+        call_command("archive_sweep")
+
+        stale.refresh_from_db()
+        assert stale.status == AdStatus.ARCHIVED
+        assert get_search_version() > version_before
