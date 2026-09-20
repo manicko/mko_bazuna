@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 
+from apps.ads.models import AdImage
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import approve_ad, reject_ad
 from apps.moderation.models import (
@@ -143,6 +144,7 @@ class TestApproveAdPriority:
         verifies the record survives the approve_ad -> PUBLISHED transition.
         """
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         approve_ad(ad, moderator_id=seller.id)
 

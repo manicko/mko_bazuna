@@ -528,12 +528,12 @@ class TestMaxAdsTOCTOUFix:
     def test_web_approve_ad_path_has_no_pre_count_check(
         self, moderation_criteria, seller, category, city
     ):
-        """approve_ad delegates to set_published without a pre-count check.
+        """approve_ad delegates to auto_moderate without a pre-count check.
 
         This documents the gap: the fix catches MaxAdsExceeded inside
-        set_published, not before it in approve_ad. With the user already
-        at cap, approve_ad still calls set_published (proving no pre-check
-        short-circuits it).
+        set_published (via auto_moderate → _pass_moderation → set_published),
+        not before it in approve_ad. With the user already at cap, approve_ad
+        still calls auto_moderate (proving no pre-check short-circuits it).
         """
         moderation_criteria.max_ads_per_user = 1
         moderation_criteria.save()
@@ -557,11 +557,11 @@ class TestMaxAdsTOCTOUFix:
         )
         moderator = seller  # reuse seller as moderator in tests
 
-        with patch("apps.moderation.admin_actions.set_published") as mock_set:
+        with patch("apps.moderation.admin_actions.auto_moderate") as mock_am:
             approve_ad(on_moderation_ad, moderator_id=moderator.id)
 
-        # set_published was called — no pre-count check skipped it
-        mock_set.assert_called_once_with(on_moderation_ad, moderator_id=moderator.id)
+        # auto_moderate was called — no pre-count check skipped it
+        mock_am.assert_called_once_with(on_moderation_ad, moderator_id=moderator.id)
 
     @pytest.mark.parametrize(
         "max_ads, expected_raise",

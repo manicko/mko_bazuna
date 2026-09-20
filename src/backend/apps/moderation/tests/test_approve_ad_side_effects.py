@@ -2,8 +2,9 @@
 Side-effect tests for the ``approve_ad`` → PUBLISHED signal chain.
 
 Verifies that ``approve_ad`` correctly:
-  (a) transitions an ``ON_MODERATION`` ad to ``PUBLISHED`` (via ``set_published``),
-  (b) triggers ``deliver_immediate_alerts_on_publish`` when
+   (a) transitions an ``ON_MODERATION`` ad to ``PUBLISHED`` (via
+       ``auto_moderate`` → ``set_published`` → ``transition_to``),
+   (b) triggers ``deliver_immediate_alerts_on_publish`` when
       ``IMMEDIATE_ALERTS_ENABLED`` is True (via ``transaction.on_commit``),
   (c) does NOT schedule alerts when ``IMMEDIATE_ALERTS_ENABLED`` is False
       (default-safe rollout),
@@ -19,6 +20,7 @@ import pytest
 from django.db import transaction
 from django.test import override_settings
 
+from apps.ads.models import AdImage
 from apps.core.enums import AdStatus
 from apps.moderation.admin_actions import approve_ad
 from apps.moderation.models import AdModerationPriority
@@ -38,6 +40,7 @@ class TestApproveAdSideEffects:
     ) -> None:
         """``approve_ad`` on an ON_MODERATION ad sets status to PUBLISHED."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         approve_ad(ad, moderator_id=seller.id)
 
@@ -51,6 +54,7 @@ class TestApproveAdSideEffects:
     ) -> None:
         """When ``IMMEDIATE_ALERTS_ENABLED=False`` (default), no alert is scheduled."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         with (
             patch(
@@ -67,6 +71,7 @@ class TestApproveAdSideEffects:
     ) -> None:
         """When ``IMMEDIATE_ALERTS_ENABLED=True``, ``deliver_immediate_alerts`` runs after commit."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         # Mock on_commit to execute the callback immediately (simulates transaction commit).
         with (

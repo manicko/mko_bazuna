@@ -12,11 +12,11 @@ from django.db import transaction
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.core.utils.sanitize import mask_telegram_id
+from apps.moderation.services.auto_moderation import auto_moderate
 from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.moderation.services.moderation_log import (
     log_ban_account,
     log_soft_delete,
-    set_published,
     set_rejected,
 )
 from apps.users.models import User
@@ -24,23 +24,35 @@ from apps.users.models import User
 logger = logging.getLogger(__name__)
 
 
-def approve_ad(ad: Ad, moderator_id: int) -> None:
+def approve_ad(ad: Ad, moderator_id: int) -> bool:
     """
     Approve an ad for publication.
 
-    Sets original_published_at on first publish (immutable audit field).
-    Delegates to set_published() which routes through transition_to(PUBLISHED)
-    and logs the action atomically.
+    Delegates to auto_moderate() which validates the ad against
+    ModerationCriteria and transitions status to PUBLISHED on success,
+    or ON_MODERATION_FAILED on failure.
 
     Args:
         ad: Ad instance to approve
         moderator_id: Moderator user ID performing the action
+
+    Returns:
+        True if the ad passed auto-moderation and was published,
+        False otherwise.
     """
     if ad.status != AdStatus.ON_MODERATION:
-        return
+        return False
 
-    set_published(ad, moderator_id=moderator_id)
-    logger.info("Ad %s approved by moderator %s", ad.id, moderator_id)
+    result = auto_moderate(ad, moderator_id=moderator_id)
+    if result:
+        logger.info("Ad %s approved by moderator %s", ad.id, moderator_id)
+    else:
+        logger.warning(
+            "Ad %s failed auto-moderation during approval by moderator %s",
+            ad.id,
+            moderator_id,
+        )
+    return result
 
 
 def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -152,7 +164,12 @@ def bulk_approve(queryset, moderator_id: int) -> int:
             .select_for_update()
         ):
             try:
-                approve_ad(ad, moderator_id)
+                if not approve_ad(ad, moderator_id):
+                    logger.warning(
+                        "Skipping ad %s in bulk_approve: auto-moderation failed",
+                        ad.id,
+                    )
+                    continue
             except MaxAdsExceeded as exc:
                 logger.warning(
                     "Skipping ad %s in bulk_approve: user %s reached "

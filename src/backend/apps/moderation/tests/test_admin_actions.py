@@ -2,9 +2,9 @@
 Unit tests for moderation admin actions (AD-001).
 
 Verifies that approve_ad, reject_ad, and soft_delete_ad route all status
-changes through the state machine (transition_to / set_published /
-set_rejected) instead of direct field assignment. Also validates the
-transition matrix edges introduced by the fix: ON_MODERATION_FAILED ->
+changes through the state machine (auto_moderate → set_published /
+set_rejected → transition_to) instead of direct field assignment. Also
+validates the transition matrix edges introduced by the fix: ON_MODERATION_FAILED ->
 REJECTED, and that PUBLISHED/ARCHIVED -> REJECTED raises ValueError.
 """
 
@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from apps.ads.models import Ad
+from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
 from apps.moderation.admin_actions import (
     approve_ad,
@@ -39,20 +39,20 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 class TestApproveAdRouting:
-    """Verify approve_ad delegates to set_published, not direct assignment."""
+    """Verify approve_ad delegates to auto_moderate, not direct assignment."""
 
-    @patch("apps.moderation.admin_actions.set_published")
-    def test_approve_ad_routes_through_set_published(
-        self, mock_set_published, seller, category, city
+    @patch("apps.moderation.admin_actions.auto_moderate")
+    def test_approve_ad_routes_through_auto_moderate(
+        self, mock_auto_moderate, seller, category, city
     ):
-        """approve_ad calls set_published() instead of assigning fields directly."""
+        """approve_ad calls auto_moderate() instead of assigning fields directly."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
         moderator = User.objects.create(
             telegram_id=900000204, chat_id=900000204, password="x"
         )
         approve_ad(ad, moderator.id)
 
-        mock_set_published.assert_called_once_with(ad, moderator_id=moderator.id)
+        mock_auto_moderate.assert_called_once_with(ad, moderator_id=moderator.id)
         # The ad must NOT have been transitioned by the old code path
         ad.refresh_from_db()
         assert ad.status == AdStatus.ON_MODERATION
@@ -63,9 +63,9 @@ class TestApproveAdRouting:
         moderator = User.objects.create(
             telegram_id=900000205, chat_id=900000205, password="x"
         )
-        with patch("apps.moderation.admin_actions.set_published") as mock_set:
+        with patch("apps.moderation.admin_actions.auto_moderate") as mock_am:
             approve_ad(ad, moderator.id)
-            mock_set.assert_not_called()
+            mock_am.assert_not_called()
 
         ad.refresh_from_db()
         assert ad.status == AdStatus.DRAFT
@@ -273,13 +273,22 @@ class TestBulkOperations:
         city,
     ) -> None:
         """3 ON_MODERATION ads for one user → all PUBLISHED, return count == 3."""
-        ads = create_test_ads_bulk(
-            seller,
-            category,
-            city,
-            3,
-            status=AdStatus.ON_MODERATION,
-        )
+        ads = [
+            create_test_ad(
+                seller, category, city, title="Red Car For Sale",
+                status=AdStatus.ON_MODERATION,
+            ),
+            create_test_ad(
+                seller, category, city, title="Blue Motorcycle Available",
+                status=AdStatus.ON_MODERATION,
+            ),
+            create_test_ad(
+                seller, category, city, title="House Near Park",
+                status=AdStatus.ON_MODERATION,
+            ),
+        ]
+        for ad in ads:
+            AdImage.objects.create(ad=ad, image=f"img-{ad.pk}.jpg", position=0)
         moderator = User.objects.create(
             telegram_id=900000210, chat_id=900000210, password="x"
         )

@@ -16,6 +16,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.ads.models import AdImage
 from apps.categories.models import Category
 from apps.core.enums import (
     AdPriorityLevel,
@@ -496,8 +497,10 @@ class TestBulkModerationActionView:
 
     def test_bulk_approve(self, category, city) -> None:
         """Bulk approve action approves all selected ads."""
-        ad1 = create_test_ad(self.user, category, city, title="Ad 1")
-        ad2 = create_test_ad(self.user, category, city, title="Ad 2")
+        ad1 = create_test_ad(self.user, category, city, title="Test Ad First")
+        ad2 = create_test_ad(self.user, category, city, title="Test Ad Second")
+        AdImage.objects.create(ad=ad1, image="img1.jpg", position=0)
+        AdImage.objects.create(ad=ad2, image="img2.jpg", position=0)
 
         client = Client()
         client.force_login(self.staff_user)

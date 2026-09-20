@@ -278,6 +278,7 @@ class TestApproveAdView:
     ) -> None:
         """POST to approve_ad transitions ad from ON_MODERATION to PUBLISHED."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         client = Client()
         client.force_login(staff_user)
@@ -300,6 +301,7 @@ class TestApproveAdView:
     ) -> None:
         """approve_ad creates a ModeratorActionLog entry."""
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="test-image.jpg", position=0)
 
         client = Client()
         client.force_login(staff_user)

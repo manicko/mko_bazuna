@@ -70,7 +70,11 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
         try:
             ad = Ad.objects.get(id=ad_id)
             if action_enum is BulkModerationAction.APPROVE:
-                approve_ad(ad, request.user.id)
+                if not approve_ad(ad, request.user.id):
+                    errors = results.get("errors", [])
+                    errors.append({"id": ad_id, "error": "Auto-moderation failed"})
+                    results["errors"] = errors
+                    continue
             elif action_enum is BulkModerationAction.REJECT:
                 reject_ad(ad, request.user.id, reason)
             elif action_enum is BulkModerationAction.FLAG:
