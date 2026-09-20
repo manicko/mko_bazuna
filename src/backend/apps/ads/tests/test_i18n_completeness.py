@@ -23,6 +23,16 @@ fast-gate CI run:
    ``handlers/`` and ``services/`` for raw ``name_i18n.get("ru")`` calls
    and ``.name``/``.title`` field access in f-strings, ``%`` dict values,
    and list comprehensions (I18N-001).
+10. ``test_title_tags_translated`` — page ``<title>`` tags localize per
+    language (I18N-003).
+11. ``test_plural_forms_runtime`` — ``{% blocktrans count %}`` selects the
+    correct CLDR plural form at runtime (I18N-003).
+12. ``test_no_hardcoded_js_strings`` — inline ``<script>`` literals must not
+    carry untranslated user-visible text (I18N-008).
+
+``test_hreflang_present`` is extended with the ``x-default`` exclusion
+(spec §5f) and ``test_locale_switch_re_render`` with an ``en`` locale-switch
+assertion (msgid fallback convention).
 
 All are marked ``@pytest.mark.unit`` (fast gate, no database).
 No third-party deps: reuses the ``_parse_po_entries`` parser approach
@@ -276,6 +286,111 @@ def test_no_hardcoded_visible_text() -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# Inline <script> JS string-literal guard (I18N-008)
+# ---------------------------------------------------------------------------
+
+# Inline <script> blocks only (external src= scripts and empty bodies skipped).
+_JS_SCRIPT_BLOCK_RE = re.compile(
+    r"<script\b([^>]*)>(.*?)</script>", re.DOTALL | re.IGNORECASE
+)
+
+# Outer-quote-aware JS string literal matcher.  Single-line only: this sidesteps
+# false matches from regex literals such as /"/g (which have no same-line
+# closing quote) and treats any inner quotes as part of the literal's content.
+_JS_STRING_RE = re.compile(r'''(["'])((?:\\.|(?!\1).)*)\1''')
+
+# JS comments are not user-visible text; strip before scanning for literals.
+_JS_COMMENT_RE = re.compile(r"/\*.*?\*/|//[^\n]*", re.DOTALL)
+
+# Django template expressions embedded inside script strings (e.g.
+# {{ var|escapejs }}, {% trans "..." %}) are server-rendered, not literal JS
+# text, so they are stripped before scanning for hardcoded literals.
+_JS_DJANGO_TAG_RE = re.compile(r"{%.*?%}|\{\{.*?\}\}", re.DOTALL)
+
+# Non-translatable tokens that legitimately appear as quoted JS strings.
+_JS_NON_TRANSLATABLE_TOKENS = frozenset({
+    "js=", "path=", "samesite", "secure", "cookie", "document.cookie",
+    "use strict", "use client", "escapejs", "data-domain", "x-csrftoken",
+})
+
+# Characters that indicate a string is markup/path/code rather than prose.
+_JS_CODE_CHAR_RE = re.compile(r"[/=\[\]{}|~@#\\]")
+
+
+def _is_user_visible_js_string(content: str) -> bool:
+    """Return True if a JS string-literal body looks like translatable prose.
+
+    A positive match requires a space plus at least one letter; HTML/SVG
+    markup, Django template expressions, CSS selectors, JS directives,
+    cookie/config tokens, and code-heavy strings are all excluded so that
+    genuine user-facing text (e.g. ``"Delete ad?"``) is the only hit.
+    """
+    source = content.strip()
+    if not source or " " not in source:
+        return False
+    if not re.search(r"[A-Za-z\u0400-\u04FF]", source):
+        return False
+    if "{{" in source or "{%" in source:  # stray template syntax (post-strip)
+        return False
+    if "<" in source or ">" in source:  # HTML / SVG markup
+        return False
+    if source.startswith(("#", ".", "[", "'", '"')):  # CSS selector
+        return False
+    if source in ("use strict", "use client"):
+        return False
+    folded = source.lower()
+    if any(token in folded for token in _JS_NON_TRANSLATABLE_TOKENS):
+        return False
+    if _JS_CODE_CHAR_RE.search(source):
+        return False
+    return True
+
+
+def test_no_hardcoded_js_strings() -> None:
+    """Quoted JS string literals in inline <script> blocks must not carry
+    hardcoded user-visible text (I18N-008).
+
+    Scans every inline ``<script>...</script>`` block in the template scope
+    (``_collect_template_files``) and flags string literals that look like
+    natural-language prose.  Server-rendered template expressions, HTML/SVG
+    markup, CSS selectors, JS directives, and cookie/config tokens are excluded
+    as non-translatable.  The current baseline's inline JS uses only such
+    non-translatable strings, so it reports no violations; this guards against
+    future hardcoded copy in JS.
+    """
+    violations: list[str] = []
+    for tpl_path in _collect_template_files():
+        source = tpl_path.read_text(encoding="utf-8")
+        rel_path = str(tpl_path.relative_to(settings.BASE_DIR))
+
+        for opening, body in _JS_SCRIPT_BLOCK_RE.findall(source):
+            # Skip external scripts and empty/whitespace-only bodies.
+            if "src=" in opening or not body.strip():
+                continue
+            # Strip JS comments first — prose inside /* ... */ or // lines is
+            # not user-visible (e.g. the "All Categories" label in a comment).
+            body = _JS_COMMENT_RE.sub("", body)
+            # Remove Django template expressions next so their quoted
+            # arguments (e.g. {% trans "..." %} inside a JS string) are not
+            # mistaken for standalone literal text.
+            body = _JS_DJANGO_TAG_RE.sub("", body)
+
+            for match in _JS_STRING_RE.finditer(body):
+                literal = match.group(2)
+                if _is_user_visible_js_string(literal):
+                    violations.append(
+                        f"{rel_path}:"
+                        f" hardcoded user-visible JS string literal: "
+                        f"{match.group(0)!r}"
+                    )
+
+    assert not violations, (
+        "Potentially untranslated user-visible text in inline JS:\n"
+        + "\n".join(violations)
+    )
+
+
 def test_extraction_completeness() -> None:
     """Every msgid in one `.po` file exists in all other `.po` files."""
     all_msgids: set[str] = set()
@@ -456,6 +571,70 @@ def test_hreflang_present() -> None:
     missing = expected_langs - found_langs
     assert not missing, f"Missing hreflang tags for languages: {sorted(missing)}"
 
+    # Spec §5f: ``x-default`` is intentionally excluded — every
+    # ``<link rel="alternate">`` must map to a concrete content language
+    # rather than a generic fallback.
+    assert 'hreflang="x-default"' not in rendered, (
+        "x-default hreflang must not be rendered (spec §5f: concrete language only)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Page <title> localization (I18N-003)
+# ---------------------------------------------------------------------------
+
+_TITLE_TAG_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.DOTALL | re.IGNORECASE)
+
+# Page templates whose <title> carries {% trans %}-wrapped text.  Under an
+# empty Context({}) the list.html title resolves to its {% trans "Ads" %}
+# branch (the query/category conditions are falsy).
+_TITLE_TEMPLATES = (
+    ("ads/list.html", "Ads", "Объявления", "Oglasi"),
+    ("ads/dashboard.html", "Dashboard", "Панель управления", "Ploča"),
+    ("ads/edit.html", "Edit Ad", "Редактировать объявление", "Uredi oglas"),
+)
+
+
+def _template_source(template_name: str) -> str:
+    """Return the raw source of a template located in a configured DIR."""
+    for tpl_cfg in settings.TEMPLATES:
+        for d in tpl_cfg.get("DIRS", []):
+            candidate = Path(d) / template_name
+            if candidate.exists():
+                return candidate.read_text(encoding="utf-8")
+    pytest.fail(f"template not found in TEMPLATES DIRs: {template_name}")
+
+
+def test_title_tags_translated() -> None:
+    """Each page <title> localizes to the active UI locale (I18N-003).
+
+    Extracts the ``<title>...</title>`` fragment from selected page templates,
+    renders it under ``translation.override()`` with an empty ``Context({})``
+    (matching the locale-switch test pattern), and asserts the rendered title
+    differs per language — proving the ``{% trans %}`` msgids resolve through
+    the active catalogue rather than a single hardcoded string.
+    """
+    for template_name, en_title, ru_title, bs_title in _TITLE_TEMPLATES:
+        source = _template_source(template_name)
+        titled = _TITLE_TAG_RE.search(source)
+        assert titled, f"{template_name}: no <title> tag found"
+        title_content = titled.group(1).strip()
+        tpl = Template("{% load i18n %}" + title_content)
+
+        rendered: dict[str, str] = {}
+        for lang, expected in (("en", en_title), ("ru", ru_title), ("bs", bs_title)):
+            with translation.override(lang):
+                rendered[lang] = tpl.render(Context({}))
+            assert expected in rendered[lang], (
+                f"{template_name} [{lang}]: expected {expected!r} in "
+                f"rendered title {rendered[lang]!r}"
+            )
+
+        assert len({rendered["en"], rendered["ru"], rendered["bs"]}) == 3, (
+            f"{template_name}: <title> did not differ across en/ru/bs — "
+            f"en={rendered['en']!r} ru={rendered['ru']!r} bs={rendered['bs']!r}"
+        )
+
 
 def test_plural_forms() -> None:
     """Each ``.po`` file's ``Plural-Forms`` header must match CLDR rules."""
@@ -482,6 +661,61 @@ def test_plural_forms() -> None:
             f"{lang}: Plural-Forms mismatch — "
             f"expected {expected[lang]!r}, got {actual!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Runtime plural-form selection (I18N-003)
+# ---------------------------------------------------------------------------
+
+# msgstr values read from each locale's django.po for the msgid
+# "%(counter)s view" / "%(counter)s views" (sourced from ads/dashboard.html:95).
+# en has an empty msgstr, so the msgid is used as the translation.
+_EXPECTED_PLURALS = {
+    "en": {1: "1 view", 2: "2 views", 5: "5 views"},
+    "ru": {1: "1 просмотр", 2: "2 просмотра", 5: "5 просмотров"},
+    "bs": {1: "1 pregled", 2: "2 pregleda", 5: "5 pregleda"},
+}
+
+
+def test_plural_forms_runtime() -> None:
+    """``{% blocktrans count %}`` selects the correct plural form at runtime.
+
+    Uses the live msgid from ``ads/dashboard.html:95`` (``"{{ counter }} view"``
+    / ``"{{ counter }} views"``) and asserts the exact rendered output for
+    n=1/2/5 in each locale, proving the CLDR plural index is recomputed per
+    count rather than always picking form[0].
+    """
+    tpl = Template(
+        "{% load i18n %}"
+        "{% blocktrans count counter=count %}{{ counter }} view"
+        "{% plural %}{{ counter }} views{% endblocktrans %}"
+    )
+    for lang, expected_by_n in _EXPECTED_PLURALS.items():
+        rendered: dict[int, str] = {}
+        for n in (1, 2, 5):
+            with translation.override(lang):
+                rendered[n] = tpl.render(Context({"count": n}))
+            assert rendered[n] == expected_by_n[n], (
+                f"{lang}: n={n} expected {expected_by_n[n]!r}, "
+                f"got {rendered[n]!r}"
+            )
+
+        # Runtime plural-form selection proofs.
+        assert rendered[1] != rendered[2], (
+            f"{lang}: singular/plural not distinguished "
+            f"(n=1={rendered[1]!r}, n=2={rendered[2]!r})"
+        )
+        if lang in ("ru", "bs"):
+            # 3-form languages: n=2 (form[1]) and n=5 (form[2]) must differ.
+            assert rendered[2] != rendered[5], (
+                f"{lang}: plural form[1] and form[2] collapsed "
+                f"(n=2={rendered[2]!r}, n=5={rendered[5]!r})"
+            )
+        else:
+            # en: both n=2 and n=5 use the plural ("views") form.
+            assert "views" in rendered[2] and "views" in rendered[5], (
+                f"{lang}: plural form not selected for n=2/5"
+            )
 
 
 def test_all_languages_ltr() -> None:
@@ -521,6 +755,12 @@ def test_locale_switch_re_render() -> None:
     with translation.override("ru"):
         rendered = tpl.render(Context({}))
     assert "Панель управления" in rendered
+
+    # Per the empty-msgstr convention the English catalogue falls back to the
+    # msgid, so "Dashboard" renders verbatim under the active en locale.
+    with translation.override("en"):
+        rendered = tpl.render(Context({}))
+    assert "Dashboard" in rendered
 
 
 # ---------------------------------------------------------------------------

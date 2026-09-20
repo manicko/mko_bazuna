@@ -18,13 +18,11 @@ from django.utils.translation import gettext as _
 
 from apps.core.enums import LanguageLocale
 from apps.users.models import User
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
 logger = logging.getLogger(__name__)
 
 router = Router()
-
-# Callback prefix for language selection (callback_data="lang:<code>").
-LANG_CALLBACK_PREFIX = "lang:"
 
 
 @router.message(Command("language"))
@@ -47,7 +45,7 @@ async def cmd_language(message: types.Message, state: FSMContext) -> None:
     )
 
 
-@router.callback_query(F.data.startswith(LANG_CALLBACK_PREFIX))
+@router.callback_query(F.data.startswith(BotCallbackPrefix.LANG))
 async def handle_language_callback(
     callback: types.CallbackQuery, state: FSMContext
 ) -> None:
@@ -55,7 +53,7 @@ async def handle_language_callback(
     if not callback.data:
         return
 
-    lang_code = callback.data[len(LANG_CALLBACK_PREFIX) :]
+    lang_code = callback.data[len(BotCallbackPrefix.LANG) :]
     try:
         locale = LanguageLocale(lang_code)
     except ValueError:
@@ -95,7 +93,7 @@ def build_language_keyboard(current: str = "") -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text=text,
-                    callback_data=f"{LANG_CALLBACK_PREFIX}{locale.value}",
+                    callback_data=f"{BotCallbackPrefix.LANG}{locale.value}",
                 )
             ]
         )

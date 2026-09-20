@@ -19,7 +19,7 @@ from asgiref.sync import sync_to_async
 from django.utils.translation import get_language, gettext as _
 
 from apps.search.models import SavedSearch
-from apps.search.services.immediate_alerts import UNSUB_CALLBACK_PREFIX
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +27,6 @@ router = Router()
 
 # Deep-link pattern: unsub_<32-char-token>
 UNSUB_DEEPLINK_PATTERN = re.compile(r"^unsub_([A-Za-z0-9_-]{32})$")
-
-# Re-enable callback prefix (complements the "Disable" button).
-UNSUB_ON_PREFIX = "unsub_on:"
 
 
 @router.message(Command("alerts"))
@@ -106,7 +103,7 @@ def get_user_saved_searches(user_id: int) -> list[SavedSearch]:
 # ---------------------------------------------------------------------------
 
 
-@router.callback_query(F.data.startswith(UNSUB_CALLBACK_PREFIX))
+@router.callback_query(F.data.startswith(BotCallbackPrefix.UNSUB))
 async def handle_unsubscribe_callback(
     callback: types.CallbackQuery, bot: types.Bot
 ) -> None:
@@ -117,7 +114,7 @@ async def handle_unsubscribe_callback(
     """
     if not callback.data:
         return
-    token = callback.data[len(UNSUB_CALLBACK_PREFIX) :]
+    token = callback.data[len(BotCallbackPrefix.UNSUB) :]
     chat_id = callback.from_user.id if callback.from_user else None
 
     saved_search = await resolve_unsubscribe(token, chat_id)
@@ -133,7 +130,7 @@ async def handle_unsubscribe_callback(
                 [
                     InlineKeyboardButton(
                         text=_("Enable notifications"),
-                        callback_data=f"{UNSUB_ON_PREFIX}{token}",
+                        callback_data=f"{BotCallbackPrefix.UNSUB_ON}{token}",
                     ),
                 ],
             ]
@@ -146,14 +143,14 @@ async def handle_unsubscribe_callback(
     await callback.answer(_("Notifications disabled"))
 
 
-@router.callback_query(F.data.startswith(UNSUB_ON_PREFIX))
+@router.callback_query(F.data.startswith(BotCallbackPrefix.UNSUB_ON))
 async def handle_reenable_callback(
     callback: types.CallbackQuery, bot: types.Bot
 ) -> None:
     """Re-enable a saved search from the swapped inline button."""
     if not callback.data:
         return
-    token = callback.data[len(UNSUB_ON_PREFIX) :]
+    token = callback.data[len(BotCallbackPrefix.UNSUB_ON) :]
     chat_id = callback.from_user.id if callback.from_user else None
 
     saved_search = await resolve_reenable(token, chat_id)
@@ -169,7 +166,7 @@ async def handle_reenable_callback(
                 [
                     InlineKeyboardButton(
                         text=_("🔕 Disable this search"),
-                        callback_data=f"{UNSUB_CALLBACK_PREFIX}{token}",
+                        callback_data=f"{BotCallbackPrefix.UNSUB}{token}",
                     ),
                 ],
             ]

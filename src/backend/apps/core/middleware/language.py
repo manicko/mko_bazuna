@@ -21,9 +21,9 @@ behaviour forward-compatible with any future reverse proxy / page cache.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from django.conf import settings
+from django.http import HttpRequest, HttpResponse
 from django.utils import translation
 from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
@@ -56,7 +56,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
     session.
     """
 
-    def process_request(self, request: Any) -> None:
+    def process_request(self, request: HttpRequest) -> None:
         """Determine and set the language code for the current request."""
         lang = request.GET.get("lang")
         if lang is not None:
@@ -75,7 +75,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
 
         self._set_language_code(request, settings.LANGUAGE_CODE)
 
-    def process_response(self, request: Any, response: Any) -> Any:
+    def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
         """Persist the ``lang_pref`` cookie and emit language response headers.
 
         The cookie value is stored on the request during ``process_request``
@@ -95,7 +95,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
         response.headers.setdefault("Content-Language", translation.get_language())
         return response
 
-    def _apply_lang_param(self, request: Any, lang: str) -> None:
+    def _apply_lang_param(self, request: HttpRequest, lang: str) -> None:
         """Apply language from the ``?lang=X`` query parameter.
 
         Normalizes language variants (e.g. ``en-US`` → ``en``) via
@@ -130,7 +130,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
             logger.warning("Ignoring invalid lang parameter: %s", lang)
 
 
-    def _set_language_code(self, request: Any, lang: str) -> None:
+    def _set_language_code(self, request: HttpRequest, lang: str) -> None:
         """Activate the language for the current thread and sync the request.
 
         ``translation.activate(lang)`` sets the thread-local active language
@@ -141,7 +141,7 @@ class LanguagePreMiddleware(MiddlewareMixin):
         translation.activate(lang)
         request.LANGUAGE_CODE = translation.get_language()
 
-    def _parse_accept_language(self, request: Any) -> str | None:
+    def _parse_accept_language(self, request: HttpRequest) -> str | None:
         """Extract the primary language tag from the Accept-Language header.
 
         Returns the resolved language code (normalized via

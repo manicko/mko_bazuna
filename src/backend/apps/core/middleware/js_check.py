@@ -12,8 +12,7 @@ bridges that attribute into the top-level template context that the
 
 from __future__ import annotations
 
-from typing import Any
-
+from django.http import HttpRequest
 from django.utils.deprecation import MiddlewareMixin
 
 
@@ -26,5 +25,5 @@ class JSExecutionMiddleware(MiddlewareMixin):
     contact-link gate.
     """
 
-    def process_request(self, request: Any) -> None:
+    def process_request(self, request: HttpRequest) -> None:
         request.js_verified = request.COOKIES.get("js") == "true"

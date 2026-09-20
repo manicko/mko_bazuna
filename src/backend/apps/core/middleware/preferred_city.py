@@ -18,8 +18,8 @@ selection endpoint (``apps.search.views.preferred_city.set_preferred_city``).
 from __future__ import annotations
 
 import logging
-from typing import Any
 
+from django.http import HttpRequest, HttpResponse
 from django.utils.deprecation import MiddlewareMixin
 
 from apps.locations.models import City
@@ -44,7 +44,7 @@ class PreferredCityMiddleware(MiddlewareMixin):
     the catalog (R-10 / stale-cookie tolerance).
     """
 
-    def process_request(self, request: Any) -> None:
+    def process_request(self, request: HttpRequest) -> None:
         """Set ``request.preferred_city`` to the effective city slug or ``None``."""
         # Reset both attributes so a request is never polluted by prior state.
         request.preferred_city = None
@@ -72,7 +72,7 @@ class PreferredCityMiddleware(MiddlewareMixin):
             logger.info("Ignoring stale preferred_city cookie value: %r", cookie_slug)
         request.preferred_city = None
 
-    def process_response(self, request: Any, response: Any) -> Any:
+    def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
         """Delete a stale ``preferred_city`` cookie, if one was detected."""
         if getattr(request, "_preferred_city_stale_cookie", False):
             response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)

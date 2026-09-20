@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
+from django.http import HttpRequest
 from django.utils.deprecation import MiddlewareMixin
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class CityResolutionMiddleware(MiddlewareMixin):
     suggestions are deferred to the views (CR-7).
     """
 
-    def process_request(self, request: Any) -> None:
+    def process_request(self, request: HttpRequest) -> None:
         """Set ``request.current_city`` to the URL-encoded slug or ``None``."""
         # Reset so the attribute is never stale from a prior request/state.
         request.current_city = None
