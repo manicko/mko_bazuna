@@ -633,3 +633,74 @@ class TestDeleteDraftStorageKeys:
 
         # Ad should be deleted from the database
         assert not await sync_to_async(lambda: Ad.objects.filter(id=ad.id).exists())()
+
+
+class TestDeleteDraftCrashRecovery:
+    """Crash-recovery test for delete_draft's transaction.atomic() boundary (DB-001).
+
+    When ad.delete() raises inside transaction.atomic(), the DB row survives
+    the rollback and the AdImage storage-key files are NOT deleted (post-commit
+    FS deletion is skipped).
+    """
+
+    @pytest.mark.asyncio
+    async def test_delete_draft_files_preserved_on_db_rollback(
+        self, seller_id: int, tmp_path
+    ) -> None:
+        """When ad.delete() raises inside transaction.atomic(), the Ad row
+        survives and physical image files are preserved."""
+        from django.test import override_settings
+
+        from apps.ads.models import Ad, AdImage
+        from apps.media.services.filesystem import generate_storage_key
+        from telegram_bot.services.ad_data import create_draft_ad, delete_draft
+
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            ad = await create_draft_ad(user_id=seller_id)
+
+            image_key = generate_storage_key()
+            stem = image_key.rsplit(".jpg", 1)[0]
+            thumb_small = f"{stem}-small.jpg"
+            thumb_medium = f"{stem}-medium.jpg"
+            thumb_large = f"{stem}-large.jpg"
+            all_keys = [image_key, thumb_small, thumb_medium, thumb_large]
+
+            await sync_to_async(AdImage.objects.create)(
+                ad=ad,
+                image=image_key,
+                thumbnail_small=thumb_small,
+                thumbnail_medium=thumb_medium,
+                thumbnail_large=thumb_large,
+            )
+
+            # Create real files on disk
+            for key in all_keys:
+                file_path = tmp_path / key
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_bytes(b"fake image data")
+
+            # Patch Ad.delete to raise — simulates crash inside transaction.atomic()
+            with patch(
+                "apps.ads.models.Ad.delete",
+                side_effect=RuntimeError("simulated crash"),
+            ):
+                # Patch delete_photo to prevent real deletion and track calls
+                with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
+                    with pytest.raises(RuntimeError, match="simulated crash"):
+                        await delete_draft(ad.id)
+
+            # DB row survived the rollback
+            exists = await sync_to_async(Ad.objects.filter(id=ad.id).exists)()
+            assert exists, "Ad row should survive transaction rollback"
+
+            # delete_photo was NOT called — FS deletion only happens post-commit
+            assert mock_delete.call_count == 0, (
+                "delete_photo should not be called when ad.delete() raises "
+                "inside transaction.atomic()"
+            )
+
+            # Physical files are still on disk (delete_photo was not called)
+            for key in all_keys:
+                assert (tmp_path / key).exists(), (
+                    f"File {key} should still exist on disk"
+                )

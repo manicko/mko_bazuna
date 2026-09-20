@@ -85,7 +85,9 @@ class TestCreateDraftAd:
         assert ad.status != AdStatus.ON_MODERATION
 
     @pytest.mark.asyncio
-    async def test_create_draft_second_call_does_not_duplicate(self, user: object) -> None:
+    async def test_create_draft_second_call_does_not_duplicate(
+        self, user: object
+    ) -> None:
         """Calling create_draft_ad twice leaves exactly one DRAFT for the user."""
         from telegram_bot.services.ad_data import create_draft_ad
 
@@ -94,8 +96,94 @@ class TestCreateDraftAd:
 
         from apps.ads.models import Ad
 
-        count = await sync_to_async(Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count)()
+        count = await sync_to_async(
+            Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count
+        )()
 
         assert count == 1
         assert ad2.status == AdStatus.DRAFT
         assert ad1.id != ad2.id
+
+
+class TestCreateDraftAdCrashRecovery:
+    """Crash-recovery tests for transaction.atomic() boundaries in ad_data.py.
+
+    Verifies DB-001 and DB-002 fixes: when an exception is raised inside
+    ``transaction.atomic()``, Django rolls back the savepoint, preserving
+    DB rows and skipping post-commit filesystem deletion.
+    """
+
+    @pytest.mark.asyncio
+    async def test_delete_draft_rollback_preserves_db_row_and_files(
+        self, user: object
+    ) -> None:
+        """If ad.delete() raises inside transaction.atomic(), the DB row
+        survives the rollback and delete_photo is NOT called (post-commit
+        FS deletion is skipped)."""
+        from unittest.mock import patch
+
+        from apps.ads.models import Ad, AdImage
+        from telegram_bot.services.ad_data import create_draft_ad, delete_draft
+
+        ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+
+        # Attach an AdImage with storage keys so delete_draft would collect them
+        await sync_to_async(AdImage.objects.create)(
+            ad=ad,
+            image="crash-test-image.jpg",
+            thumbnail_small="crash-test-image-small.jpg",
+            thumbnail_medium="crash-test-image-medium.jpg",
+            thumbnail_large="crash-test-image-large.jpg",
+        )
+
+        # Patch Ad.delete to raise — simulates crash inside transaction.atomic()
+        with patch(
+            "apps.ads.models.Ad.delete",
+            side_effect=RuntimeError("simulated crash"),
+        ):
+            # Patch delete_photo to verify it is NOT called
+            # (post-commit FS deletion is skipped on rollback)
+            with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
+                with pytest.raises(RuntimeError, match="simulated crash"):
+                    await delete_draft(ad.id)
+
+        # DB row survived the rollback (ad.delete() was inside atomic, rolled back)
+        exists = await sync_to_async(Ad.objects.filter(id=ad.id).exists)()
+        assert exists, "Ad row should survive transaction rollback"
+
+        # delete_photo was NOT called — FS deletion only happens post-commit
+        assert mock_delete.call_count == 0, (
+            "delete_photo should not be called when ad.delete() raises "
+            "inside transaction.atomic()"
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_draft_atomic_rollback_preserves_existing_draft(
+        self, user: object
+    ) -> None:
+        """If Ad.objects.create() raises after existing.delete(), the
+        transaction.atomic() rollback preserves the old DRAFT row."""
+        from unittest.mock import patch
+
+        from apps.ads.models import Ad
+        from telegram_bot.services.ad_data import create_draft_ad
+
+        # Create initial DRAFT (without patch — real create)
+        await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+
+        # Patch Ad.objects.create to raise RuntimeError on ALL calls.
+        # RuntimeError is not caught by the IntegrityError fallback, so it
+        # propagates out of transaction.atomic() and triggers rollback of
+        # the preceding existing.delete().
+        with patch(
+            "apps.ads.models.Ad.objects.create",
+            side_effect=RuntimeError("simulated create crash"),
+        ):
+            with pytest.raises(RuntimeError, match="simulated create crash"):
+                await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+
+        # The original DRAFT row survives (rollback undid existing.delete())
+        count = await sync_to_async(
+            Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count
+        )()
+        assert count == 1, "Original DRAFT should survive transaction rollback"
