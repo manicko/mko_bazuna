@@ -91,7 +91,7 @@ def _invalidate_criteria_cache() -> None:
     invalidate_criteria_cache()
 
 
-def auto_moderate(ad: Ad) -> bool:
+def auto_moderate(ad: Ad, moderator_id: int | None = None) -> bool:
     """
     Auto-moderate an ad before publish.
 
@@ -163,7 +163,7 @@ def auto_moderate(ad: Ad) -> bool:
 
     # All checks passed - publish
     try:
-        _pass_moderation(ad)
+        _pass_moderation(ad, moderator_id=moderator_id)
     except MaxAdsExceeded:
         _fail_moderation(ad)
         return False
@@ -246,7 +246,7 @@ def _fail_moderation(ad: Ad) -> None:
         )
 
 
-def _pass_moderation(ad: Ad) -> None:
+def _pass_moderation(ad: Ad, moderator_id: int | None = None) -> None:
     """Set ad to PUBLISHED with timestamp, log action, and create analytics event.
 
     All writes are wrapped in a single transaction to ensure atomicity.
@@ -254,7 +254,7 @@ def _pass_moderation(ad: Ad) -> None:
     from apps.moderation.services.moderation_log import set_published
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-        set_published(ad)
+        set_published(ad, moderator_id=moderator_id)
 
         record_event(
             event_type=AnalyticsEventType.AD_PUBLISHED,
