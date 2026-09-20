@@ -84,21 +84,22 @@ async def create_draft_ad(user_id: int) -> Ad:
 
     @sync_to_async
     def _create() -> Ad:
-        # Remove any pre-existing in-progress DRAFT for this user before
-        # creating a fresh one (Option D: delete + recreate). AdImage rows
-        # CASCADE-delete via the FK. Orphaned media files are reclaimed by
-        # sweep_orphaned_media.
-        existing = Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT)
-        if existing.exists():
-            existing.delete()
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            # Remove any pre-existing in-progress DRAFT for this user before
+            # creating a fresh one (Option D: delete + recreate). AdImage rows
+            # CASCADE-delete via the FK. Orphaned media files are reclaimed by
+            # sweep_orphaned_media.
+            existing = Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT)
+            if existing.exists():
+                existing.delete()
 
-        try:
-            return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
-        except IntegrityError:
-            # Race: a concurrent create_draft_ad slipped through the above
-            # check before the unique index was enforced. Clean up and retry.
-            Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT).delete()
-            return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
+            try:
+                return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
+            except IntegrityError:
+                # Race: a concurrent create_draft_ad slipped through the above
+                # check before the unique index was enforced. Clean up and retry.
+                Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT).delete()
+                return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
 
     return await _create()
 
