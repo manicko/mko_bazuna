@@ -16,7 +16,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import get_language, gettext as _
 
 from apps.search.models import SavedSearch
 from apps.search.services.immediate_alerts import UNSUB_CALLBACK_PREFIX
@@ -69,8 +69,8 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
     for i, ss in enumerate(saved_searches, 1):
         status = _("ON") if ss.is_active else _("OFF")
         query_display = ss.query or _("any")
-        city_display = ss.city.name if ss.city else _("any")
-        cat_display = ss.category.name if ss.category else _("any")
+        city_display = ss.city.get_name(get_language()) if ss.city else _("any")
+        cat_display = ss.category.get_name(get_language()) if ss.category else _("any")
 
         price_display = _("any")
         if ss.min_price or ss.max_price:

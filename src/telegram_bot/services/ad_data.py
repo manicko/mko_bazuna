@@ -416,7 +416,9 @@ async def get_lookup_item(item_id: int | None) -> LookupItem | None:
     return await _get()
 
 
-async def get_feature_names(feature_ids: list[int]) -> list[str]:
+async def get_feature_names(
+    feature_ids: list[int], locale: str = "ru"
+) -> list[str]:
     """Get feature names as localized strings."""
 
     @sync_to_async
@@ -426,10 +428,7 @@ async def get_feature_names(feature_ids: list[int]) -> list[str]:
         names: list[str] = []
 
         for item in items:
-            if item.name_i18n and isinstance(item.name_i18n, dict):
-                names.append(item.name_i18n.get("ru", item.slug))
-            else:
-                names.append(item.slug)
+            names.append(item.get_name(locale))
 
         return names
 
@@ -460,18 +459,16 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 
 
 def build_purpose_keyboard(
-    purposes: list[LookupItem], default_slug: str | None = None
+    purposes: list[LookupItem],
+    default_slug: str | None = None,
+    locale: str = "ru",
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for purpose selection."""
 
     builder = InlineKeyboardBuilder()
 
     for purpose in purposes:
-        text = (
-            purpose.name_i18n.get("ru", purpose.slug)
-            if purpose.name_i18n
-            else purpose.slug
-        )
+        text = purpose.get_name(locale)
 
         if purpose.slug == default_slug:
             text = f"✅ {text}"
@@ -487,15 +484,12 @@ def build_purpose_keyboard(
 
 def build_condition_keyboard(
     conditions: list[LookupItem],
+    locale: str = "ru",
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for condition single-selection."""
     builder = InlineKeyboardBuilder()
     for condition in conditions:
-        text = (
-            condition.name_i18n.get("ru", condition.slug)
-            if condition.name_i18n
-            else condition.slug
-        )
+        text = condition.get_name(locale)
         builder.button(
             text=text, callback_data=f"{BotCallbackPrefix.CONDITION}{condition.slug}"
         )
@@ -504,7 +498,9 @@ def build_condition_keyboard(
 
 
 def build_feature_keyboard(
-    features: list[LookupItem], selected_ids: set[int]
+    features: list[LookupItem],
+    selected_ids: set[int],
+    locale: str = "ru",
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for feature multi-selection."""
 
@@ -513,11 +509,7 @@ def build_feature_keyboard(
     for feature in features:
         if feature.slug in ("new", "used"):
             continue
-        text = (
-            feature.name_i18n.get("ru", feature.slug)
-            if feature.name_i18n
-            else feature.slug
-        )
+        text = feature.get_name(locale)
 
         if feature.id in selected_ids:
             text = f"✅ {text}"

@@ -19,6 +19,10 @@ fast-gate CI run:
 7. ``test_plural_forms`` — each ``.po`` Plural-Forms header matches CLDR.
 8. ``test_locale_switch_re_render`` — ``{% trans %}`` re-renders in the
    active locale (bs/ru).
+9. ``test_bot_no_raw_model_field_access`` — AST-scans bot
+   ``handlers/`` and ``services/`` for raw ``name_i18n.get("ru")`` calls
+   and ``.name``/``.title`` field access in f-strings, ``%`` dict values,
+   and list comprehensions (I18N-001).
 
 All are marked ``@pytest.mark.unit`` (fast gate, no database).
 No third-party deps: reuses the ``_parse_po_entries`` parser approach
@@ -579,3 +583,155 @@ def test_no_cyrillic_msgids() -> None:
                     f"{rel}: msgid contains Cyrillic (Russian-as-msgid): "
                     f"{msgid[:80]!r}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# I18N-001 gate: bot handlers/services must not bypass get_name/get_title
+# ---------------------------------------------------------------------------
+
+# Variable names that are NOT Django model instances — ``.name``/``.title``
+# on these objects (e.g. ``message.from_user.name``) is legitimate and must
+# not be flagged.
+_ALLOWED_NAME_VARS = frozenset({
+    "message",
+    "callback",
+    "request",
+    "user",
+    "data",
+    "state",
+})
+
+# Model attribute names that carry user-visible text and must go through
+# the locale-aware accessor (``get_name`` / ``get_title``) instead of raw
+# field access.
+_RAW_FIELD_ATTRS = frozenset({"name", "title"})
+
+
+def _collect_bot_source_files() -> list[Path]:
+    """Return every ``*.py`` file under ``telegram_bot/handlers/`` and
+    ``telegram_bot/services/``.
+    """
+    base = settings.BASE_DIR / "telegram_bot"
+    files: list[Path] = []
+    for sub in ("handlers", "services"):
+        files.extend(sorted((base / sub).rglob("*.py")))
+    return files
+
+
+def _root_name(node: ast.AST) -> str | None:
+    """Extract the root variable name from an attribute-access chain.
+
+    e.g. ``message.from_user.name`` -> ``"message"``
+         ``cat.name``            -> ``"cat"``
+    """
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
+
+
+def _is_name_i18n_get_call(node: ast.AST) -> bool:
+    """Return True for ``<obj>.name_i18n.get('<string_literal>', ...)``."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if not isinstance(func, ast.Attribute) or func.attr != "get":
+        return False
+    if not isinstance(func.value, ast.Attribute) or func.value.attr != "name_i18n":
+        return False
+    if (
+        node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    ):
+        return True
+    return False
+
+
+def _is_raw_field_access(node: ast.AST) -> bool:
+    """Return True for ``.name`` or ``.title`` on a likely model variable.
+
+    Allows method-call results (``get_name``, ``get_title``, ``get_description``)
+    by virtue of those having different ``attr`` values.
+    Allows ``<allowed_var>.name`` via the variable-name heuristic.
+    """
+    if not isinstance(node, ast.Attribute) or node.attr not in _RAW_FIELD_ATTRS:
+        return False
+    root = _root_name(node)
+    if root in _ALLOWED_NAME_VARS:
+        return False
+    return True
+
+
+def _scan_bot_source_for_violations(source: str, tree: ast.Module) -> list[str]:
+    """Collect all I18N-001 violations in a single parsed file."""
+    violations: list[str] = []
+
+    for node in ast.walk(tree):
+        # 1. name_i18n.get("<string_literal>", ...) — hardcoded locale
+        if _is_name_i18n_get_call(node):
+            violations.append(
+                f"{source}:{node.lineno}: hardcoded locale in name_i18n.get() "
+                f"— use get_name(locale) instead"
+            )
+
+        # 2a. .name / .title inside an f-string FormattedValue
+        if isinstance(node, ast.FormattedValue):
+            if _is_raw_field_access(node.value):
+                violations.append(
+                    f"{source}:{node.lineno}: raw .name/.title field access "
+                    f"in f-string — use get_name(locale)/get_title(locale)"
+                )
+
+        # 2b. .name / .title as a dict value in "% (...)" formatting
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            if isinstance(node.right, ast.Dict):
+                for value in node.right.values:
+                    if _is_raw_field_access(value):
+                        violations.append(
+                            f"{source}:{value.lineno}: raw .name/.title "
+                            f"field access in % dict value — use "
+                            f"get_name(locale)/get_title(locale)"
+                        )
+
+        # 2c. .name / .title as the element of a list comprehension
+        if isinstance(node, ast.ListComp):
+            if _is_raw_field_access(node.elt):
+                violations.append(
+                    f"{source}:{node.lineno}: raw .name/.title field access "
+                    f"in list comprehension — use get_name(locale)/"
+                    f"get_title(locale)"
+                )
+
+    return violations
+
+
+def test_bot_no_raw_model_field_access() -> None:
+    """Bot handlers and services must not bypass ``get_name``/``get_title``.
+
+    AST-scans every ``.py`` file under ``telegram_bot/handlers/`` and
+    ``telegram_bot/services/`` for:
+
+    1. ``name_i18n.get("<literal>")`` calls — a hardcoded locale bypasses
+       the active user locale.
+    2. ``.name`` / ``.title`` attribute access on model objects inside:
+       f-string ``{…}`` segments, ``%`` dict values, and list comprehensions.
+
+    Allowed patterns:
+    - ``get_name(...)``, ``get_title(...)``, ``get_description(...)`` calls
+    - ``.slug`` attribute access (legitimate)
+    - ``.name``/``.title`` on variables named ``message``, ``callback``,
+      ``request``, ``user``, ``data``, ``state`` (non-model objects)
+    """
+    all_violations: list[str] = []
+
+    for py_file in _collect_bot_source_files():
+        source = str(py_file.relative_to(settings.BASE_DIR))
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=source)
+        all_violations.extend(_scan_bot_source_for_violations(source, tree))
+
+    assert not all_violations, (
+        "Raw model field access in bot handlers/services:\n"
+        + "\n".join(all_violations)
+    )

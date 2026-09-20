@@ -18,7 +18,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import get_language, gettext as _
 
 from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.categories.models import Category
@@ -211,7 +211,7 @@ async def process_category(message: types.Message, state: FSMContext) -> None:
     suggestions = categories[:5]
 
     suggestion_text = "\n".join(
-        f"{i + 1}. {cat.name}" for i, cat in enumerate(suggestions)
+        f"{i + 1}. {cat.get_name(get_language())}" for i, cat in enumerate(suggestions)
     )
 
     await message.answer(
@@ -264,14 +264,16 @@ async def process_category_selected(
     default_purpose = await get_default_purpose(category.id, purposes)
 
     keyboard = build_purpose_keyboard(
-        purposes, default_purpose.slug if default_purpose else None
+        purposes,
+        default_purpose.slug if default_purpose else None,
+        locale=get_language(),
     )
 
     await state.set_state(AdCreateForm.purpose)
 
     await message.answer(
         _("Category: %(name)s\nSelect the purpose of your listing:")
-        % {"name": category.name},
+        % {"name": category.get_name(get_language())},
         reply_markup=keyboard,
     )
 
@@ -297,7 +299,7 @@ async def proceed_to_features_or_city(
 
         await state.update_data(condition_id=None)
 
-        keyboard = build_condition_keyboard(conditions)
+        keyboard = build_condition_keyboard(conditions, locale=get_language())
 
         await message.answer(
             _("Select item condition:"),
@@ -326,7 +328,9 @@ async def _show_features_or_city_step(
 
             await state.update_data(feature_ids=[])
 
-            keyboard = build_feature_keyboard(non_condition_features, set())
+            keyboard = build_feature_keyboard(
+                non_condition_features, set(), locale=get_language()
+            )
 
             await message.answer(
                 _(
@@ -445,7 +449,9 @@ async def process_features(callback: types.CallbackQuery, state: FSMContext) -> 
 
         features = await get_resolved_features(data.get("category_id"))
 
-        keyboard = build_feature_keyboard(features, selected_ids)
+        keyboard = build_feature_keyboard(
+            features, selected_ids, locale=get_language()
+        )
 
         await callback.message.edit_reply_markup(reply_markup=keyboard)
 
@@ -474,7 +480,7 @@ async def process_city(message: types.Message, state: FSMContext) -> None:
         all_cities = await get_all_cities()
 
         close_matches = difflib.get_close_matches(
-            city_name, [c.name for c in all_cities], n=3, cutoff=0.6
+            city_name, [c.get_name(get_language()) for c in all_cities], n=3, cutoff=0.6
         )
 
         if close_matches:
@@ -499,7 +505,7 @@ async def process_city(message: types.Message, state: FSMContext) -> None:
 
     await message.answer(
         _("City: %(name)s\nNow enter the ad title (5-200 characters).")
-        % {"name": city.name}
+        % {"name": city.get_name(get_language())}
     )
 
 
@@ -785,23 +791,21 @@ async def show_preview(message: types.Message, data: dict[str, Any]) -> None:
     purpose = await get_lookup_item(data.get("listing_purpose_id"))
 
     purpose_name = (
-        purpose.name_i18n.get("ru", purpose.slug)
-        if purpose and purpose.name_i18n
-        else (purpose.slug if purpose else _("N/A"))
+        purpose.get_name(get_language()) if purpose else _("N/A")
     )
 
     condition = await get_lookup_item(data.get("condition_id"))
 
     condition_name = (
-        condition.name_i18n.get("ru", condition.slug)
-        if condition and condition.name_i18n
-        else (condition.slug if condition else _("N/A"))
+        condition.get_name(get_language()) if condition else _("N/A")
     )
 
     feature_ids = data.get("feature_ids", [])
 
     feature_names = (
-        ", ".join(await get_feature_names(feature_ids)) if feature_ids else _("None")
+        ", ".join(await get_feature_names(feature_ids, locale=get_language()))
+        if feature_ids
+        else _("None")
     )
 
     preview_text = (
@@ -818,11 +822,11 @@ async def show_preview(message: types.Message, data: dict[str, Any]) -> None:
             "title": data.get("title", _("N/A")),
             "description": data.get("description", _("N/A"))[:100],
             "price": _format_preview_price(data),
-            "category": category.name if category else _("N/A"),
+            "category": category.get_name(get_language()) if category else _("N/A"),
             "purpose": purpose_name,
             "condition": condition_name,
             "features": feature_names,
-            "city": city.name if city else _("N/A"),
+            "city": city.get_name(get_language()) if city else _("N/A"),
         }
     )
 

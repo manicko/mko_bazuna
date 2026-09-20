@@ -12,7 +12,7 @@ from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import get_language, gettext as _
 
 from apps.ads.services.copy_service import copy_ad
 from apps.currencies.enums import CurrencyCode
@@ -86,7 +86,11 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         % {
             "ad_id": ad_id,
             "new_id": new_ad.id,
-            "title": new_ad.title,
-            "category": new_ad.category.name if new_ad.category_id else _("N/A"),
+            "title": new_ad.get_title(get_language()),
+            "category": (
+                new_ad.category.get_name(get_language())
+                if new_ad.category_id
+                else _("N/A")
+            ),
         }
     )
