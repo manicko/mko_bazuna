@@ -141,7 +141,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Completion: user taps "Login" in bot → bot writes sender `telegram_id` into `LoginToken` via shared ORM → site checks token readiness and authenticates by `telegram_id` (create/find). Site-side consumption is POST-only (token read from `request.POST` + CSRF), never a URL query parameter.
 - Expired/invalid token: clear message + retry path. No silent failures.
 - **Session:** persistent cookie, survives browser restart until explicit logout or long idle.
-- Re-login reuses existing `telegram_id` (no duplicate account). Token is atomic, one-time, constant-time compare (`hmac.compare_digest`).
+- Re-login reuses existing `telegram_id` (no duplicate account). Token issuance uses a 192-bit CSPRNG (`secrets.token_urlsafe(24)`) SHA-256 hashed into a unique, indexed `token_hash` column (raw token never persisted). Claim is a two-phase atomic `UPDATE ... RETURNING` guarded by `token_hash = %s AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > %s` (bot) and `... AND telegram_id IS NOT NULL ...` (web) — zero-TOCTOU race-safe via Postgres row locks, one-time consumption only.
 
 ### I. Bot ad-creation dialog (US-S2)
 - Strictly step-by-step, one field at a time: category → city → title → description → price (if applicable) → photos, each confirmed.
