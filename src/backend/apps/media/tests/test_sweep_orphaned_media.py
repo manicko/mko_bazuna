@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -208,3 +209,75 @@ class TestSweepOrphanedMedia:
 
         # Fresh staging file IS preserved (within TTL)
         assert fresh_file.exists(), "fresh staging file was incorrectly reclaimed"
+
+
+# ---------------------------------------------------------------------------
+# MED-001 regression guard: deletion loop must run inside advisory-lock scope
+# ---------------------------------------------------------------------------
+
+
+class TestSweepLockScope:
+    """Verify filesystem mutations occur within the advisory-lock scope.
+
+    MED-001 found that the deletion loop in ``sweep_orphaned_media`` ran
+    *after* the advisory lock was released, allowing concurrent sweeps to
+    race during file deletion.  These tests spy on ``advisory_lock`` and
+    ``delete_photo`` to assert every deletion happens while the lock is held.
+    """
+
+    def test_delete_photo_called_within_lock_scope(
+        self, seller, category, city, isolated_media_root, monkeypatch
+    ):
+        """All ``delete_photo`` calls must occur while advisory_lock is held.
+
+        This is a genuine regression guard: it **fails** on the pre-fix code
+        (deletion loop outside the lock) and **passes** after the fix.
+        """
+        key = "orphaned-file.jpg"
+        (isolated_media_root / key).write_bytes(b"orphan data")
+
+        # Shared mutable flag: True while the spy advisory_lock block is entered.
+        lock_state = {"held": False}
+
+        # Spy for advisory_lock: a no-op context manager that records enter/exit
+        # on the shared ``lock_state`` flag.  Does not acquire a real PostgreSQL
+        # lock — the goal is purely to demarcate the lock scope boundary.
+        @contextmanager
+        def spy_advisory_lock(*_args, **_kwargs):
+            lock_state["held"] = True
+            try:
+                yield
+            finally:
+                lock_state["held"] = False
+
+        monkeypatch.setattr(
+            "apps.media.management.commands.sweep_orphaned_media.advisory_lock",
+            spy_advisory_lock,
+        )
+
+        # Spy for delete_photo: records whether the lock was held at each call.
+        delete_call_lock_state: list[bool] = []
+
+        def spy_delete_photo(storage_key: str) -> None:
+            delete_call_lock_state.append(lock_state["held"])
+
+        monkeypatch.setattr(
+            "apps.media.management.commands.sweep_orphaned_media.delete_photo",
+            spy_delete_photo,
+        )
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media")
+
+        # The orphan file must have triggered at least one delete_photo call.
+        assert delete_call_lock_state, (
+            "delete_photo was never called — test fixture did not produce an "
+            "orphan, so lock-scope timing cannot be validated"
+        )
+        # Every call must have occurred while the lock was held (inside the
+        # ``with advisory_lock(...)`` block).  A single False entry means a
+        # deletion ran after lock release — the MED-001 bug.
+        assert all(delete_call_lock_state), (
+            "delete_photo was called outside the advisory-lock scope: "
+            f"{delete_call_lock_state}"
+        )

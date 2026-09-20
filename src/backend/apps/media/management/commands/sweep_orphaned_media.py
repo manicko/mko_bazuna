@@ -139,41 +139,43 @@ class Command(BaseCommand):
                 referenced = _collect_referenced_keys()
                 on_disk = set(_walk_media_files(media_root))
 
-        orphans = on_disk - referenced
+                orphans = on_disk - referenced
 
-        if dry_run:
-            logger.info(
-                "DRY RUN: Found %d orphaned media files (not deleting):",
-                len(orphans),
-            )
-            for key in sorted(orphans):
-                logger.info("  %s", key)
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"DRY RUN: {len(orphans)} orphaned files would be deleted."
-                )
-            )
-            return
-
-        deleted = 0
-        for key in sorted(orphans):
-            delete_photo(key)
-            deleted += 1
-            if deleted % 100 == 0:
-                logger.info("Deleted %d orphaned files...", deleted)
-
-        logger.info("Orphan sweep complete: deleted %d files.", deleted)
-        self.stdout.write(
-            self.style.SUCCESS(f"Deleted {deleted} orphaned media files.")
-        )
-
-        # Reclaim abandoned staging files (in-flight uploads older than TTL).
-        # Excluded from the orphan sweep above; cleaned up here by age.
-        if not dry_run:
-            reclaimed = _reclaim_stale_staging(media_root, _STAGING_TTL_SECONDS)
-            if reclaimed:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Reclaimed {reclaimed} stale staging files."
+                if dry_run:
+                    logger.info(
+                        "DRY RUN: Found %d orphaned media files (not deleting):",
+                        len(orphans),
                     )
+                    for key in sorted(orphans):
+                        logger.info("  %s", key)
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"DRY RUN: {len(orphans)} orphaned files would be deleted."
+                        )
+                    )
+                    return
+
+                deleted = 0
+                for key in sorted(orphans):
+                    delete_photo(key)
+                    deleted += 1
+                    if deleted % 100 == 0:
+                        logger.info("Deleted %d orphaned files...", deleted)
+
+                logger.info("Orphan sweep complete: deleted %d files.", deleted)
+                self.stdout.write(
+                    self.style.SUCCESS(f"Deleted {deleted} orphaned media files.")
                 )
+
+                # Reclaim abandoned staging files (in-flight uploads older than
+                # TTL).  Excluded from the orphan sweep above; cleaned up here
+                # by age.  Moved inside the lock to serialize all MEDIA_ROOT
+                # mutations (plan 34 MED-001; R1 TX-then-FS safety gate GO).
+                if not dry_run:
+                    reclaimed = _reclaim_stale_staging(media_root, _STAGING_TTL_SECONDS)
+                    if reclaimed:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Reclaimed {reclaimed} stale staging files."
+                            )
+                        )
