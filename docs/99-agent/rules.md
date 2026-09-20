@@ -92,6 +92,59 @@ setup.
 - Use `LanguageLocale.values()` (the StrEnum), not bare string literals,
   per project rule #10.
 
+### Inline-JS i18n (Q6=A Pattern)
+
+**Problem:** The completeness gate's `test_no_hardcoded_visible_text` strips
+`<script>` blocks (via `_SKIP_TAGS` in
+`apps/ads/tests/test_i18n_completeness.py:94`, which includes `"script"`), so any
+user-visible text inside inline `<script>` tags is invisible to the gate. Hardcoded
+string literals in inline JS are a testing gap — they will never be flagged by
+`test_no_hardcoded_visible_text`, `test_extraction_completeness`, or
+`test_no_empty_msgstr`, and they will never reach the `.po` extraction pipeline
+(`make makemessages` does not scan template `<script>` contents).
+
+**Prescribed solution:** The **catalog_js_labels** pattern. Wrap every user-visible
+string in `gettext` (`_()`) at the Python layer — inside a context processor — then
+JSON-encode the dict and inject it into the template context. Inline JS parses the
+injected JSON and reads `labels.<key>` instead of using string literals. Because the
+`_(...)` calls live in Python (not inside a `<script>` block), `make makemessages`
+extracts them and the msgids flow through the full completeness gate.
+
+**Implementation reference:** `apps/core/context_processors.py` → `header_context`,
+lines 100–108:
+
+```python
+"catalog_js_labels": json.dumps(
+    {
+        "show_all_results": _("Show all results"),
+        "cities": _("Cities"),
+        "categories": _("Categories"),
+        "popular_queries": _("Popular queries"),
+        "history": _("History"),
+    }
+),
+```
+
+The template consumes it (example from `templates/components/header_catalog.html:235`):
+
+```django
+<script>
+    var labels = JSON.parse('{{ catalog_js_labels|escapejs }}');
+    // Use labels.show_all_results, labels.cities, etc. — never raw string literals.
+</script>
+```
+
+Guidelines:
+
+- Use `|escapejs` on the template variable to safely embed the JSON string inside a
+  JS string literal (prevents `</script>` injection and quote breakage).
+- Every label key is a stable snake_case identifier, not a sentence; the translatable
+  text is the `_()` argument in Python, keeping msgids English per rule #10.
+- **Do NOT** add new inline `<script>` string literals containing user-visible text
+  (Cyrillic or otherwise). They bypass the gate entirely. If JS needs a translated
+  string, add it to the `catalog_js_labels` dict — or a new context-processor dict —
+  and reference it via the injected `labels` object.
+
 ## Test Infrastructure
 
 ### Test database lifecycle
@@ -155,3 +208,18 @@ A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 - `.mo` files are **not** in version control (`.gitignore` line 55) — build-time artifacts
 - DB-based i18n (`components/feature_tag.html` via `get_lookup_name`) is exempt from the completeness gate
 - Scan scope excludes `admin/` staff templates, `analytics/moderation_dashboard.html`, and `components/feature_tag.html`
+
+## Performance Discipline
+
+### Caching Rules
+
+- **Invalidate on write:** Every model `.save()` / `.delete()` that affects a cached result must invalidate the corresponding cache key. Search results are cached by `apps/search/services/cache.py` and invalidated by `apps/search/signals.py` on `Ad` publish.
+- **Single-flight on thundering herd:** Use `apps/core/utils/swr_cache.py` (`swr_get` / `swr_set`) for any cache path that recomputes an expensive result. Concurrent identical requests share a single recompute — subsequent callers receive the stale fallback while the fresh value is computed once.
+- **Cache hit-rate tracking:** SLO #6 requires >85% Redis cache hit rate. If hit rate drops below 85% in production metrics, investigate invalidation churn or key cardinality before adding capacity.
+- **Pattern-based invalidation:** `cache.delete_pattern()` is Redis-only. Under LocMemCache (dev/test) it is a no-op — do not rely on it in unit tests that assert cache state.
+
+### Profiling Rules
+
+- **Profile before optimizing:** Never optimize a hot path without first confirming it in a cProfile run (`scripts/profile_search.py`) or `EXPLAIN (ANALYZE, BUFFERS)` output (`python -m manage.py profile_queries`).
+- **Assert no sequential scans at scale:** The `profile_queries` command asserts no `Seq Scan` on `ads_ad` at seed scale (>10k rows). If it fails, add an index before tuning the query.
+- **Regression threshold:** If the Locust load test shows p95 regression >10% against SLO constants (`P95_SLO_MS=500`, `P99_SLO_MS=2000` in `src/benchmark/constants.py`), halt feature work and profile. See [`docs/ops/profiling.md`](../ops/profiling.md).
