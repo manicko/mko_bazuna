@@ -82,6 +82,16 @@ RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/them
         --ignore=.local --ignore=.playwright-mcp --ignore=.coverage --ignore=.hypothesis \
         --locale ru --locale bs --locale en
 
+# Generate CycloneDX SBOM of the Python venv for supply-chain vulnerability
+# correlation. Trivy image scan in CI uses this SBOM for package-level
+# CVE-to-package mapping. Syft installed via official install script (same
+# curl-based pattern as the Tailwind CLI above; python:3.14-slim base image
+# provides tar, builder stage provides curl + coreutils).
+RUN --mount=type=cache,target=/root/.cache/syft \
+    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+    | sh -s -- -b /usr/local/bin && \
+    syft /opt/venv -o cyclonedx-json=sbom.cyclonedx.json
+
 
 ################################################################################
 # STAGE 2: Production Runtime — non-root user, no build tools
@@ -109,6 +119,8 @@ WORKDIR /app
 
 # Copy venv from builder (no gcc/libpq-dev in final image)
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
+# Copy CycloneDX SBOM for supply-chain vulnerability correlation (Trivy image scan in CI)
+COPY --from=builder --chown=app:app /app/sbom.cyclonedx.json /sbom.cyclonedx.json
 # Copy tailwindcss binary from builder (needed for dev mode CSS generation)
 COPY --from=builder /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 # uv/uvx only needed in test-runtime for `uv sync`; runtime entrypoints use /opt/venv/bin/python directly

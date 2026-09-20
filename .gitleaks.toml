@@ -1,0 +1,39 @@
+# Gitleaks configuration for Mko Bazuna
+#
+# CI (ci.yml → security job) runs gitleaks v8.27.2:
+#   gitleaks detect --source . --exit-code 1 --report-format sarif
+# Gitleaks auto-discovers this .gitleaks.toml file (no --config flag needed).
+#
+# This config extends the built-in default rules via [extend] useDefault = true,
+# then adds project-specific allowlists for known test-only tokens.
+#
+# TOML format note: gitleaks v8.25.0 renamed the singular [allowlist] table
+# to the plural [[allowlists]] table array. Both are accepted in v8.27.2;
+# [[allowlists]] is the canonical, non-deprecated form used here.
+
+title = "Mko Bazuna gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# allowlists: known test/development tokens that are safe to commit.
+# These appear in CI workflows (.github/workflows/*.yml), example env files
+# (.env.*.example), and test code. They are NOT real credentials and must
+# not trigger scan failures.
+[[allowlists]]
+description = "Test environment tokens (CI fixtures, not real credentials)"
+regexes = [
+    '''test-secret-key-for-testing-only''',
+    '''test-bot-token-for-testing''',
+    '''test-admin-password''',
+]
+
+# allowlists: example env files containing only placeholder values.
+[[allowlists]]
+description = "Example environment files with placeholder values"
+paths = [
+    '''\.env\.example$''',
+    '''\.env\.test\.example$''',
+    '''\.env\.dev\.example$''',
+    '''\.env\.prod\.example$''',
+]
