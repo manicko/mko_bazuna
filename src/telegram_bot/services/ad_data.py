@@ -21,7 +21,7 @@ from aiogram import Bot, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.translation import gettext as _
 
 from apps.ads.models import Ad
@@ -133,13 +133,22 @@ async def delete_draft(ad_id: int) -> None:
         except Ad.DoesNotExist:
             return
 
-        # Delete physical photo files (original + all thumbnails) for any AdImage records
+        # Collect storage keys inside the transaction (DB-only read),
+        # then delete the Ad row (DB-first). Filesystem deletion happens
+        # only after the transaction commits — TX-then-Filesystem pattern
+        # mirroring soft_delete_user_ads and sweep_drafts.
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            storage_keys = [
+                key for img in ad.images.all() for key in img.storage_keys()
+            ]
+            ad.delete()
 
-        for img in ad.images.all():
-            for key in img.storage_keys():
-                delete_photo(key)
-
-        ad.delete()
+        # Delete physical media files after the transaction commits.
+        # Filesystem deletions inside transaction.atomic() cannot be
+        # rolled back, so a DB rollback would orphan DB rows pointing to
+        # already-deleted files.
+        for key in storage_keys:
+            delete_photo(key)
 
     await _delete()
 
@@ -416,9 +425,7 @@ async def get_lookup_item(item_id: int | None) -> LookupItem | None:
     return await _get()
 
 
-async def get_feature_names(
-    feature_ids: list[int], locale: str = "ru"
-) -> list[str]:
+async def get_feature_names(feature_ids: list[int], locale: str = "ru") -> list[str]:
     """Get feature names as localized strings."""
 
     @sync_to_async
@@ -445,11 +452,17 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="🇪🇺 EUR", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}EUR")
+    builder.button(
+        text="🇪🇺 EUR", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}EUR"
+    )
 
-    builder.button(text="🇷🇸 RSD", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}RSD")
+    builder.button(
+        text="🇷🇸 RSD", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}RSD"
+    )
 
-    builder.button(text="🇧🇦 BAM", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}BAM")
+    builder.button(
+        text="🇧🇦 BAM", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}BAM"
+    )
 
     builder.button(text=_("🆓 Free"), callback_data=BotCallbackPrefix.PRICE_FREE)
 
