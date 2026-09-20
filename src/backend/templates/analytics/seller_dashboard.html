@@ -5,6 +5,7 @@ Extends the same visual style as the main ads dashboard.
 {% endcomment %}
 {% load static %}
 {% load i18n %}
+{% load localized_content %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE|lower }}" dir="{{ LANGUAGE_BIDI|yesno:"rtl,ltr" }}">
     <head>
@@ -87,7 +88,7 @@ Extends the same visual style as the main ads dashboard.
                                         <td class="px-6 py-3">
                                             <a href="{% url 'ads:detail' metric.ad_id %}"
                                                class="text-blue-600 hover:underline">
-                                                {{ metric.ad.title|truncatechars:50 }}
+                                                {{ metric.ad|get_title:LANGUAGE_CODE|truncatechars:50 }}
                                             </a>
                                         </td>
                                         <td class="px-6 py-3 text-right">{{ metric.views_count }}</td>

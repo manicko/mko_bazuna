@@ -310,21 +310,88 @@ def test_no_empty_msgstr() -> None:
         assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
 
 
+# Locale-aware filter names — expressions using any of these already produce
+# locale-correct output and must NOT be flagged by the raw-attribute-access scan.
+_LOCALE_AWARE_FILTERS = (
+    "get_title",
+    "get_name",
+    "get_category_name",
+    "get_city_name",
+    "get_lookup_name",
+)
+
+
 def test_no_raw_get_name_in_templates() -> None:
-    """Templates must use ``|get_category_name:LANGUAGE_CODE`` or
-    ``|get_city_name:LANGUAGE_CODE`` filters instead of raw
-    ``{{ obj.get_name }}`` calls, which render in the default language
-    regardless of the active UI locale.
+    """Templates must use ``|get_title:LANGUAGE_CODE``,
+    ``|get_category_name:LANGUAGE_CODE``, ``|get_city_name:LANGUAGE_CODE``,
+    or ``|get_lookup_name:LANGUAGE_CODE`` filters instead of raw
+    ``{{ obj.get_name }}`` calls or raw ``.title``/``.name`` attribute access,
+    which render in the default language regardless of the active UI locale.
+
+    Exclusions (legitimate raw access that must NOT be flagged):
+    - ``language.name_local`` — Django's language name (``\\b`` guard ensures
+      ``.name`` does not match ``.name_local``).
+    - Expressions already using a locale-aware filter (``|get_title`` etc.).
+    - ``value="…"`` form-input attributes that round-trip to the base model
+      field (e.g. ``<input value="{{ ad.title }}">`` writes back to ``ad.title``).
     """
+    violations: list[str] = []
+
     for tpl_path in _collect_template_files():
         content = tpl_path.read_text(encoding="utf-8")
-        matches = re.findall(r"\{\{[^}]*\.get_name[^}]*\}\}", content)
-        if matches:
-            pytest.fail(
-                f"{tpl_path.relative_to(settings.BASE_DIR)}: "
-                f"raw .get_name call found; use get_category_name/get_city_name "
-                f"filter with LANGUAGE_CODE instead: {matches}"
+        rel_path = str(tpl_path.relative_to(settings.BASE_DIR))
+
+        # 1. Raw .get_name() method calls — should use the |get_name filter.
+        for match in re.findall(r"\{\{[^}]*\.get_name[^}]*\}\}", content):
+            violations.append(
+                f"{rel_path}: raw .get_name() call — use |get_name:LANGUAGE_CODE "
+                f"filter instead: {match}"
             )
+
+        # 2. Collect spans of value="..." / value='...' attributes so that
+        #    form inputs (which round-trip to the base model field) are
+        #    excluded from the attribute-access scan below.
+        form_value_spans = [
+            (m.start(), m.end())
+            for m in re.finditer(
+                r"""value=(["'])[^"']*\{\{[^}]*\}\}[^"']*\1""", content
+            )
+        ]
+
+        # 3. Scan each {{ }} expression for raw .title / .name access.
+        for m in re.finditer(r"\{\{[^}]*\}\}", content):
+            expr = m.group(0)
+
+            # Skip {{ }} inside a value="..."/"value='...'" form input.
+            pos = m.start()
+            if any(start <= pos < end for start, end in form_value_spans):
+                continue
+
+            # Skip expressions already using a locale-aware filter.
+            if any(f in expr for f in _LOCALE_AWARE_FILTERS):
+                continue
+
+            if re.search(r"\.title\b", expr):
+                violations.append(
+                    f"{rel_path}: raw .title attribute access — use "
+                    f"|get_title:LANGUAGE_CODE filter instead: "
+                    f"{expr.strip()}"
+                )
+
+            if re.search(r"\.name\b", expr):
+                violations.append(
+                    f"{rel_path}: raw .name attribute access — use "
+                    f"|get_category_name:LANGUAGE_CODE / "
+                    f"|get_city_name:LANGUAGE_CODE / "
+                    f"|get_lookup_name:LANGUAGE_CODE filter instead: "
+                    f"{expr.strip()}"
+                )
+
+    assert not violations, (
+        "Templates contain raw .get_name() calls or raw .title/.name "
+        "attribute access that bypass locale-aware filters:\n"
+        + "\n".join(violations)
+    )
 
 
 def test_mo_compiled() -> None:
