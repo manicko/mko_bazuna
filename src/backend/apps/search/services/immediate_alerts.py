@@ -40,7 +40,6 @@ from apps.search.services.alert_query import (
     find_matching_saved_searches,
     record_notifications,
 )
-from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +58,10 @@ _executor: ThreadPoolExecutor = ThreadPoolExecutor(
 )
 
 # Inline callback prefix for unsubscribe (callback_data="unsub:<token>").
-# References BotCallbackPrefix.UNSUB as the single source of truth for the
-# callback-data prefix string (QLT-002); the constant name is preserved here
-# to avoid a backend→bot dependency reversal on the definition.
-UNSUB_CALLBACK_PREFIX: Final[str] = BotCallbackPrefix.UNSUB
+# Defined as a backend-native string constant to avoid a backend→bot dependency
+# reversal (QLT-002 added BotCallbackPrefix.UNSUB to the bot enum; the bot
+# layer independently owns its enum, and test_callbacks.py guards against drift).
+UNSUB_CALLBACK_PREFIX: Final[str] = "unsub:"
 
 
 def deliver_immediate_alerts(ad_id: int) -> None:
