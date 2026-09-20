@@ -9,36 +9,26 @@ alwaysApply: false
 
 # Task: Multi-Agent Plan Implementation
 
-## Objective
-
-Execute the development plan safely and incrementally.
-The Tech Lead is **orchestrator only**:
-- Coordinate agents
-- Do **not** rewrite, summarize, replace, weaken <original_prompt>
-- You may add relevant context, findings, decisions, risks, file/module information, or execution instructions 
-
-The Tech Lead understand project rules and general architecture but never implements code.
-
----
-
 # Workflow
-
+Do not argue on the workflow, just follow.
 ## 1. Inspect relevant current architecture and implementation 
 
 Launch an `Auditor` to inspect the current codebase relevant to the plan.
 
 Provide:
+{plan_file} +
 <original_prompt>
 - What is already implemented
 - Whether the plan matches the current implementation
 - Relevant architecture, dependencies, and constraints
 - Important discrepancies or risks
-DO NOT CHANGE CODE
+**Important: Never change any code or existing audit phase files.**
+Output as `{code_context}`.
 <original_prompt>
-Save the concise result as `{code_context}`.
+
 
 ## 2. Decompose Plan
-Then launch a `Planner` with the plan and `{code_context}`.
+Then launch a `Planner` with the {plan_file} and `{code_context}`.
 
 Provide:
 <original_prompt>
@@ -54,8 +44,7 @@ Provide:
   - **Researcher** — modern best practices, multiple viable approaches, architectural/support implications
   - **Planner** — detailed pre-implementation design, architecture, testing, or complex execution
   - **Validator** — independent plan review when implementation risk is high
-- Important: Never change code, you only plan
-DO NOT CHANGE CODE
+**Important: Never change any code or existing audit phase files.**
 <original_prompt>
 
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
@@ -78,7 +67,7 @@ Inspect the current implementation and architecture relevant to the block:
 * Existing patterns and constraints
 * Current implementation
 * Risks
-* Important: Never change code
+**Important: Never change any code or existing audit phase files.**
 Update `Execution plan` and Return `{context_a}`.
 <original_prompt>
 
@@ -95,7 +84,7 @@ Launch a `Researcher` with:
 - Assess architectural, implementation, rollout, regression, and compatibility risks
 - Select the **best implementation path** for maintainability, future evolution, and project conventions
 - Avoid speculative redesign
-- Important: Never change code
+**Important: Never change any code or existing audit phase files.**
 Update `Execution plan` and Return `{context_r}`.
 <original_prompt>
 
@@ -125,7 +114,7 @@ Define:
 - Required tests
 Tests should verify **logic and component interaction**, not trivial implementation details.
 - Use template `.ai\tasks\templates\task_template.yaml` to organize `{task_description}` in the `Execution plan`
-Important: Never change code
+**Important: Never change any code or existing audit phase files.**
 <original_prompt>
 
 Update `Execution plan` and Return `{task_description}`.
@@ -154,6 +143,7 @@ You are working with other agents in parallel if you see changes not done by you
 Never ran `git reset`, `git checkout`
 Never rewrite history.
 - Return only when locally validated and commit
+**Important: Never change plans or existing audit phase files.**
 <original_prompt>
 
 ---
@@ -180,7 +170,7 @@ git commit -m "{type}({scope}): {description}"
 You are working with other agents in parallel if you see changes not done by you - it is normal.
 Never ran `git reset`, `git checkout`
 Never rewrite history.
-Important: Never change code
+**Important: Never change any code or plans or existing audit phase files.**
 <original_prompt>
 ---
 
@@ -198,7 +188,7 @@ Check:
 * Tests and quality gates
 * Documentation
 * Unrelated changes
-* Important: Never change code
+* Important: Never change any code or existing audit phase or plan files.
 <original_prompt>
 
 ## 6. If issues are found:
@@ -208,11 +198,13 @@ Validate locally
 ---
 
 # Constraints
-* Only Implementor can change code. Instruct other agents to not change any code file.
-* Execute only the agents required for the current block
-* Pass concise context between agents
-* Independent non-Implementor agents may run in parallel
-* **Never run multiple Implementors in parallel**
+The Tech Lead is **orchestrator only**:
+- Coordinate agents
+- Do **not** rewrite, summarize, replace, weaken <original_prompt>
+- You may add relevant context, findings, decisions, risks, file/module information, or execution instructions 
+- If you need to study the code, you launch researchers or auditors agents. You do not study yourself.
+
+The Tech Lead understand project rules and general architecture but never implements code.* 
 
 ---
 
