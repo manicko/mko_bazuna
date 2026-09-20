@@ -65,7 +65,7 @@ docker compose --env-file .env.dev \
 
 **Behavior:**
 - Finds all ads with `status = 'DELETED'` and `deleted_at` older than
-  `--retention-days` (default: 120, from `PURGE_DELETED_RETENTION_DAYS` env var).
+  `deleted_at` is older than 120 days (hardcoded).
 - Hard-deletes matching rows (cascading to `ad_images` via `on_delete=CASCADE`).
 - Uses `IX_ads_purge_deleted` partial index for efficient filtering.
 - Acquires advisory lock 11; skips if another instance is running.
@@ -73,14 +73,14 @@ docker compose --env-file .env.dev \
 
 ### Other sweeps
 
-| Command | Env Var | Default | Description |
-|---------|---------|---------|-------------|
-| `archive_sweep` | `ARCHIVE_AGE_DAYS` | 60 | Archive PUBLISHED ads older than 2 months |
-| `delete_sweep` | *(none — hardcoded 60)* | 60 | Hard-delete ARCHIVED ads older than 60 days (from archived_at) |
-| `purge_failed_ads` | `PURGE_FAILED_DAYS` | 7 | Delete ON_MODERATION_FAILED ads older than 7 days |
-| `purge_rejected_ads` | `PURGE_REJECTED_DAYS` | 90 | Delete REJECTED ads older than 90 days |
-| `sweep_drafts` | *(none — hardcoded 30m)* | 30 minutes | Delete DRAFT ads older than 30 minutes |
-| `consent_hard_delete` | `ERASURE_RETENTION_DAYS` | 30 | Hard-delete user PII after 30-day consent withdrawal |
+| Command | Retention | Description |
+|---------|-----------|-------------|
+| `archive_sweep` | 60 days | Archive PUBLISHED ads older than 2 months |
+| `delete_sweep` | 60 days | Hard-delete ARCHIVED ads older than 60 days (from archived_at) |
+| `purge_failed_ads` | 7 days | Delete ON_MODERATION_FAILED ads older than 7 days |
+| `purge_rejected_ads` | 90 days | Delete REJECTED ads older than 90 days |
+| `sweep_drafts` | 30 minutes | Delete DRAFT ads older than 30 minutes |
+| `consent_hard_delete` | 30 days | Hard-delete user PII after 30-day consent withdrawal |
 
 ## §3 Post-Withdrawal Data Retention
 
@@ -95,7 +95,7 @@ When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecyc
 
 2. **T+0 → 30 days (anonymized retained state):** User row retains `id`, empty PII fields, and `consent_revoked_at`. Ads remain soft-deleted (hidden from buyers, not searchable via FTS).
 
-3. **T+30 days (hard-delete sweep):** `consent_hard_delete` management command (advisory lock 3) hard-deletes all user rows where `consent_revoked_at < now() - 30 days` (`ERASURE_RETENTION_DAYS=30`). This CASCADE-deletes:
+3. **T+30 days (hard-delete sweep):** `consent_hard_delete` management command (advisory lock 3) hard-deletes all user rows where `consent_revoked_at < now() - 30 days` (`hardcoded 30 days`). This CASCADE-deletes:
    - All `Ad` rows belonging to the user (including `DELETED` status ads)
    - All `AdImage` rows (via `on_delete=CASCADE`)
    - All `SellerVerification` rows (via `on_delete=CASCADE`)
@@ -109,15 +109,7 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 
 ## Configuration
 
-```python
-# Environment variables (set in .env.dev)
-PURGE_DELETED_RETENTION_DAYS = 120  # days to keep soft-deleted ads before purging
-ARCHIVE_AGE_DAYS = 60  # days before auto-archiving published ads
-DELETE_AGE_DAYS = 60  # days before hard-deleting archived ads (from archived_at)
-PURGE_FAILED_DAYS = 7  # days to keep ON_MODERATION_FAILED ads
-PURGE_REJECTED_DAYS = 90  # days to keep REJECTED ads
-ERASURE_RETENTION_DAYS = 30  # days after consent withdrawal before hard-delete
-```
+All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations. The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days).
 
 ## Scheduler
 

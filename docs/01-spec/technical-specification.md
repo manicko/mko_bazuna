@@ -83,7 +83,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - Users are maximally anonymous; nothing beyond Telegram login is stored.
 - **Privacy policy / Terms required from launch** (visible to buyers without login).
 - **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
-- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, `ERASURE_RETENTION_DAYS=30`; index `IX_users_erasure_sweep`):
+- **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, hardcoded 30 days; index `IX_users_erasure_sweep`):
   - NULL `telegram_id` + `username`; SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`
    - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` (`apps.media.services.filesystem`) after transaction commits (TX-then-FS pattern)
   - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
