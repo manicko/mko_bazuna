@@ -14,7 +14,7 @@ from typing import Final
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
-from django.db.models import F, QuerySet
+from django.db.models import Case, F, IntegerField, QuerySet, When
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
@@ -25,6 +25,11 @@ from apps.core.services.analytics import record_event
 from apps.core.utils.sanitize import sanitize_query_for_log
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
+from apps.search.services.cache import (
+    SEARCH_CACHE_MAX_HITS,
+    build_search_cache_key,
+    get_cached_search_ids,
+)
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.search_history import record_search_history
 
@@ -105,7 +110,37 @@ def search(request: HttpRequest) -> HttpResponse:
     ads = ListingsQuery.build_queryset(params)
 
     if query:
-        ads = _apply_fts(ads, query, params, request)
+        locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
+        cache_key = build_search_cache_key(params, query, locale)
+
+        def producer() -> list[int]:
+            filtered_qs = _apply_fts_filtering(ads, query, params, request)
+            return list(
+                filtered_qs.values_list("id", flat=True)
+            )[:SEARCH_CACHE_MAX_HITS]
+
+        cached_ids = get_cached_search_ids(cache_key, producer)
+
+        if cached_ids is not None:
+            if cached_ids:
+                # Cache hit (fresh or stale-served): filter base queryset to
+                # cached IDs and restore FTS rank order via Case/When.
+                ads = ads.filter(pk__in=cached_ids).order_by(
+                    Case(
+                        *[When(pk=pk, then=pos) for pos, pk in enumerate(cached_ids)],
+                        default=len(cached_ids),
+                        output_field=IntegerField(),
+                    )
+                )
+            else:
+                # Cached empty result — no DB round-trip needed.
+                ads = ads.none()
+        else:
+            # Cold miss loser (lock held by another worker): fall back to a
+            # direct FTS query so the response is never blocked.
+            ads = _apply_fts_filtering(ads, query, params, request)
+
+        _record_search_analytics(query, request)
 
     # Resolve category-constrained filter options (F4/F5).
     resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
@@ -170,14 +205,17 @@ def search(request: HttpRequest) -> HttpResponse:
     return render(request, "ads/list.html", context)
 
 
-def _apply_fts(
+def _apply_fts_filtering(
     queryset: QuerySet, query: str, params: ListingsQueryParams, request: HttpRequest
 ) -> QuerySet:
-    """Apply per-language FTS filtering, relevance sort, and analytics.
+    """Apply per-language FTS filtering and relevance sort (pure, no side effects).
 
     Adds ``SearchRank`` annotation + TSVector filter on the locale's vector
-    column, overrides sort to keep ``-rank`` as a tiebreaker, and records
-    the search event + popular search / history entries.
+    column, and overrides sort to keep ``-rank`` as a tiebreaker.
+
+    Side effects (analytics recording) are deliberately excluded — the caller
+    should invoke :func:`_record_search_analytics` separately so that analytics
+    fire unconditionally for every query-bearing search regardless of cache state.
     """
     locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
     vector_field = locale.fts_vector_field
@@ -216,21 +254,31 @@ def _apply_fts(
     else:  # DATE_NEW — relevance-first default
         queryset = queryset.order_by("-rank", "-published_at", "-id")
 
-    # Record search event (analytics) after successful execution
+    return queryset
+
+
+def _record_search_analytics(query: str, request: HttpRequest) -> None:
+    """Record search analytics for a query-bearing search.
+
+    Fires ``SEARCH_PERFORMED`` event, increments the popular-search counter,
+    and records per-user (or session) search history.  Called unconditionally
+    inside the view's ``if query:`` block so that analytics are never
+    suppressed by the cache layer (cache hit, miss, stale-serve, or fallback).
+
+    Args:
+        query: The normalized (stripped, truncated) search query string.
+        request: The original HTTP request (for user/session context).
+    """
     record_event(
         AnalyticsEventType.SEARCH_PERFORMED,
         user_id=request.user.id if request.user.is_authenticated else None,
     )
-
-    # Record popular search and user history for autocomplete.
     increment_popular_search(query)
     record_search_history(
         request.user.id if request.user.is_authenticated else None,
         query,
         session=request.session,
     )
-
-    return queryset
 
 
 def _is_single_word(text: str) -> bool:
