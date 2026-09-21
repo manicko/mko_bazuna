@@ -18,7 +18,7 @@ from apps.users.services.deletion import (
     soft_delete_user_ads,
     withdraw_consent,
 )
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -264,6 +264,27 @@ class TestGiveConsent:
         assert user.ads_auto_publish is True
         assert user.consent_given_at is not None
         assert user.consent_revoked_at is None
+
+    def test_give_consent_rejected_on_soft_deleted_user(self) -> None:
+        """give_consent is a no-op for soft-deleted users (WITHDRAW is terminal)."""
+        deleted = make_user(
+            900000050,
+            consent_revoked=True,
+            is_deleted=True,
+        )
+
+        pre_revoked = deleted.consent_revoked_at
+        pre_given = deleted.consent_given_at
+        pre_telegram_id = deleted.telegram_id
+
+        give_consent(deleted)
+
+        deleted.refresh_from_db()
+        # State must be unchanged -- no DB write occurred
+        assert deleted.is_deleted is True
+        assert deleted.consent_revoked_at == pre_revoked  # not cleared
+        assert deleted.consent_given_at == pre_given  # not set
+        assert deleted.telegram_id == pre_telegram_id  # not restored/nullified
 
 
 class TestWithdrawConsentAtomicity:

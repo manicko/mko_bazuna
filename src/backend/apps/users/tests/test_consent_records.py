@@ -15,6 +15,7 @@ from django.test import Client
 from apps.core.enums import ConsentChoice, ConsentVersion
 from apps.users.models import ConsentRecord
 from apps.users.services.consent_record import _anonymize_ip
+from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -32,6 +33,21 @@ class TestConsentRecords:
         assert record.user_id == user.id
         assert record.choice == ConsentChoice.ACCEPTED.value
         assert record.categories == {"analytics": True, "preferences": True}
+
+    def test_accept_on_deleted_user_creates_no_record(self) -> None:
+        """A soft-deleted user posting to /consent/accept/ creates no ConsentRecord."""
+        deleted = make_user(
+            900000060,
+            consent_revoked=True,
+            is_deleted=True,
+        )
+
+        client = Client()
+        client.force_login(deleted)
+        response = client.post("/consent/accept/")
+
+        assert response.status_code == 403
+        assert ConsentRecord.objects.count() == 0
 
     def test_decline_creates_record(self, user) -> None:
         """Authenticated decline creates a DECLINED record."""

@@ -129,6 +129,35 @@ class TestConsentAcceptView:
         assert user.ads_auto_publish is True
         assert user.consent_given_at is not None
 
+    def test_accept_rejected_on_deleted_user(self, deleted_user: User) -> None:
+        """POST /consent/accept/ by a soft-deleted user returns 403."""
+        deleted_user.consent_revoked_at = timezone.now()
+        deleted_user.save(update_fields=["consent_revoked_at"])
+
+        client = Client()
+        client.force_login(deleted_user)
+        response = client.post("/consent/accept/")
+
+        assert response.status_code == 403
+        # No ConsentRecord(choice=ACCEPTED) created for the deleted identity
+        assert ConsentRecord.objects.filter(choice=ConsentChoice.ACCEPTED).count() == 0
+        # User state unchanged -- consent_revoked_at NOT cleared
+        deleted_user.refresh_from_db()
+        assert deleted_user.is_deleted is True
+        assert deleted_user.consent_revoked_at is not None
+
+    def test_accept_no_consent_record_on_deleted_user(self, deleted_user: User) -> None:
+        """No ConsentRecord at all is created when a soft-deleted user accepts."""
+        deleted_user.consent_revoked_at = timezone.now()
+        deleted_user.save(update_fields=["consent_revoked_at"])
+
+        client = Client()
+        client.force_login(deleted_user)
+        response = client.post("/consent/accept/")
+
+        assert response.status_code == 403
+        assert ConsentRecord.objects.count() == 0
+
 
 # ---------------------------------------------------------------------------
 # Tests: consent_decline
@@ -191,6 +220,22 @@ class TestConsentDeclineView:
         assert response.cookies["consent_analytics"].value == "false"
         # Preferences remain available even on decline (PO-02).
         assert response.cookies["consent_preferences"].value == "true"
+
+    def test_decline_rejected_on_deleted_user(self, deleted_user: User) -> None:
+        """POST /consent/decline/ by a soft-deleted user returns 403."""
+        deleted_user.consent_revoked_at = timezone.now()
+        deleted_user.save(update_fields=["consent_revoked_at"])
+
+        client = Client()
+        client.force_login(deleted_user)
+        response = client.post("/consent/decline/")
+
+        assert response.status_code == 403
+        # No ConsentRecord(choice=DECLINED) created for the deleted identity
+        assert ConsentRecord.objects.filter(choice=ConsentChoice.DECLINED).count() == 0
+        # User state unchanged
+        deleted_user.refresh_from_db()
+        assert deleted_user.is_deleted is True
 
 
 # ---------------------------------------------------------------------------
