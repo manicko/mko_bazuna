@@ -182,13 +182,13 @@ CREATE TRIGGER on_category_name_update
 > category renames / `name_i18n` edits. The trigger fires on `name_i18n` updates so localized
 > category name changes re-index all affected ads.
 
-**Migration notes:** after installing the trigger DDL, run the backfill opt-in to recompute NULL per-language vectors for pre-existing rows (seed uses `bulk_create`, bypassing the trigger):
+**Migration notes:** after installing the trigger DDL, run the backfill opt-in to recompute NULL per-language vectors for pre-existing rows (seed uses `bulk_create`, which fires the BEFORE INSERT trigger so vectors are populated — only `COPY` or `SET session_replication_role='replica'` inserts leave vectors NULL):
 
 ```bash
 python manage.py setup_search_triggers --backfill
 ```
 
-This runs `UPDATE ads SET title = title WHERE search_vector_ru IS NULL OR search_vector_bs IS NULL OR search_vector_en IS NULL`, which fires the `ads_search_vector_fn` trigger to repopulate any NULL vectors. The `--backfill` flag is opt-in (default off) so that `migrate_locked.py` — which calls `setup_search_triggers` without arguments — remains DDL-only during normal bootstrapping.
+This runs `UPDATE ads SET title = title WHERE search_vector_ru IS NULL OR search_vector_bs IS NULL OR search_vector_en IS NULL`, which fires the `ads_search_vector_fn` trigger to repopulate any NULL vectors. Such NULL vectors arise only from inserts that bypass the trigger — e.g. a `COPY` load, a `pg_dump` restore predating the trigger, or a failed trigger install during a migration window — NOT from seed `bulk_create`. The `--backfill` flag is passed automatically by `migrate_locked.py` during bootstrap so that the backfill runs under the same advisory lock as schema creation; it is idempotent (0 rows on subsequent runs).
 
 **Fallback (manual):** for environments where the management command is unavailable, the equivalent raw SQL is `UPDATE ads SET title = title` (no `WHERE` clause re-indexes all rows). O(n_ads) per category rename — acceptable for ~30-50 categories.
 

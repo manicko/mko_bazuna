@@ -25,14 +25,15 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def _null_search_vectors(ad: Ad) -> None:
-    """Set all per-language search vectors to NULL, bypassing the trigger.
+    """Set all per-language search vectors to NULL, suspending trigger execution.
 
     A plain ``QuerySet.update()`` fires the BEFORE UPDATE trigger, which would
     immediately repopulate the vectors. ``SET session_replication_role =
     'replica'`` suspends trigger execution so we can simulate pre-existing rows
-    that bypassed the trigger, e.g. during seed ``bulk_create``. Triggers are
-    re-enabled before returning so the subsequent backfill UPDATE fires
-    ``ads_search_vector_fn`` normally.
+    that lack vector data, as can occur from ``COPY`` loads or inserts that
+    explicitly bypassed the trigger (see docs/02-database/db-indexes.md,
+    "Migration notes"). Triggers are re-enabled before returning so the
+    subsequent backfill UPDATE fires ``ads_search_vector_fn`` normally.
     """
     with connection.cursor() as cursor:
         cursor.execute("SET session_replication_role = 'replica';")
@@ -60,7 +61,7 @@ class TestSetupSearchTriggersBackfill:
             description="Продается детский велосипед",
         )
         # Trigger populated vectors on INSERT; null them out to simulate
-        # pre-existing rows that bypassed the trigger.
+        # rows that lack vector data (e.g. from COPY or replication-role bypass).
         _null_search_vectors(ad)
         ad.refresh_from_db()
         assert ad.search_vector_ru is None

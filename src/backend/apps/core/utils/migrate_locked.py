@@ -4,9 +4,14 @@ One-shot migration runner with advisory lock.
 Session-scoped lock safe because migrate runs before PgBouncer is attached.
 Idempotent: subsequent runs will find lock already held and skip.
 
-Runs ``migrate --run-syncdb``, ``setup_search_triggers``, ``load_exchange_rates``,
-and optionally ``backfill_translations`` (when ``RUN_TRANSLATION_BACKFILL=true``)
-inside the single session-scoped lock, replacing the previous ``&&`` shell chain that released the lock between steps.
+Runs ``migrate --run-syncdb``, ``setup_search_triggers --backfill``,
+``load_exchange_rates``, and optionally ``backfill_translations`` (when
+``RUN_TRANSLATION_BACKFILL=true`` inside the single session-scoped lock,
+replacing the previous ``&&`` shell chain that released the lock between steps.
+
+``--backfill`` on ``setup_search_triggers`` ensures trigger-populated vectors
+for existing rows during bootstrap, preventing regrowth of NULL vectors from
+``COPY`` or pre-trigger inserts. Idempotent: subsequent runs update 0 rows.
 
 ``--run-syncdb`` ensures tables are created for unmigrated apps. When the test
 settings (``MIGRATION_MODULES = DisableMigrations``) are active, ALL apps
@@ -29,7 +34,7 @@ logger = logging.getLogger(__name__)
 def _build_steps() -> tuple[tuple[str, ...], ...]:
     """Build the ordered tuple of post-migration setup steps.
 
-    The first three steps (``migrate``, ``setup_search_triggers``,
+    The first three steps (``migrate``, ``setup_search_triggers --backfill``,
     ``load_exchange_rates``) always run. The optional fourth step
     (``backfill_translations``) is included only when the
     ``RUN_TRANSLATION_BACKFILL`` environment variable is set to ``"true"``,
@@ -38,7 +43,7 @@ def _build_steps() -> tuple[tuple[str, ...], ...]:
     """
     steps_list: list[tuple[str, ...]] = [
         ("migrate", "--noinput", "--run-syncdb"),
-        ("setup_search_triggers",),
+        ("setup_search_triggers", "--backfill"),
         ("load_exchange_rates",),
     ]
     if os.getenv("RUN_TRANSLATION_BACKFILL") == "true":
