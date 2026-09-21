@@ -45,6 +45,5 @@
     easier to edit, review, and less prone to corruption.
 
 16. **Internationalization is part of DoD**
-    Wrap user-visible strings in `{% trans %}`/`{% blocktrans %}` (templates) or `gettext`/`gettext_lazy` (Python). `msgstr` must be non-empty for `ru` and `bs`; `en` may be empty (msgid is English). Run `make makemessages` then `make compilemessages` before committing; new code must pass `test_i18n_completeness.py`. DB-based i18n (`feature_tag.html` via `get_lookup_name`) is exempt.
 
 
