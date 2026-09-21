@@ -109,6 +109,11 @@ def search(request: HttpRequest) -> HttpResponse:
     )
     ads = ListingsQuery.build_queryset(params)
 
+    # Defaults for the no-query path; overridden by the FTS COUNT(*) path when
+    # a search query is present (08-SRH-002).
+    total_count = 0
+    results_truncated = False
+
     if query:
         locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
         cache_key = build_search_cache_key(params, query, locale)
@@ -142,6 +147,15 @@ def search(request: HttpRequest) -> HttpResponse:
 
         _record_search_analytics(query, request)
 
+        # Decouple display count from the 1000-row cache cap (08-SRH-002).
+        # The cached ID list is capped at SEARCH_CACHE_MAX_HITS; compute the true
+        # match count via a cheap COUNT(*) on the GIN-filtered FTS queryset.
+        fts_count_qs = _apply_fts_filtering(
+            ListingsQuery.build_queryset(params), query, params, request
+        )
+        total_count = fts_count_qs.count()
+        results_truncated = total_count > SEARCH_CACHE_MAX_HITS
+
     # Resolve category-constrained filter options (F4/F5).
     resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
 
@@ -164,7 +178,9 @@ def search(request: HttpRequest) -> HttpResponse:
     # Paginate results
     paginator = Paginator(ads, params.per_page)
     page_obj = paginator.get_page(params.page)
-    total_count = int(paginator.count)
+    if not query:
+        total_count = int(paginator.count)
+        results_truncated = False
     has_results = total_count > 0
     if query and not has_results:
         logger.info(
@@ -196,6 +212,8 @@ def search(request: HttpRequest) -> HttpResponse:
         "categories": Category.objects.filter(is_active=True).order_by("name"),
         "selected_city": selected_city_id,
         "selected_category": selected_category_id,
+        "total_count": total_count,
+        "results_truncated": results_truncated,
         "show_filters": True,
     }
 
