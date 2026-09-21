@@ -268,6 +268,12 @@ class CookieCategory(StrEnum):
     PREFERENCES = "preferences"
 
 
+class ConsentVersion(StrEnum):
+    """Consent-banner version (GDPR Art. 7(1) accountability — version shown)."""
+
+    V1_0 = "1.0"
+
+
 __all__ = [
     "AdSort",
     "AdvisoryLockId",
@@ -287,4 +293,5 @@ __all__ = [
     "TimeRange",
     "ConsentChoice",
     "CookieCategory",
+    "ConsentVersion",
 ]
