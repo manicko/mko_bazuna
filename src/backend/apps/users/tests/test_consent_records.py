@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from django.test import Client
 
-from apps.core.enums import ConsentChoice
+from apps.core.enums import ConsentChoice, ConsentVersion
 from apps.users.models import ConsentRecord
 from apps.users.services.consent_record import _anonymize_ip
 
@@ -61,7 +61,7 @@ class TestConsentRecords:
         # The client holds a session when cookies are enabled.
         record = ConsentRecord.objects.get()
         assert record.user_id is None
-        assert record.consent_version == "1.0"
+        assert record.consent_version == ConsentVersion.V1_0.value
         assert response.cookies.get("consent_given") is not None
 
     def test_ip_is_anonymized_and_ua_truncated(self, user) -> None:

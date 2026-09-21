@@ -7,7 +7,7 @@ One user = one Telegram account. Authentication via atomic login tokens.
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from apps.core.enums import AdSource, ConsentChoice, LanguageLocale
+from apps.core.enums import AdSource, ConsentChoice, ConsentVersion, LanguageLocale
 
 
 class User(AbstractUser):
@@ -223,7 +223,7 @@ class ConsentRecord(models.Model):
     )
     consent_version = models.CharField(
         max_length=20,
-        default="1.0",
+        default=ConsentVersion.V1_0.value,
         help_text="Banner text version shown to the user",
     )
     choice = models.CharField(

@@ -174,6 +174,7 @@ TEMPLATES = [
                 "apps.core.context_processors.site_config",
                 "apps.core.context_processors.price_step",
                 "apps.users.context_processors.consent_state",
+                "apps.users.context_processors.consent_version",
             ],
         },
     },

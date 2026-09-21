@@ -13,7 +13,7 @@ import ipaddress
 
 from django.http import HttpRequest
 
-from apps.core.enums import ConsentChoice, CookieCategory
+from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
 from apps.users.models import ConsentRecord, User
 
 
@@ -39,7 +39,7 @@ def record_consent_action(
     choice: ConsentChoice,
     categories: dict[CookieCategory, bool],
     request: HttpRequest | None = None,
-    consent_version: str = "1.0",
+    consent_version: str = ConsentVersion.V1_0.value,
 ) -> ConsentRecord:
     """Create a ``ConsentRecord`` for a consent action.
 

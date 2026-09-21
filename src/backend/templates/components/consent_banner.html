@@ -48,7 +48,7 @@
                                    name="preferences"
                                    id="consent-preferences-val"
                                    value="true">
-                            <input type="hidden" name="consent_version" value="1.0">
+                            <input type="hidden" name="consent_version" value="{{ consent_version.value }}">
                             <button type="submit"
                                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
                                 {% trans "Accept" %}
@@ -63,7 +63,7 @@
                                    name="preferences"
                                    id="consent-decline-preferences-val"
                                    value="true">
-                            <input type="hidden" name="consent_version" value="1.0">
+                            <input type="hidden" name="consent_version" value="{{ consent_version.value }}">
                             <button type="submit"
                                     class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm">
                                 {% trans "Reject non-essential" %}

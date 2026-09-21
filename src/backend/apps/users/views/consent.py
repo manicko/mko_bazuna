@@ -29,7 +29,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from pydantic import ValidationError
 
-from apps.core.enums import ConsentChoice, CookieCategory
+from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
 from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 from apps.core.services.site_config import get_bot_username
@@ -162,7 +162,7 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
             CookieCategory.PREFERENCES: preferences,
         },
         request=request,
-        consent_version=submission.consent_version if submission else "1.0",
+        consent_version=submission.consent_version if submission else ConsentVersion.V1_0.value,
     )
     logger.info("User %s accepted consent via web", getattr(user, 'id', 'anonymous'))
     return response
@@ -211,7 +211,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
             CookieCategory.PREFERENCES: preferences,
         },
         request=request,
-        consent_version=submission.consent_version if submission else "1.0",
+        consent_version=submission.consent_version if submission else ConsentVersion.V1_0.value,
     )
     logger.info("User %s declined consent via web", getattr(user, 'id', 'anonymous'))
     return response

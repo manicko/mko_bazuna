@@ -110,3 +110,15 @@ def consent_state(request) -> dict[str, bool]:
         "consent_analytics": consent_analytics,
         "consent_preferences": consent_preferences,
     }
+
+
+def consent_version(request) -> dict:
+    """Expose the current consent-banner version to every template.
+
+    Mirrors the ``price_step`` pattern in ``core/context_processors.py``:
+    templates render ``value="{{ consent_version.value }}"`` instead of
+    hardcoding a version string.
+    """
+    from apps.core.enums import ConsentVersion
+
+    return {"consent_version": ConsentVersion.V1_0}

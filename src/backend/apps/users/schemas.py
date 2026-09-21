@@ -7,9 +7,13 @@ so invalid or malformed data is rejected before it reaches the views/services.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import logging
 
-from apps.core.enums import ConsentChoice, CookieCategory
+from pydantic import BaseModel, Field, field_validator
+
+from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
+
+logger = logging.getLogger(__name__)
 
 
 class ConsentSubmission(BaseModel):
@@ -23,7 +27,27 @@ class ConsentSubmission(BaseModel):
     choice: ConsentChoice
     analytics: bool = False
     preferences: bool = False
-    consent_version: str = Field(default="1.0", max_length=20)
+    consent_version: str = Field(default=ConsentVersion.V1_0.value, max_length=20)
+
+    @field_validator("consent_version", mode="before")
+    @classmethod
+    def _normalize_consent_version(cls, value: object) -> str:
+        """Leniently normalize the consent version to a valid ConsentVersion value.
+
+        ``None``, empty strings, and unrecognized values are coerced to
+        ``ConsentVersion.V1_0.value`` with a warning log so that a malformed
+        client submission never triggers a 400 — the default version is
+        recorded instead.
+        """
+        valid_values = {v.value for v in ConsentVersion}
+        if value in valid_values:
+            return str(value)
+        logger.warning(
+            "Invalid or missing consent_version (%r); coercing to %r",
+            value,
+            ConsentVersion.V1_0.value,
+        )
+        return ConsentVersion.V1_0.value
 
     def categories(self) -> dict[CookieCategory, bool]:
         """Build the category map keyed by ``CookieCategory`` enum members.
