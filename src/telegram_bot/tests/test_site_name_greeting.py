@@ -67,11 +67,11 @@ async def test_post_command_greeting_contains_site_name() -> None:
 
     with (
         patch(
-            "telegram_bot.handlers.ad_create.create_draft_ad",
+            "telegram_bot.handlers.ad_create.entry.create_draft_ad",
             new=AsyncMock(return_value=fresh_ad),
         ),
         patch(
-            "telegram_bot.handlers.ad_create.get_site_name_async",
+            "telegram_bot.handlers.ad_create.entry.get_site_name_async",
             new=AsyncMock(return_value="MyBotSite"),
         ),
     ):

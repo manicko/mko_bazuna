@@ -118,7 +118,7 @@ class TestProcessPreviewLanguageDetection:
         message = _build_message("en-US")
 
         with patch(
-            "telegram_bot.handlers.ad_create.translate_all_languages",
+            "telegram_bot.handlers.ad_create.submit.translate_all_languages",
             _mock_translate,
         ):
             await process_preview(message, state)
@@ -153,7 +153,7 @@ class TestProcessPreviewLanguageDetection:
         message = _build_message(None)
 
         with patch(
-            "telegram_bot.handlers.ad_create.translate_all_languages",
+            "telegram_bot.handlers.ad_create.submit.translate_all_languages",
             _mock_translate,
         ):
             await process_preview(message, state)
@@ -499,7 +499,7 @@ class TestCancelAfterSubmit:
             assert ad.status != AdStatus.DRAFT
 
             # Patch delete_photo — it must NOT be called for a non-DRAFT ad
-            with patch("telegram_bot.handlers.ad_create.delete_photo") as mock_delete:
+            with patch("telegram_bot.handlers.ad_create.entry.delete_photo") as mock_delete:
                 caplog.set_level(
                     logging.INFO,
                     logger="telegram_bot.handlers.ad_create",
