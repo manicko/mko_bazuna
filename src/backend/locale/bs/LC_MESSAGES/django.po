@@ -863,6 +863,9 @@ msgstr "Još nema oglasa"
 msgid "Be the first to create an ad via Telegram!"
 msgstr "Budite prvi koji stvori oglas putem Telegrama!"
 
+msgid "Over 1,000 results found. Showing the first 1,000. Refine your search to see more."
+msgstr "Pronađeno više od 1.000 rezultata. Prikazano je prvih 1.000. Refinirajte pretragu da bi ste videli više."
+
 msgid "Listing purpose"
 msgstr "Namjena"
 

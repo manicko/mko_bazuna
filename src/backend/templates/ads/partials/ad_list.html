@@ -88,6 +88,12 @@ is unaffected. {% endcomment %}
         {% endfor %}
     </div>
 {% endif %}
+<!-- Truncated results notice -->
+{% if results_truncated %}
+    <div class="mb-4 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+        {% blocktrans %}Over 1,000 results found. Showing the first 1,000. Refine your search to see more.{% endblocktrans %}
+    </div>
+{% endif %}
 <!-- Ads grid -->
 {% if page_obj %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

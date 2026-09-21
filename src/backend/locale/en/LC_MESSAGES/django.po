@@ -780,6 +780,9 @@ msgstr ""
 msgid "Be the first to create an ad via Telegram!"
 msgstr ""
 
+msgid "Over 1,000 results found. Showing the first 1,000. Refine your search to see more."
+msgstr ""
+
 msgid "Listing purpose"
 msgstr ""
 
