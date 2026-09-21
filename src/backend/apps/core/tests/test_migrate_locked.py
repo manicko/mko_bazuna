@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.unit]
 
 _DEFAULT_STEPS: tuple[tuple[str, ...], ...] = (
     ("migrate", "--noinput", "--run-syncdb"),
-    ("setup_search_triggers",),
+    ("setup_search_triggers", "--backfill"),
     ("load_exchange_rates",),
 )
 

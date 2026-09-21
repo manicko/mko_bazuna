@@ -12,6 +12,7 @@ related:
   - technical-specification
   - migration-workflow
   - seed-workflow
+  - rollback
 ---
 
 ## Purpose
@@ -327,7 +328,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 |----------|----------|-------------|
 | `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions, CSRF, password-reset) are invalidated. |
 | `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
-| `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
+| `BOT_TOKEN` | Yes | Telegram bot token from @BotFather. Rotate if compromised: get a new token from @BotFather, update `BOT_TOKEN` in `.env.prod`, then run `docker compose ... up -d bot`. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is needed. After rotation, the old token is immediately invalidated. |
 | `BOT_USERNAME` | Yes | Telegram bot username (without `@`) — used for contact deep-links and login QR codes |
 | `ALLOWED_HOSTS` | Yes (prod) | Comma-separated list of host/domain names the app can serve. `prod.py` raises `ValueError` if empty |
 | `SITE_URL` | Yes* | Public site URL for absolute links in Telegram alerts (no trailing slash). Example: `https://mko-bazuna.example.com` |
@@ -337,7 +338,8 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `POSTGRES_DB` | Yes | Database name |
 | `POSTGRES_HOST` | No (default: `db`) | Database host. Set inline to `db` (compose service name) in all services; documents the Django `DATABASES` fallback for local non-Docker development |
 | `POSTGRES_PORT` | No (default: `5432`) | Database port. Used by Django `DATABASES` fallback and the prod backup service |
-| `REDIS_URL` | No (default: `redis://localhost:6379/0`) | Redis connection for cache and rate-limiting. Set inline to `redis://redis:6379/0` in all prod Compose services |
+| `REDIS_URL` | No (default: `""`) | Redis connection for cache and rate-limiting. Set inline to `redis://redis:6379/0` in all prod Compose services. Empty in dev/test (falls back to LocMemCache / MemoryStorage) |
+| `GOOGLE_TRANSLATE_API_KEY` | Yes (prod) | Google Cloud Translation API v2 key used by `apps.core.services.translation.translate_text()`. Required in production (`config/settings/prod.py` fail-fast guard). Empty in `.env.dev`. Rotate if committed to VCS or exposed. After rotation, restart the `bot` container — the translation service reads the key at call time via `settings.GOOGLE_TRANSLATE_API_KEY`. |
 | `PLAUSIBLE_HOST` | No | Analytics host for Plausible traffic tracking (cookieless, no consent banner). Empty disables analytics |
 | `TLS_CERT_PATH` | No (default: `/etc/nginx/certs/`) | Path to TLS certificates (fullchain.pem / privkey.pem) mounted into nginx |
 | `ADMIN_USERNAME` | No (default: `admin`) | Django admin username for the `create_admin` one-shot service |
@@ -352,12 +354,62 @@ individual database variables.
 
 *Required for automatic admin creation via `create_admin` service. Can be created manually if not set.
 
+### Rotating Secrets
+
+All production secrets live in `.env.prod`. Each has a different blast radius, so rotate only what is necessary.
+The procedure for each secret follows the same pattern: generate a new value, update the variable in `.env.prod`,
+restart the affected container(s), and account for the consequences.
+
+**`DJANGO_SECRET_KEY`** — rotate if the key may have been committed to VCS or exposed.
+
+1. Generate a new key:
+   ```bash
+   python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+   ```
+2. Update `DJANGO_SECRET_KEY` in `.env.prod`.
+3. Restart `web` and `bot` together:
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d web bot
+   ```
+4. All signed tokens (sessions, CSRF, password-reset) are invalidated; users must re-authenticate and password-reset links expire.
+
+**`BOT_TOKEN`** — rotate if the token is compromised or exposed.
+
+1. Request a new token from @BotFather in Telegram.
+2. Update `BOT_TOKEN` in `.env.prod`.
+3. Restart the `bot` container:
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d bot
+   ```
+4. The old token is immediately invalidated. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is required.
+
+**`GOOGLE_TRANSLATE_API_KEY`** — rotate if the key may have been committed to VCS or exposed in logs.
+
+1. Generate or rotate the key in Google Cloud Console (Cloud Translation API v2).
+2. Update `GOOGLE_TRANSLATE_API_KEY` in `.env.prod`.
+3. Restart the `bot` container:
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d bot
+   ```
+4. The translation service reads the key at call time via `settings.GOOGLE_TRANSLATE_API_KEY`, so no other containers need restarting and no user-facing state is invalidated.
+
 ### Deployment Checks
 
 Deployment configuration is validated via Django's `manage.py check --deploy`:
 - **CI:** The `test` job runs `check --deploy` with `continue-on-error: true` — deploy warnings (e.g., `security.W025` for a `SECRET_KEY` shorter than 50 characters) appear as CI annotations but never fail the build.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
 - This complements the `${VAR:?}` presence guards in `docker-compose.yml`; it cannot be bypassed by a non-empty placeholder key.
+
+### Deployment Rollback
+
+If a deployment introduces a regression, follow the [Deployment Rollback Runbook](rollback.md).
+The runbook covers image-tag rollback (changing `IMAGE_TAG` in `.env.prod` and
+re-deploying), config rollback (reverting `.env.prod` via `git checkout`),
+schema rollback (forward-only Django migrations require a backup restore +
+corrective `migrate` step), health-check-gated validation (curl `/health/ready/`
+until 200, verify bot marker freshness), rollback-test cadence in staging, and
+the failure escalation path. This addresses finding
+  [12-OPS-007](../../.ai/audit/12-production-ops/findings.md).
 
 ## Makefile Commands
 
@@ -589,7 +641,7 @@ The nginx configuration (`docker/nginx/nginx.conf`) includes:
 ### Security Headers
 
 All responses include:
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `Content-Security-Policy: default-src 'none'; img-src 'self' data:; object-src 'none'`
@@ -948,6 +1000,7 @@ Environment section.
 
 - [Local HTTPS with mkcert](local-https-mkcert.md) - Development HTTPS setup for production parity
 - [Database Restore Runbook](restore.md)
+- [Deployment Rollback Runbook](rollback.md) - Image, config, and schema rollback procedures
 - [Migration Workflow](migration-workflow.md) - Dev migration workflow, consolidation, and rules
 - [Seed Data Workflow](seed-workflow.md) - Seed data generation, fixtures, and photo pipeline
 - [Architecture Structure](../01-spec/architecture-structure.md)
