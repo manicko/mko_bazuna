@@ -27,6 +27,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.ads.models import Ad
+from apps.ads.views.edit import _apply_price_change
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
@@ -568,3 +569,41 @@ class TestPublishedTextEdit:
         assert ad.status == AdStatus.ON_MODERATION
         assert "error" in response.context
         assert response.context["error"]
+
+
+# ---------------------------------------------------------------------------
+# Parity test: _apply_price_change delegates to the shared utility
+# (10-QLT-001 DRY invariant — closes V-09 test gap)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyPriceChangeDelegation:
+    """Verify ``_apply_price_change`` delegates price normalization to the
+    shared ``normalize_price_to_eur`` utility.
+
+    The DRY invariant (10-QLT-001) requires both the edit path and the
+    ``submit_ad`` path to call the **same** shared utility.  These tests patch
+    the utility at the call-site namespace (``apps.ads.views.edit``) — not the
+    definition site — to verify delegation without invoking real conversion.
+    """
+
+    def test_apply_price_change_delegates_to_shared_utility(
+        self, seller, category, city
+    ) -> None:
+        """Currency-present (success) and currency-None paths both call the
+        shared ``normalize_price_to_eur`` utility instead of re-implementing
+        normalization inline.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+
+        with patch("apps.ads.views.edit.normalize_price_to_eur") as mock_normalizer:
+            # Currency present (success path)
+            _apply_price_change(ad, Decimal("200"), CurrencyCode.BAM)
+            mock_normalizer.assert_called_with(ad, Decimal("200"), CurrencyCode.BAM)
+            mock_normalizer.reset_mock()
+
+            # Currency None (→ None path — utility clears the value)
+            _apply_price_change(ad, Decimal("0"), None)
+            mock_normalizer.assert_called_with(ad, Decimal("0"), None)

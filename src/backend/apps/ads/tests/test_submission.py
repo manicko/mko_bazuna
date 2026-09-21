@@ -118,3 +118,40 @@ def test_submit_ad_commit_when_auto_moderate_passes(
 
     ad.refresh_from_db()
     assert ad.status == AdStatus.ON_MODERATION
+
+
+# ---------------------------------------------------------------------------
+# Parity test: submit_ad delegates price normalization to the shared utility
+# (10-QLT-001 DRY invariant — closes V-09 test gap)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_ad_price_normalization_delegates_to_shared_utility(
+    seller, category, city
+) -> None:
+    """``submit_ad`` invokes the shared ``normalize_price_to_eur`` utility
+    (patched at the ``apps.ads.services.submission`` call-site namespace)
+    during a successful submission with a currency present.
+
+    The ``ad`` passed to the utility is fetched fresh inside ``submit_ad``'s
+    transaction — assertions verify by ``pk`` rather than object identity.
+    """
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+    with patch(
+        "apps.moderation.services.auto_moderation.auto_moderate",
+        return_value=True,
+    ):
+        with patch(
+            "apps.ads.services.submission.normalize_price_to_eur"
+        ) as mock_normalizer:
+            passed, errors = submit_ad(_make_input(ad))
+
+    assert passed is True
+    assert errors == []
+
+    mock_normalizer.assert_called_once()
+    call_args = mock_normalizer.call_args
+    assert call_args.args[0].pk == ad.pk
+    assert call_args.args[1] == Decimal("100")
+    assert call_args.args[2] == CurrencyCode.EUR
