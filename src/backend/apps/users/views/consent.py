@@ -22,7 +22,7 @@ from datetime import timedelta
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -140,6 +140,10 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
         submission.preferences if submission and "preferences" in request.POST else True
     )
     user = request.user if request.user.is_authenticated else None
+
+    if user is not None and user.is_deleted:
+        logger.warning("Soft-deleted user %s attempted consent accept -- rejected (WITHDRAW is terminal)", user.id)
+        return HttpResponseForbidden()
 
     if user is not None:
         give_consent(user)
