@@ -194,6 +194,10 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
     )
     user = request.user if request.user.is_authenticated else None
 
+    if user is not None and user.is_deleted:
+        logger.warning("Soft-deleted user %s attempted consent decline -- rejected (WITHDRAW is terminal)", user.id)
+        return HttpResponseForbidden()
+
     if user is not None:
         decline_consent(user)
         target = "ads:dashboard"
