@@ -113,7 +113,9 @@ def _serve_image(image_key: str) -> HttpResponseBase:
     file_path = settings.MEDIA_ROOT / image_key
     if not file_path.exists():
         raise Http404("Image not found")
-    return FileResponse(open(file_path, "rb"), content_type="image/jpeg")
+    response = FileResponse(open(file_path, "rb"), content_type="image/jpeg")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @vary_on_headers("Cookie")

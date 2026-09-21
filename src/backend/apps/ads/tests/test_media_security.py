@@ -291,6 +291,7 @@ class TestMediaAccessControl:
             response = _serve_image(key)
         assert isinstance(response, FileResponse)
         assert response.headers["Content-Type"] == "image/jpeg"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
 class TestExifStripping:
