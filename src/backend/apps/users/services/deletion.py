@@ -233,17 +233,32 @@ def give_consent(user: User) -> None:
 
     including bot interactions.
 
-    Also clears any prior decline or withdrawal state (D6): accepting after a
+    Covers the DECLINE to ACCEPT transition (D6): accepting after a decline
 
-    decline restores full publishing ability and clears a prior revocation
+    restores full publishing ability (is_declined=False, ads_auto_publish=True)
 
-    timestamp.
+    and clears a prior revocation timestamp.
+
+    Does NOT reverse WITHDRAW: if the user is soft-deleted (is_deleted=True),
+
+    the call is a no-op that returns immediately without mutating state or
+
+    PII. WITHDRAW is terminal -- consent_revoked_at is not cleared and no
+
+    ConsentRecord is persisted for a soft-deleted identity.
 
     Args:
 
         user: The user giving consent.
 
     """
+
+    if user.is_deleted:
+        logger.info(
+            "User %s gave consent but is soft-deleted -- no-op (WITHDRAW is terminal)",
+            user.id,
+        )
+        return
 
     user.consent_given_at = timezone.now()
 
