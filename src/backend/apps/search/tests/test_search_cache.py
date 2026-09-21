@@ -17,6 +17,7 @@ import time
 import pytest
 from django.core.cache import cache
 from django.test import Client
+from django.utils import timezone
 
 from apps.ads.services.listings_query import ListingsQueryParams
 from apps.core.enums import AdSort, AdStatus, LanguageLocale
@@ -908,3 +909,77 @@ class TestSearchCacheInvalidationOnPublish:
         version_after = get_search_version()
 
         assert version_after > version_before
+
+
+
+# ---------------------------------------------------------------------------
+# Cache invalidation on consent withdrawal (08-SRH-001)
+#
+# Uses django_db(transaction=True): the B1 fix registers the cache-version
+# bump via transaction.on_commit() inside withdraw_consent's atomic() block.
+# Under the default (non-transactional) django_db mode pytest-django wraps
+# each test in an outer transaction that is rolled back, so on_commit
+# callbacks queued inside nested atomic() are discarded.  transaction=True
+# runs the test in autocommit mode, making withdraw_consent's atomic() the
+# outermost -- its commit fires the on_commit callback synchronously.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.integration
+class TestSearchCacheInvalidationOnWithdrawal:
+    """Cache invalidation via version bump when a user withdraws consent (08-SRH-001)."""
+
+    def test_withdrawal_bumps_cache_version(self, seller, category, city):
+        """withdraw_consent bumps the search content version (08-SRH-001).
+
+        Previously, soft_delete_user_ads used QuerySet.update() which bypasses
+        post_save signals, so the cache version was NOT bumped on consent
+        withdrawal. This test locks in the fix: the on_commit callback added to
+        soft_delete_user_ads must fire after the transaction commits.
+        """
+        from apps.users.services.deletion import withdraw_consent
+        from conftest import create_test_ad
+
+        # Publish an ad so there is a buyer-visible result to invalidate
+        create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        version_before = get_search_version()
+        withdraw_consent(seller)
+        version_after = get_search_version()
+
+        assert version_after > version_before
+
+    def test_withdrawal_hides_ads_and_bumps_version(self, seller, category, city):
+        """After withdrawal, the ad is hidden from search AND the cache version is bumped."""
+        from apps.users.services.deletion import withdraw_consent
+        from conftest import create_test_ad
+
+        create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+
+        client = Client()
+        resp1 = client.get("/search/?q=велосипед&lang=ru")
+        assert len(list(resp1.context["page_obj"])) == 1
+
+        version_before = get_search_version()
+        withdraw_consent(seller)
+        version_after = get_search_version()
+
+        assert version_after > version_before
+
+        # The withdrawn ad should no longer appear in search results
+        resp2 = client.get("/search/?q=велосипед&lang=ru")
+        assert len(list(resp2.context["page_obj"])) == 0
