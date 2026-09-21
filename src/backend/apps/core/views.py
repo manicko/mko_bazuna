@@ -1,5 +1,7 @@
 """Core application views."""
 
+from __future__ import annotations
+
 import json
 import logging
 
@@ -7,8 +9,32 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+class CSPReportPayload(BaseModel):
+    """Pydantic v2 DTO for validating Content-Security-Policy violation reports.
+
+    Browsers send reports as a JSON object whose top-level key is
+    ``csp-report``.  This model validates each inner field.  All fields are
+    optional so minimal reports (e.g. only ``violated-directive``) are accepted.
+    ``extra="ignore"`` tolerates future/spec-variation keys without failing.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    document_uri: str | None = Field(default=None, alias="document-uri")
+    referrer: str | None = None
+    violated_directive: str | None = Field(default=None, alias="violated-directive")
+    blocked_uri: str | None = Field(default=None, alias="blocked-uri")
+    original_policy: str | None = Field(default=None, alias="original-policy")
+    status_code: int | str | None = Field(default=None, alias="status-code")
+    source_file: str | None = Field(default=None, alias="source-file")
+    line_number: int | None = Field(default=None, alias="line-number")
+    column_number: int | None = Field(default=None, alias="column-number")
+    disposition: str | None = None
 
 
 def privacy_policy(request: HttpRequest) -> HttpResponse:
@@ -105,5 +131,13 @@ def csp_report(request: HttpRequest) -> JsonResponse:
         report = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
-    logger.warning("CSP violation report: %s", report)
+    if not isinstance(report, dict) or "csp-report" not in report:
+        return JsonResponse({"error": "Missing 'csp-report' key"}, status=400)
+    if not isinstance(report["csp-report"], dict):
+        return JsonResponse({"error": "'csp-report' must be a JSON object"}, status=400)
+    try:
+        CSPReportPayload(**report["csp-report"])
+    except ValidationError:
+        return JsonResponse({"error": "Invalid CSP report schema"}, status=400)
+    logger.info("CSP violation report: %s", report)
     return JsonResponse({"status": "ok"})
