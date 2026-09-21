@@ -5,13 +5,12 @@ Translates existing Russian-language ads (title, description) to:
     - Bosnian (title_bs, description_bs)
 
 Skips ads where translations are already populated.
-Uses the Google Cloud Translation API (via httpx) for batch translation.
+Uses the shared ``translate_text`` service for batch translation.
 Idempotent: safe to run multiple times.
 """
 
 import logging
 
-import httpx
 from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ TARGET_LOCALES: list[tuple[str, str, str]] = [
 ]
 
 
-def _translate_text(text: str, target: str) -> str | None:
+def _translate_for_backfill(text: str, target: str) -> str:
     """Translate a single text string to the target language.
 
     Args:
@@ -31,26 +30,13 @@ def _translate_text(text: str, target: str) -> str | None:
         target: Target language code (e.g. 'en', 'bs').
 
     Returns:
-        Translated text, or None if translation failed.
+        Translated text. On any failure ``translate_text`` falls back to
+        returning the original ``text`` unchanged (never ``None``).
     """
-    if not text or not text.strip():
-        return None
-    try:
-        from apps.core.services.translation import translate_cached_generic
+    # Lazy import avoids circular dependency during management-command discovery.
+    from apps.core.services.translation import translate_text
 
-        return translate_cached_generic(text, "ru", target)
-    except (
-        httpx.HTTPStatusError,
-        httpx.RequestError,
-        httpx.TimeoutException,
-    ) as exc:
-        logger.warning(
-            "Translation failed for target=%r text=%r: %s",
-            target,
-            text[:50],
-            exc,
-        )
-        return None
+    return translate_text(text, "ru", target)
 
 
 class Command(BaseCommand):
@@ -91,7 +77,7 @@ class Command(BaseCommand):
         failed = 0
 
         for ad in ads_to_translate.iterator(chunk_size=batch_size):
-            updates: dict[str, str | None] = {}
+            updates: dict[str, str] = {}
 
             for locale, title_field, desc_field in TARGET_LOCALES:
                 # Skip if this locale's fields are already populated
@@ -103,15 +89,13 @@ class Command(BaseCommand):
 
                 # Translate title
                 if not current_title:
-                    translated_title = _translate_text(ad.title, locale)
-                    if translated_title is not None:
-                        updates[title_field] = translated_title
+                    translated_title = _translate_for_backfill(ad.title, locale)
+                    updates[title_field] = translated_title
 
                 # Translate description
                 if not current_desc:
-                    translated_desc = _translate_text(ad.description, locale)
-                    if translated_desc is not None:
-                        updates[desc_field] = translated_desc
+                    translated_desc = _translate_for_backfill(ad.description, locale)
+                    updates[desc_field] = translated_desc
 
             if not updates:
                 skipped += 1

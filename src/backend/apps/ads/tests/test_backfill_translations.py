@@ -5,7 +5,7 @@ Verifies:
 - Ads with NULL ``title_en``/``title_bs`` get translated and ``original_language``
   is set to ``"ru"``.
 - Already-translated ads are skipped (idempotent).
-- Translation failures (returns ``None``) are handled gracefully.
+- Translation failures fall back to the original text (graceful degradation).
 - No-op when no ads need translation.
 
 The external Google Cloud Translation API is mocked so tests run without
@@ -25,15 +25,19 @@ from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Patch target: ``_translate_text`` lazy-imports ``translate_cached_generic``
-# from this module at call time, so patching the module-level attribute is
-# sufficient to intercept the import.
-_TRANSLATE_PATCH = "apps.core.services.translation.translate_cached_generic"
+_TRANSLATE_PATCH = "apps.core.services.translation.translate_text"
 
 
 def _fake_translate(text: str, source_locale: str, target_locale: str) -> str:
     """Deterministic mock translation: appends the target locale as a suffix."""
     return f"{text}_{target_locale}"
+
+
+def _fallback_to_original(
+    text: str, source_locale: str, target_locale: str
+) -> str:
+    """Simulate ``translate_text``'s fallback: returns the original text unchanged."""
+    return text
 
 
 class TestBackfillTranslations:
@@ -112,7 +116,9 @@ class TestBackfillTranslations:
     def test_translation_failure_skips_gracefully(
         self, seller, category, city
     ) -> None:
-        """When translation returns None, ad fields remain unchanged."""
+        """When ``translate_text`` falls back to the original text, fields get
+        the original Russian text (Path A consistency) and the ad is still
+        marked processed rather than left NULL."""
         ad = create_test_ad(
             seller,
             category,
@@ -130,16 +136,55 @@ class TestBackfillTranslations:
         )
         ad.refresh_from_db()
 
-        with patch(_TRANSLATE_PATCH, return_value=None) as mock_translate:
+        # ``translate_text`` never returns None -- on failure it returns the
+        # original text. Simulate that fallback so the circuit-breaker/retry
+        # path is exercised without hitting the network.
+        with patch(_TRANSLATE_PATCH, side_effect=_fallback_to_original) as mock_translate:
             call_command("backfill_translations", batch_size=10)
 
-        # All four translation calls were attempted but returned None.
+        # All four translation calls were attempted and fell back to the
+        # original text.
         assert mock_translate.call_count == 4
         ad.refresh_from_db()
-        assert ad.title_en is None
-        assert ad.title_bs is None
-        assert ad.description_en is None
-        assert ad.description_bs is None
-        # original_language is only set when updates are non-empty; since all
-        # translations failed, updates was empty and the ad was skipped entirely.
-        assert ad.original_language is None
+        assert ad.title_en == "Красный велосипед"
+        assert ad.title_bs == "Красный велосипед"
+        assert ad.description_en == "Продается детский велосипед"
+        assert ad.description_bs == "Продается детский велосипед"
+        # updates was non-empty (original text populated the fields), so the ad
+        # was processed and original_language was set.
+        assert ad.original_language == "ru"
+
+    def test_uses_translate_text_not_raw_api(
+        self, seller, category, city
+    ) -> None:
+        """Backfill routes through ``translate_text`` (not the raw API helper
+        ``translate_cached_generic``) with the Russian source locale, so the
+        circuit-breaker/retry/fallback path is shared with the bot."""
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Красный велосипед",
+            description="Продается детский велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        Ad.objects.filter(pk=ad.pk).update(
+            title_en=None,
+            title_bs=None,
+            description_en=None,
+            description_bs=None,
+            original_language=None,
+        )
+        ad.refresh_from_db()
+
+        with patch(_TRANSLATE_PATCH, side_effect=_fake_translate) as mock_translate:
+            call_command("backfill_translations", batch_size=10)
+
+        # translate_text is the integration point for the backfill; the
+        # per-field httpx try/except was removed so translate_cached_generic is
+        # never invoked directly from the command.
+        assert mock_translate.call_count == 4
+        for call_args in mock_translate.call_args_list:
+            args, _ = call_args
+            # translate_text(text, source_locale="ru", target_locale)
+            assert args[1] == "ru"
