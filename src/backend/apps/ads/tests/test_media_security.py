@@ -645,7 +645,7 @@ class TestMediaGateThumbnailResolution:
 class TestMediaGateCacheControl:
     """B9/LOW-004: Cache-Control + Vary headers on media_gate responses.
 
-    Production (DEBUG=False) responses get a long cache TTL (1 year, immutable).
+    Production (DEBUG=False) responses use Cache-Control: no-store (never cached).
     Dev (DEBUG=True) responses get no-cache to prevent stale image serving
     during development.  403 and 404 responses never receive Cache-Control.
     """
@@ -653,7 +653,7 @@ class TestMediaGateCacheControl:
     def test_prod_200_cache_control_long_ttl(
         self, seller, category, city, isolated_media_root
     ):
-        """Production (DEBUG=False) 200: Cache-Control long TTL + X-Accel-Redirect."""
+        """Production (DEBUG=False) 200: Cache-Control no-store + X-Accel-Redirect."""
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key)
         client = Client()
@@ -662,13 +662,13 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
-        assert response.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
-        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert response.headers.get("Cache-Control") == "no-store"
+        assert "cookie" in response.headers.get("Vary", "").lower()
 
     def test_prod_staff_200_cache_control_long_ttl(
         self, seller, staff_user, category, city, isolated_media_root
     ):
-        """Production (DEBUG=False) staff 200: Cache-Control long TTL + X-Accel-Redirect."""
+        """Production (DEBUG=False) staff 200: Cache-Control no-store + X-Accel-Redirect."""
         key = generate_storage_key()
         _create_ad_with_image(
             seller, category, city, image_key=key, status=AdStatus.DRAFT
@@ -680,8 +680,56 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
-        assert response.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
-        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert response.headers.get("Cache-Control") == "no-store"
+        assert "cookie" in response.headers.get("Vary", "").lower()
+
+    def test_media_cache_invalidated_on_ad_status_change(
+        self, seller, category, city, isolated_media_root
+    ):
+        """no-store ensures PUBLISHED→DELETED transition yields 403 on next fetch."""
+        key = generate_storage_key()
+        ad, _, _ = _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("Cache-Control") == "no-store"
+
+        # Simulate status transition: PUBLISHED → DELETED (matches soft_delete_user_ads pattern)
+        from django.utils import timezone
+
+        from apps.ads.models import Ad
+
+        Ad.objects.filter(id=ad.id).update(
+            status=AdStatus.DELETED, deleted_at=timezone.now()
+        )
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response_after = client.get(url)
+        assert response_after.status_code == 403
+
+    def test_media_cache_invalidated_on_consent_withdrawal(
+        self, seller, category, city, isolated_media_root
+    ):
+        """no-store ensures consent withdrawal (ad soft-deleted to DELETED) yields 403 on next fetch."""
+        from apps.users.services.deletion import withdraw_consent
+
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("Cache-Control") == "no-store"
+
+        # Withdraw consent — soft_deletes all ads to DELETED via .update()
+        withdraw_consent(seller)
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response_after = client.get(url)
+        assert response_after.status_code == 403
 
     def test_dev_200_cache_control_no_cache(
         self, seller, category, city, isolated_media_root
@@ -703,7 +751,7 @@ class TestMediaGateCacheControl:
         assert response.status_code == 200
         assert isinstance(response, FileResponse)
         assert response.headers.get("Cache-Control") == "no-cache"
-        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert "cookie" in response.headers.get("Vary", "").lower()
 
     def test_dev_staff_200_cache_control_no_cache(
         self, seller, staff_user, category, city, isolated_media_root
@@ -727,7 +775,7 @@ class TestMediaGateCacheControl:
         assert response.status_code == 200
         assert isinstance(response, FileResponse)
         assert response.headers.get("Cache-Control") == "no-cache"
-        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert "cookie" in response.headers.get("Vary", "").lower()
 
     # ------------------------------------------------------------------
     # Vary + Cache-Control on error responses
@@ -736,7 +784,7 @@ class TestMediaGateCacheControl:
     def test_403_has_vary_but_no_cache_control(
         self, seller, category, city, isolated_media_root
     ):
-        """403 Forbidden: Vary: Authorization present, NO Cache-Control.
+        """403 Forbidden: Vary: Cookie present, NO Cache-Control.
 
         A cached 403 would block users after an ad transitions to PUBLISHED
         (or vice-versa for DRAFT), so access-denied responses must never be cached.
@@ -750,7 +798,7 @@ class TestMediaGateCacheControl:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             response = client.get(url)
         assert response.status_code == 403
-        assert "authorization" in response.headers.get("Vary", "").lower()
+        assert "cookie" in response.headers.get("Vary", "").lower()
         assert response.headers.get("Cache-Control") is None
 
     def test_404_has_no_cache_control(self, isolated_media_root):

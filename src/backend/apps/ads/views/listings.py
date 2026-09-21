@@ -116,7 +116,7 @@ def _serve_image(image_key: str) -> HttpResponseBase:
     return FileResponse(open(file_path, "rb"), content_type="image/jpeg")
 
 
-@vary_on_headers("Authorization")
+@vary_on_headers("Cookie")
 def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     """
     Media access gate for Ad images and thumbnails.
@@ -184,7 +184,7 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
             return response
         response = HttpResponse()
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-        response["Cache-Control"] = "public, max-age=31536000, immutable"
+        response["Cache-Control"] = "no-store"
         return response
 
     # Non-staff users: only serve images referenced by a PUBLISHED ad. A shared
@@ -200,7 +200,7 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
 
     response = HttpResponse()
     response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-    response["Cache-Control"] = "public, max-age=31536000, immutable"
+    response["Cache-Control"] = "no-store"
     return response
 
 
