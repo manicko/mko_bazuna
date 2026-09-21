@@ -257,6 +257,17 @@ BOT_USERNAME = env("BOT_USERNAME", default="")
 # See src/telegram_bot/lifecycle.py and docker/healthcheck-bot.sh (ENT-005).
 BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive")
 
+# Redis-based bot liveness marker (shared cache key written by the bot process).
+# The web readiness probe reads this key to verify the bot is alive and fresh.
+# TTL matches the staleness window; the value is an epoch timestamp so staleness
+# can be computed precisely before the key naturally expires.
+BOT_HEALTH_STALE_SECONDS = env.int("BOT_HEALTH_STALE_SECONDS", default=120)
+
+# When True, the web readiness probe verifies the bot liveness marker in Redis.
+# Disabled in tests (no bot process writes the marker). In production this is
+# always True so the web container reports Not Ready when the bot is stuck.
+BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=True)
+
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.

@@ -50,6 +50,11 @@ STORAGES = {  # noqa: F405
 # Set BOT_LIVENESS_FILE="" so lifecycle._marker_path() returns None.
 BOT_LIVENESS_FILE = ""  # noqa: F405
 
+# Disable bot liveness marker check in the web readiness probe — no bot process
+# runs in web tests, so the Redis key would always be absent (None) and would
+# 503 every readiness check without this override.
+BOT_HEALTH_CHECK_ENABLED = False  # noqa: F405
+
 # Faster password hasher for tests
 PASSWORD_HASHERS = [  # noqa: F405
     "django.contrib.auth.hashers.MD5PasswordHasher",

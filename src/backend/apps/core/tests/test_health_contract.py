@@ -1,30 +1,33 @@
 """
-Tests for the health check contract (Block 5: OPS-005, OPS-011, OPS-013).
+Tests for the health check contract (Block B1: OPS-002, OPS-003).
 
-Verifies the liveness/readiness split, versioning, and bot staleness configuration:
+Verifies the liveness/readiness split, versioning, bot liveness marker, and
+container hardening:
 - /health/live/ returns 200 with {"status": "alive"} (no DB/cache dependency)
 - /health/ready/ returns 200 with {"version": 1, "status": "ready", "checks": {...}}
-  when DB + Redis are healthy
+  when DB + Redis are healthy and the bot marker is fresh (or disabled)
 - /health/ready/ returns 503 when Redis cache is unavailable (mocked)
 - /health/ready/ returns 503 when the database is unavailable (mocked)
+- /health/ready/ includes a "bot" key in checks: "disabled" (tests), "ok"
+  (fresh marker), or "stale" (missing/old marker) when BOT_HEALTH_CHECK_ENABLED
 - /health/ (alias) returns the same response as /health/ready/
 - /health/v1/ returns a versioned response
-- BOT_HEALTH_STALE_SECONDS=120 is set in docker-compose.yml bot environment
-  and read by docker/healthcheck-bot.sh (env var is the single source of truth;
-  the Django settings mirror was removed as dead config)
-- BOT_HEALTH_STALE_SECONDS=120 is set in docker-compose.yml bot environment
-- Dockerfile HEALTHCHECK curls /health/ready/
-- docker-compose.yml web healthcheck curls /health/ready/
+- BOT_HEALTH_STALE_SECONDS=120 is set in docker-compose.yml for both bot and
+  web services; also read by docker/healthcheck-bot.sh
+- Dockerfile HEALTHCHECK curls /health/live/
+- docker-compose.yml web healthcheck curls /health/live/
 """
 
 from __future__ import annotations
 
 import json
+from time import time as _time
 from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.test import Client
+from django.core.cache import cache
+from django.test import Client, override_settings
 from django.urls import reverse
 
 pytestmark = [pytest.mark.unit]
@@ -75,13 +78,17 @@ def test_liveness_check_returns_alive(client: Client, live_url: str) -> None:
 
 @pytest.mark.django_db
 def test_readiness_check_healthy(client: Client, ready_url: str) -> None:
-    """Readiness probe returns 200 when DB + Redis cache are healthy."""
+    """Readiness probe returns 200 when DB + Redis cache are healthy.
+
+    In test settings ``BOT_HEALTH_CHECK_ENABLED`` is ``False``, so the bot
+    check reports ``"disabled"`` and does not affect the overall status.
+    """
     response = client.get(ready_url)
     assert response.status_code == 200
     data = json.loads(response.content)
     assert data["version"] == 1
     assert data["status"] == "ready"
-    assert data["checks"] == {"database": "ok", "cache": "ok"}
+    assert data["checks"] == {"database": "ok", "cache": "ok", "bot": "disabled"}
 
 
 @pytest.mark.django_db
@@ -115,6 +122,42 @@ def test_readiness_check_db_down(client: Client, ready_url: str) -> None:
     assert data["status"] == "not_ready"
     assert data["checks"]["database"] == "fail"
     assert data["checks"]["cache"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# Bot liveness marker (Redis-based, OPS-003)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_readiness_includes_bot_marker(client: Client, ready_url: str) -> None:
+    """Readiness response includes a 'bot' key in the checks dict."""
+    response = client.get(ready_url)
+    assert response.status_code == 200
+    data = json.loads(response.content)
+    assert "bot" in data["checks"]
+
+
+@pytest.mark.django_db
+@override_settings(BOT_HEALTH_CHECK_ENABLED=True)
+def test_readiness_bot_marker_ok_when_fresh(client: Client, ready_url: str) -> None:
+    """Readiness returns 200 with bot 'ok' when the liveness marker is fresh."""
+    cache.set("bot:liveness", int(_time()))
+    response = client.get(ready_url)
+    assert response.status_code == 200
+    data = json.loads(response.content)
+    assert data["checks"]["bot"] == "ok"
+
+
+@pytest.mark.django_db
+@override_settings(BOT_HEALTH_CHECK_ENABLED=True)
+def test_readiness_bot_marker_stale(client: Client, ready_url: str) -> None:
+    """Readiness returns 503 when the bot liveness marker is stale."""
+    cache.set("bot:liveness", int(_time()) - 300)
+    response = client.get(ready_url)
+    assert response.status_code == 503
+    data = json.loads(response.content)
+    assert data["checks"]["bot"] == "stale"
 
 
 # ---------------------------------------------------------------------------
@@ -155,14 +198,20 @@ def test_bot_staleseconds_set_in_compose() -> None:
     assert "BOT_HEALTH_STALE_SECONDS=120" in content
 
 
-def test_dockerfile_healthcheck_points_to_ready() -> None:
-    """Dockerfile HEALTHCHECK curls /health/ready/."""
+def test_dockerfile_healthcheck_points_to_live() -> None:
+    """Dockerfile HEALTHCHECK curls /health/live/ (not /health/ready/)."""
     content = (_PROJECT_ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
     assert "HEALTHCHECK" in content
-    assert "/health/ready/" in content
+    assert "/health/live/" in content
+    # The HEALTHCHECK line itself must not reference /health/ready/
+    for line in content.splitlines():
+        if "HEALTHCHECK" in line or "CMD curl" in line:
+            assert "/health/ready/" not in line, (
+                "HEALTHCHECK must use /health/live/, not /health/ready/"
+            )
 
 
-def test_web_compose_healthcheck_points_to_ready() -> None:
-    """docker-compose.yml web healthcheck curls /health/ready/."""
+def test_web_compose_healthcheck_points_to_live() -> None:
+    """docker-compose.yml web healthcheck curls /health/live/."""
     content = (_PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    assert "/health/ready/" in content
+    assert "/health/live/" in content

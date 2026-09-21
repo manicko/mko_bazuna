@@ -238,6 +238,7 @@ services:
       - POSTGRES_HOST=db
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
+      - BOT_HEALTH_STALE_SECONDS=120
     env_file:
       - .env.dev
     volumes:
@@ -253,7 +254,7 @@ services:
     mem_limit: ${WEB_MEM_LIMIT:-512m}
     cpus: ${WEB_CPUS:-1.5}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ready/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/live/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

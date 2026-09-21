@@ -170,7 +170,7 @@ EXPOSE 8000
 
 # Health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health/ready/ || exit 1
+    CMD curl -f http://localhost:8000/health/live/ || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application"]

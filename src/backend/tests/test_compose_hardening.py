@@ -80,7 +80,7 @@ def test_web_healthcheck_in_compose() -> None:
     """web must have an explicit healthcheck key in compose (not just Dockerfile)."""
     block = _service_block(_COMPOSE, "web")
     assert "healthcheck:" in block, "web must have healthcheck in compose"
-    assert "/health/" in block, "healthcheck must probe the /health/ endpoint"
+    assert "/health/live/" in block, "healthcheck must probe the /health/live/ endpoint"
 
 
 # --- bot ------------------------------------------------------------------

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+from time import time as _time
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -71,11 +73,15 @@ def liveness_check(request: HttpRequest) -> JsonResponse:
 
 
 def readiness_check(request: HttpRequest) -> JsonResponse:
-    """Readiness probe — verifies database and Redis cache are reachable.
+    """Readiness probe — verifies database, Redis cache, and bot liveness.
 
     Returns 200 with check details when all dependencies are healthy,
-    503 when any dependency fails. Bot health is verified separately
-    via the bot container's own healthcheck (healthcheck-bot.sh).
+    503 when any dependency fails or the bot liveness marker is stale.
+
+    Bot liveness is verified via a Redis `bot:liveness` key written by the
+    bot process on startup and on every inbound update. When
+    ``BOT_HEALTH_CHECK_ENABLED`` is ``False`` (e.g. tests) the bot check is
+    marked ``"disabled"`` and does not affect the overall status.
     """
     checks = {"database": "ok", "cache": "ok"}
 
@@ -97,7 +103,26 @@ def readiness_check(request: HttpRequest) -> JsonResponse:
         cache_healthy = False
         checks["cache"] = "fail"
 
-    if db_healthy and cache_healthy:
+    bot_healthy = True
+    if not settings.BOT_HEALTH_CHECK_ENABLED:
+        checks["bot"] = "disabled"
+    else:
+        marker_ts = None
+        try:
+            marker_ts = cache.get("bot:liveness")
+        except Exception:
+            pass
+
+        if marker_ts is None:
+            checks["bot"] = "stale"
+            bot_healthy = False
+        elif int(_time()) - int(marker_ts) > settings.BOT_HEALTH_STALE_SECONDS:
+            checks["bot"] = "stale"
+            bot_healthy = False
+        else:
+            checks["bot"] = "ok"
+
+    if db_healthy and cache_healthy and bot_healthy:
         return JsonResponse(
             {"version": 1, "status": "ready", "checks": checks}
         )
