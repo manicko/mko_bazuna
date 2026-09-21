@@ -9,7 +9,11 @@ import pytest
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.models import ExchangeRate
 from apps.currencies.services.exceptions import ExchangeRateNotFoundError
-from apps.currencies.services.price_normalizer import PriceNormalizer
+from apps.currencies.services.price_normalizer import (
+    PriceNormalizer,
+    normalize_price_to_eur,
+)
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -47,3 +51,43 @@ class TestPriceNormalizer:
         )
         with pytest.raises(ExchangeRateNotFoundError):
             PriceNormalizer().normalize_to_eur(Decimal("10"), CurrencyCode.EUR)
+
+
+class TestNormalizePriceToEur:
+    def test_sets_eur_value_when_currency_present(
+        self, exchange_rates, seller, category, city
+    ) -> None:
+        """A present currency with a valid rate sets the normalized EUR value."""
+        ad = create_test_ad(
+            seller, category, city, price=100, price_currency=CurrencyCode.BAM
+        )
+        normalize_price_to_eur(ad, Decimal("100"), CurrencyCode.BAM)
+        assert ad.price_normalized_eur == Decimal("51.2000")
+
+    def test_clears_value_on_normalization_error(
+        self, exchange_rates, seller, category, city
+    ) -> None:
+        """A failed normalization (no current rate) yields None, not a raise.
+
+        ``PriceNormalizer.normalize_to_eur`` raises ``ExchangeRateNotFoundError``
+        when no current rate exists; the broad ``except Exception`` in
+        ``normalize_price_to_eur`` must swallow it and clear the value.
+        """
+        ad = create_test_ad(
+            seller, category, city, price=100, price_currency=CurrencyCode.EUR
+        )
+        ExchangeRate.objects.filter(currency=CurrencyCode.EUR.value).update(
+            is_current=False
+        )
+        normalize_price_to_eur(ad, Decimal("100"), CurrencyCode.EUR)
+        assert ad.price_normalized_eur is None
+
+    def test_clears_value_when_currency_none(
+        self, exchange_rates, seller, category, city
+    ) -> None:
+        """A missing currency clears the normalized value."""
+        ad = create_test_ad(
+            seller, category, city, price=100, price_currency=CurrencyCode.EUR
+        )
+        normalize_price_to_eur(ad, Decimal("100"), None)
+        assert ad.price_normalized_eur is None

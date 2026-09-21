@@ -12,13 +12,19 @@ path). An explicit domain error is raised when no current rate exists for a
 currency — prices are never silently normalized with a missing rate.
 """
 
+from __future__ import annotations
+
 import logging
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from django.core.cache import cache
 
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.exceptions import ExchangeRateNotFoundError
+
+if TYPE_CHECKING:
+    from apps.ads.models import Ad
 
 logger = logging.getLogger(__name__)
 
@@ -113,3 +119,34 @@ class PriceNormalizer:
         """
         cache.delete(f"{_RATE_CACHE_PREFIX}:{currency.value}")
         logger.info("Invalidated exchange rate cache for %s", currency.value)
+
+
+def normalize_price_to_eur(
+    ad: Ad,
+    amount: Decimal,
+    currency: CurrencyCode | None,
+) -> None:
+    """Set ``ad.price_normalized_eur`` from ``amount``/``currency`` (BR-03).
+
+    Shared seam used by ``edit._apply_price_change`` and ``submit_ad`` to avoid
+    duplicating the broad ``except Exception`` + ``None``-fallback pattern.
+
+    Instantiates ``PriceNormalizer()`` per call to preserve the instance-local
+    ``_rate_cache`` semantics identical to the two original call sites — no
+    caching behavior change, and no module-level shared normalizer instance.
+
+    Args:
+        ad: The ad whose ``price_normalized_eur`` is updated in place.
+        amount: The seller's original price amount.
+        currency: The currency of ``amount`` (``None`` clears the value).
+    """
+    if currency is not None:
+        try:
+            ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
+                amount, currency
+            )
+        except Exception:
+            logger.exception("Failed to normalize price for ad %s", ad.pk)
+            ad.price_normalized_eur = None
+    else:
+        ad.price_normalized_eur = None
