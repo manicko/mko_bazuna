@@ -27,7 +27,7 @@ from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.currencies.enums import CurrencyCode
-from apps.currencies.services.price_normalizer import PriceNormalizer
+from apps.currencies.services.price_normalizer import normalize_price_to_eur
 from apps.media.services.filesystem import move_staging_to_permanent
 from apps.media.services.thumbnails import ThumbnailService
 
@@ -115,7 +115,7 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
 
     ``price_amount``/``price_currency`` become the source of truth; when
     ``price_currency`` is present ``price_normalized_eur`` is computed via
-    ``PriceNormalizer`` using the current rate (BR-03) before saving.
+    ``normalize_price_to_eur`` using the current rate (BR-03) before saving.
 
     This is a synchronous function.  Callers that run in an async context
     (e.g. the bot handler) must wrap the call in ``sync_to_async``.
@@ -191,16 +191,7 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         ad.price_currency = currency.value if currency else None
 
         # Price normalization (BR-03)
-        if currency is not None:
-            try:
-                ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
-                    input.price_amount, currency
-                )
-            except Exception:
-                logger.exception("Failed to normalize price for ad %s", input.ad_id)
-                ad.price_normalized_eur = None
-        else:
-            ad.price_normalized_eur = None
+        normalize_price_to_eur(ad, input.price_amount, currency)
 
         # Multi-language fields
         if input.title_bs:

@@ -21,7 +21,7 @@ from apps.ads.models import Ad
 from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
-from apps.currencies.services.price_normalizer import PriceNormalizer
+from apps.currencies.services.price_normalizer import normalize_price_to_eur
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,9 @@ def _apply_price_change(
     """Apply a price change and recompute ``price_normalized_eur``.
 
     Sets the source-of-truth fields (``price_amount``/``price_currency``) and
-    recomputes the derived EUR-normalized value via ``PriceNormalizer`` (CR-05,
-    CR-07). When the currency is missing the normalized value is cleared.
+    recomputes the derived EUR-normalized value via ``normalize_price_to_eur``
+    (the shared BR-03 seam). When the currency is missing the normalized value
+    is cleared.
     Returns the ad so the caller can persist it.
 
     Args:
@@ -49,16 +50,7 @@ def _apply_price_change(
     ad.price_amount = price_amount
     if price_currency is not None:
         ad.price_currency = price_currency.value
-    if price_currency is not None:
-        try:
-            ad.price_normalized_eur = PriceNormalizer().normalize_to_eur(
-                price_amount, price_currency
-            )
-        except Exception:
-            logger.exception("Failed to normalize price for ad %s", ad.pk)
-            ad.price_normalized_eur = None
-    else:
-        ad.price_normalized_eur = None
+    normalize_price_to_eur(ad, price_amount, price_currency)
     return ad
 
 
