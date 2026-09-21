@@ -19,8 +19,9 @@ from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
+from apps.search.services.cache import SEARCH_CACHE_MAX_HITS
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -610,3 +611,50 @@ class TestSearchViewInputRobustness:
         )
 
         assert response.status_code == 200
+
+
+class TestSearchViewTotalCount:
+    """Regression tests for true total_count vs 1000-row cache cap (08-SRH-002).
+
+    Verifies that ``total_count`` in the context reflects the full FTS match count
+    via a dedicated ``COUNT(*)`` rather than the capped ``SEARCH_CACHE_MAX_HITS``
+    value, and that ``results_truncated`` is set when results exceed the cap.
+    """
+
+    def test_total_count_exceeds_cap_when_many_matches(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """With >1000 matching ads, total_count is the true count, not 1000.
+
+        Before B3, the cached ID list was sliced at ``SEARCH_CACHE_MAX_HITS``
+        (1000) and ``total_count`` was derived from that slice, yielding 1000
+        regardless of the true match count. The fix computes a separate
+        ``COUNT(*)`` on the FTS-filtered queryset, so ``total_count`` is now
+        the true count and ``results_truncated`` is ``True``.
+        """
+        num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
+        create_test_ads_bulk(
+            seller,
+            root_category,
+            city,
+            count=num_ads,
+            title_prefix="Продам велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=велосипед&lang=ru")
+
+        assert response.status_code == 200
+        # True count via COUNT(*) — not capped at SEARCH_CACHE_MAX_HITS
+        assert response.context["total_count"] == num_ads
+        assert response.context["total_count"] != SEARCH_CACHE_MAX_HITS
+        # results_truncated must be True when count exceeds the cap
+        assert response.context["results_truncated"] is True
+        # Pagination still limits the visible page to PER_PAGE (24)
+        page_ads = list(response.context["page_obj"])
+        assert len(page_ads) == 24
+        assert all(a.title.startswith("Продам велосипед") for a in page_ads)
