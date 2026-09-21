@@ -91,6 +91,8 @@ command runs without a request), falling back to `ru` for legacy rows.
 
 Only ad title/description content is sent to translation API; no user PII (telegram_id, username, IP) is included. See decision G and privacy policy documentation. Translation uses Russian, Bosnian, and English multi-language support for Russian content access.
 
+> **Cross-language recall dependency:** A buyer searching in language L only matches ads whose `title_L` and `description_L` columns are populated. Ad content is translated to Russian at publication time (via the Google Cloud Translation API with a bounded 500ms socket timeout + circuit-breaker + 2 retries + LRU cache + fallback to original text). If the publication-time translation fails, the language-specific columns may be empty → degraded cross-language recall (not a crash, not a 500). The buyer sees only the ads whose per-language vector was populated.
+
 Related user stories: US-B2
 
 ## Did-You-Mean Patterns

@@ -7,6 +7,7 @@ related:
   - rules
   - references
   - migration-workflow
+  - db-enums
 ---
 
 ## Purpose
@@ -22,8 +23,15 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
   and re-derivable via the advisory-locked `recompute_normalized_prices` management command. Both
-  processes read rates from the shared DB. See
-  [`db-schema`](../02-database/db-schema.md) ([`db-enums`](../02-database/db-enums.md),
+  processes read rates from the shared DB. The web edit path
+  (`ads.views.edit._apply_price_change`) and the submission path
+  (`ads.services.submission.submit_ad`) delegate to the shared
+  `normalize_price_to_eur(ad, amount, currency)` free function in
+  `apps/currencies/services/price_normalizer.py` — the single seam for the broad
+  `except Exception` + `None`-fallback pattern (10-QLT-001). The management command
+  `recompute_normalized_prices` is intentionally *not* routed through this utility: it
+  uses a distinct `ExchangeRateNotFoundError` and a stored normalizer instance (out of
+  scope). See [`db-schema`](../02-database/db-schema.md) ([`db-enums`](../02-database/db-enums.md),
   [`db-indexes`](../02-database/db-indexes.md)).
 - **Migrations:** Dev-mode workflow with threshold-based consolidation (max 8 files/app → reset to one `0001_initial.py`). The `migrate` service runs once before web+bot via `apps.core.utils.migrate_locked.main` (session-scoped advisory lock ID 100), which executes `migrate --run-syncdb`, `setup_search_triggers`, and `load_exchange_rates` as an atomic sequence, with an optional `backfill_translations` step included when `RUN_TRANSLATION_BACKFILL=true`. See [migration-workflow](../ops/migration-workflow.md).
 
@@ -212,3 +220,75 @@ The net effect is that both CI and Docker Compose reach the same runtime configu
 **test** settings module, but they arrive there via different paths: CI leans on `base.py`
 defaults and step-level `env:` with no `.env` file, while Docker Compose leans on `.env.test`
 `env_file` injection plus YAML interpolation and an explicit bind-mount to `/app/src/.env`.
+
+## Price Normalization Seam (10-QLT-001)
+
+A shared free function `normalize_price_to_eur(ad, amount, currency)` lives in
+[`apps/currencies/services/price_normalizer.py`](../../src/backend/apps/currencies/services/price_normalizer.py),
+co-located with the `PriceNormalizer` class (single responsibility: currency conversion).
+It encapsulates the broad `except Exception` + `logger.exception` + `None`-fallback pattern that
+both the web edit path and the submission path previously duplicated:
+
+- **Web edit path** — `ads.views.edit._apply_price_change` delegates to this utility when a
+  PUBLISHED ad's price is edited. Edit branches are **not** routed through `submit_ad`
+  (that would trigger thumbnail generation, staging-file moves, `DraftAdImage` creation,
+  and the DRAFT→ON_MODERATION transition — all wrong for status-preserving edits).
+- **Submission path** — `ads.services.submission.submit_ad` delegates to the same utility at
+  the `# Price normalization (BR-03)` step.
+
+The management command `recompute_normalized_prices` is intentionally **out of scope**: it uses a
+distinct `ExchangeRateNotFoundError` exception and a stored normalizer instance, so merging it
+into the shared utility would change its error semantics. See
+[`db-enums`](../02-database/db-enums.md#currencycode) for the `CurrencyCode` StrEnum and
+[`db-schema`](../02-database/db-schema.md) for the `exchange_rates` table.
+
+## Consent Version Tracking (10-QLT-002)
+
+`ConsentVersion(StrEnum)` (defined in `apps/core/enums.py`, see
+[`db-enums`](../02-database/db-enums.md#consentversion)) is the single source of truth for the
+consent-banner version. It replaces five raw `"1.0"` string literals across the consent
+subsystem. `ConsentVersion.V1_0.value == "1.0"` matches all existing database values — the change
+is backward-compatible and required no data migration. The historical migration
+`users/migrations/0001_initial.py` was left untouched (records past state).
+
+Three layers consume it:
+
+1. **Model default** — `ConsentRecord.consent_version` (`users/models.py`) defaults to
+   `ConsentVersion.V1_0.value`.
+2. **Context processor** — `apps.users.context_processors.consent_version` exposes the
+   `ConsentVersion.V1_0` enum member to templates (mirrors the `price_step` context processor
+   pattern). `consent_banner.html` renders
+   `value="{{ consent_version.value }}"` in both the Accept and Decline hidden inputs, removing
+   the raw `"1.0"` literals at the browser boundary. Registered in
+   `config/settings/base.py` `TEMPLATES.context_processors`.
+3. **DTO validation** — `ConsentSubmission.consent_version` (`users/schemas.py`) carries a
+   lenient Pydantic `@field_validator` (`mode="before"`) that coerces unrecognized/empty values
+to `ConsentVersion.V1_0.value` with a warning log, never rejecting a legitimate
+  `consent_version=1.0` submission.
+
+The `record_consent_action` service (`users/services/consent_record.py`) defaults its
+`consent_version` parameter to `ConsentVersion.V1_0.value`, which also covers the implicit
+consumer (`consent_withdraw` calls it without the argument).
+
+## Bot Handler Module Decomposition (10-QLT-003)
+
+The monolithic 930-line `telegram_bot/handlers/ad_create.py` was split into a package:
+`telegram_bot/handlers/ad_create/` with a single shared `router` (`Router()` instance) and
+`AdCreateForm(StatesGroup)` defined in `__init__.py`. Sub-modules import the shared router and
+register handlers against it via `@router.message(...)` / `@router.callback_query(...)` decorators:
+
+| Sub-module | Contents |
+|------------|----------|
+| `__init__.py` | Package docstring, shared `router`, `AdCreateForm` FSM states, `MAX_PHOTO_BYTES`, re-exports |
+| `preview.py` | `show_preview`, `_format_preview_price` |
+| `category.py` | 7 FSM category/purpose/condition/features selection handlers |
+| `city.py` | `process_city` |
+| `text.py` | `process_title`, `process_description` |
+| `price.py` | 3 price entry/validation handlers |
+| `photos.py` | `process_photos` |
+| `entry.py` | `cmd_post`, `cmd_cancel` (command entry points) |
+| `submit.py` | `process_preview`, calls `submit_ad` |
+
+Test patch paths in `test_ad_create.py` and `test_site_name_greeting.py` were updated to reflect
+the new package import paths. The `submit_ad` interface (signature + return tuple) is unchanged,
+so the 10-QLT-001 refactoring does not block the split.

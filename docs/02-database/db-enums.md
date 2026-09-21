@@ -8,6 +8,7 @@ tags:
 related:
   - db-schema
   - db-indexes
+  - architecture
   - technical-specification
   - spec-index
 ---
@@ -54,6 +55,10 @@ this enum's value (see [db-schema.md](db-schema.md)).
 | `EUR` | Euro (default) |
 | `RSD` | Serbian Dinar |
 | `BAM` | Bosnia and Herzegovina Convertible Mark |
+
+The derived `price_normalized_eur` column is computed code-side by `PriceNormalizer`
+and written via the shared `normalize_price_to_eur(ad, amount, currency)` free function
+in `apps/currencies/services/price_normalizer.py` — see [Price Normalization Seam](../99-agent/architecture.md#price-normalization-seam-10-qlt-001).
 
 ## EventType
 Analytics event kinds for `analytics_events.event_type` (see [db-schema.md](db-schema.md)).
@@ -221,3 +226,24 @@ are always on.
 > `"preferences"`) via StrEnum serialization — no string-literal code paths
 > exist. `ESSENTIAL` cookies are always-on and intentionally not stored in
 > the `categories` dict.
+
+## ConsentVersion
+Version of the consent banner shown to the user, recorded in
+`consent_records.consent_version` (see [db-schema.md](db-schema.md) for the
+`consent_records` table). Backs the GDPR Art. 7(1)
+accountability requirement — each `ConsentRecord` stores the banner version
+the user was shown so version drift at the browser boundary is auditable.
+`ConsentVersion.V1_0.value == "1.0"` matches all existing database values;
+the StrEnum replaces five raw `"1.0"` Python literals and two template
+hidden-input literals.
+
+| Value | Meaning |
+|-------|---------|
+| `1.0` | Initial consent banner text/version |
+
+Layers that consume it:
+- **Model** — `ConsentRecord.consent_version` (`users/models.py`) defaults to `ConsentVersion.V1_0.value`.
+- **Context processor** — `apps.users.context_processors.consent_version` exposes the enum member to templates; `consent_banner.html` renders `value="{{ consent_version.value }}"`.
+- **DTO validation** — `ConsentSubmission.consent_version` (`users/schemas.py`) carries a lenient `@field_validator` that coerces unrecognized values to `ConsentVersion.V1_0.value` (never rejects a legitimate `1.0` submission).
+
+See [Consent Version Tracking](../99-agent/architecture.md#consent-version-tracking-10-qlt-002) in the architecture doc for the full pattern.

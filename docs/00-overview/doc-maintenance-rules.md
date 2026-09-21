@@ -145,3 +145,22 @@ Agents must:
 - [ ] Moved content preserving structure
 - [ ] Updated cross-links in both files
 - [ ] Updated `related` arrays in frontmatter
+
+### Code Quality Refactor (StrEnum extraction, shared-utility extraction, module split)
+
+Used when a refactoring extracts a constant into a StrEnum, merges a duplicated
+logic block into a shared utility, or splits an oversized module into a package:
+
+- [ ] Added a `##` section (or updated an existing one) in the relevant agent/spec doc
+      (e.g. `docs/99-agent/architecture.md`) describing the new seam, utility, or split
+- [ ] If a new StrEnum was introduced, added it to [`db-enums`](../02-database/db-enums.md)
+      with a value-meaning table and cross-references
+- [ ] If a shared utility replaced duplicated logic, documented the old vs. new call paths
+      and any intentionally-out-of-scope sites (e.g. management commands with different
+      exception semantics)
+- [ ] If a module was split into a package, documented the sub-module layout, the shared
+      object (router/StatesGroup), and the re-export strategy in `__init__.py`
+- [ ] Updated test import paths / patch targets in any test files that referenced the
+      old location (verify with `grep`)
+- [ ] Verified frontmatter is valid on all modified docs
+- [ ] Checked for broken relative links in modified sections
