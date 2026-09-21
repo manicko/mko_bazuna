@@ -93,8 +93,10 @@ class Command(BaseCommand):
             delete_photo(storage_key)
 
         logger.info(
-            "Hard-deleted %d users with consent revoked over 30 days ago. "
+            "Hard-deleted %d users (cascaded %d rows incl. ads/images) "
+            "with consent revoked over 30 days ago. "
             "Removed %d media files.",
+            len(user_ids),
             deleted_count,
             len(storage_keys),
         )
