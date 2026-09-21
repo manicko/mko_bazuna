@@ -24,6 +24,7 @@ from django.utils import timezone
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
 from apps.media.services.filesystem import delete_photo
+from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
@@ -219,6 +220,12 @@ def soft_delete_user_ads(user: User) -> list[str]:
     )
 
     logger.info("Soft-deleted %s ads for user %s", ads_deleted, user.id)
+
+    # Bump the search content-version so cached result IDs are invalidated
+    # for the withdrawn seller's ads (08-SRH-001). Using on_commit ensures
+    # the bump only fires if the surrounding transaction (in withdraw_consent)
+    # commits successfully; a rollback suppresses the callback.
+    transaction.on_commit(lambda: bump_search_cache_version())
     return draft_storage_keys
 
 
