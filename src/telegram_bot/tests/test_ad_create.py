@@ -177,7 +177,7 @@ class TestProcessPhotos:
         )
         message = _build_photo_message()
 
-        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+        with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
 
         mock_download.assert_not_called()
@@ -223,14 +223,14 @@ class TestProcessPhotos:
         from telegram_bot.handlers.ad_create import process_photos
 
         monkeypatch.setattr(
-            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            "telegram_bot.handlers.ad_create.photos.check_upload_rate_limit",
             AsyncMock(return_value=False),
         )
 
         state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         message = _build_photo_message()
 
-        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+        with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
 
         mock_download.assert_not_called()
@@ -246,14 +246,14 @@ class TestProcessPhotos:
         from telegram_bot.handlers.ad_create import process_photos
 
         monkeypatch.setattr(
-            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            "telegram_bot.handlers.ad_create.photos.check_upload_rate_limit",
             AsyncMock(return_value=True),
         )
 
         state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         message = _build_photo_message(file_size=3 * 1024 * 1024)
 
-        with patch("telegram_bot.handlers.ad_create.download_photo") as mock_download:
+        with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
 
         mock_download.assert_not_called()
@@ -286,7 +286,7 @@ class TestProcessPhotos:
         jpeg_bytes = buffer.getvalue()
 
         monkeypatch.setattr(
-            "telegram_bot.handlers.ad_create.check_upload_rate_limit",
+            "telegram_bot.handlers.ad_create.photos.check_upload_rate_limit",
             AsyncMock(return_value=True),
         )
 
@@ -297,7 +297,7 @@ class TestProcessPhotos:
         with (
             override_settings(MEDIA_ROOT=str(tmp_path)),
             patch(
-                "telegram_bot.handlers.ad_create.download_photo",
+                "telegram_bot.handlers.ad_create.photos.download_photo",
                 new=AsyncMock(return_value=jpeg_bytes),
             ),
         ):

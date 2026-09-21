@@ -6,12 +6,12 @@ helpers, media helpers, translation helpers and keyboard builders live in
 ``telegram_bot.services.ad_data`` (bot -> backend direction).
 
 Step handlers used to be concentrated here; they are now split across submodules
-(B10-B14: formatters in ``preview``; category/city/text/price steps below).
+(B10-B15: formatters in ``preview``; B11: category; B12: city; B13: text;
+B14: price; B15: photos).
 Each submodule imports the shared ``router`` and ``AdCreateForm`` from this
 package so every ``@router`` handler registers against the single Router
 instance, and this package re-exports them. The orchestrators (``cmd_post``,
-``cmd_cancel``) and the photo/preview steps (``process_photos``,
-``process_preview``) remain here.
+``cmd_cancel``) and the preview step (``process_preview``) remain here.
 """
 
 import asyncio
@@ -28,21 +28,13 @@ from django.utils.translation import gettext as _
 from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.core.enums import AdStatus, LanguageLocale
 from apps.core.services.site_config import get_site_name_async
-from apps.media.services.filesystem import (
-    delete_photo,
-    generate_storage_key,
-    validate_photo,
-)
-from telegram_bot.schemas.message_payloads import PhotoCountPayload
+from apps.media.services.filesystem import delete_photo
 from telegram_bot.services.ad_data import (
     _get_ad_status,
     create_draft_ad,
     delete_draft,
-    download_photo,
-    save_photo,
     translate_all_languages,
 )
-from telegram_bot.services.rate_limit import check_upload_rate_limit
 from telegram_bot.states import AdCreateState
 
 from .preview import _format_preview_price, show_preview
@@ -63,6 +55,7 @@ __all__ = [
     "process_price_currency",
     "process_price",
     "_move_from_price_to_photos",
+    "process_photos",
 ]
 
 
@@ -99,7 +92,7 @@ class AdCreateForm(StatesGroup):
     preview = AdCreateState.PREVIEW
 
 
-# Step handlers are split into submodules (10-QLT-003 B11-B14). Each submodule
+# Step handlers are split into submodules (10-QLT-003 B11-B15). Each submodule
 # imports the shared ``router`` and ``AdCreateForm`` from this package; importing
 # them here runs the ``@router`` decorators (registering every handler on the
 # single Router instance) and re-exports the public step handlers.
@@ -113,6 +106,7 @@ from .category import (  # noqa: E402
     process_purpose,
 )
 from .city import process_city  # noqa: E402
+from .photos import process_photos  # noqa: E402
 from .price import (  # noqa: E402
     _move_from_price_to_photos,
     process_price,
@@ -189,118 +183,6 @@ async def cmd_cancel(message: types.Message, state: FSMContext) -> None:
     await state.clear()
 
     await message.answer(_("Ad creation cancelled."))
-
-
-# --- Photos step ---
-
-
-@router.message(AdCreateForm.photos)
-async def process_photos(message: types.Message, state: FSMContext) -> None:
-    """Process photo uploads with validation."""
-
-    data = await state.get_data()
-
-    photos = data.get("photos", [])
-
-    # Handle 'done' command
-
-    if message.text and message.text.strip().lower() == "done":
-        count = len(photos)
-
-        try:
-            PhotoCountPayload(photo_count=count)
-
-        except Exception:
-            if count == 0:
-                await message.answer(_("Please send at least 1 photo before finishing."))
-            else:
-                await message.answer(
-                    _("You can upload at most 5 photos (you have {count}).").format(
-                        count=count
-                    )
-                )
-            return
-
-        await state.set_state(AdCreateForm.preview)
-
-        await show_preview(message, data)
-
-        return
-
-    # Validate photo exists
-
-    if not message.photo:
-        await message.answer(_("Please send a photo (JPEG only) or 'done' to finish."))
-
-        return
-
-    # Get largest photo
-
-    photo = message.photo[-1]
-
-    # Enforce the hard cap before downloading — prevents unbounded uploads
-    # and orphaned files beyond the 5-photo limit.
-    if len(photos) >= 5:
-        await message.answer(
-            _("You already have {count} photos. You can upload at most 5 photos.").format(
-                count=len(photos)
-            )
-        )
-        return
-
-    # Enforce per-seller upload burst limit (anti-abuse).
-    user_id = data.get("user_id")
-    if user_id is not None and not await check_upload_rate_limit(user_id):
-        await message.answer(_("Uploading too fast, please wait a moment."))
-        return
-
-    # Pre-check Telegram-reported file_size before downloading to prevent
-    # memory exhaustion from oversized uploads (MED-002). The post-download
-    # validate_photo size check is retained as defense-in-depth.
-
-    if photo.file_size is not None and photo.file_size > MAX_PHOTO_BYTES:
-        await message.answer(_("Photo too large. Maximum size is approximately 2MB."))
-        return
-
-    # Download photo bytes for validation
-
-    photo_bytes = await download_photo(photo.file_id, message.bot)
-
-    if not photo_bytes:
-        await message.answer(_("Failed to download photo. Try again."))
-
-        return
-
-    # Validate photo
-
-    is_valid, error = validate_photo(photo_bytes)
-
-    if not is_valid:
-        await message.answer(_("Invalid: {error}").format(error=error))
-
-        return
-
-    # Store photo
-
-    storage_key = await save_photo(generate_storage_key(), photo_bytes)
-
-    # Save to state
-
-    photos.append(
-        {
-            "storage_key": storage_key,
-            "telegram_file_id": photo.file_id,
-            "position": len(photos),
-        }
-    )
-
-    await state.update_data(photos=photos)
-
-    await message.answer(
-        _("Photo saved ({count}/5).\nSend more or 'done' to finish.").format(
-            count=len(photos)
-        )
-    )
 
 
 # --- Preview step ---
