@@ -174,3 +174,57 @@ class TestConsentHardDelete:
         assert event.user_id == seller.pk
         log.refresh_from_db()
         assert log.user_id == seller.pk
+
+    def test_log_reports_user_count_not_cascade_total(
+        self, seller, category, city, monkeypatch, caplog
+    ):
+        """Log says 'Hard-deleted 1 users' not the cascaded total.
+
+        Verifies B5: consent_hard_delete logs len(user_ids) as the user count
+        (not the queryset.delete() cascade total), with the cascaded total
+        reported separately. Creates multiple ads+AdImages per user so the
+        cascaded total is provably larger than the user count.
+        """
+        seller.consent_revoked_at = timezone.now() - timedelta(days=60)
+        seller.save()
+
+        # Create 3 ads, each with an AdImage -- cascade will delete
+        # 1 user + 3 ads + 3 AdImages = 7 rows (cascaded > user count)
+        for i in range(3):
+            ad = create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Ad {i}",
+                status=AdStatus.PUBLISHED,
+            )
+            AdImage.objects.create(
+                ad=ad,
+                image=f"test-uuid-b6-{i}.jpg",
+                thumbnail_small=f"test-uuid-b6-{i}-small.jpg",
+                thumbnail_medium=f"test-uuid-b6-{i}-medium.jpg",
+                thumbnail_large=f"test-uuid-b6-{i}-large.jpg",
+            )
+
+        # Patch delete_photo to avoid real filesystem writes
+        deleted_keys: list[str] = []
+
+        def _record(key: str) -> None:
+            deleted_keys.append(key)
+
+        monkeypatch.setattr(
+            "apps.core.management.commands.consent_hard_delete.delete_photo",
+            _record,
+        )
+
+        with caplog.at_level("INFO"):
+            call_command("consent_hard_delete")
+
+        # The log must say "Hard-deleted 1 users" (len(user_ids)),
+        # NOT "Hard-deleted 7 users" (the cascaded total)
+        assert "Hard-deleted 1 users" in caplog.text
+        # The cascaded total is logged separately
+        assert "cascaded" in caplog.text
+        assert "rows incl. ads/images" in caplog.text
+        # User no longer exists
+        assert not User.objects.filter(pk=seller.pk).exists()
