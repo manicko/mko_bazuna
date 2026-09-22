@@ -18,7 +18,7 @@ and no PII leaks through queries or logs.
 | Zone | Concern |
 |------|---------|
 | **Query Input** | Receives the raw search string from the web form (unauthenticated buyer). Must be validated and bounded. |
-| **Translation Bridge** | An external translation step converts Montenegrin queries to the index language (Russian) with timeout + cache + fallback. |
+| **Per-language FTS** | Buyers search their own language against per-language vector columns (search_vector_ru/bs/en); no query-time translation step. |
 | **FTS Execution** | Native PostgreSQL full-text search over a maintained search vector (TSVECTOR + GIN), using a language-specific text-search configuration and weighted fields. |
 | **Visibility Filter** | Applies the SAME "visible" predicate as public listing: only PUBLISHED ads. (Withdrawn sellers are excluded because withdrawal soft-deletes their ads → status no longer PUBLISHED; DECLINE keeps ads PUBLISHED and must NOT hide them from search.) |
 | **Category Tree** | Hierarchical category navigation; a parent query must expand to all descendants. |
@@ -57,8 +57,8 @@ Search vector maintained on every relevant save/transition; existing rows backfi
 - Evidence: publish/archive/delete transitions reflected in index; no permanently stale new ads; category-name change propagates.
 
 ### (c) Translation correctness + failure handling — HIGH
-Montenegrin→index-language mapping works; outage/timeout → bounded fallback, not broken search.
-- Evidence: cross-language match; simulated outage yields degraded-but-working search with latency cap; fallback path defined.
+Per-language vector lookup; no query-time translation failure mode exists (translation is publication-time only).
+- Evidence: cross-language match via per-language vectors; publication-time translation failure yields degraded recall (populated-vector-only), no 500.
 
 ### (d) Injection safety — CRITICAL
 All input parameterized; no string-built SQL reaching the engine.
@@ -92,7 +92,7 @@ Cyrillic/Montenegrin/transliteration round-trips match; no mojibake.
 ## 7. Edge Cases
 - Ad published then searched before index updates (race) → acceptable short delay or sync update; verify behavior.
 - Seller withdraws consent while ad is on a results page → disappears on refresh (no caching of withdrawn ads).
-- Translator returns empty/garbage → fallback, degraded recall, not zero-result crash.
+- Publication-time translator returns empty/garbage → language-specific columns may be unpopulated; degraded cross-language recall (buyer sees only ads whose per-language vector was populated), not a zero-result crash or 500.
 - Very long / many-token query → bounded or rejected.
 - Deep category nesting → descendant query correct and performant.
 - Mixed Cyrillic+Montenegrin+Latin query.
