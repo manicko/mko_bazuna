@@ -217,7 +217,7 @@ A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 ### Caching Rules
 
 - **Invalidate on write:** Every model `.save()` / `.delete()` that affects a cached result must invalidate the corresponding cache key. Search results are cached by `apps/search/services/cache.py` and invalidated by `apps/search/signals.py` on `Ad` publish.
-- **Single-flight on thundering herd:** Use `apps/core/utils/swr_cache.py` (`swr_get` / `swr_set`) for any cache path that recomputes an expensive result. Concurrent identical requests share a single recompute — subsequent callers receive the stale fallback while the fresh value is computed once.
+- **Single-flight on thundering herd:** Use `apps/core/utils/swr_cache.py` (`get_with_stale_revalidate`) for any cache path that recomputes an expensive result. Concurrent identical requests share a single recompute — subsequent callers receive the stale fallback while the fresh value is computed once. Pattern-based invalidation uses `invalidate_by_prefix` (Redis-only; no-op under LocMemCache — see [cache-strategy](../architecture/cache-strategy.md)).
 - **Cache hit-rate tracking:** SLO #6 requires >85% Redis cache hit rate. If hit rate drops below 85% in production metrics, investigate invalidation churn or key cardinality before adding capacity.
 - **Pattern-based invalidation:** `cache.delete_pattern()` is Redis-only. Under LocMemCache (dev/test) it is a no-op — do not rely on it in unit tests that assert cache state.
 
@@ -225,4 +225,4 @@ A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 
 - **Profile before optimizing:** Never optimize a hot path without first confirming it in a cProfile run (`scripts/profile_search.py`) or `EXPLAIN (ANALYZE, BUFFERS)` output (`python -m manage.py profile_queries`).
 - **Assert no sequential scans at scale:** The `profile_queries` command asserts no `Seq Scan` on `ads_ad` at seed scale (>10k rows). If it fails, add an index before tuning the query.
-- **Regression threshold:** If the Locust load test shows p95 regression >10% against SLO constants (`P95_SLO_MS=500`, `P99_SLO_MS=2000` in `src/benchmark/constants.py`), halt feature work and profile. See [`docs/ops/profiling.md`](../ops/profiling.md).
+- **Regression threshold:** If the Locust load test shows p95 regression >10% against SLO constants (`PerformanceSLO.P95_SLO_MS`, `PerformanceSLO.P99_SLO_MS` from `src/benchmark/constants.py`), halt feature work and profile. See [`docs/ops/profiling.md`](../ops/profiling.md).
