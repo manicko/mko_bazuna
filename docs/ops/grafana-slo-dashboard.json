@@ -1,0 +1,398 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "mko-bazuna-slo",
+    "title": "Mko Bazuna — Performance SLO Dashboard",
+    "description": "Service-level objective monitoring for the Mko Bazuna classifieds platform. Thresholds reference the PerformanceSLO IntEnum from src/benchmark/constants.py (Block B1 deliverable).",
+    "tags": ["slo", "performance", "django-prometheus", "mko-bazuna"],
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "type": "interval",
+          "name": "interval",
+          "label": "Resolution",
+          "query": "1m,5m,15m",
+          "current": {
+            "text": "5m",
+            "value": "5m"
+          },
+          "auto": false,
+          "hide": 0,
+          "includeLabels": false,
+          "multi": false,
+          "queryType": 0,
+          "refresh": 2,
+          "auto_count": 2,
+          "sort": 0
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Dashboard --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "target": {
+            "limit": 100,
+            "matchAny": [],
+            "tags": []
+          },
+          "type": "dashboard"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": "search-p95-latency",
+        "type": "graph",
+        "title": "Search p95 Latency (ms)",
+        "description": "95th-percentile response time for the /search/ endpoint, derived from the django_http_response_duration_seconds histogram (django-prometheus). Threshold: PerformanceSLO.P95_SLO_MS = 500ms (src/benchmark/constants.py).",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(django_http_response_duration_seconds_bucket{handler=\"search:search\"}[$__interval]))) * 1000",
+            "legendFormat": "p95 latency",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 500
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": "search-p99-latency",
+        "type": "graph",
+        "title": "Search p99 Latency (ms)",
+        "description": "99th-percentile response time for the /search/ endpoint, derived from the django_http_response_duration_seconds histogram (django-prometheus). Threshold: PerformanceSLO.SEARCH_SLO_MS = 2000ms (src/benchmark/constants.py; docs/01-spec/search-patterns.md:360).",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "histogram_quantile(0.99, sum by (le) (rate(django_http_response_duration_seconds_bucket{handler=\"search:search\"}[$__interval]))) * 1000",
+            "legendFormat": "p99 latency",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 1000
+                },
+                {
+                  "color": "red",
+                  "value": 2000
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": "redis-cache-hit-rate",
+        "type": "gauge",
+        "title": "Redis Cache Hit Rate (%)",
+        "description": "Rolling cache hit rate from Redis keyspace hits/misses (Redis exporter). Threshold: PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85% (src/benchmark/constants.py; docs/99-agent/rules.md:221).",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "100 * sum(rate(redis_db_keyspace_hits_total[1m])) / (sum(rate(redis_db_keyspace_hits_total[1m])) + sum(rate(redis_db_keyspace_misses_total[1m]))",
+            "legendFormat": "hit rate",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 85
+                },
+                {
+                  "color": "red",
+                  "value": 85
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "orientation": "horizontal",
+          "textMode": "value"
+        }
+      },
+      {
+        "id": "error-rate-5xx",
+        "type": "graph",
+        "title": "Error Rate (5xx) — Burn Rate",
+        "description": "Rate of 5xx HTTP responses from the Django application (django-prometheus django_http_responses_total counter). A sustained burn rate above 1.0 indicates the error budget is being consumed faster than allowed by the SLO.",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "sum by (status_code) (rate(django_http_responses_total{status_code=~\"5..\"}[5m]))",
+            "legendFormat": "{{status_code}}",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "none"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "single"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": "slo-budget-burn-rate",
+        "type": "stat",
+        "title": "Search SLO Error Budget Remaining",
+        "description": "Remaining percentage of the search latency error budget (99% SLO — 1% budget). When this drops below 90%, the search_slo_burn_rate alert fires. See prometheus-slo-alerts.yaml.",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 16,
+          "y": 8
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "100 * (1 - (1 - rate(django_http_response_duration_seconds_bucket{le=\"2.000\", handler=\"search:search\"}[1h]) / rate(django_http_response_duration_seconds_count{handler=\"search:search\"}[1h])) / 0.01)",
+            "legendFormat": "budget remaining",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "orange",
+                  "value": 0
+                },
+                {
+                  "color": "green",
+                  "value": 10
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "textMode": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          }
+        }
+      },
+      {
+        "id": "known-limitation-panel",
+        "type": "text",
+        "title": "Known Limitation — Gunicorn Multi-Worker Metrics",
+        "gridPos": {
+          "h": 4,
+          "w": 24,
+          "x": 0,
+          "y": 12
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [],
+        "fieldConfig": {
+          "defaults": {}
+        },
+        "options": {
+          "content": "<div style=\"color: #c4171d; font-weight: bold;\">\n<h3>\u26a0 Known Limitation — Multi-worker Metrics Aggregation</h3>\n<p>\nThe application runs gunicorn with <code>workers=3</code> and <code>preload_app=True</code>\n(<code>docker/gunicorn.conf.py</code>). The default <code>prometheus_client.REGISTRY</code>\n(in-process, not multiprocess mode) means each worker gets a copy-on-write clone of the\nPrometheus metrics at fork time.\n</p>\n<p>\nConsequence: each <code>/metrics</code> scrape returns <strong>only one worker's</strong>\nmetrics (whichever worker handles the request) \u2014 values are inconsistent across scrapes.\nThis affects all panels that read counters from <code>django_http_responses_total</code>\nor <code>django_http_response_duration_seconds</code>.\n</p>\n<p>\n<strong>Not a blocker</strong> for initial SLO dashboarding \u2014 the panels are deployable and\nwill render. This is a Phase 2 hardening item:\n</p>\n<ul>\n  <li>Set <code>PROMETHEUS_MULTIPROC_DIR</code> to a tmpfs directory</li>\n  <li>Add a <code>child_exit(server, worker)</code> gunicorn hook calling\n      <code>prometheus_client.multiprocess.mark_process_dead(worker.pid)</code></li>\n  <li>See <code>.ai/contexts/context_r_d2_django_prometheus.md \u00a7Q6</code></li>\n</ul>\n<p>\nThe <code>/metrics</code> endpoint is restricted to localhost via nginx\n(<code>allow 127.0.0.1; deny all;</code> at <code>docker/nginx/nginx.conf:156</code>),\nso Prometheus must scrape from the same host or a trusted network.\n</p>\n</div>",
+          "mode": "html"
+        }
+      }
+    ],
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    },
+    "timezone": "browser"
+  },
+  "folderId": 0,
+  "overwrite": false
+}

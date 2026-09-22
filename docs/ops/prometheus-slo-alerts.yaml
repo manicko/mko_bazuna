@@ -1,0 +1,158 @@
+# PrometheusRule — SLO burn-rate alerts for Mko Bazuna (finding 13-PERF-001, Block B3).
+#
+# Thresholds reference the PerformanceSLO IntEnum in src/benchmark/constants.py:
+#   - PerformanceSLO.SEARCH_SLO_MS            = 2000  (≤2s search latency, docs/01-spec/search-patterns.md:360)
+#   - PerformanceSLO.P95_SLO_MS               = 500   (p95 latency SLO)
+#   - PerformanceSLO.P99_SLO_MS               = 2000  (p99 latency SLO, identical to SEARCH_SLO_MS)
+#   - PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85   (Redis cache hit rate, docs/99-agent/rules.md:221)
+#
+# The /metrics endpoint is restricted to localhost via nginx (docker/nginx/nginx.conf:156).
+# Prometheus must scrape from the same host (or a trusted network).
+#
+# Known limitation: gunicorn runs 3 workers with preload_app=True. The default
+# prometheus_client REGISTRY is in-process — each /metrics scrape returns only
+# one worker's metrics. This affects counter-based alerts (5xx error rate, cache
+# hit rate). See .ai/contexts/context_r_d2_django_prometheus.md §Q6 (Phase 2
+# hardening: set PROMETHEUS_MULTIPROC_DIR + child_exit hook for aggregation).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mko-bazuna-slo
+  namespace: monitoring
+  labels:
+    app: mko-bazuna
+    tier: web
+  annotations:
+    description: >-
+      SLO burn-rate alerts for the Mko Bazuna classifieds platform. Thresholds
+      are derived from the PerformanceSLO IntEnum (src/benchmark/constants.py).
+spec:
+  groups:
+    - name: slo.search-latency
+      rules:
+        # -----------------------------------------------------------------
+        # search_slo_burn_rate
+        #
+        # 99% SLO for search latency: 99% of /search/ requests must complete
+        # within PerformanceSLO.SEARCH_SLO_MS (2000ms = 2.000s, identical to
+        # PerformanceSLO.P99_SLO_MS = 2000).
+        #
+        # Error budget = 1% of all search requests (1 - 0.99).
+        # Burn rate = (fraction of requests exceeding 2s) / (error budget fraction 0.01).
+        #
+        # A sustained burn rate > 10 over a 14.4-minute window means 10% of the
+        # error budget is being consumed within that window.
+        #
+        #   burn_rate = (1 - rate(bucket{le="2.000"}) / rate(count)) / 0.01
+        #
+        # The `for: 2s` clause requires the burn rate to exceed the threshold
+        # for at least 2 seconds before the alert fires (per the SRE requirement:
+        # "p99 > SEARCH_SLO_MS for >2s in 14.4min window").
+        #
+        # Metric source: django_http_response_duration_seconds (django-prometheus).
+        # Handler label: "search:search" (the URL name for /search/).
+        # -----------------------------------------------------------------
+        - alert: search_slo_burn_rate
+          expr: |
+            (
+              1
+              - rate(
+                  django_http_response_duration_seconds_bucket{le="2.000", handler="search:search"}[14.4m]
+                )
+                / rate(
+                    django_http_response_duration_seconds_count{handler="search:search"}[14.4m]
+                  )
+            )
+            / 0.01
+          for: 2s
+          labels:
+            severity: page
+            slo: search-latency
+            error_budget_percent: "1"
+            threshold_slo_ms: "2000"
+          annotations:
+            summary: "Search latency SLO burn rate exceeded — p99 > 2000ms (PerformanceSLO.SEARCH_SLO_MS)"
+            description: |-
+              The search endpoint's 99th-percentile latency exceeds the ≤2s SLO
+              (PerformanceSLO.SEARCH_SLO_MS = 2000ms, PerformanceSLO.P99_SLO_MS = 2000ms).
+
+              A sustained burn rate > 10 over a 14.4-minute window indicates that
+              10%+ of the error budget (1% for a 99% SLO) is being consumed.
+
+              Burn rate: {{ $value | humanizePercentage }}
+              Threshold:  PerformanceSLO.SEARCH_SLO_MS = 2000ms
+              Reference: docs/01-spec/search-patterns.md:360
+            runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
+
+        # -----------------------------------------------------------------
+        # search_p95_latency_slo
+        #
+        # Secondary alert for the p95 latency SLO: 95% of /search/ requests
+        # must complete within PerformanceSLO.P95_SLO_MS (500ms).
+        # Fires when the 5-minute p95 exceeds 500ms for more than 5 minutes.
+        # -----------------------------------------------------------------
+        - alert: search_p95_latency_slo
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(django_http_response_duration_seconds_bucket{handler="search:search"}[5m])
+              )
+            ) * 1000 > 500
+          for: 5m
+          labels:
+            severity: warning
+            slo: search-p95-latency
+            threshold_slo_ms: "500"
+          annotations:
+            summary: "Search p95 latency exceeds 500ms SLO (PerformanceSLO.P95_SLO_MS)"
+            description: |-
+              The 95th-percentile search response time exceeded 500ms
+              (PerformanceSLO.P95_SLO_MS = 500) for more than 5 minutes.
+              {{ $value | humanize }}ms observed.
+            runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
+
+    - name: slo.cache-hit-rate
+      rules:
+        # -----------------------------------------------------------------
+        # cache_hit_rate_slo
+        #
+        # Cache hit rate SLO: Redis cache hit rate must remain above
+        # PerformanceSLO.CACHE_HIT_RATE_THRESHOLD (85%) — see docs/99-agent/rules.md:221.
+        #
+        # Alerts when the 5-minute cache hit rate drops below 85% for more
+        # than 5 minutes, indicating cache churn, invalidation storms, or
+        # key cardinality issues.
+        #
+        # Metric source: Redis exporter keyspace hits/misses counters.
+        #   - redis_db_keyspace_hits_total
+        #   - redis_db_keyspace_misses_total
+        # -----------------------------------------------------------------
+        - alert: cache_hit_rate_slo
+          expr: |
+            100
+              * sum(rate(redis_db_keyspace_hits_total[5m]))
+                / (
+                  sum(rate(redis_db_keyspace_hits_total[5m]))
+                  + sum(rate(redis_db_keyspace_misses_total[5m]))
+                )
+            < 85
+          for: 5m
+          labels:
+            severity: warning
+            slo: cache-hit-rate
+            threshold_percent: "85"
+          annotations:
+            summary: "Redis cache hit rate below SLO (PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85%)"
+            description: |-
+              The Redis cache hit rate dropped below the 85% SLO threshold
+              (PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85) for more than 5 minutes.
+
+              Current hit rate: {{ $value | humanizePercentage }}
+              Threshold:      PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85%
+              Reference:      docs/99-agent/rules.md:221
+
+              Investigate invalidation churn, key cardinality, or missing indexes
+              before adding cache capacity.
+            runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml

@@ -138,6 +138,18 @@ jobs:
         run: uv run pytest -m "not seed" -n auto --dist loadgroup --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db
         working-directory: src/backend
 
+      # SLO regression gate (13-PERF-001, Block B3): assert the search endpoint
+      # stays within the ≤2s SLO at seed volume (≥50 PUBLISHED ads). This dedicated
+      # step makes the latency assertion a visible, named gate in every PR —
+      # separate from the coverage run — so regressions cannot be hidden in noise.
+      - name: Run SLO regression test (≤2s search latency)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest -k TestSearchResponseSLORegression -n auto --dist loadgroup --tb=short --reuse-db -v
+        working-directory: src/backend
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
