@@ -85,7 +85,7 @@ jobs:
 
             # d. Health-check gate: poll /health/ready/ until 200 or timeout (60s)
             echo "=== Step 4: Health check gate ==="
-            if timeout 60 bash -c 'while ! curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
+            if timeout 60 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
               echo "Health check passed — /health/ready/ returned 200."
             else
               echo "ERROR: Health check FAILED after 60s timeout."

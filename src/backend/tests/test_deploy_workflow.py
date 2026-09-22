@@ -117,6 +117,34 @@ def test_deploy_workflow_has_rollback_reference() -> None:
 # --- docker-compose.prod.yml structural test -------------------------------
 
 
+def test_deploy_health_check_uses_docker_exec() -> None:
+    """deploy.yml health-check must use ``docker compose exec`` not bare ``curl localhost:8000``.
+
+    Port 8000 is NOT published in production (docker-compose.yml:262 comment;
+    docker-compose.prod.yml web service has no ``ports:`` section). The SSH
+    script runs on the host, so ``curl http://localhost:8000`` would hit the
+    host's port 8000 (Connection refused). The health-check must run curl inside
+    the web container via ``docker compose exec -T web curl ...``.
+    """
+    text = _DEPLOY_YML.read_text()
+    assert "docker compose exec" in text, (
+        "deploy.yml health-check must use `docker compose exec` to reach the web "
+        "container (port 8000 is not published on the host in production)"
+    )
+    assert "docker compose exec -T web curl" in text, (
+        "deploy.yml health-check must use `docker compose exec -T web curl` "
+        "(the -T flag disables pseudo-TTY allocation, required for piped output in scripts)"
+    )
+    # Ensure the broken pattern (bare curl without docker compose exec prefix) is NOT present.
+    # The fixed line is: `while ! docker compose exec -T web curl -sf http://...`
+    # so checking for the standalone `while ! curl -sf http://localhost:8000` catches the
+    # old broken form without false-matching the corrected one.
+    assert "while ! curl -sf http://localhost:8000" not in text, (
+        "deploy.yml must NOT use bare `curl http://localhost:8000` — port 8000 is "
+        "unpublished in production; use `docker compose exec -T web curl ...` instead"
+    )
+
+
 def test_web_service_has_stop_grace_period() -> None:
     """prod web service must have stop_grace_period >= 30s for gunicorn graceful shutdown.
 
