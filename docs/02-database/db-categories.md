@@ -54,8 +54,9 @@ The two active groups (see [db-enums.md > LookupGroupCode](db-enums.md)):
 | `LISTING_FEATURE` | Listing features — multi-select, AND-semantics (e.g. `urgent`, `premium`) |
 
 `apps.lookups.services.cache_service.LookupCacheService` caches `get_all_groups()`
-(`lookup:all_groups`, 1 h TTL, prefetched items) and `get_active_items(group_code)`
-(`lookup:active_items:<code>`).
+(`lookup:v1:<version>:all_groups`, 3600 s fresh + 600 s stale, prefetched items) and
+`get_active_items(group_code)` (`lookup:v1:<version>:items:<code>`). Invalidation uses
+version-bump via `cache.incr` (`lookup:content_version`).
 
 ## Categories & bindings
 
@@ -94,13 +95,15 @@ the closest ancestor that has them, issuing a single through-table query per res
 | `get_resolved_*_codes(...)` | Same, returning codes only |
 
 **Caching:** results are memoized per category in the shared cache
-(`lookup:resolved_purposes:<id>` / `lookup:resolved_features:<id>`, 300 s TTL).
+(`lookup:v1:resolve:<version>:purposes:<id>` / `:features:<id>` / `:conditions:<id>`,
+300 s fresh + 60 s stale). Reads use stale-while-revalidate (SWR) with a
+single-flight lock.
 
-**Invalidation:**
-- `invalidate_category(category_id)` — clears the resolver cache for the category **and its
-  descendants** (inherited resolutions may change).
-- `invalidate_lookup_item(item_id)` — clears the resolver cache for any category bound to the
-  item.
+**Invalidation:** version-bump via `cache.incr` (`lookup:resolve_version`).
+- `invalidate_category(category_id)` — bumps the resolve version, making all
+  resolved-lookup entries unreachable (they expire via TTL).
+- `invalidate_lookup_item(item_id)` — same version-bump; covers any category
+  bound to the item.
 
 ## Catalog builder (YAML manifest)
 
@@ -124,8 +127,8 @@ CLI: `management.commands.load_catalog` (`--config`, `--no-rewrite`).
 |---|---|---|---|
 | Tree version | `category:tree_version` (atomic counter) | — | Category / CategoryPath save+delete |
 | Submenu fragment | `category:submenu:<version>:<slug>:<locale>` | 300 s | tree-version bump; `:<locale>` segment prevents cross-language cache bleed |
-| Resolver result | `lookup:resolved_<purposes\|features\|conditions>:<id>` | 300 s | category/binding/lookup-item changes |
-| Lookup group/item | `lookup:all_groups`, `lookup:active_items:<code>` | 3600 s | LookupGroup/LookupItem save+delete |
+| Resolver result | `lookup:v1:resolve:<version>:<type>:<id>` | 300 s + 60 s stale | resolve-version bump (`lookup:resolve_version`) on category/binding/lookup-item changes |
+| Lookup group/item | `lookup:v1:<version>:all_groups`, `lookup:v1:<version>:items:<code>` | 3600 s + 600 s stale | content-version bump (`lookup:content_version`) on LookupGroup/LookupItem save+delete |
 
 The tree version (`apps.categories.cache`) is an atomically-incremented counter
 (`cache.incr` with a set-if-missing fallback); submenu HTML fragments are keyed on it, so a

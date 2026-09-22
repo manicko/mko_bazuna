@@ -154,7 +154,7 @@ backends. It is the pattern used by:
 ## Pattern-Based Invalidation (`invalidate_by_prefix`)
 
 For caches that use a prefix-based key structure (e.g.
-`lookup:active_items:{group_code}`), use
+`category:submenu:{tree_version}:{slug}:{locale}`), use
 `apps/core/utils/swr_cache.py:invalidate_by_prefix(prefix)` to invalidate all
 entries whose key starts with `prefix`.
 
@@ -220,10 +220,11 @@ isolation instead.
 - `{locale}` — `LanguageLocale` enum value; prevents cross-language fragment
   bleed (a Russian-rendered submenu must not serve a Bosnian visitor).
 
-### 3. Lookup caches (current state — plain get/set + prefix wipe)
+### 3. Lookup caches (v1 — SWR + version-bump, aligned to convention)
 
-These caches do **not** yet conform to the convention (target of the
-B4 code refactor). They are documented faithfully as-is.
+These caches now conform to the documented convention. All reads route
+through ``get_with_stale_revalidate`` (single-flight + stale-serve) and
+invalidation uses version-bump (``cache.incr``) — no prefix wipe.
 
 #### Lookup groups & active items
 
@@ -231,15 +232,19 @@ B4 code refactor). They are documented faithfully as-is.
 |---|---|
 | Module | `apps/lookups/services/cache_service.py` |
 | Class | `LookupCacheService` |
-| Key format | `lookup:all_groups`, `lookup:active_items:{group_code}` |
-| TTL | 3600 s (`CACHE_TTL`) |
-| Invalidation | `invalidate_all()` uses `cache.delete_pattern(f"lookup:active_items:*")` (Redis-only); `invalidate_group()` uses per-key `cache.delete` |
-| SWR | Not yet used — plain `cache.get` / `cache.set` |
+| Key format | `lookup:v1:{content_version}:all_groups`, `lookup:v1:{content_version}:items:{group_code}` |
+| Version key | `lookup:content_version` |
+| Bump function | `bump_lookup_version()` |
+| Read function | `get_lookup_version()` |
+| SWR wrapper | `get_with_stale_revalidate()` |
+| `ttl` | 3600 s |
+| `stale_ttl` | 600 s |
+| `lock_ttl` | 30 s |
+| Invalidation trigger | `apps/lookups/signals.py` on `LookupGroup`/`LookupItem` save/delete |
 
 ```
-ALL_GROUPS_CACHE_KEY = "lookup:all_groups"
-ACTIVE_ITEMS_PREFIX  = "lookup:active_items"
-CACHE_TTL            = 3600
+LookupCacheKey.V1 = "lookup:v1"
+LOOKUP_CONTENT_VERSION_KEY = "lookup:content_version"
 ```
 
 #### Resolved category lookups
@@ -248,16 +253,19 @@ CACHE_TTL            = 3600
 |---|---|
 | Module | `apps/categories/services/lookup_resolution.py` |
 | Class | `CategoryLookupResolver` |
-| Key format | `lookup:resolved_purposes:{category_id}`, `lookup:resolved_features:{category_id}`, `lookup:resolved_conditions:{category_id}` |
-| TTL | 300 s (`CACHE_TTL`) |
-| Invalidation | `invalidate_lookup_item()` uses `cache.delete_pattern` for each prefix (Redis-only); `invalidate_category()` deletes per-descendant keys |
-| SWR | Not yet used — plain `cache.get` / `cache.set` |
+| Key format | `lookup:v1:resolve:{content_version}:{segment}:{category_id}` where `segment` ∈ `purposes`, `features`, `conditions` |
+| Version key | `lookup:resolve_version` |
+| Bump function | `bump_lookup_resolve_version()` |
+| Read function | `get_lookup_resolve_version()` |
+| SWR wrapper | `get_with_stale_revalidate()` |
+| `ttl` | 300 s |
+| `stale_ttl` | 60 s |
+| `lock_ttl` | 30 s |
+| Invalidation trigger | `apps/categories/signals.py` on `LookupItem` save, through-model save/delete, `Category` structural change |
 
 ```
-RESOLVED_PURPOSES_PREFIX  = "lookup:resolved_purposes"
-RESOLVED_FEATURES_PREFIX  = "lookup:resolved_features"
-RESOLVED_CONDITIONS_PREFIX = "lookup:resolved_conditions"
-CACHE_TTL                 = 300
+LookupResolveCacheKey.V1 = "lookup:v1:resolve"
+LOOKUP_RESOLVE_VERSION_KEY = "lookup:resolve_version"
 ```
 
 ## Summary of Correct SWR API Names
