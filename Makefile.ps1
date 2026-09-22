@@ -184,15 +184,27 @@ function Invoke-Format {
     docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
 }
 
-# Run the cProfile-based search-endpoint profiling harness.
-# Assumes `up` has started the dev environment (web server on :8000).
-# Override defaults via env vars: ITERATIONS=200 TOP=50 SORT=tottime
+# Run cProfile-based search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)
 function Invoke-Profile {
     $env:COMPOSE_PROJECT_NAME = $DevProject
     $iterations = if ($env:ITERATIONS) { $env:ITERATIONS } else { "50" }
     $top = if ($env:TOP) { $env:TOP } else { "30" }
     $sort = if ($env:SORT) { $env:SORT } else { "cumulative" }
     docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml exec -T web uv run python scripts/profile_search.py --iterations $iterations --top $top --sort $sort
+}
+
+# Run locust load tests against the running dev server
+# Override defaults via env vars: LOCUST_USERS=100 LOCUST_SPAWN_RATE=5 LOCUST_HOST=http://localhost:8000 make load
+function Invoke-Load {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
+    $host = if ($env:LOCUST_HOST) { $env:LOCUST_HOST } else { "http://localhost:8000" }
+    $users = if ($env:LOCUST_USERS) { $env:LOCUST_USERS } else { "50" }
+    $spawnRate = if ($env:LOCUST_SPAWN_RATE) { $env:LOCUST_SPAWN_RATE } else { "10" }
+    $runTime = if ($env:LOCUST_RUN_TIME) { $env:LOCUST_RUN_TIME } else { "60s" }
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml exec web uv run locust -f src/benchmark/locustfile.py `
+        --headless --host $host `
+        --users $users --spawn-rate $spawnRate `
+        --run-time $runTime -L info
 }
 
 # Open shell in web container
@@ -389,6 +401,7 @@ switch ($Target.ToLower()) {
     "format" { Invoke-Format }
     "typecheck" { Invoke-Typecheck }
     "profile" { Invoke-Profile }
+    "load" { Invoke-Load }
     "shell" { Invoke-Shell }
     "migrate" { Invoke-Migrate }
     "makemigrations" { Invoke-Makemigrations }

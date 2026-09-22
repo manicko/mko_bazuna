@@ -374,6 +374,132 @@ jobs:
   # is required: check --deploy is static (no custom deploy checks, no DB
   # connection). All required production env vars are set to valid non-secret
   # placeholders so the full prod settings import path is exercised.
+  load-test:
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Check lockfile freshness
+        run: uv lock --check
+        working-directory: src/backend
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      - name: Wait for database
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable after 30s" >&2
+          exit 1
+        working-directory: src/backend
+
+      - name: Run migrations + seed reference data
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
+
+      - name: Seed >100 published ads for load test
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: |
+          uv run python manage.py shell -c "
+          from apps.ads.models import Ad, AdStatus
+          from apps.categories.models import Category
+          from apps.locations.models import City
+          from django.contrib.auth import get_user_model
+          from decimal import Decimal
+          from django.db import transaction
+          cat = Category.objects.first()
+          city = City.objects.first()
+          User = get_user_model()
+          seller = User.objects.first() or User.objects.create_user('seller', telegram_id=999999)
+          with transaction.atomic():
+              for i in range(120):
+                  Ad.objects.create(
+                      title=f'Load test ad {i}',
+                      category=cat,
+                      city=city,
+                      seller=seller,
+                      price=Decimal('100'),
+                      status=AdStatus.PUBLISHED,
+                  )
+          print('Seeded 120 published ads for load test')
+          "
+        working-directory: src/backend
+
+      # Start the web server in the background
+      - name: Start web server
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+        run: |
+          uv run gunicorn config.wsgi:application \
+            --bind 0.0.0.0:8000 --workers 2 --timeout 30 &
+          # Wait for server to be ready
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8000/ >/dev/null 2>&1; then
+              echo "Web server ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Web server not ready" >&2
+          exit 1
+
+      - name: Run Locust load test
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+        run: |
+          uv run locust -f src/benchmark/locustfile.py \
+            --headless --host http://localhost:8000 \
+            --users 50 --spawn-rate 10 --run-time 60s \
+            -L info \
+            --csv=/tmp/locust-results
+          # Check p95 against SLO (PerformanceSLO.P95_SLO_MS = 500)
+          P95_SLO=500
+          ACTUAL_P95=$(cat /tmp/locust-results_stats.csv | awk -F, 'NR>1 && $1=="Total" {print $6}' | head -1)
+          if [ -n "$ACTUAL_P95" ] && [ "$(echo "$ACTUAL_P95 > $P95_SLO" | bc)" = "1" ]; then
+            echo "::error::p95 response time ${ACTUAL_P95}ms exceeds SLO of ${P95_SLO}ms"
+            exit 1
+          fi
+          echo "p95 ${ACTUAL_P95}ms within SLO of ${P95_SLO}ms"
+
   deploy-check:
     runs-on: ubuntu-latest
     env:
