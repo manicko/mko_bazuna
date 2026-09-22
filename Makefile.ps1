@@ -55,6 +55,7 @@ function Show-Help {
     Write-Host "  lint           Run ruff linter inside web container"
     Write-Host "  format         Auto-fix lint issues (including import sorting) inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
+    Write-Host "  profile        Run cProfile search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)"
     Write-Host "  shell          Open bash shell in web container"
     Write-Host "  migrate        Run database migrations (one-shot, advisory-locked)"
     Write-Host "  consolidate        Consolidate migrations (threshold: `$CONSOLIDATE_THRESHOLD)"
@@ -181,6 +182,17 @@ function Invoke-Typecheck {
 function Invoke-Format {
     $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
+}
+
+# Run the cProfile-based search-endpoint profiling harness.
+# Assumes `up` has started the dev environment (web server on :8000).
+# Override defaults via env vars: ITERATIONS=200 TOP=50 SORT=tottime
+function Invoke-Profile {
+    $env:COMPOSE_PROJECT_NAME = $DevProject
+    $iterations = if ($env:ITERATIONS) { $env:ITERATIONS } else { "50" }
+    $top = if ($env:TOP) { $env:TOP } else { "30" }
+    $sort = if ($env:SORT) { $env:SORT } else { "cumulative" }
+    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml exec -T web uv run python scripts/profile_search.py --iterations $iterations --top $top --sort $sort
 }
 
 # Open shell in web container
@@ -376,6 +388,7 @@ switch ($Target.ToLower()) {
     "lint" { Invoke-Lint }
     "format" { Invoke-Format }
     "typecheck" { Invoke-Typecheck }
+    "profile" { Invoke-Profile }
     "shell" { Invoke-Shell }
     "migrate" { Invoke-Migrate }
     "makemigrations" { Invoke-Makemigrations }

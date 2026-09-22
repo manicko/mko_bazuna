@@ -2,7 +2,7 @@
 
 .PHONY: help up down reset build restart test test-all test-db test-down test-logs test-recreate test-clean-db \
           lint format typecheck lock-check lint-templates shell makemigrations makemessages compilemessages migrate logs \
-           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test load
+           backup restore prune-backups db-shell clean fullclean create-admin load-catalog seed restore-test load profile
 
 # ====================== Settings ======================
 
