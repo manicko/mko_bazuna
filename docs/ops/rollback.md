@@ -318,20 +318,16 @@ and bot liveness. The readiness endpoint returns:
 - `503` with `{"status": "not_ready", ...}` when any of database, cache, or bot
   liveness fails.
 
-Poll this endpoint from the host (or via `docker compose exec`):
+In production, port 8000 is **not** published (nginx proxies on 80/443).
+Poll the endpoint via `docker compose exec` so curl runs inside the `web` container:
 
 ```bash
 # Poll readiness until 200 (or timeout at 90s)
-timeout 90 bash -c 'while ! curl -sf http://localhost:8000/health/ready/ > /dev/null; do sleep 5; done'
+timeout 90 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null; do sleep 5; done'
 
 # Verify the response body
-curl -s http://localhost:8000/health/ready/ | python -m json.tool
+docker compose exec -T web curl -s http://localhost:8000/health/ready/ | python -m json.tool
 ```
-
-> **Port note:** In production, port 8000 is **not** published — nginx proxies on
-> 80/443. Use `docker compose exec web curl -sf http://localhost:8000/health/ready/`
-> to probe inside the container. If you are running with published ports, use
-> `http://localhost:8000/health/ready/` directly.
 
 ### Web — `/health/live/` (liveness endpoint)
 
@@ -395,9 +391,9 @@ docker compose --env-file .env.prod \
 
 | Service | Check | Expected | Command |
 |---------|-------|----------|---------|
-| web | Liveness | HTTP 200, `status: "alive"` | `curl -sf http://localhost:8000/health/live/` |
-| web | Readiness | HTTP 200, `status: "ready"` | `curl -sf http://localhost:8000/health/ready/` |
-| web | Bot liveness marker (Redis) | `checks.bot == "ok"` in readiness response | `curl -sf http://localhost:8000/health/ready/ \| python -m json.tool` |
+| web | Liveness | HTTP 200, `status: "alive"` | `docker compose exec -T web curl -sf http://localhost:8000/health/live/` |
+| web | Readiness | HTTP 200, `status: "ready"` | `docker compose exec -T web curl -sf http://localhost:8000/health/ready/` |
+| web | Bot liveness marker (Redis) | `checks.bot == "ok"` in readiness response | `docker compose exec -T web curl -s http://localhost:8000/health/ready/ \| python -m json.tool` |
 | bot | Container healthcheck | `healthy` state | `docker compose ps bot` |
 | bot | Marker freshness | mtime within `BOT_HEALTH_STALE_SECONDS` | `stat -c %Y /tmp/mko_bazuna_bot_alive` |
 | bot | Redis liveness marker | `bot:liveness` key fresh in Redis | `docker compose exec bot python -c "from django.core.cache import cache; print(cache.get('bot:liveness'))"` |
@@ -463,7 +459,7 @@ docker compose --env-file .env.staging \
   up -d --pull always web bot
 
 # 4. Validate health checks recover
-timeout 90 bash -c 'while ! curl -sf http://localhost:8000/health/ready/ > /dev/null; do sleep 5; done'
+timeout 90 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null; do sleep 5; done'
 echo "Rollback validated in staging"
 ```
 
