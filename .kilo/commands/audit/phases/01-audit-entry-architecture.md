@@ -10,22 +10,15 @@ problems-only: true
 
 ## Purpose
 
-Reusable handbook for auditing the entry points and process architecture of a
-**dual-process Django system**:
+Reusable handbook for auditing the entry points and process architecture of an **N-process Django system**, where the long-lived process set is environment-dependent:
 
-- **Web process** — synchronous gunicorn WSGI serving a server-rendered HTMX MPA.
-- **Bot process** — asynchronous aiogram event loop that calls `django.setup()`
-  and shares the persistence layer.
+- **Web process** — synchronous gunicorn WSGI, server-rendered HTMX MPA.
+- **Bot process** — asynchronous aiogram event loop; calls `django.setup()` and shares the persistence layer.
+- **Scheduler process** (prod only, profile-gated) — long-lived celery-beat-style loop dispatching idempotent sweep/rollup/alert management commands.
 
-Both share one Django project + one PostgreSQL database. Migrations run exactly
-once before both start. An nginx reverse proxy fronts both (TLS termination,
-media serving).
+All share one Django project + one PostgreSQL database. Migration/reference bootstrap runs exactly once (under an advisory lock) before any long-lived process starts — see [Process topology](#process-topology). A reverse proxy fronts the long-lived processes for TLS termination and `/media/` serving; it is **optional in dev**.
 
-Audit through **architectural layers**, **zones of responsibility**, **key
-risks**, and **goals**. Never reference concrete file/module/class names — refer
-to the *roles* (the web WSGI entrypoint, the bot process entrypoint, the
-migration runner, the settings module, the URL router / route registry, the
-shared ORM / persistence layer, the async/sync boundary wrapper).
+*Auditing is role-based — never reference concrete file/module/class names. Refer to the web WSGI entrypoint, the bot process entrypoint, the scheduler loop, the migration gate, the settings module, the URL router, the shared ORM/persistence layer, and the advisory-lock subsystem.*
 
 ## Output Mode
 
@@ -38,12 +31,24 @@ shared ORM / persistence layer, the async/sync boundary wrapper).
 
 ---
 
+## Process topology
+
+### Startup chain (one-shot bootstrap)
+
+Compose-ordered one-shot services run to completion before the long-lived processes serve traffic:
+`db (healthy)` → `migrate` (`bootstrap_reference_data` → `migrate_locked`: `migrate --run-syncdb` + `setup_search_triggers --backtrack` + `load_exchange_rates` + optional `backfill_translations`, under session advisory lock **MIGRATE = 100**) → `load_cities` (lock 104) → `load_catalog` (lock 104) → fork: `{create_admin (lock 101), web, bot, seed (profile-gated, lock 110)}`; in prod, `scheduler` also joins the fork depending on `migrate` + `load_catalog`.
+
+### Reverse proxy note
+
+nginx terminates TLS and serves `/media/` in production (web does not publish `:8000`). In dev (`docker-compose.dev.override.yml`) nginx is **profile-gated** (`profiles: ["use-nginx"]`) and web publishes `:8000` directly — auditors must not treat nginx as a hard prod-only requirement when reviewing dev stacks.
+
 ## Architectural Layers (zones of responsibility)
 
 | Layer | Zone of responsibility | Key risks |
 |-------|------------------------|-----------|
 | Bootstrap / entry | Load settings once; `django.setup()`; establish DB connectivity; start serving. | Import-time side effects; ORM access before setup; divergent settings. |
 | Migration orchestration | Run schema migrations exactly once under an advisory lock before either process boots. | Double migrations; concurrent runs; no dependency on completion. |
+| Scheduled-job orchestration | Long-lived scheduler loop dispatches idempotent management commands (hourly sweeps + daily jobs); each command owns its advisory lock ID; distinct from the one-shot migration gate (lock 100). | Lock-ID collisions / overlapping sweeps / missed daily cadence / drift from the hourly loop. |
 | Web transport | Accept HTTP; route to thin views; delegate to service/core. | Business logic in views; blocking loops; missing pooling. |
 | Bot transport | Receive updates on the event loop; route to thin handlers; delegate. | Unwrapped ORM in async; blocking IO; no reconnect/shutdown handling. |
 | Service / core | Business logic, isolated from transport. | Reverse imports from entry layer; shared mutable local state. |
@@ -59,14 +64,15 @@ Map the architecture before checking anything. Use roles, not names.
    process entrypoint. Trace the Django bootstrap in each. Verify both reference
    the **same settings module**. Verify the bot calls `django.setup()` **before**
    any ORM/model import.
-2. **Migration orchestration discovery** — Locate the one-shot migration runner.
+2. **Scheduler discovery** — Locate the long-lived scheduler entrypoint (the hourly/daily command loop, profile-gated `scheduler`). Confirm the hourly + daily command sets, map each command to its advisory-lock ID, and verify the scheduler depends on `migrate` + `load_catalog` completion before dispatching sweeps.
+3. **Migration orchestration discovery** — Locate the one-shot migration runner.
    Verify it takes an **advisory lock** to prevent concurrent runs. Verify **both**
    processes depend on migration completion before starting.
-3. **Web↔Bot boundary mapping** — Enumerate all entry handlers (HTTP routes +
+4. **Web↔Bot boundary mapping** — Enumerate all entry handlers (HTTP routes +
    bot handlers). Trace their imports into service/core layers. Verify **no
    reverse imports** (entry layer must not be imported by lower layers). Identify
    shared-state assumptions (database, media filesystem).
-4. **Async/sync boundary mapping** — Find where the async bot loop touches the
+5. **Async/sync boundary mapping** — Find where the async bot loop touches the
    synchronous ORM. Identify the sync-to-async (or equivalent) wrapping around
    every ORM call. Identify blocking IO in async handlers.
 

@@ -415,7 +415,7 @@ restart the affected container(s), and account for the consequences.
 Deployment configuration is validated via Django's `manage.py check --deploy`:
 - **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
-- This complements the `${VAR:?}` presence guards in `docker-compose.yml`; it cannot be bypassed by a non-empty placeholder key.
+- This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time strength validation: `DJANGO_SECRET_KEY` must be ≥ 50 characters and must not be a `<...>` placeholder or `dev-only-dummy` sentinel. A non-empty placeholder or weak key is rejected at boot, preventing session/CSRF/password-reset token forgery.
 
 ### Deployment Rollback
 
@@ -971,10 +971,10 @@ make migrate
 # Check bot logs
 make logs | grep bot
 
-# Verify bot token
+# Verify bot token is set (prints only status, never the token value)
 docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
-  exec bot env | grep BOT_TOKEN
+  exec bot sh -c 'test -n "$BOT_TOKEN" && echo "BOT_TOKEN is set" || echo "BOT_TOKEN is MISSING"'
 
 # Check for Django setup errors
 docker compose --env-file .env.dev \

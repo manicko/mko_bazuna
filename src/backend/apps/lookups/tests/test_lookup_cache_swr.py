@@ -17,6 +17,7 @@ Tests therefore assert version-bump and SWR behavior, never delete_pattern.
 
 from __future__ import annotations
 
+import threading
 import time
 
 import pytest
@@ -581,3 +582,148 @@ class TestLookupInvalidationOnSave:
         purposes_after = CategoryLookupResolver.get_resolved_purposes(category)
         assert len(purposes_after) == 1
         assert purposes_after[0].name_i18n["en"] == "Sell Renamed"
+
+
+class TestLookupCacheSWR:
+    """Consolidated SWR verification for lookup caches (PERF-002/003/006).
+
+    Tests the three core SWR guarantees through ``get_with_stale_revalidate``
+    using the lookup-cache configuration constants (``LOOKUP_CACHE_TTL`` etc.):
+
+    - **Single-flight** (PERF-002): producer called once under concurrent access
+    - **Stale-serve** (PERF-003): stale value served while winner recomputes
+    - **Version-bump** (PERF-006): old cache keys become unreachable after bump
+    """
+
+    pytestmark = pytest.mark.unit
+
+    # --- Single-flight (PERF-002) --------------------------------------------
+
+    def test_single_flight_producer_called_once_under_concurrent_access(self):
+        """PERF-002: concurrent cold-miss access triggers exactly one producer
+        call — the single-flight lock prevents thundering-herd recomputes.
+
+        Five threads hit a cold cache simultaneously (via a ``Barrier``).
+        Only the lock-winner runs the producer; the other four losers
+        receive the ``default`` fallback without invoking the producer.
+        """
+        key = "test:swr:single_flight"
+        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        cache.delete(key)
+        cache.delete(lock_key)
+
+        call_count = 0
+        counter_lock = threading.Lock()
+        barrier = threading.Barrier(5)
+        results: list = []
+        result_lock = threading.Lock()
+
+        def producer():
+            nonlocal call_count
+            with counter_lock:
+                call_count += 1
+            time.sleep(0.2)  # slow enough for all threads to overlap
+            return ["computed_value"]
+
+        def worker():
+            barrier.wait()
+            val = get_with_stale_revalidate(
+                key,
+                producer,
+                ttl=LOOKUP_CACHE_TTL,
+                stale_ttl=LOOKUP_CACHE_STALE_TTL,
+                lock_ttl=LOOKUP_CACHE_LOCK_TTL,
+                default=None,
+            )
+            with result_lock:
+                results.append(val)
+
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert call_count == 1
+        assert ["computed_value"] in results
+        assert results.count(None) >= 1
+
+    # --- Stale-serve (PERF-003) -----------------------------------------------
+
+    def test_stale_serve_serves_stale_to_all_concurrent_callers(self):
+        """Stale entries are served to all concurrent callers while the winner
+        recomputes in the background — no caller blocks on the recompute.
+        """
+        key = "test:swr:stale_concurrent"
+        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        cache.delete(key)
+        cache.delete(lock_key)
+
+        cache.set(
+            key,
+            _make_entry(["stale_data"], age_seconds=LOOKUP_CACHE_TTL + 60),
+            timeout=LOOKUP_CACHE_TTL + LOOKUP_CACHE_STALE_TTL + 60,
+        )
+
+        call_count = 0
+        counter_lock = threading.Lock()
+        barrier = threading.Barrier(3)
+        results: list = []
+        result_lock = threading.Lock()
+
+        def producer():
+            nonlocal call_count
+            with counter_lock:
+                call_count += 1
+            time.sleep(0.2)
+            return ["fresh_data"]
+
+        def worker():
+            barrier.wait()
+            val = get_with_stale_revalidate(
+                key,
+                producer,
+                ttl=LOOKUP_CACHE_TTL,
+                stale_ttl=LOOKUP_CACHE_STALE_TTL,
+                lock_ttl=LOOKUP_CACHE_LOCK_TTL,
+                default=None,
+            )
+            with result_lock:
+                results.append(val)
+
+        threads = [threading.Thread(target=worker) for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert all(list(r) == ["stale_data"] for r in results)
+        assert call_count == 1
+
+    # --- Version-bump (PERF-006) ----------------------------------------------
+
+    def test_version_bump_makes_old_cache_key_unreachable(self):
+        """Version-bump invalidation makes old cache keys unreachable.
+
+        Old entries persist (expire via TTL); new reads use a new version key
+        and get a cold miss, forcing a recompute with fresh data.
+        """
+        key_before = all_groups_key()
+        version_before = get_lookup_version()
+
+        cache.set(
+            key_before,
+            _make_entry(["old_data"], age_seconds=1.0),
+            timeout=LOOKUP_CACHE_TTL + LOOKUP_CACHE_STALE_TTL + 60,
+        )
+        assert cache.get(key_before) is not None
+
+        bump_lookup_version()
+
+        version_after = get_lookup_version()
+        key_after = all_groups_key()
+
+        assert version_after == version_before + 1
+        assert key_after != key_before
+        assert cache.get(key_before) is not None  # old entry persists
+        assert cache.get(key_after) is None  # new key is cold miss

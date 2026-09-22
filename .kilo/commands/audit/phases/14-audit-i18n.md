@@ -9,19 +9,20 @@
 ## 1. Goal
 
 Verify that runtime locale resolution, fallback-chain semantics, per-user
-language binding, DB-based i18n (JSONB fields + locale cache keys), and
-completeness beyond the test gate are all correct: only the selected language
-is rendered, fallback chains resolve as documented (not raw `.name` bypasses),
-per-user language propagates to bot-rendered notifications, the test gate is
-comprehensive (title tags, hreflang, plural forms, locale switching, inline-JS),
-and RTL/Bidi readiness is maintained for the supported scripts.
+language binding, DB-based i18n (JSONB fields + locale cache keys), and the
+completeness of the i18n test gate are all correct: only the selected language
+is rendered, fallback chains resolve as documented (raw `.name`/`.title` access
+is banned by the completeness gate), per-user language propagates to bot-rendered
+notifications, the test gate is comprehensive (title tags, hreflang, plural
+forms, locale switching, inline-JS), and RTL/Bidi readiness is maintained for
+the supported scripts.
 
 ## 2. System Under Audit (layers & zones)
 
 | Zone | Concern |
 |------|---------|
 | **Runtime Locale Resolution** | A request-time middleware resolves the active language from priority order (query param → cookie → Accept-Language → default) with language normalization (`en-US`→`en`, fallback→`bs`/`ru`) and persists the choice in a long-TTL cookie. |
-| **Fallback-Chain Resolution** | Name/title/description resolution on Category, City, and LookupItem follows a `locale → ru → name` fallback chain via the documented accessors — never a raw `.name` bypass. |
+| **Fallback-Chain Resolution** | Name/title/description resolution on Category, City, and LookupItem follows a `locale → ru → name` fallback chain via the documented accessors. The completeness gate **bans** raw `.name`/`.title` access — `pytest.fail()` is raised by `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` on any raw accessor bypass (test-time enforcement, not a runtime exception). |
 | **Per-User Language Binding** | The identity's stored Telegram language is propagated to bot-rendered notification content (alert messages, saved-search notifications). |
 | **DB-Based i18n** | Catalog names use a JSONB `name_i18n` field populated per language; the submenu cache key carries a `<locale>` segment so locale bleed cannot occur. |
 | **Completeness Coverage** | The CI completeness test gate (no-hardcoded-visible-text, extraction completeness, no-empty-msgstr, mo-compiled) is comprehensive — covering title tags, hreflang, plural-form rules, locale switching correctness, and inline-JS i18n holes. |
@@ -45,7 +46,7 @@ Execute, then capture evidence (rendered HTML, HTTP headers, cache keys, notific
 2. **Name fallback** — render a Category/City/LookupItem with a missing `name_i18n` locale entry → assert it falls back through the documented chain (not a raw `.name` bypass); assert autocomplete uses the accessor, not `.name`.
 3. **Per-user bot language** — trigger an alert/saved-search notification for a `bs`-language identity → assert the notification text renders in `bs`, not the site default.
 4. **Cache locale segment** — render a submenu in `ru`, then in `bs` → assert distinct cache keys per locale; assert NO stale-language serve.
-5. **Completeness gate breadth** — run the gate → confirm it does NOT cover title tags, hreflang, plural forms, or locale switching (documented gap); confirm it passes with holes the runtime audit would catch.
+5. **Completeness gate breadth** — run the gate → confirm the gate covers title tags, hreflang, plural-form rules, locale switching, and inline-JS i18n (the gate bans raw `.name`/`.title` access via `pytest.fail()`; it is comprehensive, not a narrow 4-test subset).
 6. **Exemption surface** — confirm which templates/accessors are exempt from the gate and that the exhaustion is intentional.
 7. **Script/direction** — render Bosnian content in both Latin and Cyrillic contexts → assert `dir` attribute discipline; assert no mojibake in mixed-script pages.
 
@@ -67,25 +68,30 @@ Bot-rendered alerts and saved-search notifications honor the identity's stored T
 `name_i18n` JSONB population is correct; the submenu cache key carries a `<locale>` segment so a Russian-rendered entry is never served to a Bosnian visitor.
 - Evidence: cache keys include a `<locale>` segment per the i18n spec; populated `name_i18n` rows; the documented bug where the submenu cache key omits language is a finding.
 
-### (e) Completeness-gate breadth beyond the CI test — HIGH
-The completeness gate is comprehensive: it covers title tags, hreflang, plural-form rules, locale switching, and inline-JS i18n holes (not only no-hardcoded-text / extraction / no-empty-msgstr / mo-compiled).
-- Evidence: the gate test file (narrow, 4 tests) does NOT exercise title tags, hreflang, plurals, or locale switching; a comprehensive gate is a finding only if the runtime audit surfaces holes. Documenting the gap as a known incompleteness is itself a finding.
+### (e) Completeness-gate breadth — RESOLVED
+The completeness gate is comprehensive: it is the CI test-time gate that bans raw `.name`/`.title`/`.get_name` access and covers the full i18n surface:
+- **21 tests in CI** (22 invocations via `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`) — per `.kilo/research/14-i18n.md`.
+- **Dimensions covered:** title tags (`test_title_tags_translated`), hreflang (`test_hreflang_present` via `components/locale_head.html`), plural forms (`test_plural_forms` header + `test_plural_forms_runtime` for `{% blocktrans count %}`), locale switching (`test_locale_switch_re_render`), and inline-JS i18n (`test_no_hardcoded_js_strings`).
+- The gate raises `pytest.fail()` (not a runtime exception) on violations, including `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` for raw accessor access.
+- A comprehensive gate with no uncovered holes is the target state — no gap remains.
 
-### (f) Title tags, hreflang, plurals — HIGH
+### (f) Title tags, hreflang, plurals — RESOLVED (covered by gate)
 Page `<title>` carries the localized string; `hreflang` is emitted for the supported language matrix; plural-form rules select the correct form per language.
-- Evidence: rendered `<title>` per language; `<link rel="alternate" hreflang="...">` per language (excluding self-referential `x-default`); plural form selection correct for each of ru/bs/en. Missing hreflang on language switches is a finding.
+- Evidence: `test_title_tags_translated` (per-language `<title>` localization), `test_hreflang_present` (every page template renders `<link rel="alternate" hreflang>` via `components/locale_head.html`), `test_plural_forms` (each `.po` `Plural-Forms` header matches CLDR), `test_plural_forms_runtime` (`{% blocktrans count %}` selects correct CLDR plural form at runtime).
+- A missing title tag, hreflang, or wrong plural form is a finding only if the gate is bypassed — the gate is comprehensive.
 
-### (g) Locale switching & inline-JS i18n — MEDIUM
+### (g) Locale switching & inline-JS i18n — RESOLVED (covered by gate)
 Locale switchers update the cookie/param and re-render correctly; inline JavaScript that emits user-visible strings is wrapped in `{% blocktrans %}`/gettext and re-translated on switch.
-- Evidence: switch link sets the right cookie and the next render uses the new language; no inline JS string bypasses gettext.
+- Evidence: `test_locale_switch_re_render` (switcher sets the right cookie and the next render uses the new language), `test_no_hardcoded_js_strings` (scans inline `<script>` blocks for untranslated prose literals and raises `pytest.fail()` on violation), `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` (no inline-JS string bypasses gettext).
+- A locale-switcher bug or an unwrapped inline-JS string is a finding only if the gate is bypassed — the gate is comprehensive.
 
 ### (h) RTL / Bidi direction — MEDIUM
 The `dir` attribute is set correctly per language/script context; mixed-script (Latin + Cyrillic Bosnian) renders without mojibake.
 - Evidence: `dir="ltr"`/`dir="rtl"` discipline on `html`/container elements; mixed-script pages tokenize correctly. Missing `dir` discipline is a finding.
 
 ### (i) Test-gate exemptions — LOW
-DB-based i18n exemptions (e.g. `feature_tag.html` via the lookup-name accessor) are intentional and documented, not silently missed.
-- Evidence: exemption documented in the project rules; the exempt accessor is the only path for that template's dynamic text. An undocumented exemption is a finding.
+DB-based i18n exemptions (e.g. `feature_tag.html` via the lookup-name accessor) are intentional and documented, and the gate enforces that `feature_tag.html` is the **only** exempt template.
+- Evidence: exemption documented in the project rules (`docs/99-agent/rules.md`); the scan excludes `admin/`, `analytics/moderation_dashboard.html`, and `components/feature_tag.html` per `.kilo/research/14-i18n.md`. An undocumented exemption beyond these is a finding.
 
 ## 6. Cross-Cutting (owned here, not duplicated)
 
@@ -112,23 +118,20 @@ This phase owns **runtime i18n/localization correctness** and the **completeness
 ## 8. Severity Taxonomy
 
 - **CRITICAL**
-  - Raw `.name` bypass for Category/City/LookupItem rendering or autocomplete (documented problem 09).
-  - Submenu cache key omits locale → locale bleed (Russian served to Bosnian) (documented problem 09).
+  - Raw `.name`/`.title`/`.get_name` bypass for Category/City/LookupItem rendering or autocomplete, when the completeness gate (`test_no_raw_get_name_in_templates`, `test_bot_no_raw_model_field_access`) fails to flag it — i.e. a gate violation that slipped through (documented problem 09).
+  - Submenu cache key omits locale → locale bleed (Russian served to Bosnian) despite the gate (documented problem 09).
   - Per-user bot language not propagated to notifications.
   - `name_i18n` population absent or incorrect for a supported language.
 - **HIGH**
   - Locale priority chain broken (cookie overrides `lang` param; no normalization).
-  - Title tags not localized per language.
-  - `hreflang` missing or incorrect for the supported matrix.
-  - Plural-form rules wrong per language (ru/bs/en).
-  - Completeness gate narrow (no title-tag/hreflang/plural/locale-switch coverage) despite runtime holes.
 - **MEDIUM**
   - Locale switcher does not re-render in the new language.
   - Inline JS strings bypass gettext.
   - RTL/Bidi `dir` discipline missing on mixed-script pages.
+  - **RESOLVED:** The completeness gate is narrow / lacks title-tag, hreflang, plural, or locale-switch coverage — the gate is now comprehensive (21 tests in CI; covers all four dimensions) per `.kilo/research/14-i18n.md`. A narrow gate is no longer a finding class.
 - **LOW**
   - `lang` cookie TTL not the documented ~1 year.
-  - Undocumented exemption from the completeness gate (beyond the intentional `feature_tag.html` case).
+  - Undocumented exemption from the completeness gate beyond the intentional `feature_tag.html` exclusion.
 
 ## 9. Recommended Sequence
 
@@ -147,3 +150,4 @@ Use `I18N-` for all findings in this phase.
 - `problems-only: true`.
 - Each finding: severity, zone, evidence (rendered HTML / HTTP header / cache key / notification text / grep hit), and recommendation with effort/priority.
 - Append incrementally (≤100 lines per write) to the phase findings file per `docs/99-agent/rules.md`.
+- Completeness gate count: the i18n completeness gate is **21 tests in CI** (22 invocations across `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`), per `.kilo/research/14-i18n.md`. The phase document cites the gate scope directly rather than the `docs/99-agent/rules.md` "(11 tests)" cross-reference, which is outdated.

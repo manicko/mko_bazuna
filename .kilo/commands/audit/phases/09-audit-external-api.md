@@ -20,10 +20,10 @@ is unavailable.
 |------|---------|
 | **Bot / Async Runtime** | The async bot process drives all seller writes; bridges into the shared synchronous persistence layer. |
 | **Async↔Sync Bridge** | The wrapper that lets async handlers call the synchronous ORM. Must not block the event loop or exhaust connections (overlaps phase 03 connection sanity). |
-| **Telegram Gateway** | The credential (bot token) and the update channel (polling or webhook). Webhook (if used) must verify Telegram's secret. |
+| **Telegram Gateway** | The credential (`BOT_TOKEN`) and the update channel. The bot uses aiogram long-polling (`dp.run_polling`); no webhook endpoint is exposed — no HTTPS ingress for the bot. Updates are de-duplicated by `UpdateIdDedupMiddleware` (atomic Redis `cache.add` on `update_id`); the raw token is env-sourced only and never logged. |
 | **External Translation Client** | Calls a third-party machine-translation service (search + ad-creation). Needs timeout, retry/backoff, circuit-breaker, fallback, cost/rate-limit awareness, and NO PII egress. |
 | **Login-Token / Deep-Link** | Issues a one-time token delivered via deep-link/QR; two-phase claim; expiry; replay protection; cross-process auth handoff (crypto/expiry detail in phase 04; delivery + claim + replay here). |
-| **API Gateway (if present)** | Any REST/endpoint surface: authn/authz, rate-limit, input validation, injection safety, versioning. |
+| **API Gateway** | Mixed API surface. Public JSON endpoints (`/api/search/autocomplete`, `/api/preferred-city/`, `/search/`, `/health/live/`, `/health/ready/`, `/csp-report/`) return `200` to anonymous users by design (no auth gate). Staff-only JSON API (`/moderation/api/v1/*`, e.g. `bulk-action/`) is gated by the custom `@staff_required_api` decorator returning `401` (unauthenticated, with `WWW-Authenticate: Bearer`), `403` (authenticated non-staff), `405` (wrong method). Staff-only template views (`/moderation/queue/`, `/moderation/review/<id>/`, …) use the custom `@staff_required` decorator returning `404` for any non-staff (URL-leak prevention — not `401`/`403`). No moderation view uses Django's built-in `@staff_member_required`. No API versioning exists — the `/v1/` path prefix is not a negotiated version. |
 | **Reverse Proxy / TLS** | TLS termination, security headers (HSTS, CSP, nosniff, frame-deny), rate-limit zones, media hardening. |
 | **Secrets / Credentials** | Bot token, framework secret key, DB credentials: sourced from env/secret store, never hardcoded, rotation possible. |
 
@@ -39,25 +39,26 @@ is unavailable.
 
 Execute, then capture evidence (HTTP responses, logs, config dumps, latency):
 
-1. **Webhook/API auth (if present)** — POST to the webhook/API endpoint WITHOUT the Telegram secret (or auth) → assert rejected (401/403). WITH valid secret → accepted. If no webhook/API surface exists, assert reverse-proxy rate-limit zones are applied to public endpoints.
+1. **Bot gateway auth (long-polling)** — assert no `set_webhook()` call exists and no webhook URL env vars (`WEBHOOK_URL`, `TELEGRAM_WEBHOOK_SECRET`) are referenced anywhere in entrypoints or compose; assert `UpdateIdDedupMiddleware` de-duplicates updates by `update_id`; assert the bot token is sourced from env only and never appears in repo, logs, or traces.
+1b. **API auth (per-endpoint, not blanket)** — for each API endpoint, assert the *actual* response code: public endpoints (`/api/search/autocomplete`, `/search/`, `/health/*`, `/csp-report/`) return `200` to anonymous; unauthenticated staff-only API (`/moderation/api/v1/*`) returns `401` + `WWW-Authenticate: Bearer`; authenticated non-staff API returns `403`; non-staff template views (`/moderation/*`) return `404`.
 2. **Bot token isolation** — grep repo + capture client error traces + logs → assert the bot credential is NOT present anywhere except the runtime environment; never logged.
 3. **Translation resilience** — simulate translator timeout/outage → assert bounded latency, fallback to original text, no crash, circuit-breaker/backoff engages; verify synthetic (non-PII) text only was sent.
 4. **Login-token lifecycle** — issue token → claim once → success; replay same token → rejected; expired token → rejected; concurrent claim race → exactly one wins. Verify raw token not persisted; only a salted hash stored.
-5. **API surface (if present)** — unauthenticated → 401; malformed input → 422 (not 500); injection payload → safe; rate-limit exceeded → 429.
-6. **Secrets** — grep repo + container env dump for hardcoded secrets; assert credentials come from env/secret store; note absence of rotation procedure.
+5. **API surface (mixed)** — per-endpoint matrix (not blanket `401`): public endpoints return `200` to anonymous; staff-only JSON API returns `401`/`403`/`405`; staff-only template views return `404`. Malformed input → `422` (Pydantic DTO validation, e.g. `BulkModerationRequest`, `CSPReportPayload`); injection payload → safe; rate-limit exceeded → `429`. No API versioning exists — `/v1/` is a path prefix, not a negotiated version.
+6. **Secrets** — grep repo + container env dump for hardcoded secrets; assert credentials come from env/secret store; verify a rotation procedure is documented for `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, and `DJANGO_SECRET_KEY`.
 7. **TLS / headers** — assert valid cert, HSTS, CSP, nosniff, frame-deny at the proxy; media hardening present.
 8. **Graceful degradation** — kill translation/bot dependency → assert core browse still works; search returns degraded results, not 500s.
 9. **Quality gates** — run linter, type-checker, integration test suite.
 
 ## 5. Audit Dimensions (checks + evidence)
 
-### (a) Bot token + webhook/API auth — CRITICAL
-Credential sourced only from environment; never logged/leaked. If a webhook or API surface exists, it authenticates callers (Telegram secret / API authn).
-- Evidence: no token in repo/logs/traces; webhook rejects unauthenticated updates; reverse-proxy rate-limits public endpoints.
+### (a) Bot token + API auth — CRITICAL
+Bot token sourced only from environment; never logged/leaked. The bot uses long-polling (`dp.run_polling`) — no webhook exists, so Telegram secret verification is moot. The API surface authenticates callers via the custom `@staff_required`/`@staff_required_api` decorators (checks `is_staff or is_superuser`), not via Telegram's secret token.
+- Evidence: no token in repo/logs/traces; no `set_webhook()` call; public endpoints return 200; staff-only JSON API returns 401/403/405; staff-only template views return 404; reverse-proxy rate-limits public endpoints.
 
 ### (b) Async↔Sync bridge safety — HIGH
 ORM calls offloaded off the event loop; no connection exhaustion/leak under load; thread-safe.
-- Evidence: bridge wraps every ORM call; connection sanity under concurrency; no event-loop blocking on slow calls.
+- Evidence: bot calls `django.setup()` and shares `config.settings.prod` + the same PostgreSQL DB with the web (gunicorn) process; `DatabaseConnectionMiddleware` (bot-only, registered via `dp.update.outer_middleware` in `main.py:79`) wraps each update dispatch in `try/finally` calling `sync_to_async(close_old_connections)()` in `finally` on the asgiref worker thread owning the thread-local connection; `CONN_MAX_AGE=0` (`base.py`) prevents cross-update connection leakage; every ORM call in handlers is wrapped in `@sync_to_async`/`await sync_to_async(...)`; shared Redis cache (`django-redis`) keeps rate-limit counters and cache invalidations coherent across gunicorn workers and the bot; login-token claim is two-phase and atomic via `UPDATE … RETURNING WHERE consumed_at IS NULL AND expires_at > %s` (`login.py:191`, `consent.py:409–414`) with only a SHA-256 hash persisted.
 
 ### (c) Translation client resilience + PII egress — CRITICAL
 Timeout, retry/backoff, circuit-breaker, fallback, cost/rate-limit awareness. NO PII sent to the third party.
@@ -67,9 +68,9 @@ Timeout, retry/backoff, circuit-breaker, fallback, cost/rate-limit awareness. NO
 Issuance, two-phase claim, expiry, replay rejection, race safety; raw token never persisted.
 - Evidence: replay/expiry/race assertions pass; only hashed value stored; cross-process claim atomic.
 
-### (e) API surface security (if present) — CRITICAL
-Authn/authz, rate-limit, input validation, injection safety, versioning.
-- Evidence: unauth→401, bad input→422, injection safe, rate-limit→429, versioned contracts.
+### (e) API surface security — CRITICAL
+Authn/authz, rate-limit, input validation, injection safety.
+- Evidence: public→200 (anonymous), staff-only JSON→401/403/405, staff-only templates→404; bad input→422 (Pydantic DTOs e.g. `BulkModerationRequest`, `CSPReportPayload`); injection safe; rate-limit→429. No API versioning exists — `/v1/` is a path prefix, not a negotiated version.
 
 ### (f) Secrets management — CRITICAL
 No hardcoded secrets; env/secret store; rotation feasible.
@@ -90,11 +91,11 @@ Core browse survives integration outages; search degrades, not fails.
 
 ## 7. Edge Cases
 - Duplicate / out-of-order Telegram updates → idempotent handling.
-- Telegram gateway 429 → backoff, no corruption of in-flight drafts.
+- Telegram gateway 429 → backoff, no corruption of in-flight drafts. (Gap: no explicit application-level Telegram-API 429 backoff — relies on aiogram's `run_polling` built-in handling; verify or document.)
 - Translator returns empty/garbage → ad-creation fallback (store original, not crash).
 - Login-token opened on wrong device / twice / after expiry → rejected safely.
 - API version mismatch (client v1 vs server v2) → handled, not 500.
-- Reverse-proxy restart drops webhook registration → re-register.
+- Reverse-proxy restart drops webhook registration → re-register. (OBSOLETE — no webhook exists to re-register; bot uses long-polling. Verify `DatabaseConnectionMiddleware`'s `finally` closes connections on crash instead.)
 - Secret rotation without downtime.
 - Bot process crash mid-bridge call → connection/transaction left consistent.
 
@@ -110,7 +111,7 @@ Core browse survives integration outages; search degrades, not fails.
 - **HIGH**
   - Async↔Sync bridge causes connection exhaustion / event-loop block.
   - Translation outage cascades with no fallback / circuit-breaker.
-  - No rate-limit on API/webhook/public endpoints.
+  - Public endpoint missing its rate-limit zone assignment.
   - TLS/header weaknesses at reverse proxy.
   - No graceful degradation when an integration is down.
 - **MEDIUM**

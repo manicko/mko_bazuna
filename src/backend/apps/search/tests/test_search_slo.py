@@ -89,7 +89,7 @@ class TestSearchResponseSLORegression:
 
     _SEED_AD_COUNT: int = 60  # well above the ≥50 minimum
 
-    def test_search_latency_within_slo(self, seller, category, city) -> None:
+    def test_search_at_seed_volume_meets_slo(self, seller, category, city) -> None:
         """Search at seed volume (≥50 published ads) must complete within SLO.
 
         The spec (``docs/01-spec/search-patterns.md:360``) defines the target

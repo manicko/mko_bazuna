@@ -5,10 +5,15 @@ Imports base settings and applies production safety configuration.
 
 import logging
 import os
+import re
 
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403, F401
+
+# Matches values shipped as templates in .env.*.example files, e.g.
+# <generate-with-django-secret-key-generator>, <your-bot-token-from-botfather>
+_SECRET_PLACEHOLDER_RE = re.compile(r"^<[^>]+>$")
 
 DEBUG = False
 
@@ -79,7 +84,7 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
             "sentry-sdk not installed — error tracking disabled"
         )
 
-# Fail fast: SECRET_KEY is required in production and must be non-empty.
+# Fail fast: SECRET_KEY is required in production and must pass strength checks.
 # base.py's env("DJANGO_SECRET_KEY") (no default) returns "" for a
 # present-but-empty value — django-environ only raises when the var is
 # unset, so an empty key would boot Django until first access raises
@@ -88,29 +93,65 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
 # the build-placeholder value; the real key is provided at runtime via
 # .env.prod.
-if not SECRET_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
-    raise ImproperlyConfigured(
-        "DJANGO_SECRET_KEY must be set and non-empty in production. "
-        "Provide it via the .env.prod runtime file."
-    )
+def _validate_production_secret(var_name: str, value: str) -> None:
+    """Fail-fast validation for production secrets.
+
+    Rejects values that look like dev-only dummies, match shipped placeholder
+    templates, or (for DJANGO_SECRET_KEY) are too short — all of which would
+    leave the app signed with a publicly-knowable or forgeable key.
+
+    Raises ImproperlyConfigured with a value-free message naming the env var
+    and remediation guidance. Does NOT log the value itself.
+    """
+    if var_name == "DJANGO_SECRET_KEY" and "dev-only-dummy" in value:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY appears to use a dev-only dummy value. "
+            "Provide a real key via the .env.prod runtime file."
+        )
+    if _SECRET_PLACEHOLDER_RE.match(value):
+        raise ImproperlyConfigured(
+            f"{var_name} appears to be a placeholder value from a .env template. "
+            "Replace it with the real value in .env.prod."
+        )
+    if var_name == "DJANGO_SECRET_KEY" and len(value) < 50:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be at least 50 characters in production. "
+            'Regenerate with: python -c "from django.core.management.utils '
+            'import get_random_secret_key; print(get_random_secret_key())"'
+        )
+
+
+if not os.getenv("DJANGO_BUILD"):
+    if not SECRET_KEY:  # noqa: F405
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set and non-empty in production. "
+            "Provide it via the .env.prod runtime file."
+        )
+    _validate_production_secret("DJANGO_SECRET_KEY", SECRET_KEY)  # noqa: F405
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
 # placeholder values; the real token is provided at runtime via .env.prod.
-if not BOT_TOKEN and not os.getenv("DJANGO_BUILD"):  # noqa: F405
-    raise ImproperlyConfigured(
-        "BOT_TOKEN must be set in production. "
-        "Provide it via the .env.prod runtime file."
-    )
+# Truthiness-only guard: placeholder rejection is intentionally NOT extended
+# here or to GOOGLE_TRANSLATE_API_KEY (see scoping decision in plan 30 §3.2.1)
+# — dev one-shot services (migrate/load_cities/load_catalog) run with
+# config.settings.prod and are fed placeholder tokens via docker-compose.
+if not os.getenv("DJANGO_BUILD"):
+    if not BOT_TOKEN:  # noqa: F405
+        raise ImproperlyConfigured(
+            "BOT_TOKEN must be set in production. "
+            "Provide it via the .env.prod runtime file."
+        )
 
 # Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
 # Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds.
-if not GOOGLE_TRANSLATE_API_KEY and not os.getenv("DJANGO_BUILD"):  # noqa: F405
-    raise ImproperlyConfigured(
-        "GOOGLE_TRANSLATE_API_KEY must be set in production. "
-        "Provide it via the .env.prod runtime file."
-    )
+if not os.getenv("DJANGO_BUILD"):
+    if not GOOGLE_TRANSLATE_API_KEY:  # noqa: F405
+        raise ImproperlyConfigured(
+            "GOOGLE_TRANSLATE_API_KEY must be set in production. "
+            "Provide it via the .env.prod runtime file."
+        )
 
 # SITE_URL is required in production so Telegram alert links are absolute and
 # correct. A dev-only default must not silently leak into prod traffic.

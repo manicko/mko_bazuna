@@ -56,9 +56,25 @@ Execute, then capture evidence (tool output, grep hits, line counts):
 No `Any` masking real issues; strict hints; Pydantic at boundaries; shared types.
 - Evidence: type-checker clean except framework-forced `Any` (documented); Pydantic DTOs present at all boundaries.
 
-### (b) StrEnum for all constants — HIGH
-Fixed values are `StrEnum`, never raw strings/dicts/lists; no drift (raw string where enum exists).
-- Evidence: grep shows no raw constant literals in constant-like contexts; single source per fixed value.
+### (b) StrEnum for constants — HIGH
+`AdStatus` (`apps/core/enums.py`) is the single ad-lifecycle status enum — the only one whose
+values are ad states; the buyer-visible status is only `PUBLISHED`. `AdSource` (origin),
+`AdSort` (UI sort), `AdPriorityLevel` (moderation triage), `PriorityFilter` (UI-only sentinel,
+**not stored**), and `TrustLevel` (seller trust) are deliberately distinct vocabularies and
+MUST NOT be modeled as status-equivalents of `AdStatus`. No fixed value may drift into a raw
+string/dict/list where a `StrEnum` exists.
+
+Guard rule: any new fixed value representing ad *lifecycle state* MUST be a member of
+`AdStatus`; fixed values representing *origin/sort/priority/trust* MUST live in their own
+`StrEnum` with a distinct name and MUST never alias or be presented alongside `AdStatus` as a
+"status".
+
+- Evidence: grep shows no raw constant literals in constant-like contexts; single source per
+  fixed value; `AdStatus` is the `choices` source for `Ad.status`, parametrizes the 6 DB
+  `CheckConstraint`s and the per-status partial indexes, and drives `Ad.transition_to()`
+  (`ALLOWED_TRANSITIONS`). Sibling enums (`AdSource`, `AdSort`, `AdPriorityLevel`,
+  `PriorityFilter`, `TrustLevel`) are verified as origin/sort/priority/trust vocabularies,
+  not status-equivalents (`apps/core/enums.py`); see `docs/02-database/db-enums.md` §AdStatus.
 
 ### (c) Logging not print — HIGH
 No `print()` anywhere in production code.
@@ -73,8 +89,20 @@ Small, focused units; no giant modules mixing responsibilities.
 - Evidence: measured sizes within target; single responsibility per module/function.
 
 ### (f) Schema/validation at boundaries — MEDIUM
-Pydantic v2 at bot + web boundaries; invalid data rejected before ORM.
-- Evidence: DTOs present; web POST validated (not parsed raw then written).
+Ad-state invariants are enforced at the DB level (PostgreSQL `CheckConstraint` + partial
+`UNIQUE`); the status transition matrix is enforced by `Ad.transition_to()` (raises
+`ValueError` on disallowed moves, after `refresh_from_db`); input at the write boundary is
+validated by Pydantic v2 DTOs (`SubmitAdInput` / `AdEditInput`) before any ORM write. The `Ad`
+model defines no `clean()`/`full_clean()`.
+
+- Evidence: `Ad` has no `clean()`/`full_clean()`; repo-wide grep
+  (`full_clean|def clean|.clean(`) hits only `apps/categories/models.py:107` (`Category.clean`)
+  and zero `full_clean` calls; 6 DB `CheckConstraint`s + `uq_ads_single_draft_per_user`
+  partial unique (`apps/ads/models.py`); `Ad.transition_to()` / `ALLOWED_TRANSITIONS`
+  (models.py); Pydantic v2 DTOs `SubmitAdInput`/`AdEditInput`.
+  `apps/ads/tests/test_ad_constraints.py` deliberately bypasses model `save()` to assert DB
+  `IntegrityError`. Cross-ref: `docs/02-database/db-indexes.md`
+  §"Check Constraints & Unique Constraints — ads (AD-001)".
 
 ### (g) Naming + conventions + English-only — MEDIUM
 Consistent meaningful naming; English in code/comments/logs/errors.

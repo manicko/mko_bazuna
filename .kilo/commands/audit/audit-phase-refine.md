@@ -17,6 +17,7 @@ Ask the user which phases from `.kilo\commands\audit\phases` should be refined:
 - all existing phases.
 
 Proceed only with the confirmed selection. Process phases **one by one**.
+Maximum 2 agents in parallel.
 
 ---
 
@@ -38,6 +39,8 @@ Return a structured report containing:
 2. Assessment of each existing block (fit / outdated / gap / overlap).
 3. List of concrete problems to address.
 
+Output path: `.ai\reports`
+
 **Important:** Never change any code or existing audit phase files.
 
 ---
@@ -57,6 +60,8 @@ Return a structured recommendation containing:
 - Suggested short, self-contained formulations for each block.
 - Recommended modern practices / analysis angles (briefly).
 - Any remaining quality or brevity concerns.
+
+Output path: `.ai\reports`
 
 **Important:** Never change any code or existing audit phase files.
 
@@ -97,6 +102,8 @@ Using the Auditor and Researcher outputs:
   - Each block remains an independent task that a separate auditor can execute.
   - Blocks must reflect the high-level architecture — name and description alone should make clear what to analyse.
 - Produce a short validation report.
+
+Output path: `.ai\reports`
 
 **Important:** Never change any code or phase files at this stage.
 

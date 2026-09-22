@@ -39,8 +39,15 @@ if not env_path.exists():
         and not os.getenv("DJANGO_BUILD")
         and not os.getenv("DJANGO_SECRET_KEY")
     ):
+        _env_file_name = (
+            ".env.prod"
+            if os.getenv("DJANGO_SETTINGS_MODULE", "").endswith(".prod")
+            else ".env.dev"
+        )
         logger.error(
-            "ERROR: .env file not found. Copy .env.dev.example to .env.dev and configure values."
+            "ERROR: .env file not found. Copy .env.dev.example to %s "
+            "and configure values.",
+            _env_file_name,
         )
         sys.exit(1)
 else:

@@ -41,17 +41,17 @@ Reusable procedure for auditing:
    for classification and search.
 5. The **photo-collection** entity — 1–5 ordered photos attached per ad.
 6. The **purge/sweep jobs** — retention-window cleanup of failed, rejected,
-   draft, archived, and deleted ads.
+   draft, archived, deleted ads, and the consent-withdrawal hard-delete sweep.
 
 ### State machine (as-is)
 
-| Status | Meaning |
-|--------|---------|
+| Status | Meaning (code-faithful) |
+|--------|------------------------|
 | `DRAFT` | Bot FSM in progress (durable). |
-| `ON_MODERATION` | Submitted, awaiting auto-check approval. |
+| `ON_MODERATION` | Submitted, awaiting auto-check result. |
 | `PUBLISHED` | Approved and publicly visible. |
-| `REJECTED` | Auto-check failed, held for retention then purged. |
-| `ON_MODERATION_FAILED` | Auto-check could not complete; queued for purge. |
+| `ON_MODERATION_FAILED` | Auto-check ran and found a policy violation. Held 7 days for **human review** (re-openable → `REJECTED`); auto-purged if no action. |
+| `REJECTED` | **Manually** rejected by a moderator (internal reason stored, never shown to seller). Purged after 90 days. |
 | `ARCHIVED` | Hidden but retained; reactivatable. |
 | `DELETED` | Soft-deleted; retained then purged. |
 
@@ -59,7 +59,8 @@ Legal transitions:
 
 - `DRAFT → ON_MODERATION` (submit)
 - `ON_MODERATION → PUBLISHED` (approve) · `ON_MODERATION → REJECTED` (reject)
-- `ON_MODERATION → ON_MODERATION_FAILED` (check error)
+- `ON_MODERATION → ON_MODERATION_FAILED` (auto-check violation)
+- `ON_MODERATION_FAILED → REJECTED` (moderator manually rejects an auto-failed ad)
 - `PUBLISHED → ARCHIVED` · `ARCHIVED → PUBLISHED` (reactivate)
 - `PUBLISHED → ON_MODERATION` (text-edit re-hide + re-moderate)
 - `any → DELETED`
@@ -71,8 +72,13 @@ Legal transitions:
 | `ON_MODERATION_FAILED` | 7 days | purge |
 | `REJECTED` | 90 days | purge |
 | `DRAFT` | 30 minutes | purge |
-| `ARCHIVED` | 2 months | purge |
+| `ARCHIVED` | 2 months (on `published_at`) | archive transition (lock 1) |
+| `ARCHIVED` | 2 months (on `archived_at`) | hard-delete purge (lock 2) |
 | `DELETED` | 4 months | purge |
+| `consent_revoked_user` | 30 days | hard-delete (purge) |
+
+`consent_revoked_user` operates on `User.consent_revoked_at`; cascades to
+Ad → AdImage; nulls analytics/moderation FKs. Lock 3.
 
 ---
 
@@ -86,7 +92,7 @@ Legal transitions:
 | **Moderation-gate zone** | Auto-check as the only gate before PUBLISHED. | Gate bypassed → unmoderated content public; over-blocking valid ads; non-admin moderator; failed→purge path missing. |
 | **Category-tree zone** | Closed, admin-only hierarchical classification + search. | Cycles; orphan nodes; wrong parent; inactive category mis-used; rename not propagated. |
 | **Photo-collection zone** | 1–5 ordered photos attached to the correct ad. | Count/order violations; attachment to wrong ad; non-atomic photo+ad create. |
-| **Purge/sweep zone** | Retention-window cleanup of each terminal status. | Wrong rows purged; active rows unsafe; timezone/retention errors; no lock. |
+| **Purge/sweep zone** | Retention-window cleanup of each terminal status, plus the consent-withdrawal hard-delete sweep. | Wrong rows purged; active rows unsafe; timezone/retention errors; no lock. |
 
 ---
 
@@ -109,7 +115,8 @@ Map each layer to its implementation. Report gaps as findings.
 6. **Photo-collection mapping** — verify count/order validation; verify the
    attachment foreign key; verify atomic photo+ad creation.
 7. **Purge/sweep mapping** — for each job verify its status filter, retention
-   window, and lock; verify active rows are excluded.
+   window, and lock; verify active rows are excluded. Includes the consent
+   hard-delete sweep (30-day grace, lock 3).
 
 ---
 
@@ -202,7 +209,12 @@ Run **before** the checklist. Capture concrete evidence for every item.
 - **Transition atomicity** — Phase 03 owns the *mechanism*; **this phase owns the
   correctness** of each transition's side-effects.
 - **FSM DRAFT + consent** — when a seller revokes consent mid-dialog (Phase 06),
-  DRAFT rows and photos must be purged with no PII remaining.
+  the consent-withdrawal service soft-deletes all the seller's ads (→ `DELETED`)
+  and physically deletes DRAFT-ad media immediately. After a 30-day grace period
+  (`consent_revoked_at`), the consent hard-delete sweep hard-deletes the user row
+  and all cascaded PII (`is_deleted` / `consent_revoked_at` / `deleted_at`, lock 3).
+  Phase 06 owns the consent banner/UI; **this phase owns** the ad-lifecycle purge
+  mechanics that consent-withdrawal triggers.
 - **Category rename → search vector** — Phase 08 depends on the denormalized
   name being correct; propagation is owned here.
 - **Photo rules vs media** — Phase 07 owns file handling; **this phase owns**
@@ -230,7 +242,7 @@ Run **before** the checklist. Capture concrete evidence for every item.
 - Text-edit on `PUBLISHED` must re-hide + re-moderate.
 - Purge runs while an ad transitions.
 - Retention boundaries: `REJECTED@90d` / `FAILED@7d` / `DRAFT@30min` /
-  `ARCHIVED@2mo` / `DELETED@4mo`.
+  `ARCHIVED@2mo` / `DELETED@4mo` / `consent_revoked@30d`.
 - Seller deletes then re-creates.
 
 ---

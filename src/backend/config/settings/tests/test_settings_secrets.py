@@ -24,7 +24,7 @@ from pathlib import Path
 import environ
 import pytest
 
-from config.settings.tests.test_prod_logging import _prod_env_overrides
+from config.settings.tests.test_prod_logging import TEST_SECRET_KEY, _prod_env_overrides
 
 pytestmark = [pytest.mark.unit, pytest.mark.settings]
 
@@ -100,7 +100,7 @@ def test_bot_token_allowed_empty_in_debug() -> None:
 def test_bot_token_required_in_production() -> None:
     """BOT_TOKEN empty with DEBUG=False (production) raises ImproperlyConfigured."""
     env = {k: v for k, v in os.environ.items() if k != "BOT_TOKEN"}
-    env["DJANGO_SECRET_KEY"] = "test-secret-key-for-testing-only"
+    env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
     env["PYTHONPATH"] = os.pathsep.join(sys.path)
     result = subprocess.run(
@@ -124,7 +124,7 @@ def test_google_translate_api_key_required_in_production() -> None:
     migrate container exits with KeyError masking the real ImproperlyConfigured.
     """
     env = {k: v for k, v in os.environ.items() if k != "GOOGLE_TRANSLATE_API_KEY"}
-    env["DJANGO_SECRET_KEY"] = "test-secret-key-for-testing-only"
+    env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
     env["BOT_TOKEN"] = "test-bot-token-for-testing-only"
     env["SITE_URL"] = "https://example.com"
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
@@ -164,3 +164,47 @@ def test_secret_key_with_dollar_sign_preserved(
     assert os.environ["DJANGO_SECRET_KEY"] == (
         "=t$test-key-with-$dollar$ign$chars"
     )
+
+
+def test_prod_secret_key_rejects_short() -> None:
+    """A SECRET_KEY shorter than 50 chars must be rejected at prod import time."""
+    env = _prod_env_overrides(DJANGO_SECRET_KEY="short")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "SECRET_KEY" in stderr
+    assert "at least 50" in stderr
+
+
+def test_prod_secret_key_rejects_placeholder() -> None:
+    """A <...> placeholder SECRET_KEY must be rejected at prod import time."""
+    env = _prod_env_overrides(
+        DJANGO_SECRET_KEY="<generate-with-django-secret-key-generator>"
+    )
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "placeholder" in stderr.lower()
+
+
+def test_prod_secret_key_rejects_dev_only_dummy() -> None:
+    """A SECRET_KEY containing 'dev-only-dummy' must be rejected at prod import time."""
+    env = _prod_env_overrides(
+        DJANGO_SECRET_KEY="dev-only-dummy-key-not-for-production"
+    )
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "dummy" in stderr.lower()
+
+
+def test_prod_secret_key_still_rejects_empty() -> None:
+    """Existing empty-key guard still fires (regression — must not be shadowed by strength check)."""
+    env = _prod_env_overrides(DJANGO_SECRET_KEY="")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "SECRET_KEY" in stderr
+
+
+def test_prod_secret_key_accepts_strong_key() -> None:
+    """A valid 50+ char non-placeholder SECRET_KEY passes all prod guards."""
+    env = _prod_env_overrides()  # uses TEST_SECRET_KEY (53 chars)
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "" == stderr.strip() or "ImproperlyConfigured" not in stderr

@@ -59,14 +59,25 @@ def render_trust_badge(context: template.Context, user: User) -> str:
         return ""
 
     # Use prefetched trust_score (via prefetch_related("user__trust_score"))
-    # to avoid an N+1 query per ad in the listings loop.
-    trust_score = getattr(user, "trust_score", None)
-    if trust_score is None:
-        try:
-            trust_score = SellerTrustScore.objects.get(user=user)
-        except SellerTrustScore.DoesNotExist:
-            logger.debug("No SellerTrustScore for user %s", user.id)
+    # to avoid an N+1 query per ad in the listings loop.  When the relation
+    # has been prefetched, ``_prefetched_objects_cache`` holds the result
+    # (the related object or None) and accessing ``user.trust_score`` does
+    # NOT hit the database — so the fallback ``SellerTrustScore.objects.get``
+    # below is skipped entirely.
+    prefetched_cache = getattr(user, "_prefetched_objects_cache", None)
+    if isinstance(prefetched_cache, dict) and "trust_score" in prefetched_cache:
+        trust_score = getattr(user, "trust_score", None)
+        if trust_score is None:
             return ""
+    else:
+        # Not prefetched — try the cached attribute, then fall back to DB.
+        trust_score = getattr(user, "trust_score", None)
+        if trust_score is None:
+            try:
+                trust_score = SellerTrustScore.objects.get(user=user)
+            except SellerTrustScore.DoesNotExist:
+                logger.debug("No SellerTrustScore for user %s", user.id)
+                return ""
 
     template_path = BADGE_TEMPLATES.get(trust_score.trust_level)
     if template_path is None:

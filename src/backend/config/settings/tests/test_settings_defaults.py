@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from config.settings.tests import TEST_SECRET_KEY
+
 pytestmark = [pytest.mark.unit, pytest.mark.settings]
 
 _ROOT = Path(__file__).resolve().parent
@@ -44,7 +46,7 @@ def test_redis_url_defaults_empty() -> None:
     of the subprocess environment. The base.py default should be "".
     """
     env = {k: v for k, v in os.environ.items() if k != "REDIS_URL"}
-    env["DJANGO_SECRET_KEY"] = "test-secret-key-for-testing-only"
+    env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.test"
     result = _run_in_subprocess(
         env,

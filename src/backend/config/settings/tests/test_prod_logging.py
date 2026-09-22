@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from config.settings.tests import TEST_SECRET_KEY
+
 pytestmark = [pytest.mark.unit, pytest.mark.settings]
 
 # Resolve repository root — same pattern as test_compose_hardening.py.
@@ -50,7 +52,7 @@ def _prod_env_overrides(**overrides: str) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items()}
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
     env["DEBUG"] = "False"
-    env["DJANGO_SECRET_KEY"] = overrides.pop("DJANGO_SECRET_KEY", "test-secret-key-for-testing-only")
+    env["DJANGO_SECRET_KEY"] = overrides.pop("DJANGO_SECRET_KEY", TEST_SECRET_KEY)
     env["BOT_TOKEN"] = overrides.pop("BOT_TOKEN", "test-bot-token-for-testing-only")
     env["GOOGLE_TRANSLATE_API_KEY"] = overrides.pop(
         "GOOGLE_TRANSLATE_API_KEY", "test-translate-key-for-testing-only"

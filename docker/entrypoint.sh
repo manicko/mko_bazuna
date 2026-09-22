@@ -14,7 +14,13 @@ check_env_file() {
     fi
     if [ -z "$SKIP_ENV_CHECK" ] && [ ! -f "$ENV_PATH" ]; then
         if [ "$DJANGO_SETTINGS_MODULE" != "config.settings.test" ]; then
-            echo "ERROR: .env file not found. Copy .env.dev.example to .env.dev and configure values." >&2
+            local env_file
+            if [[ "$DJANGO_SETTINGS_MODULE" == *.prod ]]; then
+                env_file=".env.prod"
+            else
+                env_file=".env.dev"
+            fi
+            echo "ERROR: .env file not found. Copy .env.dev.example to $env_file and configure values." >&2
             exit 1
         fi
     fi

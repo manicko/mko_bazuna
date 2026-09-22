@@ -25,7 +25,7 @@ permission:
     
   bash:
     "*": allow
-    "git *": ask
+    "git*": ask
 
     # === READ-ONLY GIT === 
     "git*ls-files*" : allow 
@@ -37,7 +37,7 @@ permission:
     # === COMMIT GIT ===       
     "git*add*": allow
     "git*commit*": allow
-    "git*stash*": allow
+    "git*stash*": ask
     
     
     # === BUILD & TEST ===
@@ -54,7 +54,6 @@ permission:
     "npm run build": allow
 
     # === DOCKER ===
-    "docker *": allow
     "*docker *": allow
     "docker compose *": allow
     "docker compose config*": allow
@@ -82,7 +81,7 @@ permission:
     "kubectl top*": allow
 
     # === DB: verification ===
-    "psql*": allow
+    "psql*": ask
     "redis-cli*": allow
 
     # === UTILITIES ===
@@ -174,14 +173,14 @@ permission:
     "curl -X POST*": ask
 
     # === DENY: irreversible git ===
-    "git reset --hard*": deny
-    "git clean -fd*": deny
-    "git clean -fdx*": deny
-    "git push --force*": deny
-    "git push --force-with-lease*": deny
-    "git filter-branch*": deny
-    "git filter-repo*": deny
-    "git reflog*": deny
+    "git*reset*--hard*": deny
+    "git*clean*-fd*": deny
+    "git*clean*-fdx*": deny
+    "git*push*--force*": deny
+    "git*push*--force-with-lease*": deny
+    "git*filter-branch*": deny
+    "git*filter-repo*": deny
+    "git*reflog*": deny
 
 
     # === DENY: destructive filesystem ===

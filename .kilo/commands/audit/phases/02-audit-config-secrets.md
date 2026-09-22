@@ -16,11 +16,16 @@ share a single project and database.
 
 Architectural givens for this system class:
 
-- Secrets are injected at container level from a **single env source** consumed
-  by both processes.
+- Secrets are injected per-deployment: Docker Compose bind-mounts a single
+  `.env.*` file into both web and bot containers; CI sets all secrets as
+  step-level `env:` variables with no `.env` file, relying on `base.py`
+  defaults.
 - The **configuration layer** is split per environment (development, production,
   test).
-- Fixed values are modeled through a **fixed-value enum registry**.
+- Fixed values are modeled as `StrEnum` (or `IntEnum` for integer constants),
+  distributed across per-app-domain `enums.py` modules and inline within
+  feature modules — consumed via `.value` references, never inline string
+  literals.
 - External input is validated at boundaries through **Pydantic v2 DTO schemas**
   before it reaches persistence.
 
@@ -28,6 +33,11 @@ This phase does **not** cover: entry/bootstrap process (Phase 01), DB
 concurrency (Phase 03), authentication (Phase 04), general code quality
 (Phase 10), or test infrastructure (Phase 11). Reference those phases; do not
 duplicate their checks here.
+
+> **Scope boundary note:** connection *pooling* is a runtime/concurrency concern
+> with **zero** matches in Phase 02 (`conn_max_age`/`pooler`); it belongs to
+> Phase 03. DB connection *settings* (e.g. `CONN_MAX_AGE`) are Phase-02-owned
+> config evidence — they appear as typed settings in `config/settings/base.py`.
 
 ## Output Mode — `problems-only: true`
 
@@ -46,7 +56,7 @@ duplicate their checks here.
 |---|---|---|
 | Settings / configuration layer | Typed settings; per-environment separation; single source of truth for config | Divergent web/bot config; hardcoded values in logic; untyped config dicts; leaked environment branches |
 | Secret-loading mechanism | Flow from env source into settings; delivery of secrets to both processes | Missing secrets at boot; secret leakage in logs or tracebacks; silent defaults masking absence |
-| Fixed-value enum registry | All fixed constants modeled as enums; single definition point | Magic strings in code; duplicated constant definitions; drift between registry and usage |
+| Fixed-value enums (distributed) | All fixed constants modeled as `StrEnum`/`IntEnum` across per-domain `enums.py` modules and inline feature-module enums; single *usage* site, distributed *definition* | Inline string literals where an enum exists; enum members defined ad-hoc in non-enum modules; drift between migration `choices` and current enum |
 | Boundary DTO schema | Pydantic v2 validation of all external input at boundaries | Invalid/unvalidated data reaching persistence; unknown keys silently accepted |
 | Deployment / secret-injection zone | Container env_file → env source → settings wiring | Secrets committed to VCS; missing ignore coverage; real credentials in example/template config |
 
@@ -61,9 +71,10 @@ Perform discovery before any verification. Record locations by role, not by name
 2. **Secret-loading discovery** — Locate the secret source and the loading
    mechanism. Determine how secrets reach **both** processes. Confirm
    ignore-file coverage for the secret source.
-3. **Fixed-value registry discovery** — Enumerate all enum definitions. Trace
-   their usage across the codebase. Identify raw-string constants that bypass
-   the registry.
+3. **Fixed-value enum discovery** — Enumerate all `StrEnum`/`IntEnum`
+   definitions across `enums.py` modules and inline within feature modules
+   (bot, services, benchmark). Trace usage. Identify raw-string constants
+   bypassing an existing enum.
 4. **Boundary DTO discovery** — Enumerate all input-validation schemas. Trace
    every external input to confirm it passes through a DTO before persistence.
 5. **Config-to-consumer discovery** — For each configuration section/field,
@@ -97,7 +108,7 @@ Evaluate each dimension. Report only failing checks with evidence.
 |---|---|
 | Typed settings | All settings are typed and validated, not raw dicts |
 | No raw dicts in logic | Business logic reads typed config, not ad-hoc dictionaries |
-| Enum for fixed values | Fixed values come from the enum registry, not inline literals |
+| Enum for fixed values | Fixed values come from `StrEnum` definitions (distributed per app-domain), not inline string literals |
 | Unknown-key rejection | Unknown/unexpected config keys are rejected, not silently ignored |
 
 **Evidence required:** import output showing typed attributes; references to raw
@@ -168,8 +179,10 @@ template-vs-settings name diff; branch reachability notes.
 
 ## Cross-Cutting Concerns (this phase only)
 
-- **Shared secret source** — Both processes draw from the same env source with
-  identical required variables; no process-specific secret divergence.
+- **Shared secret source** — Compose binds a single `.env.*` file to both web
+  and bot containers; CI sets secrets as step-level `env:` with no `.env` file,
+  relying on `base.py` defaults. The constraint of identical required variables
+  across both processes still holds; only the delivery mechanism differs.
 - **Placeholder-only templates** — Example/template config files contain only
   placeholders, never real-looking values.
 - **Configured transport security** — TLS and secure-cookie behavior is enforced

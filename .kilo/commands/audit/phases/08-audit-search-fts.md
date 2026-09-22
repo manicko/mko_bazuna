@@ -8,22 +8,23 @@
 
 ## 1. Goal
 
-Verify that the unauthenticated search experience is correct, safe, and performant:
-only genuinely visible ads are returned, the FTS index is fresh, the translation
-step degrades gracefully, input cannot inject SQL, category filtering is correct,
-and no PII leaks through queries or logs.
+Verify that the unauthenticated search experience is correct, safe, and
+performant: only genuinely visible ads are returned, the FTS index is fresh,
+input cannot inject SQL, category filtering is correct, and no PII leaks
+through queries or logs. Translation is a publication-time concern (Phase 09)
+and is not on the search critical path.
 
 ## 2. System Under Audit (layers & zones)
 
 | Zone | Concern |
 |------|---------|
 | **Query Input** | Receives the raw search string from the web form (unauthenticated buyer). Must be validated and bounded. |
-| **Per-language FTS** | Buyers search their own language against per-language vector columns (search_vector_ru/bs/en); no query-time translation step. |
+| **Per-language FTS** | Buyers search their own language against per-language vector columns (search_vector_ru/bs/en); no query-time translation step. Cross-ref: `apps/core/enums.py` `LanguageLocale` (canonical vector/config mapping). |
 | **FTS Execution** | Native PostgreSQL full-text search over a maintained search vector (TSVECTOR + GIN), using a language-specific text-search configuration and weighted fields. |
-| **Visibility Filter** | Applies the SAME "visible" predicate as public listing: only PUBLISHED ads. (Withdrawn sellers are excluded because withdrawal soft-deletes their ads → status no longer PUBLISHED; DECLINE keeps ads PUBLISHED and must NOT hide them from search.) |
+| **Visibility Filter** | PUBLISHED only; DECLINE (browse-only) does not alter ad status so a seller's PUBLISHED ads remain searchable; WITHDRAW soft-deletes ads (status=DELETED) and bumps the cache version; expiration is status-driven (ARCHIVED/DELETED via background sweeps), not a date predicate. No 'sold' concept exists. |
 | **Category Tree** | Hierarchical category navigation; a parent query must expand to all descendants. |
 | **Ranking / Pagination** | Relevance ranking + bounded result sets to prevent DoS. |
-| **Observability** | Search latency, translation success ratio, and query logging — without PII. |
+| **Observability** | Search latency (p95/p99 SLOs via django-prometheus), cache hit-rate SLO (≥85 %), SEARCH_PERFORMED event recording (cache-insensitive), and PII-safe query logging (sanitized + redacted). |
 
 ## 3. Prerequisites
 
@@ -37,12 +38,12 @@ and no PII leaks through queries or logs.
 Execute, then capture evidence (HTTP responses, DB state, logs, latency):
 
 1. **Visibility gating** — publish an ad → search its text → found. Set ad to any non-PUBLISHED state (moderation/rejected/archived/deleted) → NOT found. Withdraw a seller's consent → their ads become non-PUBLISHED → NOT found. **DECLINE a seller** → their PUBLISHED ads MUST still be found (search must not filter on consent state directly).
-2. **Translation** — create an ad in the index language; search a query in the other language (Montenegrin) → translated and matched. Reverse direction → matched. Simulate translator outage/timeout → assert graceful fallback (degraded recall, bounded latency, no 500).
+2. **Translation (publication-time)** — simulate a translator outage (circuit open / timeout / empty result); assert empty `title_en/bs` columns but non-null `search_vector_ru`, and that Russian search still matches the ad. Cite `apps/core/services/translation.py` (timeout/retry/cache/breaker/fallback).
 3. **Injection** — submit SQL/injection-style and unicode/homoglyph queries → assert no injection, safe parameterized execution, no errors.
 4. **Category tree** — query a parent category → assert all descendant ads included; wrong-branch ads excluded.
 5. **Pagination / limits** — seed volume, search a common term → assert bounded results + pagination; empty query handled.
-6. **Performance** — measure search latency under seeded volume → assert within target; no unbounded query.
-7. **PII in logs** — grep search logs + analytics for identity values in query strings → assert none.
+6. **Performance** — assert within `PerformanceSLO` targets; cite the `test_search_slo.py` regression gate (≤2 s at 60-ad seed volume) rather than a manual latency probe; no unbounded query.
+7. **PII in logs** — grep search logs + analytics for identity values in query strings → assert none. Evidence: `sanitize_query_for_log` (truncate + control-char strip) and `RedactingJsonFormatter` (prod LOGGING).
 8. **Encoding** — mixed Cyrillic/Latin/Montenegrin query → assert correct tokenization, no mojibake.
 9. **Quality gates** — run linter, type-checker, search test suite.
 
@@ -56,9 +57,9 @@ Only PUBLISHED ads returned. Withdrawn (soft-deleted) sellers excluded via statu
 Search vector maintained on every relevant save/transition; existing rows backfilled.
 - Evidence: publish/archive/delete transitions reflected in index; no permanently stale new ads; category-name change propagates.
 
-### (c) Translation correctness + failure handling — HIGH
-Per-language vector lookup; no query-time translation failure mode exists (translation is publication-time only).
-- Evidence: cross-language match via per-language vectors; publication-time translation failure yields degraded recall (populated-vector-only), no 500.
+### (c) Translation (publication-time) — HIGH
+Per-language vector lookup; no query-time translation. Publication-time translator failures (circuit-broken / timeout / empty result) yield degraded cross-language recall (populated-vector-only), never a 500 — Russian search still matches.
+- Evidence: `apps/core/services/translation.py` (timeout/retry/cache/breaker/fallback returns original text on failure); empty `title_en/bs` → empty per-language `search_vector_*`, non-null `search_vector_ru`.
 
 ### (d) Injection safety — CRITICAL
 All input parameterized; no string-built SQL reaching the engine.
@@ -87,7 +88,7 @@ Cyrillic/Montenegrin/transliteration round-trips match; no mojibake.
 ## 6. Cross-Cutting (owned here, not duplicated)
 - **Visibility predicate** must be the single source of truth shared with public listing (phase 05 status + phase 06 consent semantics). Search must not re-implement divergent gating.
 - **Index maintenance** must align with the ad state-machine (phase 05): publish/archive/delete must update or exclude the index.
-- **Translation step** is an external integration (phase 09 territory) but its failure handling is a search-availability risk owned here.
+- **Translation step** is an external integration (Phase 09 territory), publication-time only — its failure handling (degraded cross-language recall, never a 500) belongs to Phase 09, not the search path.
 
 ## 7. Edge Cases
 - Ad published then searched before index updates (race) → acceptable short delay or sync update; verify behavior.
@@ -123,7 +124,7 @@ Cyrillic/Montenegrin/transliteration round-trips match; no mojibake.
 - **LOW**
   - Missing type hints on search helpers.
   - Log verbosity / no latency metrics.
-  - No observability on translation success ratio.
+  - No search-latency SLO assertion at seed scale → **RESOLVED** (`test_search_slo.py` asserts ≤2 s at 60-ad seed volume; `PerformanceSLO` constants present).
 
 ## 9. Recommended Sequence
 1. Discovery — map search entry, query builder, FTS index, translation, category tree, ranking.
