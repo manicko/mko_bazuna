@@ -314,10 +314,10 @@ Definition of Done on every fast-gate run:
 | `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
 | `test_bot_no_hardcoded_messages` | (QLT-005) AST-scans `telegram_bot/handlers/*.py` for user-facing Bot/API method calls (`.answer()`, `.reply()`, `.edit_text()`, etc.) whose text arg is a bare string literal or f-string rather than a `_()` call |
 | `test_no_cyrillic_msgids` | (QLT-005) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English |
-
-The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of `test_i18n_completeness.py`
-AST-scans `telegram_bot/handlers/*.py` to enforce that all user-facing bot strings are wrapped in
-`_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
+The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of
+`test_i18n_completeness.py` AST-scans `telegram_bot/handlers/` and
+`telegram_bot/services/` to enforce that all user-facing bot strings are wrapped
+in `_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
 
 The scan scope excludes the `admin/` staff subtree, the analytics/moderation dashboards, and
 `components/feature_tag.html` (DB-based i18n via `get_lookup_name`). `test_i18n_pipeline.py` adds
