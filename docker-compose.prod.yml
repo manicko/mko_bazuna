@@ -7,6 +7,7 @@ services:
   web:
     image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 30s
     env_file:
       - .env.prod
     volumes:

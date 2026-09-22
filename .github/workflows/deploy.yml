@@ -1,0 +1,104 @@
+name: Deploy
+
+# B4 / finding 12-OPS-005: Formal deployment workflow replacing manual
+# `docker compose up -d` with a gated, backup-then-pull-then-health-check
+# procedure. Triggered manually via workflow_dispatch with GitHub Environments
+# manual approval (environment: production).
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Git SHA from the CI build to deploy. Defaults to the current commit SHA."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: set_tag
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="${GITHUB_SHA}"
+            echo "No image_tag provided; using current commit SHA: $TAG"
+          fi
+          echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Deploying image: ghcr.io/mko-bazuna/mko_bazuna:$TAG"
+
+      - name: Deploy to production via SSH
+        id: deploy
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ steps.set_tag.outputs.image_tag }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          fingerprint: ${{ secrets.SERVER_FINGERPRINT }}
+          envs: IMAGE_TAG
+          script: |
+            set -e
+            cd /app
+
+            # Capture CI-provided image tag before sourcing .env.prod,
+            # which has IMAGE_TAG=latest as its default.
+            CI_IMAGE_TAG="${IMAGE_TAG}"
+
+            # Load production environment variables for POSTGRES_* and REGISTRY/REPOSITORY.
+            set -a
+            source .env.prod
+            set +a
+
+            # Restore the CI-provided image tag — takes precedence over .env.prod's default.
+            export IMAGE_TAG="${CI_IMAGE_TAG}"
+
+            echo "=== Starting deployment of IMAGE_TAG=${IMAGE_TAG} ==="
+
+            # a. Create a timestamped database backup (pre-deploy safety net)
+            echo "=== Step 1: Pre-deploy database backup ==="
+            mkdir -p /app/backups
+            docker compose exec -T db pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" -F c \
+              > "/app/backups/backup-$(date +%Y%m%d-%H%M%S).dump"
+            echo "Database backup created."
+
+            # b. Pull the new image
+            echo "=== Step 2: Pull new image ==="
+            IMAGE_TAG="${IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            # c. Recreate services (brief downtime; acceptable for this classifieds board)
+            echo "=== Step 3: Recreate services ==="
+            IMAGE_TAG="${IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+            # d. Health-check gate: poll /health/ready/ until 200 or timeout (60s)
+            echo "=== Step 4: Health check gate ==="
+            if timeout 60 bash -c 'while ! curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
+              echo "Health check passed — /health/ready/ returned 200."
+            else
+              echo "ERROR: Health check FAILED after 60s timeout."
+              echo "The deployment may be unhealthy. Aborting and reference:"
+              echo "https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
+              exit 1
+            fi
+
+            echo "=== Deployment complete: IMAGE_TAG=${IMAGE_TAG} ==="
+
+      - name: Deployment failed — rollback reference
+        if: failure()
+        run: |
+          echo "::error::Deployment failed. See deploy step logs above for details."
+          echo "::error::Follow the rollback procedure: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
+          echo "::error::Or read the local copy: docs/ops/rollback.md"

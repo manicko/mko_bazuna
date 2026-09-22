@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
+      contents: read
+    outputs:
+      image_tag: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,14 +25,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Build and push Docker image
+        id: build_image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
-          push: false
-          tags: mko-bazuna:ci
-          cache-from: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache
+          push: true
+          tags: |
+            mko-bazuna:ci
+            ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/manicko/mko_bazuna:buildcache
           cache-to: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
 
       - name: Scan Docker image for vulnerabilities

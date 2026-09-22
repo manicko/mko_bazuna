@@ -204,7 +204,9 @@ docker network rm mko-bazuna-restore-net
   The Makefile `prune-backups` target runs the same retention logic for manual backups.
 - **No WAL archiving / PITR.** There is no WAL archive, no `archive_command`, and no base-backup
   pipeline. Sub-24h RPO is **not** possible without adding WAL archiving and a recovery timeline
-  mechanism. This is a known gap — see the future `deploy.yml` for the pre-deploy backup step.
+  mechanism. The `deploy.yml` workflow (B4) now includes a pre-deploy backup step that captures a
+  timestamped dump before each deployment, providing a recovery point at the last deploy — but this
+  is not a substitute for WAL archiving needed for sub-24h RPO.
 - **Live data risk.** Any writes made within the last 24 hours before a failure are lost. Schedule
   the backup to run close to a low-traffic window if tighter RPO is desired.
 
