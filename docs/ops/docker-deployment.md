@@ -396,7 +396,7 @@ restart the affected container(s), and account for the consequences.
 ### Deployment Checks
 
 Deployment configuration is validated via Django's `manage.py check --deploy`:
-- **CI:** The `test` job runs `check --deploy` with `continue-on-error: true` — deploy warnings (e.g., `security.W025` for a `SECRET_KEY` shorter than 50 characters) appear as CI annotations but never fail the build.
+- **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
 - This complements the `${VAR:?}` presence guards in `docker-compose.yml`; it cannot be bypassed by a non-empty placeholder key.
 

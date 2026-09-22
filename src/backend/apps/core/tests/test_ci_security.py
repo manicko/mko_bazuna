@@ -1,9 +1,11 @@
 """
-Structural tests for CI/CD security scanning (Block 2: OPS-002 + OPS-007).
+Structural tests for CI/CD security scanning and deploy-check hardening.
 
-Verifies that the CI pipeline includes security scanning tooling and
-configuration files exist. These are non-execution tests — they assert
-on the structure of config files, not on running security tools.
+Covers security scanning tooling (pip-audit, trivy, gitleaks) and the
+dedicated `deploy-check` CI job (Block B2 / finding 12-OPS-001) that runs
+``manage.py check --deploy`` against production settings. These are
+non-execution tests — they assert on the structure of config files,
+not on running security tools.
 """
 
 from __future__ import annotations
@@ -85,3 +87,59 @@ def test_pip_audit_in_dev_deps() -> None:
     """pip-audit is listed in pyproject.toml dev dependencies."""
     content = _read("pyproject.toml")
     assert "pip-audit" in content
+
+
+# ---------------------------------------------------------------------------
+# Block B2 — CI deploy-check hardening (finding 12-OPS-001)
+# ---------------------------------------------------------------------------
+# The previous CI "Django deploy checks" step ran ``manage.py check --deploy``
+# against ``config.settings.test``, producing 6 false-positive warnings. It is
+# replaced by a dedicated, blocking ``deploy-check`` job that targets
+# ``config.settings.prod`` with ``--fail-level WARNING`` and all required
+# production env vars set to valid placeholders.
+
+
+def _deploy_check_section() -> str:
+    """Return the YAML block of the dedicated ``deploy-check`` CI job.
+
+    The job is the last definition in ``ci.yml``, so slicing from its header to
+    end-of-file isolates exactly its contents.
+    """
+    content = _read(".github", "workflows", "ci.yml")
+    marker = "  deploy-check:"
+    idx = content.index(marker)
+    return content[idx:]
+
+
+def test_ci_deploy_check_uses_prod_settings() -> None:
+    """The deploy-check job runs check --deploy against config.settings.prod (not test)."""
+    section = _deploy_check_section()
+    assert "config.settings.prod" in section
+    assert "config.settings.test" not in section
+
+
+def test_ci_deploy_check_fails_on_warnings() -> None:
+    """The deploy-check step uses --fail-level WARNING and is not continue-on-error."""
+    section = _deploy_check_section()
+    assert "check --deploy --fail-level WARNING" in section
+    assert "continue-on-error" not in section
+
+
+def test_ci_deploy_check_sets_valid_secret_key() -> None:
+    """The deploy-check job sets DJANGO_SECRET_KEY to a 50+ char non-secret literal."""
+    section = _deploy_check_section()
+    secret_key_value: str | None = None
+    for line in section.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("DJANGO_SECRET_KEY:"):
+            raw = stripped.split(":", 1)[1].strip()
+            if (raw.startswith('"') and raw.endswith('"')) or (
+                raw.startswith("'") and raw.endswith("'")
+            ):
+                raw = raw[1:-1]
+            secret_key_value = raw
+            break
+    assert secret_key_value is not None, "DJANGO_SECRET_KEY not set in deploy-check job"
+    assert len(secret_key_value) >= 50, (
+        f"DJANGO_SECRET_KEY is {len(secret_key_value)} chars; deploy-check requires >=50"
+    )

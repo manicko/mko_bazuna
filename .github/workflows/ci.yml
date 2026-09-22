@@ -139,14 +139,6 @@ jobs:
           path: src/backend/coverage.xml
           retention-days: 30
 
-      - name: Django deploy checks
-        env:
-          DJANGO_SETTINGS_MODULE: config.settings.test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
-          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run python manage.py check --deploy
-        working-directory: src/backend
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -356,3 +348,41 @@ jobs:
         with:
           sarif_file: gitleaks-results.sarif
           category: gitleaks
+
+  # Deploy-check gate (OPS-001): run manage.py check --deploy against the
+  # production settings module so deployment warnings (W-series) fail the
+  # build. The previous step ran against config.settings.test and produced
+  # 6 false-positive warnings that masked real gaps. No DB service container
+  # is required: check --deploy is static (no custom deploy checks, no DB
+  # connection). All required production env vars are set to valid non-secret
+  # placeholders so the full prod settings import path is exercised.
+  deploy-check:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: "ci-deploy-check-secret-key-not-for-production-use-1234567890"
+      BOT_TOKEN: ci-test-bot-token
+      GOOGLE_TRANSLATE_API_KEY: ci-test-translate-key
+      SITE_URL: https://example.com
+      ALLOWED_HOSTS: example.com
+      CSRF_TRUSTED_ORIGINS: https://example.com
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Check lockfile freshness
+        run: uv lock --check
+        working-directory: src/backend
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      - name: Run Django deploy checks
+        run: uv run python manage.py check --deploy --fail-level WARNING
+        working-directory: src/backend

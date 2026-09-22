@@ -166,16 +166,19 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 
 | Job | Purpose | Key steps |
 |---|---|---|
-| `build` | Docker image + test env | Checkout → Buildx → Build image → Start PG → Run migrations → `compilemessages` → pytest with coverage → `check --deploy` (non-blocking) |
+| `build` | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
+| `test` | Unit + integration tests | DB service → `bootstrap_reference_data` → `compilemessages` → pytest with coverage |
 | `lint` | Code linting | `uv sync` → `ruff check .` |
 | `typecheck` | Type checking | `uv sync` → `basedpyright .` |
 | `lint-templates` | Template linting | `uv sync` → `djlint templates/` |
 | `i18n` | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
+| `security` | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload |
+| `deploy-check` | Production deploy gate | `check --deploy --fail-level WARNING` against `config.settings.prod` with all required env vars (blocking) |
 
 - The `test` job in CI runs `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
 - Coverage report is uploaded as an artifact (`src/backend/coverage.xml`, 30-day retention).
 - CI uses SQLite-backed PostgreSQL service (not Docker Compose) — migrations run via `migrate_locked.py`.
-- The `test` job also runs `manage.py check --deploy` as a **non-blocking** step (`continue-on-error: true`). This surfaces Django deployment warnings (e.g., `security.W025` weak `SECRET_KEY`) as CI annotations without failing the build. The `web`/`bot` entrypoints also call `check --deploy` at boot (non-fatal, logs a `WARNING` and continues).
+- A dedicated, **blocking** `deploy-check` job runs `manage.py check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings) with all required production env vars set to valid non-secret placeholders (`DJANGO_SECRET_KEY` 50+ chars, `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`). `--fail-level WARNING` means any W-series finding fails the build; there is no `continue-on-error`. This replaced the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings. The `web`/`bot` entrypoints also call `check --deploy` at boot (non-fatal, logs a `WARNING` and continues).
 
 ## i18n Pipeline
 
