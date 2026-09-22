@@ -1,0 +1,94 @@
+name: Restore Test
+
+# B5 / finding 12-OPS-006: Monthly automated restore-test validation.
+# Validates backup integrity by restoring a test backup into an isolated
+# PostgreSQL instance and verifying Django ORM migration compatibility via
+# migrate --plan --check against the production app image.
+on:
+  schedule:
+    - cron: "0 3 1-7 * 1" # First Monday of each month at 03:00 UTC
+  workflow_dispatch: # Manual trigger for on-demand restore-test runs
+
+concurrency:
+  group: restore-test
+  # Do NOT cancel — a restore-test must complete to validate backup integrity.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  restore-test:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+    # B4 dependency: ci.yml build job pushes the SHA-tagged image to GHCR.
+    # This job pulls that same image and uses it for the migrate --plan --check
+    # step in `make restore-test APP_IMAGE=<image>`.
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Wait for database
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable after 30s" >&2
+          exit 1
+        working-directory: src/backend
+
+      - name: Run migrations (bootstrap reference data)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
+
+      - name: Generate test backup
+        run: |
+          mkdir -p backups
+          pg_dump --no-sync -h localhost -U postgres -d mko_bazuna -F c > backups/test_backup.dump
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull app image
+        run: docker pull ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}
+
+      - name: Run restore-test with migrate --plan --check
+        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}

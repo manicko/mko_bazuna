@@ -256,15 +256,22 @@ The `make restore-test` target:
    - **Schema (table count):** `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'`
    - **Data (row count):** `SELECT count(*) FROM ads_ad`
    - **Schema list:** `\dn`
-8. Tears down all isolated resources (container, volume, network) via an `EXIT` trap
+8. Optionally runs `migrate --plan --check` against the restored DB using the
+   production app image (when `APP_IMAGE` is provided) — verifies Django ORM-level
+   migration compatibility against the restored schema
+9. Tears down all isolated resources (container, volume, network) via an `EXIT` trap
 
-### Known limitation
+### Migrate --plan --check (optional)
 
-`manage.py migrate --plan` is **not** run inside the Makefile target — it requires the full
-production app image and Django settings stack. This check is better suited for the deploy
-workflow (`deploy.yml`) where the app container is available. The restore-test smoke tests
-verify database-level integrity only; Django ORM-level migration compatibility must be verified
-separately during a deployment dry-run.
+`manage.py migrate --plan --check` is run when `APP_IMAGE` is provided (via the
+`APP_IMAGE` Makefile variable). The step launches a one-shot container from the
+production app image on the isolated network (hostname `restore-db`), connecting
+to the restored DB with `DJANGO_BUILD=1` and `DJANGO_SETTINGS_MODULE=config.settings.prod`
+to bypass secret-validation guards. The `--check` flag causes a non-zero exit if
+pending migrations exist — the CI backup is generated from a fully-migrated DB
+(after `bootstrap_reference_data`), so the plan is empty and the step succeeds.
+CI provides the SHA-tagged image automatically via `.github/workflows/restore-test.yml`;
+manual runs skip this step unless `APP_IMAGE` is set explicitly.
 
 ## Troubleshooting
 

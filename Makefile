@@ -12,6 +12,11 @@ COMPOSE_TEST := --env-file .env.test -f docker-compose.yml -f docker-compose.tes
 ENV_PROD := --env-file .env.prod
 COMPOSE_PROD := $(ENV_PROD) -f docker-compose.yml -f docker-compose.prod.yml
 
+# App image reference (GHCR SHA-tagged) for the migrate --plan --check step in
+# restore-test. Empty by default — manual restore-test runs skip the migrate
+# check. CI provides the SHA-tagged image via APP_IMAGE.
+APP_IMAGE ?=
+
 # Isolated Compose project names so `make up` (dev) and `make test` can run
 # simultaneously without colliding on service names, networks, or named volumes.
 # Each project gets its own `postgres_data` and `uv_cache` volumes.
@@ -320,6 +325,19 @@ restore-test:
 		"SELECT count(*) FROM ads_ad;")" && \
 	echo "→ Smoke test 4/4: schema list" && \
 	docker exec restore-db psql -U restore_user -d bazuna_restore -c "\dn" && \
+	if [ -z "$(APP_IMAGE)" ]; then \
+		echo "→ Skipping migrate --plan --check (APP_IMAGE not set)"; \
+	else \
+		echo "→ Running migrate --plan --check against restored DB" && \
+		docker run --rm --network $$RESTORE_NET \
+			-e DJANGO_SETTINGS_MODULE=config.settings.prod \
+			-e DJANGO_BUILD=1 \
+			-e DATABASE_URL=postgres://restore_user:restore_pass@restore-db:5432/bazuna_restore \
+			-e ALLOWED_HOSTS='*' \
+			-e SKIP_ENV_CHECK=1 \
+			$(APP_IMAGE) \
+			python src/backend/manage.py migrate --plan --check; \
+	fi && \
 	echo "✓ Restore-test completed successfully from $(BACKUP_FILE)"
 
 prune-backups:
