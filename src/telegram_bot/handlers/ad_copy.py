@@ -67,8 +67,8 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         ad_id=new_ad.id,
         category_id=new_ad.category_id,
         listing_purpose_id=new_ad.listing_purpose_id,
-        title=new_ad.title,
-        description=new_ad.description,
+        title=new_ad.get_title(get_language()),
+        description=new_ad.get_description(get_language()),
         price_amount=Decimal("0"),
         price_currency=CurrencyCode.EUR,
     )
