@@ -9,6 +9,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    path("", include("django_prometheus.urls")),
     path("admin/", admin.site.urls),
     path("moderation/", include("apps.moderation.urls")),
     path("analytics/", include("apps.analytics.urls")),

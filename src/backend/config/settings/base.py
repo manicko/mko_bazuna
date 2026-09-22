@@ -120,6 +120,8 @@ INSTALLED_APPS = [
     "django_htmx",
     # MPTT for hierarchical categories
     "mptt",
+    # Prometheus metrics (django-prometheus)
+    "django_prometheus",
     # Theme app for Tailwind
     "theme",
     # Local apps
@@ -140,6 +142,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -152,6 +155,7 @@ MIDDLEWARE = [
     "apps.core.middleware.js_check.JSExecutionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
