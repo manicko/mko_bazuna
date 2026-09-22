@@ -18,7 +18,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 - **Fixed values:** `StrEnum` only — never plain strings/dicts/lists for constants.
 - **Small modules and functions:** Modules, services, components, and functions must be small and focused on one thing.
-- **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start. Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write a readiness marker used by the file-based `healthcheck-bot.sh` (process + marker freshness).
+- **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start. Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write two liveness markers: a file-based marker (`/tmp/mko_bazuna_bot_alive`) consumed by the file-based `healthcheck-bot.sh` (process + marker freshness), and a Redis-based `bot:liveness` key (epoch timestamp) consumed by the web `/health/ready/` readiness probe via `BOT_HEALTH_CHECK_ENABLED` / `BOT_HEALTH_STALE_SECONDS` (OPS-003).
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)

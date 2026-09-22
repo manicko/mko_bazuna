@@ -46,17 +46,25 @@ failure escalation.
   but risky — it drops columns/indexes and can destroy data. Schema rollback is
   the most dangerous dimension and should be a last resort (see
   [Schema Rollback Considerations](#schema-rollback-considerations)).
-- **Health-check gating:** The web container publishes `/health/ready/` (returns
-  `200` with `{"status": "ready"}` when DB and Redis are reachable; `503`
-  otherwise). The bot container's healthcheck
-  (`docker/healthcheck-bot.sh`) verifies PID liveness, a readiness marker file,
-  and optional freshness via `BOT_HEALTH_STALE_SECONDS`. Validation must confirm
-  both before declaring a rollback successful.
+- **Health-check gating:** The Docker `HEALTHCHECK` (in `docker/Dockerfile` and
+  `docker-compose.yml`) probes `/health/live/` — a dependency-free liveness endpoint
+  returning `{"status": "alive"}`. The application-level readiness endpoint
+  `/health/ready/` is the gated validation target: it returns `200` with
+  `{"version": 1, "status": "ready", "checks": {"database": "ok", "cache": "ok", "bot": "ok"|"stale"|"disabled"}}`
+  when PostgreSQL, Redis cache, and the bot liveness marker are all healthy; `503` otherwise.
+  The bot container's healthcheck (`docker/healthcheck-bot.sh`) verifies PID liveness,
+  a readiness marker file, and optional freshness via `BOT_HEALTH_STALE_SECONDS`.
+  Additionally, the bot process writes a Redis-based `bot:liveness` marker (epoch
+  timestamp) on startup and on every inbound update via `LivenessMiddleware` in
+  `telegram_bot/lifecycle.py` (OPS-003). The web readiness probe reads this Redis
+  key (gated by `BOT_HEALTH_CHECK_ENABLED`, default `True`) to verify the bot is alive
+  and fresh. Validation must confirm both before declaring a rollback successful.
 
-> **Note on health endpoint future change:** Finding 12-OPS-002 plans to move the
-> container-level `HEALTHCHECK` to `/health/live/` (dependency-free liveness).
+> **Note on health endpoints:** Finding 12-OPS-002 has been completed — the
+> container-level `HEALTHCHECK` now uses `/health/live/` (dependency-free liveness).
 > The application-level readiness check (`/health/ready/`) remains the gated
-> validation target. See [Health-Check-Gated Validation](#health-check-gated-validation)
+> validation target used by the deploy workflow and rollback validation. See
+> [Health-Check-Gated Validation](#health-check-gated-validation)
 > for both endpoints.
 
 | Aspect | Rollback mechanism | Risk level |
@@ -64,7 +72,7 @@ failure escalation.
 | Image tag | Change `IMAGE_TAG` in `.env.prod`, re-deploy | Low |
 | Config | `git checkout .env.prod` to pinned commit, re-deploy | Low |
 | Schema | `migrate <app> <previous_migration>` + data backfill | High |
-| Health | Curl `/health/ready/`, inspect bot marker freshness | — (validation) |
+| Health | Liveness: `/health/live/` · Readiness: `/health/ready/` (incl. Redis `bot:liveness`) | — (validation) |
 
 ## Prerequisites
 
@@ -298,12 +306,17 @@ services are healthy before declaring the rollback successful.
 
 ### Web — `/health/ready/` (readiness endpoint)
 
-The web container's Compose healthcheck (line 256 of `docker-compose.yml`) curls
-`http://localhost:8000/health/ready/`. This endpoint returns:
+The Docker container `HEALTHCHECK` (line 256 of `docker-compose.yml`, and the
+`HEALTHCHECK` in `docker/Dockerfile`) curls `http://localhost:8000/health/live/` —
+a dependency-free liveness probe. The application-level readiness endpoint
+`/health/ready/` is the gated validation target that verifies PostgreSQL, Redis,
+and bot liveness. The readiness endpoint returns:
 
-- `200` with `{"version": 1, "status": "ready", "checks": {"database": "ok", "cache": "ok"}}`
-  when PostgreSQL and Redis are both reachable.
-- `503` with `{"status": "not_ready", ...}` when either dependency is down.
+- `200` with `{"version": 1, "status": "ready", "checks": {"database": "ok", "cache": "ok", "bot": "ok"|"stale"|"disabled"}}`
+  when PostgreSQL and Redis are both reachable and the bot liveness marker is fresh
+  (or marked `"disabled"` in test settings where `BOT_HEALTH_CHECK_ENABLED = False`).
+- `503` with `{"status": "not_ready", ...}` when any of database, cache, or bot
+  liveness fails.
 
 Poll this endpoint from the host (or via `docker compose exec`):
 
@@ -324,9 +337,10 @@ curl -s http://localhost:8000/health/ready/ | python -m json.tool
 
 The liveness endpoint returns `200` with `{"status": "alive"}` regardless of
 database or cache state — it confirms the gunicorn process itself is responsive.
-> **Note:** Finding 12-OPS-002 plans to move the container-level `HEALTHCHECK` to
-> this endpoint. Today the healthcheck still probes `/health/ready/` (see
-> `docker-compose.yml:256`). This section documents both for completeness.
+This endpoint is what the Docker `HEALTHCHECK` probes (see
+`docker-compose.yml:256` and the `HEALTHCHECK` in `docker/Dockerfile`, both of
+which were corrected to `/health/live/` per OPS-002). Use `/health/ready/` (above)
+for deploy-gated readiness validation that verifies database, Redis, and bot liveness.
 
 ```bash
 curl -s http://localhost:8000/health/live/
@@ -336,13 +350,23 @@ curl -s http://localhost:8000/health/live/
 ### Bot — container healthcheck
 
 The bot container's healthcheck runs `docker/healthcheck-bot.sh` (line 299 of
-`docker-compose.yml`). It performs three checks:
+`docker-compose.yml`). It performs three checks against the file-based marker:
 
 1. **PID 1 alive** — `kill -0 1`
 2. **Readiness marker exists** — `/tmp/mko_bazuna_bot_alive` (written by the bot's
    startup lifecycle hook in `telegram_bot/lifecycle.py`)
 3. **Marker freshness** — if `BOT_HEALTH_STALE_SECONDS > 0`, the marker's mtime
    must be within that window (detects retry-loop / stuck polling)
+
+In addition to the file-based marker, the bot process writes a Redis-based
+`bot:liveness` marker (epoch timestamp) on startup and on every inbound update
+via `LivenessMiddleware` in `telegram_bot/lifecycle.py` (OPS-003). The web
+readiness probe (`/health/ready/`) reads this Redis key — gated by
+`BOT_HEALTH_CHECK_ENABLED` (default `True`, disabled in tests) with a staleness
+window of `BOT_HEALTH_STALE_SECONDS` (default 120, set on both `web` and `bot`
+services in `docker-compose.yml`) — to verify the bot is alive and fresh. If the
+key is absent or older than the staleness window, the readiness endpoint reports
+`"bot": "stale"` and returns `503`.
 
 Verify bot health via Docker:
 
@@ -371,10 +395,12 @@ docker compose --env-file .env.prod \
 
 | Service | Check | Expected | Command |
 |---------|-------|----------|---------|
-| web | Readiness | HTTP 200, `status: "ready"` | `curl -sf http://localhost:8000/health/ready/` |
 | web | Liveness | HTTP 200, `status: "alive"` | `curl -sf http://localhost:8000/health/live/` |
+| web | Readiness | HTTP 200, `status: "ready"` | `curl -sf http://localhost:8000/health/ready/` |
+| web | Bot liveness marker (Redis) | `checks.bot == "ok"` in readiness response | `curl -sf http://localhost:8000/health/ready/ \| python -m json.tool` |
 | bot | Container healthcheck | `healthy` state | `docker compose ps bot` |
 | bot | Marker freshness | mtime within `BOT_HEALTH_STALE_SECONDS` | `stat -c %Y /tmp/mko_bazuna_bot_alive` |
+| bot | Redis liveness marker | `bot:liveness` key fresh in Redis | `docker compose exec bot python -c "from django.core.cache import cache; print(cache.get('bot:liveness'))"` |
 | db | PostgreSQL healthy | `pg_isready` succeeds | `docker compose ps db` |
 | redis | Redis healthy | `redis-cli ping` → `PONG` | `docker compose ps redis` |
 
@@ -448,10 +474,14 @@ echo "Rollback validated in staging"
 
 ### CI integration
 
-Finding 12-OPS-005 (deploy workflow, P0) will add a GitHub Actions `deploy.yml`
-that gates production deploys on health-check validation. The rollback runbook
-is referenced from that workflow's `on-failure` step. Until B4 completes the
-workflow, staging rollback drills are performed manually using the procedure above.
+Finding 12-OPS-005 (deploy workflow, P0) added a GitHub Actions `deploy.yml`
+(workflow_dispatch with `environment: production` manual approval) that gates
+production deploys on `/health/ready/` validation (60-second timeout). The
+rollback runbook is referenced from that workflow's `on-failure` step. The
+monthly `restore-test.yml` workflow (B5 / OPS-006) provides a secondary
+validation of backup integrity via an isolated restore + `migrate --plan --check`.
+Staging rollback drills continue to be performed manually using the procedure
+above (see [Rollback-Test Cadence](#5-rollback-test-cadence)).
 
 ## 6. Rollback Failure Escalation Path
 
@@ -561,5 +591,8 @@ Use this table to select the rollback dimension based on the failure mode:
   (`graceful_timeout = 30`, `timeout = 60`, `preload_app = True`)
 - [docker/healthcheck-bot.sh](../../docker/healthcheck-bot.sh) — bot healthcheck
   script
-- [Finding 12-OPS-005](../../.ai/audit/12-production-ops/findings.md) — deploy workflow (mutually reinforcing)
-- [Finding 12-OPS-002](../../.ai/audit/12-production-ops/findings.md) — healthcheck endpoint change to `/health/live/`
+- [Finding 12-OPS-007](../../.ai/audit/12-production-ops/findings.md) — rollback runbook (this document)
+- [Finding 12-OPS-005](../../.ai/audit/12-production-ops/findings.md) — deploy workflow (`deploy.yml`, health-check gating)
+- [Finding 12-OPS-002](../../.ai/audit/12-production-ops/findings.md) — healthcheck endpoint changed to `/health/live/`
+- [Finding 12-OPS-003](../../.ai/audit/12-production-ops/findings.md) — Redis-based bot liveness marker (`bot:liveness`)
+- [Finding 12-OPS-006](../../.ai/audit/12-production-ops/findings.md) — restore-test automation (`restore-test.yml`)

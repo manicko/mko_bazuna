@@ -296,6 +296,23 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 ```
 
+### Automated Deployment (GitHub Actions)
+
+Production deploys are automated via the `deploy.yml` workflow (`.github/workflows/deploy.yml`,
+finding 12-OPS-005). Triggered manually via `workflow_dispatch` with a `production`
+environment approval gate, the workflow performs a backup-then-pull-then-health-check
+procedure over SSH:
+
+1. **Pre-deploy backup** — `pg_dump -F c` into `./backups/` (safety net before each deploy)
+2. **Pull** the CI-built SHA-tagged image (`ghcr.io/mko-bazuna/mko_bazuna:${SHA}`)
+3. **Recreate** all services (`docker compose up -d --remove-orphans`)
+4. **Health-check gate** — poll `/health/ready/` until HTTP 200 or 60-second timeout;
+   on failure the workflow exits `1` and references the
+   [rollback runbook](rollback.md#4-health-check-gated-validation)
+
+Use the manual `docker compose` command above for emergency deploys or when the
+GitHub Actions runner cannot reach the production host.
+
 ### Production Services
 
 | Service | Image/Command | Notes |
@@ -305,7 +322,7 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
 | `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
-| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; file-based liveness healthcheck via `docker/healthcheck-bot.sh` |
+| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; dual liveness marker: file-based (`docker/healthcheck-bot.sh` checks PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`) **and** Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` probe via `BOT_HEALTH_CHECK_ENABLED`) |
 | `nginx` | `nginx:alpine` | Ports 80/443; TLS termination |
 
 ### TLS Configuration
@@ -891,7 +908,12 @@ generation process, and configuration options.
 ### Container Health
 
 - **Web:** Exits on crash; `restart: unless-stopped` restarts automatically
-- **Bot:** File-based liveness healthcheck via `docker/healthcheck-bot.sh` (process alive + readiness marker freshness); lifecycle hooks in `telegram_bot/lifecycle.py` write the marker on startup and clean up the bot session on shutdown
+- **Bot:** Dual liveness markers: (1) file-based healthcheck via `docker/healthcheck-bot.sh`
+  (process alive + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`),
+  and (2) Redis-based `bot:liveness` key (epoch timestamp written on startup and every inbound
+  update by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/`
+  readiness probe via `BOT_HEALTH_CHECK_ENABLED`). Lifecycle hooks in `telegram_bot/lifecycle.py`
+  write both markers on startup and clean up the bot session on shutdown.
 - **Database:** Healthcheck via `pg_isready`
 
 ### Production Logging
