@@ -21,8 +21,9 @@ fast-gate CI run:
    active locale (bs/ru).
 9. ``test_bot_no_raw_model_field_access`` — AST-scans bot
    ``handlers/`` and ``services/`` for raw ``name_i18n.get("ru")`` calls
-   and ``.name``/``.title`` field access in f-strings, ``%`` dict values,
-   and list comprehensions (I18N-001).
+   and ``.name``/``.title``/``.description`` field access in f-strings,
+   ``%`` dict values, list comprehensions, and keyword-argument values
+   (I18N-001).
 10. ``test_title_tags_translated`` — page ``<title>`` tags localize per
     language (I18N-003).
 11. ``test_plural_forms_runtime`` — ``{% blocktrans count %}`` selects the
@@ -906,12 +907,13 @@ _ALLOWED_NAME_VARS = frozenset({
     "user",
     "data",
     "state",
+    "payload",
 })
 
 # Model attribute names that carry user-visible text and must go through
 # the locale-aware accessor (``get_name`` / ``get_title``) instead of raw
 # field access.
-_RAW_FIELD_ATTRS = frozenset({"name", "title"})
+_RAW_FIELD_ATTRS = frozenset({"name", "title", "description"})
 
 
 def _collect_bot_source_files() -> list[Path]:
@@ -957,7 +959,8 @@ def _is_name_i18n_get_call(node: ast.AST) -> bool:
 
 
 def _is_raw_field_access(node: ast.AST) -> bool:
-    """Return True for ``.name`` or ``.title`` on a likely model variable.
+    """Return True for ``.name``, ``.title``, or ``.description`` on a likely
+    model variable.
 
     Allows method-call results (``get_name``, ``get_title``, ``get_description``)
     by virtue of those having different ``attr`` values.
@@ -1011,6 +1014,16 @@ def _scan_bot_source_for_violations(source: str, tree: ast.Module) -> list[str]:
                     f"get_title(locale)"
                 )
 
+        # 2d. .name / .title / .description as a keyword-argument value
+        if isinstance(node, ast.keyword):
+            if _is_raw_field_access(node.value):
+                violations.append(
+                    f"{source}:{node.value.lineno}: raw .{node.value.attr} field "
+                    f"access as keyword argument — use "
+                    f"get_name(get_language())/get_title(get_language())/"
+                    f"get_description(get_language())"
+                )
+
     return violations
 
 
@@ -1022,14 +1035,16 @@ def test_bot_no_raw_model_field_access() -> None:
 
     1. ``name_i18n.get("<literal>")`` calls — a hardcoded locale bypasses
        the active user locale.
-    2. ``.name`` / ``.title`` attribute access on model objects inside:
-       f-string ``{…}`` segments, ``%`` dict values, and list comprehensions.
+    2. ``.name`` / ``.title`` / ``.description`` attribute access on model
+       objects inside: f-string ``{…}`` segments, ``%`` dict values, list
+       comprehensions, and keyword-argument values.
 
     Allowed patterns:
     - ``get_name(...)``, ``get_title(...)``, ``get_description(...)`` calls
     - ``.slug`` attribute access (legitimate)
-    - ``.name``/``.title`` on variables named ``message``, ``callback``,
-      ``request``, ``user``, ``data``, ``state`` (non-model objects)
+    - ``.name``/``.title``/``.description`` on variables named ``message``,
+      ``callback``, ``request``, ``user``, ``data``, ``state``, ``payload``
+      (non-model objects; ``payload`` is a Pydantic DTO in ad_create/text.py)
     """
     all_violations: list[str] = []
 
