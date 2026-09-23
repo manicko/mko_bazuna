@@ -3,7 +3,26 @@ Development settings for Mko Bazuna.
 Imports base settings and overrides for local development.
 """
 
+import re
+
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403, F401
+
+# Matches values shipped as templates in .env.*.example files, e.g.
+# <your-bot-token-from-botfather>. Copied from prod._SECRET_PLACEHOLDER_RE
+# to avoid importing prod settings (which carry logging/Sentry config).
+_BOT_TOKEN_PLACEHOLDER_RE = re.compile(r"^<[^>]+>$")
+
+# Fail fast: reject truthy-but-placeholder BOT_TOKEN values. Empty tokens are
+# allowed (the bot's `if not token: return` guard skips startup gracefully).
+# This is dev-only — prod has its own guard (prod.py:140-145).
+if BOT_TOKEN and _BOT_TOKEN_PLACEHOLDER_RE.match(BOT_TOKEN):  # noqa: F405
+    raise ImproperlyConfigured(
+        "BOT_TOKEN is a placeholder value from .env.dev.example. "
+        "Replace it with a real token from @BotFather, or leave it empty "
+        "(BOT_TOKEN=) to skip bot startup in development."
+    )
 
 DEBUG = True
 

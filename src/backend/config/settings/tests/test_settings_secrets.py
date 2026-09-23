@@ -44,6 +44,22 @@ def _run_in_subprocess(env: dict[str, str], import_code: str) -> str:
     return result.stderr
 
 
+def _dev_env_overrides(**overrides: str) -> dict[str, str]:
+    """Build an environment dict suitable for importing dev settings.
+
+    Starts from os.environ and applies development env vars
+    (DJANGO_SETTINGS_MODULE, DEBUG, DJANGO_SECRET_KEY) so the dev.py
+    fail-fast guards pass. Callers can override any value (e.g. BOT_TOKEN).
+    """
+    env = {k: v for k, v in os.environ.items()}
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.dev"
+    env["DEBUG"] = "True"
+    env["DJANGO_SECRET_KEY"] = overrides.pop("DJANGO_SECRET_KEY", TEST_SECRET_KEY)
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    env.update(overrides)
+    return env
+
+
 def test_django_secret_key_required() -> None:
     """Importing settings without DJANGO_SECRET_KEY raises ImproperlyConfigured."""
     env = {
@@ -208,3 +224,38 @@ def test_prod_secret_key_accepts_strong_key() -> None:
     env = _prod_env_overrides()  # uses TEST_SECRET_KEY (53 chars)
     stderr = _run_in_subprocess(env, "import django; django.setup()")
     assert "" == stderr.strip() or "ImproperlyConfigured" not in stderr
+
+
+def test_bot_token_required_in_dev() -> None:
+    """A truthy-but-placeholder BOT_TOKEN (<...>) is rejected at dev import time.
+
+    The placeholder ships in .env.dev.example; without this guard the bot's
+    truthiness-only check in main.py passes it through to Bot(token=...),
+    raising aiogram's TokenValidationError and looping under
+    restart: unless-stopped.
+    """
+    env = _dev_env_overrides(BOT_TOKEN="<your-bot-token-from-botfather>")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "BOT_TOKEN" in stderr
+
+
+def test_bot_token_placeholder_rejects_in_dev() -> None:
+    """A generic <placeholder> BOT_TOKEN is rejected at dev import time."""
+    env = _dev_env_overrides(BOT_TOKEN="<placeholder>")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "placeholder" in stderr.lower()
+
+
+def test_bot_token_real_value_allowed_in_dev() -> None:
+    """A real-looking BOT_TOKEN passes the dev placeholder guard and imports."""
+    env = _dev_env_overrides(BOT_TOKEN="123456789:ABCdefGHIjkl-MNO")
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ImproperlyConfigured" not in result.stderr
