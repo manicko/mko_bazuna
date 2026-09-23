@@ -78,8 +78,8 @@ class TestSchedulerConstants:
         ]
 
     def test_daily_commands_include_send_alerts(self) -> None:
-        """DAILY_COMMANDS must include send_alerts."""
-        assert DAILY_COMMANDS == ["send_alerts"]
+        """DAILY_COMMANDS must include send_alerts and rollup_daily_metrics."""
+        assert DAILY_COMMANDS == ["send_alerts", "rollup_daily_metrics"]
 
     def test_daily_hour_utc_is_8(self) -> None:
         """DAILY_HOUR_UTC must be 08:00 UTC per phase-02 spec."""
@@ -428,6 +428,16 @@ class TestValidateCommands:
 
         # Should not raise — all commands exist in the codebase
         _validate_commands(HOURLY_COMMANDS + DAILY_COMMANDS)
+
+    def test_rollup_daily_metrics_is_discoverable(self) -> None:
+        """``rollup_daily_metrics`` must be discoverable via get_commands().
+
+        Requires Django setup (provided by pytest-django).
+        """
+        from django.core.management import get_commands
+
+        available = get_commands()
+        assert "rollup_daily_metrics" in available
 
     def test_missing_command_raises(self) -> None:
         """A non-existent command name raises CommandError."""

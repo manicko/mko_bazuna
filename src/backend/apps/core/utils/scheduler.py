@@ -47,9 +47,10 @@ HOURLY_COMMANDS: list[str] = [
 
 # Daily at 08:00 UTC — first hourly tick >= 08:00 UTC each calendar day.
 # ``send_alerts`` is the search-alert delivery task; ``rollup_daily_metrics``
-# will be added here in a follow-up block (ENT-003).
+# is the daily analytics rollup (AdvisoryLockId.ROLLUP_DAILY_METRICS).
 DAILY_COMMANDS: list[str] = [
     "send_alerts",
+    "rollup_daily_metrics",
 ]
 
 # Daily threshold hour (UTC). Daily commands fire on the first hourly tick
