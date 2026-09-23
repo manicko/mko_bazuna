@@ -26,6 +26,7 @@ regexes = [
     '''test-secret-key-for-testing-only''',
     '''test-bot-token-for-testing''',
     '''test-admin-password''',
+    '''unpublished/withdrawn''',
 ]
 
 # allowlists: example env files containing only placeholder values.
