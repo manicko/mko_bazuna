@@ -67,6 +67,7 @@ class TestPurgeFailedAds:
         call_command("purge_failed_ads")
         assert Ad.objects.filter(pk=rejected.pk).exists()
 
+    @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
@@ -96,7 +97,7 @@ class TestPurgeFailedAds:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.purge_failed_ads.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 

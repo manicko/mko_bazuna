@@ -17,7 +17,6 @@ from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
-from apps.media.services.filesystem import delete_photo
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
 
@@ -86,11 +85,8 @@ class Command(BaseCommand):
                 # Delete users - CASCADE will handle their ads (and ad_images via ORM)
                 deleted_count, _ = queryset.delete()
 
-        # Delete physical media after the transaction commits. Filesystem
-        # deletions inside transaction.atomic() cannot be rolled back, so a DB
-        # rollback would orphan DB rows pointing to already-deleted files.
-        for storage_key in storage_keys:
-            delete_photo(storage_key)
+        # Physical media deletion is handled by the AdImage pre_delete signal
+        # via transaction.on_commit(), which runs after this transaction commits.
 
         logger.info(
             "Hard-deleted %d users (cascaded %d rows incl. ads/images) "

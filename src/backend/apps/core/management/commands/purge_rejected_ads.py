@@ -16,7 +16,6 @@ from django.utils import timezone
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
-from apps.media.services.filesystem import delete_photo
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +71,8 @@ class Command(BaseCommand):
                 # ModeratorActionLog.ad_id will be SET NULL due to on_delete=models.SET_NULL
                 deleted_count, _ = queryset.delete()
 
-        # Delete physical media after the transaction commits. Filesystem
-        # deletions inside transaction.atomic() cannot be rolled back, so a DB
-        # rollback would orphan DB rows pointing to already-deleted files.
-        for storage_key in storage_keys:
-            delete_photo(storage_key)
+        # Physical media deletion is handled by the AdImage pre_delete signal
+        # via transaction.on_commit(), which runs after this transaction commits.
 
         logger.info(
             "Deleted %d ads with REJECTED status older than 90 days. "

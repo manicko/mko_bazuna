@@ -182,6 +182,7 @@ class TestWithdrawConsentSoftDeletesAds:
         assert user.last_name == ""
         assert user.email == ""
 
+    @pytest.mark.django_db(transaction=True)
     def test_withdraw_returns_all_thumbnail_storage_keys(
         self, user: User, monkeypatch, category, city
     ):
@@ -211,7 +212,7 @@ class TestWithdrawConsentSoftDeletesAds:
         def _spy(key: str) -> None:
             deleted_keys.append(key)
 
-        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+        monkeypatch.setattr("apps.media.signals.delete_photo", _spy)
 
         result = withdraw_consent(user)
 
@@ -322,6 +323,7 @@ class TestWithdrawConsentAtomicity:
         assert user.telegram_id is not None  # not nulled (rolled back)
         assert user.consent_revoked_at is None
 
+    @pytest.mark.django_db(transaction=True)
     def test_withdraw_returns_storage_keys(
         self, user: User, monkeypatch, category, city
     ):
@@ -347,7 +349,7 @@ class TestWithdrawConsentAtomicity:
         def _spy(key: str) -> None:
             deleted_keys.append(key)
 
-        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+        monkeypatch.setattr("apps.media.signals.delete_photo", _spy)
 
         result = withdraw_consent(user)
 
@@ -406,7 +408,7 @@ class TestWithdrawConsentAtomicity:
         def _spy(key: str) -> None:
             called.append(key)
 
-        monkeypatch.setattr("apps.users.services.deletion.delete_photo", _spy)
+        monkeypatch.setattr("apps.media.signals.delete_photo", _spy)
 
         result = soft_delete_user_ads(user)
 

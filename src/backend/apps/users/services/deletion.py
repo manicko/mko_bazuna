@@ -23,7 +23,6 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
-from apps.media.services.filesystem import delete_photo
 from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
 
@@ -91,9 +90,10 @@ def withdraw_consent(user: User) -> list[str]:
 
     All DB mutations run inside ``transaction.atomic()`` so that a failure in
     any step rolls back LoginToken deletion, PII nulling, and ad soft-delete.
-    Filesystem deletions (``delete_photo``) are performed AFTER the transaction
-    commits, following the TX-then-Filesystem pattern. A rollback must never
-    remove files for rows that remain in the DB.
+    Physical media files are deleted after the transaction commits via the
+    AdImage pre_delete signal's ``on_commit`` callback, following the
+    TX-then-FS pattern. A rollback must never remove files for rows that
+    remain in the DB.
 
     Idempotency: if the user is already soft-deleted (``is_deleted=True``),
     the call is a no-op returning ``[]``.
@@ -154,12 +154,9 @@ def withdraw_consent(user: User) -> list[str]:
         # Soft-delete all user ads (DB-only: returns storage keys for FS cleanup)
         storage_keys = soft_delete_user_ads(user)
 
-    # Delete physical media files after the transaction commits. Filesystem
-    # deletions inside transaction.atomic() cannot be rolled back, so a DB
-    # rollback would orphan DB rows pointing to already-deleted files.
-    for storage_key in storage_keys:
-        delete_photo(storage_key)
-
+    # Storage keys returned for the caller's logging/inspection; physical
+    # file deletion is handled by the AdImage pre_delete signal via
+    # transaction.on_commit(), which runs after this transaction commits.
     logger.info("User %s withdrew consent - soft-delete triggered", user.id)
     return storage_keys
 

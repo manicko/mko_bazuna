@@ -74,6 +74,7 @@ class TestPurgeDeletedAds:
         call_command("purge_deleted_ads", "--dry-run")
         assert Ad.objects.filter(pk=old.pk).exists()
 
+    @pytest.mark.django_db(transaction=True)
     def test_purge_deleted_ads_media_cleanup(self, seller, category, city, monkeypatch):
 
         old = create_test_ad(
@@ -91,7 +92,7 @@ class TestPurgeDeletedAds:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.purge_deleted_ads.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 
@@ -100,6 +101,7 @@ class TestPurgeDeletedAds:
         assert "test-uuid-deleted.jpg" in deleted_keys
         assert not Ad.objects.filter(pk=old.pk).exists()
 
+    @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
@@ -129,7 +131,7 @@ class TestPurgeDeletedAds:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.purge_deleted_ads.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 

@@ -97,6 +97,7 @@ class TestSweepDrafts:
         call_command("sweep_drafts")
         assert Ad.objects.filter(status=AdStatus.PUBLISHED).count() == 1
 
+    @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
@@ -129,7 +130,7 @@ class TestSweepDrafts:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.sweep_drafts.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 

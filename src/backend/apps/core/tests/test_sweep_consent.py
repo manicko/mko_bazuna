@@ -81,6 +81,7 @@ class TestConsentHardDelete:
         call_command("consent_hard_delete")
         assert User.objects.filter(pk=seller.pk).exists()
 
+    @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
@@ -111,7 +112,7 @@ class TestConsentHardDelete:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.consent_hard_delete.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 
@@ -175,6 +176,7 @@ class TestConsentHardDelete:
         log.refresh_from_db()
         assert log.user_id == seller.pk
 
+    @pytest.mark.django_db(transaction=True)
     def test_log_reports_user_count_not_cascade_total(
         self, seller, category, city, monkeypatch, caplog
     ):
@@ -213,7 +215,7 @@ class TestConsentHardDelete:
             deleted_keys.append(key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.consent_hard_delete.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 

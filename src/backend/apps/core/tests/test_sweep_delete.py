@@ -88,6 +88,7 @@ class TestDeleteSweep:
         call_command("delete_sweep")
         assert not AdImage.objects.filter(pk=img.pk).exists()
 
+    @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
@@ -117,7 +118,7 @@ class TestDeleteSweep:
             deleted_keys.append(storage_key)
 
         monkeypatch.setattr(
-            "apps.core.management.commands.delete_sweep.delete_photo",
+            "apps.media.signals.delete_photo",
             _record,
         )
 
@@ -134,6 +135,7 @@ class TestDeleteSweep:
 class TestConcurrentSweep:
     """Concurrent-double-sweep tests verifying advisory lock serialization (DB-003)."""
 
+    @pytest.mark.django_db(transaction=True)
     def test_file_deletion_after_commit_not_inside_transaction(
         self, seller, category, city, monkeypatch
     ):
@@ -158,17 +160,23 @@ class TestConcurrentSweep:
         )
         AdImage.objects.create(ad=old, image="test-uuid.jpg")
 
-        def _raise(*args, **kwargs):
+        called: list[str] = []
+
+        def _raise(storage_key: str) -> None:
+            called.append(storage_key)
             raise RuntimeError("disk full")
 
         monkeypatch.setattr(
-            "apps.core.management.commands.delete_sweep.delete_photo",
+            "apps.media.signals.delete_photo",
             _raise,
         )
 
-        with pytest.raises(RuntimeError, match="disk full"):
-            call_command("delete_sweep")
+        # delete_photo raises inside the signal handler's try/except,
+        # which swallows the exception — the command does NOT propagate it.
+        call_command("delete_sweep")
 
         # DB rows are gone despite the file-deletion failure -> proves
         # delete_photo ran after the transaction committed.
         assert not Ad.objects.filter(pk=old.pk).exists()
+        # delete_photo was attempted (on_commit fired after commit).
+        assert called
