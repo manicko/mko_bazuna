@@ -145,6 +145,10 @@ RUN chmod +x /app/entrypoint*.sh
 COPY --chown=app:app docker/healthcheck-bot.sh /app/docker/
 RUN chmod +x /app/docker/healthcheck-bot.sh
 
+# Copy scheduler healthcheck script
+COPY --chown=app:app docker/healthcheck-scheduler.sh /app/docker/
+RUN chmod +x /app/docker/healthcheck-scheduler.sh
+
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

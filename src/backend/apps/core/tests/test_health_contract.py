@@ -21,6 +21,7 @@ container hardening:
 from __future__ import annotations
 
 import json
+import os
 from time import time as _time
 from unittest.mock import patch
 
@@ -29,6 +30,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.test import Client, override_settings
 from django.urls import reverse
+from ruamel.yaml import YAML
 
 pytestmark = [pytest.mark.unit]
 # BASE_DIR in settings points to src/ ; its parent is the repository root.
@@ -215,3 +217,44 @@ def test_web_compose_healthcheck_points_to_live() -> None:
     """docker-compose.yml web healthcheck curls /health/live/."""
     content = (_PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert "/health/live/" in content
+
+
+# ---------------------------------------------------------------------------
+# Scheduler healthcheck (ENT-004)
+# ---------------------------------------------------------------------------
+
+
+def test_scheduler_healthcheck_script_exists_and_is_executable() -> None:
+    """docker/healthcheck-scheduler.sh exists and is marked executable."""
+    path = _PROJECT_ROOT / "docker" / "healthcheck-scheduler.sh"
+    assert path.exists(), f"healthcheck script not found at {path}"
+    assert os.access(path, os.X_OK), (
+        f"{path} must be executable (chmod +x)"
+    )
+
+
+def test_scheduler_compose_has_healthcheck() -> None:
+    """docker-compose.prod.yml scheduler service has a healthcheck block.
+
+    Parses the YAML and asserts ``services.scheduler.healthcheck`` exists
+    and points to the scheduler healthcheck script.
+    """
+    yaml = YAML(typ="safe")
+    compose_path = _PROJECT_ROOT / "docker-compose.prod.yml"
+    with open(compose_path, encoding="utf-8") as fh:
+        data = yaml.load(fh)
+    assert data is not None
+    assert "services" in data
+    assert "scheduler" in data["services"]
+    scheduler = data["services"]["scheduler"]
+    assert "healthcheck" in scheduler
+    # The healthcheck test command must reference the scheduler script
+    test_cmd = scheduler["healthcheck"]["test"]
+    assert isinstance(test_cmd, list)
+    assert "/app/docker/healthcheck-scheduler.sh" in test_cmd
+
+
+def test_scheduler_compose_has_stale_seconds() -> None:
+    """docker-compose.prod.yml sets SCHEDULER_HEALTH_STALE_SECONDS=7200."""
+    content = (_PROJECT_ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
+    assert "SCHEDULER_HEALTH_STALE_SECONDS=7200" in content
