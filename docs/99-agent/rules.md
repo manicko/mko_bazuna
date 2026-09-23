@@ -172,7 +172,7 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 | `typecheck` | Type checking | `uv sync` → `basedpyright .` |
 | `lint-templates` | Template linting | `uv sync` → `djlint templates/` |
 | `i18n` | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
-| `security` | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload |
+| `security` | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
 | `deploy-check` | Production deploy gate | `check --deploy --fail-level WARNING` against `config.settings.prod` with all required env vars (blocking) |
 
 - The `test` job in CI runs `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).

@@ -16,6 +16,7 @@ A Telegram-driven classifieds board (Avito-like) with a Django website. Sellers 
 - **Test (fresh schema):** `make test-recreate` (`--no-reuse-db --create-db`).
 - **Lint:** `uv run ruff check <path>` · **Auto-fix:** `uv run ruff check --fix <path>`
 - **Typecheck:** `uv run basedpyright <path>`
+- **Pre-commit:** `pre-commit install` after cloning to enable commit-time `gitleaks protect` secret scanning (config in `.pre-commit-config.yaml`; auto-discovers `.gitleaks.toml`)
 - **Add dep:** `uv add <package>`
 
 ## Core Context
