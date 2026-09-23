@@ -62,6 +62,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       BOT_TOKEN: ${BOT_TOKEN}
+      DJANGO_BUILD: "1"
     env_file:
       - .env.dev
     volumes:
@@ -96,6 +97,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       BOT_TOKEN: ${BOT_TOKEN}
+      DJANGO_BUILD: "1"
       REDIS_URL: redis://redis:6379/0
     env_file:
       - .env.dev
@@ -131,6 +133,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set}
       BOT_TOKEN: ${BOT_TOKEN}
+      DJANGO_BUILD: "1"
       REDIS_URL: redis://redis:6379/0
     env_file:
       - .env.dev
@@ -166,6 +169,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID:--1}
+      - DJANGO_BUILD=1
     env_file:
       - .env.dev
     volumes:
@@ -201,6 +205,7 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - SEED_USERS=${SEED_USERS:-10}
       - SEED_ADS=${SEED_ADS:-600}
+      - DJANGO_BUILD=1
       - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env.dev

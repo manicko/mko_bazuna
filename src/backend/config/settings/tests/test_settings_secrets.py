@@ -259,3 +259,38 @@ def test_bot_token_real_value_allowed_in_dev() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "ImproperlyConfigured" not in result.stderr
+
+
+def test_prod_bot_token_rejects_placeholder() -> None:
+    """BOT_TOKEN placeholder (<...>) is rejected when importing prod settings."""
+    env = _prod_env_overrides(BOT_TOKEN="<your-bot-token-from-botfather>")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "BOT_TOKEN" in stderr
+
+
+def test_prod_google_translate_api_key_rejects_placeholder() -> None:
+    """GOOGLE_TRANSLATE_API_KEY placeholder (<...>) is rejected when importing
+    prod settings.
+    """
+    env = _prod_env_overrides(
+        GOOGLE_TRANSLATE_API_KEY="<your-google-cloud-translation-api-key>"
+    )
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "GOOGLE_TRANSLATE_API_KEY" in stderr
+
+
+def test_prod_bot_token_rejects_dev_only_dummy() -> None:
+    """BOT_TOKEN with 'dev-only-dummy' sentinel is rejected in prod settings."""
+    env = _prod_env_overrides(BOT_TOKEN="dev-only-dummy-key-not-for-production")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "dummy" in stderr.lower()
+
+
+def test_prod_bot_token_accepts_real_token() -> None:
+    """A real-format BOT_TOKEN passes prod placeholder validation."""
+    env = _prod_env_overrides(BOT_TOKEN="123456789:ABCdefGHIjkl-MNO")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" not in stderr

@@ -103,10 +103,10 @@ def _validate_production_secret(var_name: str, value: str) -> None:
     Raises ImproperlyConfigured with a value-free message naming the env var
     and remediation guidance. Does NOT log the value itself.
     """
-    if var_name == "DJANGO_SECRET_KEY" and "dev-only-dummy" in value:
+    if "dev-only-dummy" in value:
         raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY appears to use a dev-only dummy value. "
-            "Provide a real key via the .env.prod runtime file."
+            f"{var_name} appears to use a dev-only dummy value. "
+            "Provide a real value via the .env.prod runtime file."
         )
     if _SECRET_PLACEHOLDER_RE.match(value):
         raise ImproperlyConfigured(
@@ -131,27 +131,31 @@ if not os.getenv("DJANGO_BUILD"):
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
-# Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds with
-# placeholder values; the real token is provided at runtime via .env.prod.
-# Truthiness-only guard: placeholder rejection is intentionally NOT extended
-# here or to GOOGLE_TRANSLATE_API_KEY (see scoping decision in plan 30 §3.2.1)
-# — dev one-shot services (migrate/load_cities/load_catalog) run with
-# config.settings.prod and are fed placeholder tokens via docker-compose.
+# Skip during Docker build and one-shot services (DJANGO_BUILD=1) so
+# collectstatic and bootstrap commands succeed with placeholder values;
+# the real token is provided at runtime via .env.prod. One-shot services
+# set DJANGO_BUILD=1 in docker-compose.yml to bypass prod validation.
 if not os.getenv("DJANGO_BUILD"):
     if not BOT_TOKEN:  # noqa: F405
         raise ImproperlyConfigured(
             "BOT_TOKEN must be set in production. "
             "Provide it via the .env.prod runtime file."
         )
+    _validate_production_secret("BOT_TOKEN", BOT_TOKEN)  # noqa: F405
 
 # Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
-# Skip during Docker build (DJANGO_BUILD=1) so collectstatic succeeds.
+# Skip during Docker build and one-shot services (DJANGO_BUILD=1) so
+# bootstrap commands succeed with placeholder values; the real key is
+# provided at runtime via .env.prod.
 if not os.getenv("DJANGO_BUILD"):
     if not GOOGLE_TRANSLATE_API_KEY:  # noqa: F405
         raise ImproperlyConfigured(
             "GOOGLE_TRANSLATE_API_KEY must be set in production. "
             "Provide it via the .env.prod runtime file."
         )
+    _validate_production_secret(
+        "GOOGLE_TRANSLATE_API_KEY", GOOGLE_TRANSLATE_API_KEY  # noqa: F405
+    )
 
 # SITE_URL is required in production so Telegram alert links are absolute and
 # correct. A dev-only default must not silently leak into prod traffic.
