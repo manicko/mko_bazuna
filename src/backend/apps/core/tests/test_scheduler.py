@@ -536,7 +536,7 @@ class TestDispatchIsolation:
         assert result == 0
 
     def test_dispatch_logs_on_exception(self, caplog: pytest.LogCaptureFixture) -> None:
-        """_dispatch logs at DEBUG level on exception."""
+        """_dispatch logs at ERROR level via logger.exception on exception."""
         from apps.core.utils.scheduler import _dispatch
 
         def crashing_command(_name: str) -> int:

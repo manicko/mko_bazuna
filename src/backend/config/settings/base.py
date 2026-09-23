@@ -279,6 +279,17 @@ BOT_HEALTH_STALE_SECONDS = env.int("BOT_HEALTH_STALE_SECONDS", default=120)
 # always True so the web container reports Not Ready when the bot is stuck.
 BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=True)
 
+# File-based liveness marker path for the scheduler container healthcheck.
+# Written after each successful hourly cycle, touched on each tick.
+# Read by docker/healthcheck-scheduler.sh (added in Block D).
+SCHEDULER_LIVENESS_FILE = env("SCHEDULER_LIVENESS_FILE",
+   default="/tmp/mko_bazuna_scheduler_alive")
+
+# Staleness window for the scheduler liveness marker (seconds).
+# Must be > SCHEDULE_INTERVAL_SECONDS (3600) to avoid false negatives.
+# 7200 = 2x the hourly cycle, allowing one missed cycle before healthcheck fails.
+SCHEDULER_HEALTH_STALE_SECONDS = env.int("SCHEDULER_HEALTH_STALE_SECONDS", default=7200)
+
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.

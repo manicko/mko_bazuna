@@ -125,8 +125,10 @@ def _run_command_subprocess(name: str, manage_py: Path, python_executable: str) 
     Structured logging and exit-code inspection are added in Block B.
     """
     cmd = [python_executable, str(manage_py), name]
-    logger.debug("Running %s", " ".join(cmd))
+    logger.info("Running management command: %s", name)
     result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        logger.error("Command %s exited with code %d", name, result.returncode)
     return result.returncode
 
 
@@ -145,8 +147,26 @@ def _dispatch(
     try:
         return run_command(cmd)
     except Exception:
-        logger.debug("Failed to dispatch command %s", cmd, exc_info=True)
+        logger.exception("Failed to dispatch command %s", cmd)
         return 1
+
+
+def _write_liveness_marker() -> None:
+    """Write the scheduler liveness marker file (for Docker healthcheck).
+
+    Fail-open: if the marker path is empty or the write fails, log at debug
+    level and continue — the scheduler must never crash on a healthcheck concern.
+    """
+    from django.conf import settings
+
+    marker = getattr(settings, "SCHEDULER_LIVENESS_FILE", "")
+    if not marker:
+        return
+    try:
+        Path(marker).touch()
+        logger.debug("Scheduler liveness marker updated: %s", marker)
+    except OSError as exc:
+        logger.debug("Could not update scheduler liveness marker %s: %s", marker, exc)
 
 
 def run_one_cycle(
@@ -177,6 +197,10 @@ def run_one_cycle(
     # Hourly commands — run every tick
     for cmd in HOURLY_COMMANDS:
         _dispatch(cmd, run_command)
+
+    # Write liveness marker after hourly cycle completes (before daily section).
+    # Fail-open: if the path is empty or the write fails, the scheduler continues.
+    _write_liveness_marker()
 
     # Daily commands — once per calendar day at/after 08:00 UTC
     new_last_daily = last_daily
@@ -244,7 +268,7 @@ def run_scheduler(
                 last_daily=last_daily,
             )
         except Exception:
-            logger.debug("Scheduler cycle failed — continuing", exc_info=True)
+            logger.exception("Scheduler cycle failed — continuing")
         sleep_func(interval_seconds)
 
 

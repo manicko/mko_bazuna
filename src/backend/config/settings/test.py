@@ -55,6 +55,9 @@ BOT_LIVENESS_FILE = ""  # noqa: F405
 # 503 every readiness check without this override.
 BOT_HEALTH_CHECK_ENABLED = False  # noqa: F405
 
+# Disable scheduler liveness marker in tests (no scheduler process runs in tests).
+SCHEDULER_LIVENESS_FILE = ""  # noqa: F405
+
 # Faster password hasher for tests
 PASSWORD_HASHERS = [  # noqa: F405
     "django.contrib.auth.hashers.MD5PasswordHasher",
