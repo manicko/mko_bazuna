@@ -113,8 +113,9 @@ All retention values are hardcoded in the respective management command source f
 
 ## Scheduler
 
-All sweep commands run hourly via the `scheduler` service
-(`entrypoint-scheduler.sh`), which loops every hour and executes each sweep.
+All sweep commands run hourly via the `scheduler` service, which dispatches
+them through the extracted module `apps.core.utils.scheduler`
+(`python -m apps.core.utils.scheduler`, invoked by `entrypoint-scheduler.sh`).
 The scheduler depends on `load_catalog` completing successfully (via `depends_on:
 condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`).
 Each command is individually advisory-locked, so concurrent container restarts

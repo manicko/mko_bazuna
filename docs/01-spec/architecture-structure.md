@@ -231,7 +231,12 @@ Volumes: `postgres_data`, `media_volume`. Static files baked into image via whit
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile scheduler up -d
 ```
 
-The scheduler runs all sweep commands hourly: `archive_sweep`, `delete_sweep`, `consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`, `cleanup_login_tokens`, `purge_failed_ads`, `purge_rejected_ads`.
+The scheduler runs 9 hourly sweep commands (`archive_sweep`, `delete_sweep`,
+`consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`, `cleanup_login_tokens`,
+`purge_failed_ads`, `purge_rejected_ads`, `purge_deleted_ads`) plus 2 daily commands
+(`send_alerts`, `rollup_daily_metrics` — both fire at 08:00 UTC on the first hourly tick
+at or after that hour) via the extracted module `apps.core.utils.scheduler`
+(`python -m apps.core.utils.scheduler`), invoked by `entrypoint-scheduler.sh`.
 The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`).
 
 **Systemd alternative (bare metal):**
@@ -244,14 +249,10 @@ After=postgresql.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/mko-bazuna
-ExecStart=/opt/venv/bin/python manage.py shell -c "
-import time, sys, subprocess;
-commands = ['archive_sweep', 'delete_sweep', 'consent_hard_delete', 'sweep_drafts', 'sweep_orphaned_media', 'cleanup_login_tokens', 'purge_failed_ads', 'purge_rejected_ads', 'purge_deleted_ads'];
-while True:
-    for cmd in commands: subprocess.run([sys.executable, 'manage.py', cmd]);
-    time.sleep(3600)
-"
+WorkingDirectory=/opt/mko-bazuna/src/backend
+# The scheduler loop lives in apps/core/utils/scheduler.py and is invoked via
+# the module entry point, mirroring the Docker entrypoint-scheduler.sh.
+ExecStart=/opt/venv/bin/python -m apps.core.utils.scheduler
 Restart=always
 
 [Install]
@@ -266,17 +267,22 @@ WantedBy=multi-user.target
 5  * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py delete_sweep
 10 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py consent_hard_delete
 15 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py sweep_drafts
-20 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py cleanup_login_tokens
-25 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_failed_ads
-30 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_rejected_ads
+20 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py sweep_orphaned_media
+25 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py cleanup_login_tokens
+30 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_failed_ads
+35 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_rejected_ads
+40 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_deleted_ads
+# Daily commands at 08:00 UTC
+0 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py send_alerts
+5 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py rollup_daily_metrics
 ```
 
 ### Scheduled-job concurrency (advisory locks)
 
-All seven sweep commands — and the once-only `migrate` step — run against the same
-shared PostgreSQL database as the live web and bot processes. To prevent concurrent
-sweeps (or a sweep and a migration) from colliding on the same rows, every command
-acquires a **transaction-scoped PostgreSQL advisory lock**
+All nine hourly sweep commands (plus the two daily commands and the once-only `migrate`
+step) — run against the same shared PostgreSQL database as the live web and bot
+processes. To prevent concurrent sweeps (or a sweep and a migration) from colliding on
+the same rows, every command acquires a **transaction-scoped PostgreSQL advisory lock**
 (`apps.core.utils.advisory_lock`, `pg_advisory_xact_lock`) before doing its work. The
 lock is released automatically on transaction commit/rollback, so it is safe under
 PgBouncer transaction pooling. The `migrate` step instead uses a **session-scoped** lock

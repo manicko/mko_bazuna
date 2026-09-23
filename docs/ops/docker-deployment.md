@@ -612,9 +612,17 @@ make test-db    # recreates test DB under mko-bazuna-test
 ### Scheduler Service (Production)
 
 The scheduler is a production service (`--profile scheduler`) defined in
-`docker-compose.yml` and `docker-compose.prod.yml`. It runs all seven sweep commands
-hourly in a loop via `entrypoint-scheduler.sh`. The scheduler depends on `load_catalog`
+`docker-compose.yml` and `docker-compose.prod.yml`. It runs **9 hourly sweep
+commands + 2 daily commands** in a loop. The dispatch logic is implemented by the
+extracted module `apps.core.utils.scheduler` (`src/backend/apps/core/utils/scheduler.py`),
+invoked via `python -m apps.core.utils.scheduler` from
+`docker/entrypoint-scheduler.sh` (which delegates to `main()`). The scheduler depends on `load_catalog`
 completing successfully (`depends_on: condition: service_completed_successfully`).
+
+In `docker-compose.prod.yml` the scheduler service uses `image:` (a pre-built image
+from the registry) instead of `build:`, matching every other production service. The
+healthcheck script `docker/healthcheck-scheduler.sh` is COPY'd into the image by the
+Dockerfile and is referenced by the `healthcheck:` block on the scheduler service.
 
 | Task | Purpose | Schedule |
 |------|---------|----------|
@@ -627,6 +635,25 @@ completing successfully (`depends_on: condition: service_completed_successfully`
 | `purge_failed_ads` | Delete failed moderation ads (7 days) | Hourly |
 | `purge_rejected_ads` | Delete rejected ads (90 days) | Hourly |
 | `purge_deleted_ads` | Purge soft-deleted ads (120 days) | Hourly |
+| `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC |
+| `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
+
+### Scheduler Healthcheck
+
+The scheduler container is monitored by `docker/healthcheck-scheduler.sh`
+(`docker-compose.prod.yml` `healthcheck:` block, interval 30s). It performs three
+checks:
+
+1. **PID 1 alive** — `kill -0 1`
+2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
+   `/tmp/mko_bazuna_scheduler_alive`), written by `apps.core.utils.scheduler` after
+   each hourly cycle completes via `settings.SCHEDULER_LIVENESS_FILE`
+3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (default `7200` in
+   `base.py`, set to `7200` on the prod scheduler service), the marker's mtime must be
+   within that window (detects retry-loop / stuck scheduler)
+
+In test settings, `SCHEDULER_LIVENESS_FILE = ""` disables the marker so the scheduler
+loop never blocks on file writes during testing.
 
 ### Running Sweeps
 

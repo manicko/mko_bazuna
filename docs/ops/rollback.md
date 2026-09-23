@@ -58,7 +58,11 @@ failure escalation.
   timestamp) on startup and on every inbound update via `LivenessMiddleware` in
   `telegram_bot/lifecycle.py` (OPS-003). The web readiness probe reads this Redis
   key (gated by `BOT_HEALTH_CHECK_ENABLED`, default `True`) to verify the bot is alive
-  and fresh. Validation must confirm both before declaring a rollback successful.
+  and fresh. The scheduler container's healthcheck (`docker/healthcheck-scheduler.sh`)
+  verifies PID 1 liveness, the scheduler readiness marker file
+  (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`), and optional
+  freshness via `SCHEDULER_HEALTH_STALE_SECONDS` (default `7200`). Validation must
+  confirm all three before declaring a rollback successful.
 
 > **Note on health endpoints:** Finding 12-OPS-002 has been completed — the
 > container-level `HEALTHCHECK` now uses `/health/live/` (dependency-free liveness).
@@ -72,7 +76,7 @@ failure escalation.
 | Image tag | Change `IMAGE_TAG` in `.env.prod`, re-deploy | Low |
 | Config | `git checkout .env.prod` to pinned commit, re-deploy | Low |
 | Schema | `migrate <app> <previous_migration>` + data backfill | High |
-| Health | Liveness: `/health/live/` · Readiness: `/health/ready/` (incl. Redis `bot:liveness`) | — (validation) |
+| Health | Liveness: `/health/live/` · Readiness: `/health/ready/` (incl. Redis `bot:liveness`, scheduler marker via `healthcheck-scheduler.sh`) | — (validation) |
 
 ## Prerequisites
 
@@ -387,6 +391,47 @@ docker compose --env-file .env.prod \
   exec bot stat -c '%Y %n' /tmp/mko_bazuna_bot_alive
 ```
 
+### Scheduler — container healthcheck
+
+The scheduler container's healthcheck runs `docker/healthcheck-scheduler.sh`
+(defined in the `scheduler` service `healthcheck:` block of `docker-compose.prod.yml`,
+interval 30s). It performs three checks against the file-based marker:
+
+1. **PID 1 alive** — `kill -0 1`
+2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
+   `/tmp/mko_bazuna_scheduler_alive`), written by `apps.core.utils.scheduler` after
+   each hourly cycle completes (via `settings.SCHEDULER_LIVENESS_FILE`)
+3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (default `7200` in
+   `base.py`, set to `7200` on the prod scheduler service), the marker's mtime must be
+   within that window (detects retry-loop / stuck scheduler)
+
+> **Note:** The scheduler runs every hour, so `SCHEDULER_HEALTH_STALE_SECONDS` must be
+> greater than the hourly cycle (3600 s). The default of 7200 s allows one missed cycle
+> before the healthcheck reports failure.
+
+Verify scheduler health via Docker:
+
+```bash
+docker compose --env-file .env.prod \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  ps scheduler
+
+# Look for "healthy" in the "State" column
+```
+
+Inspect the marker file directly:
+
+```bash
+docker compose --env-file .env.prod \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  exec scheduler ls -la /tmp/mko_bazuna_scheduler_alive
+
+# Check freshness (marker mtime within SCHEDULER_HEALTH_STALE_SECONDS)
+docker compose --env-file .env.prod \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  exec scheduler stat -c '%Y %n' /tmp/mko_bazuna_scheduler_alive
+```
+
 ### Validation checklist
 
 | Service | Check | Expected | Command |
@@ -397,6 +442,8 @@ docker compose --env-file .env.prod \
 | bot | Container healthcheck | `healthy` state | `docker compose ps bot` |
 | bot | Marker freshness | mtime within `BOT_HEALTH_STALE_SECONDS` | `stat -c %Y /tmp/mko_bazuna_bot_alive` |
 | bot | Redis liveness marker | `bot:liveness` key fresh in Redis | `docker compose exec bot python -c "from django.core.cache import cache; print(cache.get('bot:liveness'))"` |
+| scheduler | Container healthcheck | `healthy` state | `docker compose ps scheduler` |
+| scheduler | Marker freshness | mtime within `SCHEDULER_HEALTH_STALE_SECONDS` | `stat -c %Y /tmp/mko_bazuna_scheduler_alive` |
 | db | PostgreSQL healthy | `pg_isready` succeeds | `docker compose ps db` |
 | redis | Redis healthy | `redis-cli ping` → `PONG` | `docker compose ps redis` |
 
@@ -587,6 +634,8 @@ Use this table to select the rollback dimension based on the failure mode:
   (`graceful_timeout = 30`, `timeout = 60`, `preload_app = True`)
 - [docker/healthcheck-bot.sh](../../docker/healthcheck-bot.sh) — bot healthcheck
   script
+- [docker/healthcheck-scheduler.sh](../../docker/healthcheck-scheduler.sh) — scheduler
+  healthcheck script
 - [Finding 12-OPS-007](../../.ai/audit/12-production-ops/findings.md) — rollback runbook (this document)
 - [Finding 12-OPS-005](../../.ai/audit/12-production-ops/findings.md) — deploy workflow (`deploy.yml`, health-check gating)
 - [Finding 12-OPS-002](../../.ai/audit/12-production-ops/findings.md) — healthcheck endpoint changed to `/health/live/`

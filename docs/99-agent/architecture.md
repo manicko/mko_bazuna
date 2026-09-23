@@ -18,7 +18,19 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 - **Fixed values:** `StrEnum` only — never plain strings/dicts/lists for constants.
 - **Small modules and functions:** Modules, services, components, and functions must be small and focused on one thing.
-- **Two processes, one DB:** Web gunicorn WSGI + Telegram bot share one Django project + PostgreSQL. Migrations run exactly once before both processes start. Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write two liveness markers: a file-based marker (`/tmp/mko_bazuna_bot_alive`) consumed by the file-based `healthcheck-bot.sh` (process + marker freshness), and a Redis-based `bot:liveness` key (epoch timestamp) consumed by the web `/health/ready/` readiness probe via `BOT_HEALTH_CHECK_ENABLED` / `BOT_HEALTH_STALE_SECONDS` (OPS-003).
+- **Two processes, one DB (+ scheduler service):** Web gunicorn WSGI + Telegram bot share
+  one Django project + PostgreSQL. Migrations run exactly once before all processes start.
+  Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write two liveness markers: a file-based
+  marker (`/tmp/mko_bazuna_bot_alive`) consumed by the file-based `healthcheck-bot.sh`
+  (process + marker freshness), and a Redis-based `bot:liveness` key (epoch timestamp)
+  consumed by the web `/health/ready/` readiness probe via `BOT_HEALTH_CHECK_ENABLED` /
+  `BOT_HEALTH_STALE_SECONDS` (OPS-003). The scheduler service (gated by
+  `profiles: ["scheduler"]`) runs the hourly sweeps + daily jobs via the extracted module
+  `apps.core.utils.scheduler` (`python -m apps.core.utils.scheduler` from
+  `docker/entrypoint-scheduler.sh`); it writes a file-based liveness marker
+  (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`) after each hourly
+  cycle, consumed by `healthcheck-scheduler.sh` with staleness governed by
+  `SCHEDULER_HEALTH_STALE_SECONDS` (default `7200`).
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
