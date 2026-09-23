@@ -1,11 +1,12 @@
 """
-Scheduler wiring test — verifies that ``sweep_orphaned_media`` is registered
-in the hourly command list of ``docker/entrypoint-scheduler.sh``.
+Scheduler wiring test — verifies that ``docker/entrypoint-scheduler.sh`` calls
+the importable ``apps.core.utils.scheduler`` module (ENT-006) instead of an
+inline ``python -c`` block.
 
 This is a static configuration test (no database interaction): if someone
-adds the command to the scheduler rotation but forgets to wire it into
-``entrypoint-scheduler.sh``, the hourly sweep never runs and orphaned media
-files accumulate indefinitely.
+refactors the scheduler script but forgets to point it at the canonical
+module, the entrypoint would diverge from the tested, coverage-instrumented
+code path.
 """
 
 from __future__ import annotations
@@ -24,14 +25,21 @@ _SCHEDULER_SCRIPT = settings.BASE_DIR.parent / "docker" / "entrypoint-scheduler.
 
 
 class TestSchedulerWiring:
-    """Verify scheduled commands are present in entrypoint-scheduler.sh."""
+    """Verify the entrypoint delegates to the scheduler Python module."""
 
-    def test_sweep_orphaned_media_in_hourly_commands(self) -> None:
-        """``sweep_orphaned_media`` must appear in the hourly_commands list."""
+    def test_entrypoint_invokes_scheduler_module(self) -> None:
+        """entrypoint-scheduler.sh must call ``python -m apps.core.utils.scheduler``."""
         content = Path(_SCHEDULER_SCRIPT).read_text(encoding="utf-8")
+        assert "apps.core.utils.scheduler" in content
 
-        # The command must be present inside the hourly_commands list,
-        # not just somewhere in the file.
-        assert "'sweep_orphaned_media'" in content
-        assert "hourly_commands" in content
-        assert "sweep_orphaned_media" in content
+    def test_entrypoint_no_longer_uses_inline_python_c(self) -> None:
+        """The inline ``python -c`` block must be gone."""
+        content = Path(_SCHEDULER_SCRIPT).read_text(encoding="utf-8")
+        assert 'python -c "' not in content
+        assert "hourly_commands" not in content
+        assert "daily_commands" not in content
+
+    def test_entrypoint_uses_exec(self) -> None:
+        """The scheduler module is launched via ``exec`` (PID 1 signal handling)."""
+        content = Path(_SCHEDULER_SCRIPT).read_text(encoding="utf-8")
+        assert "exec" in content
