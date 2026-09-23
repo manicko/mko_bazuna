@@ -1,0 +1,28 @@
+# Pre-commit hooks for Mko Bazuna
+#
+# This config provides commit-time prevention for secret leakage, complementing
+# the CI gitleaks detect scan (which runs post-commit and is too late to prevent
+# history contamination).
+#
+# Install (required for contributors):
+#   pip install pre-commit
+#   pre-commit install           # installs git hooks in .git/hooks/
+#   pre-commit autoupdate        # keep hook versions current
+#
+# Gitleaks auto-discovers .gitleaks.toml (no --config flag needed).
+# The hook uses `gitleaks protect` (the dedicated pre-commit mode) which
+# scans staged changes and respects the allowlist in .gitleaks.toml.
+#
+# Requires: gitleaks v8.27.2+ (matches CI minimum)
+
+repos:
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+        entry: gitleaks protect --verbose --
+        language: system
+        pass_filenames: false
+        stages: [commit]
+        # Gitleaks protect scans staged content against .gitleaks.toml.
+        # If it finds a leak, the commit is rejected.
