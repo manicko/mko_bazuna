@@ -1,8 +1,9 @@
 """
-Rate limiting utility for search autocomplete.
+Rate limiting utility for search endpoints (autocomplete and search).
 
 Uses Django's cache framework with atomic increment to enforce
-a per-IP request limit within a sliding time window.
+a per-IP request limit within a sliding time window. Each consumer
+uses an independent ``namespace`` so their counters do not interfere.
 """
 
 import logging
@@ -13,17 +14,20 @@ from django.http import HttpRequest
 
 logger = logging.getLogger(__name__)
 
-# Maximum number of autocomplete requests per IP within the time window.
+# Maximum number of requests per IP within the time window.
 RATE_LIMIT_REQUESTS: Final[int] = 30
 
 # Time window in seconds.
 RATE_LIMIT_PERIOD: Final[int] = 60
 
-# Cache key pattern — {ip} is replaced with the client's IP address.
-_RATE_LIMIT_KEY_PATTERN: Final[str] = "autocomplete_rl:{ip}"
+# Cache key pattern — {namespace} and {ip} are replaced with the rate-limit
+# namespace and the client's IP address respectively.
+_RATE_LIMIT_KEY_PATTERN: Final[str] = "{namespace}_rl:{ip}"
 
 
-def rate_limit_check(request: HttpRequest) -> bool:
+def rate_limit_check(
+    request: HttpRequest, *, namespace: str = "autocomplete"
+) -> bool:
     """
     Check whether the given request is within the rate limit.
 
@@ -32,14 +36,18 @@ def rate_limit_check(request: HttpRequest) -> bool:
     increment on each subsequent request.  Returns ``True`` if the
     request is allowed, ``False`` if the caller has exceeded the limit.
 
+    Each caller passes a distinct ``namespace`` so that autocomplete and
+    search keep independent per-IP counters (default ``autocomplete``).
+
     Args:
         request: The incoming HTTP request.
+        namespace: The rate-limit namespace (defaults to ``autocomplete``).
 
     Returns:
         ``True`` if the request may proceed, ``False`` if rate-limited.
     """
     ip = _get_client_ip(request)
-    key = _RATE_LIMIT_KEY_PATTERN.format(ip=ip)
+    key = _RATE_LIMIT_KEY_PATTERN.format(namespace=namespace, ip=ip)
 
     try:
         # cache.add returns True if the key was created (first request).

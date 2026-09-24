@@ -15,6 +15,7 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 from unittest.mock import patch
 
 import pytest
+from django.core.cache import cache
 from django.test import Client
 
 from apps.ads.models import Ad
@@ -818,3 +819,72 @@ class TestSearchViewTotalCount:
         # True count via the reused FTS queryset, not capped
         assert response.context["total_count"] == num_ads
         assert response.context["results_truncated"] is True
+
+
+class TestSearchViewRateLimit:
+    """The /search/ endpoint is rate-limited per-IP (SRH-006)."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_rate_limit(self) -> None:
+        """Clear the rate-limit cache before each test to prevent state bleed.
+
+        The rate limiter keys on the client IP (127.0.0.1 in tests) and
+        uses the ``search`` namespace, so an exhausted counter would reject
+        every subsequent endpoint test with 429.
+        """
+        cache.clear()
+
+    def test_search_returns_429_after_threshold(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """After exceeding the per-IP limit, /search/ returns HTTP 429."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        # Make 30+ requests (the rate limit) to the search endpoint.
+        for i in range(31):
+            response = client.get("/search/?q=велосипед&lang=ru")
+            if i < 30:
+                assert response.status_code == 200, (
+                    f"Request {i} should be allowed"
+                )
+            else:
+                assert response.status_code == 429, (
+                    f"Request {i} should be rate limited"
+                )
+                assert response.json()["error"] == "rate_limit"
+
+    def test_search_and_autocomplete_use_independent_counters(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """Exhausting the search counter does not rate-limit autocomplete."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        # Exhaust the search counter (30 requests).
+        for _ in range(30):
+            client.get("/search/?q=велосипед&lang=ru")
+        # The 31st search is rejected...
+        assert client.get("/search/?q=велосипед&lang=ru").status_code == 429
+
+        # ...but autocomplete (a different namespace) still succeeds.
+        response = client.get("/api/search/autocomplete", {"q": "вел"})
+        assert response.status_code == 200

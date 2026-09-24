@@ -15,7 +15,7 @@ from typing import Final
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
 from django.db.models import Case, F, IntegerField, QuerySet, When
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
@@ -31,6 +31,7 @@ from apps.search.services.cache import (
     get_cached_search_ids,
 )
 from apps.search.services.popular_search import increment_popular_search
+from apps.search.services.rate_limit import rate_limit_check
 from apps.search.services.search_history import record_search_history
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,9 @@ def search(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered search results page (full or HTMX partial)
     """
+    if not rate_limit_check(request, namespace="search"):
+        return JsonResponse({"error": "rate_limit"}, status=429)
+
     query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
 
     # City filter (by slug). An explicit URL city (``request.current_city``,
