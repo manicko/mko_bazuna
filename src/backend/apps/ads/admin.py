@@ -32,11 +32,11 @@ def user_link(obj: Ad) -> str:
     ``transaction.atomic()``.
     """
     if obj.user:
-        return str(obj.user.telegram_id)
+        return str(obj.user)
     return "-"
 
 
-user_link.short_description = "User (telegram_id)"  # type: ignore[attr-defined]
+user_link.short_description = "User ID"  # type: ignore[attr-defined]
 
 
 def rejected_reason(obj: Ad) -> str:

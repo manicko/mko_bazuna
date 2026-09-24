@@ -6,6 +6,7 @@ Custom admin with restricted access and consents visibility.
 
 from django.contrib import admin
 
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.services import withdraw_consent
 
@@ -107,7 +108,13 @@ class LoginTokenAdmin(admin.ModelAdmin):
     LoginToken admin for debugging authentication flows.
     """
 
-    list_display = ["id", "telegram_id", "created_at", "expires_at", "consumed_at"]
+    list_display = [
+        "id",
+        "telegram_id_display",
+        "created_at",
+        "expires_at",
+        "consumed_at",
+    ]
     list_filter = ["consumed_at"]
     search_fields = ["telegram_id"]
     readonly_fields = [
@@ -117,6 +124,11 @@ class LoginTokenAdmin(admin.ModelAdmin):
         "expires_at",
         "consumed_at",
     ]
+
+    @admin.display(description="Telegram ID (masked)", ordering="telegram_id")
+    def telegram_id_display(self, obj: LoginToken) -> str:
+        """Display the masked Telegram ID of the token claimer (PII-001/VAL-001)."""
+        return mask_telegram_id(obj.telegram_id)
 
     def has_add_permission(self, request) -> bool:
         return False

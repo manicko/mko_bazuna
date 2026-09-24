@@ -31,10 +31,10 @@ class AnalyticsEventAdmin(admin.ModelAdmin):
     def user_link(self, obj):
         """Display user telegram_id if available."""
         if obj.user:
-            return str(obj.user.telegram_id)
+            return str(obj.user)
         return "-"
 
-    user_link.short_description = "User (telegram_id)"  # type: ignore[attr-defined]
+    user_link.short_description = "User ID"  # type: ignore[attr-defined]
 
     def has_add_permission(self, request):
         """Events are created programmatically, not via admin."""

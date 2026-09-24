@@ -20,11 +20,11 @@ log_ad_link.short_description = "Ad ID"  # type: ignore[attr-defined]
 def log_user_link(obj: ModeratorActionLog) -> str:
     """Display user telegram_id if available."""
     if obj.user:
-        return str(obj.user.telegram_id)
+        return str(obj.user)
     return "-"
 
 
-log_user_link.short_description = "User (telegram_id)"  # type: ignore[attr-defined]
+log_user_link.short_description = "User ID"  # type: ignore[attr-defined]
 
 
 @admin.register(ModerationCriteria)
