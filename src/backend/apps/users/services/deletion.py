@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,14 @@ def decline_consent(user: User) -> None:
 
     Does NOT set consent_revoked_at, is_deleted, or trigger any deletion.
 
+    Because PUBLISHED ads of a consent-declined user are hidden from listings
+
+    and search by the live ``user__is_declined=False`` filter (SRH-001), the
+
+    search cache version is bumped once this transaction commits so cached
+
+    result sets are invalidated and the ads disappear immediately.
+
 
 
     Args:
@@ -60,6 +69,11 @@ def decline_consent(user: User) -> None:
     user.consent_given_at = None
 
     user.save(update_fields=["ads_auto_publish", "is_declined", "consent_given_at"])
+
+    # No Ad.save() fires here (ads are not mutated), so the post_save signal
+    # would not bump the search cache. Invalidate explicitly, after the decline
+    # is committed, so cached search/listings results drop the hidden ads.
+    transaction.on_commit(bump_search_cache_version)
 
     logger.info(
         "User %s declined consent - browse-only mode: "

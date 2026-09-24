@@ -119,7 +119,8 @@ class ListingsQuery:
         """Return the filtered, sorted, favorite-annotated queryset.
 
         Steps (order preserved from the original inline implementation):
-        1. Base: ``PUBLISHED`` + null-safe category active filter.
+        1. Base: ``PUBLISHED`` + not consent-declined + null-safe category active
+           filter.
         2. ``select_related`` / ``prefetch_related`` for efficient rendering.
         3. Category subtree filter (if ``category_slug`` resolves).
         4. City filter (if ``city_slug`` resolves).
@@ -130,7 +131,7 @@ class ListingsQuery:
         9. ``annotate_favorites``.
         """
         ads = (
-            Ad.objects.filter(status=AdStatus.PUBLISHED)
+            Ad.objects.filter(status=AdStatus.PUBLISHED, user__is_declined=False)
             .filter(Q(category__isnull=True) | Q(category__is_active=True))
             .select_related("category", "city", "user")
             .prefetch_related("features", "user__trust_score", "images")

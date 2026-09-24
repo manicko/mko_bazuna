@@ -16,6 +16,7 @@ import pytest
 from django.test import Client
 
 from apps.ads.models import Ad
+from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
@@ -244,6 +245,101 @@ class TestSearchViewPublishesFilter:
         assert response.status_code == 200
         ads_in_page = list(response.context["page_obj"])
         assert any(a.id == ad.id for a in ads_in_page)
+
+
+class TestSearchViewDeclinedConsent:
+    """A consent-declined user's PUBLISHED ads are hidden from search and listings (SRH-001)."""
+
+    def test_declined_user_published_ads_hidden_from_search(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """PUBLISHED ads of a declined user do not appear in /search/."""
+        declined_ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Объявление отклонённого пользователя",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # Sanity: the ad is visible before the decline.
+        client = Client()
+        response = client.get("/search/")
+        assert declined_ad.id in {a.id for a in response.context["page_obj"]}
+
+        # Decline consent — the user's PUBLISHED ads must disappear.
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        response = client.get("/search/")
+        assert response.status_code == 200
+        assert declined_ad.id not in {a.id for a in response.context["page_obj"]}
+
+    def test_declined_user_published_ads_hidden_from_listings(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """PUBLISHED ads of a declined user do not appear on the listings page."""
+        declined_ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Объявление в списке",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/")
+        assert declined_ad.id in {a.id for a in response.context["page_obj"]}
+
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        response = client.get("/")
+        assert response.status_code == 200
+        assert declined_ad.id not in {a.id for a in response.context["page_obj"]}
+
+    def test_give_consent_restores_declined_ads_to_queryset(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """Restoring consent (is_declined=False) makes the user's ads visible again.
+
+        Verified against the live queryset (``build_queryset``) rather than the
+        cached search view: ``give_consent`` intentionally does not bump the
+        search cache, so a warm cache entry persists until TTL expiry — the ad
+        reappears via the live ``user__is_declined=False`` filter once results
+        are (re)computed.
+        """
+        from apps.users.services.deletion import give_consent
+
+        ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Велосипед после согласия",
+            status=AdStatus.PUBLISHED,
+        )
+
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        params = ListingsQueryParams()
+        assert ad.id not in {a.id for a in ListingsQuery.build_queryset(params)}
+
+        # give_consent clears is_declined -> live filter lets the ad reappear.
+        give_consent(seller)
+        seller.refresh_from_db()
+        assert seller.is_declined is False
+
+        assert ad.id in {a.id for a in ListingsQuery.build_queryset(params)}
 
 
 class TestSearchViewDescendantCategories:

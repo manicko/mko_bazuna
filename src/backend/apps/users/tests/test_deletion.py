@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.search.services.cache import get_search_version
 from apps.users.models import LoginToken, User
 from apps.users.services.deletion import (
     decline_consent,
@@ -133,6 +134,28 @@ class TestDeclineConsentDoesNotInvalideTokens:
         assert user.is_deleted is False
         # consent_given_at is cleared on decline (PC-001)
         assert user.consent_given_at is None
+
+
+class TestDeclineConsentBumpsSearchCache:
+    """decline_consent invalidates cached search results (SRH-001)."""
+
+    @pytest.mark.django_db(transaction=True)
+    def test_decline_bumps_search_cache_version(self, user: User) -> None:
+        """decline_consent increments the search cache version.
+
+        No Ad.save() fires on decline (ads are not mutated), so the post_save
+        signal would not bump the search cache. The explicit
+        ``transaction.on_commit(bump_search_cache_version)`` must invalidate
+        cached results so the declined user's PUBLISHED ads disappear from
+        search and listings. ``django_db(transaction=True)`` is required so
+        the on_commit callback actually runs.
+        """
+        version_before = get_search_version()
+
+        decline_consent(user)
+
+        version_after = get_search_version()
+        assert version_after > version_before
 
 
 class TestWithdrawConsentSoftDeletesAds:
