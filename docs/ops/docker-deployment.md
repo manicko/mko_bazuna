@@ -690,6 +690,8 @@ All responses include:
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: geolocation=(), microphone=(), camera=()`
 - `Content-Security-Policy: default-src 'none'; img-src 'self' data:; object-src 'none'`
 
 ### Media Access Control
