@@ -12,6 +12,7 @@ with no external translation.
 """
 
 import html
+import json
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -128,6 +129,11 @@ def _translate_via_api(query: str, source_locale: str, target_locale: str) -> st
     Raises httpx.HTTPStatusError, httpx.RequestError, httpx.TimeoutException
     on failure -- the caller (``translate_text``) owns retry, circuit-breaker,
     and graceful fallback.
+
+    On a malformed 200 response this may also raise ``json.JSONDecodeError``
+    (unparseable body) or ``KeyError``/``ValueError`` (body missing the nested
+    ``data["data"]["translations"][0]["translatedText"]`` key). These are also
+    handled by ``translate_text`` as transport-failure-equivalent errors.
     """
     response = _TRANSLATION_CLIENT.post(
         GOOGLE_TRANSLATE_V2_URL,
@@ -188,7 +194,14 @@ def translate_text(text: str, source_locale: str, target_locale: str) -> str:
                 return result
             # Empty result — fall back without retrying
             break
-        except (TimeoutError, httpx.TimeoutException, httpx.RequestError) as e:
+        except (
+            TimeoutError,
+            httpx.TimeoutException,
+            httpx.RequestError,
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+        ) as e:
             # Transport-level failures — always retryable
             _CIRCUIT_BREAKER.record_failure()
             logger.warning(

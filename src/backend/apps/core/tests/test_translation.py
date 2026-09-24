@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from unittest.mock import patch
@@ -224,6 +225,65 @@ class TestTranslateTextFallback:
         # Each attempt calls _translate_via_api once (through the executor).
         # With max_attempts=2 and empty retry, we expect exactly 2 calls.
         assert call_count == TRANSLATION_MAX_ATTEMPTS
+
+    def test_translate_text_malformed_200_opens_breaker(self) -> None:
+        """A malformed 200 response (bad JSON body) charges the circuit breaker.
+
+        Regression test for EXT-005: ``translate_text`` must treat a
+        ``json.JSONDecodeError`` (raised by ``response.json()`` on a malformed
+        body) exactly like a transport failure -- recording the failure on the
+        circuit breaker and engaging backoff -- rather than leaking the parser
+        exception and bypassing the breaker.
+        """
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=json.JSONDecodeError(
+                "Expecting value", doc="", pos=0
+            ),
+        ) as mock_api, patch(
+            "apps.core.services.translation.time.sleep", return_value=None
+        ):
+            original = "Hello world"
+
+            # Each call attempts TRANSLATION_MAX_ATTEMPTS retries.
+            # After two calls (4 failures >= threshold 3) the circuit opens.
+            for _ in range(2):
+                result = translate_text(original, "en", "ru")
+                assert result == original
+
+            assert _CIRCUIT_BREAKER.is_open is True
+
+            # Third call: circuit is open -- short-circuit, no API call.
+            mock_api.reset_mock()
+            result = translate_text(original, "en", "ru")
+            assert result == original
+            mock_api.assert_not_called()
+
+    def test_translate_text_malformed_200_missing_key_opens_breaker(self) -> None:
+        """A 200 body missing the nested translation key charges the breaker.
+
+        Regression test for EXT-005: ``translate_text`` must treat the
+        ``KeyError`` raised when ``data["data"]["translations"][0]
+        ["translatedText"]`` is missing exactly like a transport failure.
+        """
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=KeyError("translatedText"),
+        ) as mock_api, patch(
+            "apps.core.services.translation.time.sleep", return_value=None
+        ):
+            original = "Hello world"
+
+            for _ in range(2):
+                result = translate_text(original, "en", "ru")
+                assert result == original
+
+            assert _CIRCUIT_BREAKER.is_open is True
+
+            mock_api.reset_mock()
+            result = translate_text(original, "en", "ru")
+            assert result == original
+            mock_api.assert_not_called()
 
 
 class TestTranslateTextSuccess:
