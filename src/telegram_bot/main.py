@@ -95,6 +95,17 @@ def main() -> None:
     dp.include_router(language_router)
     dp.include_router(contact_router)
 
+    # EXT-002: replay-capable 429 (flood control) backoff for outbound calls.
+    # Only TelegramRetryAfter is intercepted; all other errors still flow to
+    # the generic catch-all. Must be registered before run_polling. Imports are
+    # lazy to avoid pulling Django models before django.setup().
+    from aiogram.exceptions import TelegramRetryAfter
+    from aiogram.filters import ExceptionTypeFilter
+
+    from telegram_bot.retry import retry_transient
+
+    dp.errors(ExceptionTypeFilter(TelegramRetryAfter))(retry_transient)
+
     # Create bot and start polling
     bot = Bot(token=token)
 
