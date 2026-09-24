@@ -34,30 +34,17 @@ def decline_consent(user: User) -> None:
 
     Decline consent (browse-only, decision K).
 
-
-
-    This blocks only seller actions. No deletion occurs. Contact button continues to work.
-
-    Sets is_declined=True and ads_auto_publish=False to block new ads and login,
-
-    but preserves existing ads and PII.
-
-
-
-    Does NOT set consent_revoked_at, is_deleted, or trigger any deletion.
-
-    Because PUBLISHED ads of a consent-declined user are hidden from listings
-
-    and search by the live ``user__is_declined=False`` filter (SRH-001), the
-
-    search cache version is bumped once this transaction commits so cached
-
-    result sets are invalidated and the ads disappear immediately.
-
-
+    This blocks only seller actions (no deletion occurs) and sets
+    ``is_declined=True`` with ``ads_auto_publish=False`` to block new ads and
+    login, while preserving existing ads and PII. It does NOT set
+    ``consent_revoked_at`` or ``is_deleted``, and triggers no erasure —
+    DECLINE is distinct from WITHDRAW. Because PUBLISHED ads of a
+    consent-declined user are hidden from listings and search by the live
+    ``user__is_declined=False`` filter (SRH-001), the search cache version is
+    bumped (via ``transaction.on_commit``) once this transaction commits so
+    cached result sets are invalidated and the ads disappear immediately.
 
     Args:
-
         user: The user declining consent.
 
     """

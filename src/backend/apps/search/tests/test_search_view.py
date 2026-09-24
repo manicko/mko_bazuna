@@ -713,11 +713,15 @@ class TestSearchViewInputRobustness:
 
 
 class TestSearchViewTotalCount:
-    """Regression tests for true total_count vs 1000-row cache cap (08-SRH-002).
+    """Regression tests for true total_count vs 1000-row cache cap (SRH-002).
 
-    Verifies that ``total_count`` in the context reflects the full FTS match count
-    via a dedicated ``COUNT(*)`` rather than the capped ``SEARCH_CACHE_MAX_HITS``
-    value, and that ``results_truncated`` is set when results exceed the cap.
+    After SRH-002 the dedicated FTS ``COUNT(*)`` is gated: it runs only at the
+    ``SEARCH_CACHE_MAX_HITS`` cap boundary (or on the cold-miss-loser path),
+    while on the common non-truncated path ``total_count`` comes from
+    ``len(cached_ids)``. These tests verify that above the cap the true count
+    is preserved via a ``COUNT(*)`` at the boundary (``results_truncated`` is
+    ``True``), and that an exact-cap result set yields ``total_count == 1000``
+    and is not marked truncated.
     """
 
     def test_total_count_exceeds_cap_when_many_matches(
