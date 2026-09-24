@@ -328,6 +328,56 @@ class TestProcessPhotos:
             reopened.load()
 
 
+class TestDownloadPhotoBoundedRead:
+    """Tests for MED-002: download_photo bounds memory via a capped writer.
+
+    ``bot.download(file_id, destination=None)`` buffers the entire file in
+    memory before returning, so the fix passes a bounded destination writer
+    that raises as soon as the byte cap is crossed. These tests simulate
+    aiogram's per-chunk ``destination.write()`` contract (64 KB chunks).
+    """
+
+    @pytest.mark.asyncio
+    async def test_download_photo_aborts_on_oversized_stream(self) -> None:
+        """download_photo returns None (not full buffer) when stream exceeds cap.
+
+        Simulates Telegram omitting file_size: the bounded destination writer
+        must raise on the chunk that crosses the cap, so download_photo
+        returns None instead of buffering the entire payload.
+        """
+        from telegram_bot.handlers.ad_create import MAX_PHOTO_BYTES
+        from telegram_bot.services.ad_data import download_photo
+
+        bot = MagicMock()
+        too_large = b"x" * (MAX_PHOTO_BYTES + 4096)
+
+        async def fake_download(file_id, destination=None):
+            # Simulate aiogram writing the payload in 64KB chunks through the writer.
+            step = 64 * 1024
+            for i in range(0, len(too_large), step):
+                destination.write(too_large[i : i + step])
+            return destination
+
+        bot.download.side_effect = fake_download
+        assert await download_photo("test_file_id", bot) is None
+
+    @pytest.mark.asyncio
+    async def test_download_photo_returns_within_cap(self) -> None:
+        """download_photo returns bytes for a within-cap payload."""
+        from telegram_bot.services.ad_data import download_photo
+
+        bot = MagicMock()
+        payload = b"x" * 1024
+
+        async def fake_download(file_id, destination=None):
+            destination.write(payload)
+            return destination
+
+        bot.download.side_effect = fake_download
+        result = await download_photo("test_file_id", bot)
+        assert result == payload
+
+
 # ---------------------------------------------------------------------------
 # Helpers for CR-001 / MED-001 regression tests (cancel-after-submit,
 # delete_draft storage_keys)
