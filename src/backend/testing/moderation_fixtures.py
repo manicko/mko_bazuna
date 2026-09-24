@@ -52,7 +52,7 @@ def permissive_criteria(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
+        lambda user_id, max_ads, ad_id: True,
     )
     monkeypatch.setattr(
         "apps.moderation.services.auto_moderation._is_duplicate_title",
@@ -77,7 +77,7 @@ def banning_criteria(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "apps.moderation.services.auto_moderation._validate_max_ads_per_user",
-        lambda user_id, max_ads: True,
+        lambda user_id, max_ads, ad_id: True,
     )
     monkeypatch.setattr(
         "apps.moderation.services.auto_moderation._is_duplicate_title",

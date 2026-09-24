@@ -152,7 +152,7 @@ def auto_moderate(ad: Ad, moderator_id: int | None = None) -> bool:
         return False
 
     # Validate max ads per user
-    if not _validate_max_ads_per_user(ad.user_id, max_ads):
+    if not _validate_max_ads_per_user(ad.user_id, max_ads, ad.id):
         _fail_moderation(ad)
         return False
 
@@ -201,14 +201,23 @@ def _contains_banned_words(title: str, description: str, banned_words: tuple) ->
     return False
 
 
-def _validate_max_ads_per_user(user_id: int, max_ads: int) -> bool:
-    """Validate user has not exceeded max active ads limit."""
+def _validate_max_ads_per_user(user_id: int, max_ads: int, ad_id: int) -> bool:
+    """Validate user has not exceeded max active ads limit.
+
+    Excludes the in-flight ad (ad_id) so a user at the limit boundary is not
+    over-blocked: with max_ads=N, a user with N-1 active ads can submit the
+    Nth ad (AD-002).
+    """
     # Count only published and on-moderation ads (not drafts, rejected, archived, deleted)
     active_statuses = [AdStatus.PUBLISHED, AdStatus.ON_MODERATION]
-    count = Ad.objects.filter(
-        user_id=user_id,
-        status__in=active_statuses,
-    ).count()
+    count = (
+        Ad.objects.filter(
+            user_id=user_id,
+            status__in=active_statuses,
+        )
+        .exclude(id=ad_id)
+        .count()
+    )
     return count < max_ads
 
 
@@ -349,7 +358,7 @@ def check(ad: Ad) -> tuple[bool, str | None]:
         )
 
     # Validate max ads per user
-    if not _validate_max_ads_per_user(ad.user_id, max_ads):
+    if not _validate_max_ads_per_user(ad.user_id, max_ads, ad.id):
         return (
             False,
             "Your ad content does not meet our requirements. Please review and try again.",

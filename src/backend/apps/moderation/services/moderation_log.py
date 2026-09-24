@@ -213,7 +213,9 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
     The user row is locked with ``select_for_update()`` and the active-ads
     count is re-counted inside the transaction — this is the authoritative,
     race-safe guard for ``max_ads_per_user`` (the advisory check in
-    ``auto_moderate`` / ``check`` is best-effort only).
+    ``auto_moderate`` / ``check`` is best-effort only). The in-flight ad is
+    excluded from the count so a user at the limit boundary is not
+    over-blocked (AD-002).
 
     Args:
         ad: The Ad instance to publish.
@@ -229,10 +231,17 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
 
         max_ads = ModerationCriteria.get_singleton().max_ads_per_user
         active_statuses = [AdStatus.PUBLISHED, AdStatus.ON_MODERATION]
-        active_count = Ad.objects.filter(
-            user_id=ad.user_id,
-            status__in=active_statuses,
-        ).count()
+        active_count = (
+            Ad.objects.filter(
+                user_id=ad.user_id,
+                status__in=active_statuses,
+            )
+            # Exclude the in-flight ad: it is still ON_MODERATION at this
+            # point, so counting it would over-block at the limit boundary
+            # (AD-002) — a user with max_ads=N could never reach N active ads.
+            .exclude(id=ad.id)
+            .count()
+        )
         if active_count >= max_ads:
             raise MaxAdsExceeded(
                 user_id=ad.user_id,

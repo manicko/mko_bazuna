@@ -9,7 +9,7 @@ import hashlib
 import pytest
 from django.utils import timezone
 
-from apps.ads.models import AdImage
+from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
 from apps.users.models import LoginToken, User
 from apps.users.services.deletion import (
@@ -167,6 +167,33 @@ class TestWithdrawConsentSoftDeletesAds:
         assert ad1.status == AdStatus.DELETED
         assert ad1.deleted_at is not None
         assert ad2.status == AdStatus.DELETED
+
+    def test_withdraw_refreshes_updated_at_on_ads(self, user: User, category, city):
+        """Consent withdrawal refreshes updated_at on soft-deleted ads (AD-001).
+
+        Previously soft_delete_user_ads used QuerySet.update(), which bypasses
+        save() and leaves updated_at (auto_now=True) stale. Routing through
+        transition_to(DELETED) now persists updated_at (included in the
+        targeted save's update_fields), so it is refreshed.
+        """
+        ad = create_test_ad(
+            user,
+            category,
+            city,
+            title="Ad 1",
+            description="Description 1",
+            status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        # Backdate updated_at so a refresh is detectable
+        stale_at = timezone.now() - timezone.timedelta(days=1)
+        Ad.objects.filter(pk=ad.pk).update(updated_at=stale_at)
+
+        withdraw_consent(user)
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.DELETED
+        assert ad.updated_at > stale_at
 
     def test_withdraw_soft_deletes_user_sets_pii_nulls(self, user: User):
         """withdraw_consent nulls PII: telegram_id, username, first_name, last_name, email."""

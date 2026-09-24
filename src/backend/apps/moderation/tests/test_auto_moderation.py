@@ -133,7 +133,8 @@ class TestCheckFunction:
             status=AdStatus.PUBLISHED,
         )
 
-        # New submission in ON_MODERATION — counted as active, pushing total to 3.
+        # New submission in ON_MODERATION — excluded from the count per
+        # AD-002, so the advisory check sees the 2 PUBLISHED ads (2 >= 2 fails).
         ad = _create_valid_ad(
             self.user,
             self.category,
@@ -564,18 +565,31 @@ class TestMaxAdsTOCTOUFix:
         mock_am.assert_called_once_with(on_moderation_ad, moderator_id=moderator.id)
 
     @pytest.mark.parametrize(
-        "max_ads, expected_raise",
-        [(2, False), (1, True)],
-        ids=["under_cap_passes", "at_cap_raises"],
+        "max_ads, existing_published, expected_raise",
+        [
+            (1, 0, False),  # in-flight ad excluded -> user's first ad publishes
+            (1, 1, True),  # one other PUBLISHED ad at cap=1 -> raises
+            (2, 1, False),  # one other PUBLISHED ad under cap=2 -> passes
+        ],
+        ids=["first_ad_publishes", "at_cap_raises", "under_cap_passes"],
     )
     def test_set_published_lock_serializes_concurrent_counts(
-        self, max_ads, expected_raise, moderation_criteria, seller, category, city
+        self,
+        max_ads,
+        existing_published,
+        expected_raise,
+        moderation_criteria,
+        seller,
+        category,
+        city,
     ):
         """The locked re-count in set_published is authoritative.
 
-        With 0 existing PUBLISHED ads and 1 ON_MODERATION ad (the target):
-        - max_ads=2: re-count = 1 (the ON_MODERATION ad) → 1 < 2 → passes.
-        - max_ads=1: re-count = 1 (the ON_MODERATION ad) → 1 >= 1 → raises.
+        The in-flight ON_MODERATION ad is excluded from the count (AD-002), so
+        with ``existing_published`` other PUBLISHED ads the locked re-count is
+        ``existing_published``:
+        - if ``existing_published >= max_ads`` -> raises MaxAdsExceeded.
+        - otherwise -> the ad is published.
 
         This proves set_published enforces the cap independently of the
         advisory _validate_max_ads_per_user check.
@@ -583,6 +597,15 @@ class TestMaxAdsTOCTOUFix:
         moderation_criteria.max_ads_per_user = max_ads
         moderation_criteria.save()
 
+        for i in range(existing_published):
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Published Ad {i}",
+                description="Published ad description text",
+                status=AdStatus.PUBLISHED,
+            )
         on_moderation_ad = _create_valid_ad(seller, category, city)
 
         if expected_raise:
@@ -591,7 +614,7 @@ class TestMaxAdsTOCTOUFix:
             exc = exc_info.value
             assert exc.user_id == seller.id
             assert exc.limit == max_ads
-            assert exc.current_count == 1  # just the ON_MODERATION ad
+            assert exc.current_count == existing_published
             on_moderation_ad.refresh_from_db()
             assert on_moderation_ad.status == AdStatus.ON_MODERATION
         else:
@@ -642,9 +665,10 @@ class TestMaxAdsTOCTOUFix:
     ):
         """At cap: the advisory check fails and auto_moderate returns False.
 
-        With max_ads=1 and 1 PUBLISHED + 1 ON_MODERATION (count=2), the
-        advisory _validate_max_ads_per_user returns False, so set_published
-        is never called. The ad lands in ON_MODERATION_FAILED.
+        With max_ads=1, 1 PUBLISHED + 1 ON_MODERATION (the in-flight ad is
+        excluded from the count per AD-002, so count=1), the advisory
+        _validate_max_ads_per_user returns False, so set_published is never
+        called. The ad lands in ON_MODERATION_FAILED.
         """
         moderation_criteria.max_ads_per_user = 1
         moderation_criteria.save()
@@ -676,9 +700,10 @@ class TestMaxAdsTOCTOUFix:
         """Reactivation (ARCHIVED -> ON_MODERATION -> auto_moderate) fails at cap.
 
         User has 1 PUBLISHED + 1 ARCHIVED (not counted) + 1 ON_MODERATION
-        (reactivated ad). Advisory check sees 2 active (PUBLISHED +
-        ON_MODERATION) >= max_ads=1 → fails. Ad lands ON_MODERATION_FAILED.
-        Covers edit.py:171 auto_moderate() call in the web reactivation path.
+        (reactivated ad, excluded from the count per AD-002). Advisory check
+        sees 1 active (PUBLISHED) >= max_ads=1 → fails. Ad lands
+        ON_MODERATION_FAILED. Covers edit.py:171 auto_moderate() call in the
+        web reactivation path.
         """
         moderation_criteria.max_ads_per_user = 1
         moderation_criteria.save()

@@ -915,13 +915,11 @@ class TestSearchCacheInvalidationOnPublish:
 # ---------------------------------------------------------------------------
 # Cache invalidation on consent withdrawal (08-SRH-001)
 #
-# Uses django_db(transaction=True): the B1 fix registers the cache-version
-# bump via transaction.on_commit() inside withdraw_consent's atomic() block.
-# Under the default (non-transactional) django_db mode pytest-django wraps
-# each test in an outer transaction that is rolled back, so on_commit
-# callbacks queued inside nested atomic() are discarded.  transaction=True
-# runs the test in autocommit mode, making withdraw_consent's atomic() the
-# outermost -- its commit fires the on_commit callback synchronously.
+# soft_delete_user_ads routes each ad through transition_to(DELETED), whose
+# save() fires the post_save signal bump_search_cache_on_ad_change, which
+# bumps the search content version (AD-001). django_db(transaction=True) runs
+# the test in autocommit mode so the DB writes are actually committed and
+# visible to the search queries in the second test.
 # ---------------------------------------------------------------------------
 
 
@@ -933,10 +931,9 @@ class TestSearchCacheInvalidationOnWithdrawal:
     def test_withdrawal_bumps_cache_version(self, seller, category, city):
         """withdraw_consent bumps the search content version (08-SRH-001).
 
-        Previously, soft_delete_user_ads used QuerySet.update() which bypasses
-        post_save signals, so the cache version was NOT bumped on consent
-        withdrawal. This test locks in the fix: the on_commit callback added to
-        soft_delete_user_ads must fire after the transaction commits.
+        soft_delete_user_ads routes each ad through transition_to(DELETED),
+        whose save() fires the post_save signal bump_search_cache_on_ad_change,
+        bumping the cache version (AD-001).
         """
         from apps.users.services.deletion import withdraw_consent
         from conftest import create_test_ad

@@ -23,7 +23,6 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
-from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
 
 logger = logging.getLogger(__name__)
@@ -183,8 +182,6 @@ def soft_delete_user_ads(user: User) -> list[str]:
 
     """
 
-    now = timezone.now()
-
     draft_storage_keys: list[str] = []
 
     # Collect storage keys for DRAFT ads' images and delete rows (DB-only)
@@ -210,19 +207,26 @@ def soft_delete_user_ads(user: User) -> list[str]:
             user.id,
         )
 
-    # Soft-delete all ads: set status=DELETED, deleted_at=now
-    ads_deleted = Ad.objects.filter(user=user).update(
-        status=AdStatus.DELETED,
-        deleted_at=now,
-    )
+    # Soft-delete all ads through the state-machine driver (AD-001). Routing
+    # through transition_to(DELETED) — instead of a bulk QuerySet.update() —
+    # fires the post_save signal (which bumps the search cache version) and
+    # refreshes updated_at on each ad. any -> DELETED is always allowed in the
+    # transition matrix; already-DELETED ads are skipped by transition_to.
+    ads_deleted = 0
+    for ad in Ad.objects.filter(user=user):
+        try:
+            ad.transition_to(AdStatus.DELETED)
+        except (ValueError, Ad.DoesNotExist):
+            logger.warning(
+                "Could not soft-delete ad %s for user %s on consent withdrawal",
+                ad.id,
+                user.id,
+                exc_info=True,
+            )
+            continue
+        ads_deleted += 1
 
     logger.info("Soft-deleted %s ads for user %s", ads_deleted, user.id)
-
-    # Bump the search content-version so cached result IDs are invalidated
-    # for the withdrawn seller's ads (08-SRH-001). Using on_commit ensures
-    # the bump only fires if the surrounding transaction (in withdraw_consent)
-    # commits successfully; a rollback suppresses the callback.
-    transaction.on_commit(lambda: bump_search_cache_version())
     return draft_storage_keys
 
 

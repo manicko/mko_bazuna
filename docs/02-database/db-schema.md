@@ -171,7 +171,7 @@ locale-specific column > Russian > original column.
 - DRAFT → ON_MODERATION
 - ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED
 - ON_MODERATION_FAILED → REJECTED (manual review of auto-failed ads; AD-001)
-- PUBLISHED → ARCHIVED → PUBLISHED (reactivation, text re-moderation)
+- PUBLISHED → ARCHIVED → PUBLISHED (reactivation); ARCHIVED → ON_MODERATION (edit-then-re-moderate)
 - PUBLISHED → ON_MODERATION (text edits only; immediate hide; mixed edit follows text rule)
 - any → DELETED
 

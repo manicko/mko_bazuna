@@ -78,7 +78,8 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 ## AdStatus state machine
 
 `DRAFT → ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED`;
-`PUBLISHED → ARCHIVED → PUBLISHED` (reactivation); `PUBLISHED → ON_MODERATION` (text edit);
+`PUBLISHED → ARCHIVED → PUBLISHED` (reactivation); `ARCHIVED → ON_MODERATION` (edit-then-re-moderate);
+`PUBLISHED → ON_MODERATION` (text edit);
 any → `DELETED`.
 
 - `REJECTED` purged @90d; `ON_MODERATION_FAILED` purged @7d (`moderation_failed_at`)

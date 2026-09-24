@@ -31,6 +31,7 @@ class Ad(models.Model):
     - DRAFT -> ON_MODERATION
     - ON_MODERATION -> PUBLISHED | REJECTED | ON_MODERATION_FAILED
     - PUBLISHED -> ARCHIVED -> PUBLISHED (reactivation)
+    - ARCHIVED -> ON_MODERATION (edit-then-re-moderate)
     - PUBLISHED -> ON_MODERATION (text edits, hidden)
     - any -> DELETED
 
@@ -425,7 +426,11 @@ class Ad(models.Model):
             if current != AdStatus.DELETED:
                 self.status = AdStatus.DELETED
                 self.deleted_at = timezone.now()
-                self.save(update_fields=["status", "deleted_at"])
+                # Refresh updated_at so DELETED rows don't retain a stale
+                # "last modified" timestamp (AD-001). auto_now fields are only
+                # written when present in update_fields.
+                self.updated_at = timezone.now()
+                self.save(update_fields=["status", "deleted_at", "updated_at"])
             return
 
         # Validate transition against allowed matrix

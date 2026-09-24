@@ -54,8 +54,9 @@ class TestSetPublishedCapGuard:
     ):
         """At cap: set_published re-counts under lock and raises MaxAdsExceeded.
 
-        With max=1 and 1 PUBLISHED + 1 ON_MODERATION (both in the counted
-        set), the locked re-count = 2 >= 1, so the ad is NOT transitioned.
+        With max=1, 1 PUBLISHED, and 1 ON_MODERATION target (excluded from the
+        count per AD-002), the locked re-count = 1 >= 1, so the ad is NOT
+        transitioned.
         """
         moderation_criteria.max_ads_per_user = 1
         moderation_criteria.save()
@@ -83,7 +84,7 @@ class TestSetPublishedCapGuard:
         exc = exc_info.value
         assert exc.user_id == seller.id
         assert exc.limit == 1
-        assert exc.current_count == 2  # 1 PUBLISHED + 1 ON_MODERATION
+        assert exc.current_count == 1  # 1 PUBLISHED (ON_MODERATION target excluded)
 
         on_moderation_ad.refresh_from_db()
         assert on_moderation_ad.status == AdStatus.ON_MODERATION
@@ -93,7 +94,8 @@ class TestSetPublishedCapGuard:
     ):
         """Under cap: set_published transitions ON_MODERATION -> PUBLISHED.
 
-        With max=3 and 1 PUBLISHED + 1 ON_MODERATION, locked re-count = 2 < 3.
+        With max=3, 1 PUBLISHED, and 1 ON_MODERATION target (excluded per
+        AD-002), locked re-count = 1 < 3.
         """
         moderation_criteria.max_ads_per_user = 3
         moderation_criteria.save()
