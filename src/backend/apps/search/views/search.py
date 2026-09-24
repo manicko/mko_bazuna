@@ -30,6 +30,7 @@ from apps.search.services.cache import (
     build_search_cache_key,
     get_cached_search_ids,
 )
+from apps.search.services.category_fuzzy import get_active_category_names
 from apps.search.services.popular_search import increment_popular_search
 from apps.search.services.rate_limit import rate_limit_check
 from apps.search.services.search_history import record_search_history
@@ -379,15 +380,20 @@ def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None
     by_slug = Category.objects.filter(slug__iexact=query, is_active=True).first()
     if by_slug:
         return by_slug
-    # Exact match against the locale-appropriate display name (case-insensitive)
-    for category in Category.objects.filter(is_active=True):
-        if category.get_name(locale.value).lower() == query.lower():
-            return category
+    # Exact match against the locale-appropriate display name (case-insensitive).
+    # Iterates the cached name list rather than loading all active categories.
+    for entry in get_active_category_names(locale):
+        if str(entry["name"]).lower() == query.lower():
+            return Category.objects.get(id=entry["id"])
     return _fuzzy_match_by_name(query, locale)
 
 
 def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     """Find the closest category name match using difflib fuzzy matching.
+
+    Uses the cached active-category name list (versioned + locale-aware), so
+    a warm cache runs the fuzzy match with zero category SELECTs. The
+    ``difflib.get_close_matches`` algorithm and cutoff are unchanged.
 
     Args:
         query: The single-word search query
@@ -396,12 +402,12 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     Returns:
         Matching Category or None
     """
-    active = list(Category.objects.filter(is_active=True))
-    all_names = [category.get_name(locale.value) for category in active]
+    entries = get_active_category_names(locale)
+    all_names = [str(entry["name"]) for entry in entries]
     matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
     if matches:
         matched_name = matches[0]
-        for category in active:
-            if category.get_name(locale.value) == matched_name:
-                return category
+        for entry in entries:
+            if str(entry["name"]) == matched_name:
+                return Category.objects.get(id=entry["id"])
     return None
