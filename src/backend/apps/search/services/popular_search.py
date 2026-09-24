@@ -11,6 +11,7 @@ from typing import Final
 from django.db.models import F
 
 from apps.core.enums import SearchSuggestionSource
+from apps.core.utils.sanitize import redact_search_query
 from apps.search.models import PopularSearch
 from apps.search.schemas import AutocompleteSuggestion
 
@@ -35,14 +36,19 @@ def increment_popular_search(query: str) -> None:
     if not normalized:
         return
 
+    # Redact PII (phones, emails, names) before persisting (SRH-004).
+    # ``query_normalized`` remains the lookup/dedup key, so redaction does
+    # not affect matching or autocomplete suggestions.
+    redacted = redact_search_query(query)
+
     obj, created = PopularSearch.objects.get_or_create(
         query_normalized=normalized,
-        defaults={"query": query, "hit_count": 1},
+        defaults={"query": redacted, "hit_count": 1},
     )
     if not created:
         PopularSearch.objects.filter(pk=obj.pk).update(
             hit_count=F("hit_count") + 1,
-            query=query,
+            query=redacted,
         )
 
 

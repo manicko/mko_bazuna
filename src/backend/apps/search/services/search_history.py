@@ -14,6 +14,7 @@ import logging
 
 from django.contrib.sessions.backends.base import SessionBase
 
+from apps.core.utils.sanitize import redact_search_query
 from apps.search.models import SearchHistory
 
 logger = logging.getLogger(__name__)
@@ -58,9 +59,14 @@ def record_search_history(user_id: int | None, query: str, session: SessionBase 
     if not normalized:
         return
 
+    # Redact PII (phones, emails, names) before persisting, both to the
+    # database (authenticated users) and to the session (anonymous users).
+    # ``query_normalized`` remains the dedup/lookup key (SRH-004).
+    redacted = redact_search_query(query)
+
     if user_id is None:
         if session is not None:
-            _record_session_history(session, normalized, query)
+            _record_session_history(session, normalized, redacted)
         return
 
     # Deduplicate: delete existing entry with the same normalized query.
@@ -72,7 +78,7 @@ def record_search_history(user_id: int | None, query: str, session: SessionBase 
     # Create the new entry.
     SearchHistory.objects.create(
         user_id=user_id,
-        query=query,
+        query=redacted,
         query_normalized=normalized,
     )
 

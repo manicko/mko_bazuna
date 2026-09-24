@@ -21,6 +21,89 @@ _MAX_QUERY_LENGTH: Final[int] = 100
 # are stripped to prevent log-line injection.
 _CONTROL_CHAR_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
+# Redaction of persisted search queries (SRH-004).
+#
+# Masking-set decision (Path A, conservative): phones and emails are
+# high-confidence PII and always masked. Personal names are masked only when
+# they appear as two or more consecutive capitalized words (a first+last name
+# pattern such as "Ivan Petrov" / "Иван Петров"). Single capitalized words are
+# intentionally left intact so legitimate city/brand search terms (e.g.
+# "Sarajevo", "Bosna", "Сараево") are not damaged by over-matching.
+#
+# Letters considered for name detection: Latin + Cyrillic.
+_NAME_LETTERS: Final[str] = r"A-Za-zА-Яа-яЁё"
+
+# Uppercase letters (Latin + Cyrillic) used as the first char of a name word.
+_UPPER_LETTERS: Final[str] = r"A-ZА-ЯЁ"
+
+# Phone numbers: optional leading '+', 7-15 digits with optional separators.
+_PHONE_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"(?<!\d)(?:\+?\d[\d\s().\-]{5,}\d|\+?\d{7,15})(?!\d)"
+)
+
+# Email addresses: local-part@domain.tld
+_EMAIL_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
+)
+
+# Conservative name pattern: two or more consecutive capitalized words.
+_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(
+    rf"\b[{_UPPER_LETTERS}][{_NAME_LETTERS}]*(?:\s+[{_UPPER_LETTERS}][{_NAME_LETTERS}]*)+"
+)
+
+
+def _mask_phone(match: re.Match[str]) -> str:
+    """Mask a phone number, keeping only the leading '+' and first digit."""
+    phone = match.group(0)
+    offset = 1 if phone.startswith("+") else 0
+    return phone[: offset + 1] + "*" * (len(phone) - offset - 1)
+
+
+def _mask_email(match: re.Match[str]) -> str:
+    """Mask the local part of an email, keeping the '@domain' suffix.
+
+    Length-preserving (never lengthens): the local part is replaced by its
+    first two characters plus asterisks filling the remaining length. A longer
+    fixed ``***`` suffix is not used because it would lengthen short local
+    parts and break the never-lengthen invariant that keeps the
+    ``max_length=200`` column caps safe.
+    """
+    email = match.group(0)
+    local, sep, domain = email.partition("@")
+    if len(local) <= 2:
+        masked_local = local
+    else:
+        masked_local = local[:2] + "*" * (len(local) - 2)
+    return f"{masked_local}{sep}{domain}"
+
+
+def _mask_name(match: re.Match[str]) -> str:
+    """Mask a multi-word name, keeping only the first letter of each word."""
+    words = match.group(0).split()
+    return " ".join(f"{w[0]}{'*' * (len(w) - 1)}" for w in words)
+
+
+def redact_search_query(query: str) -> str:
+    """Redact PII from a search query before it is persisted.
+
+    Masks phone numbers, email addresses and multi-word personal names, then
+    truncates to ``_MAX_QUERY_LENGTH``. Redaction never lengthens the string,
+    so the ``PopularSearch``/``SearchHistory`` ``max_length=200`` column caps
+    remain safe.
+
+    Args:
+        query: The raw search query string.
+
+    Returns:
+        The redacted (and truncated) query string.
+    """
+    if not query:
+        return query
+    redacted = _EMAIL_PATTERN.sub(_mask_email, query)
+    redacted = _PHONE_PATTERN.sub(_mask_phone, redacted)
+    redacted = _NAME_PATTERN.sub(_mask_name, redacted)
+    return redacted[:_MAX_QUERY_LENGTH]
+
 
 def sanitize_query_for_log(query: str | None) -> str:
     """
