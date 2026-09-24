@@ -399,6 +399,22 @@ class TestStripPhotoExif:
         after = set(tmp_path.iterdir())
         assert before == after
 
+    def test_strips_jpeg_comment(self) -> None:
+        """JPEG COM marker bytes are removed by strip_photo_exif."""
+        img = Image.new("RGB", (100, 100), color="red")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", comment=b"PII-in-comment")
+        cleaned = strip_photo_exif(buf.getvalue())
+        assert b"PII-in-comment" not in cleaned
+
+    def test_strips_xmp_packet(self) -> None:
+        """XMP packet bytes are removed by strip_photo_exif."""
+        img = Image.new("RGB", (100, 100), color="red")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", exif=b"\xff\xe1\x00\x10Exif\x00\x00")
+        cleaned = strip_photo_exif(buf.getvalue())
+        assert b"Exif\x00\x00" not in cleaned
+
 
 # ---------------------------------------------------------------------------
 # Test — assert_storage_key_contained
