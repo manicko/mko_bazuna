@@ -685,6 +685,11 @@ class TestSearchViewCaching:
         assert len(ads2) == 1
         assert ads1[0].id == ads2[0].id
 
+        # On the second (cache-hit) request below the cap, total_count must
+        # equal the true match count and results must not be truncated (SRH-002).
+        assert resp2.context["total_count"] == 1
+        assert resp2.context["results_truncated"] is False
+
     def test_cache_hit_does_not_reexecute_producer(
         self, seller, category, city, monkeypatch
     ):

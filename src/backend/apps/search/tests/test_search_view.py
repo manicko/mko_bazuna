@@ -12,6 +12,8 @@ skipped during pytest collection). Migrated here so the /search/ endpoint
 coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
+from unittest.mock import patch
+
 import pytest
 from django.test import Client
 
@@ -754,3 +756,65 @@ class TestSearchViewTotalCount:
         page_ads = list(response.context["page_obj"])
         assert len(page_ads) == 24
         assert all(a.title.startswith("Продам велосипед") for a in page_ads)
+
+    def test_total_count_at_cap_is_exact_and_not_truncated(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """With exactly SEARCH_CACHE_MAX_HITS matching ads, the count is exact
+        and results are not marked truncated.
+
+        The dedicated FTS COUNT(*) runs only at the cap boundary (SRH-002), so
+        ``total_count`` equals the cache cap and ``results_truncated`` is False.
+        """
+        num_ads = SEARCH_CACHE_MAX_HITS  # exactly 1000
+        create_test_ads_bulk(
+            seller,
+            root_category,
+            city,
+            count=num_ads,
+            title_prefix="Продам велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=велосипед&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS
+        assert response.context["results_truncated"] is False
+
+    def test_cold_miss_loser_reports_true_count(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """On a cold-miss loser (cache returns None, lock held), the fallback
+        FTS queryset is reused to report the true count and truncation flag.
+
+        Seeds >1000 matching ads and forces ``get_cached_search_ids`` to return
+        None, so the view falls back to a direct FTS query and derives the count
+        from that same queryset (SRH-002).
+        """
+        num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
+        create_test_ads_bulk(
+            seller,
+            root_category,
+            city,
+            count=num_ads,
+            title_prefix="Продам велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # Force the cache service to return None (simulating cold miss + lock held)
+        with patch("apps.search.views.search.get_cached_search_ids", return_value=None):
+            client = Client()
+            response = client.get("/search/?q=велосипед&lang=ru")
+
+        assert response.status_code == 200
+        # True count via the reused FTS queryset, not capped
+        assert response.context["total_count"] == num_ads
+        assert response.context["results_truncated"] is True

@@ -112,3 +112,19 @@ class TestSearchQueryCount:
             f"Query count must stay bounded — check for missing "
             f"select_related/prefetch_related or uncached filter-option resolution."
         )
+
+        # --- no dedicated FTS COUNT(*) on the non-truncated hot path (SRH-002) ---
+        # When the cached ID list is below SEARCH_CACHE_MAX_HITS the true count
+        # is derived from the cached list length, so the view must not run a
+        # second FTS evaluation for counting. Detect a dedicated FTS COUNT(*)
+        # as any SELECT COUNT(*) whose SQL also carries the per-locale
+        # search_vector_* / to_tsvector match expression.
+        for captured in ctx.captured_queries:
+            sql = captured["sql"]
+            if "SELECT COUNT(*)" in sql and (
+                "search_vector_" in sql or "to_tsvector" in sql
+            ):
+                raise AssertionError(
+                    "Dedicated FTS COUNT(*) must not run on the non-truncated "
+                    "hot path (SRH-002):\n" + sql
+                )

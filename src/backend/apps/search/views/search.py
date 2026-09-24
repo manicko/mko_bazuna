@@ -148,13 +148,14 @@ def search(request: HttpRequest) -> HttpResponse:
         _record_search_analytics(query, request)
 
         # Decouple display count from the 1000-row cache cap (08-SRH-002).
-        # The cached ID list is capped at SEARCH_CACHE_MAX_HITS; compute the true
-        # match count via a cheap COUNT(*) on the GIN-filtered FTS queryset.
-        fts_count_qs = _apply_fts_filtering(
-            ListingsQuery.build_queryset(params), query, params, request
+        # The cached ID list is capped at SEARCH_CACHE_MAX_HITS. To avoid
+        # re-running the expensive FTS filter just to count, the true match
+        # count is derived from the cache outcome: the cached list length when
+        # it is below the cap, a dedicated COUNT(*) only at/over the cap, and
+        # the already-built FTS queryset on the cold-miss loser fallback.
+        total_count, results_truncated = _resolve_search_count(
+            cached_ids, ads, query, params, request
         )
-        total_count = fts_count_qs.count()
-        results_truncated = total_count > SEARCH_CACHE_MAX_HITS
 
     # Resolve category-constrained filter options (F4/F5).
     resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
@@ -273,6 +274,46 @@ def _apply_fts_filtering(
         queryset = queryset.order_by("-rank", "-published_at", "-id")
 
     return queryset
+
+
+def _resolve_search_count(
+    cached_ids: list[int] | None,
+    ads: QuerySet,
+    query: str,
+    params: ListingsQueryParams,
+    request: HttpRequest,
+) -> tuple[int, bool]:
+    """Resolve the true match count and truncation flag for a query search.
+
+    Three outcomes based on the cache outcome of ``cached_ids``:
+
+    - ``cached_ids is not None`` and below ``SEARCH_CACHE_MAX_HITS`` (common
+      hot path): the count is simply ``len(cached_ids)`` and results are not
+      truncated. No ``COUNT(*)`` and no second FTS evaluation.
+    - ``cached_ids is not None`` and at the cap: the display queryset ``ads``
+      is ``pk__in``-capped to the slice, so a fresh FTS-filtered queryset is
+      built to compute the true count via ``COUNT(*)``.
+    - ``cached_ids is None`` (cold-miss loser, lock held): ``ads`` is already
+      the FTS-filtered queryset, so its count is reused directly.
+
+    Returns:
+        A ``(total_count, results_truncated)`` tuple.
+    """
+    if cached_ids is not None and len(cached_ids) < SEARCH_CACHE_MAX_HITS:
+        # Common non-truncated hot path: the cached ID list is authoritative.
+        return len(cached_ids), False
+
+    if cached_ids is not None:
+        # At/over the cap: recompute the true count from a fresh FTS queryset.
+        fts_count_qs = _apply_fts_filtering(
+            ListingsQuery.build_queryset(params), query, params, request
+        )
+        total_count = fts_count_qs.count()
+        return total_count, total_count > SEARCH_CACHE_MAX_HITS
+
+    # Cold-miss loser fallback: ads is already the FTS-filtered queryset.
+    total_count = ads.count()
+    return total_count, total_count > SEARCH_CACHE_MAX_HITS
 
 
 def _record_search_analytics(query: str, request: HttpRequest) -> None:
