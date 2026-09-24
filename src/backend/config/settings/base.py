@@ -274,10 +274,14 @@ BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive"
 # can be computed precisely before the key naturally expires.
 BOT_HEALTH_STALE_SECONDS = env.int("BOT_HEALTH_STALE_SECONDS", default=120)
 
-# When True, the web readiness probe verifies the bot liveness marker in Redis.
-# Disabled in tests (no bot process writes the marker). In production this is
-# always True so the web container reports Not Ready when the bot is stuck.
-BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=True)
+# When True, the web readiness probe also verifies the Redis bot:liveness marker
+# and gates web readiness on it. Defaults to False so web readiness is decoupled
+# from bot liveness: when False (the default), the probe reports
+# checks["bot"] == "disabled" and does not gate web readiness on the bot. Set
+# True explicitly (e.g. via env var) to opt back into the coupling. The bot has
+# its own independent file-based healthcheck (BOT_LIVENESS_FILE) as its separate
+# alert mechanism.
+BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=False)
 
 # File-based liveness marker path for the scheduler container healthcheck.
 # Written after each successful hourly cycle, touched on each tick.

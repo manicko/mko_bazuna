@@ -73,15 +73,19 @@ def liveness_check(request: HttpRequest) -> JsonResponse:
 
 
 def readiness_check(request: HttpRequest) -> JsonResponse:
-    """Readiness probe — verifies database, Redis cache, and bot liveness.
+    """Readiness probe — verifies database and Redis cache health.
 
-    Returns 200 with check details when all dependencies are healthy,
-    503 when any dependency fails or the bot liveness marker is stale.
+    Returns 200 with check details when the required dependencies are healthy,
+    503 when any of them fails.
 
-    Bot liveness is verified via a Redis `bot:liveness` key written by the
-    bot process on startup and on every inbound update. When
-    ``BOT_HEALTH_CHECK_ENABLED`` is ``False`` (e.g. tests) the bot check is
-    marked ``"disabled"`` and does not affect the overall status.
+    Bot liveness is a soft/alert dimension, not a web readiness gate by
+    default: ``BOT_HEALTH_CHECK_ENABLED`` defaults to ``False``, so the probe
+    reports ``checks["bot"] == "disabled"`` and does not gate web readiness on
+    the bot. When explicitly enabled (``BOT_HEALTH_CHECK_ENABLED=True``), the
+    Redis ``bot:liveness`` key (written by the bot process on startup and on
+    every inbound update) is verified: fresh -> ``"ok"``; missing or old ->
+    ``"stale"`` and the probe returns 503. The bot's file-based healthcheck
+    (``BOT_LIVENESS_FILE``) remains its separate alert mechanism.
     """
     checks = {"database": "ok", "cache": "ok"}
 

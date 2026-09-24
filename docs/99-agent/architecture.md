@@ -22,9 +22,11 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   one Django project + PostgreSQL. Migrations run exactly once before all processes start.
   Bot lifecycle hooks (`telegram_bot/lifecycle.py`) write two liveness markers: a file-based
   marker (`/tmp/mko_bazuna_bot_alive`) consumed by the file-based `healthcheck-bot.sh`
-  (process + marker freshness), and a Redis-based `bot:liveness` key (epoch timestamp)
-  consumed by the web `/health/ready/` readiness probe via `BOT_HEALTH_CHECK_ENABLED` /
-  `BOT_HEALTH_STALE_SECONDS` (OPS-003). The scheduler service (gated by
+  (process + marker freshness) — the primary bot alert — and a Redis-based `bot:liveness`
+  key (epoch timestamp) consumed by the web `/health/ready/` readiness probe as a
+  soft/alert dimension via `BOT_HEALTH_CHECK_ENABLED` / `BOT_HEALTH_STALE_SECONDS`
+  (OPS-003). `BOT_HEALTH_CHECK_ENABLED` defaults off, so the Redis key does not gate web
+  readiness by default (the probe reports bot as `"disabled"`). The scheduler service (gated by
   `profiles: ["scheduler"]`) runs the hourly sweeps + daily jobs via the extracted module
   `apps.core.utils.scheduler` (`python -m apps.core.utils.scheduler` from
   `docker/entrypoint-scheduler.sh`); it writes a file-based liveness marker

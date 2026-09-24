@@ -324,7 +324,7 @@ GitHub Actions runner cannot reach the production host.
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
 | `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
-| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; dual liveness marker: file-based (`docker/healthcheck-bot.sh` checks PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`) **and** Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` probe via `BOT_HEALTH_CHECK_ENABLED`) |
+| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; dual liveness marker: file-based (`docker/healthcheck-bot.sh` checks PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`, the primary bot alert) **and** Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` probe via `BOT_HEALTH_CHECK_ENABLED`, which defaults off so the probe reports bot as `"disabled"` and does not gate web readiness) |
 | `nginx` | `nginx:alpine` | Ports 80/443; TLS termination |
 
 ### TLS Configuration
@@ -941,7 +941,9 @@ generation process, and configuration options.
   (process alive + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`),
   and (2) Redis-based `bot:liveness` key (epoch timestamp written on startup and every inbound
   update by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/`
-  readiness probe via `BOT_HEALTH_CHECK_ENABLED`). Lifecycle hooks in `telegram_bot/lifecycle.py`
+  readiness probe via `BOT_HEALTH_CHECK_ENABLED`, which defaults off so the probe reports bot as
+  `"disabled"` and does not gate readiness by default; the file-based healthcheck remains the
+  primary bot alert). Lifecycle hooks in `telegram_bot/lifecycle.py`
   write both markers on startup and clean up the bot session on shutdown.
 - **Database:** Healthcheck via `pg_isready`
 

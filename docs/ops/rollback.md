@@ -57,7 +57,7 @@ failure escalation.
   Additionally, the bot process writes a Redis-based `bot:liveness` marker (epoch
   timestamp) on startup and on every inbound update via `LivenessMiddleware` in
   `telegram_bot/lifecycle.py` (OPS-003). The web readiness probe reads this Redis
-  key (gated by `BOT_HEALTH_CHECK_ENABLED`, default `True`) to verify the bot is alive
+  key (gated by `BOT_HEALTH_CHECK_ENABLED`, default `False`) to verify the bot is alive
   and fresh. The scheduler container's healthcheck (`docker/healthcheck-scheduler.sh`)
   verifies PID 1 liveness, the scheduler readiness marker file
   (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`), and optional
@@ -362,7 +362,7 @@ In addition to the file-based marker, the bot process writes a Redis-based
 `bot:liveness` marker (epoch timestamp) on startup and on every inbound update
 via `LivenessMiddleware` in `telegram_bot/lifecycle.py` (OPS-003). The web
 readiness probe (`/health/ready/`) reads this Redis key — gated by
-`BOT_HEALTH_CHECK_ENABLED` (default `True`, disabled in tests) with a staleness
+`BOT_HEALTH_CHECK_ENABLED` (default `False`, opt-in `True`) with a staleness
 window of `BOT_HEALTH_STALE_SECONDS` (default 120, set on both `web` and `bot`
 services in `docker-compose.yml`) — to verify the bot is alive and fresh. If the
 key is absent or older than the staleness window, the readiness endpoint reports

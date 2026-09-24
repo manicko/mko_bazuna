@@ -162,6 +162,16 @@ def test_readiness_bot_marker_stale(client: Client, ready_url: str) -> None:
     assert data["checks"]["bot"] == "stale"
 
 
+@pytest.mark.django_db
+def test_readiness_ready_without_bot_marker(client: Client, ready_url: str) -> None:
+    """Readiness returns 200 (not 503) with bot disabled under the prod default."""
+    cache.delete("bot:liveness")
+    response = client.get(ready_url)
+    assert response.status_code == 200
+    data = json.loads(response.content)
+    assert data["checks"]["bot"] == "disabled"
+
+
 # ---------------------------------------------------------------------------
 # Alias + versioned routes
 # ---------------------------------------------------------------------------
