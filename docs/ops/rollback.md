@@ -318,7 +318,7 @@ and bot liveness. The readiness endpoint returns:
 
 - `200` with `{"version": 1, "status": "ready", "checks": {"database": "ok", "cache": "ok", "bot": "ok"|"stale"|"disabled"}}`
   when PostgreSQL and Redis are both reachable and the bot liveness marker is fresh
-  (or marked `"disabled"` in test settings where `BOT_HEALTH_CHECK_ENABLED = False`).
+  (or marked `"disabled"` when `BOT_HEALTH_CHECK_ENABLED` is `False`, which is now the default).
 - `503` with `{"status": "not_ready", ...}` when any of database, cache, or bot
   liveness fails.
 
