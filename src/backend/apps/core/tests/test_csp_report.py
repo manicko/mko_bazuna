@@ -154,3 +154,19 @@ def test_post_valid_report_with_all_fields_returns_200(
     )
     assert response.status_code == 200
     assert json.loads(response.content) == {"status": "ok"}
+
+
+def test_post_invalid_csp_report_field_returns_422(
+    client: Client, csp_url: str
+) -> None:
+    """A CSPReportPayload field-type mismatch returns 422 (DTO validation)."""
+    payload = {"csp-report": {"document-uri": 123}}  # wrong type for document-uri
+    response = client.post(
+        csp_url,
+        data=json.dumps(payload).encode(),
+        content_type="application/json",
+    )
+    assert response.status_code == 422
+    data = json.loads(response.content)
+    assert data["error"]
+    assert "errors" in data

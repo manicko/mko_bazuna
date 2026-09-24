@@ -13,6 +13,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from apps.core.utils.sanitize import pydantic_errors_json
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,7 +168,14 @@ def csp_report(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "'csp-report' must be a JSON object"}, status=400)
     try:
         CSPReportPayload(**report["csp-report"])
-    except ValidationError:
-        return JsonResponse({"error": "Invalid CSP report schema"}, status=400)
+    except ValidationError as exc:
+        logger.warning("Invalid CSP report payload: %s", exc)
+        return JsonResponse(
+            {
+                "error": "Invalid CSP report schema",
+                "errors": pydantic_errors_json(exc),
+            },
+            status=422,
+        )
     logger.info("CSP violation report: %s", report)
     return JsonResponse({"status": "ok"})
