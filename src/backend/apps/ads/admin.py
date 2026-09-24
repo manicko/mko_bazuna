@@ -72,8 +72,8 @@ class AdAdmin(admin.ModelAdmin):
     Ad admin with listing filters and reject/ban moderation actions.
 
     Failed-ads list shows rejection reason (INTERNAL ONLY, never to seller).
-    The ``user_link`` column in ``list_display`` (raw ``telegram_id``) is
-    staff-only INTERNAL ONLY — access is gated by ``has_view_permission`` /
+    The ``user_link`` column in ``list_display`` (non-identifying ``str(obj.user)``)
+    is staff-only INTERNAL ONLY — access is gated by ``has_view_permission`` /
     ``has_change_permission`` (``is_staff or is_superuser`` only).
     """
 

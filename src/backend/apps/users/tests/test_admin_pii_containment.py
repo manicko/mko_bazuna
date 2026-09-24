@@ -35,7 +35,7 @@ def test_ads_user_link_hides_telegram_id() -> None:
     from apps.ads.admin import user_link
 
     _assert_no_raw_telegram_id(inspect.getsource(user_link))
-    assert user_link.short_description == "User ID"
+    assert getattr(user_link, "short_description") == "User ID"  # noqa: B009
 
 
 def test_analytics_user_link_hides_telegram_id() -> None:
@@ -51,7 +51,7 @@ def test_moderation_log_user_link_hides_telegram_id() -> None:
     from apps.moderation.admin import log_user_link
 
     _assert_no_raw_telegram_id(inspect.getsource(log_user_link))
-    assert log_user_link.short_description == "User ID"
+    assert getattr(log_user_link, "short_description") == "User ID"  # noqa: B009
 
 
 def test_login_token_list_display_masks_telegram_id() -> None:
