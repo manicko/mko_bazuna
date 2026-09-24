@@ -81,4 +81,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         else:
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
             logger.info("Acquired transaction advisory lock %s", lock_id)
+            transaction.on_commit(
+                lambda: logger.info("Released transaction advisory lock %s", lock_id)
+            )
             yield
