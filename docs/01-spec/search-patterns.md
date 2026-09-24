@@ -56,6 +56,7 @@ The homepage search combines keyword input with city selection for local discove
 | Minimum width | 27 characters (recommended) |
 | Submission | Form submit or HTMX `hx-get` |
 | Autocomplete | HTMX-driven, `delay:300ms`, 10-item cap, 429 on rate limit |
+| Rate limit | 30 req/min per IP (cache-based, `search` namespace); HTTP 429 on overflow |
 
 Related user stories: US-B2, US-B3, US-B7
 

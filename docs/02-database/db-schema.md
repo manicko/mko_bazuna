@@ -60,7 +60,7 @@ username (VARCHAR, nullable)             # optional public @username; NOT used f
 is_staff / is_superuser                  # admin/moderator role (decision A)
 is_banned (BOOL)                          # account block (US-A4)
 is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted; checked by template consent-banner guard in 5 templates
-is_declined (BOOL, default False)         # user declined consent (browse-only mode)
+is_declined (BOOL, default False)         # user declined consent (browse-only); user's PUBLISHED ads excluded from public search/listings via `user__is_declined=False` filter in ListingsQuery
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 telegram_premium (BOOL, default False)    # Telegram Premium subscription status
   preferred_city_id (FK → cities.id, nullable, SET_NULL, related_name="+")  # default city for search/filter for authenticated users (plan 15); guests use a 1-year consent-gated cookie instead
@@ -541,7 +541,7 @@ Tracks popular search queries for autocomplete suggestions.
 
 ```
 id (PK)
-query (VARCHAR(200), db_index=True)
+query (VARCHAR(200), db_index=True)                              # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query() — query_normalized remains the raw lookup/dedup key
 query_normalized (VARCHAR(200), db_index=True)
 hit_count (POSITIVE INT, default 1)
 last_seen (TIMESTAMP, auto_now=True)
@@ -557,7 +557,7 @@ Per-user search query tracking for personalized autocomplete.
 ```
 id (PK)
 user_id (FK → users.id, CASCADE, nullable)
-query (VARCHAR(200))
+query (VARCHAR(200))                                            # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query()
 query_normalized (VARCHAR(200), db_index=True)
 created_at (TIMESTAMP, auto_now_add=True)
 

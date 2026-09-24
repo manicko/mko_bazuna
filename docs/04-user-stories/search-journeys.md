@@ -203,6 +203,8 @@ The merged list is deduplicated by text and capped at 10. Excess requests are th
 
 - Every FTS query with a non-empty `q` is recorded: auth buyers get a `SearchHistory` row
   (deduped by normalized query, capped at 50); anonymous buyers get a session-scoped entry.
+  The persisted `query` is PII-redacted at write time (phones, emails, and multi-word personal
+  names masked via `redact_search_query`) — data minimization, never the raw query string.
 - Recorded queries feed the autocomplete "History" section and appear on the
   `/cabinet/search-history/` page (auth only) with a "Clear history" button.
 - Buyers can save a search (auth only, button on `/search/?q=`) and get a Telegram
