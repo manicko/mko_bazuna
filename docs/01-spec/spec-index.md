@@ -89,7 +89,7 @@ any → `DELETED`.
 `users`, `login_tokens`, `ads`, `categories`, `category_paths`, `lookup_groups`, `lookup_items`, `category_listing_purposes`, `category_listing_features`, `category_listing_conditions`, `ad_features`, `cities`, `ad_images`, `exchange_rates`, `analytics_events`, `moderation_criteria`, `ModeratorActionLog`, `DailyAdMetrics`, `SavedSearch`, `SavedSearchNotification`, `PopularSearch`, `SearchHistory`, `AdFavorite`, `SellerTrustScore`, `SellerVerification`, `AdModerationPriority`, `consent_records`.
 
 - PII erasure sweep index: `IX_users_erasure_sweep`
-- Search indexes: `GinIndex`es on per-language `search_vector_ru/bs/en` TSVECTOR columns (IX_ads_search_gin_ru/bs/en), plus legacy generic `IX_ads_search_gin` retained during transition
+- Search indexes: `GinIndex`es on per-language `search_vector_ru/bs/en` TSVECTOR columns (IX_ads_search_gin_ru/bs/en), plus legacy generic `IX_ads_search_gin` retained **for backward compatibility only** — a **candidate for removal in a future migration** (all FTS read paths use the per-language columns)
 
 ## UI Patterns
 

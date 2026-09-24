@@ -18,7 +18,7 @@ Two long-lived processes share one Django project + one DB:
 - **web:** sync WSGI (gunicorn), server-rendered HTMX MPA
 - **bot:** aiogram, runs `django.setup()`, shares the ORM. The step-by-step ad dialog is persisted as an `Ad` row (`DRAFT`) via the shared ORM.
 
-**Migrations run exactly once** before web+bot start. **Search:** native PostgreSQL full-text search (`search_vector` TSVECTOR + GIN, russian config).
+**Migrations run exactly once** before web+bot start. **Search:** native PostgreSQL full-text search over per-language `search_vector_ru/bs/en` TSVECTOR columns + GIN (ru/bs/en configs); the legacy `search_vector` column + `IX_ads_search_gin` are retained for backward compatibility only and are candidates for removal in a future migration.
 
 ## Quick start
 ```bash

@@ -179,8 +179,10 @@ features (e.g., "mileage" on a real-estate ad). Cross-referenced from
 ## Per-Language Full-Text Search
 
 Each `Ad` carries per-language `TSVECTOR` columns — `search_vector_ru`, `search_vector_bs`,
-`search_vector_en` (plus a legacy `search_vector` during the dual-write transition, not yet
-dropped; see [`db-schema.md`](../02-database/db-schema.md) > Search) — maintained by the
+`search_vector_en` (plus a legacy `search_vector` column + `IX_ads_search_gin` index that are
+retained **for backward compatibility only** — all FTS read paths use the per-language
+`search_vector_ru/bs/en` columns — and are **candidates for removal in a future migration**;
+see [`db-schema.md`](../02-database/db-schema.md) > Search) — maintained by the
 `ads_search_vector_fn` trigger. `LanguageLocale` maps a resolved locale to the matching vector
 column and PostgreSQL text-search configuration:
 
