@@ -19,7 +19,7 @@ import logging
 import secrets
 from datetime import timedelta
 
-from django.contrib.auth import login as auth_login
+from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
@@ -245,6 +245,11 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
     """
     user = request.user
     withdraw_consent(user)
+
+    # AUT-002: flush the session on consent withdrawal so a withdrawn
+    # (soft-deleted) identity cannot keep using seller features. This must
+    # run after withdraw_consent() (DB commit) and before the redirect.
+    logout(request)
 
     response = redirect("ads:dashboard")
     _set_consent_cookies(

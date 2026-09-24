@@ -327,6 +327,37 @@ class TestConsentWithdrawView:
         # The form posts to the consent withdrawal endpoint
         assert b'action="/consent/withdraw/"' in response.content
 
+    def test_withdraw_flushes_session_and_redirects(self, user: User) -> None:
+        """consent_withdraw flushes the session and redirects to the dashboard."""
+        client = Client()
+        client.force_login(user)
+        assert "_auth_user_id" in client.session
+
+        response = client.post("/consent/withdraw/")
+        assert response.status_code == 302
+        assert response.url == "/dashboard/"
+        # Session flushed by django.contrib.auth.logout (AUT-002)
+        assert "_auth_user_id" not in client.session
+
+    def test_withdraw_workflow_returns_anonymous(self, user: User) -> None:
+        """Login -> dashboard -> POST withdraw -> redirected -> anonymous again."""
+        client = Client()
+        client.force_login(user)
+
+        # dashboard reachable while authenticated
+        dashboard = client.get("/dashboard/")
+        assert dashboard.status_code == 200
+
+        # withdraw via POST redirects to the dashboard
+        response = client.post("/consent/withdraw/")
+        assert response.status_code == 302
+        assert response.url == "/dashboard/"
+
+        # subsequent dashboard request redirects to login (anonymous)
+        response = client.get("/dashboard/")
+        assert response.status_code == 302
+        assert response.url.startswith("/login/issue/")
+
 
 # ---------------------------------------------------------------------------
 # Tests: login_status PII masking
