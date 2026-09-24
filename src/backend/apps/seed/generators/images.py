@@ -10,6 +10,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.ads.models import Ad, AdImage
+from apps.media.services.filesystem import strip_photo_exif
 from apps.media.services.thumbnails import ThumbnailService
 from apps.seed.generators.base import BaseGenerator
 from apps.seed.paths import FIXTURES_IMAGES_DIR
@@ -291,6 +292,10 @@ class ImageGenerator(BaseGenerator):
         # Read JPEG bytes from fixture
         with open(fixture_path, "rb") as f:
             img_bytes = f.read()
+
+        # Strip EXIF/metadata (incl. JPEG comment/XMP) before persist —
+        # unifies the sanitization contract with the user-upload path.
+        img_bytes = strip_photo_exif(img_bytes)
 
         # Write original image
         with open(original_path, "wb") as f:

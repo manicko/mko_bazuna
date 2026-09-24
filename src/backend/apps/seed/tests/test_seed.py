@@ -22,6 +22,7 @@ from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus, AdvisoryLockId, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
+from apps.media.services.thumbnails import ThumbnailService
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
 from apps.seed.generators.base import BaseGenerator
@@ -332,6 +333,39 @@ class TestImageGenerator:
         for img in images:
             assert img.ad_id == self.ad.pk
             assert img.position >= 1
+
+    @pytest.mark.seed
+    @override_settings(MEDIA_ROOT="/tmp/test_seed_media")
+    def test_seed_original_strips_jpeg_comment(self) -> None:
+        """Seed original written to MEDIA_ROOT is stripped of JPEG comment/XMP.
+
+        Guards MED-003: _preprocess_one must sanitize fixture bytes (via
+        strip_photo_exif) before persisting the seed original, unifying the
+        metadata contract with the user-upload path.
+        """
+        from PIL import Image
+
+        # Materialize a fixture JPEG carrying a JPEG comment marker.
+        fixture_name = "med003_comment_01.jpg"
+        fixture_path = FIXTURES_IMAGES_DIR / fixture_name
+        img = Image.new("RGB", (100, 100), color="red")
+        img.save(fixture_path, format="JPEG", comment=b"seed-pii-comment")
+        self._created_files.append(fixture_path)
+
+        from django.conf import settings
+
+        media_root = settings.MEDIA_ROOT
+        seed_dir = os.path.join(media_root, "seed")
+        os.makedirs(seed_dir, exist_ok=True)
+
+        gen = ImageGenerator({"faker_seed": 42}, [])
+        thumbnail_service = ThumbnailService(storage_dir=seed_dir)
+        assert gen._preprocess_one(
+            f"seed/{fixture_name}", seed_dir, thumbnail_service
+        )
+
+        original = Path(seed_dir) / fixture_name
+        assert b"seed-pii-comment" not in original.read_bytes()
 
     def test_image_keys_have_correct_format(self) -> None:
         """Image keys are valid UUID-based filenames."""
