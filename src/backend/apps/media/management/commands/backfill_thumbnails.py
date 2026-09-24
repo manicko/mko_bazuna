@@ -6,6 +6,14 @@ thumbnail keys, generates all three thumbnail variants, and persists
 them. Idempotent — skips records that already have thumbnails.
 
 Uses advisory lock 102 for safe concurrent execution.
+
+The workflow is split into three phases:
+  1. Lock-acquire + collect — advisory lock held inside a short
+     transaction to count and collect target IDs, then released.
+  2. Filesystem I/O — performed outside any transaction so slow disk
+     reads/writes do not hold the DB lock.
+  3. Persist — a single short transaction writes all generated keys;
+     the lock is not re-acquired (the I/O step is idempotent).
 """
 
 import logging
@@ -49,10 +57,25 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute the backfill command."""
+        """Execute the backfill command in three phases.
+
+        Phase 1 acquires the advisory lock inside a short transaction,
+        collects the IDs of records needing thumbnails, and releases the
+        lock before any filesystem I/O begins.
+
+        Phase 2 performs all filesystem reads and thumbnail generation
+        outside any transaction.
+
+        Phase 3 persists every generated key in a single short
+        transaction without re-acquiring the advisory lock.
+        """
         dry_run: bool = options["dry_run"]
         batch_size: int = options["batch_size"]
 
+        # Phase 1 — Lock-acquire + collect (short transaction.atomic() +
+        # advisory lock).  The lock covers the count-to-mutate sequence;
+        # I/O happens after the ``with`` block exits so the transaction
+        # is not held across slow filesystem reads/writes.
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(LOCK_ID):
                 # Find AdImage records that have an original image but are
@@ -80,46 +103,82 @@ class Command(BaseCommand):
                     logger.info("No AdImage records need thumbnail backfill")
                     return
 
-                logger.info("Starting thumbnail backfill for %d records", total)
-
-                service = ThumbnailService(storage_dir=settings.MEDIA_ROOT)
-                processed = 0
-                errors = 0
-
-                # Process in batches to avoid long-running transactions
                 ids = list(queryset.values_list("id", flat=True))
-                for i in range(0, len(ids), batch_size):
-                    batch_ids = ids[i : i + batch_size]
-                    batch = list(AdImage.objects.filter(id__in=batch_ids).iterator())
 
-                    for ad_image in batch:
-                        try:
-                            self._process_one(service, ad_image)
-                            processed += 1
-                        except Exception as exc:
-                            errors += 1
-                            logger.exception(
-                                "Failed to generate thumbnails for AdImage %d: %s",
-                                ad_image.id,
-                                exc,
-                            )
+        # Phase 2 — I/O (no transaction, no lock).  Filesystem reads and
+        # thumbnail generation happen here, accumulating pending updates.
+        logger.info("Starting thumbnail backfill for %d records", total)
 
-                    logger.info(
-                        "Progress: %d/%d processed, %d errors",
-                        min(i + batch_size, total),
-                        total,
-                        errors,
+        service = ThumbnailService(storage_dir=settings.MEDIA_ROOT)
+        processed = 0
+        errors = 0
+        pending_updates: list[tuple[int, dict[str, str]]] = []
+
+        for i in range(0, len(ids), batch_size):
+            batch_ids = ids[i : i + batch_size]
+            batch = list(AdImage.objects.filter(id__in=batch_ids).iterator())
+
+            for ad_image in batch:
+                try:
+                    result = self._read_and_generate(service, ad_image)
+                    if result is not None:
+                        pending_updates.append(result)
+                        processed += 1
+                except Exception as exc:
+                    errors += 1
+                    logger.exception(
+                        "Failed to generate thumbnails for AdImage %d: %s",
+                        ad_image.id,
+                        exc,
                     )
 
-                logger.info(
-                    "Backfill complete: %d processed, %d errors out of %d total",
-                    processed,
-                    errors,
-                    total,
-                )
+            logger.info(
+                "Progress: %d/%d processed, %d errors",
+                min(i + batch_size, total),
+                total,
+                errors,
+            )
 
-    def _process_one(self, service: ThumbnailService, ad_image: AdImage) -> None:
-        """Generate thumbnails for a single AdImage record."""
+        # Phase 3 — Persist (single short transaction.atomic(), NO lock
+        # re-acquisition).  Relying on _read_and_generate idempotency,
+        # concurrent runs are safe without holding the lock.
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            for ad_image_id, update_kwargs in pending_updates:
+                if update_kwargs:
+                    AdImage.objects.filter(id=ad_image_id).update(**update_kwargs)
+
+        logger.info(
+            "Backfill complete: %d processed, %d errors out of %d total",
+            processed,
+            errors,
+            total,
+        )
+
+    def _read_and_generate(
+        self, service: ThumbnailService, ad_image: AdImage
+    ) -> tuple[int, dict[str, str]] | None:
+        """Read the original image and generate thumbnail keys.
+
+        Performs only filesystem I/O and returns the fields that still
+        need updating.  Does **not** write to the database — persistence
+        is deferred to the caller (Phase 3).
+
+        Args:
+            service: ThumbnailService for generating variants.
+            ad_image: The AdImage record to process.
+
+        Returns:
+            ``(ad_image.id, update_kwargs)`` on success, where
+            ``update_kwargs`` contains only the thumbnail fields that
+            are still ``None`` on ``ad_image``.  Returns ``None`` when
+            the original file is missing or thumbnails already exist
+            (race condition).
+
+        Raises:
+            ValueError: If the image bytes cannot be decoded (propagates
+                to the caller's batch loop so the error counter
+                increments).
+        """
         original_path = Path(settings.MEDIA_ROOT) / str(ad_image.image)
 
         if not original_path.is_file():
@@ -128,28 +187,36 @@ class Command(BaseCommand):
                 ad_image.id,
                 original_path,
             )
-            return
+            return None
 
         with open(str(original_path), "rb") as f:
             photo_bytes = f.read()
 
-        thumbnail_keys = service.generate_thumbnails(photo_bytes, ad_image.image)
+        try:
+            thumbnail_keys = service.generate_thumbnails(
+                photo_bytes, ad_image.image
+            )
+        except FileExistsError:
+            logger.warning(
+                "Thumbnail files already exist for AdImage %d (race), skipping",
+                ad_image.id,
+            )
+            return None
 
-        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
-            # Only update the fields that are still missing
-            update_kwargs = {}
-            if ad_image.thumbnail_small is None:
-                update_kwargs["thumbnail_small"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.SMALL
-                )
-            if ad_image.thumbnail_medium is None:
-                update_kwargs["thumbnail_medium"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.MEDIUM
-                )
-            if ad_image.thumbnail_large is None:
-                update_kwargs["thumbnail_large"] = thumbnail_keys.get(
-                    ThumbnailSizeStrEnum.LARGE
-                )
+        # Only update the fields that are still missing (idempotency
+        # check) — preserves any thumbnails already present.
+        update_kwargs: dict[str, str] = {}
+        if ad_image.thumbnail_small is None:
+            update_kwargs["thumbnail_small"] = thumbnail_keys[
+                ThumbnailSizeStrEnum.SMALL
+            ]
+        if ad_image.thumbnail_medium is None:
+            update_kwargs["thumbnail_medium"] = thumbnail_keys[
+                ThumbnailSizeStrEnum.MEDIUM
+            ]
+        if ad_image.thumbnail_large is None:
+            update_kwargs["thumbnail_large"] = thumbnail_keys[
+                ThumbnailSizeStrEnum.LARGE
+            ]
 
-            if update_kwargs:
-                AdImage.objects.filter(id=ad_image.id).update(**update_kwargs)
+        return (ad_image.id, update_kwargs)
