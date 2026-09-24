@@ -44,10 +44,15 @@ class Command(BaseCommand):
                 # Status is PUBLISHED, published_at older than 2 months
                 cutoff_date = timezone.now() - timedelta(days=60)
 
+                # DB-010: acquire row-level lock via select_for_update() to prevent
+                # lost-update race between archive_sweep and concurrent web/bot writes.
+                # All other Ad-mutating paths use select_for_update(); archive_sweep
+                # was the sole exception. .order_by("pk") ensures deterministic lock
+                # ordering to prevent deadlock under concurrent access.
                 queryset = Ad.objects.filter(
                     status=AdStatus.PUBLISHED,
                     published_at__lt=cutoff_date,
-                )
+                ).select_for_update().order_by("pk")
 
                 count = queryset.count()
 
@@ -70,7 +75,7 @@ class Command(BaseCommand):
                 #    ad's status; invalid transitions raise ValueError and are
                 #    skipped (logged at WARN).
                 updated_count = 0
-                for ad in queryset.order_by("pk"):
+                for ad in queryset:
                     try:
                         ad.transition_to(AdStatus.ARCHIVED)
                     except (ValueError, Ad.DoesNotExist):

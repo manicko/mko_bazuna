@@ -46,17 +46,17 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           7  PURGE_REJECTED_ADS           rejected-ad purge
           8  ROLLUP_DAILY_METRICS         daily metrics rollup
           9  ALERT_DELIVERY_TASK          search-alert delivery (production path)
-         11  PURGE_DELETED_ADS            deleted-ad purge
-         12  RECOMPUTE_NORMALIZED_PRICES  price normalization
+          11  PURGE_DELETED_ADS            deleted-ad purge
+          12  RECOMPUTE_NORMALIZED_PRICES  price normalization
+          102  BACKFILL_THUMBNAILS          thumbnail backfill
+          103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
 
     Session-scoped (pg_advisory_lock; spans the connection, pre-PgBouncer):
-        100  MIGRATE                      post-migration setup (runs pre-PgBouncer)
-        101  CREATE_ADMIN                 admin creation
-        102  BACKFILL_THUMBNAILS          thumbnail backfill
-        103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
-        104  CATALOG_LOAD                 catalog load
-        110  SEED                         seed service
-        111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
+          100  MIGRATE                      post-migration setup (runs pre-PgBouncer)
+          101  CREATE_ADMIN                 admin creation
+          104  CATALOG_LOAD                 catalog load
+          110  SEED                         seed service
+          111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
 
     ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
     was removed in DB-007. IDs 13-99 are reserved for future scheduled jobs.
