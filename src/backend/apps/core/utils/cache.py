@@ -140,3 +140,53 @@ def invalidate_bot_username_cache(key: str = BOT_USERNAME_CACHE_KEY) -> None:
         key: Cache key to invalidate (defaults to site_config:bot_username:v1)
     """
     cache.delete(key)
+
+
+SUPPORT_CONTACTS_CACHE_KEY: Final[str] = "support_contacts:v1"
+SUPPORT_CONTACTS_CACHE_TTL: Final[int] = 3600  # 1 hour
+
+
+def get_cached_support_contacts(
+    key: str = SUPPORT_CONTACTS_CACHE_KEY,
+) -> list | None:
+    """
+    Get cached support contacts.
+
+    Args:
+        key: Cache key (defaults to support_contacts:v1)
+
+    Returns:
+        List of cached SupportContact model instances or None if not cached
+    """
+    return cache.get(key)
+
+
+def set_cached_support_contacts(
+    value: list,
+    key: str = SUPPORT_CONTACTS_CACHE_KEY,
+    ttl: int = SUPPORT_CONTACTS_CACHE_TTL,
+) -> None:
+    """
+    Set cached support contacts.
+
+    Args:
+        value: List of SupportContact model instances to cache
+        key: Cache key (defaults to support_contacts:v1)
+        ttl: Time-to-live in seconds (defaults to 3600)
+    """
+    cache.set(key, value, ttl)
+
+
+def invalidate_support_contacts_cache(
+    key: str = SUPPORT_CONTACTS_CACHE_KEY,
+) -> None:
+    """
+    Invalidate the cached support contacts.
+
+    Called when admin creates, updates, or deletes a SupportContact to ensure
+    fresh data is fetched from the DB on the next access.
+
+    Args:
+        key: Cache key to invalidate (defaults to support_contacts:v1)
+    """
+    cache.delete(key)
