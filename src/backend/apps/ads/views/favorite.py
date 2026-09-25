@@ -12,6 +12,7 @@ import logging
 from django.db.models import Exists, OuterRef, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad, AdFavorite
 from apps.core.enums import AdStatus
@@ -38,6 +39,7 @@ def annotate_favorites(queryset: QuerySet[Ad], user_id: int | None) -> QuerySet[
     return queryset.annotate(is_favorited=Exists(favorite_exists))
 
 
+@require_POST
 def toggle_favorite(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     Toggle whether the current user has favorited a PUBLISHED ad.

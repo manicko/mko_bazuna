@@ -108,6 +108,36 @@ class TestFavoriteToggle:
         resp = client.post(f"/favorite/{ad.id}/")
         assert resp.status_code == 404
 
+    def test_get_toggle_returns_405(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """A GET to /favorite/<ad_id>/ is rejected — POST-only via @require_POST.
+
+        Mirrors test_logout.py::test_get_logout_returns_405. Anonymous users
+        must not toggle favorites on any method.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(buyer)
+        response = client.get(f"/favorite/{ad.id}/")
+        assert response.status_code == 405
+
+    def test_get_toggle_does_not_mutate_favorites(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """A GET must not create or delete an AdFavorite row (CSRF-safe).
+
+        Verifies the state-changing body (get_or_create + delete) is not reached
+        on a non-POST request.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(buyer)
+
+        response = client.get(f"/favorite/{ad.id}/")
+        assert response.status_code == 405
+        assert not AdFavorite.objects.filter(user=buyer, ad=ad).exists()
+
 
 # ---------------------------------------------------------------------------
 # annotate_favorites helper
