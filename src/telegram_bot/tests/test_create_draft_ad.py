@@ -143,7 +143,7 @@ class TestCreateDraftAdCrashRecovery:
         ):
             # Patch delete_photo to verify it is NOT called
             # (post-commit FS deletion is skipped on rollback)
-            with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
+            with patch("telegram_bot.services.ad_data.orm.delete_photo") as mock_delete:
                 with pytest.raises(RuntimeError, match="simulated crash"):
                     await delete_draft(ad.id)
 

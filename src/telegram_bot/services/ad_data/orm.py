@@ -1,0 +1,178 @@
+"""ORM helper functions for the Telegram bot ad-creation service.
+
+All DB access is wrapped in ``sync_to_async`` to keep the bot's event loop
+responsive (bot -> backend direction). This module may import from ``apps.*``
+but ``apps.*`` must never import ``telegram_bot.*``.
+"""
+
+import logging
+
+from asgiref.sync import sync_to_async
+from django.db import IntegrityError, transaction
+
+from apps.ads.models import Ad
+from apps.categories.models import Category
+from apps.core.enums import AdStatus
+from apps.locations.models import City
+from apps.media.services.filesystem import delete_photo
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "create_draft_ad",
+    "_get_ad_status",
+    "delete_draft",
+    "search_categories",
+    "get_city_by_name",
+    "get_all_cities",
+    "get_category",
+    "get_city",
+]
+
+
+# ---------------------------------------------------------------------------
+# ORM helpers (sync_to_async)
+# ---------------------------------------------------------------------------
+
+
+async def create_draft_ad(user_id: int) -> Ad:
+    """Create a draft ad row, ensuring at most one in-progress DRAFT per user.
+
+    If an existing DRAFT is found for the user, it is deleted first (with its
+    AdImage rows CASCADE-deleted). The partial unique index
+    ``uq_ads_single_draft_per_user`` fires ``IntegrityError`` as a backstop
+    for any concurrent race that slips past this check; on such a race we
+    retry once after cleaning up.
+    """
+
+    @sync_to_async
+    def _create() -> Ad:
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
+            # Remove any pre-existing in-progress DRAFT for this user before
+            # creating a fresh one (Option D: delete + recreate). AdImage rows
+            # CASCADE-delete via the FK. Orphaned media files are reclaimed by
+            # sweep_orphaned_media.
+            existing = Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT)
+            if existing.exists():
+                existing.delete()
+
+            try:
+                return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
+            except IntegrityError:
+                # Race: a concurrent create_draft_ad slipped through the above
+                # check before the unique index was enforced. Clean up and retry.
+                Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT).delete()
+                return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
+
+    return await _create()
+
+
+async def _get_ad_status(ad_id: int) -> AdStatus | None:
+    """Return the current ``AdStatus`` for *ad_id*, or ``None`` if it doesn't exist.
+
+    Uses ``sync_to_async`` to perform the lightweight DB lookup off
+    the bot's event loop, mirroring the TX-then-Filesystem pattern used
+    throughout this module.
+    """
+
+    @sync_to_async
+    def _get() -> AdStatus | None:
+        status_str = (
+            Ad.objects.filter(id=ad_id).values_list("status", flat=True).first()
+        )
+        if status_str is None:
+            return None
+        return AdStatus(status_str)
+
+    return await _get()
+
+
+async def delete_draft(ad_id: int) -> None:
+    """Delete a draft ad and clean up its photo files."""
+
+    @sync_to_async
+    def _delete() -> None:
+        try:
+            ad = Ad.objects.get(id=ad_id, status=AdStatus.DRAFT)
+        except Ad.DoesNotExist:
+            return
+
+        # Collect storage keys inside the transaction (DB-only read),
+        # then delete the Ad row (DB-first). Filesystem deletion happens
+        # only after the transaction commits — TX-then-Filesystem pattern
+        # mirroring soft_delete_user_ads and sweep_drafts.
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            storage_keys = [
+                key for img in ad.images.all() for key in img.storage_keys()
+            ]
+            ad.delete()
+
+        # Delete physical media files after the transaction commits.
+        # Filesystem deletions inside transaction.atomic() cannot be
+        # rolled back, so a DB rollback would orphan DB rows pointing to
+        # already-deleted files.
+        for key in storage_keys:
+            delete_photo(key)
+
+    await _delete()
+
+
+async def search_categories(keyword: str) -> list[Category]:
+    """Search categories by keyword."""
+
+    @sync_to_async
+    def _search() -> list[Category]:
+        return list(
+            Category.objects.filter(name__icontains=keyword, is_active=True)[:5]
+        )
+
+    return await _search()
+
+
+async def get_city_by_name(name: str) -> City | None:
+    """Get city by exact name."""
+
+    @sync_to_async
+    def _get() -> City | None:
+        try:
+            return City.objects.get(name__iexact=name)
+        except City.DoesNotExist:
+            return None
+
+    return await _get()
+
+
+async def get_all_cities() -> list[City]:
+    """Get all cities."""
+
+    @sync_to_async
+    def _get() -> list[City]:
+        return list(City.objects.all())
+
+    return await _get()
+
+
+async def get_category(category_id: int) -> Category | None:
+    """Get category by ID."""
+
+    @sync_to_async
+    def _get() -> Category | None:
+        try:
+            return Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return None
+
+    return await _get()
+
+
+async def get_city(city_id: int) -> City | None:
+    """Get city by ID."""
+
+    @sync_to_async
+    def _get() -> City | None:
+        try:
+            return City.objects.get(id=city_id)
+        except City.DoesNotExist:
+            return None
+
+    return await _get()

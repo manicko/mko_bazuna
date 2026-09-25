@@ -673,7 +673,7 @@ class TestDeleteDraftStorageKeys:
             )
 
         # Patch delete_photo to spy on calls (avoid real filesystem deletion)
-        with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
+        with patch("telegram_bot.services.ad_data.orm.delete_photo") as mock_delete:
             await delete_draft(ad.id)
 
         # delete_photo must be called for ALL 4 keys, not just img.image
@@ -735,7 +735,7 @@ class TestDeleteDraftCrashRecovery:
                 side_effect=RuntimeError("simulated crash"),
             ):
                 # Patch delete_photo to prevent real deletion and track calls
-                with patch("telegram_bot.services.ad_data.delete_photo") as mock_delete:
+                with patch("telegram_bot.services.ad_data.orm.delete_photo") as mock_delete:
                     with pytest.raises(RuntimeError, match="simulated crash"):
                         await delete_draft(ad.id)
 
