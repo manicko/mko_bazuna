@@ -1,5 +1,5 @@
 """
-Favorites toggle view and ad-card annotation helper (FT-001).
+Favorites toggle view (FT-001).
 
 The heart toggle is an auth-gated HTMX endpoint. It uses a **manual** auth
 check so an anonymous tap returns the ``login_prompt`` fragment (HTTP 200,
@@ -9,7 +9,6 @@ no 302) that htmx swaps in place, instead of following a redirect blindly
 
 import logging
 
-from django.db.models import Exists, OuterRef, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
@@ -23,20 +22,6 @@ logger = logging.getLogger(__name__)
 _FAVORITE_HEART_TEMPLATE = "components/favorite_heart.html"
 # Template returned to anonymous users who tap the heart (guest login gate).
 _LOGIN_PROMPT_TEMPLATE = "components/login_prompt.html"
-
-
-def annotate_favorites(queryset: QuerySet[Ad], user_id: int | None) -> QuerySet[Ad]:
-    """Annotate each Ad with an ``is_favorited`` flag for the current user.
-
-    Uses a correlated ``Exists`` subquery on ``AdFavorite`` so cards render the
-    correct initial heart state without per-card queries. Anonymous users
-    (``user_id`` None) never match a favorite, so every ad is False.
-    """
-    favorite_exists = AdFavorite.objects.filter(
-        ad_id=OuterRef("pk"),
-        user_id=user_id,
-    )
-    return queryset.annotate(is_favorited=Exists(favorite_exists))
 
 
 @require_POST

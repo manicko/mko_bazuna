@@ -15,7 +15,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
 from apps.ads.models import Ad
-from apps.ads.views.favorite import annotate_favorites
+from apps.ads.services.favorites import annotate_favorites
 
 logger = logging.getLogger(__name__)
 

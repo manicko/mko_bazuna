@@ -26,7 +26,7 @@ from django.db.models import F, Q, QuerySet
 from pydantic import BaseModel, Field, field_validator
 
 from apps.ads.models import Ad
-from apps.ads.views.favorite import annotate_favorites
+from apps.ads.services.favorites import annotate_favorites
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus

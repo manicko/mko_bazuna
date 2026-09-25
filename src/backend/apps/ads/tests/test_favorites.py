@@ -17,7 +17,7 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdFavorite
-from apps.ads.views.favorite import annotate_favorites
+from apps.ads.services.favorites import annotate_favorites
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
