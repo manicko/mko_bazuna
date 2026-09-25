@@ -10,6 +10,10 @@ services:
     stop_grace_period: 30s
     env_file:
       - .env.prod
+    environment:
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    tmpfs:
+      - /tmp/prometheus_multiproc:rw
     volumes:
       - ./.env.prod:/app/src/.env:ro
       - media_volume:/app/media

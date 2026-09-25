@@ -5,6 +5,8 @@ This file is auto-discovered by Gunicorn when the working directory is /app
 ``preload_app`` can safely load the configuration before worker processes fork.
 """
 
+from prometheus_client import multiprocess
+
 # Socket: bind to all interfaces on the HTTP port exposed by the container.
 bind = "0.0.0.0:8000"
 
@@ -36,3 +38,13 @@ errorlog = "-"
 # Safe here because this module contains only pure Python values and performs
 # no Django imports at parse time.
 preload_app = True
+
+
+def child_exit(server, worker):
+    """Clean up multiprocess Prometheus metrics when a worker exits.
+
+    Called by Gunicorn in the master process when a worker process exits.
+    Removes the exiting worker's stale gauge files from PROMETHEUS_MULTIPROC_DIR
+    so that the next /metrics scrape does not include dead-worker metrics.
+    """
+    multiprocess.mark_process_dead(worker.pid)

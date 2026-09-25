@@ -16,6 +16,8 @@ from django.test import Client
 
 pytestmark = [pytest.mark.unit]
 
+_PROJECT_ROOT = settings.BASE_DIR.parent
+
 
 # ---------------------------------------------------------------------------
 # INSTALLED_APPS
@@ -57,3 +59,27 @@ def test_metrics_endpoint(client: Client) -> None:
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "# HELP" in content or "# TYPE" in content
+
+
+# ---------------------------------------------------------------------------
+# Prometheus multiprocess mode (P1 — 12-OPS-011)
+# ---------------------------------------------------------------------------
+
+
+def test_prometheus_multiproc_dir_configured() -> None:
+    """docker-compose.prod.yml sets PROMETHEUS_MULTIPROC_DIR for the web service."""
+    content = (_PROJECT_ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
+    assert "PROMETHEUS_MULTIPROC_DIR" in content, (
+        "docker-compose.prod.yml must set PROMETHEUS_MULTIPROC_DIR for the web service"
+    )
+
+
+def test_gunicorn_has_child_exit_hook() -> None:
+    """gunicorn.conf.py defines a child_exit hook for multiprocess cleanup."""
+    content = (_PROJECT_ROOT / "gunicorn.conf.py").read_text(encoding="utf-8")
+    assert "def child_exit" in content, (
+        "gunicorn.conf.py must define a child_exit hook"
+    )
+    assert "mark_process_dead" in content, (
+        "child_exit must call prometheus_client.multiprocess.mark_process_dead(worker.pid)"
+    )
