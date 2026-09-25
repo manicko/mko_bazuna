@@ -30,6 +30,17 @@ fast-gate CI run:
     correct CLDR plural form at runtime (I18N-003).
 12. ``test_no_hardcoded_js_strings`` — inline ``<script>`` literals must not
     carry untranslated user-visible text (I18N-008).
+13. ``test_all_languages_ltr`` — all configured languages are LTR (guards the
+    I18N-006 Bidi invariant).
+14. ``test_bot_no_hardcoded_messages`` — AST-scans bot handler user-facing
+    method calls (``answer``, ``reply``, ``edit_text``, ``edit_caption``,
+    ``send_message``, ``button``) for unwrapped string/f-string text arguments.
+15. ``test_no_cyrillic_msgids`` — no ``msgid`` in any ``.po`` contains
+    Cyrillic characters (msgids must be English; msgstr is exempt).
+16. ``test_no_raw_get_name_in_templates`` — public/seller-facing templates must
+    use locale-aware ``|get_title`` / ``|get_category_name`` /
+    ``|get_city_name`` / ``|get_lookup_name`` filters instead of raw
+    ``{{ obj.get_name }}`` calls or raw ``.title`` / ``.name`` attribute access.
 
 ``test_hreflang_present`` is extended with the ``x-default`` exclusion
 (spec §5f) and ``test_locale_switch_re_render`` with an ``en`` locale-switch
