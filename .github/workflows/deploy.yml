@@ -68,6 +68,12 @@ jobs:
 
             echo "=== Starting deployment of IMAGE_TAG=${IMAGE_TAG} ==="
 
+            # Capture the currently running image tag before pulling/recreating.
+            # Must be captured while old containers still run (before pull/up),
+            # so it reflects the last-known-good IMAGE_TAG for potential rollback.
+            PREVIOUS_IMAGE_TAG=$(docker compose images --format '{{.Tag}}' web | head -1)
+            echo "Previous image tag: ${PREVIOUS_IMAGE_TAG:-none}"
+
             # a. Create a timestamped database backup (pre-deploy safety net)
             echo "=== Step 1: Pre-deploy database backup ==="
             mkdir -p /app/backups
@@ -89,9 +95,37 @@ jobs:
               echo "Health check passed — /health/ready/ returned 200."
             else
               echo "ERROR: Health check FAILED after 60s timeout."
-              echo "The deployment may be unhealthy. Aborting and reference:"
-              echo "https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
-              exit 1
+              echo "=== Attempting automated rollback ==="
+
+              # No previous tag available — cannot roll back automatically.
+              if [ -z "${PREVIOUS_IMAGE_TAG}" ] || [ "${PREVIOUS_IMAGE_TAG}" = "<none>" ]; then
+                echo "ERROR: No previous image tag available for rollback (PREVIOUS_IMAGE_TAG is empty or '<none>')."
+                echo "Manual rollback required. Runbook: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
+                exit 1
+              fi
+
+              echo "Rolling back to previous image: ${PREVIOUS_IMAGE_TAG}"
+
+              # Revert IMAGE_TAG to the previous known-good tag and pull it.
+              IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+              # Recreate services with the previous image (force-recreate so
+              # Docker does not reuse containers keyed on the old image digest).
+              echo "=== Step 4b: Recreate services with previous image ==="
+              IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot
+
+              # Re-poll /health/ready/ with a 30-second timeout to confirm rollback
+              # restored a healthy state (curl runs inside the web container —
+              # port 8000 is not published on the host).
+              echo "=== Re-running health check for rollback validation (30s timeout) ==="
+              if timeout 30 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
+                echo "Rollback health check passed — /health/ready/ returned 200."
+                echo "=== Rollback complete: reverted to IMAGE_TAG=${PREVIOUS_IMAGE_TAG} ==="
+              else
+                echo "ERROR: Rollback health check ALSO FAILED after 30s timeout."
+                echo "Manual intervention required. Runbook: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
+                exit 1
+              fi
             fi
 
             echo "=== Deployment complete: IMAGE_TAG=${IMAGE_TAG} ==="
