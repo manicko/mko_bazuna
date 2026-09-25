@@ -198,17 +198,20 @@ isolation instead.
 > result set (up to `SEARCH_CACHE_MAX_HITS=1000`); pagination is handled by
 > Django's `Paginator` on the re-fetched queryset.
 
-### 2. Category submenu cache (reference — tree-version bump + locale)
+### 2. Category submenu cache (reference — SWR + tree-version bump + locale)
 
 | Attribute | Value |
 |---|---|
-| Module | `apps/categories/cache.py` |
+| Module | `apps/categories/views.py` (`category_submenu()`) |
 | Key format | `category:submenu:{tree_version}:{slug}:{locale}` |
 | Version key | `category:tree_version` |
-| Bump function | `bump_tree_version()` |
-| Read function | `get_tree_version()` |
-| TTL | 300 s (`SUBMENU_CACHE_TTL`) |
-| Invalidation trigger | Category / CategoryPath structural changes |
+| Bump function | `bump_tree_version()` (`apps/categories/cache.py`) |
+| Read function | `get_tree_version()` (`apps/categories/cache.py`) |
+| SWR wrapper | `get_with_stale_revalidate()` |
+| `ttl` | 300 s (`SUBMENU_CACHE_TTL`) |
+| `stale_ttl` | 60 s (`SUBMENU_CACHE_STALE_TTL`) |
+| `lock_ttl` | 30 s (`SUBMENU_CACHE_LOCK_TTL`) |
+| Invalidation trigger | Category / CategoryPath structural changes (signal-driven) |
 
 **Key segments:**
 
