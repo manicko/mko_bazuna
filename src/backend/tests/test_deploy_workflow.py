@@ -3,9 +3,9 @@ Deployment workflow structural tests (B4 / finding 12-OPS-005).
 
 Asserts that the deploy workflow exists and contains the required
 deploy-safety mechanisms: SSH-based deployment, pre-deploy backup,
-health-check gating on /health/ready/, rollback documentation
-reference, and the connection-draining stop_grace_period on the
-production web service.
+health-check gating on /health/ready/, automated rollback on health-check
+failure (12-OPS-010), rollback documentation reference, and the
+connection-draining stop_grace_period on the production web service.
 
 Follows the same pattern as test_compose_hardening.py and
 test_docs_ci_parity.py: string-level checks via Path.read_text(),
@@ -111,6 +111,32 @@ def test_deploy_workflow_has_rollback_reference() -> None:
     )
     assert "rollback.md" in text, (
         "deploy.yml must reference docs/ops/rollback.md on failure"
+    )
+
+
+def test_deploy_workflow_captures_previous_image_tag() -> None:
+    """deploy.yml must capture PREVIOUS_IMAGE_TAG before pulling/recreating (12-OPS-010)."""
+    text = _DEPLOY_YML.read_text()
+    assert "PREVIOUS_IMAGE_TAG" in text, (
+        "deploy.yml must capture PREVIOUS_IMAGE_TAG before pull for rollback"
+    )
+
+
+def test_deploy_workflow_has_automated_rollback_step() -> None:
+    """deploy.yml must perform automated rollback on health-check failure (12-OPS-010).
+
+    Asserts the rollback mechanism: revert image tag, force-recreate services,
+    and re-poll /health/ready/ with a 30-second timeout to validate rollback.
+    """
+    text = _DEPLOY_YML.read_text()
+    assert "--force-recreate" in text, (
+        "deploy.yml automated rollback must use --force-recreate when reverting"
+    )
+    assert "PREVIOUS_IMAGE_TAG" in text, (
+        "deploy.yml rollback must revert to the captured PREVIOUS_IMAGE_TAG"
+    )
+    assert "timeout 30" in text, (
+        "deploy.yml rollback must re-poll /health/ready/ with a 30-second timeout"
     )
 
 

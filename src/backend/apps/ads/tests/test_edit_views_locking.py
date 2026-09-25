@@ -215,3 +215,110 @@ class TestEditViewsRowLockConcurrency:
             "Ad should have been hard-deleted by the concurrent sweep "
             "after the lock was released"
         )
+
+    def test_select_for_update_blocks_concurrent_delete_during_edit(
+        self, seller, category, city
+    ) -> None:
+        """A row locked with ``select_for_update()`` blocks a concurrent
+        hard-delete during the ad_edit POST path (mirror of archive test).
+
+        The ad_edit view fetches with ``Ad.objects.select_for_update()`` inside
+        ``transaction.atomic()`` before calling ``transition_to()``. This test
+        verifies the lock blocks a concurrent sweep until the transaction commits.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad_id = ad.id
+
+        started = threading.Event()
+        finished = threading.Event()
+        errors: list[BaseException] = []
+
+        def concurrent_hard_delete() -> None:
+            started.set()
+            try:
+                with transaction.atomic():
+                    Ad.objects.filter(pk=ad_id).delete()
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+            finally:
+                finished.set()
+                connection.close()
+
+        with transaction.atomic():
+            locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
+            assert locked_ad.id == ad_id
+
+            thread = threading.Thread(target=concurrent_hard_delete)
+            thread.start()
+
+            assert started.wait(timeout=5), "Background thread did not start"
+
+            time.sleep(1.0)
+            assert not finished.is_set(), (
+                "DELETE completed before lock was released — "
+                "select_for_update did not block the concurrent delete"
+            )
+
+        assert finished.wait(timeout=10), (
+            "DELETE did not complete after lock was released"
+        )
+        thread.join(timeout=10)
+
+        assert not errors, f"Background thread raised: {errors}"
+        assert not Ad.objects.filter(pk=ad_id).exists(), (
+            "Ad should have been hard-deleted by the concurrent sweep "
+            "after the lock was released"
+        )
+
+    def test_select_for_update_blocks_concurrent_delete_during_reactivate(
+        self, seller, category, city
+    ) -> None:
+        """A row locked with ``select_for_update()`` blocks a concurrent
+        hard-delete during the ad_reactivate path.
+
+        The ad_reactivate view fetches with ``Ad.objects.select_for_update()``
+        inside ``transaction.atomic()`` before calling ``transition_to()``.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
+        ad_id = ad.id
+
+        started = threading.Event()
+        finished = threading.Event()
+        errors: list[BaseException] = []
+
+        def concurrent_hard_delete() -> None:
+            started.set()
+            try:
+                with transaction.atomic():
+                    Ad.objects.filter(pk=ad_id).delete()
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+            finally:
+                finished.set()
+                connection.close()
+
+        with transaction.atomic():
+            locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
+            assert locked_ad.id == ad_id
+
+            thread = threading.Thread(target=concurrent_hard_delete)
+            thread.start()
+
+            assert started.wait(timeout=5), "Background thread did not start"
+
+            time.sleep(1.0)
+            assert not finished.is_set(), (
+                "DELETE completed before lock was released — "
+                "select_for_update did not block the concurrent delete"
+            )
+
+        assert finished.wait(timeout=10), (
+            "DELETE did not complete after lock was released"
+        )
+        thread.join(timeout=10)
+
+        assert not errors, f"Background thread raised: {errors}"
+        assert not Ad.objects.filter(pk=ad_id).exists(), (
+            "Ad should have been hard-deleted by the concurrent sweep "
+            "after the lock was released"
+        )

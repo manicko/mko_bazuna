@@ -59,6 +59,16 @@ class TestCleanupLoginTokens:
         call_command("cleanup_login_tokens")
         assert LoginToken.objects.filter(pk=consumed_recent.pk).exists()
 
+    def test_deletes_consumed_tokens_older_than_24h(self):
+        """Token with future expiry but consumed >24h ago IS deleted
+        (second OR branch: consumed_at__lt=consumed_cutoff)."""
+        stale_consumed = self._make_token(
+            expires_at=timezone.now() + timedelta(hours=1),
+            consumed_at=timezone.now() - timedelta(hours=25),
+        )
+        call_command("cleanup_login_tokens")
+        assert not LoginToken.objects.filter(pk=stale_consumed.pk).exists()
+
     def test_preserves_fresh_unconsumed_tokens(self):
 
         token = self._make_token(

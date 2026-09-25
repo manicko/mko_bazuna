@@ -12,6 +12,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
 django.setup()
 
 from aiogram import Bot, Dispatcher  # noqa: E402
+from aiogram.fsm.storage.base import BaseStorage  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
 from aiogram.fsm.storage.redis import RedisStorage  # noqa: E402
 from django.conf import settings  # noqa: E402
@@ -29,6 +30,62 @@ from telegram_bot.middlewares import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+
+def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
+    """Configure a Dispatcher with storage, lifecycle hooks, middleware, and routers.
+
+    Both ``main()`` and the test ``dp`` fixture call this to guarantee
+    production and test wiring are identical — same middleware order, same
+    routers, same error-handler registration.
+    """
+    dp = Dispatcher(storage=storage)
+
+    # Register lifecycle hooks: startup writes the liveness marker,
+    # shutdown removes it and closes DB connections, LivenessMiddleware
+    # touches the marker on every inbound update for freshness.
+    dp.startup.register(_on_startup)
+    dp.shutdown.register(_on_shutdown)
+    dp.update.middleware(UpdateIdDedupMiddleware())
+    dp.update.middleware(LivenessMiddleware())
+    # Locale middleware must run before AccountStateMiddleware so denial
+    # messages render in the user's preferred language (FQ-001).
+    dp.update.middleware(LanguageMiddleware())
+    # Register account state middleware on update-level so it receives Update
+    # events (Message + CallbackQuery), making the isinstance(event, Update)
+    # gate and event.message / event.callback_query access functional.
+    dp.update.middleware(AccountStateMiddleware())
+    dp.update.outer_middleware(DatabaseConnectionMiddleware())
+
+    # Include all 6 routers — the canonical wiring.
+    from telegram_bot.handlers import (
+        ad_copy_router,
+        ad_create_router,
+        alerts_router,
+        contact_router,
+        language_router,
+        login_router,
+    )
+
+    dp.include_router(login_router)
+    dp.include_router(ad_create_router)
+    dp.include_router(alerts_router)
+    dp.include_router(ad_copy_router)
+    dp.include_router(language_router)
+    dp.include_router(contact_router)
+
+    # EXT-002: replay-capable 429 (flood control) backoff for outbound calls.
+    # Only TelegramRetryAfter is intercepted; all other errors still flow to
+    # the generic catch-all. Must be registered before run_polling. Imports are
+    # lazy to avoid pulling Django models before django.setup().
+    from aiogram.exceptions import TelegramRetryAfter
+    from aiogram.filters import ExceptionTypeFilter
+
+    from telegram_bot.retry import retry_transient
+
+    dp.errors(ExceptionTypeFilter(TelegramRetryAfter))(retry_transient)
+
+    return dp
 
 
 def main() -> None:
@@ -60,51 +117,8 @@ def main() -> None:
     else:
         logger.warning("REDIS_URL not set — using MemoryStorage (ephemeral FSM)")
         storage = MemoryStorage()
-    dp = Dispatcher(storage=storage)
 
-    # Register lifecycle hooks: startup writes the liveness marker,
-    # shutdown removes it and closes DB connections, LivenessMiddleware
-    # touches the marker on every inbound update for freshness.
-    dp.startup.register(_on_startup)
-    dp.shutdown.register(_on_shutdown)
-    dp.update.middleware(UpdateIdDedupMiddleware())
-    dp.update.middleware(LivenessMiddleware())
-    # Locale middleware must run before AccountStateMiddleware so denial
-    # messages render in the user's preferred language (FQ-001).
-    dp.update.middleware(LanguageMiddleware())
-    # Register account state middleware on update-level so it receives Update
-    # events (Message + CallbackQuery), making the isinstance(event, Update)
-    # gate and event.message / event.callback_query access functional.
-    dp.update.middleware(AccountStateMiddleware())
-    dp.update.outer_middleware(DatabaseConnectionMiddleware())
-
-    # Include routers
-    from telegram_bot.handlers import (
-        ad_copy_router,
-        ad_create_router,
-        alerts_router,
-        contact_router,
-        language_router,
-        login_router,
-    )
-
-    dp.include_router(login_router)
-    dp.include_router(ad_create_router)
-    dp.include_router(alerts_router)
-    dp.include_router(ad_copy_router)
-    dp.include_router(language_router)
-    dp.include_router(contact_router)
-
-    # EXT-002: replay-capable 429 (flood control) backoff for outbound calls.
-    # Only TelegramRetryAfter is intercepted; all other errors still flow to
-    # the generic catch-all. Must be registered before run_polling. Imports are
-    # lazy to avoid pulling Django models before django.setup().
-    from aiogram.exceptions import TelegramRetryAfter
-    from aiogram.filters import ExceptionTypeFilter
-
-    from telegram_bot.retry import retry_transient
-
-    dp.errors(ExceptionTypeFilter(TelegramRetryAfter))(retry_transient)
+    dp = configure_dispatcher(storage)
 
     # Create bot and start polling
     bot = Bot(token=token)

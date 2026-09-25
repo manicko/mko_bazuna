@@ -11,9 +11,12 @@ REJECTED, and that PUBLISHED/ARCHIVED -> REJECTED raises ValueError.
 from __future__ import annotations
 
 import inspect
+import threading
+import time
 from unittest.mock import patch
 
 import pytest
+from django.db import connection, transaction
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
@@ -350,6 +353,63 @@ class TestBulkOperations:
         ads[1].refresh_from_db()
         assert ads[1].status == AdStatus.ON_MODERATION
 
+    def test_bulk_reject_rejects_all(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """N ON_MODERATION/ON_MODERATION_FAILED ads → all REJECTED,
+        rejected_at set, return count == N."""
+        ads = [
+            create_test_ad(
+                seller, category, city, title="Reject A",
+                status=AdStatus.ON_MODERATION,
+            ),
+            create_test_ad(
+                seller, category, city, title="Reject B",
+                status=AdStatus.ON_MODERATION_FAILED,
+            ),
+        ]
+        moderator = User.objects.create(
+            telegram_id=900000213, chat_id=900000213, password="x"
+        )
+
+        count = bulk_reject(Ad.objects.all(), moderator.id, "policy violation")
+
+        assert count == 2
+        for ad in ads:
+            ad.refresh_from_db()
+            assert ad.status == AdStatus.REJECTED
+            assert ad.rejected_at is not None
+
+    def test_bulk_reject_skips_already_rejected(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """Already-REJECTED ads are skipped, not double-rejected."""
+        rejected_ad = create_test_ad(
+            seller, category, city, title="Already Rejected",
+            status=AdStatus.REJECTED,
+        )
+        on_moderation_ad = create_test_ad(
+            seller, category, city, title="On Moderation",
+            status=AdStatus.ON_MODERATION,
+        )
+        moderator = User.objects.create(
+            telegram_id=900000216, chat_id=900000216, password="x"
+        )
+
+        count = bulk_reject(Ad.objects.all(), moderator.id, "reason")
+
+        assert count == 1
+        rejected_ad.refresh_from_db()
+        assert rejected_ad.status == AdStatus.REJECTED  # unchanged
+        on_moderation_ad.refresh_from_db()
+        assert on_moderation_ad.status == AdStatus.REJECTED
+
 
 # ---------------------------------------------------------------------------
 # Tests: DB-003 transactional rollback for ban+audit-log writes
@@ -423,3 +483,82 @@ class TestBanAtomicRollback:
             assert u.is_banned is False
         # The first call succeeded before the failure was triggered.
         assert mock_log.call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# Tests: DB-003 behavioral concurrency — select_for_update blocks delete
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.slow
+@pytest.mark.integration
+@pytest.mark.concurrent
+class TestBulkRejectRowLockConcurrency:
+    """DB-003: ``select_for_update()`` in bulk_reject prevents stale-state races.
+
+    Mirrors ``TestEditViewsRowLockConcurrency`` from ``test_edit_views_locking.py``:
+    a row locked by ``select_for_update()`` inside ``transaction.atomic()``
+    blocks a concurrent hard-delete until the locking transaction commits.
+    """
+
+    def test_select_for_update_blocks_concurrent_delete_during_bulk_reject(
+        self, seller: User, category, city
+    ) -> None:
+        """A row locked by bulk_reject's ``select_for_update()`` blocks a
+        concurrent hard-delete until the transaction commits.
+
+        This verifies that the row-level lock in ``bulk_reject`` (DB-003)
+        prevents a concurrent sweep from deleting an ad mid-bulk, which would
+        otherwise cause ``Ad.DoesNotExist`` inside the transition.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad_id = ad.id
+
+        started = threading.Event()
+        finished = threading.Event()
+        errors: list[BaseException] = []
+
+        def concurrent_hard_delete() -> None:
+            """Background thread: hard-deletes the locked row.
+
+            Should block while the main thread holds the ``FOR UPDATE`` lock.
+            """
+            started.set()
+            try:
+                with transaction.atomic():
+                    Ad.objects.filter(pk=ad_id).delete()
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+            finally:
+                finished.set()
+                connection.close()
+
+        # --- Main thread: acquire the row lock (as bulk_reject does) ---
+        with transaction.atomic():
+            locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
+            assert locked_ad.id == ad_id
+
+            thread = threading.Thread(target=concurrent_hard_delete)
+            thread.start()
+
+            assert started.wait(timeout=5), "Background thread did not start"
+
+            # The DELETE should be blocked waiting for the row lock.
+            time.sleep(1.0)
+            assert not finished.is_set(), (
+                "DELETE completed before lock was released — "
+                "select_for_update did not block the concurrent delete"
+            )
+
+        # --- Main transaction commits, releasing the row lock ---
+        assert finished.wait(timeout=10), (
+            "DELETE did not complete after lock was released"
+        )
+        thread.join(timeout=10)
+
+        assert not errors, f"Background thread raised: {errors}"
+        assert not Ad.objects.filter(pk=ad_id).exists(), (
+            "Ad should have been hard-deleted by the concurrent sweep "
+            "after the lock was released"
+        )

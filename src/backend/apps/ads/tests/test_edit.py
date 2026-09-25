@@ -26,7 +26,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.ads.models import Ad
+from apps.ads.models import Ad, AdImage
 from apps.ads.views.edit import _apply_price_change
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
@@ -607,3 +607,257 @@ class TestApplyPriceChangeDelegation:
             # Currency None (→ None path — utility clears the value)
             _apply_price_change(ad, Decimal("0"), None)
             mock_normalizer.assert_called_with(ad, Decimal("0"), None)
+
+
+# ---------------------------------------------------------------------------
+# TST-008: Authorization (wrong-user 403 on GET and POST)
+# ---------------------------------------------------------------------------
+
+
+class TestEditAuthorization:
+    """TST-008: wrong-user GET/POST returns 403 Forbidden."""
+
+    def test_edit_wrong_user_get_returns_403(
+        self,
+        seller,
+        user,
+        category,
+        city,
+    ) -> None:
+        """A different authenticated user GETting /ads/<id>/edit/ gets 403."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(user)
+
+        response = client.get(reverse("ads:edit", args=[ad.id]))
+        assert response.status_code == 403
+
+    def test_edit_wrong_user_post_returns_403(
+        self,
+        seller,
+        user,
+        category,
+        city,
+    ) -> None:
+        """A different authenticated user POSTing to /ads/<id>/edit/ gets 403."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": "Hack Attempt",
+                "description": "Trying to edit someone else's ad",
+                "price_amount": "100",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+        assert response.status_code == 403
+
+        ad.refresh_from_db()
+        assert ad.title != "Hack Attempt"
+
+
+# ---------------------------------------------------------------------------
+# TST-008: GET path renders the edit form with prefetched images
+# ---------------------------------------------------------------------------
+
+
+class TestEditGetPath:
+    """TST-008: GET display path renders the edit form."""
+
+    def test_edit_get_renders_form_with_images(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """GET /ads/<id>/edit/ renders the edit template with prefetched images."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(ad=ad, image="test.jpg", position=0)
+
+        client = Client()
+        client.force_login(seller)
+        response = client.get(reverse("ads:edit", args=[ad.id]))
+
+        assert response.status_code == 200
+        assert "ad" in response.context
+        assert response.context["ad"] == ad
+
+
+# ---------------------------------------------------------------------------
+# TST-008: ad_archive authorization + PUBLISHED → ARCHIVED transition
+# ---------------------------------------------------------------------------
+
+
+class TestAdArchive:
+    """TST-008: ad_archive view (PUBLISHED → ARCHIVED + wrong-user 403)."""
+
+    def test_archive_owner_transitions_to_archived(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """Owner POSTing to /ads/<id>/archive/ transitions PUBLISHED → ARCHIVED."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+        assert ad.archived_at is not None
+
+    def test_archive_wrong_user_returns_403(
+        self,
+        seller,
+        user,
+        category,
+        city,
+    ) -> None:
+        """A different user POSTing to /ads/<id>/archive/ gets 403."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+        assert response.status_code == 403
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED  # unchanged
+
+    def test_archive_non_published_is_noop(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """ad_archive only acts on PUBLISHED; REJECTED ad stays REJECTED."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.REJECTED  # unchanged
+
+
+# ---------------------------------------------------------------------------
+# TST-008: ad_reactivate authorization + ARCHIVED → ON_MODERATION/PUBLISHED
+# ---------------------------------------------------------------------------
+
+
+class TestAdReactivateDirect:
+    """TST-008: ad_reactivate view (ARCHIVED → ON_MODERATION/PUBLISHED + 403)."""
+
+    def test_reactivate_owner_transitions_to_published(
+        self,
+        seller,
+        category,
+        city,
+        permissive_criteria,
+    ) -> None:
+        """Owner reactivating an ARCHIVED ad transitions through ON_MODERATION
+        to PUBLISHED (with permissive criteria)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+
+        client = Client()
+        client.force_login(seller)
+        response = client.post(reverse("ads:reactivate", args=[ad.id]))
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+
+    def test_reactivate_wrong_user_returns_403(
+        self,
+        seller,
+        user,
+        category,
+        city,
+    ) -> None:
+        """A different user POSTing to /ads/<id>/reactivate/ gets 403."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(reverse("ads:reactivate", args=[ad.id]))
+        assert response.status_code == 403
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED  # unchanged
+
+    def test_reactivate_non_archived_is_noop(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """ad_reactivate only acts on ARCHIVED; PUBLISHED ad stays PUBLISHED."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(reverse("ads:reactivate", args=[ad.id]))
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED  # unchanged
+
+
+# ---------------------------------------------------------------------------
+# TST-008: Other-status direct-save branch (ON_MODERATION, ON_MODERATION_FAILED)
+# ---------------------------------------------------------------------------
+
+
+class TestEditOtherStatusDirectSave:
+    """TST-008: ON_MODERATION/ON_MODERATION_FAILED ads use direct-save branch.
+
+    The view saves fields directly without a status transition (no auto-moderation).
+    """
+
+    def test_edit_on_moderation_direct_save(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """POSTing an edit to an ON_MODERATION ad updates fields without
+        changing status (direct-save branch)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        new_title = "Updated In Moderation"
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": new_title,
+                "description": ad.description,
+                "price_amount": "100",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        assert ad.title == new_title
+        assert ad.status == AdStatus.ON_MODERATION  # unchanged
+

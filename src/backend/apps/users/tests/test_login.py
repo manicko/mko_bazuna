@@ -464,3 +464,32 @@ class TestLoginRateLimitCheck:
 
         # Counter reflects 11 increments: 1 (init) + 10 + the throttled attempt.
         assert cache.get("login_rl:127.0.0.1") == RATE_LIMIT_REQUESTS + 1
+
+    def test_login_rate_limit_check_handles_cache_incr_value_error(self) -> None:
+        """ValueError from cache.incr (race: key expired between add/incr) →
+        counter reset to 1, returns True (graceful degradation)."""
+        from unittest.mock import patch
+
+        from django.core.cache import cache
+        from django.http import HttpRequest
+
+        from apps.users.services.login_rate_limit import login_rate_limit_check
+
+        cache.clear()
+        request = HttpRequest()
+        request.META = {"REMOTE_ADDR": "127.0.0.1"}
+
+        # First call: cache.add succeeds (creates key, value=1)
+        assert login_rate_limit_check(request) is True
+
+        # Second call: cache.add fails (key exists), cache.incr raises ValueError
+        # (simulating the key expiring between add and incr)
+        with patch(
+            "apps.users.services.login_rate_limit.cache.incr",
+            side_effect=ValueError("missing key"),
+        ):
+            result = login_rate_limit_check(request)
+
+        assert result is True
+        # Counter was reset to 1 by the except ValueError branch
+        assert cache.get("login_rl:127.0.0.1") == 1

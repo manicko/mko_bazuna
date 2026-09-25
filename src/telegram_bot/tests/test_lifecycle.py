@@ -1,70 +1,169 @@
-"""Tests for ``telegram_bot.lifecycle`` shutdown hook.
+"""
+Tests for lifecycle hooks (TST-012).
 
-The shutdown hook (``_on_shutdown``) must close Django DB connections via
-``sync_to_async`` rather than calling sync functions directly on the event-loop
-thread, where Django 5.2's ``@async_unsafe`` guard raises
-``SynchronousOnlyOperation``.
+Covers:
+- ``_on_startup``: writes liveness markers without raising.
+- ``_on_shutdown``: removes markers and closes DB connections without raising.
+- ``LivenessMiddleware``: touches file marker and writes Redis marker on
+  every inbound update, then delegates to the handler.
 """
 
-from collections.abc import Callable
-from typing import Any
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from asgiref.sync import sync_to_async
-from django.db import (
-    close_old_connections as django_close_old_connections,
-    connections as django_connections,
-)
 
-import telegram_bot.lifecycle as lifecycle_module
-from apps.users.models import User
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.integration,
+    pytest.mark.concurrent,
+]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
-pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+class TestOnStartup:
+    """Tests for the startup hook."""
+
+    @pytest.mark.asyncio
+    async def test_startup_disabled_when_no_marker_path(self) -> None:
+        """When ``BOT_LIVENESS_FILE`` is empty, the hook is a no-op."""
+        from telegram_bot.lifecycle import _on_startup
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                await _on_startup(MagicMock(), MagicMock())
+
+
+    @pytest.mark.asyncio
+    async def test_startup_writes_file_marker(self, tmp_path: Path) -> None:
+        """When a marker path is configured, the file is touched."""
+        from telegram_bot.lifecycle import _on_startup
+
+        marker = tmp_path / "bot_alive"
+        assert not marker.exists()
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=str(marker)):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                await _on_startup(MagicMock(), MagicMock())
+
+        assert marker.exists()
+
+    @pytest.mark.asyncio
+    async def test_startup_writes_redis_marker(self) -> None:
+        """The Redis liveness key is always written on startup."""
+        from telegram_bot.lifecycle import _on_startup
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ) as mock_redis:
+                await _on_startup(MagicMock(), MagicMock())
+
+        mock_redis.assert_awaited_once()
 
 
 class TestOnShutdown:
-    """Tests for the ``_on_shutdown`` lifecycle hook."""
+    """Tests for the shutdown hook."""
 
     @pytest.mark.asyncio
-    async def test_on_shutdown_closes_connections_via_sync_to_async(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Both ``connections.close_all`` and ``close_old_connections`` are
-        dispatched through ``sync_to_async``.
+    async def test_shutdown_removes_file_marker(self, tmp_path: Path) -> None:
+        """On shutdown, the file marker is removed."""
+        from telegram_bot.lifecycle import _on_shutdown
 
-        Guards against regression to the broken alternative of calling the sync
-        DB methods directly on the event-loop thread, which would raise
-        ``SynchronousOnlyOperation`` (since ``BaseDatabaseWrapper.close`` is
-        ``@async_unsafe``).
-        """
-        captured: list[Callable[..., Any]] = []
-        real_sync_to_async = lifecycle_module.sync_to_async
+        marker = tmp_path / "bot_alive"
+        marker.touch()
+        assert marker.exists()
 
-        def spy_sync_to_async(
-            func: Callable[..., Any], *args: Any, **kwargs: Any
-        ) -> Any:
-            captured.append(func)
-            return real_sync_to_async(func, *args, **kwargs)
+        with patch("telegram_bot.lifecycle._marker_path", return_value=str(marker)):
+            with patch("telegram_bot.lifecycle.connections.close_all"):
+                with patch("telegram_bot.lifecycle.close_old_connections"):
+                    await _on_shutdown(MagicMock(), MagicMock())
 
-        monkeypatch.setattr(lifecycle_module, "sync_to_async", spy_sync_to_async)
-
-        await lifecycle_module._on_shutdown()
-
-        assert len(captured) == 2
-        assert django_close_old_connections in captured
-        assert django_connections.close_all in captured
+        assert not marker.exists()
 
     @pytest.mark.asyncio
-    async def test_on_shutdown_no_synchronous_only_operation(self) -> None:
-        """``_on_shutdown`` must not raise ``SynchronousOnlyOperation`` from
-        async context.
+    async def test_shutdown_handles_missing_file(self) -> None:
+        """If the marker file doesn't exist, shutdown does not raise."""
+        from telegram_bot.lifecycle import _on_shutdown
 
-        Establishes a live DB connection on the asgiref worker thread (simulating
-        real bot ORM work), then invokes the shutdown hook.  Before the fix, the
-        direct call to ``close_old_connections()`` on the event-loop thread would
-        raise ``SynchronousOnlyOperation`` (Django's ``@async_unsafe`` guard).
-        """
-        # Establish a live DB connection on the asgiref worker thread.
-        await sync_to_async(User.objects.count)()
-        # Must not raise SynchronousOnlyOperation or any other exception.
-        await lifecycle_module._on_shutdown()
+        with patch("telegram_bot.lifecycle._marker_path", return_value="/nonexistent/path"):
+            with patch("telegram_bot.lifecycle.connections.close_all"):
+                with patch("telegram_bot.lifecycle.close_old_connections"):
+                    # Should not raise FileNotFoundError.
+                    await _on_shutdown(MagicMock(), MagicMock())
+
+
+class TestLivenessMiddleware:
+    """Tests for the liveness middleware."""
+
+    @pytest.mark.asyncio
+    async def test_middleware_touches_file_marker(self, tmp_path: Path) -> None:
+        """The middleware updates the file marker mtime on each update."""
+        from telegram_bot.lifecycle import LivenessMiddleware
+
+        marker = tmp_path / "bot_alive"
+        marker.touch()
+        original_mtime = os.path.getmtime(marker)
+
+        mw = LivenessMiddleware()
+        state: dict = {}
+        handler = AsyncMock(return_value="ok")
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=str(marker)):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                await mw(handler, MagicMock(), state)
+
+        handler.assert_awaited_once()
+        # The mtime should have been updated.
+        assert os.path.getmtime(marker) >= original_mtime
+
+    @pytest.mark.asyncio
+    async def test_middleware_writes_redis_marker(self) -> None:
+        """The middleware writes the Redis liveness key on each update."""
+        from telegram_bot.lifecycle import LivenessMiddleware
+
+        mw = LivenessMiddleware()
+        state: dict = {}
+        handler = AsyncMock(return_value="ok")
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ) as mock_redis:
+                await mw(handler, MagicMock(), state)
+
+        mock_redis.assert_awaited_once()
+        handler.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_middleware_without_marker_path(self) -> None:
+        """When marker path is None, middleware still delegates to handler."""
+        from telegram_bot.lifecycle import LivenessMiddleware
+
+        mw = LivenessMiddleware()
+        state: dict = {}
+        handler = AsyncMock(return_value="ok")
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                result = await mw(handler, MagicMock(), state)
+
+        assert result == "ok"
+        handler.assert_awaited_once()

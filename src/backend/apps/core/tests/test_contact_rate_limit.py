@@ -58,6 +58,33 @@ class TestDeepLinkRenderRateLimit:
         # First call from the XFF IP is allowed (fresh counter).
         assert check_deep_link_render_rate_limit(request) is True
 
+    def test_rate_limit_check_handles_cache_incr_value_error(self) -> None:
+        """ValueError from cache.incr (race: key expired between add/incr) →
+        counter reset to 1, returns True (graceful degradation)."""
+        from unittest.mock import patch
+
+        from apps.core.services.contact_rate_limit import (
+            check_deep_link_render_rate_limit,
+        )
+
+        cache.clear()
+        request = _make_request()
+
+        # First call: cache.add succeeds (creates key, value=1)
+        assert check_deep_link_render_rate_limit(request) is True
+
+        # Second call: cache.add fails (key exists), cache.incr raises ValueError
+        # (simulating the key expiring between add and incr)
+        with patch(
+            "apps.core.services.contact_rate_limit.cache.incr",
+            side_effect=ValueError("missing key"),
+        ):
+            result = check_deep_link_render_rate_limit(request)
+
+        assert result is True
+        # Counter was reset to 1 by the except ValueError branch
+        assert cache.get("telegram_dl_rl:127.0.0.1") == 1
+
 
 class TestDeepLinkRenderRateLimitView:
     """View-level 429 wiring for the deep-link render rate limiter."""

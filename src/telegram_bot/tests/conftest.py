@@ -13,7 +13,6 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
@@ -44,46 +43,17 @@ def bot() -> Bot:
 def dp() -> Dispatcher:
     """Create a Dispatcher with the same middleware and routers as production.
 
-    This replicates the setup from ``telegram_bot.main()`` so that handler
-    tests exercise the full pipeline (middleware -> router -> handler).
+    This replicates the setup from ``telegram_bot.main()`` — via
+    ``configure_dispatcher()`` — so that handler tests exercise the full
+    pipeline (middleware -> router -> handler). All 6 routers and 5 middleware
+    are wired identically to production.
     """
+    from aiogram.fsm.storage.memory import MemoryStorage
+
+    from telegram_bot.main import configure_dispatcher
+
     storage = MemoryStorage()
-    dp = Dispatcher(storage=storage)
-
-    from telegram_bot.handlers import (
-        ad_create_router,
-        alerts_router,
-        contact_router,
-        login_router,
-    )
-    from telegram_bot.middlewares import (
-        AccountStateMiddleware,
-        DatabaseConnectionMiddleware,
-        LanguageMiddleware,
-        UpdateIdDedupMiddleware,
-    )
-
-    dp.include_router(login_router)
-    dp.include_router(ad_create_router)
-    dp.include_router(alerts_router)
-    dp.include_router(contact_router)
-
-    # Mirror production lifecycle hooks: startup writes the liveness marker,
-    # shutdown removes it and closes DB connections, LivenessMiddleware
-    # touches the marker on every inbound update for freshness.
-    from telegram_bot.lifecycle import LivenessMiddleware, _on_shutdown, _on_startup
-
-    dp.startup.register(_on_startup)
-    dp.shutdown.register(_on_shutdown)
-    dp.update.middleware(UpdateIdDedupMiddleware())
-    dp.update.middleware(LivenessMiddleware())
-    # Locale middleware must run before AccountStateMiddleware (FQ-001).
-    dp.update.middleware(LanguageMiddleware())
-    # Register account state middleware on update-level (moved from dp.message)
-    dp.update.middleware(AccountStateMiddleware())
-    dp.update.outer_middleware(DatabaseConnectionMiddleware())
-
-    return dp
+    return configure_dispatcher(storage)
 
 
 # ---------------------------------------------------------------------------
