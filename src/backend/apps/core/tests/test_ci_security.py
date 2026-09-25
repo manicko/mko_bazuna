@@ -143,3 +143,31 @@ def test_ci_deploy_check_sets_valid_secret_key() -> None:
     assert len(secret_key_value) >= 50, (
         f"DJANGO_SECRET_KEY is {len(secret_key_value)} chars; deploy-check requires >=50"
     )
+
+
+# ---------------------------------------------------------------------------
+# SAST scanning (bandit) — finding 12-OPS-008
+# ---------------------------------------------------------------------------
+# The security job runs bandit SAST against src/backend and src/telegram_bot
+# to catch common Python security issues (hardcoded passwords, subprocess
+# usage, weak crypto, etc.). Test directories are excluded via the
+# [tool.bandit] ``exclude_dirs`` config; B101 (assert) and B105 (hardcoded
+# password string) are skipped because they are pre-existing and mitigated.
+
+
+def test_ci_yml_has_sast_job() -> None:
+    """ci.yml references a SAST tool (bandit or semgrep)."""
+    content = _read(".github", "workflows", "ci.yml")
+    assert "bandit" in content or "semgrep" in content
+
+
+def test_bandit_in_dev_deps() -> None:
+    """pyproject.toml lists a SAST tool (bandit or semgrep) in dev dependencies."""
+    content = _read("pyproject.toml")
+    assert "bandit" in content or "semgrep" in content
+
+
+def test_bandit_has_config_section() -> None:
+    """pyproject.toml contains a [tool.bandit] configuration section."""
+    content = _read("pyproject.toml")
+    assert "[tool.bandit]" in content

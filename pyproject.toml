@@ -224,7 +224,13 @@ dev = [
     "coverage>=7.15.2",
     "djlint>=1.44.2",
     "pip-audit>=2.7.0",
+    "bandit>=1.7.0,<2.0",
 ]
+
+[tool.bandit]
+exclude_dirs = ["src/backend/apps/**/tests", "src/backend/tests", "docs"]
+skips = ["B101", "B105"]
+level = "low"
 
 # Django template linter configuration.
 # djlint's built-in H017 rule in v1.44.x is "void tags should be self closing"

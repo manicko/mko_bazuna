@@ -352,6 +352,11 @@ jobs:
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.27.2/gitleaks_8.27.2_linux_x64.tar.gz | tar xz
           ./gitleaks detect --source . --exit-code 1 --report-format sarif --report-path gitleaks-results.sarif
 
+      # --- SAST (static application security testing) ---
+      - name: Run SAST (bandit)
+        run: uv run bandit -r src/backend src/telegram_bot -c pyproject.toml
+        working-directory: src/backend
+
       # --- SARIF uploads (runs even if scans find issues) ---
       - name: Upload Trivy SARIF results
         if: always()
