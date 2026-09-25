@@ -290,6 +290,21 @@ class UserRole(StrEnum):
     ADMIN = "admin"
 
 
+class SupportChannelType(StrEnum):
+    """Channel types for seller support tickets."""
+
+    EMAIL = "email"
+    TELEGRAM = "telegram"
+
+
+class SupportTicketStatus(StrEnum):
+    """Lifecycle status of a seller support ticket."""
+
+    OPEN = "open"
+    REPLIED = "replied"
+    CLOSED = "closed"
+
+
 __all__ = [
     "AdSort",
     "AdvisoryLockId",
@@ -311,4 +326,6 @@ __all__ = [
     "CookieCategory",
     "ConsentVersion",
     "UserRole",
+    "SupportChannelType",
+    "SupportTicketStatus",
 ]
