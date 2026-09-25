@@ -209,7 +209,10 @@ category:submenu:<tree_version>:<slug>:<locale>
   by `Category` / `CategoryPath` save+delete signals, so a single increment invalidates all
   cached submenus.
 - `<locale>` — `request.LANGUAGE_CODE or "ru"` (resolved by `LanguagePreMiddleware`).
-    - TTL 300 s (`SUBMENU_CACHE_TTL`) with a 60 s stale-serve window (`SUBMENU_CACHE_STALE_TTL`) and a 30 s single-flight lock (`SUBMENU_CACHE_LOCK_TTL`); the fragment is cached via `category_submenu()` in `apps/categories/views.py`, which calls `get_with_stale_revalidate()` from `apps/core/utils/swr_cache.py`.
+- TTL 300 s (`SUBMENU_CACHE_TTL`) with a 60 s stale-serve window (`SUBMENU_CACHE_STALE_TTL`)
+  and a 30 s single-flight lock (`SUBMENU_CACHE_LOCK_TTL`); the fragment is cached via
+  `category_submenu()` in `apps/categories/views.py`, which calls
+  `get_with_stale_revalidate()` from `apps/core/utils/swr_cache.py`.
 
 The locale segment is the key correctness property: without it, a Russian submenu render would be
 reused for a Bosnian visitor.
