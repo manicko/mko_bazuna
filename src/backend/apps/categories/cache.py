@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 TREE_VERSION_KEY = "category:tree_version"
 # Submenu fragment cache TTL (seconds).
 SUBMENU_CACHE_TTL = 300
+# Stale-while-revalidate parameters (seconds). Mirrors the proven
+# search/lookup/resolve tiers: lock TTL < stale TTL (SWR invariant).
+SUBMENU_CACHE_STALE_TTL = 60
+SUBMENU_CACHE_LOCK_TTL = 30
 
 
 def get_tree_version() -> int:

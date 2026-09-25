@@ -7,12 +7,17 @@ Currently provides the HTMX ``category_submenu`` partial used by the header's
 
 import logging
 
-from django.core.cache import cache
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from apps.categories.cache import SUBMENU_CACHE_TTL, get_tree_version
+from apps.categories.cache import (
+    SUBMENU_CACHE_LOCK_TTL,
+    SUBMENU_CACHE_STALE_TTL,
+    SUBMENU_CACHE_TTL,
+    get_tree_version,
+)
 from apps.categories.models import Category
+from apps.core.utils.swr_cache import get_with_stale_revalidate
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +49,23 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
         raise Http404("Category not found")
 
     cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{request.LANGUAGE_CODE or 'ru'}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return HttpResponse(cached)
 
-    children = list(category.get_children().filter(is_active=True).order_by("name"))
-    html = render(
-        request,
-        "categories/partials/mega_submenu.html",
-        {"category": category, "children": children},
-    ).content.decode("utf-8")
+    def _render_submenu_fragment() -> str:
+        children = list(
+            category.get_children().filter(is_active=True).order_by("name")
+        )
+        return render(
+            request,
+            "categories/partials/mega_submenu.html",
+            {"category": category, "children": children},
+        ).content.decode("utf-8")
 
-    cache.set(cache_key, html, SUBMENU_CACHE_TTL)
+    html = get_with_stale_revalidate(
+        cache_key,
+        _render_submenu_fragment,
+        ttl=SUBMENU_CACHE_TTL,
+        stale_ttl=SUBMENU_CACHE_STALE_TTL,
+        lock_ttl=SUBMENU_CACHE_LOCK_TTL,
+        default="",
+    )
     return HttpResponse(html)
