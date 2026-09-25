@@ -366,6 +366,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `ADMIN_TELEGRAM_ID` | No (default: `-1`) | Placeholder telegram_id for the admin user (negative avoids collision with real Telegram IDs) |
 | `SEED_USERS` | No (default: `10`) | Number of demo users to generate (seed service) |
 | `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
+| `PROMETHEUS_MULTIPROC_DIR` | No (default: `/tmp/prometheus_multiproc`) | Directory for Prometheus multiprocess metrics mode (web service only). Required for accurate per-worker metric collection under gunicorn when `PROMETHEUS_MULTIPROC_DIR` is set; see [Prometheus Metrics](#prometheus-metrics) |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
@@ -418,6 +419,13 @@ Deployment configuration is validated via Django's `manage.py check --deploy`:
 - **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
 - This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time strength validation on `DJANGO_SECRET_KEY`, `BOT_TOKEN`, and `GOOGLE_TRANSLATE_API_KEY`: each must not be a `<...>` placeholder or the `dev-only-dummy` sentinel, and `DJANGO_SECRET_KEY` must additionally be ≥ 50 characters. A non-empty placeholder or weak key is rejected at boot, preventing session/CSRF/password-reset token forgery. One-shot services (`migrate`, `load_cities`, `load_catalog`, `create_admin`, `seed`) bypass all production import-time guards via `DJANGO_BUILD=1` set in their `environment:` blocks in `docker-compose.yml` — these services do not serve HTTP and are fed placeholder/dummy tokens from `.env.dev` during bootstrap, so the placeholder/dummy rejection is skipped for them; the real secret values are enforced at runtime by the long-lived `web` and `bot` services, which never set `DJANGO_BUILD`.
+
+> **CI security scanning (SAST):** The CI `security` job runs `bandit` (finding 12-OPS-008)
+> against `src/backend` and `src/telegram_bot` per the `[tool.bandit]` config in
+> `pyproject.toml`. Test directories (`src/backend/apps/**/tests`, `src/backend/tests`) and
+> `docs` are excluded; `B101` (assert) and `B105` (hardcoded password strings) are skipped
+> as pre-existing/mitigated. This complements the existing `pip-audit`, Trivy filesystem
+> scan, and Gitleaks secret scan that also run in the `security` job.
 
 ### Deployment Rollback
 
@@ -625,6 +633,11 @@ In `docker-compose.prod.yml` the scheduler service uses `image:` (a pre-built im
 from the registry) instead of `build:`, matching every other production service. The
 healthcheck script `docker/healthcheck-scheduler.sh` is COPY'd into the image by the
 Dockerfile and is referenced by the `healthcheck:` block on the scheduler service.
+
+Scheduler deploy parity — that the service uses `image:` (never `build:`), is gated by
+`profiles: ["scheduler"]`, and ships an executable entrypoint — is enforced by CI tests
+in `src/backend/tests/test_compose_hardening.py` (finding 12-OPS-009), so the production
+compose override stays consistent with this documented configuration.
 
 | Task | Purpose | Schedule |
 |------|---------|----------|
@@ -972,6 +985,47 @@ docker compose --env-file .env.dev \
 # Filter by pattern
 make logs | grep "ERROR"
 ```
+
+### Prometheus Metrics
+
+Production exposes a Prometheus `/metrics` endpoint behind the `web` service (wired via
+`django_prometheus` in `INSTALLED_APPS`, middleware, and `path("", include("django_prometheus.urls"))`
+in `config/urls.py`). An external Prometheus instance scrapes it on its own schedule.
+
+Because gunicorn runs **3 worker processes** (`workers = 3` in `gunicorn.conf.py`),
+each worker owns its own in-process metrics registry. Without multiprocess mode, metrics
+gathered by a worker are discarded when that worker is recycled — gunicorn restarts workers
+after `max_requests = 1000` (with ±100 jitter) — which causes the scraped `/metrics` output
+to jump, drop, or report partial values.
+
+Multiprocess mode fixes this by writing each worker's metric samples to a shared on-disk
+directory so the scraper can compute consistent aggregates across all live workers. Three
+pieces in production compose must stay in lockstep:
+
+1. **`PROMETHEUS_MULTIPROC_DIR`** environment variable — set to `/tmp/prometheus_multiproc`
+   on the `web` service in `docker-compose.prod.yml` (and in `.env.prod.example`).
+   `prometheus_client` reads this at import time to locate the per-worker data files.
+2. **`tmpfs` mount** — `docker-compose.prod.yml` mounts `/tmp/prometheus_multiproc` as an
+   ephemeral tmpfs (`tmpfs: - /tmp/prometheus_multiproc:rw`), so metric files live in memory,
+   are writable by the container user, and are discarded on container restart (stale files
+   from a crashed worker would otherwise accumulate and skew aggregates).
+3. **`child_exit` hook** in `gunicorn.conf.py` — when a worker exits (normal recycle or
+   crash), Gunicorn calls `child_exit(server, worker)`, which runs
+   `prometheus_client.multiprocess.mark_process_dead(worker.pid)`. This flags the exiting
+   worker's data files as dead so they are excluded from the next `/metrics` render,
+   preventing double-counting or stale-gauge values.
+
+```bash
+# Verify the metrics endpoint inside the web container
+docker compose --env-file .env.prod \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T web curl -s http://localhost:8000/metrics | head
+# Expected: # HELP / # TYPE exposition-format lines
+```
+
+> **Note:** The `bot` and `scheduler` services do **not** set
+> `PROMETHEUS_MULTIPROC_DIR` — they do not expose a `/metrics` endpoint. Only the
+> `web` gunicorn service needs multiprocess mode.
 
 ### Viewing Metrics
 

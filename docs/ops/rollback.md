@@ -19,10 +19,12 @@ related:
 
 Runbook for rolling back a production deployment of the Mko Bazuna platform when a
 deployed image, configuration change, or schema migration causes a regression.
-The rollback process is manual (deployment is currently manual — B4 is creating
-a formal deploy workflow referenced in finding
-[12-OPS-005](../../.ai/audit/12-production-ops/findings.md)). This
-document covers the six rollback dimensions: image-tag rollback, config rollback,
+Rollback is supported in **two modes** — see
+[Automated Rollback](#automated-rollback) for the CI-driven path and the
+dimension-specific manual procedures (sections 1–3) for failures the automated
+flow cannot resolve.
+
+This document covers the six rollback dimensions: image-tag rollback, config rollback,
 schema rollback, health-check-gated validation, rollback-test cadence, and
 failure escalation.
 
@@ -519,12 +521,114 @@ echo "Rollback validated in staging"
 
 Finding 12-OPS-005 (deploy workflow, P0) added a GitHub Actions `deploy.yml`
 (workflow_dispatch with `environment: production` manual approval) that gates
-production deploys on `/health/ready/` validation (60-second timeout). The
-rollback runbook is referenced from that workflow's `on-failure` step. The
-monthly `restore-test.yml` workflow (B5 / OPS-006) provides a secondary
-validation of backup integrity via an isolated restore + `migrate --plan --check`.
+production deploys on `/health/ready/` validation (60-second timeout). Finding
+12-OPS-010 extended this workflow with **automated rollback**: on health-check
+failure the workflow reverts `IMAGE_TAG` to the captured `PREVIOUS_IMAGE_TAG`,
+force-recreates the `web`/`bot` containers, and re-runs the readiness probe. See
+[Automated Rollback](#automated-rollback). The workflow's `on-failure` step still
+references this runbook as the manual fallback. The monthly `restore-test.yml`
+workflow (B5 / OPS-006) provides a secondary validation of backup integrity via an
+isolated restore + `migrate --plan --check`.
 Staging rollback drills continue to be performed manually using the procedure
 above (see [Rollback-Test Cadence](#5-rollback-test-cadence)).
+
+## Automated Rollback
+
+The `deploy.yml` GitHub Actions workflow (finding 12-OPS-010) performs an
+**image-tag rollback automatically** when the post-deploy health-check gate fails.
+This complements — but does not replace — the manual procedures in
+[1. Image-Tag Rollback](#1-image-tag-rollback) through
+[3. Schema Rollback Considerations](#3-schema-rollback-considerations). Use the
+manual procedures when the automated flow cannot help: no previous image tag is
+available, the failure is a config regression (no code change), or the automated
+rollback's own re-validation also fails.
+
+### Capturing `PREVIOUS_IMAGE_TAG`
+
+Before pulling or recreating any container, the deploy script captures the
+**currently running** image tag so the last-known-good value is always available
+for rollback. It is read from the running `web` container's image tag while the
+old containers are still up (critical — it must reflect the prior deploy, not the
+new failing one):
+
+```bash
+PREVIOUS_IMAGE_TAG=$(docker compose images --format '{{.Tag}}' web | head -1)
+```
+
+The captured value is the resolved `${IMAGE_TAG}` (e.g. a git SHA or `v1.3.2`),
+since `docker-compose.prod.yml` resolves the `web` image from
+`${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}`. It is held in a shell variable for the
+duration of the SSH deploy step; if the deploy succeeds it is discarded.
+
+### Automatic rollback condition
+
+Rollback triggers **only** when the deploy health-check gate (Step 4) fails. The
+gate polls `/health/ready/` (database + Redis + bot liveness) from inside the
+`web` container with a **60-second** timeout:
+
+```bash
+if timeout 60 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
+    echo "Health check passed — /health/ready/ returned 200."
+else
+    echo "ERROR: Health check FAILED after 60s timeout."
+    echo "=== Attempting automated rollback ==="
+    # ...rollback branch...
+fi
+```
+
+If the new image never reaches readiness within 60 seconds, the workflow enters
+the rollback branch. When `PREVIOUS_IMAGE_TAG` is empty or `<none>` (first-ever
+deploy with no prior image to roll back to), the workflow exits `1` and surfaces
+a link to this runbook — no automatic rollback is attempted.
+
+### Rollback procedure (automated)
+
+On health-check failure the workflow performs three steps:
+
+1. **Revert `IMAGE_TAG` to `PREVIOUS_IMAGE_TAG`** and pull the prior image:
+   ```bash
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+   ```
+2. **Force-recreate** the long-lived containers so Docker does not reuse
+   containers keyed on the old image digest:
+   ```bash
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot
+   ```
+   Only `web` and `bot` are recreated — the one-shot bootstrap services
+   (`migrate`, `load_catalog`, etc.) do not need re-running for a code-only
+   rollback, and skipping them avoids touching the database schema.
+3. **Re-run the health check** with a **30-second** validation timeout to confirm
+   the rolled-back image restored a healthy state (curl still runs inside
+   `web`, since port 8000 is not published on the host):
+   ```bash
+   if timeout 30 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
+       echo "Rollback health check passed"
+   else
+       echo "ERROR: Rollback health check ALSO FAILED after 30s timeout."
+       echo "Manual intervention required."
+       exit 1
+   fi
+   ```
+
+If the rollback validation also fails (the 30-second re-check still returns
+`503`), the deploy step exits `1` and the workflow's `if: failure()` fallback
+post references this runbook. From there, follow
+[6. Rollback Failure Escalation Path](#6-rollback-failure-escalation-path)
+for a manual rollback and database restore.
+
+### Relationship to manual rollback
+
+| Scenario | Recommended procedure |
+|----------|----------------------|
+| Health-check failure after deploy (new image won't become ready) | **Automated** — deploy.yml reverts `IMAGE_TAG`, force-recreates `web bot`, re-validates |
+| Config regression (`DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, invalid `BOT_TOKEN`, …) | [2. Config Rollback](#2-config-rollback) — the automated flow only reverts image tags, not `.env.prod` |
+| Schema migration failure (`migrate` one-shot exits non-zero, `no such column`, …) | [3. Schema Rollback Considerations](#3-schema-rollback-considerations) + [1. Image-Tag Rollback](#1-image-tag-rollback) |
+| Automated rollback failed (rollback re-check also returns `503`) | [6. Rollback Failure Escalation Path](#6-rollback-failure-escalation-path) |
+
+> **Scope:** The automated rollback is scoped to **image-tag** failures detected
+> by the `/health/ready/` readiness probe. It cannot correct config-only
+> regressions (no code change to image-tag) or schema problems (which require a
+> `migrate` rollback + backup restore). For those, use the manual procedures.
 
 ## 6. Rollback Failure Escalation Path
 
@@ -638,6 +742,7 @@ Use this table to select the rollback dimension based on the failure mode:
   healthcheck script
 - [Finding 12-OPS-007](../../.ai/audit/12-production-ops/findings.md) — rollback runbook (this document)
 - [Finding 12-OPS-005](../../.ai/audit/12-production-ops/findings.md) — deploy workflow (`deploy.yml`, health-check gating)
+- [Finding 12-OPS-010](../../.ai/audit/12-production-ops/findings.md) — automated deploy rollback on health-check failure
 - [Finding 12-OPS-002](../../.ai/audit/12-production-ops/findings.md) — healthcheck endpoint changed to `/health/live/`
 - [Finding 12-OPS-003](../../.ai/audit/12-production-ops/findings.md) — Redis-based bot liveness marker (`bot:liveness`)
 - [Finding 12-OPS-006](../../.ai/audit/12-production-ops/findings.md) — restore-test automation (`restore-test.yml`)
