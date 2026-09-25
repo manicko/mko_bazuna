@@ -2,7 +2,7 @@
 Callback data constants for Telegram bot inline keyboards.
 
 Centralizes the bot's callback tokens so the ``F.data`` filter lambdas in the
-handler modules and the keyboard builders in ``ad_data.py`` can never drift
+handler modules and the keyboard builders in ``ad_data.keyboards`` can never drift
 apart. All fixed values are modeled as a StrEnum per project rule 10.
 """
 
@@ -18,7 +18,7 @@ class BotCallbackPrefix(StrEnum):
 
     Centralizes every callback-data prefix in one StrEnum so the
     ``F.data.startswith(...)`` filter lambdas in handler modules and the
-    keyboard builders in ``ad_data.py`` / ``immediate_alerts.py`` can never
+    keyboard builders in ``ad_data.keyboards`` / ``immediate_alerts.py`` can never
     drift apart (project rule 10).
     """
 

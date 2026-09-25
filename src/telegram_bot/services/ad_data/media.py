@@ -28,7 +28,7 @@ __all__ = [
 
 # Byte cap for the bounded download writer. Must match
 # ``handlers.ad_create.MAX_PHOTO_BYTES`` (2 MB). Defined locally rather than
-# imported to avoid a circular import (ad_data.py is imported by photos.py,
+# imported to avoid a circular import (ad_data.media is imported by photos.py,
 # which already imports MAX_PHOTO_BYTES from handlers.ad_create). The +1 makes
 # the writer reject any payload that reaches the cap exactly.
 _PHOTO_DOWNLOAD_CAP = 2 * 1024 * 1024 + 1

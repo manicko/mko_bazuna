@@ -106,7 +106,7 @@ class TestCreateDraftAd:
 
 
 class TestCreateDraftAdCrashRecovery:
-    """Crash-recovery tests for transaction.atomic() boundaries in ad_data.py.
+    """Crash-recovery tests for transaction.atomic() boundaries in ad_data.
 
     Verifies DB-001 and DB-002 fixes: when an exception is raised inside
     ``transaction.atomic()``, Django rolls back the savepoint, preserving
