@@ -70,7 +70,7 @@ Bot-rendered alerts and saved-search notifications honor the identity's stored T
 
 ### (e) Completeness-gate breadth — RESOLVED
 The completeness gate is comprehensive: it is the CI test-time gate that bans raw `.name`/`.title`/`.get_name` access and covers the full i18n surface:
-- **21 tests in CI** (22 invocations via `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`) — per `.kilo/research/14-i18n.md`.
+- **21 tests in CI** (22 invocations via `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`).
 - **Dimensions covered:** title tags (`test_title_tags_translated`), hreflang (`test_hreflang_present` via `components/locale_head.html`), plural forms (`test_plural_forms` header + `test_plural_forms_runtime` for `{% blocktrans count %}`), locale switching (`test_locale_switch_re_render`), and inline-JS i18n (`test_no_hardcoded_js_strings`).
 - The gate raises `pytest.fail()` (not a runtime exception) on violations, including `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` for raw accessor access.
 - A comprehensive gate with no uncovered holes is the target state — no gap remains.
@@ -91,7 +91,7 @@ The `dir` attribute is set correctly per language/script context; mixed-script (
 
 ### (i) Test-gate exemptions — LOW
 DB-based i18n exemptions (e.g. `feature_tag.html` via the lookup-name accessor) are intentional and documented, and the gate enforces that `feature_tag.html` is the **only** exempt template.
-- Evidence: exemption documented in the project rules (`docs/99-agent/rules.md`); the scan excludes `admin/`, `analytics/moderation_dashboard.html`, and `components/feature_tag.html` per `.kilo/research/14-i18n.md`. An undocumented exemption beyond these is a finding.
+- Evidence: exemption documented in the project rules (`docs/99-agent/rules.md`); the scan excludes `admin/`, `analytics/moderation_dashboard.html`, and `components/feature_tag.html` per the completeness gate source (`test_i18n_completeness.py:75-79`). An undocumented exemption beyond these is a finding.
 
 ## 6. Cross-Cutting (owned here, not duplicated)
 
@@ -128,7 +128,7 @@ This phase owns **runtime i18n/localization correctness** and the **completeness
   - Locale switcher does not re-render in the new language.
   - Inline JS strings bypass gettext.
   - RTL/Bidi `dir` discipline missing on mixed-script pages.
-  - **RESOLVED:** The completeness gate is narrow / lacks title-tag, hreflang, plural, or locale-switch coverage — the gate is now comprehensive (21 tests in CI; covers all four dimensions) per `.kilo/research/14-i18n.md`. A narrow gate is no longer a finding class.
+  - **RESOLVED:** The completeness gate is narrow / lacks title-tag, hreflang, plural, or locale-switch coverage — the gate is now comprehensive (21 tests in CI; covers all four dimensions). A narrow gate is no longer a finding class.
 - **LOW**
   - `lang` cookie TTL not the documented ~1 year.
   - Undocumented exemption from the completeness gate beyond the intentional `feature_tag.html` exclusion.
@@ -150,4 +150,4 @@ Use `I18N-` for all findings in this phase.
 - `problems-only: true`.
 - Each finding: severity, zone, evidence (rendered HTML / HTTP header / cache key / notification text / grep hit), and recommendation with effort/priority.
 - Append incrementally (≤100 lines per write) to the phase findings file per `docs/99-agent/rules.md`.
-- Completeness gate count: the i18n completeness gate is **21 tests in CI** (22 invocations across `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`), per `.kilo/research/14-i18n.md`. The phase document cites the gate scope directly rather than the `docs/99-agent/rules.md` "(11 tests)" cross-reference, which is outdated.
+- Completeness gate count: the i18n completeness gate is **21 tests in CI** (22 invocations across `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`). The phase document cites the gate scope directly rather than the `docs/99-agent/rules.md` "(11 tests)" cross-reference, which is outdated.

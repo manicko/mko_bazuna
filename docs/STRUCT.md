@@ -40,9 +40,19 @@ C:\py_dev\mko_bazuna\src
 ├── telegram_bot
 │   ├── handlers
 │   │   ├── ad_copy.py
-│   │   ├── ad_create.py
+│   │   ├── ad_create/
+│   │   │   ├── __init__.py
+│   │   │   ├── category.py
+│   │   │   ├── city.py
+│   │   │   ├── entry.py
+│   │   │   ├── photos.py
+│   │   │   ├── preview.py
+│   │   │   ├── price.py
+│   │   │   ├── submit.py
+│   │   │   └── text.py
 │   │   ├── alerts.py
 │   │   ├── contact.py
+│   │   ├── language.py
 │   │   └── login.py
 │   ├── main.py
 │   ├── lifecycle.py

@@ -319,6 +319,11 @@ Definition of Done on every fast-gate run:
 | `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
 | `test_bot_no_hardcoded_messages` | (QLT-005) AST-scans `telegram_bot/handlers/*.py` for user-facing Bot/API method calls (`.answer()`, `.reply()`, `.edit_text()`, etc.) whose text arg is a bare string literal or f-string rather than a `_()` call |
 | `test_no_cyrillic_msgids` | (QLT-005) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English |
+| `test_title_tags_translated` | Page `<title>` tags localize per language |
+| `test_plural_forms_runtime` | `{% blocktrans count %}` selects correct CLDR plural form at runtime |
+| `test_all_languages_ltr` | All configured languages use LTR scripts; `LANGUAGE_BIDI` is False for ru/bs/en |
+| `test_no_hardcoded_js_strings` | Inline `<script>` blocks contain no untranslated prose string literals |
+| `test_bot_no_raw_model_field_access` | AST-scans bot `handlers/` and `services/` for raw `.name`/`.title`/`.description` access |
 The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of
 `test_i18n_completeness.py` AST-scans `telegram_bot/handlers/` and
 `telegram_bot/services/` to enforce that all user-facing bot strings are wrapped

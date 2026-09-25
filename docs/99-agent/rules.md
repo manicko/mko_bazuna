@@ -192,7 +192,7 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 
 ### Completeness gate
 
-`apps/ads/tests/test_i18n_completeness.py` (11 tests, marked `@pytest.mark.unit`) enforces the multilingual Definition of Done. The gate was extended (QLT-005) to also AST-scan `telegram_bot/handlers/*.py` for unwrapped user-facing bot strings:
+`apps/ads/tests/test_i18n_completeness.py` (16 tests, marked `@pytest.mark.unit`) enforces the multilingual Definition of Done. The gate was extended (QLT-005) to also AST-scan `telegram_bot/handlers/*.py` for unwrapped user-facing bot strings:
 - `test_no_hardcoded_visible_text` — scans public/seller-facing templates for visible text not wrapped in `{% trans %}`
 - `test_extraction_completeness` — every `{% trans %}` / `{{ _("…") }}` msgid exists in all 3 `.po` files
 - `test_no_empty_msgstr` — `ru` and `bs` have 0 empty `msgstr` for non-header entries
