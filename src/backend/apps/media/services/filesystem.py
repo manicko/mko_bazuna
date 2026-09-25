@@ -12,10 +12,11 @@ import shutil
 import time
 import uuid
 from pathlib import Path
-from typing import Any
 
 from django.conf import settings
 from PIL import Image, ImageOps
+
+from apps.media.schemas import SubmittedPhoto
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,10 @@ STAGING_SUBDIR = "staging"
 STAGING_PREFIX = f"{STAGING_SUBDIR}/"
 
 
-def move_staging_to_permanent(photos: list[dict[str, Any]]) -> None:
+def move_staging_to_permanent(photos: list[SubmittedPhoto]) -> None:
     """Promote in-flight staging files to permanent MEDIA_ROOT storage.
 
-    Iterates every key field on each photo dict (``storage_key`` and all
+    Iterates every key field on each photo (``storage_key`` and all
     ``thumbnail_*`` variants), strips the ``staging/`` prefix, and atomically
     renames the file from ``staging/<key>`` to ``<key>``.  Keys that do not
     carry the staging prefix (e.g. seed data or test fixtures that write
@@ -58,14 +59,15 @@ def move_staging_to_permanent(photos: list[dict[str, Any]]) -> None:
     rather than re-desynchronising the filesystem and database.
 
     Args:
-        photos: List of photo dicts (as built by the FSM ``process_photos``
-            handler).  Modified **in place** — each staging key is replaced
+        photos: List of ``SubmittedPhoto`` instances (as built by the FSM
+            ``process_photos`` handler and coerced by ``SubmitAdInput``).
+            Modified **in place** — each staging key is replaced
             with its permanent counterpart.
     """
     key_fields = ("storage_key", "thumbnail_small", "thumbnail_medium", "thumbnail_large")
     for photo in photos:
         for field in key_fields:
-            key = photo.get(field)
+            key = getattr(photo, field)
             if not key or not key.startswith(STAGING_PREFIX):
                 continue
             permanent_key = key.removeprefix(STAGING_PREFIX)
@@ -79,7 +81,7 @@ def move_staging_to_permanent(photos: list[dict[str, Any]]) -> None:
                         shutil.move(staging_path, permanent_path)
                     else:
                         raise
-            photo[field] = permanent_key
+            setattr(photo, field, permanent_key)
 
 
 def assert_storage_key_contained(storage_key: str) -> None:

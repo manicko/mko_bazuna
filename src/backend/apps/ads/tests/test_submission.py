@@ -200,3 +200,60 @@ def test_submit_ad_input_rejects_invalid_currency_string() -> None:
             user_id=None,
         )
     assert exc_info.value.errors()[0]["loc"] == ("price_currency",)
+
+
+# ---------------------------------------------------------------------------
+# SubmitAdInput photo validation (10-QLT-008: SubmittedPhoto sub-model)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_ad_input_rejects_photo_missing_storage_key() -> None:
+    """A photo dict missing the required ``storage_key`` raises ``ValidationError``
+    at ``SubmitAdInput`` construction — before any DB write or filesystem I/O.
+
+    Pydantic v2 coerces each dict in ``photos`` into a ``SubmittedPhoto`` and
+    rejects the payload when ``storage_key`` is absent.
+    """
+    with pytest.raises(ValidationError) as exc_info:
+        SubmitAdInput(
+            ad_id=1,
+            title_ru="Test Title",
+            desc_ru="Test description text",
+            category_id=None,
+            city_id=None,
+            price_amount=Decimal("100"),
+            price_currency=CurrencyCode.EUR,
+            photos=[{"position": 0}],
+            user_id=None,
+        )
+    errors = exc_info.value.errors()
+    assert errors[0]["loc"] == ("photos", 0, "storage_key")
+    assert errors[0]["type"] == "missing"
+
+
+def test_submit_ad_input_accepts_valid_photo_dict() -> None:
+    """A well-formed photo dict is coerced to a ``SubmittedPhoto`` instance
+    with ``thumbnail_*`` defaults of ``None`` and ``position`` defaulted to 0."""
+    from apps.media.schemas import SubmittedPhoto
+
+    dto = SubmitAdInput(
+        ad_id=1,
+        title_ru="Test Title",
+        desc_ru="Test description text",
+        category_id=None,
+        city_id=None,
+        price_amount=Decimal("100"),
+        price_currency=CurrencyCode.EUR,
+        photos=[
+            {"storage_key": "abc123.jpg", "telegram_file_id": "AgADBQ", "position": 2}
+        ],
+        user_id=None,
+    )
+    photo = dto.photos[0]
+    assert isinstance(photo, SubmittedPhoto)
+    assert photo.storage_key == "abc123.jpg"
+    assert photo.telegram_file_id == "AgADBQ"
+    assert photo.position == 2
+    assert photo.thumbnail_small is None
+    assert photo.thumbnail_medium is None
+    assert photo.thumbnail_large is None

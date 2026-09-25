@@ -22,6 +22,7 @@ import pytest
 from django.test import override_settings
 from PIL import Image
 
+from apps.media.schemas import SubmittedPhoto
 from apps.media.services.filesystem import (
     DELETE_PHOTO_MAX_ATTEMPTS,
     assert_storage_key_contained,
@@ -504,20 +505,20 @@ class TestMoveStagingToPermanent:
             (staging_dir / name).write_bytes(b"staged")
 
         photos = [
-            {
-                "storage_key": "staging/uuid.jpg",
-                "thumbnail_small": "staging/uuid-small.jpg",
-                "thumbnail_medium": "staging/uuid-medium.jpg",
-                "thumbnail_large": "staging/uuid-large.jpg",
-            }
+            SubmittedPhoto(
+                storage_key="staging/uuid.jpg",
+                thumbnail_small="staging/uuid-small.jpg",
+                thumbnail_medium="staging/uuid-medium.jpg",
+                thumbnail_large="staging/uuid-large.jpg",
+            )
         ]
 
         move_staging_to_permanent(photos)
 
-        assert photos[0]["storage_key"] == "uuid.jpg"
-        assert photos[0]["thumbnail_small"] == "uuid-small.jpg"
-        assert photos[0]["thumbnail_medium"] == "uuid-medium.jpg"
-        assert photos[0]["thumbnail_large"] == "uuid-large.jpg"
+        assert photos[0].storage_key == "uuid.jpg"
+        assert photos[0].thumbnail_small == "uuid-small.jpg"
+        assert photos[0].thumbnail_medium == "uuid-medium.jpg"
+        assert photos[0].thumbnail_large == "uuid-large.jpg"
 
         # Files physically moved to permanent location
         assert (tmp_path / "uuid.jpg").exists()
@@ -531,35 +532,35 @@ class TestMoveStagingToPermanent:
         (tmp_path / "permanent-small.jpg").write_bytes(b"data")
 
         photos = [
-            {
-                "storage_key": "permanent.jpg",
-                "thumbnail_small": "permanent-small.jpg",
-                "thumbnail_medium": "perm-medium.jpg",
-                "thumbnail_large": "perm-large.jpg",
-            }
+            SubmittedPhoto(
+                storage_key="permanent.jpg",
+                thumbnail_small="permanent-small.jpg",
+                thumbnail_medium="perm-medium.jpg",
+                thumbnail_large="perm-large.jpg",
+            )
         ]
 
         move_staging_to_permanent(photos)
 
-        assert photos[0]["storage_key"] == "permanent.jpg"
-        assert photos[0]["thumbnail_small"] == "permanent-small.jpg"
-        assert photos[0]["thumbnail_medium"] == "perm-medium.jpg"
-        assert photos[0]["thumbnail_large"] == "perm-large.jpg"
+        assert photos[0].storage_key == "permanent.jpg"
+        assert photos[0].thumbnail_small == "permanent-small.jpg"
+        assert photos[0].thumbnail_medium == "perm-medium.jpg"
+        assert photos[0].thumbnail_large == "perm-large.jpg"
 
     def test_updates_key_even_if_file_missing(self) -> None:
         """The key is updated even when the staging file does not exist on disk."""
-        photos = [{"storage_key": "staging/missing.jpg"}]
+        photos = [SubmittedPhoto(storage_key="staging/missing.jpg")]
 
         move_staging_to_permanent(photos)
 
-        assert photos[0]["storage_key"] == "missing.jpg"
+        assert photos[0].storage_key == "missing.jpg"
 
     def test_exdev_falls_back_to_shutil_move(self, tmp_path: Path) -> None:
         """OSError(EXDEV) from os.replace triggers the shutil.move fallback."""
         staging_file = tmp_path / "staging" / "uuid.jpg"
         staging_file.write_bytes(b"test-data")
 
-        photos = [{"storage_key": "staging/uuid.jpg"}]
+        photos = [SubmittedPhoto(storage_key="staging/uuid.jpg")]
 
         with (
             patch(
@@ -572,14 +573,14 @@ class TestMoveStagingToPermanent:
 
         mock_replace.assert_called_once()
         mock_move.assert_called_once()
-        assert photos[0]["storage_key"] == "uuid.jpg"
+        assert photos[0].storage_key == "uuid.jpg"
 
     def test_non_exdev_oserror_reraises(self, tmp_path: Path) -> None:
         """Non-EXDEV OSError from os.replace is re-raised to the caller."""
         staging_file = tmp_path / "staging" / "uuid.jpg"
         staging_file.write_bytes(b"test-data")
 
-        photos = [{"storage_key": "staging/uuid.jpg"}]
+        photos = [SubmittedPhoto(storage_key="staging/uuid.jpg")]
 
         with patch(
             "apps.media.services.filesystem.os.replace",
@@ -589,7 +590,7 @@ class TestMoveStagingToPermanent:
                 move_staging_to_permanent(photos)
 
         # Key must NOT be updated when os.replace raises
-        assert photos[0]["storage_key"] == "staging/uuid.jpg"
+        assert photos[0].storage_key == "staging/uuid.jpg"
 
     def test_multiple_photos_processed(self, tmp_path: Path) -> None:
         """Each photo dict in the list is processed independently."""
@@ -598,11 +599,11 @@ class TestMoveStagingToPermanent:
             (staging_dir / name).write_bytes(b"data")
 
         photos = [
-            {"storage_key": "staging/a.jpg", "thumbnail_small": None},
-            {"storage_key": "staging/b.jpg", "thumbnail_small": None},
+            SubmittedPhoto(storage_key="staging/a.jpg", thumbnail_small=None),
+            SubmittedPhoto(storage_key="staging/b.jpg", thumbnail_small=None),
         ]
 
         move_staging_to_permanent(photos)
 
-        assert photos[0]["storage_key"] == "a.jpg"
-        assert photos[1]["storage_key"] == "b.jpg"
+        assert photos[0].storage_key == "a.jpg"
+        assert photos[1].storage_key == "b.jpg"

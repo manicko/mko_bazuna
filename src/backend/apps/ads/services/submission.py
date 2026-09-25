@@ -32,6 +32,7 @@ from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import normalize_price_to_eur
+from apps.media.schemas import SubmittedPhoto
 from apps.media.services.filesystem import move_staging_to_permanent
 from apps.media.services.thumbnails import ThumbnailService
 
@@ -48,7 +49,7 @@ class SubmitAdInput(BaseModel):
     city_id: int | None
     price_amount: Decimal
     price_currency: CurrencyCode | None
-    photos: list[dict[str, Any]]
+    photos: list[SubmittedPhoto]
     user_id: int | None
     title_bs: str = ""
     desc_bs: str = ""
@@ -138,23 +139,23 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     # so a DB rollback does not leave filesystem and DB desynced.
     for photo in input.photos:
         try:
-            original_path = os.path.join(settings.MEDIA_ROOT, photo["storage_key"])
+            original_path = os.path.join(settings.MEDIA_ROOT, photo.storage_key)
             with open(original_path, "rb") as f:
                 photo_bytes = f.read()
             thumbnail_service = ThumbnailService(settings.MEDIA_ROOT)
             thumbnail_keys = thumbnail_service.generate_thumbnails(
-                photo_bytes, photo["storage_key"]
+                photo_bytes, photo.storage_key
             )
-            photo["thumbnail_small"] = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
-            photo["thumbnail_medium"] = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
-            photo["thumbnail_large"] = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
+            photo.thumbnail_small = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
+            photo.thumbnail_medium = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
+            photo.thumbnail_large = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
         except Exception:
             logger.exception(
-                "Failed to generate thumbnails for %s", photo["storage_key"]
+                "Failed to generate thumbnails for %s", photo.storage_key
             )
-            photo["thumbnail_small"] = None
-            photo["thumbnail_medium"] = None
-            photo["thumbnail_large"] = None
+            photo.thumbnail_small = None
+            photo.thumbnail_medium = None
+            photo.thumbnail_large = None
 
     # Promote staging files to permanent storage BEFORE the transaction.
     # Thumbnailing already wrote staging/<uuid>-*.jpg variants; this moves the
@@ -216,12 +217,12 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         for photo in input.photos:
             AdImageService.create_or_skip(
                 ad=ad,
-                image=photo["storage_key"],
-                telegram_file_id=photo["telegram_file_id"],
-                position=photo["position"],
-                thumbnail_small=photo.get("thumbnail_small"),
-                thumbnail_medium=photo.get("thumbnail_medium"),
-                thumbnail_large=photo.get("thumbnail_large"),
+                image=photo.storage_key,
+                telegram_file_id=photo.telegram_file_id,
+                position=photo.position,
+                thumbnail_small=photo.thumbnail_small,
+                thumbnail_medium=photo.thumbnail_medium,
+                thumbnail_large=photo.thumbnail_large,
             )
 
         # Transition DRAFT -> ON_MODERATION (state machine requires this step)
