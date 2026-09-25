@@ -186,35 +186,31 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             # Price/photo edit -> stays PUBLISHED
             # Mixed edit -> follows text rule
             if has_text_change:
-                # Text edit: go to moderation
-                ad.title = dto.title
-                ad.description = dto.description
-                ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
-                ad.save(
-                    update_fields=[
-                        "title",
-                        "description",
-                        "price_amount",
-                        "price_currency",
-                        "price_normalized_eur",
-                        "updated_at",
-                    ]
+                # Delegate to the shared submission orchestrator, mirroring the
+                # reactivation branch above. submit_ad sets the fields, saves,
+                # transitions to ON_MODERATION, then runs auto_moderate.
+                #
+                # The currency pre-coercion above (price_currency_value)
+                # ensures it is a valid CurrencyCode | None — submit_ad
+                # preserves the ad's current currency when None (web
+                # "keep-current" semantic, Path A).
+                passed, errors = submit_ad(
+                    SubmitAdInput(
+                        ad_id=ad_id,
+                        title_ru=dto.title,
+                        desc_ru=dto.description,
+                        category_id=ad.category_id,
+                        city_id=ad.city_id,
+                        price_amount=dto.price_amount,
+                        price_currency=price_currency_value,
+                        photos=[],
+                        user_id=ad.user_id,
+                        listing_condition_id=ad.listing_condition_id,
+                    )
                 )
 
-                # Use transition_to for status change to ON_MODERATION
-                ad.transition_to(AdStatus.ON_MODERATION)
-                logger.info("Ad %s text edited, moved to ON_MODERATION", ad_id)
-
-                # Run auto-moderation on the edited text content (mirrors
-                # ad_reactivate which calls auto_moderate directly).
-                # auto_moderate runs its own atomic() (a SAVEPOINT inside this
-                # view's outer atomic); on pass it promotes to PUBLISHED, on fail
-                # to ON_MODERATION_FAILED. Branch on the bool return and reuse
-                # the seller-safe error message from the reactivation branch.
-                from apps.moderation.services.auto_moderation import auto_moderate
-
-                am_result = auto_moderate(ad)
-                if am_result:
+                if passed:
+                    logger.info("Ad %s text edited, moved to ON_MODERATION", ad_id)
                     return redirect("ads:dashboard")
 
                 ad = Ad.objects.prefetch_related("images").get(id=ad_id)
@@ -223,7 +219,9 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     "ads/edit.html",
                     {
                         "ad": ad,
-                        "error": _("Ad failed moderation checks"),
+                        "error": errors[0]
+                        if errors
+                        else _("Ad failed moderation checks"),
                     },
                 )
             else:

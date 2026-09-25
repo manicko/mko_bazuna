@@ -73,10 +73,13 @@ class AdEditInput(BaseModel):
     - *Invalid price → Free:* an unparseable ``price_amount`` yields
       ``Decimal("0")`` (matching the original ``except Exception`` fallback).
 
-    TODO(QLT-004): Blank title/description still overwrite the ad's values
-    (matching the original view logic where missing POST keys → ``""``).
-    Consider rejecting blanks or requiring an explicit clear signal in a
-    future pass.
+    The PUBLISHED text-edit branch in ``ad_edit`` now delegates to
+    ``submit_ad`` (QLT-004), passing a pre-coerced ``CurrencyCode | None`` so
+    that ``None`` preserves the ad's current currency via Path A.
+
+    NOTE: Blank title/description still overwrite the ad's values (matching the
+    original view logic where missing POST keys → ``""``). Consider rejecting
+    blanks or requiring an explicit clear signal in a future pass.
     """
 
     title: str = ""
@@ -127,7 +130,9 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     ``price_currency`` is trusted directly from ``SubmitAdInput``: Pydantic v2's
     native ``StrEnum`` coercion already converted it to a ``CurrencyCode``
     (or ``None``) at DTO construction, so no defensive ``isinstance``/``str()``
-    re-coercion is needed here.
+    re-coercion is needed here.  When ``price_currency`` is ``None`` the ad's
+    existing ``price_currency`` is preserved (web "keep-current" semantic; the
+    bot flow never sends ``None`` per ``price.py`` FSM handlers).
     """
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.
@@ -174,8 +179,12 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
 
         # Currency is already coerced to CurrencyCode | None by SubmitAdInput
         # via Pydantic v2's native StrEnum coercion; trust the DTO directly.
+        # None means "preserve the ad's current currency" (web "keep-current"
+        # semantic); the bot flow always passes a valid CurrencyCode per
+        # price.py FSM handlers, so this branch is a no-op for bots.
         currency = input.price_currency
-        ad.price_currency = currency.value if currency else None
+        if currency is not None:
+            ad.price_currency = currency.value
 
         # Price normalization (BR-03)
         normalize_price_to_eur(ad, input.price_amount, currency)
