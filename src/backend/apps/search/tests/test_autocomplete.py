@@ -560,7 +560,7 @@ class TestEntitySuggestionsService:
         city.name_i18n = {"ru": "Тестград", "bs": "Testgrad"}
         city.save(update_fields=["name_i18n"])
 
-        results = get_entity_suggestions("тран", locale="bs")
+        results = get_entity_suggestions("prev", locale="bs")
         cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
         assert cat.text == "Prevoz"
@@ -573,7 +573,7 @@ class TestEntitySuggestionsService:
         root_category.name_i18n = {"ru": "Транспорт", "en": "Transport"}
         root_category.save(update_fields=["name_i18n"])
 
-        results = get_entity_suggestions("тран", locale="en")
+        results = get_entity_suggestions("trans", locale="en")
         cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
         assert cat.text == "Transport"
@@ -599,11 +599,35 @@ class TestEntitySuggestionsService:
         child_category.name_i18n = {"ru": "Велосипеды", "bs": "Bicikli"}
         child_category.save(update_fields=["name_i18n"])
 
-        results = get_entity_suggestions("вел", locale="bs")
+        results = get_entity_suggestions("bic", locale="bs")
         cat = next((r for r in results if r.type == "category"), None)
         assert cat is not None
         assert cat.text == "Bicikli"
         assert cat.category_path == "Prevoz > Bicikli"
+
+    def test_entity_suggestions_latin_prefix_excludes_cyrillic_match(
+        self, root_category: Category
+    ) -> None:
+        """Latin prefix matches localized name; Cyrillic prefix does not match
+        when a localized name is present (matching is locale-aware).
+
+        With ``name_i18n['bs'] = 'Prevoz'`` the locale-aware match name is
+        'Prevoz', so a Latin prefix ``'prev'`` matches while a Cyrillic prefix
+        ``'тран'`` (which would match the base ``name='Транспорт'``) does not.
+        """
+        root_category.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
+        root_category.save(update_fields=["name_i18n"])
+
+        latin_results = get_entity_suggestions("prev", locale="bs")
+        cat = next((r for r in latin_results if r.type == "category"), None)
+        assert cat is not None
+        assert cat.text == "Prevoz"
+
+        cyrillic_results = get_entity_suggestions("тран", locale="bs")
+        cat = next(
+            (r for r in cyrillic_results if r.type == "category"), None
+        )
+        assert cat is None
 
 
 # ---------------------------------------------------------------------------

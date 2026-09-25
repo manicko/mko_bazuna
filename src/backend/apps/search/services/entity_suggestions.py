@@ -7,6 +7,10 @@ used in the search bar dropdown.
 
 import logging
 
+from django.db.models import F, TextField
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Coalesce
+
 from apps.categories.models import Category
 from apps.core.enums import SearchSuggestionSource
 from apps.locations.models import City
@@ -43,7 +47,10 @@ def get_entity_suggestions(
     Queries Category (with ``is_active=True`` filter) and City
     (no ``is_active`` filter) using case-insensitive prefix matching.
     Results are limited by the ``limit`` parameter per entity type.
-    Category and city names are localized via ``get_name(locale)``.
+    Matching is performed against the locale-aware name
+    (``name_i18n[locale] → name_i18n["ru"] → name``) so that prefixes
+    in the user's language are honored.  Display names are localized
+    via ``get_name(locale)``.
 
     Args:
         prefix: The beginning of a name to match (case-insensitive).
@@ -57,16 +64,28 @@ def get_entity_suggestions(
     if not normalized:
         return []
 
-    # Category suggestions with is_active filter — prefix match (istartswith)
-    categories = Category.objects.filter(
-        name__istartswith=normalized,
-        is_active=True,
-    ).order_by("name")[:limit]
+    match_name = Coalesce(
+        KeyTextTransform(locale, F("name_i18n")),
+        KeyTextTransform("ru", F("name_i18n")),
+        F("name"),
+        output_field=TextField(),
+    )
 
-    # City suggestions without is_active filter (field doesn't exist) — prefix match
-    cities = City.objects.filter(
-        name__istartswith=normalized,
-    ).order_by("name")[:limit]
+    # Category suggestions with is_active filter — prefix match (istartswith)
+    # on the locale-aware name (locale → ru → base name fallback chain).
+    categories = (
+        Category.objects.annotate(_match_name=match_name)
+        .filter(_match_name__istartswith=normalized, is_active=True)
+        .order_by("name")[:limit]
+    )
+
+    # City suggestions without is_active filter (field doesn't exist) — prefix
+    # match on the same locale-aware name fallback chain.
+    cities = (
+        City.objects.annotate(_match_name=match_name)
+        .filter(_match_name__istartswith=normalized)
+        .order_by("name")[:limit]
+    )
 
     suggestions: list[AutocompleteSuggestion] = [
         AutocompleteSuggestion(
