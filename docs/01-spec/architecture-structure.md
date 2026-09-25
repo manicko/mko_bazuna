@@ -139,7 +139,7 @@ src/
 │   ├── handlers/                  # aiogram 3.x handlers (login, ad_create, contact)
 │   ├── schemas/                   # pydantic v2 DTOs for bot message payloads (rule 11)
 │   ├── middlewares/               # LanguageMiddleware (per-user locale, FQ-001), AccountStateMiddleware, DatabaseConnectionMiddleware, UpdateIdDedupMiddleware
-│   ├── services/                  # business logic (ad_data.py — ORM helpers + keyboard builders extracted from ad_create.py QLT-001; rate_limit.py; media.py relocated to apps/media/services/filesystem.py)
+│   ├── services/                  # business logic (ad_data/ package — ORM helpers, media I/O, translation, feature helpers, keyboard builders (QLT-006); rate_limit.py)
 │   ├── config.py
 │   └── main.py
 ├── scraping_service/              # DEFERRED to phase 2 (decision B). Separate Telethon userbot process.

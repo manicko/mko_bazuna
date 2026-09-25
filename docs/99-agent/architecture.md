@@ -306,3 +306,29 @@ register handlers against it via `@router.message(...)` / `@router.callback_quer
 Test patch paths in `test_ad_create.py` and `test_site_name_greeting.py` were updated to reflect
 the new package import paths. The `submit_ad` interface (signature + return tuple) is unchanged,
 so the 10-QLT-001 refactoring does not block the split.
+
+## Ad-Data Service Package Split (10-QLT-006)
+
+The monolithic 598-line `telegram_bot/services/ad_data.py` was split into a package:
+`telegram_bot/services/ad_data/` with a façade `__init__.py` that re-exports all public names so
+that all 32 importers across the codebase keep resolving names from
+`telegram_bot.services.ad_data` unchanged. Sub-modules are organized by concern and import only
+from `apps.*` or `telegram_bot.schemas.*` — never from a sibling `ad_data.*` submodule:
+
+| Sub-module | Contents |
+|------------|----------|
+| `__init__.py` | Package docstring, re-exports of all 22 public names, `__all__` |
+| `orm.py` | DB helpers (``sync_to_async``): `create_draft_ad`, `delete_draft`, `_get_ad_status`, `get_all_cities`, `get_category`, `get_city`, `get_city_by_name`, `search_categories` |
+| `media.py` | Bounded photo download + atomic staging: `download_photo`, `save_photo` |
+| `translation.py` | Parallel multi-language translation orchestration: `translate_all_languages` |
+| `feature_helpers.py` | Purpose/feature/condition resolution + lookups: `get_default_purpose`, `get_feature_names`, `get_lookup_item`, `get_lookup_item_by_slug`, `get_resolved_conditions`, `get_resolved_features`, `get_resolved_purposes` |
+| `keyboards.py` | Inline keyboard builders: `build_currency_keyboard`, `build_purpose_keyboard`, `build_condition_keyboard`, `build_feature_keyboard` |
+
+`build_currency_keyboard` (in `keyboards.py`) now loops over `CurrencyCode` enum members instead of
+hardcoding `"EUR"`/`"RSD"`/`"BAM"` tokens — the enum's definition order (EUR, RSD, BAM) keeps EUR
+first (10-QLT-003). `delete_photo` is deliberately absent from the re-export surface: it is an
+imported name used internally by `orm.delete_draft` and is resolved through `orm`'s module globals;
+patch targets must use `telegram_bot.services.ad_data.orm.delete_photo`.
+
+Test patch targets referencing `telegram_bot.services.ad_data` (e.g. in
+`test-audit-block-f-findings.md`) remain valid — the façade preserves the import path.

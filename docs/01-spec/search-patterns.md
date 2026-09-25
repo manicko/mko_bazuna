@@ -82,7 +82,7 @@ critical path.
 
 Ads store per-language `TSVECTOR` columns maintained by the `ads_search_vector_fn`
 trigger at publication time. The publication-time translator
-(`translate_all_languages` in `telegram_bot/services/ad_data.py`) remains the only
+(`translate_all_languages` in `telegram_bot/services/ad_data/translation.py`) remains the only
 use of httpx + Google Cloud Translation API — content is translated once when the ad is created.
 
 Saved search alerts search the persisted `SavedSearch.language` field (the alert

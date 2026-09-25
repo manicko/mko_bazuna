@@ -129,11 +129,11 @@ Templates do **not** call `get_name` directly. They use the `localized_content` 
 
 | Filter | Signature | Behavior |
 |---|---|---|
-| `get_category_name` | `(category, locale="ru")` | `""` if `None`, else `category.get_name(locale)` |
-| `get_city_name` | `(city, locale="ru")` | `""` if `None`, else `city.get_name(locale)` |
-| `get_lookup_name` | `(item, locale="ru")` | `item.get_name(locale)` (used by `feature_tag.html`, DB-based i18n) |
-| `get_title` | `(ad, locale="ru")` | `ad.get_title(locale)` |
-| `get_description` | `(ad, locale="ru")` | `ad.get_description(locale)` |
+| `get_category_name` | `(category, locale=LanguageLocale.RUSSIAN)` | `""` if `None`, else `category.get_name(locale)` |
+| `get_city_name` | `(city, locale=LanguageLocale.RUSSIAN)` | `""` if `None`, else `city.get_name(locale)` |
+| `get_lookup_name` | `(item, locale=LanguageLocale.RUSSIAN)` | `item.get_name(locale)` (used by `feature_tag.html`, DB-based i18n) |
+| `get_title` | `(ad, locale=LanguageLocale.RUSSIAN)` | `ad.get_title(locale)` |
+| `get_description` | `(ad, locale=LanguageLocale.RUSSIAN)` | `ad.get_description(locale)` |
 
 Per-ad content lives in `Ad.title` (Russian base) / `Ad.title_en` / `Ad.title_bs` and the matching
 `description_*` columns (`apps/ads/models.py` L43-75). `Ad.get_title(locale)` iterates
@@ -141,7 +141,7 @@ Per-ad content lives in `Ad.title` (Russian base) / `Ad.title_en` / `Ad.title_bs
 analogous (`apps/ads/models.py` L464-487).
 
 Entity-suggestion matching threads the locale explicitly: `get_entity_suggestions(prefix,
-limit=5, locale="ru")` (`apps/search/services/entity_suggestions.py` L36-38) resolves category and
+limit=5, locale=LanguageLocale.RUSSIAN)` (`apps/search/services/entity_suggestions.py` L36-38) resolves category and
 city labels via `get_name(locale)`, so autocomplete matches the active UI language.
 
 ## Feature Tag Rendering (Catalog + Detail)
