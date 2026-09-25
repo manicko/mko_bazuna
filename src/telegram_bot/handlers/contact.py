@@ -283,4 +283,4 @@ async def handle_contact_orm(
     return await _handle()
 
 
-ANONYMOUS_BUYER_LABEL = _("Buyer")
+ANONYMOUS_BUYER_LABEL = gettext_lazy("Buyer")

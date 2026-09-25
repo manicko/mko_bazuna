@@ -29,6 +29,7 @@ from django.utils import translation
 
 from telegram_bot.handlers.contact import (
     _CONTACT_US_GREETING,
+    ANONYMOUS_BUYER_LABEL,
     CONTACT_US_PATTERN,
     CONTACT_US_RATE_LIMITED_MESSAGE,
     handle_contact_us_callback,
@@ -212,3 +213,24 @@ class TestLoginStartGreetingButton:
         button = reply_markup.inline_keyboard[0][0]
         assert button.callback_data == "contact_us"
         assert button.text == "Contact us"
+
+
+# ---------------------------------------------------------------------------
+# ANONYMOUS_BUYER_LABEL — lazy resolution respects per-user locale
+# ---------------------------------------------------------------------------
+
+
+class TestAnonymousBuyerLabelLocale:
+    """``ANONYMOUS_BUYER_LABEL`` must defer translation so the per-request
+    locale (activated by ``LanguageMiddleware``) wins, not the import-time
+    ``LANGUAGE_CODE`` freeze."""
+
+    def test_resolves_russian_label(self) -> None:
+        """Under ``ru`` the label renders as ``Покупатель``."""
+        with translation.override("ru"):
+            assert str(ANONYMOUS_BUYER_LABEL) == "Покупатель"
+
+    def test_resolves_bosnian_label(self) -> None:
+        """Under ``bs`` the label renders as ``Kupac``."""
+        with translation.override("bs"):
+            assert str(ANONYMOUS_BUYER_LABEL) == "Kupac"
