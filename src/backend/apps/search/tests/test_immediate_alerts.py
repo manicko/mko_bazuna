@@ -331,5 +331,6 @@ class TestBuildAlertMessageKeyboard:
         assert button.callback_data == (
             f"{UNSUB_CALLBACK_PREFIX}{saved_search.unsubscribe_token}"
         )
+        assert button.callback_data is not None
         assert button.callback_data.startswith("unsub:")
         assert button.callback_data.endswith("opaque_token_123")
