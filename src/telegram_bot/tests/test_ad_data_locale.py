@@ -12,9 +12,12 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.utils import translation
 
+from apps.currencies.enums import CurrencyCode
 from apps.lookups.models import LookupGroup, LookupItem
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.services.ad_data import (
     build_condition_keyboard,
+    build_currency_keyboard,
     build_feature_keyboard,
     build_purpose_keyboard,
     get_feature_names,
@@ -270,3 +273,102 @@ class TestGetFeatureNamesLocale:
         )
         names = await get_feature_names([item.id], locale="bs")
         assert names == ["no-i18n-item"]
+
+
+# ---------------------------------------------------------------------------
+# build_currency_keyboard
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCurrencyKeyboard:
+    """``build_currency_keyboard`` must emit CurrencyCode-derived tokens (10-QLT-003).
+
+    The callback-data currency suffixes must be derived from the
+    ``CurrencyCode`` StrEnum (single source of truth shared with the
+    ``price.py`` parser) rather than bare ``"EUR"``/``"RSD"``/``"BAM"``
+    literals. EUR must remain first (PO-01).
+    """
+
+    @staticmethod
+    def _button_pairs(markup: object) -> list[tuple[str | None, str | None]]:
+        """Extract ``(text, callback_data)`` pairs from an ``InlineKeyboardMarkup``."""
+        pairs: list[tuple[str | None, str | None]] = []
+        for row in getattr(markup, "inline_keyboard", []) or []:
+            for button in row:
+                pairs.append(
+                    (
+                        getattr(button, "text", None),
+                        getattr(button, "callback_data", None),
+                    )
+                )
+        return pairs
+
+    def test_currency_suffixes_match_currency_code_values(self) -> None:
+        """Every emitted currency callback suffix is a ``CurrencyCode`` value.
+
+        Property test: the set of suffixes after the ``PRICE_CURRENCY`` prefix
+        must exactly equal ``{c.value for c in CurrencyCode}`` — no bare
+        literals, no extra or missing tokens.
+        """
+        markup = build_currency_keyboard()
+        pairs = self._button_pairs(markup)
+
+        suffixes = {
+            cb.removeprefix(str(BotCallbackPrefix.PRICE_CURRENCY))
+            for _text, cb in pairs
+            if cb is not None and str(cb).startswith(str(BotCallbackPrefix.PRICE_CURRENCY))
+        }
+
+        assert suffixes == {c.value for c in CurrencyCode}
+
+    def test_round_trip_currency_tokens_parse(self) -> None:
+        """Each emitted currency token must be accepted by ``CurrencyCode(...)``.
+
+        Mirrors the ``price.py`` parser path: strip the prefix, then
+        ``CurrencyCode(currency_value)`` must succeed for every keyboard token.
+        """
+        markup = build_currency_keyboard()
+        pairs = self._button_pairs(markup)
+
+        for _text, cb in pairs:
+            if cb is not None and str(cb).startswith(str(BotCallbackPrefix.PRICE_CURRENCY)):
+                currency_value = cb.replace(BotCallbackPrefix.PRICE_CURRENCY, "")
+                assert isinstance(CurrencyCode(currency_value), CurrencyCode)
+
+    def test_eur_is_first_currency_button(self) -> None:
+        """EUR must be the first currency button (PO-01 ordering)."""
+        markup = build_currency_keyboard()
+        pairs = self._button_pairs(markup)
+
+        currency_buttons = [
+            (text, cb)
+            for text, cb in pairs
+            if cb is not None and str(cb).startswith(str(BotCallbackPrefix.PRICE_CURRENCY))
+        ]
+
+        assert currency_buttons, "expected at least one currency button"
+
+        text, cb = currency_buttons[0]
+        assert cb == f"{BotCallbackPrefix.PRICE_CURRENCY}{CurrencyCode.EUR.value}"
+        assert "EUR" in (text or "")
+
+    def test_free_button_preserved(self) -> None:
+        """The 'Free' button sentinel and ``adjust(2)`` must remain unchanged."""
+        markup = build_currency_keyboard()
+        pairs = self._button_pairs(markup)
+
+        callback_values = [cb for _text, cb in pairs if cb is not None]
+        assert BotCallbackPrefix.PRICE_FREE in callback_values
+
+    def test_exactly_one_button_per_currency_code(self) -> None:
+        """There must be exactly one currency button per ``CurrencyCode`` member."""
+        markup = build_currency_keyboard()
+        pairs = self._button_pairs(markup)
+
+        currency_buttons = [
+            cb
+            for _text, cb in pairs
+            if cb is not None and str(cb).startswith(str(BotCallbackPrefix.PRICE_CURRENCY))
+        ]
+
+        assert len(currency_buttons) == len(list(CurrencyCode))

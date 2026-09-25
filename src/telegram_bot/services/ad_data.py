@@ -30,6 +30,7 @@ from apps.categories.models import Category, CategoryListingPurpose
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdStatus
 from apps.core.services.translation import translate_text
+from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.lookups.models import LookupItem
 from apps.media.services.filesystem import (
@@ -495,23 +496,31 @@ async def get_feature_names(feature_ids: list[int], locale: str = "ru") -> list[
 # Inline keyboard builders
 # ---------------------------------------------------------------------------
 
+# Presentation-only emoji lookup keyed by CurrencyCode members; the currency
+# codes themselves remain sourced solely from the CurrencyCode StrEnum.
+_CURRENCY_FLAGS: dict[CurrencyCode, str] = {
+    CurrencyCode.EUR: "🇪🇺",
+    CurrencyCode.RSD: "🇷🇸",
+    CurrencyCode.BAM: "🇧🇦",
+}
+
 
 def build_currency_keyboard() -> types.InlineKeyboardMarkup:
-    """Build the inline keyboard for currency selection (EUR first, PO-01)."""
+    """Build the inline keyboard for currency selection (EUR first, PO-01).
+
+    Currency buttons are derived from the ``CurrencyCode`` StrEnum so the
+    builder and the price-step parser (``price.py``) share a single source of
+    truth — no bare ``"EUR"``/``"RSD"``/``"BAM"`` literals (10-QLT-003). The
+    enum's definition order (EUR, RSD, BAM) keeps EUR first.
+    """
 
     builder = InlineKeyboardBuilder()
 
-    builder.button(
-        text="🇪🇺 EUR", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}EUR"
-    )
-
-    builder.button(
-        text="🇷🇸 RSD", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}RSD"
-    )
-
-    builder.button(
-        text="🇧🇦 BAM", callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}BAM"
-    )
+    for code in CurrencyCode:
+        builder.button(
+            text=f"{_CURRENCY_FLAGS[code]} {code.value}",
+            callback_data=f"{BotCallbackPrefix.PRICE_CURRENCY}{code.value}",
+        )
 
     builder.button(text=_("🆓 Free"), callback_data=BotCallbackPrefix.PRICE_FREE)
 
