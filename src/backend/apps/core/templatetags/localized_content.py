@@ -12,11 +12,13 @@ Usage:
 
 from django import template
 
+from apps.core.enums import LanguageLocale
+
 register = template.Library()
 
 
 @register.filter
-def get_title(ad, locale: str = "ru") -> str:
+def get_title(ad, locale: str = LanguageLocale.RUSSIAN) -> str:
     """
     Return localized ad title using the given locale.
 
@@ -33,7 +35,7 @@ def get_title(ad, locale: str = "ru") -> str:
 
 
 @register.filter
-def get_description(ad, locale: str = "ru") -> str:
+def get_description(ad, locale: str = LanguageLocale.RUSSIAN) -> str:
     """
     Return localized ad description using the given locale.
 
@@ -50,7 +52,7 @@ def get_description(ad, locale: str = "ru") -> str:
 
 
 @register.filter
-def get_lookup_name(item, locale: str = "ru") -> str:
+def get_lookup_name(item, locale: str = LanguageLocale.RUSSIAN) -> str:
     """
     Return the localized name of a lookup item (purpose/feature).
 
@@ -68,7 +70,7 @@ def get_lookup_name(item, locale: str = "ru") -> str:
 
 
 @register.filter
-def get_category_name(category, locale: str = "ru") -> str:
+def get_category_name(category, locale: str = LanguageLocale.RUSSIAN) -> str:
     """
     Return the localized name of a Category.
 
@@ -88,7 +90,7 @@ def get_category_name(category, locale: str = "ru") -> str:
 
 
 @register.filter
-def get_city_name(city, locale: str = "ru") -> str:
+def get_city_name(city, locale: str = LanguageLocale.RUSSIAN) -> str:
     """
     Return the localized name of a City.
 

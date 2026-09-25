@@ -6,6 +6,8 @@ Location reference data with i18n name support.
 
 from django.db import models
 
+from apps.core.enums import LanguageLocale
+
 
 class City(models.Model):
     """
@@ -41,7 +43,7 @@ class City(models.Model):
         db_table = "cities"
         verbose_name_plural = "cities"
 
-    def get_name(self, locale: str = "ru") -> str:
+    def get_name(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Get localized name with fallback chain: locale → ru → name."""
         # At runtime, name_i18n is a dict or None
         name_i18n = getattr(self, "name_i18n", None)

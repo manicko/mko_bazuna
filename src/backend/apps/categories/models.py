@@ -7,6 +7,7 @@ Hierarchical category tree using django-mptt (single source of truth).
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 
+from apps.core.enums import LanguageLocale
 from apps.lookups.enums import LookupGroupCode
 
 
@@ -50,7 +51,7 @@ class Category(MPTTModel):
         db_table = "categories"
         verbose_name_plural = "categories"
 
-    def get_name(self, locale: str = "ru") -> str:
+    def get_name(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Get localized name with fallback chain: locale → ru → name."""
         # At runtime, name_i18n is a dict or None
         name_i18n = getattr(self, "name_i18n", None)

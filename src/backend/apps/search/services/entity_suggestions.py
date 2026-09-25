@@ -12,14 +12,14 @@ from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 
 from apps.categories.models import Category
-from apps.core.enums import SearchSuggestionSource
+from apps.core.enums import LanguageLocale, SearchSuggestionSource
 from apps.locations.models import City
 from apps.search.schemas import AutocompleteSuggestion
 
 logger = logging.getLogger(__name__)
 
 
-def _category_path(category: Category, locale: str = "ru") -> str:
+def _category_path(category: Category, locale: str = LanguageLocale.RUSSIAN) -> str:
     """Build a root→leaf, human-readable path for a category suggestion.
 
     Uses ``get_ancestors(include_self=True)`` (root→leaf order) joined by
@@ -39,7 +39,7 @@ def _category_path(category: Category, locale: str = "ru") -> str:
 
 
 def get_entity_suggestions(
-    prefix: str, limit: int = 5, locale: str = "ru"
+    prefix: str, limit: int = 5, locale: str = LanguageLocale.RUSSIAN
 ) -> list[AutocompleteSuggestion]:
     """
     Get matching category and city names for autocomplete.

@@ -28,7 +28,7 @@ from django.utils.translation import gettext as _
 from apps.ads.models import Ad
 from apps.categories.models import Category, CategoryListingPurpose
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, LanguageLocale
 from apps.core.services.translation import translate_text
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
@@ -475,7 +475,9 @@ async def get_lookup_item(item_id: int | None) -> LookupItem | None:
     return await _get()
 
 
-async def get_feature_names(feature_ids: list[int], locale: str = "ru") -> list[str]:
+async def get_feature_names(
+    feature_ids: list[int], locale: str = LanguageLocale.RUSSIAN
+) -> list[str]:
     """Get feature names as localized strings."""
 
     @sync_to_async
@@ -532,7 +534,7 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 def build_purpose_keyboard(
     purposes: list[LookupItem],
     default_slug: str | None = None,
-    locale: str = "ru",
+    locale: str = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for purpose selection."""
 
@@ -555,7 +557,7 @@ def build_purpose_keyboard(
 
 def build_condition_keyboard(
     conditions: list[LookupItem],
-    locale: str = "ru",
+    locale: str = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for condition single-selection."""
     builder = InlineKeyboardBuilder()
@@ -571,7 +573,7 @@ def build_condition_keyboard(
 def build_feature_keyboard(
     features: list[LookupItem],
     selected_ids: set[int],
-    locale: str = "ru",
+    locale: str = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for feature multi-selection."""
 

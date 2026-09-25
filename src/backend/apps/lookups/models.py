@@ -7,6 +7,8 @@ LookupItem defines individual values within a group (e.g. "sell", "rent").
 
 from django.db import models
 
+from apps.core.enums import LanguageLocale
+
 
 class LookupGroup(models.Model):
     """A named group of reference data values.
@@ -85,7 +87,7 @@ class LookupItem(models.Model):
         ordering = ["group", "sort_order"]
         verbose_name = "lookup item"
 
-    def get_name(self, locale: str = "ru") -> str:
+    def get_name(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Return the localized name with fallback chain: locale → ru → slug."""
         name_i18n = getattr(self, "name_i18n", None)
         if name_i18n:

@@ -17,7 +17,7 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.core.enums import AdSource, AdStatus
+from apps.core.enums import AdSource, AdStatus, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.lookups.enums import LookupGroupCode
 from apps.media.services.filesystem import KEY_FORMAT_REGEX
@@ -499,7 +499,7 @@ class Ad(models.Model):
         self.status = target
         self.save(update_fields=update_fields)
 
-    def get_title(self, locale: str = "ru") -> str:
+    def get_title(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Return localized title for *locale* with a fallback to the Russian base.
 
         The Russian base lives in the ``title`` column (``title_ru`` is not a
@@ -511,7 +511,7 @@ class Ad(models.Model):
                 return val
         return ""
 
-    def get_description(self, locale: str = "ru") -> str:
+    def get_description(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Return localized description for *locale* with a fallback to the Russian base.
 
         The Russian base lives in the ``description`` column
