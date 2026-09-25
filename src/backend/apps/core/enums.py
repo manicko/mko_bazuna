@@ -274,6 +274,22 @@ class ConsentVersion(StrEnum):
     V1_0 = "1.0"
 
 
+class UserRole(StrEnum):
+    """Roles defined by Phase 15 authorization spec.
+
+    Single source of truth consumed by both the web process and the bot
+    process. Maps to Django identity flags:
+
+    - ``ADMIN``     → ``is_staff or is_superuser``
+    - ``SELLER``    → authenticated (and not staff/superuser)
+    - ``ANONYMOUS``  → unauthenticated identity
+    """
+
+    ANONYMOUS = "anonymous"
+    SELLER = "seller"
+    ADMIN = "admin"
+
+
 __all__ = [
     "AdSort",
     "AdvisoryLockId",
@@ -294,4 +310,5 @@ __all__ = [
     "ConsentChoice",
     "CookieCategory",
     "ConsentVersion",
+    "UserRole",
 ]

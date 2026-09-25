@@ -7,7 +7,13 @@ One user = one Telegram account. Authentication via atomic login tokens.
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from apps.core.enums import AdSource, ConsentChoice, ConsentVersion, LanguageLocale
+from apps.core.enums import (
+    AdSource,
+    ConsentChoice,
+    ConsentVersion,
+    LanguageLocale,
+    UserRole,
+)
 
 
 class User(AbstractUser):
@@ -147,6 +153,23 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return f"User {self.id}"
+
+    @property
+    def role(self) -> UserRole:
+        """Resolve this identity's role from Django flags (Phase 15 spec).
+
+        Maps ``is_staff`` / ``is_superuser`` to the ``UserRole`` StrEnum —
+        the single source of truth consumed by both processes.
+
+        - ``is_staff or is_superuser`` → ``ADMIN``
+        - authenticated (and not staff/superuser) → ``SELLER``
+        - unauthenticated identity → ``ANONYMOUS``
+        """
+        if self.is_staff or self.is_superuser:
+            return UserRole.ADMIN
+        if self.is_authenticated:
+            return UserRole.SELLER
+        return UserRole.ANONYMOUS
 
 
 class LoginToken(models.Model):
