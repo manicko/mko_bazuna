@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
+from pydantic import ValidationError
 
 from apps.ads.models import Ad
 from apps.ads.services.submission import SubmitAdInput, submit_ad
@@ -155,3 +156,47 @@ def test_submit_ad_price_normalization_delegates_to_shared_utility(
     assert call_args.args[0].pk == ad.pk
     assert call_args.args[1] == Decimal("100")
     assert call_args.args[2] == CurrencyCode.EUR
+
+
+# ---------------------------------------------------------------------------
+# SubmitAdInput currency coercion (Pydantic v2 native StrEnum)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_ad_input_coerces_valid_currency_string() -> None:
+    """A raw ``"EUR"`` string passed to ``SubmitAdInput`` is coerced to
+    ``CurrencyCode.EUR`` by Pydantic v2's native ``StrEnum`` coercion, so
+    ``submit_ad`` can trust ``input.price_currency`` directly.
+    """
+    dto = SubmitAdInput(
+        ad_id=1,
+        title_ru="Test Title",
+        desc_ru="Test description text",
+        category_id=None,
+        city_id=None,
+        price_amount=Decimal("100"),
+        price_currency="EUR",
+        photos=[],
+        user_id=None,
+    )
+    assert dto.price_currency is CurrencyCode.EUR
+
+
+def test_submit_ad_input_rejects_invalid_currency_string() -> None:
+    """An unknown currency string raises ``ValidationError`` at DTO
+    construction — it is never silently coerced to ``None``, so the removed
+    ``except ValueError`` fallback in ``submit_ad`` could never have fired.
+    """
+    with pytest.raises(ValidationError) as exc_info:
+        SubmitAdInput(
+            ad_id=1,
+            title_ru="Test Title",
+            desc_ru="Test description text",
+            category_id=None,
+            city_id=None,
+            price_amount=Decimal("100"),
+            price_currency="XYZ",
+            photos=[],
+            user_id=None,
+        )
+    assert exc_info.value.errors()[0]["loc"] == ("price_currency",)

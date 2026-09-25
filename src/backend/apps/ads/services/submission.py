@@ -1,6 +1,6 @@
 """
-Shared ad submission service — extracted verbatim from the bot handler's
-``_update_and_moderate`` logic (QLT-001 Stage 1).
+Shared ad submission service — extracted from the bot handler's
+``_update_and_moderate`` logic.
 
 ``submit_ad`` is now wired into both callers:
   * the bot handler's ``process_preview`` step, invoked via ``sync_to_async``
@@ -8,8 +8,12 @@ Shared ad submission service — extracted verbatim from the bot handler's
   * the web edit view's ``ad_edit`` reactivation branch, which transitions
     an ``ARCHIVED`` ad back to ``ON_MODERATION`` (see ``edit.py``).
 
-The currency-coercion divergence between the two call paths (Path 2) is
-documented in the ``submit_ad`` function docstring.
+Currency coercion is the DTO's responsibility: Pydantic v2's native ``StrEnum``
+coercion converts a valid ``"EUR"`` to ``CurrencyCode.EUR`` and rejects an
+unknown currency via ``ValidationError`` at construction.  The bot flow passes
+``data.get("price_currency")`` (``CurrencyCode`` or ``None`` from FSM state);
+the web edit path pre-coerces to a valid ``CurrencyCode | None`` before
+construction, so an unparseable form value preserves the ad's currency.
 """
 
 from __future__ import annotations
@@ -120,17 +124,10 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     This is a synchronous function.  Callers that run in an async context
     (e.g. the bot handler) must wrap the call in ``sync_to_async``.
 
-    .. note::
-
-        **Currency coercion divergence (QLT-001 Stage 3 / Path 2):**
-        This function defensively coerces ``CurrencyCode | str`` inputs,
-        falling back to ``None`` on ``ValueError`` (inherited from the bot
-        handler's original ``update_ad_and_moderate``).  The web edit view
-        pre-validates currency at the view layer (preserving the user's
-        current currency on invalid form input) and passes a valid
-        ``CurrencyCode | None`` via ``SubmitAdInput``, so the coercion is a
-        no-op for the edit path.  Do not remove this defensive check without
-        verifying the bot flow still guards against raw-string currencies.
+    ``price_currency`` is trusted directly from ``SubmitAdInput``: Pydantic v2's
+    native ``StrEnum`` coercion already converted it to a ``CurrencyCode``
+    (or ``None``) at DTO construction, so no defensive ``isinstance``/``str()``
+    re-coercion is needed here.
     """
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.
@@ -175,19 +172,9 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         ad.city_id = input.city_id
         ad.price_amount = input.price_amount
 
-        # Currency coercion
-        currency: CurrencyCode | None = None
-        if input.price_currency is not None:
-            try:
-                currency = (
-                    input.price_currency
-                    if isinstance(input.price_currency, CurrencyCode)
-                    else CurrencyCode(str(input.price_currency))
-                )
-            except ValueError:
-                logger.warning(
-                    "Invalid price_currency %r for ad %s", input.price_currency, input.ad_id
-                )
+        # Currency is already coerced to CurrencyCode | None by SubmitAdInput
+        # via Pydantic v2's native StrEnum coercion; trust the DTO directly.
+        currency = input.price_currency
         ad.price_currency = currency.value if currency else None
 
         # Price normalization (BR-03)
