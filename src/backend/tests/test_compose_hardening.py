@@ -9,6 +9,7 @@ no PyYAML dependency.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -141,6 +142,30 @@ def test_scheduler_hardened_in_prod() -> None:
     assert 'cap_drop: ["ALL"]' in block, 'scheduler must have cap_drop: ["ALL"]'
     for key in _HARDENING_KEYS:
         assert key in block, f"scheduler must have {key}"
+
+
+# --- scheduler deploy parity (OPS-009) ---------------------------------------
+
+
+def test_scheduler_has_scheduler_profile() -> None:
+    """scheduler must be gated by profiles: ["scheduler"] in prod compose."""
+    block = _service_block(_PROD_COMPOSE, "scheduler")
+    assert "profiles:" in block, "scheduler must define profiles:"
+    assert "- scheduler" in block, "scheduler must be listed under profiles"
+
+
+def test_scheduler_uses_image_not_build() -> None:
+    """scheduler must use a pre-built image, never a local build directive."""
+    block = _service_block(_PROD_COMPOSE, "scheduler")
+    assert "image:" in block, "scheduler must use image: in production"
+    assert "build:" not in block, "scheduler must NOT use build: in production"
+
+
+def test_scheduler_entrypoint_is_executable() -> None:
+    """docker/entrypoint-scheduler.sh must exist and be marked executable."""
+    path = _ROOT / "docker" / "entrypoint-scheduler.sh"
+    assert path.exists(), f"entrypoint not found at {path}"
+    assert os.access(path, os.X_OK), f"{path} must be executable (chmod +x)"
 
 
 def test_backup_hardened_in_prod() -> None:
