@@ -138,6 +138,25 @@ class TestFavoriteToggle:
         assert response.status_code == 405
         assert not AdFavorite.objects.filter(user=buyer, ad=ad).exists()
 
+    def test_heart_form_carries_csrf_header(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """The heart form embeds its own hx-headers with X-CSRFToken (AUTZ-002).
+
+        The component renders via the ads:favorite_toggle view. After the fix,
+        its <form> must carry hx-headers so the POST is self-contained even when
+        rendered outside a parent <body hx-headers> scope.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(buyer)
+
+        response = client.post(f"/favorite/{ad.id}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "hx-headers" in content
+        assert "X-CSRFToken" in content
+
 
 # ---------------------------------------------------------------------------
 # annotate_favorites helper

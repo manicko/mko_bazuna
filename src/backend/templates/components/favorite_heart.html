@@ -4,6 +4,7 @@ anonymous taps swap in the login_prompt fragment instead (no 302). {% endcomment
 {% load i18n %}
 <form class="inline-block"
       hx-post="{% url 'ads:favorite_toggle' ad.id %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       hx-target="closest form"
       hx-swap="outerHTML"
       aria-label="{% if is_favorited %}{% trans "Remove from favorites" %}{% else %}{% trans "Add to favorites" %}{% endif %}">
