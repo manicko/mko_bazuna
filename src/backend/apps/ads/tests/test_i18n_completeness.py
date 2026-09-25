@@ -847,6 +847,32 @@ def _check_call_for_unwrapped(call: ast.Call, source: str, lineno: int) -> list[
     return violations
 
 
+def _check_append_for_unwrapped(
+    call: ast.Call, source: str, lineno: int
+) -> list[str]:
+    """Flag translatable f-strings/literals passed to list.append()."""
+    func = call.func
+    if not (isinstance(func, ast.Attribute) and func.attr == "append"):
+        return []
+    if not call.args:
+        return []
+    arg = call.args[0]
+    if not _find_untranslated(arg) or _is_gettext_wrapped(arg):
+        return []
+    # Skip non-prose strings (price formatting like f"≥{ss.min_price}")
+    if isinstance(arg, ast.JoinedStr):
+        for val in arg.values:
+            if isinstance(val, ast.FormattedValue):
+                continue
+            if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                if _is_translatable_text(val.value):
+                    return [
+                        f"{source}:{lineno}: unwrapped user-facing string in "
+                        f".append() — wrap in _()"
+                    ]
+    return []
+
+
 def test_bot_no_hardcoded_messages() -> None:
     """Bot handler user-facing strings must be wrapped in ``gettext``.
 
@@ -865,6 +891,9 @@ def test_bot_no_hardcoded_messages() -> None:
             if isinstance(node, ast.Call):
                 all_violations.extend(
                     _check_call_for_unwrapped(node, source, node.lineno)
+                )
+                all_violations.extend(
+                    _check_append_for_unwrapped(node, source, node.lineno)
                 )
 
     assert not all_violations, (

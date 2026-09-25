@@ -80,8 +80,8 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
 
         lines.append(
             f"{i}. [{status}] {query_display[:30]}\n"
-            f"   City: {city_display}, Category: {cat_display}, "
-            f"Price: {price_display}"
+            f"   {_('City:')} {city_display}, {_('Category:')} {cat_display}, "
+            f"{_('Price:')} {price_display}"
         )
 
     lines.append(_("\nReply with number to toggle, or /cancel to exit."))
