@@ -6,7 +6,7 @@ SiteConfig singleton editing with add/delete disabled.
 
 from django.contrib import admin
 
-from apps.core.models import SiteConfig
+from apps.core.models import SiteConfig, SupportContact, SupportTicket
 
 
 @admin.register(SiteConfig)
@@ -26,4 +26,50 @@ class SiteConfigAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None) -> bool:
+        return False
+
+
+@admin.register(SupportContact)
+class SupportContactAdmin(admin.ModelAdmin):
+    """
+    SupportContact admin (email/Telegram channels configured by staff).
+
+    Add and delete are enabled so staff can manage the full contact list.
+    ``is_active`` and ``ordering`` are editable inline from the changelist.
+    """
+
+    list_display = ["label", "channel_type", "email", "telegram_id", "is_active", "ordering"]
+    list_editable = ["is_active", "ordering"]
+    list_filter = ["channel_type", "is_active"]
+    search_fields = ["label", "email", "telegram_id"]
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    """
+    SupportTicket admin (read-only audit trail).
+
+    Tickets are created via the Telegram bot; the admin can only view and
+    filter them. Add/delete are disabled to preserve the audit trail.
+    """
+
+    list_display = ["ticket_ref", "status", "user", "chat_id", "telegram_id", "created_at"]
+    list_filter = ["status", "created_at"]
+    search_fields = ["ticket_ref", "telegram_id", "username", "text"]
+    readonly_fields = [
+        "ticket_ref",
+        "chat_id",
+        "telegram_id",
+        "username",
+        "text",
+        "user",
+        "created_at",
+    ]
+
+    def has_add_permission(self, request) -> bool:
+        # Tickets created via bot, not admin
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        # Audit trail preservation
         return False
