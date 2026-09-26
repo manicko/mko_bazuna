@@ -12,6 +12,49 @@ import environ
 
 logger = logging.getLogger(__name__)
 
+# Allowlist of environment variables that may be loaded from the .env file.
+# Any .env key not listed here triggers a warning (Gate E, Option A) to surface
+# typos like `BOT_T0KEN`. Includes both Python-consumed vars (env()/env.*()/
+# os.getenv in base.py & prod.py) and shell/entrypoint/compose-injected vars.
+ALLOWED_ENV_VARS = frozenset({
+    # --- Python-consumed (env()/env.*()/os.getenv in base.py & prod.py) ---
+    "DJANGO_SECRET_KEY", "DJANGO_SETTINGS_MODULE", "DJANGO_BUILD", "DJANGO_ONESHOT",
+    "DEBUG", "BOT_TOKEN", "GOOGLE_TRANSLATE_API_KEY",
+    "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS",
+    "DATABASE_URL",
+    "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_HOST", "POSTGRES_PORT",
+    "BOT_USERNAME", "BOT_LIVENESS_FILE", "BOT_HEALTH_STALE_SECONDS",
+    "BOT_HEALTH_CHECK_ENABLED",
+    "SCHEDULER_LIVENESS_FILE", "SCHEDULER_COMMAND_TIMEOUT", "SCHEDULER_HEALTH_STALE_SECONDS",
+    "SITE_URL", "IMMEDIATE_ALERTS_ENABLED", "PLAUSIBLE_HOST", "SENTRY_DSN", "REDIS_URL",
+    "EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD",
+    "EMAIL_USE_TLS", "EMAIL_TIMEOUT", "EMAIL_BACKEND",
+    "DEFAULT_FROM_EMAIL", "SUPPORT_NOTIFICATION_RECIPIENTS",
+    # --- Shell/entrypoint/compose-injected (not consumed by Python env()) ---
+    "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_TELEGRAM_ID",
+    "SEED_USERS", "SEED_ADS", "FIX_PERMISSIONS", "SKIP_ENV_CHECK",
+    "TLS_CERT_PATH", "PROMETHEUS_MULTIPROC_DIR",
+    "REGISTRY", "REPOSITORY", "IMAGE_TAG",
+})
+
+
+def _warn_unknown_env_vars(loaded_keys: set[str]) -> None:
+    """Log a warning for env vars loaded from .env not in ALLOWED_ENV_VARS.
+
+    Uses an os.environ pre/post diff (not os.environ directly) so inherited OS
+    env vars (PATH, HOME, etc.) and compose-injected vars already present before
+    read_env() are never flagged. Non-fatal by design (Gate E Option A).
+    """
+    unknown = loaded_keys - ALLOWED_ENV_VARS
+    for key in sorted(unknown):
+        logger.warning(
+            "Unknown env var '%s' loaded from .env — not in ALLOWED_ENV_VARS "
+            "(possible typo; value will be ignored by env() calls). "
+            "If this is intentional, add it to ALLOWED_ENV_VARS in base.py.",
+            key,
+        )
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
@@ -57,7 +100,9 @@ else:
     # (e.g., test_django_secret_key_required expects ImproperlyConfigured
     # when DJANGO_SECRET_KEY is absent from os.environ).
     if "test" not in os.getenv("DJANGO_SETTINGS_MODULE", ""):
+        _env_keys_before = set(os.environ)
         environ.Env.read_env(env_path)
+        _warn_unknown_env_vars(set(os.environ) - _env_keys_before)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
