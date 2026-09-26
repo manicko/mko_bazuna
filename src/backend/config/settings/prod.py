@@ -84,6 +84,34 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
             "sentry-sdk not installed — error tracking disabled"
         )
 
+# ---------------------------------------------------------------------------
+# Secret-validation bypass flags
+# ---------------------------------------------------------------------------
+# Two bypass env vars exist, each serving a distinct purpose:
+#
+#   DJANGO_BUILD=1   — set ONLY in Dockerfile during image build
+#                     (collectstatic --noinput). Allows the build-placeholder
+#                     SECRET_KEY to pass. No env_file or runtime secrets are
+#                     present during build.
+#
+#   DJANGO_ONESHOT=1 — set on one-shot bootstrap services (migrate, load_cities,
+#                     load_catalog, create_admin, seed) via
+#                     docker-compose.dev.override.yml ONLY in development.
+#                     Allows dev placeholder/dummy secrets to pass for services
+#                     that do not serve HTTP traffic and do not need a real
+#                     BOT_TOKEN or GOOGLE_TRANSLATE_API_KEY.
+#
+# In production, NEITHER flag is set for one-shot services:
+#   docker-compose.prod.yml does NOT set DJANGO_ONESHOT (and the base
+#   docker-compose.yml no longer sets DJANGO_BUILD for one-shot services).
+#   Full secret validation runs against the real .env.prod values.
+# Long-lived web and bot services never set either flag.
+# ---------------------------------------------------------------------------
+_SKIP_SECRET_VALIDATION = bool(
+    os.getenv("DJANGO_BUILD") or os.getenv("DJANGO_ONESHOT")
+)
+
+
 # Fail fast: SECRET_KEY is required in production and must pass strength checks.
 # base.py's env("DJANGO_SECRET_KEY") (no default) returns "" for a
 # present-but-empty value — django-environ only raises when the var is
@@ -121,7 +149,7 @@ def _validate_production_secret(var_name: str, value: str) -> None:
         )
 
 
-if not os.getenv("DJANGO_BUILD"):
+if not _SKIP_SECRET_VALIDATION:
     if not SECRET_KEY:  # noqa: F405
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must be set and non-empty in production. "
@@ -131,11 +159,12 @@ if not os.getenv("DJANGO_BUILD"):
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
-# Skip during Docker build and one-shot services (DJANGO_BUILD=1) so
-# collectstatic and bootstrap commands succeed with placeholder values;
-# the real token is provided at runtime via .env.prod. One-shot services
-# set DJANGO_BUILD=1 in docker-compose.yml to bypass prod validation.
-if not os.getenv("DJANGO_BUILD"):
+# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
+# (DJANGO_ONESHOT=1) so collectstatic and bootstrap commands succeed with
+# placeholder values; the real token is provided at runtime via .env.prod.
+# In production, web/bot services do not set either flag, so real tokens are
+# enforced at boot.
+if not _SKIP_SECRET_VALIDATION:
     if not BOT_TOKEN:  # noqa: F405
         raise ImproperlyConfigured(
             "BOT_TOKEN must be set in production. "
@@ -144,10 +173,10 @@ if not os.getenv("DJANGO_BUILD"):
     _validate_production_secret("BOT_TOKEN", BOT_TOKEN)  # noqa: F405
 
 # Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
-# Skip during Docker build and one-shot services (DJANGO_BUILD=1) so
-# bootstrap commands succeed with placeholder values; the real key is
-# provided at runtime via .env.prod.
-if not os.getenv("DJANGO_BUILD"):
+# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
+# (DJANGO_ONESHOT=1) so bootstrap commands succeed with placeholder values;
+# the real key is provided at runtime via .env.prod.
+if not _SKIP_SECRET_VALIDATION:
     if not GOOGLE_TRANSLATE_API_KEY:  # noqa: F405
         raise ImproperlyConfigured(
             "GOOGLE_TRANSLATE_API_KEY must be set in production. "
@@ -159,7 +188,7 @@ if not os.getenv("DJANGO_BUILD"):
 
 # SITE_URL is required in production so Telegram alert links are absolute and
 # correct. A dev-only default must not silently leak into prod traffic.
-if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+if not os.getenv("SITE_URL") and not _SKIP_SECRET_VALIDATION:  # noqa: F405
     raise ImproperlyConfigured(
         "SITE_URL must be set in production. "
         "Provide it via the .env.prod runtime file."
@@ -167,12 +196,10 @@ if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405
 
 # Fail fast: EMAIL_HOST is required in production so transactional emails
 # (password resets, alert notifications, seller confirmations) are deliverable.
-# Skip during Docker build (DJANGO_BUILD=1) — collectstatic runs before runtime
-# env vars are available and does not need SMTP connectivity.
-# Unlike the SECRET_KEY/BOT_TOKEN/GOOGLE_TRANSLATE_API_KEY guards above (which
-# also skip DJANGO_ONESHOT), this guard only skips DJANGO_BUILD: SMTP config
-# must be present even on one-shot bootstrap services.
-if not os.getenv("DJANGO_BUILD"):
+# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
+# (DJANGO_ONESHOT=1) so collectstatic/bootstrap commands succeed; the real
+# SMTP config is provided at runtime via .env.prod.
+if not _SKIP_SECRET_VALIDATION:
     if not EMAIL_HOST:  # noqa: F405
         raise ImproperlyConfigured(
             "EMAIL_HOST must be set in production. "
@@ -203,8 +230,8 @@ if not ALLOWED_HOSTS:  # noqa: F405
 # Fail fast: CSRF_TRUSTED_ORIGINS is required in production behind a
 # TLS-terminating proxy. Without it, Django rejects all POST requests with a
 # valid CSRF token (HTTP 403) because the Origin/Referer header is not in the
-# allow-list. Skip during Docker build (DJANGO_BUILD=1) so collectstatic
-# succeeds with placeholder values; the real origins are provided at runtime
-# via .env.prod.
-if not CSRF_TRUSTED_ORIGINS and not os.getenv("DJANGO_BUILD"):  # noqa: F405
+# allow-list. Skip during Docker build (DJANGO_BUILD=1) and dev one-shot
+# services (DJANGO_ONESHOT=1) so collectstatic/bootstrap commands succeed with
+# placeholder values; the real origins are provided at runtime via .env.prod.
+if not CSRF_TRUSTED_ORIGINS and not _SKIP_SECRET_VALIDATION:  # noqa: F405
     raise ValueError("CSRF_TRUSTED_ORIGINS must be set in production")

@@ -25,6 +25,11 @@ while not (_ROOT / "pyproject.toml").exists():
 
 _COMPOSE = _ROOT / "docker-compose.yml"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
+_DEV_OVERRIDE_COMPOSE = _ROOT / "docker-compose.dev.override.yml"
+
+# One-shot bootstrap services. In dev they run against prod settings with
+# dev placeholder secrets (see DJANGO_ONESHOT handling in prod.py).
+_ONE_SHOT_SERVICES = ["migrate", "load_cities", "load_catalog", "create_admin"]
 
 # Hardening keys required on every long-lived / hardened service.
 _HARDENING_KEYS = [
@@ -241,4 +246,41 @@ def test_resource_limits_use_env_substitution() -> None:
     )
     assert re.search(r"cpus: \$\{[A-Z_]+:-", text), (
         "cpus must use ${VAR:-default} env substitution"
+    )
+
+
+# --- DJANGO_BUILD / DJANGO_ONESHOT split (CFG-001) -------------------------
+
+
+def test_compose_oneshot_flags() -> None:
+    """One-shot services carry DJANGO_ONESHOT=1 in dev but never in prod.
+
+    One-shot bootstrap services (migrate, load_cities, load_catalog,
+    create_admin) use prod settings. In development they need DJANGO_ONESHOT=1
+    so the prod.py secret-validation guards bypass dev placeholder secrets. In
+    production neither DJANGO_BUILD nor DJANGO_ONESHOT may appear — full secret
+    validation runs against the real .env.prod values. seed is exempt: it uses
+    config.settings.dev in the dev override.
+    """
+    # Prod: no one-shot service block may carry either bypass flag.
+    for service in _ONE_SHOT_SERVICES:
+        block = _service_block(_PROD_COMPOSE, service)
+        assert "DJANGO_BUILD" not in block, (
+            f"{service} in prod compose must not set DJANGO_BUILD"
+        )
+        assert "DJANGO_ONESHOT" not in block, (
+            f"{service} in prod compose must not set DJANGO_ONESHOT"
+        )
+
+    # Dev: every one-shot service must carry DJANGO_ONESHOT=1.
+    for service in _ONE_SHOT_SERVICES:
+        block = _service_block(_DEV_OVERRIDE_COMPOSE, service)
+        assert "DJANGO_ONESHOT=1" in block, (
+            f"{service} in dev override must set DJANGO_ONESHOT=1"
+        )
+
+    # Dev seed is exempt (uses config.settings.dev) — must NOT set DJANGO_ONESHOT.
+    seed_block = _service_block(_DEV_OVERRIDE_COMPOSE, "seed")
+    assert "DJANGO_ONESHOT" not in seed_block, (
+        "seed in dev override must not set DJANGO_ONESHOT (uses config.settings.dev)"
     )

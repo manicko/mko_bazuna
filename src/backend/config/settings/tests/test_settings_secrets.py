@@ -294,3 +294,31 @@ def test_prod_bot_token_accepts_real_token() -> None:
     env = _prod_env_overrides(BOT_TOKEN="123456789:ABCdefGHIjkl-MNO")
     stderr = _run_in_subprocess(env, "import django; django.setup()")
     assert "ImproperlyConfigured" not in stderr
+
+
+def test_django_oneshot_bypasses_all_secrets() -> None:
+    """DJANGO_ONESHOT=1 skips all prod secret guards, including EMAIL_HOST.
+
+    One-shot bootstrap services (migrate, load_cities, load_catalog,
+    create_admin) run against prod settings but carry dev-only placeholder
+    secrets and no SMTP config. DJANGO_ONESHOT=1 must bypass every
+    secret-validation guard so those containers boot without editing .env.dev.
+    """
+    env = _prod_env_overrides(
+        DJANGO_SECRET_KEY="dev-only-dummy-key-not-for-production",
+        BOT_TOKEN="dev-only-dummy-key-not-for-production",
+        GOOGLE_TRANSLATE_API_KEY="dev-only-dummy-key-not-for-production",
+        EMAIL_HOST="",
+        SITE_URL="",
+    )
+    env["CSRF_TRUSTED_ORIGINS"] = ""
+    env["DJANGO_ONESHOT"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ImproperlyConfigured" not in result.stderr
+    assert "ValueError" not in result.stderr
