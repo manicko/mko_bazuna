@@ -32,3 +32,10 @@ class SavedSearchState(StrEnum):
     CATEGORY = "alerts_category"
     PRICE = "alerts_price"
     CONFIRM = "alerts_confirm"
+
+
+class ContactUsState(StrEnum):
+    """FSM states for the support message intake flow."""
+
+    IDLE = "support_idle"
+    AWAITING_MESSAGE = "support_awaiting_message"

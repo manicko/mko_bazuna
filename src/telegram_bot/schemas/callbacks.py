@@ -37,5 +37,8 @@ class BotCallbackPrefix(StrEnum):
     # Language selection — /language keyboard.
     LANG = "lang:"
 
+    # Support / contact message intake — /start support flow (EC-2).
+    SUPPORT_START = "support_start"
+
 
 __all__ = ["BotCallbackPrefix"]

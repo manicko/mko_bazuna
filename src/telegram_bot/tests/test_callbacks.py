@@ -14,6 +14,7 @@ import pytest
 
 from apps.search.services.immediate_alerts import UNSUB_CALLBACK_PREFIX
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
+from telegram_bot.states import ContactUsState
 
 pytestmark = [pytest.mark.unit]
 
@@ -35,6 +36,8 @@ class TestBotCallbackPrefixValues:
             (BotCallbackPrefix.UNSUB, "unsub:"),
             (BotCallbackPrefix.UNSUB_ON, "unsub_on:"),
             (BotCallbackPrefix.LANG, "lang:"),
+            # EC-2: support /start flow sentinel (exact-match, no colon).
+            (BotCallbackPrefix.SUPPORT_START, "support_start"),
         ],
     )
     def test_member_value_matches_expected(self, member, expected: str) -> None:
@@ -102,3 +105,17 @@ class TestBotCallbackPrefixValues:
         token = "abc123"
         callback_data = f"{UNSUB_CALLBACK_PREFIX}{token}"
         assert callback_data == "unsub:abc123"
+
+
+class TestContactUsStateValues:
+    """FSM state members for the support message intake flow (EC-2)."""
+
+    def test_idle_state(self) -> None:
+        """``ContactUsState.IDLE`` resolves to the expected string."""
+        assert ContactUsState.IDLE == "support_idle"
+        assert str(ContactUsState.IDLE) == "support_idle"
+
+    def test_awaiting_message_state(self) -> None:
+        """``ContactUsState.AWAITING_MESSAGE`` resolves to the expected string."""
+        assert ContactUsState.AWAITING_MESSAGE == "support_awaiting_message"
+        assert str(ContactUsState.AWAITING_MESSAGE) == "support_awaiting_message"

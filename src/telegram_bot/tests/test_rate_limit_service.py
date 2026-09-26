@@ -15,6 +15,7 @@ from django.core.cache import cache
 
 from telegram_bot.services.rate_limit import (
     check_contact_start_rate_limit,
+    check_support_message_rate_limit,
     check_upload_rate_limit,
 )
 
@@ -61,6 +62,52 @@ class TestContactStartRateLimit:
         for _ in range(3):
             assert await check_contact_start_rate_limit(111, limit=3, period=600) is True
         assert await check_contact_start_rate_limit(111, limit=3, period=600) is False
+
+
+class TestSupportMessageRateLimit:
+    """Tests for ``check_support_message_rate_limit``."""
+
+    @pytest.mark.asyncio
+    async def test_allows_under_limit(self) -> None:
+        """First 5 support messages within the window are allowed."""
+        for _ in range(5):
+            assert await check_support_message_rate_limit(222) is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_after_threshold(self) -> None:
+        """6th support message within the window is rate-limited."""
+        for _ in range(5):
+            assert await check_support_message_rate_limit(333) is True
+        assert await check_support_message_rate_limit(333) is False
+
+    @pytest.mark.asyncio
+    async def test_independent_per_user(self) -> None:
+        """Rate-limit counters are isolated per Telegram user_id."""
+        for _ in range(5):
+            assert await check_support_message_rate_limit(444) is True
+        # User 555 is unaffected by user 444's window.
+        assert await check_support_message_rate_limit(555) is True
+
+    @pytest.mark.asyncio
+    async def test_custom_limit_and_period(self) -> None:
+        """limit/period kwargs override the defaults."""
+        for _ in range(3):
+            assert await check_support_message_rate_limit(666, limit=3, period=600) is True
+        assert await check_support_message_rate_limit(666, limit=3, period=600) is False
+
+    @pytest.mark.asyncio
+    async def test_key_does_not_collide_with_contact_limiter(self) -> None:
+        """Support limiter uses a distinct cache key from the contact limiter.
+
+        The same user_id should be able to consume both budgets independently —
+        exhausting the contact limiter must not exhaust the support limiter.
+        """
+        # Exhaust the contact-start budget for this user.
+        for _ in range(5):
+            assert await check_contact_start_rate_limit(777) is True
+        assert await check_contact_start_rate_limit(777) is False
+        # The support limiter for the same user is still within budget.
+        assert await check_support_message_rate_limit(777) is True
 
 
 def test_rate_limit_functions_are_async_callable() -> None:
