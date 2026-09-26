@@ -190,3 +190,56 @@ def invalidate_support_contacts_cache(
         key: Cache key to invalidate (defaults to support_contacts:v1)
     """
     cache.delete(key)
+
+
+ANON_LANG_CACHE_KEY_PATTERN: Final[str] = "bot_anon_lang:{telegram_id}"
+ANON_LANG_CACHE_TTL: Final[int] = 3600  # 1 hour
+
+
+def get_cached_anon_language(
+    telegram_id: int,
+    key: str = ANON_LANG_CACHE_KEY_PATTERN,
+) -> str | None:
+    """
+    Get the cached language for an anonymous Telegram user.
+
+    Args:
+        telegram_id: Telegram user ID for which the language was cached
+        key: Cache key pattern (defaults to bot_anon_lang:{telegram_id})
+
+    Returns:
+        Cached language code string or None if not cached
+    """
+    return cache.get(key.format(telegram_id=telegram_id))
+
+
+def set_cached_anon_language(
+    telegram_id: int,
+    lang: str,
+    key: str = ANON_LANG_CACHE_KEY_PATTERN,
+    ttl: int = ANON_LANG_CACHE_TTL,
+) -> None:
+    """
+    Cache the language for an anonymous Telegram user.
+
+    Args:
+        telegram_id: Telegram user ID for which to cache the language
+        lang: Language code to cache
+        key: Cache key pattern (defaults to bot_anon_lang:{telegram_id})
+        ttl: Time-to-live in seconds (defaults to 3600)
+    """
+    cache.set(key.format(telegram_id=telegram_id), lang, ttl)
+
+
+def invalidate_anon_language_cache(
+    telegram_id: int,
+    key: str = ANON_LANG_CACHE_KEY_PATTERN,
+) -> None:
+    """
+    Invalidate the cached language for an anonymous Telegram user.
+
+    Args:
+        telegram_id: Telegram user ID whose cached language to invalidate
+        key: Cache key pattern (defaults to bot_anon_lang:{telegram_id})
+    """
+    cache.delete(key.format(telegram_id=telegram_id))

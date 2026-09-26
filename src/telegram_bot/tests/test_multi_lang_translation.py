@@ -361,6 +361,15 @@ class TestPerUserLocaleActivation:
         assert lang == settings.LANGUAGE_CODE
 
     @pytest.mark.asyncio
+    async def test_anonymous_user_with_cached_choice_uses_cached_locale(self) -> None:
+        """An anonymous user (no User row) with a cached choice gets that locale."""
+        from apps.core.utils.cache import set_cached_anon_language
+
+        set_cached_anon_language(999_999_997, "ru")
+        lang = await _resolve_user_language(999_999_997)
+        assert lang == "ru"
+
+    @pytest.mark.asyncio
     async def test_null_language_falls_back_to_default(self) -> None:
         """A user with ``telegram_language=""`` falls back to ``LANGUAGE_CODE``."""
         from apps.users.models import User

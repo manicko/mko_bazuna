@@ -61,15 +61,22 @@ class LanguageMiddleware(BaseMiddleware):
 
 @sync_to_async
 def _resolve_user_language(telegram_id: int) -> str:
-    """Return the user's ``telegram_language``, falling back to LANGUAGE_CODE.
+    """Return the user's preferred language, falling back to the temp store.
 
-    Looks up by ``telegram_id`` (the Telegram-reported user ID, never nullified
-    on GDPR erasure unlike ``telegram_id`` — actually ``telegram_id`` IS
-    nullified on withdrawal; ``chat_id`` is the stable field).  Uses
-    ``telegram_id`` here because ``from_user.id`` is always a Telegram ID; if
-    the user has withdrawn consent (``telegram_id IS NULL``) the lookup falls
-    back to ``LANGUAGE_CODE``.
+    Fallback chain:
+    1. The persisted ``User.telegram_language`` (set via ``/language`` or the
+       Telegram-reported language code at registration).
+    2. The temporary anon-lang cache store, which honors an anonymous user's
+       first-screen language choice before they register/login.
+    3. ``settings.LANGUAGE_CODE``.
+
+    This middleware identifies the user by ``from_user.id``, which is always a
+    Telegram ID and therefore is what ``telegram_id`` refers to here.  Note that
+    ``chat_id`` is the stable field used by ``AccountStateMiddleware``, but this
+    middleware resolves the user via ``telegram_id`` (matching how the rest of
+    the bot identifies users).
     """
+    from apps.core.utils.cache import get_cached_anon_language
     from apps.users.models import User
 
     lang = (
@@ -77,4 +84,9 @@ def _resolve_user_language(telegram_id: int) -> str:
         .values_list("telegram_language", flat=True)
         .first()
     )
-    return lang or settings.LANGUAGE_CODE
+    if lang:
+        return lang
+    cached = get_cached_anon_language(telegram_id)
+    if cached:
+        return cached
+    return settings.LANGUAGE_CODE
