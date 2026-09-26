@@ -12,6 +12,7 @@ these are fast unit tests with no database or subprocess involvement.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import subprocess
 from contextlib import nullcontext
@@ -142,3 +143,18 @@ class TestMainTimeout:
             and record.levelno == logging.ERROR
             for record in caplog.records
         )
+
+
+class TestDefaultSettings:
+    """Verify migrate_locked.main() defaults to the prod settings module."""
+
+    def test_main_defaults_to_prod_settings(self) -> None:
+        """``os.environ.setdefault`` in ``main()`` targets ``config.settings.prod``."""
+        source = inspect.getsource(migrate_locked.main)
+        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")' in source
+
+    def test_main_does_not_default_to_dev_settings(self) -> None:
+        """The default is ``config.settings.prod``, never ``config.settings.dev``."""
+        source = inspect.getsource(migrate_locked.main)
+        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
+

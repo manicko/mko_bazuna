@@ -20,6 +20,14 @@ as unmigrated, so ``migrate`` alone creates no tables and the post-migrate
 signal crashes on the missing ``django_content_type`` table. With normal
 (dev/prod) settings, ``--run-syncdb`` is a harmless no-op because every app
 has migrations.
+
+Standalone invocation (without a ``DJANGO_SETTINGS_MODULE`` override from the
+environment or Compose) defaults to the production settings module,
+``config.settings.prod``, matching the scheduler/web/bot entrypoints. Prod
+settings enforce strict secret validation, so standalone use requires
+``DJANGO_SETTINGS_MODULE`` to be set explicitly, or the build/one-shot guard
+flags (``DJANGO_BUILD=1`` / ``DJANGO_ONESHOT=1``) to be present, so that secret
+validation is satisfied.
 """
 
 import logging
@@ -65,7 +73,7 @@ def main() -> int:
     """
     import django
 
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
     django.setup()
 
     from django.conf import settings
