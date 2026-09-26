@@ -57,6 +57,19 @@ def _prod_env(**overrides: str) -> dict[str, str]:
     )
     env["SITE_URL"] = overrides.pop("SITE_URL", "https://example.com")
     env["ALLOWED_HOSTS"] = overrides.pop("ALLOWED_HOSTS", "example.com")
+    # EMAIL_* defaults — EMAIL_HOST must be non-empty to pass the prod.py
+    # fail-fast guard (see prod.py: EMAIL_HOST required in production).
+    env["EMAIL_HOST"] = overrides.pop("EMAIL_HOST", "smtp.example.com")
+    env["EMAIL_PORT"] = overrides.pop("EMAIL_PORT", "587")
+    env["EMAIL_HOST_USER"] = overrides.pop("EMAIL_HOST_USER", "")
+    env["EMAIL_HOST_PASSWORD"] = overrides.pop("EMAIL_HOST_PASSWORD", "")
+    env["EMAIL_TIMEOUT"] = overrides.pop("EMAIL_TIMEOUT", "10")
+    env["EMAIL_BACKEND"] = overrides.pop(
+        "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+    )
+    env["DEFAULT_FROM_EMAIL"] = overrides.pop(
+        "DEFAULT_FROM_EMAIL", "noreply@example.com"
+    )
     env.update(overrides)
     return env
 
