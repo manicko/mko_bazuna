@@ -123,7 +123,12 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         # Validate POST data via DTO before any ad.save() call (QLT-004).
         # AdEditInput models the web-edit path's currency-fallback-on-invalid
         # and price-fallback-to-Free semantics via field validators.
-        dto = AdEditInput.model_validate(request.POST)
+        # Filter to declared fields so that CSRF/reactivate keys (not part of
+        # the DTO) are rejected by extra="forbid" rather than raising on every
+        # ad-edit POST.
+        dto = AdEditInput.model_validate(
+            {k: v for k, v in request.POST.items() if k in AdEditInput.model_fields}
+        )
 
         # Currency-fallback-on-invalid: None means preserve the ad's current
         # currency (web-specific behavior that diverges from the bot flow).

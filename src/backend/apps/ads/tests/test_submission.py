@@ -16,7 +16,7 @@ from django.core.cache import cache
 from pydantic import ValidationError
 
 from apps.ads.models import Ad
-from apps.ads.services.submission import SubmitAdInput, submit_ad
+from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.models import ExchangeRate
@@ -200,6 +200,50 @@ def test_submit_ad_input_rejects_invalid_currency_string() -> None:
             user_id=None,
         )
     assert exc_info.value.errors()[0]["loc"] == ("price_currency",)
+
+
+# ---------------------------------------------------------------------------
+# Extra-field rejection (CC-2: extra="forbid" on input DTOs)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_ad_input_rejects_unknown_key() -> None:
+    """An unknown key on ``SubmitAdInput`` raises ``ValidationError``."""
+    with pytest.raises(ValidationError):
+        SubmitAdInput(
+            ad_id=1,
+            title_ru="Test Title",
+            desc_ru="Test description text",
+            category_id=None,
+            city_id=None,
+            price_amount=Decimal("100"),
+            price_currency=CurrencyCode.EUR,
+            photos=[],
+            user_id=None,
+            rogue="x",
+        )
+
+
+def test_ad_edit_input_rejects_unknown_key() -> None:
+    """An unknown key on ``AdEditInput`` raises ``ValidationError``.
+
+    Regression guard for the producer fix: the web edit view filters
+    ``request.POST`` to declared fields so that ``csrfmiddlewaretoken`` /
+    ``reactivate`` do not trip ``extra="forbid"``.
+    """
+    with pytest.raises(ValidationError):
+        AdEditInput(
+            title="Test Title",
+            description="Test description text",
+            rogue="x",
+        )
+
+
+def test_ad_edit_input_accepts_declared_fields_only() -> None:
+    """``AdEditInput`` validates cleanly when only declared fields are passed."""
+    dto = AdEditInput(title="Test Title", description="Test description text")
+    assert dto.title == "Test Title"
+    assert dto.description == "Test description text"
 
 
 # ---------------------------------------------------------------------------

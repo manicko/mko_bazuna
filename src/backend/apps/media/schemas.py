@@ -6,20 +6,20 @@ submission boundary.  By coercing raw dicts (produced by the bot FSM and tests)
 into this model at ``SubmitAdInput`` construction, malformed photos are rejected
 *before* any filesystem or database write occurs (10-QLT-008).
 
-This module is a leaf — it imports only ``pydantic`` — so that
-``media.services.filesystem`` can import it without creating an import cycle
-(``submission.py`` imports ``filesystem.py`` at module level, so the reverse
-direction is forbidden).
+This module is a leaf — it imports only ``pydantic`` (and the ``core`` base
+schema) — so that ``media.services.filesystem`` can import it without creating
+an import cycle (``submission.py`` imports ``filesystem.py`` at module level,
+so the reverse direction is forbidden).
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from apps.core.schemas import BaseInputModel
 
 __all__ = ["SubmittedPhoto"]
 
 
-class SubmittedPhoto(BaseModel):
+class SubmittedPhoto(BaseInputModel):
     """A single photo's storage metadata as submitted by the bot FSM.
 
     The bot's ``process_photos`` handler builds dicts with ``storage_key``,

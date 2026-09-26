@@ -14,11 +14,13 @@ from datetime import timedelta
 import pytest
 from django.test import Client
 from django.utils import timezone
+from pydantic import ValidationError
 
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, ConsentChoice
 from apps.locations.models import City
 from apps.users.models import ConsentRecord, LoginToken, User
+from apps.users.schemas import ConsentSubmission
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -479,3 +481,32 @@ class TestConsentWithdrawIdempotency:
         assert LoginToken.objects.filter(
             telegram_id=deleted_user.telegram_id
         ).exists()
+
+
+# ---------------------------------------------------------------------------
+# ConsentSubmission DTO extra-field rejection (CC-2)
+# ---------------------------------------------------------------------------
+
+
+class TestConsentSubmissionExtraForbid:
+    """``ConsentSubmission`` rejects unknown/extra fields (extra="forbid").
+
+    The consent producer strips the always-present ``csrfmiddlewaretoken``
+    before validation (see ``apps.users.views.consent._parse_submission``),
+    so an unknown key on the DTO indicates a genuinely malformed submission.
+    """
+
+    def test_consent_submission_rejects_unknown_key(self) -> None:
+        """An unknown key on ``ConsentSubmission`` raises ``ValidationError``."""
+        with pytest.raises(ValidationError):
+            ConsentSubmission(choice=ConsentChoice.ACCEPTED, rogue="x")
+
+    def test_consent_submission_accepts_declared_fields(self) -> None:
+        """``ConsentSubmission`` validates cleanly with declared fields only."""
+        submission = ConsentSubmission(
+            choice=ConsentChoice.ACCEPTED,
+            analytics="true",
+            preferences="false",
+        )
+        assert submission.analytics is True
+        assert submission.preferences is False

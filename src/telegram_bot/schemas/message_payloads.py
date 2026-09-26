@@ -7,12 +7,13 @@ All bot message payloads validated before ORM writes per rule 11.
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from apps.core.schemas import BaseInputModel
 from apps.currencies.enums import CurrencyCode
 
 
-class TitlePayload(BaseModel):
+class TitlePayload(BaseInputModel):
     """Validated title input from seller."""
 
     title: Annotated[
@@ -23,7 +24,7 @@ class TitlePayload(BaseModel):
     ]
 
 
-class DescriptionPayload(BaseModel):
+class DescriptionPayload(BaseInputModel):
     """Validated description input from seller."""
 
     description: Annotated[
@@ -36,7 +37,7 @@ class DescriptionPayload(BaseModel):
     ]
 
 
-class PricePayload(BaseModel):
+class PricePayload(BaseInputModel):
     """Validated price input from seller (amount + currency).
 
     The amount is mandatory: the bot no longer offers a "Skip" option, so
@@ -50,7 +51,7 @@ class PricePayload(BaseModel):
     price_currency: CurrencyCode = CurrencyCode.EUR
 
 
-class PhotoCountPayload(BaseModel):
+class PhotoCountPayload(BaseInputModel):
     """Validated photo count constraint."""
 
     photo_count: Annotated[

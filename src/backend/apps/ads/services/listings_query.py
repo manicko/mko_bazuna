@@ -23,13 +23,14 @@ from decimal import Decimal
 from typing import Any
 
 from django.db.models import F, Q, QuerySet
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
 from apps.ads.models import Ad
 from apps.ads.services.favorites import annotate_favorites
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus
+from apps.core.schemas import BaseInputModel
 from apps.locations.models import City
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
@@ -37,7 +38,7 @@ from apps.lookups.models import LookupItem
 logger = logging.getLogger(__name__)
 
 
-class ListingsQueryParams(BaseModel):
+class ListingsQueryParams(BaseInputModel):
     """Validated filter + pagination parameters for PUBLISHED-ad listings.
 
     Replaces the inline ``request.GET`` parsing and silent

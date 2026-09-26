@@ -100,6 +100,12 @@ class TestPricePayloadValidation:
         with pytest.raises(ValidationError):
             PricePayload(price_amount=Decimal("-1"))
 
+    def test_price_payload_rejects_unknown_key(self) -> None:
+        """An unknown key on ``PricePayload`` raises ``ValidationError``
+        (CC-2: extra="forbid" on input DTOs)."""
+        with pytest.raises(ValidationError):
+            PricePayload(price_amount=Decimal("10"), rogue="x")
+
 
 # ---------------------------------------------------------------------------
 # Free-path FSM callback_query — exercises ``process_price_currency``

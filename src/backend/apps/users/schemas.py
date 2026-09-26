@@ -9,14 +9,15 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
 from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
+from apps.core.schemas import BaseInputModel
 
 logger = logging.getLogger(__name__)
 
 
-class ConsentSubmission(BaseModel):
+class ConsentSubmission(BaseInputModel):
     """
     Pydantic DTO for consent form submission validation (TR-06 / C-9.2).
 

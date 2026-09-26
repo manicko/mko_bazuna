@@ -6,10 +6,12 @@ Validates search query and price range inputs from the bot and web UI.
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from apps.core.schemas import BaseInputModel
 
 
-class SavedSearchQueryPayload(BaseModel):
+class SavedSearchQueryPayload(BaseInputModel):
     """Validated search query input for saved search alert."""
 
     query: Annotated[
@@ -18,7 +20,7 @@ class SavedSearchQueryPayload(BaseModel):
     ] = None
 
 
-class SavedSearchPricePayload(BaseModel):
+class SavedSearchPricePayload(BaseInputModel):
     """Validated price range input for saved search alert."""
 
     min_price: Annotated[

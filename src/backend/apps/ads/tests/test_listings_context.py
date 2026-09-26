@@ -24,7 +24,9 @@ from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from pydantic import ValidationError
 
+from apps.ads.services.listings_query import ListingsQueryParams
 from apps.core.enums import AdSort, AdStatus
 from conftest import create_test_ad
 
@@ -199,3 +201,10 @@ def test_listings_excludes_deactivated_category_ads(
     response = _get()
     assert response.status_code == 200
     assert response.context["has_results"] is False
+
+
+def test_listings_query_params_rejects_unknown_key() -> None:
+    """An unknown key on ``ListingsQueryParams`` raises ``ValidationError``
+    (CC-2 spot-check: extra="forbid" on input DTOs)."""
+    with pytest.raises(ValidationError):
+        ListingsQueryParams(category_slug="electronics", rogue="x")

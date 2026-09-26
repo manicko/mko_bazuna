@@ -25,11 +25,12 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
+from apps.core.schemas import BaseInputModel
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import normalize_price_to_eur
 from apps.media.schemas import SubmittedPhoto
@@ -39,7 +40,7 @@ from apps.media.services.thumbnails import ThumbnailService
 logger = logging.getLogger(__name__)
 
 
-class SubmitAdInput(BaseModel):
+class SubmitAdInput(BaseInputModel):
     """DTO bundling every field ``submit_ad`` needs to finalise and moderate an ad."""
 
     ad_id: int
@@ -61,7 +62,7 @@ class SubmitAdInput(BaseModel):
     listing_condition_id: int | None = None
 
 
-class AdEditInput(BaseModel):
+class AdEditInput(BaseInputModel):
     """DTO validating ad-edit POST data before any ORM write (QLT-004).
 
     Models the web-edit path's divergent semantics that ``SubmitAdInput``

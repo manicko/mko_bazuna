@@ -109,7 +109,14 @@ def _parse_submission(request: HttpRequest) -> ConsentSubmission | None:
     back to a safe default rather than erroring on a malformed consent post).
     """
     try:
-        return ConsentSubmission.model_validate(request.POST.dict())
+        # Strip the CSRF token (always present in the consent banner form) so
+        # that extra="forbid" on ConsentSubmission does not reject every POST.
+        data = {
+            k: v
+            for k, v in request.POST.dict().items()
+            if k != "csrfmiddlewaretoken"
+        }
+        return ConsentSubmission.model_validate(data)
     except ValidationError:
         logger.warning("Invalid consent submission rejected")
         return None
