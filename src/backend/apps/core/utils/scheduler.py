@@ -23,14 +23,33 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Set by the SIGTERM/SIGINT handler (in main()) to request a graceful break
+# of the run_scheduler() while-True loop. Signal handlers run in the main
+# thread; run_scheduler() also runs in the main thread, so a threading.Event
+# is the safe, idiomatic handoff (no cross-thread locking concerns).
+_stop_event = threading.Event()
+
+
+def _handle_shutdown_signal(signum: int, frame: Any) -> None:
+    """Minimal SIGTERM/SIGINT handler: set the stop flag and let the loop break.
+
+    Deliberately does only logging + flag-setting (no I/O, no DB work) so the
+    handler stays async-signal-safe in practice; all teardown happens in main().
+    """
+    logger.info("Received signal %s; requesting graceful scheduler shutdown", signum)
+    _stop_event.set()
 
 # Phase 4 hourly sweeps + Phase 2 purges (run every hour)
 HOURLY_COMMANDS: list[str] = [
@@ -272,6 +291,9 @@ def run_scheduler(
     logger.info("Scheduler started (interval=%s seconds)", interval_seconds)
     last_daily: date | None = None
     while True:
+        if _stop_event.is_set():
+            logger.info("Stop flag set — exiting scheduler loop after completed cycle")
+            break
         try:
             last_daily = run_one_cycle(
                 now_func=now_func,
@@ -283,6 +305,21 @@ def run_scheduler(
         sleep_func(interval_seconds)
 
 
+def _shutdown() -> None:
+    """Graceful shutdown teardown: close Django DB connections and log.
+
+    Called from main() after run_scheduler() returns (loop broken via signal).
+    Kept separate from run_scheduler() so the loop stays pure/Django-free and
+    remains unit-testable without a configured Django DB. Import of
+    ``django.db.connections`` is deferred to runtime to preserve the module's
+    "importable without Django configured" property.
+    """
+    from django.db import connections
+
+    connections.close_all()
+    logger.info("Scheduler shutdown complete; DB connections closed")
+
+
 def main() -> int:
     """Entry point for standalone / Docker execution.
 
@@ -290,13 +327,23 @@ def main() -> int:
     ``DJANGO_SETTINGS_MODULE`` defaults to the production settings module.
     Django-dependent imports are deferred to runtime so the module itself
     can be imported without Django configured.
+
+    Registers SIGTERM/SIGINT handlers before entering the scheduler loop and
+    runs graceful teardown (:func:`_shutdown`) in a ``finally`` block so DB
+    connections are always closed when the loop exits.
     """
     import django
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
     django.setup()
 
-    run_scheduler()
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
+
+    try:
+        run_scheduler()
+    finally:
+        _shutdown()
     return 0
 
 

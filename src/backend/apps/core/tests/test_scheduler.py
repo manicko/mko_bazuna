@@ -27,6 +27,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import apps.core.utils.scheduler as scheduler_mod
 from apps.core.utils.scheduler import (
     DAILY_COMMANDS,
     DAILY_HOUR_UTC,
@@ -409,6 +410,79 @@ class TestRunScheduler:
         # All hourly + all daily commands were attempted (none skipped)
         expected = len(HOURLY_COMMANDS) + len(DAILY_COMMANDS)
         assert call_count[0] == expected
+
+
+# ---------------------------------------------------------------------------
+# TestGracefulShutdown — SIGTERM/SIGINT graceful shutdown (ENT-002)
+# ---------------------------------------------------------------------------
+
+
+class TestGracefulShutdown:
+    """Test the graceful shutdown path (ENT-002).
+
+    Gate C Option A: a module-level ``threading.Event`` stop flag is set by the
+    SIGTERM/SIGINT handler registered in ``main()``; ``run_scheduler()`` checks
+    it at the top of each iteration and breaks cleanly after the current cycle.
+    These tests drive the flag directly (no real signal delivery).
+    """
+
+    def test_scheduler_stops_on_stop_event_after_one_cycle(self) -> None:
+        """Loop breaks cleanly after one full cycle once the stop flag is set."""
+        scheduler_mod._stop_event.clear()
+        try:
+            run_command = MagicMock(return_value=0)
+
+            def sleep_sets_stop_flag(_seconds: float) -> None:
+                # Simulate a signal arriving during the sleep: set the flag so
+                # the next top-of-loop check breaks the while-True.
+                scheduler_mod._stop_event.set()
+
+            now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
+
+            run_scheduler(
+                sleep_func=sleep_sets_stop_flag,
+                now_func=now_func,
+                run_command_fn=run_command,
+                interval_seconds=0,
+            )
+
+            # One full cycle ran (hourly + daily), then the loop broke normally.
+            assert run_command.call_count == len(HOURLY_COMMANDS) + len(DAILY_COMMANDS)
+        finally:
+            scheduler_mod._stop_event.clear()
+
+    def test_shutdown_closes_db_connections(self, caplog: pytest.LogCaptureFixture) -> None:
+        """_shutdown() closes all Django DB connections and logs completion."""
+        with patch("django.db.connections") as mock_conn:
+            with caplog.at_level(logging.INFO, logger="apps.core.utils.scheduler"):
+                scheduler_mod._shutdown()
+
+        mock_conn.close_all.assert_called_once()
+        assert "Scheduler shutdown complete" in caplog.text
+
+    def test_main_registers_signal_handlers_and_shuts_down(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """main() registers SIGTERM/SIGINT handlers and runs teardown."""
+        installed: dict[int, object] = {}
+
+        def fake_signal(signum: int, handler: object) -> None:
+            installed[signum] = handler
+
+        shutdown_called = []
+
+        monkeypatch.setattr(scheduler_mod.signal, "signal", fake_signal)
+        monkeypatch.setattr(scheduler_mod, "run_scheduler", lambda: None)
+        monkeypatch.setattr(scheduler_mod, "_shutdown", lambda: shutdown_called.append(True))
+        monkeypatch.delenv("DJANGO_SETTINGS_MODULE", raising=False)
+
+        rc = scheduler_mod.main()
+
+        assert rc == 0
+        assert installed.get(scheduler_mod.signal.SIGTERM) is scheduler_mod._handle_shutdown_signal
+        assert installed.get(scheduler_mod.signal.SIGINT) is scheduler_mod._handle_shutdown_signal
+        assert shutdown_called == [True]
 
 
 # ---------------------------------------------------------------------------
