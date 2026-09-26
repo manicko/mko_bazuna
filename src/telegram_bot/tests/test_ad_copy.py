@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from django.utils import timezone
+
 from apps.ads.models import Ad
 from apps.currencies.enums import CurrencyCode
 

@@ -41,8 +41,8 @@ class TestProcessCity:
     @pytest.mark.asyncio
     async def test_exact_match_proceeds(self) -> None:
         """An exact city match updates state and moves to title."""
-        from telegram_bot.handlers.ad_create.city import process_city
         from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.city import process_city
 
         city = MagicMock(id=10, get_name=MagicMock(return_value="Podgorica"))
 
@@ -91,8 +91,8 @@ class TestProcessCity:
     @pytest.mark.asyncio
     async def test_close_match_used(self) -> None:
         """When exact match fails but a close match exists, it is used."""
-        from telegram_bot.handlers.ad_create.city import process_city
         from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.city import process_city
 
         city = MagicMock(id=15, get_name=MagicMock(return_value="Podgorica"))
 

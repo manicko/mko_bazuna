@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from asgiref.sync import sync_to_async
+
 from apps.search.models import SavedSearch
 from apps.users.models import User
 

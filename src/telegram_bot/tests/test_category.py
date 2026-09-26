@@ -232,9 +232,9 @@ class TestProcessFeatures:
     @pytest.mark.asyncio
     async def test_features_done_advances_to_city(self) -> None:
         """``features_done`` saves selections and moves to city state."""
+        from telegram_bot.handlers.ad_create import AdCreateForm
         from telegram_bot.handlers.ad_create.category import process_features
         from telegram_bot.schemas.callbacks import BotCallbackPrefix
-        from telegram_bot.handlers.ad_create import AdCreateForm
 
         state = MagicMock()
         state.update_data = AsyncMock()
