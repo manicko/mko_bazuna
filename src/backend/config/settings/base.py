@@ -289,11 +289,6 @@ BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=False)
 SCHEDULER_LIVENESS_FILE = env("SCHEDULER_LIVENESS_FILE",
    default="/tmp/mko_bazuna_scheduler_alive")
 
-# Staleness window for the scheduler liveness marker (seconds).
-# Must be > SCHEDULE_INTERVAL_SECONDS (3600) to avoid false negatives.
-# 7200 = 2x the hourly cycle, allowing one missed cycle before healthcheck fails.
-SCHEDULER_HEALTH_STALE_SECONDS = env.int("SCHEDULER_HEALTH_STALE_SECONDS", default=7200)
-
 # Per-command timeout (seconds) for the scheduler subprocess dispatch. Guards
 # against a hung management command stalling the whole cycle (ENT-001).
 # 1800 = 30 min, safely under the healthcheck staleness window (7200).

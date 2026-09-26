@@ -21,6 +21,8 @@ if [ ! -f "$marker" ]; then
 fi
 
 # (c) Freshness (optional): detect retry-loop / stuck scheduler
+# SCHEDULER_HEALTH_STALE_SECONDS is read directly from the environment (not
+# from the Django settings object); default 7200 = 2x the hourly cycle.
 stale="${SCHEDULER_HEALTH_STALE_SECONDS:-0}"
 if [ "$stale" -gt 0 ] 2>/dev/null; then
     now="$(date +%s)"
