@@ -1,7 +1,7 @@
 """
 Smoke tests for TST-006: bot entry point wiring.
 
-Verifies that configure_dispatcher() registers all 6 routers and 5 middleware
+Verifies that configure_dispatcher() registers all 7 routers and 5 middleware
 in the correct order, and that the dp test fixture includes all routers
 (matching production).
 """
@@ -25,6 +25,7 @@ _ALL_ROUTERS = [
     "contact_router",
     "language_router",
     "login_router",
+    "support_router",
 ]
 
 
@@ -40,8 +41,8 @@ def _reset_router_parents() -> None:
         router._parent_router = None  # noqa: SLF001 — test-only reset
 
 
-def test_configure_dispatcher_registers_all_six_routers() -> None:
-    """configure_dispatcher includes all 6 production routers."""
+def test_configure_dispatcher_registers_all_seven_routers() -> None:
+    """configure_dispatcher includes all 7 production routers."""
     from telegram_bot.handlers import (
         ad_copy_router,
         ad_create_router,
@@ -49,6 +50,7 @@ def test_configure_dispatcher_registers_all_six_routers() -> None:
         contact_router,
         language_router,
         login_router,
+        support_router,
     )
     from telegram_bot.main import configure_dispatcher
 
@@ -60,7 +62,8 @@ def test_configure_dispatcher_registers_all_six_routers() -> None:
     assert id(ad_copy_router) in registered
     assert id(language_router) in registered
     assert id(contact_router) in registered
-    assert len(dp.sub_routers) == 6
+    assert id(support_router) in registered
+    assert len(dp.sub_routers) == 7
 
 
 def test_configure_dispatcher_registers_five_middleware() -> None:
@@ -113,8 +116,8 @@ def test_dp_fixture_includes_ad_copy_and_language_routers(dp: Dispatcher) -> Non
 
 
 def test_dp_fixture_matches_production_router_count(dp: Dispatcher) -> None:
-    """The dp fixture wires the same 6 routers as production."""
-    assert len(dp.sub_routers) == 6
+    """The dp fixture wires the same 7 routers as production."""
+    assert len(dp.sub_routers) == 7
 
 
 def test_configure_dispatcher_accepts_redis_storage() -> None:

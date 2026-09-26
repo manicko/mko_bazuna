@@ -57,7 +57,7 @@ def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
     dp.update.middleware(AccountStateMiddleware())
     dp.update.outer_middleware(DatabaseConnectionMiddleware())
 
-    # Include all 6 routers — the canonical wiring.
+    # Include all 7 routers — the canonical wiring.
     from telegram_bot.handlers import (
         ad_copy_router,
         ad_create_router,
@@ -65,6 +65,7 @@ def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
         contact_router,
         language_router,
         login_router,
+        support_router,
     )
 
     dp.include_router(login_router)
@@ -73,6 +74,7 @@ def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
     dp.include_router(ad_copy_router)
     dp.include_router(language_router)
     dp.include_router(contact_router)
+    dp.include_router(support_router)
 
     # EXT-002: replay-capable 429 (flood control) backoff for outbound calls.
     # Only TelegramRetryAfter is intercepted; all other errors still flow to

@@ -6,6 +6,7 @@ from .alerts import router as alerts_router
 from .contact import router as contact_router
 from .language import router as language_router
 from .login import router as login_router
+from .support import router as support_router
 
 __all__ = [
     "login_router",
@@ -14,4 +15,5 @@ __all__ = [
     "ad_copy_router",
     "language_router",
     "contact_router",
+    "support_router",
 ]
