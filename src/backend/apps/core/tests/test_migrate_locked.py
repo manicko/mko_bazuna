@@ -12,8 +12,15 @@ these are fast unit tests with no database or subprocess involvement.
 
 from __future__ import annotations
 
+import logging
+import subprocess
+from contextlib import nullcontext
+
+import django
 import pytest
 
+import apps.core.utils.migrate_locked as migrate_locked
+from apps.core.utils import advisory_lock
 from apps.core.utils.migrate_locked import _build_steps
 
 pytestmark = [pytest.mark.unit]
@@ -96,3 +103,42 @@ class TestBuildStepsEnvGated:
         monkeypatch.setenv("RUN_TRANSLATION_BACKFILL", "True")
         steps = _build_steps()
         assert ("backfill_translations",) not in steps
+
+
+class TestMainTimeout:
+    """Verify migrate_locked.main() handles a subprocess TimeoutExpired."""
+
+    def test_main_timeout_logs_error_and_returns_nonzero(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A timeout is logged as an ERROR and main() returns non-zero."""
+
+        def raising_run(
+            *args: object, **kwargs: object
+        ) -> subprocess.CompletedProcess[bytes]:
+            raise subprocess.TimeoutExpired(
+                cmd=["python", "manage.py", "migrate"], timeout=1800
+            )
+
+        monkeypatch.setattr(django, "setup", lambda: None)
+        monkeypatch.setattr(
+            advisory_lock,
+            "advisory_lock",
+            lambda *args, **kwargs: nullcontext(),
+        )
+        monkeypatch.setattr(migrate_locked.subprocess, "run", raising_run)
+        monkeypatch.delenv("RUN_TRANSLATION_BACKFILL", raising=False)
+
+        with caplog.at_level(
+            logging.ERROR, logger="apps.core.utils.migrate_locked"
+        ):
+            rc = migrate_locked.main()
+
+        assert rc == 1
+        assert any(
+            "timed out" in record.message
+            and record.levelno == logging.ERROR
+            for record in caplog.records
+        )

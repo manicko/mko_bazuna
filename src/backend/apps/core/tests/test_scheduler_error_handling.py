@@ -13,6 +13,7 @@ subprocess. ``subprocess.run`` and ``_write_liveness_marker`` are mocked where n
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,7 @@ from django.conf import settings
 from apps.core.utils.scheduler import (
     DAILY_COMMANDS,
     HOURLY_COMMANDS,
+    _build_subprocess_runner,
     _dispatch,
     _run_command_subprocess,
     _write_liveness_marker,
@@ -149,6 +151,85 @@ class TestRunCommandLogging:
                 "test_cmd", tmp_path / "manage.py", "python"
             )
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# _run_command_subprocess — configurable timeout handling (ENT-001)
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutHandling:
+    """Verify the configurable subprocess timeout and TimeoutExpired handling."""
+
+    def test_run_command_forwards_timeout_kwarg(self, tmp_path: Path) -> None:
+        """subprocess.run receives timeout=settings.SCHEDULER_COMMAND_TIMEOUT."""
+        fake_result = MagicMock(returncode=0)
+        with patch(
+            "apps.core.utils.scheduler.subprocess.run",
+            return_value=fake_result,
+        ) as mock_run:
+            _run_command_subprocess("test_cmd", tmp_path / "manage.py", "python")
+
+        mock_run.assert_called_once()
+        _, kwargs = mock_run.call_args
+        assert kwargs.get("timeout") == settings.SCHEDULER_COMMAND_TIMEOUT
+
+    def test_run_command_timeout_logs_error_and_returns_sentinel(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        tmp_path: Path,
+    ) -> None:
+        """TimeoutExpired logs an ERROR containing 'timed out' and returns 1."""
+        timeout = settings.SCHEDULER_COMMAND_TIMEOUT
+        with patch(
+            "apps.core.utils.scheduler.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(
+                cmd=["python", "manage.py", "test_cmd"], timeout=timeout
+            ),
+        ):
+            with caplog.at_level(
+                logging.ERROR, logger="apps.core.utils.scheduler"
+            ):
+                rc = _run_command_subprocess(
+                    "test_cmd", tmp_path / "manage.py", "python"
+                )
+
+        assert rc == 1
+        assert any(
+            "timed out" in record.message
+            and record.levelno == logging.ERROR
+            for record in caplog.records
+        )
+
+    def test_run_one_cycle_continues_after_timeout(self, tmp_path: Path) -> None:
+        """A TimeoutExpired on one hourly command does not skip the rest."""
+        timed_out_command = HOURLY_COMMANDS[2]
+
+        def fake_run(
+            cmd: list[str], check: bool = False, timeout: int | None = None
+        ) -> MagicMock:
+            if cmd[-1] == timed_out_command:
+                raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout or 0)
+            return MagicMock(returncode=0)
+
+        with patch(
+            "apps.core.utils.scheduler.subprocess.run",
+            side_effect=fake_run,
+        ) as mock_run:
+            run_command = _build_subprocess_runner(
+                tmp_path / "manage.py", "python"
+            )
+            now_func = lambda: _utc(2025, 6, 15, 6)  # noqa: E731
+            last_daily = run_one_cycle(
+                now_func=now_func,
+                run_command=run_command,
+                last_daily=None,
+            )
+
+        # All 9 hourly commands were attempted despite the timeout.
+        assert mock_run.call_count == len(HOURLY_COMMANDS)
+        # Hour < 8, so daily commands must not have fired.
+        assert last_daily is None
 
 
 # ---------------------------------------------------------------------------

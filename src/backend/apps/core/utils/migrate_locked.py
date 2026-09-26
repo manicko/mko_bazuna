@@ -68,17 +68,30 @@ def main() -> int:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
     django.setup()
 
+    from django.conf import settings
+
     from apps.core.enums import AdvisoryLockId
     from apps.core.utils.advisory_lock import advisory_lock
 
     manage_py = Path(__file__).resolve().parents[3] / "manage.py"
+    command_timeout = settings.SCHEDULER_COMMAND_TIMEOUT
     with advisory_lock(AdvisoryLockId.MIGRATE, session=True):
         steps: tuple[tuple[str, ...], ...] = _build_steps()
         first_error: int | None = None
         for argv in steps:
             cmd = [sys.executable, str(manage_py), *argv]
             logger.info("Running %s", " ".join(cmd))
-            result = subprocess.run(cmd)
+            try:
+                result = subprocess.run(cmd, check=False, timeout=command_timeout)
+            except subprocess.TimeoutExpired:
+                logger.error(
+                    "manage.py %s timed out after %s seconds",
+                    " ".join(argv),
+                    command_timeout,
+                )
+                if first_error is None:
+                    first_error = 1
+                continue
             if result.returncode != 0 and first_error is None:
                 first_error = result.returncode
                 logger.error(

@@ -123,11 +123,21 @@ def _run_command_subprocess(name: str, manage_py: Path, python_executable: str) 
     non-zero exit code does **not** raise — the scheduler continues to the
     next command regardless. Returns the subprocess exit code.
 
-    Structured logging and exit-code inspection are added in Block B.
+    A ``SCHEDULER_COMMAND_TIMEOUT`` timeout is enforced so a hung command
+    cannot stall the cycle (ENT-001). On ``TimeoutExpired`` the subprocess is
+    terminated, an error is logged, and ``1`` is returned so ``_dispatch``
+    continues to the next command.
     """
+    from django.conf import settings
+
+    timeout = settings.SCHEDULER_COMMAND_TIMEOUT
     cmd = [python_executable, str(manage_py), name]
     logger.info("Running management command: %s", name)
-    result = subprocess.run(cmd, check=False)
+    try:
+        result = subprocess.run(cmd, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        logger.error("Command %s timed out after %s seconds", name, timeout)
+        return 1
     if result.returncode != 0:
         logger.error("Command %s exited with code %d", name, result.returncode)
     return result.returncode

@@ -294,6 +294,11 @@ SCHEDULER_LIVENESS_FILE = env("SCHEDULER_LIVENESS_FILE",
 # 7200 = 2x the hourly cycle, allowing one missed cycle before healthcheck fails.
 SCHEDULER_HEALTH_STALE_SECONDS = env.int("SCHEDULER_HEALTH_STALE_SECONDS", default=7200)
 
+# Per-command timeout (seconds) for the scheduler subprocess dispatch. Guards
+# against a hung management command stalling the whole cycle (ENT-001).
+# 1800 = 30 min, safely under the healthcheck staleness window (7200).
+SCHEDULER_COMMAND_TIMEOUT = env.int("SCHEDULER_COMMAND_TIMEOUT", default=1800)
+
 # Public site URL used for absolute links (e.g. Telegram alert messages).
 # Normalized to have no trailing slash. A sensible dev default is provided so
 # dev/test absolute links never 500 (R10); production reads it from env.
