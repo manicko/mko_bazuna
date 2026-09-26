@@ -95,9 +95,9 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
 #                     present during build.
 #
 #   DJANGO_ONESHOT=1 — set on dev one-shot bootstrap services (migrate,
-#                     load_cities, load_catalog, create_admin) via
+#                     load_cities, load_catalog, create_admin, seed) via
 #                     docker-compose.dev.override.yml ONLY in development
-#                     (seed uses config.settings.dev and sets neither flag).
+#                     (all one-shot services now use config.settings.prod).
 #                     Allows dev placeholder/dummy secrets to pass for services
 #                     that do not serve HTTP traffic and do not need a real
 #                     BOT_TOKEN or GOOGLE_TRANSLATE_API_KEY.

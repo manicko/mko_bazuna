@@ -300,7 +300,7 @@ def test_django_oneshot_bypasses_all_secrets() -> None:
     """DJANGO_ONESHOT=1 skips all prod secret guards, including EMAIL_HOST.
 
     One-shot bootstrap services (migrate, load_cities, load_catalog,
-    create_admin) run against prod settings but carry dev-only placeholder
+    create_admin, seed) run against prod settings but carry dev-only placeholder
     secrets and no SMTP config. DJANGO_ONESHOT=1 must bypass every
     secret-validation guard so those containers boot without editing .env.dev.
     """

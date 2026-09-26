@@ -29,7 +29,7 @@ _DEV_OVERRIDE_COMPOSE = _ROOT / "docker-compose.dev.override.yml"
 
 # One-shot bootstrap services. In dev they run against prod settings with
 # dev placeholder secrets (see DJANGO_ONESHOT handling in prod.py).
-_ONE_SHOT_SERVICES = ["migrate", "load_cities", "load_catalog", "create_admin"]
+_ONE_SHOT_SERVICES = ["migrate", "load_cities", "load_catalog", "create_admin", "seed"]
 
 # Hardening keys required on every long-lived / hardened service.
 _HARDENING_KEYS = [
@@ -256,11 +256,10 @@ def test_compose_oneshot_flags() -> None:
     """One-shot services carry DJANGO_ONESHOT=1 in dev but never in prod.
 
     One-shot bootstrap services (migrate, load_cities, load_catalog,
-    create_admin) use prod settings. In development they need DJANGO_ONESHOT=1
+    create_admin, seed) use prod settings. In development they need DJANGO_ONESHOT=1
     so the prod.py secret-validation guards bypass dev placeholder secrets. In
     production neither DJANGO_BUILD nor DJANGO_ONESHOT may appear — full secret
-    validation runs against the real .env.prod values. seed is exempt: it uses
-    config.settings.dev in the dev override.
+    validation runs against the real .env.prod values.
     """
     # Prod: no one-shot service block may carry either bypass flag.
     for service in _ONE_SHOT_SERVICES:
@@ -278,9 +277,3 @@ def test_compose_oneshot_flags() -> None:
         assert "DJANGO_ONESHOT=1" in block, (
             f"{service} in dev override must set DJANGO_ONESHOT=1"
         )
-
-    # Dev seed is exempt (uses config.settings.dev) — must NOT set DJANGO_ONESHOT.
-    seed_block = _service_block(_DEV_OVERRIDE_COMPOSE, "seed")
-    assert "DJANGO_ONESHOT" not in seed_block, (
-        "seed in dev override must not set DJANGO_ONESHOT (uses config.settings.dev)"
-    )

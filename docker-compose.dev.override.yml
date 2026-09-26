@@ -123,12 +123,23 @@ services:
   # making the one-shot seed container start with a plain `docker compose up`.
   # In production, docker-compose.prod.yml retains profiles: ["seed"] so seed
   # only runs on explicit --profile seed demand.
+  #
+  # Like the other one-shot bootstrap services, seed runs against prod settings
+  # (config.settings.prod, inherited from the base compose) with DJANGO_ONESHOT=1
+  # so the prod.py secret-validation guards bypass dev placeholder/dummy secrets
+  # from .env.dev. Seed does not serve HTTP and has no dependency on BOT_TOKEN
+  # (it is a pure DB/media population command), so the bypass is safe here.
+  # The dev override does NOT set DJANGO_SETTINGS_MODULE or REDIS_URL — both are
+  # inherited from the base compose (config.settings.prod and
+  # redis://redis:6379/0 respectively).
   seed:
     profiles: !reset []
     entrypoint: /app/entrypoint-seed.sh
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.dev
-      - REDIS_URL=
+      - DJANGO_ONESHOT=1
+      - SITE_URL=${SITE_URL:-http://localhost:8000}
+      - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       - SEED_USERS=10
     volumes:
       - .:/app
