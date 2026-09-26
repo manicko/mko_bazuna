@@ -61,3 +61,6 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
+
+# Email: console backend so no SMTP server is needed in development.
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

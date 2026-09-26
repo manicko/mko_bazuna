@@ -165,6 +165,20 @@ if not os.getenv("SITE_URL") and not os.getenv("DJANGO_BUILD"):  # noqa: F405
         "Provide it via the .env.prod runtime file."
     )
 
+# Fail fast: EMAIL_HOST is required in production so transactional emails
+# (password resets, alert notifications, seller confirmations) are deliverable.
+# Skip during Docker build (DJANGO_BUILD=1) — collectstatic runs before runtime
+# env vars are available and does not need SMTP connectivity.
+# Unlike the SECRET_KEY/BOT_TOKEN/GOOGLE_TRANSLATE_API_KEY guards above (which
+# also skip DJANGO_ONESHOT), this guard only skips DJANGO_BUILD: SMTP config
+# must be present even on one-shot bootstrap services.
+if not os.getenv("DJANGO_BUILD"):
+    if not EMAIL_HOST:  # noqa: F405
+        raise ImproperlyConfigured(
+            "EMAIL_HOST must be set in production. "
+            "Provide it via the .env.prod runtime file."
+        )
+
 # TLS-ready settings
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

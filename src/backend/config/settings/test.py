@@ -65,6 +65,9 @@ CACHES = {
     }
 }
 
+# Email: in-memory backend for tests (no SMTP, messages captured in mail.outbox).
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
 
 # Skip migration replay during test DB creation for faster --create-db.
 # pytest-django uses create_test_db() (model introspection) instead of
