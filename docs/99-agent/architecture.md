@@ -337,3 +337,109 @@ patch targets must use `telegram_bot.services.ad_data.orm.delete_photo`.
 
 Test patch targets referencing `telegram_bot.services.ad_data` (e.g. in
 `test-audit-block-f-findings.md`) remain valid — the façade preserves the import path.
+
+## Bot Command Menu
+
+The bot registers a localized command menu at startup (EC-3). In `telegram_bot/lifecycle.py`,
+`_on_startup` calls `_set_bot_commands(bot)`, which invokes
+`bot.set_my_commands(commands, language=lang)` once per configured language — `ru`, `bs`, `en` —
+so users see the bot menu (`/start`, `/language`, `/post`, `/alerts`) in their preferred locale, plus
+a no-language default scope (`_COMMANDS["en"]`) so the menu never renders empty.
+
+| Locale | `start` | `language` | `post` | `alerts` |
+|---|---|---|---|---|
+| `ru` | Начать | Язык | Разместить объявление | Уведомления |
+| `bs` | Početak | Jezik | Objavi oglas | Obavještenja |
+| `en` | _(gettext msgid)_ | _(gettext msgid)_ | _(gettext msgid)_ | _(gettext msgid)_ |
+
+The `ru`/`bs` descriptions are stored as localized literals; the `en` descriptions are `gettext`
+msgids (`_("Start")`, etc.) and are therefore extracted into the `.po` catalogs. Failures on any
+scope are logged and skipped — the bot still starts polling (fail-open). The registered handlers
+live in the 7 routers wired by `configure_dispatcher` in `telegram_bot/main.py` (see
+[Bot Support Intake Flow](#bot-support-intake-flow)).
+
+## Bot Language Switch
+
+The `/start` greeting shown to unauthenticated/DECLINE users now renders an inline keyboard with
+three buttons: "🌐 Language" (`BotCallbackPrefix.LANG_OPEN`), "Contact us"
+(`BotCallbackPrefix.CONTACT_US`), and "Contact support" (`BotCallbackPrefix.SUPPORT_START`)
+(`telegram_bot/handlers/login.py` `handle_login_deep_link` no-arg branch). The "🌐 Language"
+button opens the language-selection keyboard from `telegram_bot/handlers/language.py`.
+
+`/language` is **not** login-gated (EC-4/EC-5): the same keyboard is served to anonymous users, and
+the selected language is stashed in a temporary cache keyed `bot_anon_lang:{telegram_id}` (TTL 3600,
+`ANON_LANG_CACHE_TTL` in `apps/core/utils/cache.py`) rather than — for registered users — written to
+`User.telegram_language`. At login, `handle_login_orm` backfills the temp-cached language onto a
+freshly-created `User` row and then clears the temp cache (`invalidate_anon_language_cache`).
+
+Per-update locale activation is performed by `LanguageMiddleware`
+(`telegram_bot/middlewares/language.py`, FQ-001), registered **before** `AccountStateMiddleware`,
+resolving each update to: `User.telegram_language` → the `bot_anon_lang` temp cache →
+`settings.LANGUAGE_CODE`. Full runtime mechanics (fallback chain, `translation.activate()`/`deactivate()`
+lifecycle, `language` context processor) are documented in [`i18n-spec.md`](../01-spec/i18n-spec.md).
+
+## Bot Support Intake Flow
+
+Support intake (EC-2/EC-9) is handled by a dedicated `support_router` in
+`telegram_bot/handlers/support.py` — the 7th router included by `configure_dispatcher`
+(`telegram_bot/main.py`) alongside `login`, `ad_create`, `alerts`, `ad_copy`, `language`, and
+`contact`.
+
+Flow:
+1. A user taps "Contact support" on the `/start` greeting → callback `BotCallbackPrefix.SUPPORT_START`
+   = `support_start`.
+2. `handle_support_start` rejects bots first (fail fast), then applies the per-user support-message
+   rate limit (5 messages per 600 s, cache key `bot_support_rl:{user_id}`, see
+   `telegram_bot/services/rate_limit.py` `check_support_message_rate_limit`), then sets
+   `ContactUsState.AWAITING_MESSAGE` (a `StrEnum` in `telegram_bot/states.py`) and prompts
+   *"Write your question — we will reply as soon as possible."*
+3. The user's reply is handled by `handle_support_message`, which validates the input (bots rejected,
+   empty text rejected, 4000-char cap), persists a `SupportTicket` (status `OPEN`) in a single
+   `sync_to_async` ORM call (`handle_support_orm`), then delivers it and confirms the user with the
+   generated `ticket_ref` (*"Your request has been received. Reference: SUP-YYYYMM-NNN"*), resetting
+   the FSM to `IDLE`.
+
+Delivery targets admin-configured channels via two fail-open seams:
+- **Email** — `telegram_bot/services/support_delivery_email.py` resolves recipients from
+  `SUPPORT_NOTIFICATION_RECIPIENTS` (then falls back to `EMAIL`-type `SupportContact` rows) and sends
+  via `sync_to_async(send_mail(...))` so blocking SMTP I/O never blocks the async event loop.
+- **Telegram** — `telegram_bot/services/support_delivery_telegram.py` DMs each active `TELEGRAM`-type
+  `SupportContact` via `bot.send_message`, isolating per-recipient failures (including a single
+  429 `TelegramRetryAfter` retry-after retry); `EMAIL`-type contacts are skipped.
+
+Access control is enforced upstream by `AccountStateMiddleware`: anonymous and DECLINE users may reach
+support, while banned/deleted/consent-revoked users are blocked before the handler runs. The handler
+additionally guards against bots (mirroring `contact.py`). `SupportContact`/`SupportTicket` schema
+and the `SupportChannelType`/`SupportTicketStatus` enums are documented in
+[`db-schema.md`](../02-database/db-schema.md#support_contacts) /
+[`db-enums.md`](../02-database/db-enums.md#supportchanneltype).
+
+## Email and Support Notification Settings
+
+Email/SMTP and support-notification configuration are read from environment variables in
+`config/settings/base.py` via `django-environ`. `dev.py`, `test.py`, and `prod.py` override the
+backend (see [Environment Variable Resolution](#environment-variable-resolution)):
+
+| Setting | base.py default | dev.py | test.py | prod.py |
+|---|---|---|---|---|
+| `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` |
+| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1`) |
+| `EMAIL_PORT` | `587` | — | — | — |
+| `EMAIL_HOST_USER` | `""` | — | — | — |
+| `EMAIL_HOST_PASSWORD` | `""` | — | — | — |
+| `EMAIL_USE_TLS` | `True` | — | — | — |
+| `EMAIL_TIMEOUT` | `10` | — | — | — |
+| `DEFAULT_FROM_EMAIL` | `noreply@<SITE_URL>` | — | — | — |
+| `SUPPORT_NOTIFICATION_RECIPIENTS` | `[]` (`env.list`) | — | — | — |
+
+- `EMAIL_*` are the classic Django SMTP settings; `prod.py` raises `ImproperlyConfigured` if
+  `EMAIL_HOST` is empty at runtime (ensures transactional email deliverability).
+- `SUPPORT_NOTIFICATION_RECIPIENTS` is an optional `env.list` of admin email addresses that
+  support-ticket notifications are delivered to. When empty, the email delivery service falls back
+  to the `email` addresses of active `EMAIL`-type `SupportContact` rows.
+- Template variables (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+  `EMAIL_USE_TLS`, `EMAIL_TIMEOUT`, `DEFAULT_FROM_EMAIL`, `SUPPORT_NOTIFICATION_RECIPIENTS`) are
+  present in `.env.dev.example`, `.env.prod.example`, and `.env.test.example` (these `.example`
+  templates are the tracked source; live `.env.*` files are gitignored). See
+  [`docker-deployment.md`](../ops/docker-deployment.md#environment-variables) for the full runtime
+  environment-variable catalog.

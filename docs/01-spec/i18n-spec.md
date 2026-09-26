@@ -91,19 +91,40 @@ Telegram users set it through the bot:
 - `/language` command (`telegram_bot/handlers/language.py` `cmd_language`) renders an inline
   keyboard with one `InlineKeyboardButton` per `LanguageLocale` — `🇷🇺 Русский`, `🇧🇦 Bosanski`,
   `🇬🇧 English` — the currently-selected one prefixed with `✅ `.
-- Callback data is `lang:<code>` (`LANG_CALLBACK_PREFIX = "lang:"`); the handler validates the code
-  through `LanguageLocale`, then `_set_user_language` updates `User.telegram_language` via
-  `User.objects.filter(id=...).update(telegram_language=...)` (no full model save).
+- Callback data is `lang:<code>` (`BotCallbackPrefix.LANG`); the handler validates the code through
+  `LanguageLocale`, then:
+  - **Registered users** — `_set_user_language` persists the choice via
+    `User.objects.filter(id=...).update(telegram_language=...)` (no full model save).
+  - **Anonymous users** — the choice is stashed in a temporary cache keyed
+    `bot_anon_lang:{telegram_id}` (TTL 3600, `ANON_LANG_CACHE_TTL` in
+    `apps/core/utils/cache.py`) via `set_cached_anon_language`, so the preference survives across
+    updates before the user registers.
+- **Reconcile at login (EC-5):** when an anonymous deep-linker completes `/start login_<token>` and a
+  **new** `User` row is created, `handle_login_orm` (`telegram_bot/handlers/login.py`) backfills the
+  temp-cached language onto `User.telegram_language` (DB value wins for a fresh row), then clears the
+  temp cache (`invalidate_anon_language_cache`) so a later login cannot re-apply a stale choice.
+- `/language` is **not** login-gated: anonymous users receive the same keyboard and see the temp-store
+  choice (or the default). The "🌐 Language" button in the `/start` greeting opens it via
+  `BotCallbackPrefix.LANG_OPEN`.
 
 **Runtime activation (FQ-001):** `LanguageMiddleware` (`telegram_bot/middlewares/language.py`) is
 registered in `telegram_bot/main.py` (and in the bot test conftest) as an update-level middleware
-that runs **before** `AccountStateMiddleware`. It resolves `event.from_user.id` to the user's
-`telegram_language` via the ORM (using `sync_to_async`), calls `translation.activate(lang)` before
-handler dispatch, and calls `translation.deactivate()` in a `finally` block to prevent locale
-leakage between updates on the same asgiref worker thread. Anonymous or unregistered users (no
-`telegram_id`) fall back to `settings.LANGUAGE_CODE`. This ensures all `_()`-wrapped strings in bot
-handlers — including denial messages from `AccountStateMiddleware` — render in the user's preferred
-language.
+that runs **before** `AccountStateMiddleware`. It resolves `event.from_user.id` to the preferred
+language via `_resolve_user_language` (using `sync_to_async`), calls `translation.activate(lang)`
+before handler dispatch, and calls `translation.deactivate()` in a `finally` block to prevent locale
+leakage between updates on the same asgiref worker thread. The resolution fallback chain is:
+
+| Priority | Source |
+|---|---|
+| 1 (highest) | Persisted `User.telegram_language` (registered users) |
+| 2 | Temporary anon-lang cache `bot_anon_lang:{telegram_id}` (anonymous users who chose a language) |
+| 3 (default) | `settings.LANGUAGE_CODE` |
+
+This ensures all `_()`-wrapped strings in bot handlers — including denial messages from
+`AccountStateMiddleware` — render in the user's preferred language. The anonymous temp-cache choice
+is reconciled onto the `User` row at first login (see above). See the
+[language switch](../99-agent/architecture.md#bot-language-switch) seam in the architecture doc for
+the broader bot UX context.
 
 The stored language drives per-user message localization in bot notifications (see
 [Localized notifications](#localized-notifications)) and is exposed to the web context for

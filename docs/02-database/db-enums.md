@@ -247,3 +247,25 @@ Layers that consume it:
 - **DTO validation** — `ConsentSubmission.consent_version` (`users/schemas.py`) carries a lenient `@field_validator` that coerces unrecognized values to `ConsentVersion.V1_0.value` (never rejects a legitimate `1.0` submission).
 
 See [Consent Version Tracking](../99-agent/architecture.md#consent-version-tracking-10-qlt-002) in the architecture doc for the full pattern.
+
+## SupportChannelType
+Support channel kinds offered to sellers/buyers, backing `SupportContact.channel_type` (see
+[`db-schema.md`](db-schema.md#support_contacts)). Enforced by the
+`support_contact_channel_value_required` `CheckConstraint`, which couples the `channel_type`
+to its identifying field: an `EMAIL` row must populate `email` (and leave `telegram_id` null),
+and a `TELEGRAM` row must populate `telegram_id` (and leave `email` null).
+
+| Value | Meaning |
+|-------|---------|
+| `email` | Email-based support channel; requires `email`, `telegram_id` must be null |
+| `telegram` | Telegram-based support channel; requires `telegram_id`, `email` must be null |
+
+## SupportTicketStatus
+Lifecycle status of a `SupportTicket` submitted via the Telegram bot (see
+[`db-schema.md`](db-schema.md#support_tickets)).
+
+| Value | Meaning |
+|-------|---------|
+| `open` | Freshly submitted; not yet handled by the support desk |
+| `replied` | A desk member has replied to the submitter |
+| `closed` | Ticket resolved and closed |

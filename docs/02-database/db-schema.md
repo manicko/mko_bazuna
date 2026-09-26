@@ -422,6 +422,61 @@ the context-processor inventory.
 
 ---
 
+### support_contacts
+
+Admin-managed support channels (email or Telegram) that the bot delivers support tickets to
+(`apps/core/models.py`, `SupportContact`; migration `0004_support_models`). Exactly one
+channel-type/value pair is required: an `EMAIL` row must populate `email` (and leave
+`telegram_id` null), and a `TELEGRAM` row must populate `telegram_id` (and leave `email` null).
+The `support_contact_channel_value_required` `CheckConstraint` enforces this at the DB layer.
+Active rows are cached (`SUPPORT_CONTACTS_CACHE_KEY = "support_contacts:v1"`, 1 h TTL in
+`apps/core/utils/cache.py`) and invalidated on admin save/delete via `post_save`/`post_delete`
+receivers in `apps/core/signals.py`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | PK | `BigAutoField` |
+| `channel_type` | VARCHAR(10), choices=`SupportChannelType` | `email` or `telegram` |
+| `label` | VARCHAR(255) | Human-readable label |
+| `email` | VARCHAR, nullable | Required when `channel_type=email` |
+| `telegram_id` | BIGINT, nullable | Required when `channel_type=telegram` |
+| `is_active` | BOOL, default TRUE | Only active rows are offered |
+| `ordering` | SMALLINT, default 0 | Display order (lower first) |
+| — | — | `db_table: support_contacts`; `ordering: [ordering, id]`; constraint `support_contact_channel_value_required` |
+
+The bot reads active contacts via `apps.core.services.support.get_support_contacts()` (cached,
+1 h TTL, fails open to `[]`); email recipients may also be sourced from the
+`SUPPORT_NOTIFICATION_RECIPIENTS` setting. Admin: `SupportContactAdmin` (`list_display`,
+`list_editable` on `is_active`/`ordering`, `list_filter`/`search_fields`). See
+[`db-enums.md`](db-enums.md#supportchanneltype).
+
+### support_tickets
+
+Support tickets submitted by sellers/buyers via the bot (`/start` → "Contact support" → free-text
+message) (`apps/core/models.py`, `SupportTicket`; migration `0004_support_models`). The `ticket_ref`
+(`SUP-YYYYMM-NNN`) is auto-generated in `save()` on first save by counting same-month rows.
+Admin displays `SupportTicketAdmin` as a read-only audit trail (add/delete disabled).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | PK | `BigAutoField` |
+| `user_id` | FK → users.id, nullable, SET_NULL (`related_name="support_tickets"`) | Null when anonymous |
+| `chat_id` | BIGINT | Telegram `chat_id` of the submitter |
+| `telegram_id` | BIGINT | Submitter's Telegram ID |
+| `username` | VARCHAR(255), nullable | Telegram username (if available) |
+| `text` | TEXT | Ticket body |
+| `status` | VARCHAR(10), default `open`, choices=`SupportTicketStatus` | `open`/`replied`/`closed` |
+| `ticket_ref` | VARCHAR(32), UNIQUE, editable=False | Auto-generated `SUP-YYYYMM-NNN` |
+| `created_at` | TIMESTAMP, default now | |
+| — | — | `db_table: support_tickets`; `ordering: [-created_at]` |
+
+The bot persists tickets in a single `sync_to_async` ORM call (`handle_support_orm` in
+`telegram_bot/handlers/support.py`) and confirms to the user with the generated `ticket_ref`.
+Delivery channels are the `[support_contacts](#support_contacts)` rows (email + Telegram) and the
+`SUPPORT_NOTIFICATION_RECIPIENTS` setting. See [`db-enums.md`](db-enums.md#supporttickestatus).
+
+---
+
 ### moderation_criteria (zone D3/D4, US-A11, decision O4)
 Singleton table (exactly one active row), edited by admin at runtime. Applied to NEW ads (read current row at submit; no per-ad `criteria_version` needed). Stored in DB (NOT `settings.py`) so it is editable at runtime per US-A11.
 
