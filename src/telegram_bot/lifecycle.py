@@ -24,14 +24,15 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 from django.db import close_old_connections, connections
-from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
 
 
-# Localized Telegram command menu (EC-3). English descriptions are gettext
-# msgids (``_()``) so they are extracted into the .po catalogs; the ru/bs
-# entries carry their final localized descriptions directly.
+# Localized Telegram command menu (EC-3). The ru/bs entries carry their final
+# localized descriptions directly as literals. The en entries are English
+# literals too (NOT gettext msgids): using eager ``_()`` here would freeze
+# them to the import-time locale (``settings.LANGUAGE_CODE``, Russian in
+# production), which would leak Russian text into the ``language="en"`` menu.
 _COMMANDS: dict[str, list[BotCommand]] = {
     "ru": [
         BotCommand(command="start", description="Начать"),
@@ -46,10 +47,10 @@ _COMMANDS: dict[str, list[BotCommand]] = {
         BotCommand(command="alerts", description="Obavještenja"),
     ],
     "en": [
-        BotCommand(command="start", description=_("Start")),
-        BotCommand(command="language", description=_("Language")),
-        BotCommand(command="post", description=_("Post ad")),
-        BotCommand(command="alerts", description=_("Alerts")),
+        BotCommand(command="start", description="Start"),
+        BotCommand(command="language", description="Language"),
+        BotCommand(command="post", description="Post ad"),
+        BotCommand(command="alerts", description="Alerts"),
     ],
 }
 

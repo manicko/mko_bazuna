@@ -18,7 +18,7 @@ from typing import Final
 
 from aiogram import Bot, F, Router, types
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
 
 from apps.core.services.support import get_support_contacts_async
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
@@ -43,17 +43,20 @@ SUPPORT_MESSAGE_MAX_LENGTH: Final[int] = 4000
 SUPPORT_START_CALLBACK: Final[BotCallbackPrefix] = BotCallbackPrefix.SUPPORT_START
 
 # Prompt shown when the support flow is entered (English source).
-SUPPORT_PROMPT_MESSAGE: Final = _(
+# ``gettext_lazy`` keeps the translation deferred until handler-run time so it
+# resolves under the per-user locale (see contact.py), not the import-time
+# ``settings.LANGUAGE_CODE``.
+SUPPORT_PROMPT_MESSAGE: Final = gettext_lazy(
     "Write your question — we will reply as soon as possible."
 )
 
 # Shown when a user exceeds the support-message rate limit.
-SUPPORT_RATE_LIMITED_MESSAGE: Final = _(
+SUPPORT_RATE_LIMITED_MESSAGE: Final = gettext_lazy(
     "Too many requests to support. Please try again later."
 )
 
 # Shown when a submitted message is too long.
-SUPPORT_MESSAGE_TOO_LONG_MESSAGE: Final = _(
+SUPPORT_MESSAGE_TOO_LONG_MESSAGE: Final = gettext_lazy(
     "Your message is too long. Please write no more than 4000 characters."
 )
 

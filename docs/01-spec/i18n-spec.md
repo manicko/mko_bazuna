@@ -306,9 +306,9 @@ Django's default 404 handler does not surface them to users in production.
 | `apps/ads/views/listings.py` | `HttpResponseForbidden` (1) | `gettext` (runtime) |
 | `apps/search/management/commands/send_alerts.py` | "New ads matching your saved searches" (1) | `gettext` (runtime) |
 
-QLT-005 extended `_()` wrapping to the five Telegram bot handler modules under
+QLT-005 extended `_()` wrapping to the seven Telegram bot handler modules under
 `telegram_bot/handlers/` (`alerts.py`, `ad_create.py`, `ad_copy.py`, `contact.py`,
-`login.py`). These are runtime `gettext` calls activated per-update by
+`login.py`, `language.py`, `support.py`). These are runtime `gettext` calls activated per-update by
 `LanguageMiddleware` (FQ-001), which resolves `User.telegram_language` and calls
 `translation.activate()` before handler dispatch.
 

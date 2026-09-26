@@ -350,10 +350,12 @@ a no-language default scope (`_COMMANDS["en"]`) so the menu never renders empty.
 |---|---|---|---|---|
 | `ru` | Начать | Язык | Разместить объявление | Уведомления |
 | `bs` | Početak | Jezik | Objavi oglas | Obavještenja |
-| `en` | _(gettext msgid)_ | _(gettext msgid)_ | _(gettext msgid)_ | _(gettext msgid)_ |
+| `en` | Start | Language | Post ad | Alerts |
 
-The `ru`/`bs` descriptions are stored as localized literals; the `en` descriptions are `gettext`
-msgids (`_("Start")`, etc.) and are therefore extracted into the `.po` catalogs. Failures on any
+The `ru`/`bs`/`en` descriptions are stored as localized literals. Notably, the `en`
+descriptions are English literals (NOT `gettext` msgids): eager `_()` at module
+scope would freeze them to the import-time locale (`settings.LANGUAGE_CODE`,
+Russian in production), leaking Russian into the `language="en"` menu. Failures on any
 scope are logged and skipped — the bot still starts polling (fail-open). The registered handlers
 live in the 7 routers wired by `configure_dispatcher` in `telegram_bot/main.py` (see
 [Bot Support Intake Flow](#bot-support-intake-flow)).

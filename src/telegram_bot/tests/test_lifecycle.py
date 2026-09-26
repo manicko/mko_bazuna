@@ -100,6 +100,28 @@ class TestSetBotCommands:
             assert {c.command for c in commands} == expected_commands
 
     @pytest.mark.asyncio
+    async def test_en_descriptions_are_english_literals(self) -> None:
+        """The ``en`` command descriptions are English literals, not localized text.
+
+        Regression (import-time locale baking): eager ``_()`` at module scope
+        froze the ``en`` menu to ``settings.LANGUAGE_CODE`` (Russian in
+        production), so under ``language="en"`` users saw Russian. The ``en``
+        descriptions must be plain English literals.
+        """
+        from telegram_bot.lifecycle import _COMMANDS
+
+        expected = {
+            "start": "Start",
+            "language": "Language",
+            "post": "Post ad",
+            "alerts": "Alerts",
+        }
+        en_by_command = {c.command: c.description for c in _COMMANDS["en"]}
+        assert en_by_command == expected
+        # The English menu must never leak the Russian translations.
+        assert "Старт" not in en_by_command.values()
+
+    @pytest.mark.asyncio
     async def test_set_commands_fail_open(self) -> None:
         """A failing ``set_my_commands`` is logged, not raised."""
         from telegram_bot.lifecycle import _set_bot_commands

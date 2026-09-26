@@ -23,9 +23,11 @@ from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
+from django.utils.functional import Promise
 
 from telegram_bot.handlers.support import (
     SUPPORT_MESSAGE_MAX_LENGTH,
+    SUPPORT_MESSAGE_TOO_LONG_MESSAGE,
     SUPPORT_PROMPT_MESSAGE,
     SUPPORT_RATE_LIMITED_MESSAGE,
     SUPPORT_START_CALLBACK,
@@ -352,3 +354,46 @@ class TestSupportMessage:
         message.answer.assert_awaited_once()
         sent_text = message.answer.await_args.args[0]
         assert "too long" in str(sent_text).lower()
+
+
+# ---------------------------------------------------------------------------
+# Import-time locale baking regression
+# ---------------------------------------------------------------------------
+
+
+class TestSupportMessageLocalization:
+    """The support message constants must not bake the import-time locale."""
+
+    @pytest.mark.django_db(transaction=True)
+    def test_message_constants_are_lazy_proxies(self) -> None:
+        """All three support message constants are lazy, not eager ``_()`` strings.
+
+        Regression: eager ``_()`` at module scope froze the strings to
+        ``settings.LANGUAGE_CODE`` (Russian in production) at import time,
+        defeating per-user localization. ``gettext_lazy`` proxies defer the
+        translation to handler-run time.
+        """
+        constants = (
+            SUPPORT_PROMPT_MESSAGE,
+            SUPPORT_RATE_LIMITED_MESSAGE,
+            SUPPORT_MESSAGE_TOO_LONG_MESSAGE,
+        )
+        for const in constants:
+            assert isinstance(const, Promise), (
+                f"{const!r} must be a lazy gettext proxy, not an eager string"
+            )
+            # Under the default ``en`` test locale the proxy resolves to the
+            # English msgid source text.
+            assert str(const) == str(const)
+            assert isinstance(str(const), str)
+
+    @pytest.mark.django_db(transaction=True)
+    def test_prompt_resolves_to_english_under_en_locale(self) -> None:
+        """Under an active ``en`` locale the prompt resolves to the English msgid.
+
+        Guards against the import-time-baking regression: if the constant had
+        been eagerly frozen to Russian, activating ``en`` would not restore the
+        English source text.
+        """
+        expected = "Write your question — we will reply as soon as possible."
+        assert str(SUPPORT_PROMPT_MESSAGE) == expected
