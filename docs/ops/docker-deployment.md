@@ -374,7 +374,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `SEED_USERS` | No (default: `10`) | Number of demo users to generate (seed service) |
 | `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
 | `PROMETHEUS_MULTIPROC_DIR` | No (default: `/tmp/prometheus_multiproc`) | Directory for Prometheus multiprocess metrics mode (web service only). Required for accurate per-worker metric collection under gunicorn when `PROMETHEUS_MULTIPROC_DIR` is set; see [Prometheus Metrics](#prometheus-metrics) |
-| `SCHEDULER_COMMAND_TIMEOUT` | No (default: `1800`) | Per-command timeout (seconds) for `subprocess.run` dispatch in the scheduler (`apps.core.utils.scheduler`) and in `migrate_locked.main`. Bounds a hung management command so it cannot stall the hourly cycle or the migration bootstrap; a timed-out command is logged and skipped (ENT-001). The default sits safely under the scheduler healthcheck staleness window (`SCHEDULER_HEALTH_STALE_SECONDS = 7200`). |
+| `SCHEDULER_COMMAND_TIMEOUT` | No (default: `1800`) | Per-command timeout (seconds) for `subprocess.run` dispatch in the scheduler (`apps.core.utils.scheduler`) and in `migrate_locked.main`. Bounds a hung management command so it cannot stall the hourly cycle or the migration bootstrap; a timed-out command is logged and skipped (ENT-001). The default sits safely under the scheduler healthcheck staleness window (`SCHEDULER_HEALTH_STALE_SECONDS` env var, `7200` in prod). |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
@@ -685,8 +685,8 @@ checks:
 2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
    `/tmp/mko_bazuna_scheduler_alive`), written by `apps.core.utils.scheduler` after
    each hourly cycle completes via `settings.SCHEDULER_LIVENESS_FILE`
-3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (default `7200` in
-   `base.py`, set to `7200` on the prod scheduler service), the marker's mtime must be
+3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (read from the environment by `healthcheck-scheduler.sh`; default `0` disables the
+   check, set to `7200` on the prod scheduler service), the marker's mtime must be
    within that window (detects retry-loop / stuck scheduler)
 
 In test settings, `SCHEDULER_LIVENESS_FILE = ""` disables the marker so the scheduler

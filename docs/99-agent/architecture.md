@@ -32,7 +32,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   `docker/entrypoint-scheduler.sh`); it writes a file-based liveness marker
   (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`) after each hourly
   cycle, consumed by `healthcheck-scheduler.sh` with staleness governed by
-  `SCHEDULER_HEALTH_STALE_SECONDS` (default `7200`). Each command is dispatched via
+   `SCHEDULER_HEALTH_STALE_SECONDS` (env var; default `0`/disabled, `7200` in prod). Each command is dispatched via
   `subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)`; a command that
   exceeds the timeout (`TimeoutExpired`) is logged and skipped so the cycle continues
   (ENT-001). On `SIGTERM`/`SIGINT` the scheduler sets a stop flag checked at the top of each
@@ -150,7 +150,7 @@ When multiple mechanisms provide the same variable, the following precedence app
    `DJANGO_SETTINGS_MODULE=config.settings.prod` (`docker/Dockerfile` lines 68–75) are baked
    into the image but are overridden by any compose `environment:` / `env_file:` value at
    runtime. `docker build` itself sets `DJANGO_BUILD=1`, which the settings module checks to
-   skip `.env` validation (see below).
+   skip `.env` validation (see [Deployment Checks](../ops/docker-deployment.md#deployment-checks)).
 
 > Note: running `docker compose config` shows a flat merged `environment:` list and does **not**
 > reveal which `.env` file a given key originated from. Inspect the `volumes:` section of the
@@ -173,6 +173,10 @@ When multiple mechanisms provide the same variable, the following precedence app
 - **In CI**: no `.env` file is bind-mounted and `read_env()` is never reached; every variable is
   set directly as a step-level `env:` in the workflow. The `DJANGO_BUILD=1` Dockerfile `ENV` is
   never set in CI, so it has no effect there.
+- **Env-var allowlist:** After `read_env()` loads keys from `.env`, `base.py` calls
+  `_warn_unknown_env_vars()`, which logs a non-fatal warning for any loaded key not in the
+  `ALLOWED_ENV_VARS` frozenset (e.g. a typo like `BOT_T0KEN`). The warning names the key and
+  suggests adding it to the allowlist if intentional; it does not block startup.
 
 **Database resolution** (`base.py` lines 181–202): `base.py` checks `os.getenv("DATABASE_URL")`
 first. If set, it parses the URL via `env.db()` and the `POSTGRES_*` fallback is skipped
@@ -288,6 +292,20 @@ to `ConsentVersion.V1_0.value` with a warning log, never rejecting a legitimate
 The `record_consent_action` service (`users/services/consent_record.py`) defaults its
 `consent_version` parameter to `ConsentVersion.V1_0.value`, which also covers the implicit
 consumer (`consent_withdraw` calls it without the argument).
+
+## Input DTO Validation Convention (CFG-004)
+
+`BaseInputModel` (`apps/core/schemas.py`) is the shared base for every client-input DTO. It sets
+`model_config = ConfigDict(extra="forbid")`, so unknown or misspelled fields are rejected at the
+HTTP boundary with a `400` error instead of being silently dropped. It backs `SubmitAdInput`,
+`AdEditInput`, `ListingsQueryParams`, `SubmittedPhoto`, `ConsentSubmission`, the saved-search
+payloads (`SavedSearchQueryPayload`, `SavedSearchPricePayload`), the message-editing payloads
+(`TitlePayload`, `DescriptionPayload`, `PricePayload`, `PhotoCountPayload`), and
+`BulkModerationRequest`.
+
+Two DTOs intentionally override `extra`: `AutocompleteSuggestion` (`apps/search/schemas.py`,
+`extra="allow"` — a response DTO that tolerates additional upstream keys) and `CSPReportPayload`
+(`apps/core/views.py`, `extra="ignore"` — absorbs spec-varying browser keys).
 
 ## Bot Handler Module Decomposition (10-QLT-003)
 
@@ -425,7 +443,7 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 | Setting | base.py default | dev.py | test.py | prod.py |
 |---|---|---|---|---|
 | `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` |
-| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1`) |
+| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1` at build or `DJANGO_ONESHOT=1` on dev one-shots) |
 | `EMAIL_PORT` | `587` | — | — | — |
 | `EMAIL_HOST_USER` | `""` | — | — | — |
 | `EMAIL_HOST_PASSWORD` | `""` | — | — | — |

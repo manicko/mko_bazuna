@@ -63,7 +63,7 @@ failure escalation.
   and fresh. The scheduler container's healthcheck (`docker/healthcheck-scheduler.sh`)
   verifies PID 1 liveness, the scheduler readiness marker file
   (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`), and optional
-  freshness via `SCHEDULER_HEALTH_STALE_SECONDS` (default `7200`). Validation must
+   freshness via `SCHEDULER_HEALTH_STALE_SECONDS` (env var; default `0`/disabled, `7200` in prod). Validation must
   confirm all three before declaring a rollback successful.
 
 > **Note on health endpoints:** Finding 12-OPS-002 has been completed — the
@@ -403,12 +403,12 @@ interval 30s). It performs three checks against the file-based marker:
 2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
    `/tmp/mko_bazuna_scheduler_alive`), written by `apps.core.utils.scheduler` after
    each hourly cycle completes (via `settings.SCHEDULER_LIVENESS_FILE`)
-3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (default `7200` in
-   `base.py`, set to `7200` on the prod scheduler service), the marker's mtime must be
+3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (read from the environment by `healthcheck-scheduler.sh`; default `0` disables the
+   check, set to `7200` on the prod scheduler service), the marker's mtime must be
    within that window (detects retry-loop / stuck scheduler)
 
 > **Note:** The scheduler runs every hour, so `SCHEDULER_HEALTH_STALE_SECONDS` must be
-> greater than the hourly cycle (3600 s). The default of 7200 s allows one missed cycle
+> greater than the hourly cycle (3600 s). The production value of 7200 s allows one missed cycle
 > before the healthcheck reports failure.
 
 Verify scheduler health via Docker:

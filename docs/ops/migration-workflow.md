@@ -124,7 +124,7 @@ seconds). This is the same `SCHEDULER_COMMAND_TIMEOUT` that bounds the scheduler
 hourly/daily command dispatch. A step that raises `TimeoutExpired` is logged at `ERROR` and
 skipped — the remaining steps still run and the advisory lock is released when the `with`
 block exits. The default sits safely under the scheduler healthcheck staleness window
-(`SCHEDULER_HEALTH_STALE_SECONDS = 7200` in `base.py`).
+(`SCHEDULER_HEALTH_STALE_SECONDS=7200` on the prod scheduler service; read from the environment by `healthcheck-scheduler.sh`).
 
 **Standalone invocation (ENT-003):** `migrate_locked.py` defaults `DJANGO_SETTINGS_MODULE`
 to `config.settings.prod` via `os.environ.setdefault` (changed from `config.settings.dev`),
