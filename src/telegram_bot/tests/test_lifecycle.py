@@ -72,6 +72,97 @@ class TestOnStartup:
         mock_redis.assert_awaited_once()
 
 
+class TestSetBotCommands:
+    """Tests for the localized command-menu registration (EC-3)."""
+
+    @pytest.mark.asyncio
+    async def test_set_commands_per_language(self) -> None:
+        """``_set_bot_commands`` registers the menu for every configured language."""
+        from telegram_bot.lifecycle import _COMMANDS, _set_bot_commands
+
+        bot = MagicMock()
+        bot.set_my_commands = AsyncMock()
+
+        await _set_bot_commands(bot)
+
+        # One call per language plus the default (no-language) scope.
+        expected_calls = len(_COMMANDS) + 1
+        assert bot.set_my_commands.await_count == expected_calls
+
+        for lang, commands in _COMMANDS.items():
+            bot.set_my_commands.assert_any_await(commands, language=lang)
+        # The default scope reuses the English menu without a language.
+        bot.set_my_commands.assert_any_await(_COMMANDS["en"])
+
+        # Every language list carries the four canonical commands.
+        expected_commands = {"start", "language", "post", "alerts"}
+        for commands in _COMMANDS.values():
+            assert {c.command for c in commands} == expected_commands
+
+    @pytest.mark.asyncio
+    async def test_set_commands_fail_open(self) -> None:
+        """A failing ``set_my_commands`` is logged, not raised."""
+        from telegram_bot.lifecycle import _set_bot_commands
+
+        bot = MagicMock()
+        bot.set_my_commands = AsyncMock(side_effect=RuntimeError("api down"))
+
+        # Must not propagate the error.
+        await _set_bot_commands(bot)
+
+
+class TestOnStartupCommands:
+    """Startup registers the command menu and swallows failures."""
+
+    @pytest.mark.asyncio
+    async def test_startup_sets_commands(self) -> None:
+        """Startup calls ``_set_bot_commands`` with the bot kwarg."""
+        from telegram_bot.lifecycle import _on_startup
+
+        bot = MagicMock()
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                with patch(
+                    "telegram_bot.lifecycle._set_bot_commands",
+                    new=AsyncMock(),
+                ) as mock_set_commands:
+                    await _on_startup(MagicMock(), bot=bot)
+
+        mock_set_commands.assert_awaited_once_with(bot)
+
+    @pytest.mark.asyncio
+    async def test_startup_swallows_command_failure(self) -> None:
+        """A ``set_my_commands`` failure on startup does not abort polling."""
+        from telegram_bot.lifecycle import _on_startup
+
+        bot = MagicMock()
+        bot.set_my_commands = AsyncMock(side_effect=RuntimeError("api down"))
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                # Must not propagate the error from set_my_commands.
+                await _on_startup(MagicMock(), bot=bot)
+
+    @pytest.mark.asyncio
+    async def test_startup_without_bot(self) -> None:
+        """Startup proceeds when no bot kwarg is provided."""
+        from telegram_bot.lifecycle import _on_startup
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=None):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker",
+                new=AsyncMock(),
+            ):
+                await _on_startup(MagicMock(), MagicMock())
+
+
 class TestOnShutdown:
     """Tests for the shutdown hook."""
 
