@@ -107,8 +107,35 @@ with advisory_lock(AdvisoryLockId.MIGRATE, session=True):
     # _build_steps() returns 3 or 4 tuples depending on RUN_TRANSLATION_BACKFILL
     steps = _build_steps()
     for argv in steps:
-        subprocess.run([sys.executable, str(manage_py), *argv])
+        # check=False: one failing step does not abort the others (preserves the
+        # original &&-chain intent inside the lock). timeout binds each step to
+        # settings.SCHEDULER_COMMAND_TIMEOUT (default 1800s); TimeoutExpired is
+        # logged and skipped (ENT-001) so the lock is released on context exit.
+        subprocess.run(
+            [sys.executable, str(manage_py), *argv],
+            check=False,
+            timeout=settings.SCHEDULER_COMMAND_TIMEOUT,
+        )
 ```
+
+**Per-command timeout (ENT-001):** `migrate_locked.main()` dispatches each step with
+`subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)` (default `1800`
+seconds). This is the same `SCHEDULER_COMMAND_TIMEOUT` that bounds the scheduler's
+hourly/daily command dispatch. A step that raises `TimeoutExpired` is logged at `ERROR` and
+skipped — the remaining steps still run and the advisory lock is released when the `with`
+block exits. The default sits safely under the scheduler healthcheck staleness window
+(`SCHEDULER_HEALTH_STALE_SECONDS = 7200` in `base.py`).
+
+**Standalone invocation (ENT-003):** `migrate_locked.py` defaults `DJANGO_SETTINGS_MODULE`
+to `config.settings.prod` via `os.environ.setdefault` (changed from `config.settings.dev`),
+matching the scheduler/web/bot entrypoints. The Docker `migrate` service and the
+`bootstrap_reference_data` one-shot set `DJANGO_SETTINGS_MODULE=config.settings.prod`
+explicitly in `environment:`, so the default does not affect the Compose path. Standalone
+invocation outside that path (e.g. running
+`python src/backend/apps/core/utils/migrate_locked.py` directly) requires
+`DJANGO_SETTINGS_MODULE` to be set explicitly, or the build/one-shot guard flags
+`DJANGO_BUILD=1` / `DJANGO_ONESHOT=1` to be present — prod settings enforce strict secret
+validation otherwise.
 
 `apps/core/utils/advisory_lock.py` uses `pg_advisory_lock` (session scope) for the migrate path.
 This is safe in dev because **no PgBouncer is attached to the migration database** — the lock is

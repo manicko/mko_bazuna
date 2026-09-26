@@ -237,7 +237,7 @@ The scheduler runs 9 hourly sweep commands (`archive_sweep`, `delete_sweep`,
 (`send_alerts`, `rollup_daily_metrics` — both fire at 08:00 UTC on the first hourly tick
 at or after that hour) via the extracted module `apps.core.utils.scheduler`
 (`python -m apps.core.utils.scheduler`), invoked by `entrypoint-scheduler.sh`.
-The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`).
+The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`). Each dispatched command is bounded by `SCHEDULER_COMMAND_TIMEOUT` (default `1800s`); a command that times out is logged and skipped so the cycle continues (ENT-001).
 
 **Systemd alternative (bare metal):**
 
@@ -253,6 +253,10 @@ WorkingDirectory=/opt/mko-bazuna/src/backend
 # The scheduler loop lives in apps/core/utils/scheduler.py and is invoked via
 # the module entry point, mirroring the Docker entrypoint-scheduler.sh.
 ExecStart=/opt/venv/bin/python -m apps.core.utils.scheduler
+# Graceful shutdown: the scheduler installs SIGTERM/SIGINT handlers that set a
+# stop flag checked at the top of each loop iteration; the loop breaks after the
+# current cycle and closes Django DB connections in a finally teardown (ENT-002).
+# systemd's default KillSignal=SIGTERM is therefore handled cleanly on stop.
 Restart=always
 
 [Install]

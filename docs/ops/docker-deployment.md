@@ -143,7 +143,10 @@ db (healthy, pg_isready)
 - **`migrate`** — runs `apps.core.utils.migrate_locked.main` (all three required steps — `migrate --run-syncdb`,
   `setup_search_triggers`, `load_exchange_rates` — plus an optional `backfill_translations` step
   when `RUN_TRANSLATION_BACKFILL=true` — under a session-scoped advisory lock ID 100) so
-  concurrent runs are serialized. Exits 0 on success (including a fresh DB with no pending
+  concurrent runs are serialized. Each step is dispatched via `subprocess.run(check=False,
+  timeout=settings.SCHEDULER_COMMAND_TIMEOUT)`; a step that exceeds the timeout (`TimeoutExpired`)
+  is logged and skipped so the remaining steps still run and the lock is released (ENT-001).
+  Exits 0 on success (including a fresh DB with no pending
   migrations). See [the migration workflow](migration-workflow.md) for details.
 - **`load_catalog`** — loads the category tree from `apps/categories/catalog/categories.yaml`.
   Depends on `migrate` completing successfully.
@@ -320,7 +323,7 @@ GitHub Actions runner cannot reach the production host.
 | Service | Image/Command | Notes |
 |---------|---------------|-------|
 | `db` | `postgres:18-alpine` | Persistent volume `postgres_data` |
-| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100, with optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true` |
+| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100, with optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`. Each step is bounded by `SCHEDULER_COMMAND_TIMEOUT` (`check=False, timeout=...`); a timed-out step is logged and skipped (ENT-001) |
 | `create_admin` | Build image, creates admin user | One-shot service, idempotent |
 | `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
 | `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
@@ -367,6 +370,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `SEED_USERS` | No (default: `10`) | Number of demo users to generate (seed service) |
 | `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
 | `PROMETHEUS_MULTIPROC_DIR` | No (default: `/tmp/prometheus_multiproc`) | Directory for Prometheus multiprocess metrics mode (web service only). Required for accurate per-worker metric collection under gunicorn when `PROMETHEUS_MULTIPROC_DIR` is set; see [Prometheus Metrics](#prometheus-metrics) |
+| `SCHEDULER_COMMAND_TIMEOUT` | No (default: `1800`) | Per-command timeout (seconds) for `subprocess.run` dispatch in the scheduler (`apps.core.utils.scheduler`) and in `migrate_locked.main`. Bounds a hung management command so it cannot stall the hourly cycle or the migration bootstrap; a timed-out command is logged and skipped (ENT-001). The default sits safely under the scheduler healthcheck staleness window (`SCHEDULER_HEALTH_STALE_SECONDS = 7200`). |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
@@ -638,6 +642,20 @@ Scheduler deploy parity — that the service uses `image:` (never `build:`), is 
 `profiles: ["scheduler"]`, and ships an executable entrypoint — is enforced by CI tests
 in `src/backend/tests/test_compose_hardening.py` (finding 12-OPS-009), so the production
 compose override stays consistent with this documented configuration.
+
+Each command dispatched by the scheduler is executed via
+`subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)` (default `1800`
+seconds); a command that exceeds the timeout raises `TimeoutExpired`, is logged at `ERROR`,
+and is skipped so the hourly/daily cycle continues without stalling (ENT-001). Configure
+the bound via the `SCHEDULER_COMMAND_TIMEOUT` environment variable (see
+[Environment Variables](#environment-variables)).
+
+On `SIGTERM` / `SIGINT` (e.g. `docker stop`), the scheduler installs handlers
+(`_handle_shutdown_signal`) that set a module-level stop flag (`_stop_event`) checked at
+the top of each `run_scheduler()` loop iteration; the loop breaks cleanly after the
+current cycle and `main()` runs `_shutdown()` in a `finally` block — closing all Django
+DB connections and logging — so no work is abandoned mid-cycle and no DB connections leak
+(ENT-002).
 
 | Task | Purpose | Schedule |
 |------|---------|----------|
