@@ -63,6 +63,22 @@ def _prod_env_overrides(**overrides: str) -> dict[str, str]:
         "CSRF_TRUSTED_ORIGINS", "https://example.com"
     )
     env["SENTRY_DSN"] = overrides.pop("SENTRY_DSN", "")
+    # EMAIL_* defaults — EMAIL_HOST must be non-empty to pass the prod.py
+    # fail-fast guard (see prod.py: EMAIL_HOST required in production).
+    env["EMAIL_HOST"] = overrides.pop("EMAIL_HOST", "smtp.example.com")
+    env["EMAIL_PORT"] = overrides.pop("EMAIL_PORT", "587")
+    env["EMAIL_HOST_USER"] = overrides.pop("EMAIL_HOST_USER", "")
+    env["EMAIL_HOST_PASSWORD"] = overrides.pop("EMAIL_HOST_PASSWORD", "")
+    env["EMAIL_TIMEOUT"] = overrides.pop("EMAIL_TIMEOUT", "10")
+    env["EMAIL_BACKEND"] = overrides.pop(
+        "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+    )
+    env["DEFAULT_FROM_EMAIL"] = overrides.pop(
+        "DEFAULT_FROM_EMAIL", "noreply@example.com"
+    )
+    env["SUPPORT_NOTIFICATION_RECIPIENTS"] = overrides.pop(
+        "SUPPORT_NOTIFICATION_RECIPIENTS", "support@example.com"
+    )
     env.update(overrides)
     return env
 
@@ -153,3 +169,31 @@ def test_sentry_sdk_in_pyproject_dependencies() -> None:
     sentry_deps = [d for d in deps if d.startswith("sentry-sdk")]
     assert len(sentry_deps) == 1, f"Expected exactly one sentry-sdk dep, got {sentry_deps}"
     assert "sentry-sdk" in sentry_deps[0]
+
+
+def test_prod_settings_email_accessible() -> None:
+    """prod settings import successfully and expose EMAIL_* settings."""
+    env = _prod_env_overrides()
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import django; django.setup(); "
+                "from django.conf import settings; "
+                "print(f'email_host={settings.EMAIL_HOST}'); "
+                "print(f'email_port={settings.EMAIL_PORT}'); "
+                "print(f'email_backend={settings.EMAIL_BACKEND}'); "
+                "print(f'default_from_email={settings.DEFAULT_FROM_EMAIL}')"
+            ),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "email_host=smtp.example.com" in result.stdout
+    assert "email_port=587" in result.stdout
+    assert "email_backend=django.core.mail.backends.smtp.EmailBackend" in result.stdout
+    assert "default_from_email=noreply@example.com" in result.stdout
