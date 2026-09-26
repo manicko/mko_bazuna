@@ -212,7 +212,9 @@ class TestMessageBody:
         await send_support_notification_telegram(ticket, bot, [contact])
 
         assert send_mock.await_count == 1
-        body = send_mock.await_args.kwargs["text"]
+        call = send_mock.await_args
+        assert call is not None
+        body = call.kwargs["text"]
         assert "SUP-202609-003" in body
         assert "900000042" in body
         assert "buyer_42" in body

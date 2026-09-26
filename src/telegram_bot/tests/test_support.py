@@ -19,7 +19,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
+from aiogram.fsm.storage.base import StorageKey
+from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
 
@@ -201,11 +202,15 @@ class TestSupportMessage:
 
         # Delivered via both email and Telegram with the created ticket.
         mock_email.assert_awaited_once()
-        delivered_ticket = mock_email.await_args.args[0]
+        email_call = mock_email.await_args
+        assert email_call is not None
+        delivered_ticket = email_call.args[0]
         assert delivered_ticket.id == ticket.id
-        assert mock_email.await_args.args[1] == "mybot"
+        assert email_call.args[1] == "mybot"
         mock_telegram.assert_awaited_once()
-        assert mock_telegram.await_args.args[0].id == ticket.id
+        telegram_call = mock_telegram.await_args
+        assert telegram_call is not None
+        assert telegram_call.args[0].id == ticket.id
 
         # Confirmation reply carries the ticket_ref.
         message.answer.assert_awaited_once()

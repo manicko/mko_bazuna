@@ -97,7 +97,7 @@ class TestSupportContactConstraints:
     ) -> None:
         """Invalid channel/value combinations raise IntegrityError."""
         with pytest.raises(IntegrityError):
-            with transaction.atomic():
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                 SupportContact.objects.create(
                     channel_type=channel_type,
                     label="Invalid",
