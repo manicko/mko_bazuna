@@ -30,6 +30,7 @@ from django.utils import translation
 from telegram_bot.handlers.contact import (
     _CONTACT_US_GREETING,
     ANONYMOUS_BUYER_LABEL,
+    CONTACT_US_CALLBACK,
     CONTACT_US_PATTERN,
     CONTACT_US_RATE_LIMITED_MESSAGE,
     handle_contact_us_callback,
@@ -186,12 +187,14 @@ class TestContactUsCallback:
 
 
 class TestLoginStartGreetingButton:
-    """The no-arg ``/start`` welcome greeting now carries a Contact us button."""
+    """The no-arg ``/start`` welcome greeting carries Language / Contact us /
+    Contact support buttons."""
 
     @pytest.mark.asyncio
-    async def test_welcome_greeting_has_contact_us_button(self) -> None:
-        """``/start`` with no args yields the site-name greeting + Contact us button."""
+    async def test_welcome_greeting_has_three_buttons(self) -> None:
+        """``/start`` with no args yields the site-name greeting + 3 buttons."""
         from telegram_bot.handlers.login import handle_login_deep_link
+        from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         message = MagicMock()
         message.text = "/start"
@@ -210,9 +213,17 @@ class TestLoginStartGreetingButton:
         sent_text = message.answer.await_args.args[0]
         assert "Welcome to MyBotSite!" in sent_text
         reply_markup = message.answer.await_args.kwargs["reply_markup"]
-        button = reply_markup.inline_keyboard[0][0]
-        assert button.callback_data == "contact_us"
-        assert button.text == "Contact us"
+        keyboard = reply_markup.inline_keyboard
+
+        # Row 0: Language button (opens the selector).
+        assert keyboard[0][0].callback_data == BotCallbackPrefix.LANG_OPEN
+        assert keyboard[0][0].text == "🌐 Language"
+        # Row 1: Contact us button.
+        assert keyboard[1][0].callback_data == CONTACT_US_CALLBACK
+        assert keyboard[1][0].text == "Contact us"
+        # Row 2: Contact support button.
+        assert keyboard[2][0].callback_data == BotCallbackPrefix.SUPPORT_START
+        assert keyboard[2][0].text == "Contact support"
 
 
 # ---------------------------------------------------------------------------

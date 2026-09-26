@@ -28,6 +28,7 @@ from apps.core.utils.cache import (
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
 from telegram_bot.handlers.contact import CONTACT_US_CALLBACK
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.services.rate_limit import check_login_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -64,9 +65,22 @@ async def handle_login_deep_link(
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
-                InlineKeyboardButton(
-                    text=_("Contact us"), callback_data=CONTACT_US_CALLBACK
-                ),
+                        InlineKeyboardButton(
+                            text=_("🌐 Language"),
+                            callback_data=BotCallbackPrefix.LANG_OPEN,
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=_("Contact us"),
+                            callback_data=CONTACT_US_CALLBACK,
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=_("Contact support"),
+                            callback_data=BotCallbackPrefix.SUPPORT_START,
+                        ),
                     ],
                 ],
             ),

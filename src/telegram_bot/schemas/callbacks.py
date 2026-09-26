@@ -37,6 +37,10 @@ class BotCallbackPrefix(StrEnum):
     # Language selection — /language keyboard.
     LANG = "lang:"
 
+    # Opens the language-selection keyboard (no language suffix). Distinct
+    # sentinel so it is never captured by the ``LANG:`` selection handler.
+    LANG_OPEN = "lang_open"
+
     # Support / contact message intake — /start support flow (EC-2).
     SUPPORT_START = "support_start"
 

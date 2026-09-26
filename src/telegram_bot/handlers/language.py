@@ -86,6 +86,20 @@ async def handle_language_callback(
     await callback.answer(_("Language set to %(lang)s") % {"lang": locale.value})
 
 
+@router.callback_query(F.data == BotCallbackPrefix.LANG_OPEN)
+async def handle_language_open(callback: types.CallbackQuery) -> None:
+    """Render the language-selection keyboard from the ``/start`` greeting.
+
+    Triggered by the "🌐 Language" inline button. Reuses ``build_language_keyboard``
+    so the selector is identical to the one shown by ``cmd_language``.
+    """
+    await callback.answer()  # dismiss spinner
+    if callback.message is not None:
+        await callback.message.edit_reply_markup(
+            reply_markup=build_language_keyboard()
+        )
+
+
 def build_language_keyboard(current: str = "") -> InlineKeyboardMarkup:
     """Build an inline keyboard with one button per supported language.
 

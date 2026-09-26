@@ -145,3 +145,47 @@ class TestHandleLanguageCallback:
         # The choice must land in the temp store, not a login prompt.
         cached = get_cached_anon_language(123)
         assert cached == LanguageLocale.ENGLISH.value
+
+
+class TestHandleLanguageOpen:
+    """Tests for the "🌐 Language" button handler (opens the selector)."""
+
+    @pytest.mark.asyncio
+    async def test_lang_open_renders_language_keyboard(self) -> None:
+        """Tapping the Language button renders the language-selection keyboard."""
+        from telegram_bot.handlers.language import (
+            build_language_keyboard,
+            handle_language_open,
+        )
+        from telegram_bot.schemas.callbacks import BotCallbackPrefix
+
+        callback = MagicMock()
+        callback.data = BotCallbackPrefix.LANG_OPEN
+        callback.answer = AsyncMock()
+
+        msg = MagicMock()
+        msg.edit_reply_markup = AsyncMock()
+        callback.message = msg
+
+        await handle_language_open(callback)
+
+        callback.answer.assert_awaited_once()  # spinner dismissed
+        msg.edit_reply_markup.assert_awaited_once()
+
+        sent_markup = msg.edit_reply_markup.await_args.kwargs["reply_markup"]
+        expected = build_language_keyboard()
+        assert sent_markup.inline_keyboard == expected.inline_keyboard
+
+    @pytest.mark.asyncio
+    async def test_lang_open_no_message_is_noop(self) -> None:
+        """A callback with no originating message only dismisses the spinner."""
+        from telegram_bot.handlers.language import handle_language_open
+
+        callback = MagicMock()
+        callback.message = None
+        callback.answer = AsyncMock()
+
+        await handle_language_open(callback)
+
+        callback.answer.assert_awaited_once()
+        # No edit attempted when there is no message to edit.
