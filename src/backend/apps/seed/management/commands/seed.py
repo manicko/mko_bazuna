@@ -16,6 +16,7 @@ import logging
 
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.core.enums import SEEDABLE_AD_STATUSES
 from apps.seed.services.seed_service import SeedService
 
 logger = logging.getLogger(__name__)
@@ -80,13 +81,7 @@ class Command(BaseCommand):
                         f"got {type(parsed).__name__}"
                     )
                 # Validate keys are valid status names
-                valid_keys = {
-                    "published",
-                    "archived",
-                    "draft",
-                    "on_moderation",
-                    "rejected",
-                }
+                valid_keys = {s.value for s in SEEDABLE_AD_STATUSES}
                 for key in parsed:
                     if key not in valid_keys:
                         raise CommandError(

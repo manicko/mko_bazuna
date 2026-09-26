@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import Client, override_settings
 from django.utils import timezone
 
@@ -582,6 +583,30 @@ class TestSeedCommand:
         # Step 4: Assert clean state — no duplicates, correct counts
         assert User.objects.filter(source=AdSource.SEED).count() == 3
         assert Ad.objects.filter(source=AdSource.SEED).count() == 5
+
+    @pytest.mark.parametrize(
+        "distribution",
+        [
+            '{"on_moderation_failed": 1.0}',
+            '{"deleted": 1.0}',
+            '{"bogus": 1.0}',
+        ],
+    )
+    def test_seed_rejects_invalid_status_keys(self, distribution: str) -> None:
+        """Non-seedable status keys are rejected with the expected error."""
+        with pytest.raises(CommandError) as exc_info:
+            call_command(
+                "seed",
+                "--users=0",
+                "--ads=0",
+                "--force",
+                "--analytics=False",
+                "--status-distribution",
+                distribution,
+            )
+        message = str(exc_info.value)
+        assert "Invalid status key" in message
+        assert "Valid keys:" in message
 
 
 # ─── Enum tests ──────────────────────────────────────────────────────────

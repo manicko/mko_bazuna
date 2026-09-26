@@ -12,7 +12,7 @@ from typing import Any
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
-from apps.core.enums import AdSource, AdStatus, LanguageLocale
+from apps.core.enums import SEEDABLE_AD_STATUSES, AdSource, AdStatus, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.lookups.models import LookupItem
@@ -513,11 +513,7 @@ class AdGenerator(BaseGenerator):
     ) -> tuple[list[AdStatus], list[float]]:
         """Convert string status weights to AdStatus enum and normalize."""
         status_map: dict[str, AdStatus] = {
-            "published": AdStatus.PUBLISHED,
-            "archived": AdStatus.ARCHIVED,
-            "draft": AdStatus.DRAFT,
-            "on_moderation": AdStatus.ON_MODERATION,
-            "rejected": AdStatus.REJECTED,
+            s.value: s for s in SEEDABLE_AD_STATUSES
         }
         statuses: list[AdStatus] = []
         weights: list[float] = []

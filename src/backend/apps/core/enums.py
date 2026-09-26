@@ -55,6 +55,11 @@ class AdStatus(StrEnum):
     DELETED = "deleted"
 
 
+SEEDABLE_AD_STATUSES: frozenset[AdStatus] = frozenset(
+    s for s in AdStatus if s not in {AdStatus.ON_MODERATION_FAILED, AdStatus.DELETED}
+)
+
+
 class AdSource(StrEnum):
     """Origin of an ad. Phase 1 accepts ads only via Telegram bot."""
 
@@ -309,6 +314,7 @@ __all__ = [
     "AdSort",
     "AdvisoryLockId",
     "AdStatus",
+    "SEEDABLE_AD_STATUSES",
     "AdSource",
     "AnalyticsEventType",
     "TrustLevel",
