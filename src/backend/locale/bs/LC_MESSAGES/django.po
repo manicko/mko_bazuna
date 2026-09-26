@@ -1464,6 +1464,65 @@ msgstr "Prijava uspešna! Preusmeravanje..."
 msgid "Error checking login status."
 msgstr "Greška pri proveri statusa prijave."
 
+msgid "🌐 Language"
+msgstr "🌐 Jezik"
+
+msgid "Contact support"
+msgstr "Kontaktiraj podršku"
+
+msgid "Write your question — we will reply as soon as possible."
+msgstr "Napišite vaše pitanje — odgovorićemo u najkraćem roku."
+
+msgid "Your message is too long. Please write no more than 4000 characters."
+msgstr "Vaša poruka je predugačka. Molimo napišite najviše 4000 karaktera."
+
+msgid "Please send your question as a text message."
+msgstr "Molimo pošaljite vaše pitanje kao tekstualnu poruku."
+
+#, python-format
+msgid "Your request has been received. Reference: %(ref)s"
+msgstr "Vaš zahtjev je primljen. Referenca: %(ref)s"
+
+msgid "Start"
+msgstr "Start"
+
+msgid "Language"
+msgstr "Jezik"
+
+msgid "Post ad"
+msgstr "Objavi oglas"
+
+msgid "Alerts"
+msgstr "Obavještenja"
+
+#, python-format
+msgid "[%(ref)s] New support request"
+msgstr "[%(ref)s] Novi zahtjev za podršku"
+
+#, python-format
+msgid ""
+"Support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""
+"Zahtjev za podršku %(ref)s\n"
+"Od: telegram_id=%(tid)s korisničko_ime=%(username)s\n"
+"\n"
+"%(text)s"
+
+#, python-format
+msgid ""
+"New support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""
+"Novi zahtjev za podršku %(ref)s\n"
+"Od: telegram_id=%(tid)s korisničko_ime=%(username)s\n"
+"\n"
+"%(text)s"
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

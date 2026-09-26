@@ -1347,3 +1347,54 @@ msgstr ""
 
 msgid "Error checking login status."
 msgstr ""
+
+msgid "🌐 Language"
+msgstr ""
+
+msgid "Contact support"
+msgstr ""
+
+msgid "Write your question — we will reply as soon as possible."
+msgstr ""
+
+msgid "Your message is too long. Please write no more than 4000 characters."
+msgstr ""
+
+msgid "Please send your question as a text message."
+msgstr ""
+
+#, python-format
+msgid "Your request has been received. Reference: %(ref)s"
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Post ad"
+msgstr ""
+
+msgid "Alerts"
+msgstr ""
+
+#, python-format
+msgid "[%(ref)s] New support request"
+msgstr ""
+
+#, python-format
+msgid ""
+"Support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"New support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""

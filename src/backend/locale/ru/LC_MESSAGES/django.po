@@ -1482,6 +1482,65 @@ msgstr "Вход выполнен успешно! Перенаправление
 msgid "Error checking login status."
 msgstr "Ошибка проверки статуса входа."
 
+msgid "🌐 Language"
+msgstr "🌐 Язык"
+
+msgid "Contact support"
+msgstr "Связаться с поддержкой"
+
+msgid "Write your question — we will reply as soon as possible."
+msgstr "Напишите ваш вопрос — мы ответим как можно скорее."
+
+msgid "Your message is too long. Please write no more than 4000 characters."
+msgstr "Ваше сообщение слишком длинное. Пожалуйста, напишите не более 4000 символов."
+
+msgid "Please send your question as a text message."
+msgstr "Пожалуйста, отправьте ваш вопрос текстовым сообщением."
+
+#, python-format
+msgid "Your request has been received. Reference: %(ref)s"
+msgstr "Ваш запрос получен. Номер обращения: %(ref)s"
+
+msgid "Start"
+msgstr "Старт"
+
+msgid "Language"
+msgstr "Язык"
+
+msgid "Post ad"
+msgstr "Разместить объявление"
+
+msgid "Alerts"
+msgstr "Уведомления"
+
+#, python-format
+msgid "[%(ref)s] New support request"
+msgstr "[%(ref)s] Новый запрос в поддержку"
+
+#, python-format
+msgid ""
+"Support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""
+"Заявка в поддержку %(ref)s\n"
+"От: telegram_id=%(tid)s имя_пользователя=%(username)s\n"
+"\n"
+"%(text)s"
+
+#, python-format
+msgid ""
+"New support ticket %(ref)s\n"
+"From: telegram_id=%(tid)s username=%(username)s\n"
+"\n"
+"%(text)s"
+msgstr ""
+"Новая заявка в поддержку %(ref)s\n"
+"От: telegram_id=%(tid)s имя_пользователя=%(username)s\n"
+"\n"
+"%(text)s"
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"
