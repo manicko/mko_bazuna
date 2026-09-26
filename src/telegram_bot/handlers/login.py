@@ -21,6 +21,10 @@ from django.utils.translation import gettext as _
 from apps.core.enums import AnalyticsEventType
 from apps.core.services.analytics import record_event
 from apps.core.services.site_config import get_site_name_async
+from apps.core.utils.cache import (
+    get_cached_anon_language,
+    invalidate_anon_language_cache,
+)
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
 from telegram_bot.handlers.contact import CONTACT_US_CALLBACK
@@ -227,6 +231,18 @@ async def handle_login_orm(
                         user_id=user.id,
                     )
                     logger.info("Registration event recorded for user %s", user.id)
+
+            # Reconcile the anonymous language choice onto a freshly-created
+            # user (DB value wins; a fresh row has no persisted preference yet),
+            # then always drop the temp cache so a later login cannot re-apply
+            # a stale choice.
+            if created:
+                temp_lang = get_cached_anon_language(telegram_id)
+                if temp_lang:
+                    user.telegram_language = temp_lang
+                    user.save(update_fields=["telegram_language"])
+            invalidate_anon_language_cache(telegram_id)
+
             return login_token, user, created
 
     return await _handle()

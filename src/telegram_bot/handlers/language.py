@@ -17,6 +17,10 @@ from asgiref.sync import sync_to_async
 from django.utils.translation import gettext as _
 
 from apps.core.enums import LanguageLocale
+from apps.core.utils.cache import (
+    get_cached_anon_language,
+    set_cached_anon_language,
+)
 from apps.users.models import User
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
@@ -27,17 +31,24 @@ router = Router()
 
 @router.message(Command("language"))
 async def cmd_language(message: types.Message, state: FSMContext) -> None:
-    """Show an inline keyboard to pick the preferred language."""
+    """Show an inline keyboard to pick the preferred language.
+
+    Registered users see their persisted choice; anonymous users are served
+    the same keyboard and see the temp-store choice (or the default).
+    """
     if not message.from_user:
         return
 
     data = await state.get_data()
     user_id = data.get("user_id")
-    if not user_id:
-        await message.answer(_("Please login first with /start login_<token>"))
-        return
+    if user_id:
+        current_lang = await _get_user_language(user_id)
+    else:
+        current_lang = (
+            get_cached_anon_language(message.from_user.id)
+            or LanguageLocale.RUSSIAN.value
+        )
 
-    current_lang = await _get_user_language(user_id)
     keyboard = build_language_keyboard(current_lang)
     await message.answer(
         _("Select your preferred language:"),
@@ -62,11 +73,12 @@ async def handle_language_callback(
 
     data = await state.get_data()
     user_id = data.get("user_id")
-    if not user_id:
-        await callback.answer(_("Please login first."), show_alert=True)
-        return
-
-    await _set_user_language(user_id, locale.value)
+    if user_id:
+        await _set_user_language(user_id, locale.value)
+    else:
+        # Anonymous user: stash the choice in the temp store so it can be
+        # reconciled onto the User row when they log in.
+        set_cached_anon_language(callback.from_user.id, locale.value)
 
     keyboard = build_language_keyboard(locale.value)
     if callback.message is not None:

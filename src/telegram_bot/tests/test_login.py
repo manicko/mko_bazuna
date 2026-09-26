@@ -423,6 +423,93 @@ class TestConcurrentClaim:
 
 
 # ---------------------------------------------------------------------------
+# Anonymous language reconcile (EC-5)
+# ---------------------------------------------------------------------------
+
+
+class TestAnonLanguageReconcile:
+    """`handle_login_orm` backfills the anon language onto a fresh user."""
+
+    @pytest.mark.asyncio
+    async def test_backfills_anon_language_on_created_and_invalidates_cache(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """A fresh user gets the cached anon language backfilled; cache is cleared."""
+        from apps.core.utils.cache import (
+            get_cached_anon_language,
+            set_cached_anon_language,
+        )
+        from apps.users.models import User
+        from telegram_bot.handlers.login import handle_login_orm
+
+        telegram_id = 900000710
+        set_cached_anon_language(telegram_id, "ru")
+
+        _raw_token, token = await login_token_factory()
+        login_token, user, created = await handle_login_orm(
+            token_hash=token.token_hash,
+            telegram_id=telegram_id,
+            username="anon_user",
+            first_name="Anon",
+            last_name="User",
+        )
+
+        assert login_token is not None
+        assert user is not None
+        assert created is True
+        # Backfilled from the temp store.
+        refreshed = await sync_to_async(
+            User.objects.values_list("telegram_language", flat=True).get
+        )(id=user.id)
+        assert refreshed == "ru"
+        # Temp cache invalidated after reconcile.
+        assert get_cached_anon_language(telegram_id) is None
+
+    @pytest.mark.asyncio
+    async def test_invalidates_cache_and_keeps_db_value_on_existing_user(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """Existing user: DB language wins and the temp cache is still cleared."""
+        from apps.core.utils.cache import (
+            get_cached_anon_language,
+            set_cached_anon_language,
+        )
+        from apps.users.models import User
+        from telegram_bot.handlers.login import handle_login_orm
+
+        telegram_id = 900000720
+        existing = await sync_to_async(User.objects.create)(
+            telegram_id=telegram_id,
+            chat_id=telegram_id,
+            username="existing_user",
+            telegram_language="bs",
+        )
+        # Stale anon choice that must NOT overwrite the DB value.
+        set_cached_anon_language(telegram_id, "en")
+
+        _raw_token, token = await login_token_factory()
+        login_token, user, created = await handle_login_orm(
+            token_hash=token.token_hash,
+            telegram_id=telegram_id,
+            username="existing_user",
+            first_name="Existing",
+            last_name="User",
+        )
+
+        assert login_token is not None
+        assert user is not None
+        assert user.id == existing.id
+        assert created is False
+        refreshed = await sync_to_async(
+            User.objects.values_list("telegram_language", flat=True).get
+        )(id=user.id)
+        assert refreshed == "bs"  # DB value wins
+        assert get_cached_anon_language(telegram_id) is None
+
+
+# ---------------------------------------------------------------------------
 # Login rate-limit integration tests (EXT-007)
 # ---------------------------------------------------------------------------
 
