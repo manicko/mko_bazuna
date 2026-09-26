@@ -314,7 +314,6 @@ class SeedService:
     def _log_progress(self, name: str, count: int, elapsed: float) -> None:
         """Log progress for a generation step."""
         logger.info("[seed] %s: %d rows in %.2fs", name, count, elapsed)
-        logger.info("  %s: %d rows in %.2fs", name, count, elapsed)
 
     def _backfill_image_hashes(self, ad_images: list[AdImage]) -> int:
         """Compute SHA-256 for seed AdImage records bypassed by bulk_create.
