@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 from django.http import Http404, JsonResponse
 
+from apps.core.enums import UserRole
 from apps.moderation.views.decorators import staff_required, staff_required_api
 
 pytestmark = [pytest.mark.unit]
@@ -32,13 +33,24 @@ def _make_request(
     is_superuser: bool = False,
     is_authenticated: bool = True,
 ) -> MagicMock:
-    """Build a request mock with the desired user auth attributes."""
+    """Build a request mock with the desired user auth attributes.
+
+    ``role`` mirrors the ``User.role`` property resolution so the decorators'
+    role-based check (``UserRole.ADMIN``) behaves identically to the former
+    ``is_staff or is_superuser`` check.
+    """
     request = MagicMock()
     request.method = method
     user = MagicMock()
     user.is_staff = is_staff
     user.is_superuser = is_superuser
     user.is_authenticated = is_authenticated
+    if is_staff or is_superuser:
+        user.role = UserRole.ADMIN
+    elif is_authenticated:
+        user.role = UserRole.SELLER
+    else:
+        user.role = UserRole.ANONYMOUS
     request.user = user
     return request
 

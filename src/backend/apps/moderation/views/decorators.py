@@ -11,6 +11,8 @@ from functools import wraps
 
 from django.http import Http404, HttpRequest, JsonResponse
 
+from apps.core.enums import UserRole
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +26,7 @@ def staff_required(
 
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> object:
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not request.user.is_authenticated or request.user.role != UserRole.ADMIN:
             raise Http404("Not found")
         return view_func(request, *args, **kwargs)
 
@@ -48,7 +50,7 @@ def staff_required_api(
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if not (request.user.is_staff or request.user.is_superuser):
+        if request.user.role != UserRole.ADMIN:
             return JsonResponse({"error": "Staff access required"}, status=403)
         if request.method != "POST":
             return JsonResponse({"error": "POST required"}, status=405)

@@ -22,7 +22,7 @@ from django.test import Client
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, UserRole
 from apps.locations.models import City
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
@@ -109,6 +109,30 @@ class TestModerationStaffAccess:
         ad_on_moderation: Ad,
     ) -> None:
         """Non-staff users get 404 for moderation review."""
+        client = Client()
+        client.force_login(regular_user)
+        response = client.get(f"/moderation/review/{ad_on_moderation.id}/")
+        assert response.status_code == 404
+
+    def test_staff_required_accepts_staff_user(
+        self,
+        staff_user: User,
+        ad_on_moderation: Ad,
+    ) -> None:
+        """@staff_required accepts an is_staff=True user (UserRole.ADMIN)."""
+        assert staff_user.role == UserRole.ADMIN
+        client = Client()
+        client.force_login(staff_user)
+        response = client.get(f"/moderation/review/{ad_on_moderation.id}/")
+        assert response.status_code == 200
+
+    def test_staff_required_rejects_non_staff_user(
+        self,
+        regular_user: User,
+        ad_on_moderation: Ad,
+    ) -> None:
+        """@staff_required rejects an authenticated is_staff=False user (UserRole.SELLER)."""
+        assert regular_user.role == UserRole.SELLER
         client = Client()
         client.force_login(regular_user)
         response = client.get(f"/moderation/review/{ad_on_moderation.id}/")
