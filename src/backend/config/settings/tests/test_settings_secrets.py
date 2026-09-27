@@ -114,8 +114,16 @@ def test_bot_token_allowed_empty_in_debug() -> None:
 
 
 def test_bot_token_required_in_production() -> None:
-    """BOT_TOKEN empty with DEBUG=False (production) raises ImproperlyConfigured."""
+    """BOT_TOKEN empty with DEBUG=False (production) raises ImproperlyConfigured.
+
+    BOT_TOKEN is set present-but-empty (rather than deleted) because the local
+    Docker test gate bind-mounts .env.test (which sets BOT_TOKEN) and base.py's
+    read_env() restores it when config.settings.prod is imported. Present-but-empty
+    prevents read_env from restoring the value, pinning the guard to BOT_TOKEN.
+    """
     env = {k: v for k, v in os.environ.items() if k != "BOT_TOKEN"}
+    env["BOT_TOKEN"] = ""
+    env["GOOGLE_TRANSLATE_API_KEY"] = "test-translate-key-for-testing-only"
     env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
     env["PYTHONPATH"] = os.pathsep.join(sys.path)
@@ -127,6 +135,8 @@ def test_bot_token_required_in_production() -> None:
     )
     assert result.returncode != 0, result.stderr
     assert "ImproperlyConfigured" in result.stderr
+    assert "BOT_TOKEN" in result.stderr
+    assert "GOOGLE_TRANSLATE_API_KEY" not in result.stderr
 
 
 def test_google_translate_api_key_required_in_production() -> None:
