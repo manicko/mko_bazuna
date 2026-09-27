@@ -126,13 +126,17 @@ def seller() -> User:
 
     Uses telegram_id 900 000 100 to match the bot test-suite convention.
     Note: the ``user`` fixture above also uses this ID — no single test
-    requests both.
+    requests both. Uses ``get_or_create`` (like ``user`` above) so it is
+    idempotent and survives ``--reuse-db``.
     """
-    return User.objects.create(
+    user, _ = User.objects.get_or_create(
         telegram_id=900000100,
-        chat_id=900000100,
-        password="x",
+        defaults={
+            "chat_id": 900000100,
+            "password": "x",
+        },
     )
+    return user
 
 
 @pytest.fixture

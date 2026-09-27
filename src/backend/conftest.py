@@ -172,49 +172,70 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
 
 @pytest.fixture
 def seller() -> User:
-    """Create a generic seller user."""
-    return User.objects.create(
+    """Create a generic seller user.
+
+    Uses ``get_or_create`` keyed on the fixed ``telegram_id`` so the fixture
+    is idempotent and survives ``--reuse-db`` (stale rows left by an
+    interrupted run do not cause IntegrityError).
+    """
+    user, _ = User.objects.get_or_create(
         telegram_id=900000001,
-        chat_id=900000001,
-        password="x",
+        defaults={
+            "chat_id": 900000001,
+            "password": "x",
+        },
     )
+    return user
 
 
 @pytest.fixture
 def user() -> User:
     """Create a generic user (alias of seller for modules that use 'user')."""
-    return User.objects.create(
+    user, _ = User.objects.get_or_create(
         telegram_id=900000002,
-        chat_id=900000002,
-        password="x",
+        defaults={
+            "chat_id": 900000002,
+            "password": "x",
+        },
     )
+    return user
 
 
 @pytest.fixture
 def buyer() -> User:
     """Create a generic buyer user (password 'y', next ID after user)."""
-    return User.objects.create(
+    user, _ = User.objects.get_or_create(
         telegram_id=900000003,
-        chat_id=900000003,
-        password="y",
+        defaults={
+            "chat_id": 900000003,
+            "password": "y",
+        },
     )
+    return user
 
 
 @pytest.fixture
 def category() -> Category:
     """Create a generic root category."""
-    return Category.objects.create(name="Транспорт", slug="transport")
+    category, _ = Category.objects.get_or_create(
+        slug="transport",
+        defaults={"name": "Транспорт"},
+    )
+    return category
 
 
 @pytest.fixture
 def city() -> City:
     """Create a generic city."""
-    return City.objects.create(
-        country_code="ME",
-        name="Тестград",
-        region="Central",
+    city, _ = City.objects.get_or_create(
         slug="test-grad",
+        defaults={
+            "country_code": "ME",
+            "name": "Тестград",
+            "region": "Central",
+        },
     )
+    return city
 
 
 # ---------------------------------------------------------------------------
