@@ -12,12 +12,16 @@ If stop or break prefer resume old session not launching new agent.
 
 ## Quick start
 
+**This environment is Windows 11** — `make` requires WSL or a GNU Make install.
+Use `.\Makefile.ps1` in PowerShell 7+:
+
 | Task | Command |
 |---|---|
-| Dev up (web :8000 + test DB :5433) | `make up` |
-| Fast test gate (skips nightly `seed` tests) | `make test` |
-| Full suite (incl. nightly `seed`) | `make test-all` |
-| Fresh test schema (after migration changes) | `make test-recreate` |
+| Dev up (web :8000 + test DB :5433) | `.\Makefile.ps1 up` |
+| Fast test gate (skips nightly `seed` tests) | `.\Makefile.ps1 test` |
+| Full suite (incl. nightly `seed`) | `.\Makefile.ps1 test-all` |
+| Fresh test schema (after migration changes) | `.\Makefile.ps1 test-recreate` |
+| Stop test environment | `.\Makefile.ps1 test-down` |
 
 ## Python (local, PowerShell)
 
@@ -29,7 +33,7 @@ If stop or break prefer resume old session not launching new agent.
 | Typecheck | `uv run basedpyright <path>` |
 | Add dep | `uv add <pkg>` / `uv add --dev <pkg>` |
 
-> `ruff check --fix` handles import sorting (I001). `ruff format` only reformats (line wraps, quotes) and does **NOT** sort imports — `make format` runs `ruff check --fix src/`, not `ruff format`.
+> `ruff check --fix` handles import sorting (I001). `ruff format` only reformats (line wraps, quotes) and does **NOT** sort imports — `.\Makefile.ps1 format` runs `ruff check --fix src/`, not `ruff format`.
 
 ## Tests (Docker only — never `uv run pytest` locally)
 
@@ -40,13 +44,14 @@ Local `uv run pytest` fails: there is no DB on `localhost:5432`. Runs go through
 $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
 ```
 `--env-file .env.test` is **required** — compose interpolates `${POSTGRES_*?}` from it; omitting it aborts with "must be set".
+**Prefer `.\Makefile.ps1 <target>`** for canonical commands (it manages `--project-name` and `--env-file` for you). Raw `$dc` invocations are for one-off overrides only — ensure `$TestProject = "mko-bazuna-test"` is used (not `mko-bazuna-dev`).
 
 | Task | Command | When |
 |---|---|---|
 | Start DB | `$dc up -d db` | Once per session (persistent volume → `--reuse-db` caching) |
 | Fast gate | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Default dev iteration (skips `seed`) |
 | Full suite | `$dc run --rm test` | Changes touch seeding/images |
-| Fresh schema | `$dc run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test` | After migration changes or interrupted run |
+| Fresh schema | `$dc run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test` | After migration changes or interrupted run |
 | Stop | `$dc down` | Done (preserves named volume) |
 
 **Run a single test / file** — pass pytest args via `PYTEST_OPTS`:
@@ -54,7 +59,7 @@ $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f doc
 $dc run --rm -e PYTEST_OPTS="-k test_name" test
 $dc run --rm -e PYTEST_OPTS="src/backend/apps/ads/tests/test_edit.py src/backend/apps/ads/tests/test_submission.py --tb=short" test
 ```
-Two caveats (verified): the value is **unquoted** in `docker/entrypoint-test.sh`, so each token is word-split on spaces — `-k test_name` and bare file paths work, but quoted multi-token values (e.g. `-k "a b"`) do **not**. Setting `PYTEST_OPTS` also **replaces** the defaults (`--reuse-db -n auto --maxprocesses=4 --dist loadgroup`), so targeted runs lose xdist parallelism and DB reuse. Never use `--override-ini=addopts=` — it strips `--import-mode=importlib` (set in `pyproject.toml`).
+Two caveats (verified): the value is **unquoted** in `docker/entrypoint-test.sh`, so each token is word-split on spaces — `-k test_name` and bare file paths work, but quoted multi-token values (e.g. `-k "a b"`) do **not**. Setting `PYTEST_OPTS` also **replaces** the defaults (`--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`), so targeted runs lose xdist parallelism and DB reuse. Never use `--override-ini=addopts=` — it strips `--import-mode=importlib` (set in `pyproject.toml`).
 
 **Entry-point flow** (`docker/entrypoint.sh` = image `ENTRYPOINT`; `docker/entrypoint-test.sh` = `test` service `command`):
 1. `entrypoint.sh` — wait for DB/Redis, `compilemessages` (.po→.mo), `check --deploy` (non-fatal).
@@ -66,7 +71,7 @@ Two caveats (verified): the value is **unquoted** in `docker/entrypoint-test.sh`
 
 Wrap user-visible strings in `{% trans %}` / `{% blocktrans %}` (templates) or `gettext` / `gettext_lazy` (Python). `msgstr` must be non-empty for `ru` and `bs`; `en` may be empty (msgid is English). `.mo` files are gitignored (`*.mo`) and are compiled **automatically** at image build, at container start (`entrypoint.sh` → `compile_messages`), and in the CI `i18n` job — so manual `compilemessages` is rarely needed.
 
-**`make makemessages` does NOT work on Win 11 + Docker Desktop.** Verified causes:
+**`make makemessages` / `make compilemessages` do NOT work on Win 11 + Docker Desktop.** Verified causes:
 - The dev `web` service `depends_on` `load_catalog`, `redis`, and `seed` (i.e. the whole chain `db→redis→migrate→load_cities→load_catalog→seed→web`) is booted to serve a static string-extraction scan.
 - `uv run` inside a one-shot `run` container triggers a venv sync that fails with `Read-only file system` on `/opt/venv`.
 
@@ -87,4 +92,4 @@ Compile (`.mo` gitignored — only needed manually after editing `.po`):
 $dev run --rm --no-deps --entrypoint "" web python src/backend/manage.py compilemessages --ignore=.venv --ignore=.git --ignore=__pycache__ --ignore=*.pyc --ignore=node_modules --locale ru --locale bs --locale en
 ```
 
-Requires `.env.dev` (copy `.env.dev.example`). Verified in-image: `xgettext` (GNU gettext 0.23.1), `msgfmt`, and `makemessages`/`compilemessages --help` run with exit 0 and **no database**. DB-based i18n (`feature_tag.html` → `get_lookup_name`) is exempt from the completeness gate; after changing strings, `make test` (or `test_i18n_completeness.py`) must pass.
+Requires `.env.dev` (copy `.env.dev.example`). Verified in-image: `xgettext` (GNU gettext 0.23.1), `msgfmt`, and `makemessages`/`compilemessages --help` run with exit 0 and **no database**. DB-based i18n (`feature_tag.html` → `get_lookup_name`) is exempt from the completeness gate; after changing strings, `.\Makefile.ps1 test` (or `test_i18n_completeness.py`) must pass.
