@@ -16,6 +16,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
+from django.db import transaction
 from django.utils.translation import get_language, gettext as _
 
 from apps.search.models import SavedSearch
@@ -237,9 +238,12 @@ def _resolve_owned(token: str, chat_id: int | None, active: bool) -> SavedSearch
     if not chat_id:
         return None
     try:
-        saved_search = SavedSearch.objects.select_related("user").get(
-            unsubscribe_token=token
-        )
+        with transaction.atomic():
+            saved_search = (
+                SavedSearch.objects.select_for_update()
+                .select_related("user")
+                .get(unsubscribe_token=token)
+            )
     except SavedSearch.DoesNotExist:
         return None
 
