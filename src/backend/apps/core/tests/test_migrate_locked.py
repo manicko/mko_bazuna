@@ -12,6 +12,7 @@ these are fast unit tests with no database or subprocess involvement.
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import logging
 import subprocess
@@ -156,5 +157,15 @@ class TestDefaultSettings:
     def test_main_does_not_default_to_dev_settings(self) -> None:
         """The default is ``config.settings.prod``, never ``config.settings.dev``."""
         source = inspect.getsource(migrate_locked.main)
+        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
+
+    def test_manage_defaults_to_prod_settings(self) -> None:
+        """``manage.py``'s ``os.environ.setdefault`` targets ``config.settings.prod``."""
+        source = inspect.getsource(importlib.import_module("manage").main)
+        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")' in source
+
+    def test_manage_does_not_default_to_dev_settings(self) -> None:
+        """``manage.py``'s default is ``config.settings.prod``, never ``config.settings.dev``."""
+        source = inspect.getsource(importlib.import_module("manage").main)
         assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
 
