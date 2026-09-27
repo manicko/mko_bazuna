@@ -23,6 +23,8 @@ Use `.\Makefile.ps1` in PowerShell 7+:
 | Fresh test schema (after migration changes) | `.\Makefile.ps1 test-recreate` |
 | Stop test environment | `.\Makefile.ps1 test-down` |
 
+`head` and `tail` commands are not working in PowerShell 
+
 ## Python (local, PowerShell)
 
 | Task | Command |

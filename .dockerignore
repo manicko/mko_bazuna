@@ -47,6 +47,7 @@ src/backend/mko_bazuna
 # Git worktrees — exclude from build context so compilemessages (Dockerfile :78)
 # only compiles the current branch's locale files, not stale worktree .po files
 .kilo/
+.ai/
 
 # Documentation — not needed in runtime image
 docs/
