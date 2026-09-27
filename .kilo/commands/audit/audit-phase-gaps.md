@@ -9,6 +9,9 @@ alwaysApply: false
 
 # Workflow
 Do not argue on the workflow, just follow.
+Max allowed parallel subagents = 2
+Do not launch agents in background.
+If stop or break prefer resume old session not launching new agent.
 
 ## Step 1. Study Current Architecture and Existing Audit Phases
 

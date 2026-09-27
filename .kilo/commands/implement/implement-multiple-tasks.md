@@ -1,7 +1,6 @@
 ---
 name: implement-multiple-tasks
 description: Execute semantic development tasks safely and incrementally using implementor subagents with validation and completion control
-agent: implementor-orchestrator
 alwaysApply: false
 allowed-tools:
   - read_file

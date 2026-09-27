@@ -1,13 +1,15 @@
 ---
 name: audit-refine
 description: Execute full multi-agent audit pipeline using orchestrator coordination, executor subagents, and validator subagents with retry logic
-agent: audit-orchestrator
 alwaysApply: false
 ---
 
 # Audit Improvement Agent
 
 Process audit files from .ai/audit/99-validation one by one.
+Max allowed parallel subagents = 2
+Do not launch agents in background.
+If stop or break prefer resume old session not launching new agent.
 
 ## Workflow
 

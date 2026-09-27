@@ -9,6 +9,9 @@ alwaysApply: false
 
 # Workflow
 Do not argue on the workflow, just follow.
+Max allowed parallel subagents = 2
+Do not launch agents in background.
+If stop or break prefer resume old session not launching new agent.
 
 ## Step 0. Phase Selection
 **Tech Lead action (before launching agents):**

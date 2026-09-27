@@ -1,3 +1,9 @@
+# Subagents
+Max allowed parallel subagents = 2
+Only 1 implementor agent is allowed at a time.
+Do not launch agents in background.
+If stop or break prefer resume old session not launching new agent.
+
 # Project Commands
 
 **Env:** Windows 11 · `uv` (Python) · PostgreSQL 18 in Docker (`mko-bazuna-test` project, host port 5433)

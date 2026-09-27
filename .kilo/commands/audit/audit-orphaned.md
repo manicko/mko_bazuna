@@ -11,6 +11,9 @@ alwaysApply: false
 Identify files in the repository that are genuinely unused, orphaned, or accidental leftovers and can safely be considered for removal.
 
 Strictly distinguish them from files that are intentionally unreferenced but still required by the project.
+Max allowed parallel subagents = 2
+Do not launch agents in background.
+If stop or break prefer resume old session not launching new agent.
 
 ## Scope
 
