@@ -58,7 +58,13 @@ def _make_message_update(chat_id: int, text: str = "") -> Update:
 
 
 def _make_callback_update(chat_id: int, callback_data: str = "test_action") -> Update:
-    """Construct a real aiogram Update wrapping a CallbackQuery from a test user."""
+    """Construct a real aiogram Update wrapping a CallbackQuery from a test user.
+
+    Mirrors the production scenario: the callback_query.message is the bot-sent
+    message containing the inline keyboard, so its ``from_user`` is the bot's
+    identity (``is_bot=True``), while the acting user who pressed the button is
+    ``callback_query.from_user``.
+    """
     from aiogram.types import (
         CallbackQuery,
         Chat,
@@ -67,12 +73,15 @@ def _make_callback_update(chat_id: int, callback_data: str = "test_action") -> U
         User as TelegramUser,
     )
 
+    # The user who pressed the inline button — the acting identity.
     user = TelegramUser(id=chat_id, first_name="Test", is_bot=False)
+    # The bot-sent message carrying the inline keyboard.
+    bot = TelegramUser(id=777000, first_name="MkoBazunaBot", is_bot=True)
     msg = Message(
         message_id=1,
         date=timezone.now(),
         chat=Chat(id=chat_id, type="private"),
-        from_user=user,
+        from_user=bot,
     )
     return Update(
         update_id=next(_next_update_id),
@@ -548,7 +557,13 @@ class TestCallPipeline:
     async def test_call_handles_callback_query_update(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A normal registered user's callback_query Update reaches the handler."""
+        """A normal registered user's callback_query Update reaches the handler.
+
+        Regression test for task_autz_001: callback_query.message.from_user is the
+        bot's identity (is_bot=True), so the middleware must resolve the acting
+        user from callback_query.from_user. When that matches a real User row, the
+        event proceeds to the handler.
+        """
         chat_id = _BASE_CHAT_ID + 504
         await sync_to_async(make_user)(chat_id)
 
@@ -561,6 +576,75 @@ class TestCallPipeline:
 
         assert result == "proceed"
         handler.assert_awaited_once_with(update, {})
+
+    @pytest.mark.asyncio
+    async def test_call_blocks_banned_user_callback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A banned user's callback_query is blocked — handler NOT called.
+
+        task_autz_001: before the fix the middleware resolved identity from the
+        bot-sent message (message.from_user = bot), so no User row matched and the
+        state check fail-opened. After the fix the acting user is resolved from
+        callback_query.from_user and the banned state blocks the event.
+        """
+        chat_id = _BASE_CHAT_ID + 801
+        await sync_to_async(make_user)(chat_id, is_banned=True)
+
+        update = _make_callback_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "restrict" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_blocks_declined_user_callback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user's callback_query is blocked — handler NOT called."""
+        chat_id = _BASE_CHAT_ID + 802
+        await sync_to_async(make_user)(chat_id, is_declined=True)
+
+        update = _make_callback_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "browse" in mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_call_blocks_consent_revoked_user_callback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A consent-revoked user's callback_query is blocked — handler NOT called."""
+        chat_id = _BASE_CHAT_ID + 803
+        await sync_to_async(make_user)(chat_id, consent_revoked=True)
+
+        update = _make_callback_update(chat_id)
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert (
+            "erased" in mock_answer.call_args[0][0]
+            or "withdrawn" in mock_answer.call_args[0][0]
+        )
 
     @pytest.mark.asyncio
     async def test_call_normal_user_proceeds(

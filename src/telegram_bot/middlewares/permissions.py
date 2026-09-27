@@ -75,11 +75,20 @@ class AccountStateMiddleware(BaseMiddleware):
         if message is None:
             return await handler(event, data)
 
-        # Check if from_user exists
-        if message.from_user is None:
+        # Resolve the acting user identity. For callback_query updates the
+        # message is the bot-sent message carrying the inline keyboard, so
+        # message.from_user is the bot's identity — the acting user is
+        # callback_query.from_user. Fall back to message.from_user for plain
+        # Message updates.
+        if event.callback_query is not None:
+            from_user = event.callback_query.from_user
+        else:
+            from_user = message.from_user
+
+        if from_user is None:
             return await handler(event, data)
 
-        chat_id = message.from_user.id
+        chat_id = from_user.id
         text = message.text or ""
 
         # Lazy import to avoid any circular dependency with handlers.
