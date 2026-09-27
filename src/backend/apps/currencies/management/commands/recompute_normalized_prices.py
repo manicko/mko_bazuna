@@ -111,7 +111,7 @@ class Command(BaseCommand):
             A ``(checked, changed)`` tuple for this batch.
         """
         ads = list(
-            Ad.objects.filter(pk__in=batch_ids).only(
+            Ad.objects.select_for_update().filter(pk__in=batch_ids).only(
                 "pk", "price_amount", "price_currency", "price_normalized_eur"
             )
         )
