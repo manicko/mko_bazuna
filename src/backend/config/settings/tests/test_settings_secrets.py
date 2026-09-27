@@ -156,6 +156,35 @@ def test_google_translate_api_key_required_in_production() -> None:
     assert "GOOGLE_TRANSLATE_API_KEY" in result.stderr
 
 
+def test_redis_url_required_in_production() -> None:
+    """REDIS_URL empty with DEBUG=False (production) raises ImproperlyConfigured.
+
+    base.py's env("REDIS_URL", default="") returns "" when the var is
+    absent or present-but-empty, so a prod deployment missing REDIS_URL
+    would silently fall back to MemoryStorage for the bot FSM and an empty
+    cache location. This guard must fail fast at settings import time.
+    """
+    env = {k: v for k, v in os.environ.items() if k != "REDIS_URL"}
+    env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
+    env["BOT_TOKEN"] = "test-bot-token-for-testing-only"
+    env["SITE_URL"] = "https://example.com"
+    env["GOOGLE_TRANSLATE_API_KEY"] = "test-translate-key-for-testing-only"
+    env["EMAIL_HOST"] = "smtp.example.com"
+    env["ALLOWED_HOSTS"] = "example.com"
+    env["CSRF_TRUSTED_ORIGINS"] = "https://example.com"
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "REDIS_URL" in result.stderr
+
+
 def test_secret_key_with_dollar_sign_preserved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

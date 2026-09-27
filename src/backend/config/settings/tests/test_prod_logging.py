@@ -63,6 +63,9 @@ def _prod_env_overrides(**overrides: str) -> dict[str, str]:
         "CSRF_TRUSTED_ORIGINS", "https://example.com"
     )
     env["SENTRY_DSN"] = overrides.pop("SENTRY_DSN", "")
+    # REDIS_URL must be non-empty to pass the prod.py fail-fast guard
+    # (see prod.py: REDIS_URL required in production).
+    env["REDIS_URL"] = overrides.pop("REDIS_URL", "redis://redis:6379/0")
     # EMAIL_* defaults — EMAIL_HOST must be non-empty to pass the prod.py
     # fail-fast guard (see prod.py: EMAIL_HOST required in production).
     env["EMAIL_HOST"] = overrides.pop("EMAIL_HOST", "smtp.example.com")

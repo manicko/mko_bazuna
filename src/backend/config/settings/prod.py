@@ -236,3 +236,16 @@ if not ALLOWED_HOSTS:  # noqa: F405
 # placeholder values; the real origins are provided at runtime via .env.prod.
 if not CSRF_TRUSTED_ORIGINS and not _SKIP_SECRET_VALIDATION:  # noqa: F405
     raise ValueError("CSRF_TRUSTED_ORIGINS must be set in production")
+
+# Fail fast: REDIS_URL is required in production for shared caching and bot FSM.
+# base.py's env("REDIS_URL", default="") returns "" for a present-but-empty value,
+# so without this guard a deployment missing REDIS_URL would silently fall back to
+# MemoryStorage for the bot FSM (ephemeral state) and an empty cache location.
+# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
+# (DJANGO_ONESHOT=1); the real URL is provided at runtime via .env.prod.
+if not _SKIP_SECRET_VALIDATION:
+    if not REDIS_URL:  # noqa: F405
+        raise ImproperlyConfigured(
+            "REDIS_URL must be set in production. "
+            "Provide it via the .env.prod runtime file."
+        )

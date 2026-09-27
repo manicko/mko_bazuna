@@ -57,6 +57,9 @@ def _prod_env(**overrides: str) -> dict[str, str]:
     )
     env["SITE_URL"] = overrides.pop("SITE_URL", "https://example.com")
     env["ALLOWED_HOSTS"] = overrides.pop("ALLOWED_HOSTS", "example.com")
+    # REDIS_URL must be non-empty to pass the prod.py fail-fast guard
+    # (see prod.py: REDIS_URL required in production).
+    env["REDIS_URL"] = overrides.pop("REDIS_URL", "redis://redis:6379/0")
     # EMAIL_* defaults — EMAIL_HOST must be non-empty to pass the prod.py
     # fail-fast guard (see prod.py: EMAIL_HOST required in production).
     env["EMAIL_HOST"] = overrides.pop("EMAIL_HOST", "smtp.example.com")
