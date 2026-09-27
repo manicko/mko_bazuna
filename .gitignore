@@ -143,10 +143,9 @@ activemq-data/
 
 # Environment files — all runtime env files are gitignored
 .env
-.env.dev
-.env.prod
-.env.test
-# Templates (.example files) are tracked in git
+.env.*
+!.env.example
+!.env.*.example
 .envrc
 .venv
 env/
