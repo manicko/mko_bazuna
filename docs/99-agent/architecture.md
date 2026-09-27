@@ -40,8 +40,10 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   a `finally` teardown (ENT-002).
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
-  `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate)
-  and re-derivable via the advisory-locked `recompute_normalized_prices` management command. Both
+  `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate,
+  5 min TTL) and re-derivable via the advisory-locked `recompute_normalized_prices` management
+  command (lock 12). The command locks each batch row with `select_for_update()` to
+  prevent concurrent writes racing on `price_normalized_eur` (zone DB-001). Both
   processes read rates from the shared DB. The web edit path
   (`ads.views.edit._apply_price_change`) and the submission path
   (`ads.services.submission.submit_ad`) delegate to the shared
@@ -84,6 +86,12 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
    and `scheduler` via `REDIS_URL` env var and `depends_on` healthchecks. The `scheduler`
    service also `depends_on: load_catalog (completed successfully)` so sweep commands never
    start before the category catalog is loaded.
+- **Production fail-fast (CFG-001):** `config/settings/prod.py` raises
+   `ImproperlyConfigured` at import time if `REDIS_URL` is empty, because an unset URL
+   would silently fall back to `MemoryStorage` for the bot FSM (ephemeral state) and an
+   empty cache location. The guard is skipped under `DJANGO_BUILD=1` (image build) and
+   `DJANGO_ONESHOT=1` (dev one-shot services); the real URL is provided at runtime via
+   `.env.prod`.
 
 ## Environment Variable Resolution
 
@@ -427,9 +435,13 @@ Delivery targets admin-configured channels via two fail-open seams:
   `SupportContact` via `bot.send_message`, isolating per-recipient failures (including a single
   429 `TelegramRetryAfter` retry-after retry); `EMAIL`-type contacts are skipped.
 
-Access control is enforced upstream by `AccountStateMiddleware`: anonymous and DECLINE users may reach
-support, while banned/deleted/consent-revoked users are blocked before the handler runs. The handler
-additionally guards against bots (mirroring `contact.py`). `SupportContact`/`SupportTicket` schema
+Access control is enforced upstream by `AccountStateMiddleware` (`telegram_bot/middlewares/permissions.py`):
+anonymous and DECLINE users may reach support, while banned/deleted/consent-revoked users are
+blocked before the handler runs. For `callback_query` updates the acting-user identity is resolved
+from `callback_query.from_user.id` (the button-clicker), **not** `callback_query.message.from_user.id`
+(the bot account that sent the inline keyboard) — the prior use of `message.from_user` produced a
+fail-open `User.DoesNotExist` bypass of account-state gating on all callback-driven bot interactions.
+The handler additionally guards against bots (mirroring `contact.py`). `SupportContact`/`SupportTicket` schema
 and the `SupportChannelType`/`SupportTicketStatus` enums are documented in
 [`db-schema.md`](../02-database/db-schema.md#support_contacts) /
 [`db-enums.md`](../02-database/db-enums.md#supportchanneltype).

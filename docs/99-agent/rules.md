@@ -49,11 +49,11 @@ This file contains coding standards and rules for the Mko Bazuna project.
   | `asyncio` (pytest-asyncio, strict mode) | Async Telegram bot handlers |
 
   The `e2e` marker was removed — do not reference it.
-- **Fixtures:** Root `conftest.py` at `src/backend/conftest.py` provides canonical `seller`, `user`, `category`, `city` fixtures. Do NOT redefine these locally — import or use directly. Bot tests under `src/telegram_bot/` have a separate conftest and cannot resolve backend fixtures.
+- **Fixtures:** Root `conftest.py` at `src/backend/conftest.py` provides canonical `seller`, `user`, `category`, `city` fixtures. Do NOT redefine these locally — import or use directly. Bot tests under `src/telegram_bot/` have a separate conftest and cannot resolve backend fixtures. All canonical fixtures (and their bot-test counterparts) use `get_or_create` keyed on fixed IDs so they are **idempotent** and survive `--reuse-db` (stale rows from an interrupted run do not cause `IntegrityError`).
 - **Ad creation:** Use `from conftest import create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)` — it sets status-specific timestamps automatically. Add `status=AdStatus.PUBLISHED` explicitly if the test requires it.
 - **Backdating `created_at`:** `create_test_ad` cannot backdate `created_at` (auto_now_add=True). Use: `ad = create_test_ad(...)` then `Ad.objects.filter(pk=ad.pk).update(created_at=...)` then `ad.refresh_from_db()`.
 - **Assertions:** Use plain `assert` statements — do NOT use `self.assertEqual`, `self.assertTrue`, etc.
-- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--no-reuse-db --create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and   `create_test_ad`.
+- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--no-reuse-db --create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and `create_test_ad`.
 
 ### i18n / Language Testing
 
@@ -178,7 +178,7 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 - The `test` job in CI runs `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
 - Coverage report is uploaded as an artifact (`src/backend/coverage.xml`, 30-day retention).
 - CI uses SQLite-backed PostgreSQL service (not Docker Compose) — migrations run via `migrate_locked.py`.
-- A dedicated, **blocking** `deploy-check` job runs `manage.py check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings) with all required production env vars set to valid non-secret placeholders (`DJANGO_SECRET_KEY` 50+ chars, `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`). `--fail-level WARNING` means any W-series finding fails the build; there is no `continue-on-error`. This replaced the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings. The `web`/`bot` entrypoints also call `check --deploy` at boot (non-fatal, logs a `WARNING` and continues).
+- A dedicated, **blocking** `deploy-check` job runs `manage.py check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings) with all required production env vars set to valid non-secret placeholders (`DJANGO_SECRET_KEY` 50+ chars, `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `REDIS_URL=redis://redis:6379/0`, `DATABASE_URL`). `--fail-level WARNING` means any W-series finding fails the build; there is no `continue-on-error`. This replaced the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings. The `web`/`bot` entrypoints also call `check --deploy` at boot (non-fatal, logs a `WARNING` and continues).
 
 ## i18n Pipeline
 

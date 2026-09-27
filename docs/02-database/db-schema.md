@@ -57,10 +57,10 @@ id (PK)
 telegram_id (BIGINT, UNIQUE, nullable)   # nullable for admin-created accounts
 chat_id (BIGINT, UNIQUE, nullable)       # stable Telegram chat ID; set on first bot contact, never nullified
 username (VARCHAR, nullable)             # optional public @username; NOT used for t.me link or publishing (decision C)
-is_staff / is_superuser                  # admin/moderator role (decision A)
+is_staff / is_superuser                  # admin/moderator role (decision A); resolved to UserRole.ADMIN via the User.role property (see db-enums.md)
 is_banned (BOOL)                          # account block (US-A4)
 is_deleted (BOOL)                         # soft-delete (US-S8); Phase 3: immediate flag + PII null; Phase 4: ads hard-deleted; checked by template consent-banner guard in 5 templates
-is_declined (BOOL, default False)         # user declined consent (browse-only); user's PUBLISHED ads excluded from public search/listings via `user__is_declined=False` filter in ListingsQuery
+is_declined (BOOL, default False)         # user declined consent (browse-only); PUBLISHED ads excluded from public search/listings and direct URL access — `user__is_declined=False` in ListingsQuery, `ad_detail` queryset, and `ad__user__is_declined=False` in `media_gate` non-staff filter; search cache version bumped to invalidate cached results
 ads_auto_publish (BOOL, default True)     # publishing ban (US-S9)
 telegram_premium (BOOL, default False)    # Telegram Premium subscription status
   preferred_city_id (FK → cities.id, nullable, SET_NULL, related_name="+")  # default city for search/filter for authenticated users (plan 15); guests use a 1-year consent-gated cookie instead
@@ -285,7 +285,8 @@ created_at / updated_at
 Constraint: at most one `is_current=True` row per currency (partial unique index
 `uq_exchange_rate_current_per_currency`). `PriceNormalizer` reads the current rate
 (cached 5 min) to compute `price_normalized_eur`; `recompute_normalized_prices`
-re-derives it after rate changes.
+re-derives it after rate changes, locking each batch row via `select_for_update()`
+to prevent concurrent writes (zone DB-001).
 
 ### lookup_groups
 Reference data groups (e.g. `listing_purpose`, `listing_feature`). Managed through Django admin. System groups are protected from deletion.
@@ -552,7 +553,7 @@ language (VARCHAR(5), nullable, default 'bs')   # Saved-search query language: s
 created_at (TIMESTAMP)
 updated_at (TIMESTAMP, auto_now=True)          # last-modified (plan 16 / FND-001)
 last_notified_at (TIMESTAMP, nullable)          # last time this search produced a notification
-unsubscribe_token (VARCHAR(40), unique, db_index, nullable)  # opaque capability token (32 URL-safe chars)
+unsubscribe_token (VARCHAR(40), unique, db_index, nullable)  # opaque capability token (32 URL-safe chars); resolved under transaction.atomic() + select_for_update() in alerts.py _resolve_owned to prevent lost-update races on the unsubscribe toggle
 
 Index: IX_saved_searches_user_active (user_id, is_active)
 db_table: saved_searches

@@ -269,3 +269,22 @@ Lifecycle status of a `SupportTicket` submitted via the Telegram bot (see
 | `open` | Freshly submitted; not yet handled by the support desk |
 | `replied` | A desk member has replied to the submitter |
 | `closed` | Ticket resolved and closed |
+
+## UserRole
+Roles resolved from Django identity flags (`is_staff`, `is_superuser`, `is_authenticated`).
+This is the single source of truth consumed by both the web process and the bot
+process for authorization decisions (Phase 15 authorization spec). It is **not** a
+database column — `User.role` is a read-only `@property` on the `User` model
+(`apps/users/models.py`) that maps the Django flags to the enum at runtime:
+
+| Value | Meaning | Django flag mapping |
+|-------|---------|---------------------|
+| `ANONYMOUS` | Unauthenticated identity | `not is_authenticated` |
+| `SELLER` | Authenticated non-admin seller | `is_authenticated` and not (`is_staff` or `is_superuser`) |
+| `ADMIN` | Administrator/moderator | `is_staff or is_superuser` |
+
+`staff_required` and `staff_required_api` decorators
+(`apps/moderation/views/decorators.py`) gate moderation endpoints on
+`UserRole.ADMIN` (replacing the previous direct `is_staff or is_superuser` check).
+See [`db-schema.md`](db-schema.md#users) for the `users` table.
+

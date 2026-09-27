@@ -128,7 +128,11 @@ block exits. The default sits safely under the scheduler healthcheck staleness w
 
 **Standalone invocation (ENT-003):** `migrate_locked.py` defaults `DJANGO_SETTINGS_MODULE`
 to `config.settings.prod` via `os.environ.setdefault` (changed from `config.settings.dev`),
-matching the scheduler/web/bot entrypoints. The Docker `migrate` service and the
+matching the scheduler/web/bot entrypoints. The top-level `manage.py` entry point follows the
+same convention (ENT-002): its `os.environ.setdefault("DJANGO_SETTINGS_MODULE", ...)` also
+defaults to `config.settings.prod`, so standalone `python src/backend/manage.py <cmd>` invocations
+outside Docker land on production settings (and enforce the prod secret guards) unless
+`DJANGO_SETTINGS_MODULE` is explicitly overridden. The Docker `migrate` service and the
 `bootstrap_reference_data` one-shot set `DJANGO_SETTINGS_MODULE=config.settings.prod`
 explicitly in `environment:`, so the default does not affect the Compose path. Standalone
 invocation outside that path (e.g. running
