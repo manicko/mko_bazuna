@@ -751,6 +751,50 @@ class TestAdArchive:
 
 
 # ---------------------------------------------------------------------------
+# Authz-002: ad_archive GET rejected with 405 (require_POST)
+# ---------------------------------------------------------------------------
+
+
+class TestAdArchiveGetRejected:
+    """Authz-002: GET /ads/<id>/archive/ returns 405; POST still works."""
+
+    def test_archive_get_returns_405(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """A crafted GET URL must not archive an ad; returns 405."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.get(reverse("ads:archive", args=[ad.id]))
+        assert response.status_code == 405
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED  # unchanged by GET
+
+    def test_archive_post_still_works(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """POST /ads/<id>/archive/ still archives the ad."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+
+
+# ---------------------------------------------------------------------------
 # TST-008: ad_reactivate authorization + ARCHIVED → ON_MODERATION/PUBLISHED
 # ---------------------------------------------------------------------------
 
@@ -819,6 +863,27 @@ class TestAdReactivateDirect:
 
         ad.refresh_from_db()
         assert ad.status == AdStatus.PUBLISHED  # unchanged
+
+    def test_reactivate_get_returns_405(
+        self,
+        seller,
+        category,
+        city,
+    ) -> None:
+        """A crafted GET URL must not reactivate an ad; returns 405."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+
+        client = Client()
+        client.force_login(seller)
+
+        response = client.get(reverse("ads:reactivate", args=[ad.id]))
+        assert response.status_code == 405
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED  # unchanged by GET
 
 
 # ---------------------------------------------------------------------------

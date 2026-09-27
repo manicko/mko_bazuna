@@ -15,6 +15,7 @@ from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -22,6 +23,7 @@ from apps.core.enums import AdStatus
 logger = logging.getLogger(__name__)
 
 
+@require_POST
 @login_required
 def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
     """

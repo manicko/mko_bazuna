@@ -16,6 +16,7 @@ from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
 from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
@@ -264,6 +265,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             return redirect("ads:dashboard")
 
 
+@require_POST
 @login_required
 def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -300,6 +302,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     return redirect("ads:dashboard")
 
 
+@require_POST
 @login_required
 def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
