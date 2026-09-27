@@ -238,25 +238,28 @@ def _resolve_owned(token: str, chat_id: int | None, active: bool) -> SavedSearch
     if not chat_id:
         return None
     try:
-        with transaction.atomic():
+        # The ownership check and save() must live inside the same atomic block
+        # as the locked read so the row lock is held until the write commits,
+        # preventing a concurrent toggle from interleaving.
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             saved_search = (
                 SavedSearch.objects.select_for_update()
                 .select_related("user")
                 .get(unsubscribe_token=token)
             )
+
+            # Ownership via the stable, never-nullified chat_id (R5/F4/A4).
+            if saved_search.user.chat_id != chat_id:
+                return None
+
+            saved_search.is_active = active
+            saved_search.save(update_fields=["is_active", "updated_at"])
+            logger.info(
+                "Saved search %s for user %s set active=%s via Telegram",
+                saved_search.pk,
+                saved_search.user_id,
+                active,
+            )
+            return saved_search
     except SavedSearch.DoesNotExist:
         return None
-
-    # Ownership via the stable, never-nullified chat_id (R5/F4/A4).
-    if saved_search.user.chat_id != chat_id:
-        return None
-
-    saved_search.is_active = active
-    saved_search.save(update_fields=["is_active", "updated_at"])
-    logger.info(
-        "Saved search %s for user %s set active=%s via Telegram",
-        saved_search.pk,
-        saved_search.user_id,
-        active,
-    )
-    return saved_search
