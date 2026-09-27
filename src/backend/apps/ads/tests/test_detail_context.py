@@ -128,6 +128,43 @@ class TestAdDetailContext:
         assert isinstance(response.context["display_features"], list)
 
 
+class TestAdDetailDeclinedUserVisibility:
+    """A declined user's PUBLISHED ad is hidden from direct URL access (AUTZ-003).
+
+    The ad is PUBLISHED but its owner has declined consent (``is_declined=True``).
+    Such ads are excluded from browse/search by the shared
+    ``ListingsQuery.build_queryset`` filter; this guards the direct
+    ``/ads/<id>/`` detail route from leaking them.
+    """
+
+    def test_declined_user_published_ad_returns_404(
+        self, seller, category, city
+    ) -> None:
+        """A declined user's PUBLISHED ad returns 404 via ad_detail."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+
+        # Sanity: visible before the decline.
+        client = Client()
+        assert (
+            client.get(reverse("ads:detail", args=[ad.id])).status_code == 200
+        )
+
+        # Decline consent — the PUBLISHED ad must become unreachable by URL.
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 404
+
+    def test_non_declined_user_published_ad_returns_200(
+        self, published_ad, seller, category, city
+    ) -> None:
+        """A non-declined user's PUBLISHED ad still renders normally."""
+        client = Client()
+        response = client.get(reverse("ads:detail", args=[published_ad.id]))
+        assert response.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # Template-source tests (unchanged — they read template files, no MagicMock)
 # ---------------------------------------------------------------------------

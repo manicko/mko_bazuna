@@ -59,7 +59,11 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad = (
             Ad.objects.select_related("category", "city", "user")
             .prefetch_related("images", "features", "user__trust_score")
-            .get(id=ad_id, status=AdStatus.PUBLISHED)
+            .get(
+                id=ad_id,
+                status=AdStatus.PUBLISHED,
+                user__is_declined=False,
+            )
         )
     except Ad.DoesNotExist:
         raise Http404("Ad not found") from None
@@ -189,10 +193,15 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         response["Cache-Control"] = "no-store"
         return response
 
-    # Non-staff users: only serve images referenced by a PUBLISHED ad. A shared
-    # seed key can be attached to several ads, so check existence across all of
-    # them rather than the status of a single (arbitrary) row.
-    if not AdImage.objects.filter(key_q, ad__status=AdStatus.PUBLISHED).exists():
+    # Non-staff users: only serve images referenced by a PUBLISHED ad owned by a
+    # non-declined user. A shared seed key can be attached to several ads, so
+    # check existence across all of them rather than the status of a single
+    # (arbitrary) row.
+    if not AdImage.objects.filter(
+        key_q,
+        ad__status=AdStatus.PUBLISHED,
+        ad__user__is_declined=False,
+    ).exists():
         return HttpResponseForbidden(_("Access denied"))
 
     if settings.DEBUG:

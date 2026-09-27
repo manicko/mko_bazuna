@@ -294,6 +294,71 @@ class TestMediaAccessControl:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
+class TestMediaGateDeclinedUser:
+    """Declined-user media is gated from non-staff access (AUTZ-003).
+
+    A declined user's PUBLISHED ad is hidden from browse/search; this guards the
+    direct ``/media/<key>`` route from leaking its images. Staff (moderators)
+    keep access to review content.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _debug_false(self):
+        with override_settings(DEBUG=False):
+            yield
+
+    def test_declined_user_published_image_returns_forbidden(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A declined user's PUBLISHED ad image returns 403 for non-staff."""
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+
+        # Sanity: accessible before the decline.
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            assert client.get(url).status_code == 200
+
+        # Decline consent — the image must become unreachable.
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 403
+
+    def test_staff_can_view_declined_user_image(
+        self, seller, staff_user, category, city, isolated_media_root
+    ):
+        """Staff can still view a declined user's image (regression guard)."""
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        client = Client()
+        client.force_login(staff_user)
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+
+    def test_non_declined_user_published_image_returns_redirect(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A non-declined user's PUBLISHED ad image still serves normally."""
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
+
+
 class TestExifStripping:
     """EXIF stripping (MED-002) — metadata is removed on store."""
 
