@@ -121,9 +121,9 @@ Update `Execution plan` and Return `{task_description}`.
 
 
 ### 3.4 Implementor
+Never parallel implementor agents only one at a time is allowed.
 
-Launch **`Implementor`** (one at a time) with the required context:
-
+Launch one **`Implementor`** with the required context:
 `{context_a} + {context_r} + {task_description}`
 <original_prompt>
 Implementor owns the local cycle:
