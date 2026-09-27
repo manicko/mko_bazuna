@@ -35,8 +35,6 @@ Present the list to the user as a numbered table:
 Store the result as `{SELECTED_PHASES}`.
 From `{SELECTED_PHASES}` parse each remaining filename (`NN-audit-name.md`) to extract phase number and name.
 
-**Ask the user:** Does validation phase needed?
-
 
 ## 1. Gather Base Layer Context (once)
 
@@ -85,7 +83,9 @@ Check that `{OUTPUT_PATH}` exists and is not empty.
 If missing or empty: retry once, then escalate on second failure.
 
 ### 2.4 Launch Validator (skip for Phase 99)
-Only if user confirmed this phase is needed.
+Launch the Validator **only** when Findings are **not trivial** ands relate to **significant code changes** or **architecture modifications**.
+
+In all other cases — skip.
 
 ```
 Task(
