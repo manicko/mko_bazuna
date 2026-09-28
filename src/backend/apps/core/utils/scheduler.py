@@ -30,6 +30,13 @@ injects a recording double that satisfies the :class:`DailyMarker` protocol.
 
 The original ``check=False`` and ``except Exception: pass`` semantics are
 preserved; structured logging and exit-code inspection are added in Block B.
+
+Liveness-marker contract (ENT-013): the file-based marker records the last
+cycle in which every command the scheduler dispatched exited 0 (plus the
+process's first cycle). ``healthcheck-scheduler.sh`` consumes its mtime, and
+``SCHEDULER_HEALTH_STALE_SECONDS`` supplies the deadline, so a failing cycle
+leaves the marker untouched and eventually becomes ``unhealthy`` rather than
+silently green. See :func:`_write_liveness_marker` and :func:`run_one_cycle`.
 """
 
 from __future__ import annotations
@@ -217,6 +224,10 @@ def _dispatch(
 def _write_liveness_marker() -> None:
     """Write the scheduler liveness marker file (for Docker healthcheck).
 
+    This is a *success* marker, not a heartbeat: :func:`run_one_cycle` refreshes
+    it only after a cycle in which every dispatched command exited 0, and
+    unconditionally on the process's first cycle.
+
     Fail-open: if the marker path is empty or the write fails, log at debug
     level and continue — the scheduler must never crash on a healthcheck concern.
     """
@@ -238,6 +249,7 @@ def run_one_cycle(
     run_command: Callable[[str], int],
     last_daily: date | None,
     daily_marker: DailyMarker,
+    is_first_cycle: bool = False,
 ) -> date | None:
     """Execute one scheduler tick.
 
@@ -246,6 +258,15 @@ def run_one_cycle(
     command exited 0 with no stop requested, records the day on
     ``daily_marker`` and returns it as the new ``last_daily``. No infinite
     loop, no sleep — pure unit-testable function.
+
+    The liveness marker is refreshed only after both the hourly and daily sets
+    have completed cleanly, so three distinct outcomes follow a non-clean
+    cycle: a cycle-level failure raises before the write, a command failure
+    leaves the marker untouched, and a stop-truncated cycle (deliberately
+    silent) also leaves it untouched. Because ``_dispatch`` isolates every
+    per-command failure, a cycle-level exception here can only originate
+    outside dispatch (``now_func()``, the daily gate, the marker's own
+    fail-open write, or a logger call), so the raise path is rare.
 
     Args:
         now_func: Callable returning ``datetime`` (injectable for tests).
@@ -256,6 +277,10 @@ def run_one_cycle(
         daily_marker: The durable daily-dispatch marker seam (``DailyMarker``
             protocol). Written only on a clean daily cycle; never re-read here
             (the read is a start-up concern in :func:`run_scheduler`).
+        is_first_cycle: ``True`` only for the first cycle after process start
+            (set by :func:`run_scheduler`), which refreshes the liveness marker
+            regardless of outcome. ``False`` (the default) makes a bare
+            ``run_one_cycle(...)`` call an ordinary cycle.
 
     Returns:
         The new ``last_daily`` value. It is ``now.date()`` **only** when the
@@ -268,16 +293,16 @@ def run_one_cycle(
     """
     now = now_func()
 
-    # Hourly commands — run every tick
-    for cmd in HOURLY_COMMANDS:
-        _dispatch(cmd, run_command)
-
-    # Write liveness marker after hourly cycle completes (before daily section).
-    # Fail-open: if the path is empty or the write fails, the scheduler continues.
-    _write_liveness_marker()
+    # Hourly commands — run every tick. The list comprehension (not a generator)
+    # evaluates fully, so all commands are dispatched even when the first fails —
+    # the behaviour TestCycleErrorIsolation and TestDispatchIsolation assert.
+    hourly_exit_codes = [_dispatch(cmd, run_command) for cmd in HOURLY_COMMANDS]
+    hourly_ok = all(code == 0 for code in hourly_exit_codes)
 
     # Daily commands — once per calendar day at/after 08:00 UTC
     new_last_daily = last_daily
+    daily_exit_codes: list[int] = []
+    daily_ok = True
     if should_run_daily(now, last_daily, DAILY_HOUR_UTC):
         # Dispatch EVERY daily command before judging the outcome: the list is
         # deliberate. all(_dispatch(c, r) == 0 for c in DAILY_COMMANDS) would
@@ -313,6 +338,26 @@ def run_one_cycle(
                 "Daily commands completed for %s - durable marker recorded",
                 day.isoformat(),
             )
+
+    # Liveness marker — the container health signal. Refreshed only after a cycle
+    # in which every command the scheduler dispatched exited 0 (ENT-013). A cycle
+    # that failed leaves the marker untouched, so the 7200 s staleness check in
+    # healthcheck-scheduler.sh eventually reports it instead of a green container
+    # reporting success forever.
+    cycle_succeeded = not _stop_event.is_set() and hourly_ok and daily_ok
+    if cycle_succeeded or is_first_cycle:
+        _write_liveness_marker()
+    elif not _stop_event.is_set():
+        # A stop request is deliberately silent: _stop_aware_dispatch and the
+        # daily branch already logged it, and the container is on its way down.
+        logger.warning(
+            "Scheduler cycle at %s did not complete cleanly (hourly exit codes %s, "
+            "daily exit codes %s) - the liveness marker is left unchanged so the "
+            "healthcheck reports it",
+            now.isoformat(),
+            hourly_exit_codes,
+            daily_exit_codes,
+        )
 
     return new_last_daily
 
@@ -403,6 +448,10 @@ def run_scheduler(
     check, so a stop is bounded by one in-flight command rather than by the
     interval.
 
+    The first cycle after process start refreshes the liveness marker
+    regardless of outcome, because the marker is the container's readiness
+    signal and the container is born without one.
+
     Args:
         manage_py: Path to ``manage.py`` (auto-resolved if ``None``).
         python_executable: Python binary for subprocess dispatch
@@ -458,6 +507,7 @@ def run_scheduler(
             "Recovered scheduler daily marker - daily set last completed %s",
             last_daily.isoformat(),
         )
+    first_cycle = True
     while True:
         if _stop_event.is_set():
             logger.info("Stop flag set — exiting scheduler loop after completed cycle")
@@ -468,7 +518,9 @@ def run_scheduler(
                 run_command=dispatch,
                 last_daily=last_daily,
                 daily_marker=daily_marker,
+                is_first_cycle=first_cycle,
             )
+            first_cycle = False
         except Exception:
             logger.exception("Scheduler cycle failed — continuing")
         sleep_func(interval_seconds)

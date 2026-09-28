@@ -3,8 +3,8 @@
 #
 # Replaces the previous PID-only check (kill -0 1) with a two-stage test:
 #   (a) PID 1 alive        — basic liveness
-#   (b) Marker file exists — readiness (scheduler wrote the marker after cycle)
-#   (c) Optional freshness — detects retry-loop / stuck scheduler
+#   (b) Marker file exists — readiness (scheduler wrote the marker after a clean cycle)
+#   (c) Optional freshness — detects retry-loop / stuck scheduler or a failing cycle
 set -euo pipefail
 
 # (a) Process liveness (PID 1 alive)
@@ -20,7 +20,7 @@ if [ ! -f "$marker" ]; then
     exit 1
 fi
 
-# (c) Freshness (optional): detect retry-loop / stuck scheduler
+# (c) Freshness (optional): detect retry-loop / stuck scheduler or a failing cycle
 # SCHEDULER_HEALTH_STALE_SECONDS is read directly from the environment (not
 # from the Django settings object); default 7200 = 2x the hourly cycle.
 stale="${SCHEDULER_HEALTH_STALE_SECONDS:-0}"

@@ -13,6 +13,7 @@ subprocess. ``subprocess.run`` and ``_write_liveness_marker`` are mocked where n
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -21,12 +22,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.conf import settings
 
+import apps.core.utils.scheduler as scheduler_mod
 from apps.core.utils.scheduler import (
     DAILY_COMMANDS,
     HOURLY_COMMANDS,
     _build_subprocess_runner,
     _dispatch,
     _run_command_subprocess,
+    _stop_aware_dispatch,
     _write_liveness_marker,
     run_one_cycle,
 )
@@ -536,29 +539,34 @@ class TestLivenessMarkerIntegration:
                 daily_marker=daily_marker,
             )
 
-        # Written exactly once — after hourly commands, before the daily section
+        # Written exactly once — after both the hourly and daily sets complete
         assert mock_marker.call_count == 1
         assert marker.exists()
 
-    def test_marker_written_even_when_hourly_command_fails(
+    def test_marker_not_refreshed_when_hourly_command_fails(
         self,
         daily_marker,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """Liveness marker is written even if a hourly command raises.
+        """A failing hourly command leaves the liveness marker untouched.
 
-        The marker is written after the hourly loop completes (failures caught
-        by _dispatch), not gated on command success.
+        The marker is pre-created with a known old mtime; a failing cycle must
+        not refresh it (ENT-013). Assert the mtime is *unchanged* rather than
+        that the file is absent — a deletion would also pass the latter, which
+        is the opposite of the contract.
         """
         marker = tmp_path / "scheduler_alive"
+        marker.touch()
+        old_mtime = 1_000_000
+        os.utime(marker, (old_mtime, old_mtime))
         monkeypatch.setattr(
             settings, "SCHEDULER_LIVENESS_FILE", str(marker)
         )
 
         def failing_command(name: str) -> int:
             if name == HOURLY_COMMANDS[0]:
-                raise RuntimeError("crash")
+                return 1
             return 0
 
         now_func = lambda: _utc(2025, 6, 15, 0)  # noqa: E731
@@ -568,6 +576,155 @@ class TestLivenessMarkerIntegration:
             run_command=failing_command,
             last_daily=None,
             daily_marker=daily_marker,
+        )
+
+        assert marker.stat().st_mtime_ns == old_mtime * 1_000_000_000
+
+    def test_marker_not_refreshed_when_daily_command_fails(
+        self,
+        daily_marker,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A failing daily command leaves the liveness marker untouched.
+
+        ``now`` is at 08:00 UTC so the daily set fires; ``daily_marker`` is not
+        recorded either, keeping the two markers distinct.
+        """
+        marker = tmp_path / "scheduler_alive"
+        marker.touch()
+        old_mtime = 1_000_000
+        os.utime(marker, (old_mtime, old_mtime))
+        monkeypatch.setattr(
+            settings, "SCHEDULER_LIVENESS_FILE", str(marker)
+        )
+
+        def failing_command(name: str) -> int:
+            if name == DAILY_COMMANDS[0]:
+                return 1
+            return 0
+
+        now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
+
+        run_one_cycle(
+            now_func=now_func,
+            run_command=failing_command,
+            last_daily=None,
+            daily_marker=daily_marker,
+        )
+
+        assert marker.stat().st_mtime_ns == old_mtime * 1_000_000_000
+        assert daily_marker.recorded == []
+
+    def test_marker_not_refreshed_when_cycle_raises(
+        self,
+        daily_marker,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A cycle that raises before the marker write leaves the marker untouched.
+
+        The raise is induced at the daily gate — the only point after the hourly
+        set where a raise is both reachable in production and distinguishable
+        from pre-fix behaviour. The ``run_one_cycle`` caller observes the raise;
+        the swallow belongs to ``run_scheduler``, not here.
+        """
+        marker = tmp_path / "scheduler_alive"
+        marker.touch()
+        old_mtime = 1_000_000
+        os.utime(marker, (old_mtime, old_mtime))
+        monkeypatch.setattr(
+            settings, "SCHEDULER_LIVENESS_FILE", str(marker)
+        )
+
+        now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
+
+        with patch(
+            "apps.core.utils.scheduler.should_run_daily",
+            side_effect=RuntimeError("boom"),
+        ):
+            with pytest.raises(RuntimeError):
+                run_one_cycle(
+                    now_func=now_func,
+                    run_command=_noop_command,
+                    last_daily=None,
+                    daily_marker=daily_marker,
+                )
+
+        assert marker.stat().st_mtime_ns == old_mtime * 1_000_000_000
+
+    def test_marker_not_refreshed_when_stop_requested_mid_cycle(
+        self,
+        daily_marker,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A stop-truncated cycle leaves the marker untouched even with all 0s.
+
+        ``_stop_aware_dispatch`` returns 0 for every command it declines, so all
+        nine exit codes are 0; the marker must still not be refreshed. The stop
+        flag is driven directly and cleared in a ``finally`` (pytest-randomly).
+        """
+        marker = tmp_path / "scheduler_alive"
+        marker.touch()
+        old_mtime = 1_000_000
+        os.utime(marker, (old_mtime, old_mtime))
+        monkeypatch.setattr(
+            settings, "SCHEDULER_LIVENESS_FILE", str(marker)
+        )
+
+        def stop_on_first(name: str) -> int:
+            if name == HOURLY_COMMANDS[0]:
+                scheduler_mod._stop_event.set()
+            return 0
+
+        dispatch = _stop_aware_dispatch(stop_on_first)
+        now_func = lambda: _utc(2025, 6, 15, 0)  # noqa: E731
+
+        try:
+            run_one_cycle(
+                now_func=now_func,
+                run_command=dispatch,
+                last_daily=None,
+                daily_marker=daily_marker,
+            )
+        finally:
+            scheduler_mod._stop_event.clear()
+
+        assert marker.stat().st_mtime_ns == old_mtime * 1_000_000_000
+
+    def test_marker_written_after_a_failing_first_cycle(
+        self,
+        daily_marker,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A failing first cycle still writes the marker (first-cycle grace).
+
+        Design guard for the ``is_first_cycle`` parameter: a fresh container is
+        born without a marker, so its first cycle must write it unconditionally
+        to avoid a restart storm under a persistent failure. Green pre-fix by
+        construction — it pins a deliberate deviation from a pure conditional
+        write and protects the grace from being removed.
+        """
+        marker = tmp_path / "scheduler_alive"
+        monkeypatch.setattr(
+            settings, "SCHEDULER_LIVENESS_FILE", str(marker)
+        )
+
+        def failing_command(name: str) -> int:
+            if name == HOURLY_COMMANDS[0]:
+                return 1
+            return 0
+
+        now_func = lambda: _utc(2025, 6, 15, 0)  # noqa: E731
+
+        run_one_cycle(
+            now_func=now_func,
+            run_command=failing_command,
+            last_daily=None,
+            daily_marker=daily_marker,
+            is_first_cycle=True,
         )
 
         assert marker.exists()
