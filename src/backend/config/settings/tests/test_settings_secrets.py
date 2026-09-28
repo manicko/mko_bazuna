@@ -266,29 +266,56 @@ def test_prod_secret_key_accepts_strong_key() -> None:
 
 
 def test_bot_token_required_in_dev() -> None:
-    """A truthy-but-placeholder BOT_TOKEN (<...>) is rejected at dev import time.
+    """A truthy-but-placeholder BOT_TOKEN (<...>) no longer rejects dev import.
 
-    The placeholder ships in .env.dev.example; without this guard the bot's
-    truthiness-only check in main.py passes it through to Bot(token=...),
-    raising aiogram's TokenValidationError and looping under
-    restart: unless-stopped.
+    The placeholder guard moved out of config.settings.dev into the bot
+    entrypoint (telegram_bot.main.main()). Importing dev settings with a
+    placeholder token must therefore succeed; the refusal to start now happens
+    when main() runs (asserted in src/telegram_bot/tests/test_main.py).
+
+    Note the placeholder does NOT ship in .env.dev.example (which ships
+    BOT_TOKEN= empty); <your-bot-token-from-botfather> ships only in
+    .env.example and .env.prod.example.
     """
     env = _dev_env_overrides(BOT_TOKEN="<your-bot-token-from-botfather>")
-    stderr = _run_in_subprocess(env, "import django; django.setup()")
-    assert "ImproperlyConfigured" in stderr
-    assert "BOT_TOKEN" in stderr
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ImproperlyConfigured" not in result.stderr
 
 
 def test_bot_token_placeholder_rejects_in_dev() -> None:
-    """A generic <placeholder> BOT_TOKEN is rejected at dev import time."""
+    """A generic <placeholder> BOT_TOKEN no longer rejects dev import.
+
+    Same contract as test_bot_token_required_in_dev: the placeholder guard now
+    lives in telegram_bot.main.main(), so importing config.settings.dev with a
+    placeholder token succeeds. The refusal to start is asserted at the bot
+    entrypoint (test_main.py).
+    """
     env = _dev_env_overrides(BOT_TOKEN="<placeholder>")
-    stderr = _run_in_subprocess(env, "import django; django.setup()")
-    assert "ImproperlyConfigured" in stderr
-    assert "placeholder" in stderr.lower()
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ImproperlyConfigured" not in result.stderr
 
 
 def test_bot_token_real_value_allowed_in_dev() -> None:
-    """A real-looking BOT_TOKEN passes the dev placeholder guard and imports."""
+    """A real-looking BOT_TOKEN imports dev settings cleanly.
+
+    With the placeholder guard relocated to the bot entrypoint, a real-format
+    token imports without error. The former docstring claimed this value
+    "passes the dev placeholder guard" — that guard no longer exists at
+    settings import time, and this test now documents the import-time
+    behaviour only.
+    """
     env = _dev_env_overrides(BOT_TOKEN="123456789:ABCdefGHIjkl-MNO")
     result = subprocess.run(
         [sys.executable, "-c", "import django; django.setup()"],

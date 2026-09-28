@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 
 import django
 
@@ -16,6 +17,7 @@ from aiogram.fsm.storage.base import BaseStorage  # noqa: E402
 from aiogram.fsm.storage.memory import MemoryStorage  # noqa: E402
 from aiogram.fsm.storage.redis import RedisStorage  # noqa: E402
 from django.conf import settings  # noqa: E402
+from django.core.exceptions import ImproperlyConfigured  # noqa: E402
 
 from telegram_bot.lifecycle import (  # noqa: E402
     LivenessMiddleware,
@@ -30,6 +32,12 @@ from telegram_bot.middlewares import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+# Matches values shipped as placeholders in .env.*.example files, e.g.
+# <your-bot-token-from-botfather>. A truthy-but-placeholder BOT_TOKEN is a
+# misconfiguration, distinct from an empty token (which legitimately skips
+# bot startup in development). Copied from prod._SECRET_PLACEHOLDER_RE.
+_BOT_TOKEN_PLACEHOLDER_RE = re.compile(r"^<[^>]+>$")
 
 
 def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
@@ -101,6 +109,19 @@ def main() -> None:
     if not token:
         logger.warning("BOT_TOKEN not set - skipping bot startup (development mode)")
         return
+
+    # Reject a truthy-but-placeholder BOT_TOKEN (e.g. <your-bot-token-from-botfather>).
+    # An empty token is handled by the skip branch above; a placeholder is a
+    # misconfiguration and must crash loudly rather than exit 0 and report
+    # healthy while carrying an unusable token. This guard lives at the bot
+    # entrypoint (not in a settings module) so a bot-only credential cannot
+    # take the whole dev stack down at import time.
+    if _BOT_TOKEN_PLACEHOLDER_RE.match(token):
+        raise ImproperlyConfigured(
+            "BOT_TOKEN is a placeholder value from .env.dev.example. "
+            "Replace it with a real token from @BotFather, or leave it empty "
+            "(BOT_TOKEN=) to skip bot startup in development."
+        )
 
     # Storage: RedisStorage (persistent FSM across restarts) with MemoryStorage fallback.
     # In production, RedisStorage.from_url(settings.REDIS_URL, ...) persists FSM
