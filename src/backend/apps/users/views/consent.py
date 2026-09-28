@@ -14,10 +14,7 @@ translation service — search runs per-language on pre-translated FTS vectors
 (section G in docs/01-spec/technical-specification.md).
 """
 
-import hashlib
 import logging
-import secrets
-from datetime import timedelta
 
 from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
@@ -35,7 +32,7 @@ from apps.core.services.contact_rate_limit import check_deep_link_render_rate_li
 from apps.core.services.site_config import get_bot_username
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
-from apps.users.models import LoginToken, User
+from apps.users.models import User
 from apps.users.schemas import ConsentSubmission
 from apps.users.services import (
     can_login,
@@ -45,6 +42,7 @@ from apps.users.services import (
     withdraw_consent,
 )
 from apps.users.services.login_rate_limit import login_rate_limit_check
+from apps.users.services.login_token import ConsumeOutcome, consume_token, issue_token
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +297,9 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     """
     Issue a login token and render the Telegram deep-link.
 
-    Generates a cryptographically random 32-char URL-safe token,
-    stores only its SHA-256 hash, and renders the deep-link
+    Generates a cryptographically random 32-char URL-safe token via
+    ``issue_token``, which stores only its SHA-256 hash and owns the token
+    lifecycle, then renders the deep-link
     https://t.me/<BOT_USERNAME>?start=login_<raw_token>.
 
     The raw token is never stored — only the hash is persisted.
@@ -320,30 +319,29 @@ def login_issue(request: HttpRequest) -> HttpResponse:
         logger.warning("Rate limit exceeded for login_issue")
         return HttpResponse(status=429)
 
-    raw_token = secrets.token_urlsafe(24)  # 32 URL-safe chars, matches bot regex `{32}`
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    LoginToken.objects.create(
-        token_hash=token_hash,
-        expires_at=timezone.now() + timedelta(minutes=5),
-    )
+    issued = issue_token()
 
     bot_username = get_bot_username()
 
-    logger.info("Issued login token hash=%s...", token_hash[:8])
+    logger.info("Issued login token hash=%s...", issued.token_hash[:8])
 
     return render(
         request,
         "users/login_issue.html",
         {
             "bot_username": bot_username,
-            "raw_token": raw_token,
+            "raw_token": issued.raw_token,
         },
     )
 
 
 def _reconcile_preferred_city_on_login(request: HttpRequest, user: User) -> None:
     """Migrate a guest's ``preferred_city`` cookie into the account (AC-6).
+
+    Decided to STAY in the view (ENT-005): it has no relationship to the token
+    lifecycle, takes an ``HttpRequest``, and would force
+    ``apps.locations.models`` and ``apps.core.middleware.preferred_city`` into
+    the ``login_token`` service — both on its forbidden-import list.
 
     Runs immediately after ``auth_login``. If the just-authenticated user has no
     ``User.preferred_city`` and the ``preferred_city`` cookie references a
@@ -399,49 +397,38 @@ def login_status(request: HttpRequest) -> HttpResponse:
     if not raw_token:
         return HttpResponse(status=410)
 
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
+    # The caller owns the transaction; the service owns the predicate.
+    # consume_token opens no transaction of its own — the current outer
+    # atomic() covers exactly the read and the guarded UPDATE, nothing after.
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-        try:
-            token = LoginToken.objects.get(token_hash=token_hash)
-        except LoginToken.DoesNotExist:
-            return HttpResponse(status=410)
+        result = consume_token(raw_token)
 
-        # Token expired or already consumed — gone
-        if token.expires_at <= timezone.now() or token.consumed_at is not None:
+        if result.outcome is ConsumeOutcome.NOT_FOUND:
             return HttpResponse(status=410)
-
-        # Bot has not claimed the token yet — keep polling
-        if token.telegram_id is None:
+        if result.outcome is ConsumeOutcome.GONE:
+            return HttpResponse(status=410)
+        if result.outcome is ConsumeOutcome.PENDING:
             return HttpResponse(status=204)
-
-        # Bot has claimed the token — atomically mark consumed (single UPDATE)
-        # Optimistic concurrency: filter conditions ensure only an unclaimed,
-        # unexpired token with matching telegram_id is touched.
-        updated = LoginToken.objects.filter(
-            token_hash=token_hash,
-            telegram_id=token.telegram_id,
-            consumed_at__isnull=True,
-            expires_at__gt=timezone.now(),
-        ).update(consumed_at=timezone.now())
-
-        if updated == 0:
-            # Race condition — another request already consumed it
+        if result.outcome is ConsumeOutcome.LOST_RACE:
             return HttpResponse(status=410)
+        # CONSUMED — the token is marked used; capture the identity for the
+        # session-establishment steps that follow the transaction.
+        token_hash = result.token_hash
+        telegram_id = result.telegram_id
 
     logger.info(
         "Login token %s consumed by telegram_id=%s",
         token_hash[:8],
-        mask_telegram_id(token.telegram_id),
+        mask_telegram_id(telegram_id),
     )
 
     # Look up the user by telegram_id
     try:
-        user = User.objects.get(telegram_id=token.telegram_id)
+        user = User.objects.get(telegram_id=telegram_id)
     except User.DoesNotExist:
         logger.error(
             "User not found for telegram_id=%s",
-            mask_telegram_id(token.telegram_id),
+            mask_telegram_id(telegram_id),
         )
         return HttpResponse(status=410)
 
@@ -449,7 +436,7 @@ def login_status(request: HttpRequest) -> HttpResponse:
     if not can_login(user):
         logger.warning(
             "Login denied for telegram_id=%s: banned",
-            mask_telegram_id(token.telegram_id),
+            mask_telegram_id(telegram_id),
         )
         return HttpResponse(status=410)
 
@@ -464,7 +451,7 @@ def login_status(request: HttpRequest) -> HttpResponse:
     logger.info(
         "Web session established for user %s (telegram_id=%s)",
         user.id,
-        mask_telegram_id(token.telegram_id),
+        mask_telegram_id(telegram_id),
     )
 
     return HttpResponse(status=200)

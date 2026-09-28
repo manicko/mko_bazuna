@@ -2,6 +2,13 @@
 Login handler for Telegram bot deep-link authentication.
 
 Implements atomic token claim via indexed SHA-256 hash lookup.
+
+The claim itself is delegated to ``apps.users.services.login_token`` (the
+single lifecycle owner). The SHA-256 spelling in this module (``handle_login_deep_link``)
+is a deep-link *parse* step — it hashes the token from the message to produce
+the ``token_hash`` argument — not a second lifecycle owner. It is retained
+because ``handle_login_orm``'s ``token_hash=`` parameter is pinned by 12 bot
+test call sites; it is not a defect and must not be "fixed" here.
 """
 
 import datetime
@@ -14,7 +21,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -27,6 +34,7 @@ from apps.core.utils.cache import (
 )
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
+from apps.users.services.login_token import claim_token
 from telegram_bot.handlers.contact import CONTACT_US_CALLBACK
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.services.rate_limit import check_login_rate_limit
@@ -154,37 +162,15 @@ async def handle_login_deep_link(
 def _claim_login_token(
     token_hash: str, telegram_id: int, now: datetime.datetime
 ) -> LoginToken | None:
-    """Atomically claim a login token by setting its ``telegram_id``.
+    """Claim a login token by setting its ``telegram_id``.
 
-    Uses PostgreSQL ``UPDATE ... RETURNING`` for a single-statement,
-    zero-TOCTOU claim. The ``WHERE`` clause guarantees only an unclaimed
-    (``telegram_id IS NULL``), not-yet-consumed (``consumed_at IS NULL``),
-    and unexpired (``expires_at > now``) token is touched. Postgres holds a
-    row-level lock for the duration of the ``UPDATE``, so a concurrent claim
-    from another bot worker matches zero rows and returns ``None``.
-
-    Returns the claimed ``LoginToken`` instance (with ``telegram_id`` set and
-    ``consumed_at`` still ``NULL``), or ``None`` when no token matched.
+    Thin delegation to ``apps.users.services.login_token.claim_token``, which
+    owns the raw ``UPDATE ... RETURNING`` and its zero-TOCTOU ``WHERE``
+    clause. This wrapper keeps the claim call site inside ``handle_login_orm``'s
+    single ``@sync_to_async`` closure and single ``transaction.atomic()`` — it
+    must stay synchronous and must not open a transaction of its own.
     """
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            UPDATE login_tokens
-               SET telegram_id = %s
-             WHERE token_hash = %s
-               AND telegram_id IS NULL
-               AND consumed_at IS NULL
-               AND expires_at > %s
-            RETURNING id, token_hash, telegram_id, created_at, expires_at, consumed_at
-            """,
-            [telegram_id, token_hash, now],
-        )
-        row = cursor.fetchone()
-        if row is None:
-            return None
-        columns = [desc[0] for desc in cursor.description]
-
-    return LoginToken(**dict(zip(columns, row, strict=True)))
+    return claim_token(token_hash, telegram_id, now)
 
 
 async def handle_login_orm(
