@@ -73,7 +73,7 @@ services:
     mem_limit: ${MIGRATE_MEM_LIMIT:-256m}
     cpus: ${MIGRATE_CPUS:-0.5}
     # One-shot service: runs migrations with advisory lock (ID 100), then exits
-    # Idempotent: advisory lock prevents concurrent runs
+    # The advisory lock serialises concurrent runs: a contending run blocks until granted
 
   load_cities:
     build:

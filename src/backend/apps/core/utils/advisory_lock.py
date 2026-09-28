@@ -71,6 +71,12 @@ def advisory_lock(lock_id: int, *, session: bool = False):
 
     with connection.cursor() as cursor:
         if session:
+            # Log acquisition intent BEFORE pg_advisory_lock so a contending
+            # run (which blocks until the lock is granted) is not a silent
+            # hang. Deliberately placed only in the session branch: the
+            # transaction-scoped branch's log/on_commit flow is untouched
+            # (see DB-010) and phase 03's DB-004 owns any timeout wording.
+            logger.info("Requesting session advisory lock %s", lock_id)
             cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
             logger.info("Acquired session advisory lock %s", lock_id)
             try:

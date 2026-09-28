@@ -17,11 +17,13 @@ import inspect
 import logging
 import subprocess
 from contextlib import nullcontext
+from unittest.mock import patch
 
 import django
 import pytest
 
 import apps.core.utils.migrate_locked as migrate_locked
+from apps.core.enums import AdvisoryLockId
 from apps.core.utils import advisory_lock
 from apps.core.utils.migrate_locked import _build_steps
 
@@ -168,4 +170,47 @@ class TestDefaultSettings:
         """``manage.py``'s default is ``config.settings.prod``, never ``config.settings.dev``."""
         source = inspect.getsource(importlib.import_module("manage").main)
         assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
+
+
+class TestSessionLockAcquisitionLog:
+    """Session-scoped advisory_lock logs acquisition intent BEFORE acquiring.
+
+    The session branch issues the blocking ``pg_advisory_lock``; a contending
+    run blocks until the lock is granted. Without a pre-acquisition INFO line
+    the operator sees a silent hang (ENT-006 residual), so the log line must
+    fire before the acquisition statement executes.
+    """
+
+    def test_session_lock_logs_request_before_acquire(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The 'requesting' INFO line is emitted before pg_advisory_lock runs.
+
+        The cursor's acquire call is patched to raise, so the lock is never
+        granted. Asserting the request line is already in the log proves it is
+        emitted on the acquisition side (before the blocking call), not after
+        the lock is granted.
+        """
+        caplog.set_level(logging.INFO, logger="apps.core.utils.advisory_lock")
+
+        def _acquire_raises(sql: str, params: object | None = None) -> None:
+            if "pg_advisory_lock" in sql:
+                raise RuntimeError("simulated block on pg_advisory_lock")
+
+        with patch("apps.core.utils.advisory_lock.connection") as mock_conn:
+            mock_conn.cursor.return_value.__enter__.return_value.execute.side_effect = (
+                _acquire_raises
+            )
+            with pytest.raises(RuntimeError, match="simulated block"):
+                with advisory_lock.advisory_lock(AdvisoryLockId.MIGRATE, session=True):
+                    pass  # pragma: no cover - never reached because acquire raises
+
+        messages = [r.message for r in caplog.records]
+        assert any(
+            "Requesting session advisory lock" in m for m in messages
+        ), (
+            "expected a pre-acquisition INFO line ('Requesting session advisory "
+            "lock') before pg_advisory_lock executes; without it a blocked run "
+            "is a silent hang"
+        )
 

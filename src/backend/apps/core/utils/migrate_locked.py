@@ -2,7 +2,8 @@
 """
 One-shot migration runner with advisory lock.
 Session-scoped lock safe because migrate runs before PgBouncer is attached.
-Idempotent: subsequent runs will find lock already held and skip.
+The lock serialises concurrent runs: a contending run blocks on
+``pg_advisory_lock`` until the lock is granted, rather than skipping.
 
 Runs ``migrate --run-syncdb``, ``setup_search_triggers --backfill``,
 ``load_exchange_rates``, and optionally ``backfill_translations`` (when
