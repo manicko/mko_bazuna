@@ -1,0 +1,183 @@
+ Container mko-bazuna-test-test-run-89e980bc4459 Creating 
+ Container mko-bazuna-test-test-run-89e980bc4459 Created 
+Fixing media volume permissions...
+No REDIS_URL configured, skipping Redis wait
+Compiling translations...
+File “/app/src/backend/locale/en/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/ru/LC_MESSAGES/django.po” is already compiled and up to date.
+File “/app/src/backend/locale/bs/LC_MESSAGES/django.po” is already compiled and up to date.
+Running Django deploy checks...
+System check identified some issues:
+
+WARNINGS:
+?: (security.W008) Your SECURE_SSL_REDIRECT setting is not set to True. Unless your site should be available over both SSL and non-SSL connections, you may want to either set this setting True or configure a load balancer or reverse-proxy server to redirect all connections to HTTPS.
+?: (security.W009) Your SECRET_KEY has less than 50 characters, less than 5 unique characters, or it's prefixed with 'django-insecure-' indicating that it was generated automatically by Django. Please generate a long and random value, otherwise many of Django's security-critical features will be vulnerable to attack.
+?: (security.W012) SESSION_COOKIE_SECURE is not set to True. Using a secure-only session cookie makes it more difficult for network traffic sniffers to hijack user sessions.
+?: (security.W016) You have 'django.middleware.csrf.CsrfViewMiddleware' in your MIDDLEWARE, but you have not set CSRF_COOKIE_SECURE to True. Using a secure-only CSRF cookie makes it more difficult for network traffic sniffers to steal the CSRF token.
+?: (security.W018) You should not have DEBUG set to True in deployment.
+?: (security.W021) You have not set the SECURE_HSTS_PRELOAD setting to True. Without this, your site cannot be submitted to the browser preload list.
+
+System check identified 6 issues (0 silenced).
+
+=== A. effective runtime DB config ===
+ENGINE          : django.db.backends.postgresql
+CONN_MAX_AGE    : 0
+OPTIONS         : {'prepare_threshold': None}
+CONN_HEALTH     : False
+isolation_level : read committed
+autocommit      : True
+max_connections : 100
+server iso lvl  : read committed
+
+=== B. create_draft_ad IntegrityError backstop (no inner savepoint) ===
+recovery branch outcome -> TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+drafts left for user    -> 1
+
+=== C. record_event inside an open transaction (real FK violation) ===
+record_event returned  -> ad_published at 2026-09-28 07:26:20.107009+00:00
+caller state afterwards-> IntegrityError: insert or update on table "analytics_events" violates foreign key constraint "analytics_events_user_id_b21e3686_fk_users_id"
+DETAIL:  Key (user_id)=(10000000) is not present in table "users".
+needs_rollback flag    -> False
+
+=== C2. record_event: immediate statement error inside open transaction ===
+Failed to record analytics event ad_viewed (user_id=None, ad_id=None, source=None)
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.StringDataRightTruncation: value too long for type character varying(30)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/app/src/backend/apps/core/services/analytics.py", line 46, in record_event
+    return AnalyticsEvent.objects.create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        event_type=event_type,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        source=source,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "/app/.ai/audit/03-db-concurrency/verify_db.py", line 153, in _boom
+    cur.execute(
+    ~~~~~~~~~~~^
+        "INSERT INTO analytics_events (event_type, timestamp) VALUES (%s, %s)",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ["x" * 200, timezone.now()],  # varchar(30) -> immediate DataError
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.14/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/venv/lib/python3.14/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.14/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.DataError: value too long for type character varying(30)
+record_event returned  -> None
+caller state afterwards-> InternalError: current transaction is aborted, commands ignored until end of transaction block
+
+=== D. advisory lock: two concurrent sweep attempts ===
+   A-acquired@254135.24
+   A-released@254137.26
+   A-waited=2.02s
+   B-acquired@254135.24
+   B-released@254139.26
+   B-waited=4.02s
+
+=== E. advisory lock visible in pg_locks while held ===
+   advisory_rows_while_held  = 1
+   advisory_rows_after_commit = 0
+
+=== F. advisory lock released on ROLLBACK (process-crash proxy) ===
+   advisory rows after rollback = 0
+
+=== G. concurrent LoginToken claim (two 'processes') ===
+   tid=770000->CLAIMED
+   tid=770001->none
+   tid=770002->none
+   tid=770003->none
+   claims = 1
+
+=== H. concurrent create_draft_ad for one user (bot double /post) ===
+   task0 ok ad_id=217
+   task1 ok ad_id=218
+   drafts for user -> 1
+
+=== H2. create_draft_ad body raced from 6 real threads ===
+   RAISED TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+   RAISED TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+   RAISED TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+   RAISED TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+   RAISED TransactionManagementError: An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block.
+   ok ad_id=219
+   drafts for user -> 1
+
+=== I. connection behaviour under concurrent load ===
+   threads=16 queries=5 each -> errors: 0
+   idle-in-transaction conns -> 0
+   total conns to db        -> 2
+
+=== J. sweep_drafts vs an in-flight bot dialog ===
+   draft created_at -> 2026-09-28T06:55:33.087453+00:00
+   ad.updated_at    -> 2026-09-28T07:26:33.067409+00:00
+   row still present after sweep_drafts -> False
+   submit_ad re-fetch -> Ad.DoesNotExist (seller loses the ad)
+
+=== K. delete_sweep (no row lock) vs concurrent reactivation ===
+   sweep selected ids=[226]
+   reactivation committed status=ON_MODERATION
+   sweep deleted n=1
+   final row -> GONE
+
+=== L. row lock held by sweep -> bot submit_ad + whole bot stall ===
+   unrelated bot ORM read took 0.01s (blocked 14.66s wall)
+   submit_ad-shaped lock acquired after 15.05s
+
+=== M. sweep_orphaned_media vs an in-flight submit_ad file move ===
+Photo not found (already deleted): f438207101-a1b2c3d4.jpg
+   planted permanent file -> /app/media/f438207101-a1b2c3d4.jpg True
+Deleted 1 orphaned media files.
+   file after sweep        -> False
+   AdImage row committed   -> id=49 key=f438207101-a1b2c3d4.jpg
+   file on disk for row    -> False
+   => live ad row points at a deleted file: True
+
+=== N. immediate-alert writer vs daily send_alerts writer ===
+   IMMEDIATE_ALERTS_ENABLED = False
+   A: find_matching_saved_searches -> [4]
+   B: find_matching_ads (no lock, no notif yet) -> [229]
+   notification rows for (ss, ad) -> 1
+   => A sends and B sends the SAME (saved_search, ad) pair: True
+
+=== O. copy_ad (web /copy) while the bot FSM holds a DRAFT ===
+   before copy_ad: drafts = 1
+   copy_ad -> IntegrityError: duplicate key value violates unique constraint "uq_ads_single_draft_per_user"
+DETAIL:  Key (user_id)=(101) already exists.
+   rows after copy_ad -> [(230, 'source listing', 'published'), (231, 'bot fsm draft', 'draft')]
+   source ad intact -> True
+
+=== cleanup sentinel rows ===
+   ads left   -> 0
+   users left -> 0
+   advisory locks left -> 0
