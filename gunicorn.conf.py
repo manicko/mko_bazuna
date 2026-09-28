@@ -3,7 +3,11 @@
 This file is auto-discovered by Gunicorn when the working directory is /app
 (runtime container CWD). Only pure Python values are used so that
 ``preload_app`` can safely load the configuration before worker processes fork.
+``os`` is a standard-library module with no Django dependency, so importing it
+keeps that promise intact.
 """
+
+import os
 
 from prometheus_client import multiprocess
 
@@ -46,5 +50,19 @@ def child_exit(server, worker):
     Called by Gunicorn in the master process when a worker process exits.
     Removes the exiting worker's stale gauge files from PROMETHEUS_MULTIPROC_DIR
     so that the next /metrics scrape does not include dead-worker metrics.
+
+    The call is guarded: ``prometheus_client.multiprocess`` resolves the
+    directory from ``PROMETHEUS_MULTIPROC_DIR`` with a lowercase
+    ``prometheus_multiproc_dir`` fallback. When neither is set the path is
+    ``None`` and ``mark_process_dead`` raises ``TypeError`` inside
+    ``os.path.join``; Gunicorn's arbiter only catches ``OSError`` around this
+    hook, so the exception escapes to the loop-level handler, which stops the
+    arbiter and exits 255. The truthiness check also treats an empty-string
+    value as unset, matching ``django_prometheus``'s own presence check, so the
+    hook and the /metrics export stay consistent.
     """
-    multiprocess.mark_process_dead(worker.pid)
+    path = os.environ.get("PROMETHEUS_MULTIPROC_DIR") or os.environ.get(
+        "prometheus_multiproc_dir"
+    )
+    if path:
+        multiprocess.mark_process_dead(worker.pid)

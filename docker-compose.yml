@@ -237,6 +237,11 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - BOT_HEALTH_STALE_SECONDS=120
+      # Prometheus multiprocess directory. gunicorn.conf.py's child_exit hook
+      # reads this to clean up dead-worker gauge files, and django_prometheus
+      # exports from it on /metrics. Prometheus and the web process must agree
+      # on this single value.
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     env_file:
       - .env.dev
     volumes:
@@ -245,8 +250,16 @@ services:
     restart: unless-stopped
     cap_drop: ["ALL"]
     read_only: true
+    # The extra tmpfs below is a deliberate pair with PROMETHEUS_MULTIPROC_DIR.
+    # prometheus_client never calls os.makedirs on the directory, so the tmpfs
+    # mount (created before the container starts) is the only thing that makes
+    # it exist. Without it the container boots fine and then the first metric
+    # write raises FileNotFoundError — a silently broken /metrics on a live
+    # service, which is harder to detect than an outage. Neither the variable
+    # nor the tmpfs is sufficient alone.
     tmpfs:
       - /tmp
+      - /tmp/prometheus_multiproc:rw
     security_opt:
       - no-new-privileges:true
     mem_limit: ${WEB_MEM_LIMIT:-512m}

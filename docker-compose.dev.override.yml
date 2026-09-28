@@ -30,6 +30,11 @@ services:
       seed:
         condition: service_completed_successfully
 
+  # Dev bot deliberately does NOT depend on seed (unlike dev web). The bot
+  # serves no media, so waiting for the full seed run (600 ads by default)
+  # would only delay it in the development loop — a strictly worse trade.
+  # This asymmetry is asserted by the compose-contract test in
+  # src/backend/tests/, so adding a depends_on here is a reviewed act.
   bot:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
