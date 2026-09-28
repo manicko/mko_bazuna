@@ -144,6 +144,7 @@ function Invoke-TestRecreate {
     Invoke-TestCleanDb
     $env:COMPOSE_PROJECT_NAME = $TestProject
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 # Run the fast test gate in the test container (auto-starts the test DB if not
@@ -156,6 +157,7 @@ function Invoke-Test {
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
     # PYTEST_SKIP_MARKERS=seed appends -m "not (seed)" in entrypoint-test.sh.
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed" test
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 # Run the COMPLETE test suite (includes the nightly `seed` suite, ~35min). Use
@@ -164,6 +166,7 @@ function Invoke-TestAll {
     $env:COMPOSE_PROJECT_NAME = $TestProject
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm test
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 # Run linter inside web container
