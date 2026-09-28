@@ -11,12 +11,13 @@ Both markers are fail-open: a failure to write either is logged but does not
 disrupt bot operation.  See ENT-005.
 """
 
+import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from time import time as _now
-from typing import Any
+from typing import Any, Final
 
 from aiogram import BaseMiddleware, Bot
 from aiogram.types import BotCommand, TelegramObject
@@ -53,6 +54,16 @@ _COMMANDS: dict[str, list[BotCommand]] = {
         BotCommand(command="alerts", description="Alerts"),
     ],
 }
+
+
+# Whole-registration budget (seconds) for the command-menu setup at startup
+# (ENT-007). The menu is best-effort, so it must never gate bot readiness:
+# the file/Redis liveness markers are written before this runs, and this
+# bound caps the worst-case startup stall well under the healthcheck's
+# ``start_period: 30s``. A healthy run completes in well under a second, so
+# 10s (also the healthcheck ``timeout``) is generous for four sequential
+# ``set_my_commands`` round-trips while keeping the unhealthy worst case small.
+_BOT_COMMANDS_SETUP_TIMEOUT: Final[float] = 10.0
 
 
 def _marker_path() -> str | None:
@@ -111,21 +122,25 @@ async def _on_startup(*args: Any, **kwargs: Any) -> None:
     the bot has not yet become ready.
 
     Writes both the file-based marker (read by ``healthcheck-bot.sh``) and the
-    Redis ``bot:liveness`` key (read by the web readiness probe). Also
-    registers the localized command menu via ``set_my_commands`` (EC-3); a
-    failure there is logged but does not abort startup.
+    Redis ``bot:liveness`` key (read by the web readiness probe) before any
+    network I/O. The localized command-menu registration (EC-3) runs *after*
+    the markers, under a bounded ``asyncio.wait_for`` budget so a slow or
+    unresponsive Telegram API can never gate readiness (ENT-007). A failure
+    there — including a budget timeout — is logged but does not abort startup.
     """
-    bot = kwargs.get("bot")
-    if bot is not None:
-        try:
-            await _set_bot_commands(bot)
-        except Exception:
-            logger.warning("Failed to register bot commands at startup")
     path = _marker_path()
     if path:
         Path(path).touch()
         logger.info("Bot liveness marker written: %s", path)
     await _write_redis_marker()
+    bot = kwargs.get("bot")
+    if bot is not None:
+        try:
+            await asyncio.wait_for(
+                _set_bot_commands(bot), _BOT_COMMANDS_SETUP_TIMEOUT
+            )
+        except Exception:
+            logger.warning("Failed to register bot commands at startup")
 
 
 async def _on_shutdown(*args: Any, **kwargs: Any) -> None:

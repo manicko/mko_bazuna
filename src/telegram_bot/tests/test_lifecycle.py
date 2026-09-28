@@ -10,11 +10,14 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from telegram_bot.lifecycle import _BOT_COMMANDS_SETUP_TIMEOUT
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -22,6 +25,14 @@ pytestmark = [
     pytest.mark.concurrent,
 ]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
+
+# Test-only bound (seconds) for asserting the startup hook returns on its own
+# when command registration hangs. Chosen a little *above* the production
+# budget (``_BOT_COMMANDS_SETUP_TIMEOUT``) so the production ``asyncio.wait_for``
+# fires first and ``_on_startup`` returns by itself; using the production value
+# verbatim would race the two timeouts and force the test to wait the full
+# budget before it could observe anything.
+_STARTUP_RETURN_BOUND = _BOT_COMMANDS_SETUP_TIMEOUT + 5.0
 
 
 class TestOnStartup:
@@ -183,6 +194,60 @@ class TestOnStartupCommands:
                 new=AsyncMock(),
             ):
                 await _on_startup(MagicMock(), MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_markers_written_when_command_registration_hangs(
+        self, tmp_path: Path
+    ) -> None:
+        """Readiness markers are published before command registration (ENT-007).
+
+        Regression: markers used to be written only *after* ``_set_bot_commands``
+        returned, so a slow or unresponsive Telegram API (up to 4 × 30 s) could
+        leave the bot unready across the healthcheck's unhealthy window. The
+        markers must be written first, and the hook must return within its
+        budget even when registration never completes.
+        """
+        from telegram_bot.lifecycle import _on_startup
+
+        marker = tmp_path / "bot_alive"
+        redis_marker = AsyncMock()
+        registration_started = asyncio.Event()
+
+        async def hanging_set_bot_commands(bot: object) -> None:
+            # Signal that registration has begun, then never complete to
+            # simulate a hung Telegram API call.
+            registration_started.set()
+            await asyncio.Event().wait()
+
+        with patch("telegram_bot.lifecycle._marker_path", return_value=str(marker)):
+            with patch(
+                "telegram_bot.lifecycle._write_redis_marker", new=redis_marker
+            ):
+                with patch(
+                    "telegram_bot.lifecycle._set_bot_commands",
+                    new=hanging_set_bot_commands,
+                ):
+                    startup_task = asyncio.create_task(
+                        _on_startup(MagicMock(), bot=MagicMock())
+                    )
+                    # Wait until registration is in-flight.
+                    await asyncio.wait_for(
+                        registration_started.wait(), _STARTUP_RETURN_BOUND
+                    )
+                    # While registration is still pending, both markers must
+                    # already be written (the reorder under test).
+                    assert marker.exists(), (
+                        "file marker must be written before command registration"
+                    )
+                    redis_marker.assert_awaited_once()
+                    # The hook must return within its budget rather than hang:
+                    # the production ``asyncio.wait_for`` fires first, so this
+                    # resolves on its own inside our slightly larger bound.
+                    await asyncio.wait_for(startup_task, _STARTUP_RETURN_BOUND)
+
+        # Both markers are durably written after startup completes.
+        assert marker.exists()
+        redis_marker.assert_awaited_once()
 
 
 class TestOnShutdown:
