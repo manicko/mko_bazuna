@@ -201,7 +201,7 @@ class TestTimeoutHandling:
             for record in caplog.records
         )
 
-    def test_run_one_cycle_continues_after_timeout(self, tmp_path: Path) -> None:
+    def test_run_one_cycle_continues_after_timeout(self, daily_marker, tmp_path: Path) -> None:
         """A TimeoutExpired on one hourly command does not skip the rest."""
         timed_out_command = HOURLY_COMMANDS[2]
 
@@ -224,6 +224,7 @@ class TestTimeoutHandling:
                 now_func=now_func,
                 run_command=run_command,
                 last_daily=None,
+                daily_marker=daily_marker,
             )
 
         # All 9 hourly commands were attempted despite the timeout.
@@ -307,7 +308,7 @@ class TestDispatchIsolation:
 class TestCycleErrorIsolation:
     """Verify run_one_cycle continues past per-command failures."""
 
-    def test_hourly_cycle_continues_past_failure(self) -> None:
+    def test_hourly_cycle_continues_past_failure(self, daily_marker) -> None:
         """If the 3rd hourly command raises, commands 4-9 are still dispatched."""
         dispatched: list[str] = []
 
@@ -323,12 +324,13 @@ class TestCycleErrorIsolation:
             now_func=now_func,
             run_command=mock_run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         # All 9 hourly commands were attempted (3rd raised, but _dispatch caught it)
         assert dispatched == HOURLY_COMMANDS
 
-    def test_hourly_failure_does_not_skip_daily(self) -> None:
+    def test_hourly_failure_does_not_skip_daily(self, daily_marker) -> None:
         """If an hourly command raises, daily commands are still dispatched."""
         dispatched: list[str] = []
 
@@ -344,6 +346,7 @@ class TestCycleErrorIsolation:
             now_func=now_func,
             run_command=mock_run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         # All hourly commands dispatched despite the first one failing
@@ -351,8 +354,15 @@ class TestCycleErrorIsolation:
         # Daily command also dispatched
         assert "send_alerts" in dispatched
 
-    def test_daily_cycle_continues_past_failure(self) -> None:
-        """If the daily command raises, the cycle completes and last_daily updates."""
+    def test_daily_cycle_continues_past_failure(self, daily_marker) -> None:
+        """If the daily command raises, the cycle completes but the day is NOT marked.
+
+        The daily set did not complete, so the day must not be recorded.
+        Leaving ``last_daily`` unchanged is what makes the next hourly tick
+        retry it. (This test was previously green asserting the marker was
+        written despite the exception — a test pinning the defect it now guards
+        against.)
+        """
         dispatched: list[str] = []
 
         def mock_run_command(name: str) -> int:
@@ -367,12 +377,55 @@ class TestCycleErrorIsolation:
             now_func=now_func,
             run_command=mock_run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         # Daily command was still dispatched (exception caught by _dispatch)
         assert DAILY_COMMANDS[0] in dispatched
-        # last_daily was updated despite the exception
-        assert result == date(2025, 6, 15)
+        # The daily set did not complete, so the day must NOT be marked. Leaving
+        # last_daily unchanged is what makes the next hourly tick retry it.
+        assert result is None
+        assert daily_marker.recorded == []
+
+    def test_daily_cycle_retries_on_the_next_tick(self, daily_marker) -> None:
+        """A failed daily set is retried on the next tick and marked on success."""
+        dispatched: list[str] = []
+        failed_once = {"done": False}
+
+        def mock_run_command(name: str) -> int:
+            dispatched.append(name)
+            if name == DAILY_COMMANDS[0] and not failed_once["done"]:
+                failed_once["done"] = True
+                return 1
+            return 0
+
+        now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
+
+        # First tick: DAILY_COMMANDS[0] fails, so the day is NOT marked.
+        result1 = run_one_cycle(
+            now_func=now_func,
+            run_command=mock_run_command,
+            last_daily=None,
+            daily_marker=daily_marker,
+        )
+        assert result1 is None
+        assert daily_marker.recorded == []
+
+        # Second tick: same recording marker, carrying the first return as
+        # last_daily (exactly what the scheduler loop does).
+        result2 = run_one_cycle(
+            now_func=now_func,
+            run_command=mock_run_command,
+            last_daily=result1,
+            daily_marker=daily_marker,
+        )
+
+        # Both daily commands were dispatched on BOTH ticks — no short-circuit.
+        assert dispatched.count(DAILY_COMMANDS[0]) == 2
+        assert dispatched.count(DAILY_COMMANDS[1]) == 2
+        # Marked exactly once, on the successful retry.
+        assert daily_marker.recorded == [date(2025, 6, 15)]
+        assert result2 == date(2025, 6, 15)
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +488,7 @@ class TestLivenessMarkerIntegration:
 
     def test_hourly_cycle_writes_marker(
         self,
+        daily_marker,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
@@ -450,12 +504,14 @@ class TestLivenessMarkerIntegration:
             now_func=now_func,
             run_command=_noop_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         assert marker.exists()
 
     def test_daily_cycle_does_not_write_marker(
         self,
+        daily_marker,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
@@ -477,6 +533,7 @@ class TestLivenessMarkerIntegration:
                 now_func=now_func,
                 run_command=_noop_command,
                 last_daily=None,
+                daily_marker=daily_marker,
             )
 
         # Written exactly once — after hourly commands, before the daily section
@@ -485,6 +542,7 @@ class TestLivenessMarkerIntegration:
 
     def test_marker_written_even_when_hourly_command_fails(
         self,
+        daily_marker,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
@@ -509,6 +567,7 @@ class TestLivenessMarkerIntegration:
             now_func=now_func,
             run_command=failing_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         assert marker.exists()

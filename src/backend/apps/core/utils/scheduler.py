@@ -11,12 +11,22 @@ Design (Block A — faithful extraction):
     the exact command lists from the inline script.
   * ``should_run_daily()`` — pure, independently testable timing predicate.
   * ``run_one_cycle()`` — unit-testable single tick (no infinite loop, no sleep).
+    On a clean daily cycle it **writes** the durable daily marker (see below);
+    it does **not** re-read it — the read is a start-up concern in
+    :func:`run_scheduler`.
   * ``run_scheduler()`` — production infinite loop with injectable
     ``sleep_func`` / ``now_func`` / ``run_command_fn`` for testability. The
     inter-cycle wait is backed by the module stop event (interruptible), and a
     stop request short-circuits the commands not yet started in the current
     cycle (see :func:`_stop_aware_dispatch`).
   * ``main()`` — Django setup + entry point for standalone / Docker execution.
+
+Durable daily-dispatch marker: the daily set fires once per calendar day per
+*recorded success*, not once per process. The completion date lives in the
+``scheduler_daily_state`` singleton row (see
+``apps.core.services.scheduler_daily_state``), not process memory.
+``main()`` constructs the DB-backed marker and injects it; the unit suite
+injects a recording double that satisfies the :class:`DailyMarker` protocol.
 
 The original ``check=False`` and ``except Exception: pass`` semantics are
 preserved; structured logging and exit-code inspection are added in Block B.
@@ -33,9 +43,30 @@ import threading
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
+
+
+class DailyMarker(Protocol):
+    """Read/write seam over the durable daily-dispatch marker.
+
+    Declared here (rather than imported) so the module keeps its Django-free
+    import surface with zero app-level imports. ``read_last_daily`` is the
+    start-up read in :func:`run_scheduler`; ``record_daily`` is the write in
+    :func:`run_one_cycle` after a clean daily cycle. See
+    ``apps.core.services.scheduler_daily_state`` for the production
+    implementation.
+    """
+
+    def read_last_daily(self) -> date | None:
+        """Return the date the daily set last completed, or ``None``."""
+        ...
+
+    def record_daily(self, day: date) -> None:
+        """Record *day* as the date the daily set completed."""
+        ...
+
 
 # Set by the SIGTERM/SIGINT handler (in main()) to request a graceful break
 # of the run_scheduler() while-True loop. Signal handlers run in the main
@@ -206,12 +237,15 @@ def run_one_cycle(
     now_func: Callable[[], datetime] = _utcnow,
     run_command: Callable[[str], int],
     last_daily: date | None,
+    daily_marker: DailyMarker,
 ) -> date | None:
     """Execute one scheduler tick.
 
     Dispatches all hourly commands unconditionally. If ``should_run_daily()``
-    returns ``True``, dispatches all daily commands and updates ``last_daily``
-    to today's date. No infinite loop, no sleep — pure unit-testable function.
+    returns ``True``, dispatches all daily commands and, only when every daily
+    command exited 0 with no stop requested, records the day on
+    ``daily_marker`` and returns it as the new ``last_daily``. No infinite
+    loop, no sleep — pure unit-testable function.
 
     Args:
         now_func: Callable returning ``datetime`` (injectable for tests).
@@ -219,10 +253,18 @@ def run_one_cycle(
             mock in tests, ``_run_command_subprocess`` in production).
         last_daily: The date the daily commands were last dispatched, or
             ``None`` on first run.
+        daily_marker: The durable daily-dispatch marker seam (``DailyMarker``
+            protocol). Written only on a clean daily cycle; never re-read here
+            (the read is a start-up concern in :func:`run_scheduler`).
 
     Returns:
-        The updated ``last_daily`` value — ``now.date()`` if daily commands
-        ran, otherwise the previous ``last_daily`` unchanged.
+        The new ``last_daily`` value. It is ``now.date()`` **only** when the
+        daily set was dispatched **and** every daily command exited 0 **and**
+        no stop was requested; otherwise the previous value unchanged, so the
+        next hourly tick retries. A failing daily command leaves the marker
+        untouched and is retried (bounded ~16 attempts/day); both daily
+        commands are idempotent after the delivery fix, and a failing
+        ``rollup_daily_metrics`` genuinely should be retried.
     """
     now = now_func()
 
@@ -237,9 +279,40 @@ def run_one_cycle(
     # Daily commands — once per calendar day at/after 08:00 UTC
     new_last_daily = last_daily
     if should_run_daily(now, last_daily, DAILY_HOUR_UTC):
-        for cmd in DAILY_COMMANDS:
-            _dispatch(cmd, run_command)
-        new_last_daily = now.date()
+        # Dispatch EVERY daily command before judging the outcome: the list is
+        # deliberate. all(_dispatch(c, r) == 0 for c in DAILY_COMMANDS) would
+        # short-circuit on the first failure and skip the remaining commands.
+        daily_exit_codes = [_dispatch(cmd, run_command) for cmd in DAILY_COMMANDS]
+        daily_ok = all(code == 0 for code in daily_exit_codes)
+        # The stop-flag check is load-bearing: _stop_aware_dispatch returns 0
+        # for every command it declines, so exit codes alone cannot reveal that
+        # the daily set never actually ran.
+        if _stop_event.is_set():
+            logger.warning(
+                "Stop requested during the daily cycle for %s - the daily marker "
+                "is left unchanged so the daily set re-runs on the next start",
+                now.date().isoformat(),
+            )
+        elif not daily_ok:
+            logger.warning(
+                "Daily commands for %s did not all succeed (exit codes %s) - the "
+                "daily marker is left unchanged and the set is retried on the next "
+                "hourly tick",
+                now.date().isoformat(),
+                daily_exit_codes,
+            )
+        else:
+            day = now.date()
+            # Order matters: the durable record is attempted first, then the
+            # in-memory carrier advances. record_daily is fail-open, so a marker
+            # failure never blocks the tick; the cost is that this process will
+            # not retry within the day, and the next start will re-run the set.
+            daily_marker.record_daily(day)
+            new_last_daily = day
+            logger.info(
+                "Daily commands completed for %s - durable marker recorded",
+                day.isoformat(),
+            )
 
     return new_last_daily
 
@@ -289,8 +362,11 @@ def _stop_aware_dispatch(
     graceful stop, so every skipped sweep runs on the next start.
 
     Returns the wrapped dispatcher's exit code unchanged. A skipped command
-    returns ``0`` — nothing failed, it was deliberately not run, and the
-    return value is currently unobserved by ``run_one_cycle``.
+    returns ``0`` — nothing failed, it was deliberately not run — and that
+    ``0`` is now **load-bearing**, because the daily gate in
+    :func:`run_one_cycle` combines "all daily exit codes are 0" with an
+    explicit ``_stop_event.is_set()`` check, since exit codes alone cannot
+    distinguish a skipped command from a successful one.
     """
     def dispatch(name: str) -> int:
         if _stop_event.is_set():
@@ -308,6 +384,8 @@ def run_scheduler(
     now_func: Callable[[], datetime] = _utcnow,
     run_command_fn: Callable[[str], int] | None = None,
     interval_seconds: float = SCHEDULE_INTERVAL_SECONDS,
+    *,
+    daily_marker: DailyMarker,
 ) -> None:
     """Infinite scheduler loop — hourly sweeps + daily jobs.
 
@@ -344,6 +422,13 @@ def run_scheduler(
             :func:`_stop_aware_dispatch` before being handed to
             :func:`run_one_cycle`.
         interval_seconds: Tick interval in seconds (default 3600).
+        daily_marker: The durable daily-dispatch marker seam (``DailyMarker``
+            protocol). Required, with no default: a ``None`` default would be a
+            silent no-op that reintroduces the exact defect this seam prevents
+            (the daily set re-running every tick). ``last_daily`` is recovered
+            from this marker at start-up rather than assumed ``None``; a read
+            failure reports ``None`` so the set **runs** — a marker problem must
+            re-run, never skip.
     """
     python_executable = python_executable or sys.executable
     resolved_manage_py = Path(manage_py) if manage_py else _default_manage_py()
@@ -357,7 +442,22 @@ def run_scheduler(
     _validate_commands(HOURLY_COMMANDS + DAILY_COMMANDS)
 
     logger.info("Scheduler started (interval=%s seconds)", interval_seconds)
-    last_daily: date | None = None
+    # Recover the last daily-completion date from the durable marker rather
+    # than assuming None. A read failure reports None, which makes the daily
+    # set run on the first tick at/after DAILY_HOUR_UTC — a marker problem must
+    # cause a re-run, never a silent skip.
+    last_daily = daily_marker.read_last_daily()
+    if last_daily is None:
+        logger.info(
+            "No scheduler daily marker found - the daily set will run on the "
+            "first tick at/after %02d:00 UTC",
+            DAILY_HOUR_UTC,
+        )
+    else:
+        logger.info(
+            "Recovered scheduler daily marker - daily set last completed %s",
+            last_daily.isoformat(),
+        )
     while True:
         if _stop_event.is_set():
             logger.info("Stop flag set — exiting scheduler loop after completed cycle")
@@ -367,6 +467,7 @@ def run_scheduler(
                 now_func=now_func,
                 run_command=dispatch,
                 last_daily=last_daily,
+                daily_marker=daily_marker,
             )
         except Exception:
             logger.exception("Scheduler cycle failed — continuing")
@@ -399,8 +500,16 @@ def main() -> int:
     Registers SIGTERM/SIGINT handlers before entering the scheduler loop and
     runs graceful teardown (:func:`_shutdown`) in a ``finally`` block so DB
     connections are always closed when the loop exits.
+
+    After ``django.setup()`` the DB-backed daily marker
+    (``SchedulerDailyMarker``) is constructed and injected into
+    :func:`run_scheduler`. The import is deferred to runtime (and to after
+    ``django.setup()``) because the marker's class imports the Django ORM; its
+    construction touches no database.
     """
     import django
+
+    from apps.core.services.scheduler_daily_state import SchedulerDailyMarker
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
     django.setup()
@@ -409,7 +518,7 @@ def main() -> int:
     signal.signal(signal.SIGINT, _handle_shutdown_signal)
 
     try:
-        run_scheduler()
+        run_scheduler(daily_marker=SchedulerDailyMarker())
     finally:
         _shutdown()
     return 0

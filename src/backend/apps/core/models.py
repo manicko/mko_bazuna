@@ -54,6 +54,48 @@ class SiteConfig(models.Model):
         return obj
 
 
+class SchedulerDailyState(models.Model):
+    """
+    Durable marker for the scheduler's daily command set (singleton).
+
+    Exactly one row exists (pk=1), created lazily via ``get_or_create(pk=1)``.
+    Records the calendar date the daily set last completed cleanly, written by
+    ``run_one_cycle`` only after every daily command exited 0 with no stop
+    requested. Read by ``run_scheduler`` once on start-up. The implicit ``pk=1``
+    is the singleton invariant, so no explicit constraint is needed. Not
+    registered in admin — no second operator-driven write path.
+    """
+
+    last_daily = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Calendar date the daily set last completed cleanly",
+    )
+    last_daily_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the daily set last completed cleanly",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When this marker row was last written",
+    )
+
+    class Meta:
+        db_table = "scheduler_daily_state"
+        verbose_name = "Scheduler Daily State"
+        verbose_name_plural = "Scheduler Daily State"
+
+    def __str__(self) -> str:
+        return f"SchedulerDailyState(last_daily={self.last_daily})"
+
+    @classmethod
+    def get_singleton(cls) -> SchedulerDailyState:
+        """Get the singleton instance, creating it if necessary."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class SupportContact(models.Model):
     """A support channel (email or Telegram) offered to sellers."""
 

@@ -199,7 +199,7 @@ class TestRunOneCycle:
         """Create a mock run_command that returns 0 for all calls."""
         return MagicMock(return_value=0)
 
-    def test_hourly_commands_all_dispatched(self) -> None:
+    def test_hourly_commands_all_dispatched(self, daily_marker) -> None:
         """Every command in HOURLY_COMMANDS is dispatched exactly once per cycle."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 0)  # noqa: E731
@@ -208,6 +208,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         # Every hourly command was called exactly once
@@ -217,7 +218,7 @@ class TestRunOneCycle:
         assert len(called_names) == len(HOURLY_COMMANDS)
 
     def test_daily_commands_not_dispatched_before_threshold_first_run(
-        self,
+        self, daily_marker
     ) -> None:
         """First run before 08:00 UTC — daily commands are NOT dispatched."""
         run_command = self._make_mock_run_command()
@@ -227,6 +228,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -234,7 +236,7 @@ class TestRunOneCycle:
             assert cmd not in called_names
         assert result is None  # last_daily unchanged
 
-    def test_daily_commands_dispatched_at_threshold_first_run(self) -> None:
+    def test_daily_commands_dispatched_at_threshold_first_run(self, daily_marker) -> None:
         """First run at 08:00 UTC — daily commands ARE dispatched."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
@@ -243,6 +245,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -250,7 +253,7 @@ class TestRunOneCycle:
             assert cmd in called_names, f"{cmd} was not dispatched"
         assert result == date(2025, 6, 15)
 
-    def test_daily_commands_dispatched_after_threshold(self) -> None:
+    def test_daily_commands_dispatched_after_threshold(self, daily_marker) -> None:
         """First run after 08:00 UTC — daily commands dispatched."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 14, 30)  # noqa: E731
@@ -259,6 +262,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -266,7 +270,7 @@ class TestRunOneCycle:
             assert cmd in called_names
         assert result == date(2025, 6, 15)
 
-    def test_daily_not_repeated_same_day(self) -> None:
+    def test_daily_not_repeated_same_day(self, daily_marker) -> None:
         """Same day as last_daily — daily commands NOT dispatched again."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 12)  # noqa: E731
@@ -275,6 +279,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=date(2025, 6, 15),
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -282,7 +287,7 @@ class TestRunOneCycle:
             assert cmd not in called_names
         assert result == date(2025, 6, 15)  # unchanged
 
-    def test_daily_not_run_next_day_before_threshold(self) -> None:
+    def test_daily_not_run_next_day_before_threshold(self, daily_marker) -> None:
         """New day but before 08:00 — daily not dispatched, last_daily unchanged."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 16, 7)  # noqa: E731
@@ -291,6 +296,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=date(2025, 6, 15),
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -298,7 +304,7 @@ class TestRunOneCycle:
             assert cmd not in called_names
         assert result == date(2025, 6, 15)  # unchanged
 
-    def test_daily_runs_next_day_at_threshold(self) -> None:
+    def test_daily_runs_next_day_at_threshold(self, daily_marker) -> None:
         """New day at 08:00 — daily dispatched, last_daily updated to new date."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 16, 8)  # noqa: E731
@@ -307,6 +313,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=date(2025, 6, 15),
+            daily_marker=daily_marker,
         )
 
         called_names = [call.args[0] for call in run_command.call_args_list]
@@ -314,7 +321,7 @@ class TestRunOneCycle:
             assert cmd in called_names
         assert result == date(2025, 6, 16)
 
-    def test_hourly_plus_daily_count(self) -> None:
+    def test_hourly_plus_daily_count(self, daily_marker) -> None:
         """Total dispatches = len(HOURLY) + len(DAILY) when daily runs."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 8)  # noqa: E731
@@ -323,12 +330,13 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=date(2025, 6, 14),
+            daily_marker=daily_marker,
         )
 
         expected = len(HOURLY_COMMANDS) + len(DAILY_COMMANDS)
         assert run_command.call_count == expected
 
-    def test_hourly_only_count_no_daily(self) -> None:
+    def test_hourly_only_count_no_daily(self, daily_marker) -> None:
         """Total dispatches = len(HOURLY) when daily does not run."""
         run_command = self._make_mock_run_command()
         now_func = lambda: _utc(2025, 6, 15, 7)  # noqa: E731
@@ -337,6 +345,7 @@ class TestRunOneCycle:
             now_func=now_func,
             run_command=run_command,
             last_daily=None,
+            daily_marker=daily_marker,
         )
 
         assert run_command.call_count == len(HOURLY_COMMANDS)
@@ -350,7 +359,7 @@ class TestRunOneCycle:
 class TestRunScheduler:
     """Test the infinite loop with injectable collaborators."""
 
-    def test_single_cycle_then_stop(self) -> None:
+    def test_single_cycle_then_stop(self, daily_marker) -> None:
         """Inject a no-op sleep that raises to break the loop after one cycle."""
         run_command = MagicMock(return_value=0)
         sleep_calls: list[float] = []
@@ -367,6 +376,7 @@ class TestRunScheduler:
                 now_func=now_func,
                 run_command_fn=run_command,
                 interval_seconds=0,
+                daily_marker=daily_marker,
             )
 
         # One sleep call (the loop ran exactly once before StopIteration)
@@ -374,7 +384,7 @@ class TestRunScheduler:
         # Hourly + daily commands dispatched
         assert run_command.call_count == len(HOURLY_COMMANDS) + len(DAILY_COMMANDS)
 
-    def test_cycle_failure_does_not_crash(self) -> None:
+    def test_cycle_failure_does_not_crash(self, daily_marker) -> None:
         """A cycle-level exception is caught; scheduler continues."""
         call_count = [0]
 
@@ -398,12 +408,13 @@ class TestRunScheduler:
                 now_func=now_func,
                 run_command_fn=failing_run_command,
                 interval_seconds=0,
+                daily_marker=daily_marker,
             )
 
         # Sleep was still called — the cycle exception was caught
         assert len(sleep_calls) == 1
 
-    def test_command_exception_does_not_skip_remaining(self) -> None:
+    def test_command_exception_does_not_skip_remaining(self, daily_marker) -> None:
         """Per-command exception is isolated; remaining commands still dispatch."""
         call_count = [0]
 
@@ -427,6 +438,7 @@ class TestRunScheduler:
                 now_func=now_func,
                 run_command_fn=selective_fail,
                 interval_seconds=0,
+                daily_marker=daily_marker,
             )
 
         # All hourly + all daily commands were attempted (none skipped)
@@ -448,7 +460,7 @@ class TestGracefulShutdown:
     These tests drive the flag directly (no real signal delivery).
     """
 
-    def test_scheduler_stops_on_stop_event_after_one_cycle(self) -> None:
+    def test_scheduler_stops_on_stop_event_after_one_cycle(self, daily_marker) -> None:
         """Loop breaks cleanly after one full cycle once the stop flag is set."""
         scheduler_mod._stop_event.clear()
         try:
@@ -466,6 +478,7 @@ class TestGracefulShutdown:
                 now_func=now_func,
                 run_command_fn=run_command,
                 interval_seconds=0,
+                daily_marker=daily_marker,
             )
 
             # One full cycle ran (hourly + daily), then the loop broke normally.
@@ -495,7 +508,7 @@ class TestGracefulShutdown:
         shutdown_called = []
 
         monkeypatch.setattr(scheduler_mod.signal, "signal", fake_signal)
-        monkeypatch.setattr(scheduler_mod, "run_scheduler", lambda: None)
+        monkeypatch.setattr(scheduler_mod, "run_scheduler", lambda **_kwargs: None)
         monkeypatch.setattr(scheduler_mod, "_shutdown", lambda: shutdown_called.append(True))
         monkeypatch.delenv("DJANGO_SETTINGS_MODULE", raising=False)
 
@@ -536,6 +549,7 @@ class TestBoundedStopLatency:
 
     def test_stop_request_during_wait_exits_loop_promptly(
         self,
+        daily_marker,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """The default wait is interruptible: the real handler ends it at once.
@@ -561,6 +575,7 @@ class TestBoundedStopLatency:
                     run_command_fn=instant_run_command,
                     now_func=lambda: _utc(2025, 6, 15, 12),
                     interval_seconds=_WAIT_INTERVAL_SECONDS,
+                    daily_marker=daily_marker,
                 )
             except BaseException as exc:
                 errors.append(exc)
@@ -602,6 +617,7 @@ class TestBoundedStopLatency:
 
     def test_stop_request_during_cycle_skips_remaining_commands(
         self,
+        daily_marker,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """A stop raised mid-cycle short-circuits the commands not yet started.
@@ -628,6 +644,7 @@ class TestBoundedStopLatency:
                     run_command_fn=stop_on_first_command,
                     now_func=lambda: _utc(2025, 6, 15, 12),
                     interval_seconds=_WAIT_INTERVAL_SECONDS,
+                    daily_marker=daily_marker,
                 )
             except BaseException as exc:
                 errors.append(exc)
@@ -647,6 +664,9 @@ class TestBoundedStopLatency:
             # Only the in-flight command ran; the other 8 hourly and 2 daily
             # commands were skipped.
             assert dispatched == [HOURLY_COMMANDS[0]]
+            # A mid-cycle stop means the daily set never ran; recording the day
+            # would suppress it for 24 hours.
+            assert daily_marker.recorded == []
             # A shortened cycle is never silent.
             assert "skipping remaining command" in caplog.text
         finally:
