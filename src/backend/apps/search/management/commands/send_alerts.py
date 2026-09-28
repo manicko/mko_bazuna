@@ -1,9 +1,21 @@
 """
 Management command to send daily saved search alert notifications.
 
-Runs once daily via cron. Uses advisory lock for idempotency.
-Collects matching ads, records notifications and analytics events,
-then sends consolidated digests to users via Telegram.
+Dispatched by the scheduler service on the first hourly tick at or after 08:00
+UTC each calendar day — there is no cron entry in the containerised deployment.
+Collects matching ads, records notifications and analytics events, then sends
+consolidated digests to users via Telegram.
+
+It takes a transaction-scoped advisory lock (``AdvisoryLockId.ALERT_DELIVERY_TASK``)
+for **concurrency** control, not **repeat** protection; a second run against
+unchanged data collects nothing anyway, because ``find_matching_ads`` excludes
+already-notified pairs and the ``uq_saved_search_ad`` constraint makes the
+insert idempotent.
+
+Per-user delivery is capped at ``_DIGEST_AD_LIMIT`` (10), applied at
+**collection** time so the notification rows and the rendered digest contain
+the same ads; ads beyond the cap get no notification row, so a later run can
+still deliver them.
 """
 
 import asyncio
@@ -20,10 +32,11 @@ from aiogram.exceptions import (
     TelegramServerError,
 )
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.translation import gettext as _, override as translation_override
 
+from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId, AnalyticsEventType, LanguageLocale
@@ -35,6 +48,29 @@ logger = logging.getLogger(__name__)
 
 # Capped backoff base (seconds) for transient retries (429/network/5xx).
 _BACKOFF_BASE: Final[float] = 0.5
+
+# Maximum unique ads rendered in a single user's daily digest. Applied at
+# collection time so the notification set and the rendered set are the same set.
+_DIGEST_AD_LIMIT: Final[int] = 10
+
+
+def _select_digest_ads(bucket: list[Ad], matching_ads: list[Ad], limit: int) -> list[Ad]:
+    """Return the ads from *matching_ads* that fit into *bucket* under *limit*.
+
+    Deduplicates against what the user already has in *bucket* and stops once
+    the per-user cap is reached. This is a *second, different* limit from the
+    per-search 10-ad cap inside ``find_matching_ads``; that one bounds one
+    saved search, this one bounds one user's whole digest.
+    """
+    known_ids = {ad.id for ad in bucket}
+    selected: list[Ad] = []
+    for ad in matching_ads:
+        if len(bucket) + len(selected) >= limit:
+            break
+        if ad.id in known_ids:
+            continue
+        selected.append(ad)
+    return selected
 
 
 class Command(BaseCommand):
@@ -52,7 +88,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute alert delivery with advisory lock."""
+        """Execute alert delivery with advisory lock.
+
+        Loss window (known, escalated): the send runs outside both the advisory
+        lock and the transaction; a crash between the commit of the
+        notification rows and the last ``send_message`` permanently loses those
+        digests, because the notifications are written, so ``find_matching_ads``
+        will never re-collect those ads, and no delivery-state column exists to
+        distinguish "recorded" from "delivered". Moving the send inside the
+        lock/transaction is **wrong** — a mid-send crash would roll back the
+        notification write and re-enable duplicate delivery, and it would widen
+        the contention window against the lock-free ``deliver_immediate_alerts``
+        publish-time path. The correct fix is a delivery-state column on
+        ``SavedSearchNotification`` (phase 03 DB-007's schema).
+
+        CommandError policy: raised only when every attempted user failed. A
+        no-match day and a partially-failed day both exit 0.
+        """
         dry_run: bool = options["dry_run"]
 
         if dry_run:
@@ -69,11 +121,23 @@ class Command(BaseCommand):
 
                 self._persist_alerts(notifications_to_create, analytics_events)
 
-        # Send messages outside the transaction (network I/O)
+        # Send messages outside the transaction and outside the advisory lock
+        # (network I/O). See the docstring for the loss window this creates.
+        users_attempted = len(user_ads)
+        users_sent = 0
         try:
-            asyncio.run(self._send_user_digests(settings.BOT_TOKEN, user_ads))
+            users_sent = asyncio.run(
+                self._send_user_digests(settings.BOT_TOKEN, user_ads)
+            )
         except AiogramError as exc:
             logger.error("Daily alert send failed: %s", exc)
+
+        # A blanket AiogramError swallow exits 0, which lets the scheduler record
+        # the day as complete even though nothing was delivered. Raise only when
+        # every attempted user failed, so one dead chat_id cannot block the day's
+        # marker while a total Telegram outage still blocks it.
+        if users_attempted > 0 and users_sent == 0:
+            raise CommandError(f"Alert delivery failed for all {users_attempted} users")
 
     def _dry_run_check(self) -> None:
         """Log counts of users, saved searches, and potential matches."""
@@ -100,6 +164,24 @@ class Command(BaseCommand):
     def _collect_alerts(self) -> tuple[dict[int, list], list, list]:
         """Collect notification data for all active saved searches.
 
+        The per-user digest cap (``_DIGEST_AD_LIMIT``) is applied **here**, at
+        collection time, not in ``_send_user_digests``, so the notification rows
+        and the rendered message contain the same ads. ``SEARCH_ALERT_MATCHED``
+        now means "this search contributed at least one ad to the digest".
+        Ads suppressed by the cap keep no notification row and stay collectable
+        by a later run.
+
+        Fairness note (known, accepted): the cap is applied in the iteration
+        order of ``SavedSearch.objects.filter(is_active=True)``, which has no
+        ``Meta.ordering``. A user with saved search A (10 matching ads) and
+        saved search B (10 matching ads) therefore always receives A's ten and
+        B's ten are deferred to a later run, regardless of which were published
+        first or how relevant they are. This is deterministic in practice but
+        not guaranteed by any ordering, and it is a fairness wart, not a bug:
+        the suppressed ads carry no ``SavedSearchNotification`` row, so they
+        are collected by the next run. Changing the policy (fair-share
+        interleaving, or sorting by match rank across searches) is out of scope.
+
         Must be called inside a transaction with the advisory lock held.
 
         Returns:
@@ -113,19 +195,25 @@ class Command(BaseCommand):
             "user", "city", "category"
         ):
             matching_ads = find_matching_ads(saved_search)
-
             if not matching_ads:
                 continue
 
-            if saved_search.user_id not in user_ads:
-                user_ads[saved_search.user_id] = []
-            user_ads[saved_search.user_id].extend(matching_ads)
+            # Cap the per-user digest at collection time, so the notification
+            # rows and the rendered message contain the SAME ads. Previously a
+            # notification row was written for every collected ad while the
+            # digest rendered only the first 10, so the surplus was permanently
+            # suppressed by find_matching_ads' NOT EXISTS with no record and no
+            # way to deliver it later.
+            bucket = user_ads.setdefault(saved_search.user_id, [])
+            selected_ads = _select_digest_ads(bucket, matching_ads, _DIGEST_AD_LIMIT)
+            if not selected_ads:
+                continue
 
+            bucket.extend(selected_ads)
             notifications_to_create.extend(
                 SavedSearchNotification(saved_search_id=saved_search.id, ad_id=ad.id)
-                for ad in matching_ads
+                for ad in selected_ads
             )
-
             analytics_events.append(
                 AnalyticsEvent(
                     event_type=AnalyticsEventType.SEARCH_ALERT_MATCHED,
@@ -150,15 +238,31 @@ class Command(BaseCommand):
             )
 
         if analytics_events:
+            # No constraint on analytics_events: eleven writers legitimately
+            # duplicate (per ad-detail render, per search, per auto-moderation
+            # attempt, per contact, seed bulk-creates). The scheduler's
+            # run-level durable marker, not a row-level constraint, is the
+            # dedupe mechanism. Do NOT add ignore_conflicts here: with no
+            # conflict target it would silently swallow every constraint added
+            # later, and test_contact.py asserts duplicates are kept.
             AnalyticsEvent.objects.bulk_create(analytics_events)
 
     async def _send_user_digests(
         self, bot_token: str, user_ads: dict[int, list]
-    ) -> None:
-        """Send consolidated digest messages to users."""
+    ) -> int:
+        """Send consolidated digest messages; return users messaged.
+
+        The caller owns the per-user cap, so the ``[:10]`` slice that used to
+        live here is gone — each user's ``ads`` list is already the capped
+        digest. The return value counts users whose message was accepted by
+        Telegram (skipped and fully-failed users do not count) and is what
+        ``handle()`` uses to decide whether the day's dispatch succeeded.
+        """
         from apps.users.models import User
 
         bot = Bot(token=bot_token)
+        sent_users = 0
+        rendered_ads = 0
         try:
             for user_id, ads in user_ads.items():
                 try:
@@ -173,7 +277,7 @@ class Command(BaseCommand):
                     )
                     continue
 
-                unique_ads = list({ad.id: ad for ad in ads}.values())[:10]
+                unique_ads = list({ad.id: ad for ad in ads}.values())
 
                 if not unique_ads:
                     continue
@@ -187,6 +291,8 @@ class Command(BaseCommand):
                         text=message,
                         parse_mode="HTML",
                     )
+                    rendered_ads += len(unique_ads)
+                    sent_users += 1
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logger.warning("Failed to send alert to user %d: %s", user_id, e)
                 except (
@@ -206,19 +312,22 @@ class Command(BaseCommand):
                             text=message,
                             parse_mode="HTML",
                         )
+                        rendered_ads += len(unique_ads)
+                        sent_users += 1
                     except AiogramError as retry_exc:
                         logger.warning(
                             "Alert retry failed to user %d: %s", user_id, retry_exc
                         )
 
-            total_ads = sum(len(ads) for ads in user_ads.values())
             logger.info(
-                "Sent alert digest for %d ads to %d users",
-                total_ads,
+                "Alert digests sent: %d ads to %d users (%d users attempted)",
+                rendered_ads,
+                sent_users,
                 len(user_ads),
             )
         finally:
             await bot.session.close()
+        return sent_users
 
     def _format_digest(self, ads: list, locale: str = LanguageLocale.RUSSIAN.value) -> str:
         """Format digest message for a user in their preferred locale."""

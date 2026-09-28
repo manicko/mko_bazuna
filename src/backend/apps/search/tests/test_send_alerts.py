@@ -251,7 +251,12 @@ class TestHandleSafety:
     """handle() wraps asyncio.run() in try/except AiogramError."""
 
     def test_handle_swallows_aiogram_error(self) -> None:
-        """handle() — _send_user_digests raising AiogramError -> handle() does not raise."""
+        """handle() — _send_user_digests raising AiogramError -> handle() does not raise.
+
+        ``_collect_alerts`` is patched to ``({}, [], [])``, so ``users_attempted
+        == 0`` and the all-failed ``CommandError`` branch is not entered: the
+        blanket ``AiogramError`` swallow exits 0.
+        """
         from apps.search.management.commands.send_alerts import Command
 
         cmd = Command()
