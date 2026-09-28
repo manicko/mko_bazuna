@@ -52,6 +52,18 @@ def _noop_command(_name: str) -> int:
     return 0
 
 
+def _leaky_failing_command(name: str) -> int:
+    """A run_command stub whose first hourly command returns non-zero.
+
+    Produces a *dirty* (non-clean but non-raising) cycle: ``_dispatch`` returns
+    the non-zero exit code, ``run_one_cycle`` completes, and only a leaked
+    ``is_first_cycle`` flag would refresh the liveness marker.
+    """
+    if name == HOURLY_COMMANDS[0]:
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # _run_command_subprocess — structured logging + exit-code inspection
 # ---------------------------------------------------------------------------
@@ -728,3 +740,84 @@ class TestLivenessMarkerIntegration:
         )
 
         assert marker.exists()
+
+    def test_marker_refreshed_only_once_when_first_cycles_raise(
+        self,
+        daily_marker,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """The first-cycle liveness grace is one-shot on the *attempt*.
+
+        Drives ``run_scheduler`` (not ``run_one_cycle`` directly) because the
+        success-gated reset defect lives in the loop: when ``run_one_cycle``
+        raises, a naive ``first_cycle = False`` placed after the call is never
+        reached, so the unconditional grace leaks into every later cycle. Here
+        the first two cycles raise and the third is the first non-raising cycle
+        but is deliberately *dirty* (one hourly command returns non-zero): a
+        leaked first-cycle flag would refresh the marker on that dirty cycle
+        too. The marker must be refreshed only once — on the final, clean cycle
+        — never from a stuck first-cycle flag.
+        """
+        marker = tmp_path / "scheduler_alive"
+        marker.touch()
+        old_mtime = 1_000_000
+        os.utime(marker, (old_mtime, old_mtime))
+        monkeypatch.setattr(
+            settings, "SCHEDULER_LIVENESS_FILE", str(marker)
+        )
+
+        real_run_one_cycle = scheduler_mod.run_one_cycle
+        state = {"cycles": 0}
+
+        def staged_run_one_cycle(**kwargs):
+            state["cycles"] += 1
+            if state["cycles"] <= 2:
+                raise RuntimeError("cycle boom")
+            if state["cycles"] == 3:
+                # Dirty cycle: an hourly command fails (returns non-zero).
+                return real_run_one_cycle(
+                    **{
+                        **kwargs,
+                        "run_command": _leaky_failing_command,
+                    }
+                )
+            return real_run_one_cycle(**kwargs)
+
+        monkeypatch.setattr(scheduler_mod, "run_one_cycle", staged_run_one_cycle)
+
+        writes = {"n": 0}
+        real_write = scheduler_mod._write_liveness_marker
+
+        def counting_write() -> None:
+            writes["n"] += 1
+            real_write()
+
+        monkeypatch.setattr(scheduler_mod, "_write_liveness_marker", counting_write)
+
+        def stop_after_four(_seconds: float) -> None:
+            if state["cycles"] >= 4:
+                scheduler_mod._stop_event.set()
+
+        now_func = lambda: _utc(2025, 6, 15, 0)  # noqa: E731
+
+        try:
+            scheduler_mod.run_scheduler(
+                now_func=now_func,
+                run_command_fn=_noop_command,
+                sleep_func=stop_after_four,
+                daily_marker=daily_marker,
+                interval_seconds=0,
+            )
+        finally:
+            scheduler_mod._stop_event.clear()
+
+        # Refreshed exactly once, on the final clean cycle — not on the two
+        # raising cycles, and not on the dirty cycle via a leaked first-cycle
+        # flag (which would make this 2 refreshes).
+        assert writes["n"] == 1, (
+            "liveness marker must be refreshed exactly once; got "
+            f"{writes['n']} refreshes (a leaked first-cycle flag refreshes "
+            "the marker on the dirty cycle too)"
+        )
+        assert marker.stat().st_mtime_ns > old_mtime * 1_000_000_000

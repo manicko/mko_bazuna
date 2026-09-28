@@ -520,9 +520,14 @@ def run_scheduler(
                 daily_marker=daily_marker,
                 is_first_cycle=first_cycle,
             )
-            first_cycle = False
         except Exception:
             logger.exception("Scheduler cycle failed — continuing")
+        finally:
+            # The first-cycle liveness grace is one-shot on the *attempt*, not
+            # the success: clear the flag after the first cycle has been
+            # attempted regardless of outcome, so a cycle that raises cannot
+            # hand the unconditional liveness refresh to every subsequent cycle.
+            first_cycle = False
         sleep_func(interval_seconds)
 
 
