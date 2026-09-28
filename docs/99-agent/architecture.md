@@ -454,6 +454,10 @@ blocked before the handler runs. For `callback_query` updates the acting-user id
 from `callback_query.from_user.id` (the button-clicker), **not** `callback_query.message.from_user.id`
 (the bot account that sent the inline keyboard) — the prior use of `message.from_user` produced a
 fail-open `User.DoesNotExist` bypass of account-state gating on all callback-driven bot interactions.
+The middleware resolves the acting user exactly once per update by the stable `chat_id` (never
+`telegram_id`, which is nulled on GDPR withdrawal) and reuses that single instance for the interaction
+gate, the publish gate, and the FSM `user_id` backfill; an unregistered `chat_id` is a memoised absent
+state (`None`), not an error.
 The handler additionally guards against bots (mirroring `contact.py`). `SupportContact`/`SupportTicket` schema
 and the `SupportChannelType`/`SupportTicketStatus` enums are documented in
 [`db-schema.md`](../02-database/db-schema.md#support_contacts) /
