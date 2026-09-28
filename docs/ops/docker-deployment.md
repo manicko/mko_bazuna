@@ -666,11 +666,16 @@ keeps an all-failed day from being recorded as a success. Inspect with
 `SELECT last_daily, last_daily_completed_at FROM scheduler_daily_state;`.
 
 On `SIGTERM` / `SIGINT` (e.g. `docker stop`), the scheduler installs handlers
-(`_handle_shutdown_signal`) that set a module-level stop flag (`_stop_event`) checked at
-the top of each `run_scheduler()` loop iteration; the loop breaks cleanly after the
-current cycle and `main()` runs `_shutdown()` in a `finally` block — closing all Django
-DB connections and logging — so no work is abandoned mid-cycle and no DB connections leak
-(ENT-002).
+(`_handle_shutdown_signal`) that set a module-level stop flag (`_stop_event`). The
+inter-cycle wait is **interruptible** — it blocks on that stop event, so the flag ends the
+wait immediately instead of at the end of the hour. A stop arriving *during* a cycle
+short-circuits the commands that have not started yet; the command already in flight is
+never interrupted and runs to completion under `SCHEDULER_COMMAND_TIMEOUT`. The loop then
+breaks at its next top-of-iteration check, and `main()` runs `_shutdown()` in a `finally`
+block — closing all Django DB connections and logging — so no DB connections leak and a
+stop is bounded by one in-flight command rather than by the interval. Skipped sweeps are
+not lost work: the loop runs a full cycle on its first iteration after start, and the
+service is restarted immediately after a graceful stop (ENT-002).
 
 | Task | Purpose | Schedule |
 |------|---------|----------|
@@ -686,17 +691,19 @@ DB connections and logging — so no work is abandoned mid-cycle and no DB conne
 | `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC (first hourly tick ≥ 08:00 UTC; only if not already completed today) — one digest per user per day, max 10 ads |
 | `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
 
-Per-user digest fairness note: the 10-ad per-user cap is applied in the iteration order of
-`saved_searches` (no `Meta.ordering`), so a user with two saved searches that each match
-10 ads always receives the first search's ten and defers the second's ten to a later run —
+Per-user digest fairness note: the 10-ad per-user cap is applied at **collection** time
+(in `_collect_alerts`, so the notification rows and the rendered digest are the same set),
+in the iteration order of `SavedSearch.objects.filter(is_active=True)` — `saved_searches`,
+which has no `Meta.ordering`. A user with two saved searches that each match 10 ads always
+receives the first search's ten and defers the second's ten to a later run —
 deterministic in practice, but a known fairness wart, not a bug (suppressed ads carry no
 notification row and are collected by the next run).
 
 ### Scheduler Healthcheck
 
 The scheduler container is monitored by `docker/healthcheck-scheduler.sh`
-(`docker-compose.prod.yml` `healthcheck:` block, interval 30s). It performs three
-checks:
+(`docker-compose.prod.yml` `healthcheck:` block, interval 30s, `start_period: 600s`).
+It performs three checks:
 
 1. **PID 1 alive** — `kill -0 1`
 2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
@@ -708,6 +715,12 @@ checks:
 
 In test settings, `SCHEDULER_LIVENESS_FILE = ""` disables the marker so the scheduler
 loop never blocks on file writes during testing.
+
+`start_period` is 600 s because the marker is a success signal, refreshed only after a
+cycle in which every dispatched command exited `0` (plus an unconditional refresh on the
+process's first cycle). A legitimately slow first cycle — a full hourly set, each command
+bounded by `SCHEDULER_COMMAND_TIMEOUT` — would otherwise consume the `3 × 30 s` retry
+budget and mark a healthy container `unhealthy`.
 
 ### Running Sweeps
 
@@ -1042,12 +1055,22 @@ directory so the scraper can compute consistent aggregates across all live worke
 pieces in production compose must stay in lockstep:
 
 1. **`PROMETHEUS_MULTIPROC_DIR`** environment variable — set to `/tmp/prometheus_multiproc`
-   on the `web` service in `docker-compose.prod.yml` (and in `.env.prod.example`).
-   `prometheus_client` reads this at import time to locate the per-worker data files.
-2. **`tmpfs` mount** — `docker-compose.prod.yml` mounts `/tmp/prometheus_multiproc` as an
+   on the `web` service in the **base** [`docker-compose.yml`](../../docker-compose.yml)
+   (and in `.env.prod.example`). `prometheus_client` reads this at import time to locate
+   the per-worker data files.
+2. **`tmpfs` mount** — the base `docker-compose.yml` mounts `/tmp/prometheus_multiproc` as an
    ephemeral tmpfs (`tmpfs: - /tmp/prometheus_multiproc:rw`), so metric files live in memory,
    are writable by the container user, and are discarded on container restart (stale files
    from a crashed worker would otherwise accumulate and skew aggregates).
+
+   **Halves 1 and 2 are a pair, not two independent settings.** `prometheus_client` never
+   calls `os.makedirs` on the directory, so the tmpfs mount — created before the container
+   starts — is the only thing that makes it exist. The variable alone yields a container that
+   boots fine and then raises `FileNotFoundError` on the first metric write (a silently broken
+   `/metrics` on a live service); the mount alone is never read. Both halves live in the base
+   file so every environment that inherits `gunicorn.conf.py` (dev and prod alike) gets the
+   same contract; `docker-compose.prod.yml` overrides only `image:`, `env_file:`, `volumes:`
+   and `stop_grace_period` for `web`, and deliberately does not repeat them.
 3. **`child_exit` hook** in `gunicorn.conf.py` — when a worker exits (normal recycle or
    crash), Gunicorn calls `child_exit(server, worker)`, which runs
    `prometheus_client.multiprocess.mark_process_dead(worker.pid)`. This flags the exiting

@@ -68,7 +68,7 @@ docker compose --env-file .env.dev \
   `deleted_at` is older than 120 days (hardcoded).
 - Hard-deletes matching rows (cascading to `ad_images` via `on_delete=CASCADE`).
 - Uses `IX_ads_purge_deleted` partial index for efficient filtering.
-- Acquires advisory lock 11; skips if another instance is running.
+- Acquires advisory lock 11; a contending run **blocks** until the lock is granted (no lock timeout is configured).
 - `--dry-run` logs the count without deleting.
 
 ### Other sweeps

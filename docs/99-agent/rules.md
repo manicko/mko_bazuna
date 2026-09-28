@@ -168,8 +168,8 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 |---|---|---|
 | `build` | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
 | `test` | Unit + integration tests | DB service → `bootstrap_reference_data` → `compilemessages` → pytest with coverage |
-| `lint` | Code linting | `uv sync` → `ruff check .` |
-| `typecheck` | Type checking | `uv sync` → `basedpyright .` |
+| `lint` | Code linting | `uv sync` → `ruff check src/` (from the repository root) |
+| `typecheck` | Type checking | `uv sync` → `basedpyright src/` (from the repository root) |
 | `lint-templates` | Template linting | `uv sync` → `djlint templates/` |
 | `i18n` | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
 | `security` | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
@@ -177,6 +177,10 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 
 - The `test` job in CI runs `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
 - Coverage report is uploaded as an artifact (`src/backend/coverage.xml`, 30-day retention).
+- The `lint` and `typecheck` jobs run from the **repository root** over `src/`, so both process trees
+  (`src/backend` and `src/telegram_bot`) are in scope — the same scope as `make lint` /
+  `make typecheck`. The gate is `src/`, **not** `.`: `ruff check .` from the root also walks
+  `.ai/**`, which `[tool.ruff] exclude` does not cover.
 - CI uses SQLite-backed PostgreSQL service (not Docker Compose) — migrations run via `migrate_locked.py`.
 - A dedicated, **blocking** `deploy-check` job runs `manage.py check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings) with all required production env vars set to valid non-secret placeholders (`DJANGO_SECRET_KEY` 50+ chars, `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `REDIS_URL=redis://redis:6379/0`, `DATABASE_URL`). `--fail-level WARNING` means any W-series finding fails the build; there is no `continue-on-error`. This replaced the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings. The `web`/`bot` entrypoints also call `check --deploy` at boot (non-fatal, logs a `WARNING` and continues).
 

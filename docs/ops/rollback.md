@@ -397,7 +397,8 @@ docker compose --env-file .env.prod \
 
 The scheduler container's healthcheck runs `docker/healthcheck-scheduler.sh`
 (defined in the `scheduler` service `healthcheck:` block of `docker-compose.prod.yml`,
-interval 30s). It performs three checks against the file-based marker:
+interval 30s, `start_period: 600s`). It performs three checks against the file-based
+marker:
 
 1. **PID 1 alive** — `kill -0 1`
 2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
