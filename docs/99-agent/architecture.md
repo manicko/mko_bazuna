@@ -35,11 +35,14 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
    `SCHEDULER_HEALTH_STALE_SECONDS` (env var; default `0`/disabled, `7200` in prod). Each command is dispatched via
   `subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)`; a command that
   exceeds the timeout (`TimeoutExpired`) is logged and skipped so the cycle continues
-  (ENT-001). On `SIGTERM`/`SIGINT` the scheduler sets a stop flag: the inter-cycle
-  wait is interruptible (backed by the stop event), a stop during a cycle short-circuits the
-  commands not yet started, and the in-flight command is never interrupted. The loop then
-  breaks at its next top-of-loop check and closes Django DB connections in
-  a `finally` teardown (ENT-002).
+   (ENT-001). On `SIGTERM`/`SIGINT` the scheduler sets a stop flag: the inter-cycle
+   wait is interruptible (backed by the stop event), a stop during a cycle short-circuits the
+   commands not yet started, and the in-flight command is never interrupted. The loop then
+   breaks at its next top-of-loop check and closes Django DB connections in
+   a `finally` teardown (ENT-002). The daily set (`send_alerts`, `rollup_daily_metrics`) is
+   gated on a **durable** marker in the `scheduler_daily_state` singleton ([`db-schema`](../02-database/db-schema.md#scheduler_daily_state)),
+   read at start-up and written only on a clean daily cycle; a failed daily cycle is retried
+   on the next hourly tick.
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);
   `price_normalized_eur` is derived by `PriceNormalizer` (cached current `ExchangeRate` rate,
@@ -87,7 +90,15 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 - **Docker:** `redis:7-alpine` service in `docker-compose.yml`; wired into `web`, `bot`,
    and `scheduler` via `REDIS_URL` env var and `depends_on` healthchecks. The `scheduler`
    service also `depends_on: load_catalog (completed successfully)` so sweep commands never
-   start before the category catalog is loaded.
+   start before the category catalog is loaded. **Redis is a disposable cache, not durable
+   storage.** The service runs `redis-server --save "" --appendonly no --dir /tmp` with
+   `read_only: true`, `tmpfs: /tmp` and **no `redis_data` volume** — persistence is disabled
+   by design, so the entire dataset is lost on every container recreation. Redis is therefore
+   never a candidate for state that must survive a restart (the scheduler's daily-dispatch
+   marker, the bot liveness key, FSM state). Anything durable belongs in PostgreSQL. (The
+   bot liveness key is deliberately non-durable: a lost key degrades the readiness probe's
+   soft dimension, which is the correct failure mode for a *freshness* signal, and
+   `BOT_HEALTH_CHECK_ENABLED` defaults to `False`.)
 - **Production fail-fast (CFG-001):** `config/settings/prod.py` raises
    `ImproperlyConfigured` at import time if `REDIS_URL` is empty, because an unset URL
    would silently fall back to `MemoryStorage` for the bot FSM (ephemeral state) and an

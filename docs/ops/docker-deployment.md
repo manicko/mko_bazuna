@@ -654,6 +654,17 @@ and is skipped so the hourly/daily cycle continues without stalling (ENT-001). C
 the bound via the `SCHEDULER_COMMAND_TIMEOUT` environment variable (see
 [Environment Variables](#environment-variables)).
 
+**Daily dispatch marker.** The two daily commands (`send_alerts`, `rollup_daily_metrics`)
+fire once per calendar day per successful dispatch, not once per process.
+`run_scheduler` reads the last successful date from the `scheduler_daily_state` singleton
+(`pk=1`) on start-up, and `run_one_cycle` records it only after every daily command
+exited `0` with no stop request. A restart mid-day therefore does **not** re-fire the set;
+a day whose set failed is retried on the next hourly tick (bounded ~16 attempts). If the
+marker cannot be read or written the scheduler **re-runs** the set and never skips it
+silently. `send_alerts` additionally exits non-zero if every attempted user failed, which
+keeps an all-failed day from being recorded as a success. Inspect with
+`SELECT last_daily, last_daily_completed_at FROM scheduler_daily_state;`.
+
 On `SIGTERM` / `SIGINT` (e.g. `docker stop`), the scheduler installs handlers
 (`_handle_shutdown_signal`) that set a module-level stop flag (`_stop_event`) checked at
 the top of each `run_scheduler()` loop iteration; the loop breaks cleanly after the
@@ -672,8 +683,14 @@ DB connections and logging — so no work is abandoned mid-cycle and no DB conne
 | `purge_failed_ads` | Delete failed moderation ads (7 days) | Hourly |
 | `purge_rejected_ads` | Delete rejected ads (90 days) | Hourly |
 | `purge_deleted_ads` | Purge soft-deleted ads (120 days) | Hourly |
-| `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC |
+| `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC (first hourly tick ≥ 08:00 UTC; only if not already completed today) — one digest per user per day, max 10 ads |
 | `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
+
+Per-user digest fairness note: the 10-ad per-user cap is applied in the iteration order of
+`saved_searches` (no `Meta.ordering`), so a user with two saved searches that each match
+10 ads always receives the first search's ten and defers the second's ten to a later run —
+deterministic in practice, but a known fairness wart, not a bug (suppressed ads carry no
+notification row and are collected by the next run).
 
 ### Scheduler Healthcheck
 

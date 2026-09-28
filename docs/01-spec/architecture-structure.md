@@ -239,6 +239,14 @@ at or after that hour) via the extracted module `apps.core.utils.scheduler`
 (`python -m apps.core.utils.scheduler`), invoked by `entrypoint-scheduler.sh`.
 The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`). Each dispatched command is bounded by `SCHEDULER_COMMAND_TIMEOUT` (default `1800s`); a command that times out is logged and skipped so the cycle continues (ENT-001).
 
+The two daily commands are gated on a **durable** marker, not process memory. The date lives
+in the `scheduler_daily_state` singleton (see `apps/core/services/scheduler_daily_state.py`
+and [`db-schema`](../02-database/db-schema.md#scheduler_daily_state)); `run_scheduler` reads
+it before the loop, and `run_one_cycle` writes it only when every daily command exits `0`
+with no stop request. A restart does not re-fire the set, a failed set is retried on the
+next tick, and the marker is **fail-open** (a marker problem causes a re-run, never a
+silent skip).
+
 **Systemd alternative (bare metal):**
 
 ```ini
@@ -283,6 +291,12 @@ WantedBy=multi-user.target
 0 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py send_alerts
 5 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py rollup_daily_metrics
 ```
+
+**Note (cron alternative):** the bare-metal `cron` block above fires both commands directly.
+Under cron there is no scheduler marker in the loop, so a retried or manually re-invoked
+`send_alerts` is protected by `uq_saved_search_ad` + `find_matching_ads`' `NOT EXISTS` (it
+collects nothing new) but **not** by a run-level marker. Do not invoke `send_alerts` more
+than once per day under cron.
 
 ### Scheduled-job concurrency (advisory locks)
 

@@ -423,6 +423,34 @@ the context-processor inventory.
 
 ---
 
+### scheduler_daily_state (singleton)
+
+Durable marker for the scheduler's daily command set (`apps/core/models.py`,
+`SchedulerDailyState`; migration `0005_scheduler_daily_state`; service
+`apps/core/services/scheduler_daily_state.py`). Records the calendar date the daily set
+(`send_alerts`, `rollup_daily_metrics`) last completed cleanly. `run_scheduler` reads it
+once on start-up, and `run_one_cycle` writes it only when every daily command exited `0`
+with no stop request; a failed day is retried on the next hourly tick. The implicit `pk=1`
+is the singleton invariant (no `UniqueConstraint` needed). Two overlapping schedulers during
+a deploy are benign: each daily command takes its own advisory lock, so the second collects
+nothing and both write the same value; the `get_or_create(pk=1)` shape absorbs the
+concurrent-insert race. Both the read and the write are **fail-open** — a marker problem
+causes a re-run, never a silent skip. Redis is deliberately **not** the substrate (it is a
+disposable cache, not durable storage; see [Cache Backend](../99-agent/architecture.md#cache-backend)):
+```
+id (PK, fixed at 1)                        # the singleton invariant
+last_daily (DATE, null)                    # calendar date the daily set last completed cleanly
+last_daily_completed_at (TIMESTAMP, null)  # when the daily set last completed cleanly
+updated_at (TIMESTAMP, auto_now)           # when the marker row was last written
+db_table: scheduler_daily_state
+```
+Inspect with:
+```sql
+SELECT last_daily, last_daily_completed_at FROM scheduler_daily_state;
+```
+
+---
+
 ### support_contacts
 
 Admin-managed support channels (email or Telegram) that the bot delivers support tickets to
