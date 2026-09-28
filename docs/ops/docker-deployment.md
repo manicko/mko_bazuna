@@ -540,7 +540,7 @@ make test-down
 | Target | Description |
 |--------|-------------|
 | `make test-db` | Start only the test PostgreSQL on port `5433` (`restart: unless-stopped`, persistent volume). Idempotent. |
-| `make test` | Start the test DB if not running, then run the one-shot `test` container (migrate + pytest). |
+| `make test` | Start the test DB if not running, then run the one-shot `test` container (dev-dependency sync + pytest; the test DB schema and reference data are restored by the autouse conftest fixture). |
 | `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives between sessions. |
 | `make test-clean-db` | Drop stale `test_mko_bazuna*` and `gw*` databases (from crashed xdist workers) from the persistent test PG volume. Pre-flight for `test-recreate`. |
 | `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). Runs `test-clean-db` first to clear stuck connections. |

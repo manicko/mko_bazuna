@@ -166,9 +166,10 @@ test-clean-db:
 	@echo "Stale test databases dropped."
 
 # Force a fresh test DB schema by ignoring the --reuse-db cache. The entrypoint
-# (entrypoint-test.sh) still runs uv sync + wait_for_db + migrate beforehand;
-# only pytest's DB-caching flags are overridden via PYTEST_OPTS.
-# Pre-start the DB (same as `make test`) so this target is self-contained.
+# (entrypoint-test.sh) still runs uv sync + wait_for_db beforehand; the test DB
+# schema and its reference data are then built by pytest-django plus the
+# session-autouse conftest fixture. Only pytest's DB-caching flags are
+# overridden via PYTEST_OPTS.
 test-recreate: test-clean-db
 	# test-clean-db (pre-flight) drops stale test_mko_bazuna* + gw* databases,
 	# handling stuck connections from crashed xdist workers before pytest runs.

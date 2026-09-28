@@ -122,9 +122,8 @@ docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-com
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
 2. Wait for PostgreSQL to be ready
-     3. Run migrations via `manage.py bootstrap_reference_data` (which delegates to `migrate_locked.main`, running `migrate --run-syncdb` → `load_exchange_rates` → `setup_search_triggers`, with an optional `backfill_translations` step when `RUN_TRANSLATION_BACKFILL=true`, under the MIGRATE lock) on the base `mko_bazuna` DB; the conftest autouse fixture then calls the same three steps in-process via `call_command` on `test_mko_bazuna`
-4. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup`)
-5. Exit with the pytest exit code (0 = all pass, non-zero = failures)
+3. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`). The test database is provisioned by pytest-django and its reference data (search triggers, exchange rates) by the session-autouse `_restore_test_schema_post_db_setup` fixture in `src/backend/conftest.py` — the container runs no `manage.py` command of its own
+4. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
 > **Stale databases:** If you see `database is being accessed by other users` or schema errors,
 > run `make test-clean-db` first to drop stale `test_mko_bazuna*` and `gw*` databases from
@@ -189,7 +188,7 @@ The `migrate_locked.py` now uses `Path(__file__).resolve().parents[3]` to find `
 docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm --no-deps --workdir /tmp migrate python src/backend/manage.py bootstrap_reference_data
 ```
 
-Expected: the `bootstrap_reference_data` command executes successfully regardless of CWD (it delegates to `migrate_locked.main`, which resolves the `manage.py` path via `Path(__file__).resolve().parents[3]`). Note: `entrypoint-test.sh` calls `bootstrap_reference_data` directly (see Step 1 above). The conftest autouse fixture (`_restore_test_schema_post_db_setup`) then calls the same three steps in-process via `call_command` on `test_mko_bazuna` (RUN_TRANSLATION_BACKFILL is not set in tests, so only the three required steps run), because `migrate_locked.main()` spawns subprocesses that would connect to `mko_bazuna` instead of the test DB.
+Expected: the `bootstrap_reference_data` command executes successfully regardless of CWD (it delegates to `migrate_locked.main`, which resolves the `manage.py` path via `Path(__file__).resolve().parents[3]`). The conftest autouse fixture (`_restore_test_schema_post_db_setup`) then calls the same three steps in-process via `call_command` on `test_mko_bazuna` (RUN_TRANSLATION_BACKFILL is not set in tests, so only the three required steps run), because `migrate_locked.main()` spawns subprocesses that would connect to `mko_bazuna` instead of the test DB.
 
 ---
 

@@ -135,9 +135,10 @@ function Invoke-TestCleanDb {
     Write-Host "Stale test databases dropped." -ForegroundColor Green
 }
 
-# Drop and rebuild the test DB schema (ignores the --reuse-db cache).
-# The entrypoint-test.sh pipeline (uv sync + wait + migrate + pytest) still runs;
-# only pytest's caching flags are overridden via PYTEST_OPTS.
+# The entrypoint-test.sh pipeline (uv sync + wait + pytest) still runs; the test
+# DB schema and its reference data come from pytest-django plus the
+# session-autouse conftest fixture. Only pytest's caching flags are overridden
+# via PYTEST_OPTS.
 function Invoke-TestRecreate {
     # Pre-flight: drop stale test_mko_bazuna + gw* databases (handles stuck
     # connections from crashed xdist workers before pytest spawns new ones).
