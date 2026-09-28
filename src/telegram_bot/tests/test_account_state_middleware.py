@@ -726,6 +726,70 @@ class TestCallPipeline:
         assert result == "proceed"
         handler.assert_awaited_once_with(update, {})
 
+    @pytest.mark.asyncio
+    async def test_two_consecutive_updates_do_not_share_a_resolved_user(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two consecutive __call__s with different chat_ids do not share a resolved user.
+
+        The real guard against a cross-update cache: the acting user is resolved
+        per update, keyed on that update's chat_id.  One banned user's update is
+        blocked and answered; the following normal user's update reaches the
+        handler.  Each handler also saw its OWN Update object.
+        """
+        banned_chat_id = _BASE_CHAT_ID + 510
+        normal_chat_id = _BASE_CHAT_ID + 511
+        await sync_to_async(make_user)(banned_chat_id, is_banned=True)
+        await sync_to_async(make_user)(normal_chat_id)
+
+        middleware = AccountStateMiddleware()
+
+        banned_update = _make_message_update(banned_chat_id)
+        banned_handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        first = await middleware(banned_handler, banned_update, {})
+        assert first is None
+        banned_handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "restrict" in mock_answer.call_args[0][0]
+
+        normal_update = _make_message_update(normal_chat_id)
+        normal_handler = AsyncMock(return_value="proceed")
+        second = await middleware(normal_handler, normal_update, {})
+
+        assert second == "proceed"
+        normal_handler.assert_awaited_once_with(normal_update, {})
+        banned_handler.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unregistered_user_post_proceeds_without_backfill(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An unregistered chat_id sending /post is fail-open and gets no backfill.
+
+        End-to-end pin of the memoised absent state across all three consumers:
+        the interaction gate and the publish gate both fail open (handler runs),
+        and the FSM ``user_id`` backfill is suppressed because the resolved user
+        is the memoised ``None``.  No ``state.update_data``, no ``message.answer``.
+        """
+        chat_id = 999999997
+        update = _make_message_update(chat_id, "/post")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, data)
+        state.update_data.assert_not_awaited()
+        mock_answer.assert_not_awaited()
+
 
 # ---------------------------------------------------------------------------
 # user_id backfill via ORM lookup (AUT-001)
@@ -879,6 +943,36 @@ class TestUserIdBackfill:
         assert result == "proceed"
         handler.assert_awaited_once_with(update, data)
         state.update_data.assert_awaited_once_with(user_id=user.id)
+
+    @pytest.mark.asyncio
+    async def test_post_backfill_uses_the_same_row_as_the_state_gate(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The publish gate and the backfill are driven by the same resolution.
+
+        A user with ``ads_auto_publish=False`` sending /post with an empty FSM
+        is blocked at the publish gate — the handler is NOT awaited and the FSM
+        ``user_id`` backfill is NOT issued.  Confirms both consumers run off the
+        single resolved user from one lookup.
+        """
+        chat_id = _BASE_CHAT_ID + 606
+        await sync_to_async(make_user)(chat_id, ads_auto_publish=False)
+
+        update = _make_message_update(chat_id, "/post")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        state = _make_mock_fsm_context({})
+        data: dict[str, Any] = {"state": state}
+
+        result = await AccountStateMiddleware()(handler, update, data)
+
+        assert result is None
+        handler.assert_not_awaited()
+        state.update_data.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert "publishing" in mock_answer.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------

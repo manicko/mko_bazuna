@@ -38,6 +38,16 @@ class AccountStateMiddleware(BaseMiddleware):
 
     For banned/deleted/declined/withdrawn users: responds with rejection message and skips handler.
     For publish-restricted users: allows other commands but blocks /post.
+
+    Resolution contract: the acting ``User`` is resolved exactly once per
+    update, keyed on the stable ``chat_id`` (never ``telegram_id`` — see
+    ``_resolve_user`` for the column rationale).  All three consumers — the
+    interaction gate, the publish gate, and the FSM ``user_id`` backfill —
+    share that one resolution.  An unregistered ``chat_id`` is a memoised
+    absent state (``None``), not an error, and each consumer applies its own
+    existing tolerance to it.  Any new consumer must take the resolved
+    instance, must not re-query, and must not mutate or ``.save()`` it (the
+    login path owns its own instance).
     """
 
     async def __call__(
@@ -99,9 +109,13 @@ class AccountStateMiddleware(BaseMiddleware):
         callback_data = event.callback_query.data if event.callback_query else None
         is_contact_link = classify_contact_deep_link(text, callback_data) is not None
 
-        # Check if user is banned, deleted, or has revoked consent
-        can_interact, state_reason = await self._check_user_state(
-            chat_id, is_contact_link=is_contact_link
+        # Resolve the acting user ONCE per update; every consumer below
+        # shares this instance.  Keyed on the stable chat_id, never
+        # telegram_id: see the class docstring for the column rationale.
+        user = await self._resolve_user(chat_id)
+
+        can_interact, state_reason = self._evaluate_user_state(
+            user, is_contact_link=is_contact_link
         )
         if not can_interact:
             await message.answer(state_reason)
@@ -109,7 +123,7 @@ class AccountStateMiddleware(BaseMiddleware):
 
         # Check publish restriction for /post command
         if text.strip().lower() == "/post":
-            can_publish, publish_reason = await self._check_publish_permission(chat_id)
+            can_publish, publish_reason = self._evaluate_publish_permission(user)
             if not can_publish:
                 await message.answer(publish_reason)
                 return None
@@ -125,12 +139,10 @@ class AccountStateMiddleware(BaseMiddleware):
         state: FSMContext | None = data.get("state")
         if state is not None:
             fsm_data = await state.get_data()
-            if "user_id" not in fsm_data:
-                try:
-                    user = await self._get_user(chat_id)
-                    await state.update_data(user_id=user.id)
-                except User.DoesNotExist:
-                    pass  # Unregistered user — handler auth gate will reject.
+            # ``user is None`` is the memoised absent state: an unregistered
+            # chat_id gets no backfill and the handler's own gate rejects.
+            if "user_id" not in fsm_data and user is not None:
+                await state.update_data(user_id=user.id)
 
         return await handler(event, data)
 
@@ -138,14 +150,16 @@ class AccountStateMiddleware(BaseMiddleware):
         self, chat_id: int, is_contact_link: bool = False
     ) -> tuple[bool, str]:
         """
-        Check if user is banned, deleted, declined, or has revoked consent.
+        Resolve a chat_id and evaluate the interaction gate in one step.
 
-        Delegates to the shared ``get_account_state`` predicate so that the
-        bot and web dashboard evaluate account-state flags from one source of
-        truth. Returns a state-specific denial message for each blocked state.
+        Convenience entry point for callers that hold only a chat_id (tests,
+        and any future single-consumer path).  ``__call__`` does **not** use
+        it — it resolves once and calls ``_evaluate_user_state`` so that the
+        publish gate and the FSM backfill share the same instance.
 
-        Uses stable chat_id (never nullified) instead of telegram_id to ensure
-        withdrawn/deleted users are properly blocked.
+        The signature is load-bearing: ``TestCheckUserStateMessages`` and
+        ``TestCrossPredicateAgreement`` call ``_check_user_state(chat_id)``
+        with a single positional argument.  Do not change it.
 
         Args:
             chat_id: Stable Telegram chat ID.
@@ -157,9 +171,58 @@ class AccountStateMiddleware(BaseMiddleware):
         Returns:
             Tuple of (can_interact, rejection_message).
         """
+        user = await self._resolve_user(chat_id)
+        return self._evaluate_user_state(user, is_contact_link=is_contact_link)
+
+    @sync_to_async
+    def _resolve_user(self, chat_id: int) -> User | None:
+        """
+        Resolve the acting user by stable chat_id, once per update.
+
+        Uses chat_id instead of telegram_id so that withdrawn/deleted users
+        (whose telegram_id is nulled by GDPR erasure) are still found.
+        ``telegram_id`` and ``chat_id`` can match different rows for a
+        withdrawn user or an admin-created placeholder account, so the two
+        columns are not interchangeable; the bot's account gate is keyed on
+        chat_id by design (``test_backfill_uses_stable_chat_id``).
+
+        A missing row is an ordinary, memoised outcome — ``None`` — not an
+        exception.  Callers apply their own tolerance to ``None``; none of
+        them re-queries.
+
+        Args:
+            chat_id: Stable Telegram chat ID (the acting user's Telegram ID).
+
+        Returns:
+            The User instance, or None if the chat_id is not registered.
+        """
         try:
-            user = await self._get_user(chat_id)
+            return User.objects.get(chat_id=chat_id)
         except User.DoesNotExist:
+            return None
+
+    def _evaluate_user_state(
+        self, user: User | None, *, is_contact_link: bool
+    ) -> tuple[bool, str]:
+        """
+        Evaluate the interaction gate from an already-resolved user.
+
+        Pure: no DB access, no mutation of ``user``.  Delegates flag reading
+        to the shared ``get_account_state`` predicate so the bot and the web
+        dashboard evaluate account-state flags from one source of truth.
+
+        Args:
+            user: The resolved acting user, or None if unregistered.
+            is_contact_link: True if the current event is a contact deep-link
+                (``/start contact_<ad_id>``, ``/start contact_us``, or the
+                inline ``contact_us`` callback).  DECLINE users are allowed
+                through contact deep-links only (browse-only consent).
+
+        Returns:
+            Tuple of (can_interact, rejection_message).  An unregistered user
+            is fail-open: (True, "") — the handler's own gate rejects them.
+        """
+        if user is None:
             return (True, "")  # User not registered yet
 
         state = get_account_state(user)
@@ -189,26 +252,23 @@ class AccountStateMiddleware(BaseMiddleware):
 
         return (True, "")
 
-    async def _check_publish_permission(self, chat_id: int) -> tuple[bool, str]:
+    def _evaluate_publish_permission(self, user: User | None) -> tuple[bool, str]:
         """
-        Check if user can publish ads (ads_auto_publish flag).
+        Evaluate the /post publish gate from an already-resolved user.
 
-        Delegates to the shared ``get_account_state`` predicate for flag access.
-        Uses stable chat_id lookup.
+        Pure: no DB access, no mutation of ``user``.
 
         Args:
-            chat_id: Stable Telegram chat ID.
+            user: The resolved acting user, or None if unregistered.
 
         Returns:
-            Tuple of (can_publish, rejection_message).
+            Tuple of (can_publish, rejection_message).  An unregistered user
+            is fail-open: (True, "") — the login check handles them.
         """
-        try:
-            user = await self._get_user(chat_id)
-        except User.DoesNotExist:
+        if user is None:
             return (True, "")  # Will be handled by login check
 
         state = get_account_state(user)
-
         if not state.ads_auto_publish:
             return (
                 False,
@@ -216,24 +276,4 @@ class AccountStateMiddleware(BaseMiddleware):
                     "Your account has publishing restrictions. Contact support for assistance."
                 ),
             )
-
         return (True, "")
-
-    @sync_to_async
-    def _get_user(self, chat_id: int) -> User:
-        """
-        Get user by stable chat_id.
-
-        Uses chat_id instead of telegram_id so that withdrawn/deleted users
-        (whose telegram_id is nulled) are still found by the middleware.
-
-        Args:
-            chat_id: Stable Telegram chat ID.
-
-        Returns:
-            User instance.
-
-        Raises:
-            User.DoesNotExist if user not found.
-        """
-        return User.objects.get(chat_id=chat_id)
