@@ -117,16 +117,18 @@ permission:
     "chown -R *": ask
 
     # === ASK: potentially destructive Docker ===
-    "docker compose down --volumes*": ask
-    "docker compose down -v*": ask
-    "docker volume rm*": ask
-    "docker volume prune*": ask
-    "docker system prune -a*": ask
-    "docker rm -f*": ask
-    "docker rmi -f*": ask
-    "docker image prune -a*": ask
-    "docker container prune*": ask
-    "docker network prune*": ask
+    "docker compose down*": allow
+    "docker compose down --volumes*": allow
+    "docker compose down -v*": allow
+    "docker volume rm*": allow
+    "docker volume prune*": allow
+    "docker system prune -a*": allow
+    "docker rm*": allow
+    "docker rm -f*": allow
+    "docker rmi -f*": allow
+    "docker image prune -a*": allow
+    "docker container prune*": allow
+    "docker network prune*": allow
 
     # === ASK: potentially destructive K8s ===
     "kubectl describe*": ask
