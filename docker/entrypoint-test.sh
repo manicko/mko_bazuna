@@ -1,8 +1,23 @@
 #!/bin/bash
-# Test entrypoint for Mko Bazuna
-# Runs pytest. The base ENTRYPOINT (entrypoint.sh) already waits for the DB,
-# runs migrations, and compiles translations, so this script only syncs deps and
-# launches the test suite.
+# Test entrypoint for Mko Bazuna.
+#
+# Runs as the `test` service `command` (docker-compose.test.yml), so the base
+# image ENTRYPOINT (docker/entrypoint.sh) runs first and execs this script. Its
+# steps are: check_env_file -> fix_volume_permissions -> wait_for_db ->
+# wait_for_redis -> compile_messages -> deploy_check -> exec "$@".
+# It runs no migrations and loads no reference data. This script therefore only
+# installs dev dependencies and then launches pytest.
+#
+# Test-database setup is NOT done here. config/settings/test.py hard-pins
+# DATABASES["default"]["NAME"] = "mko_bazuna", so any manage.py command run from
+# this script would build the whole schema by syncdb into the non-test database,
+# which nothing reads. pytest-django provisions test_mko_bazuna instead, and the
+# session-autouse fixture _restore_test_schema_post_db_setup in
+# src/backend/conftest.py runs `migrate --run-syncdb`, `load_exchange_rates` and
+# `setup_search_triggers` in-process against it, under
+# AdvisoryLockId.TEST_SCHEMA_SETUP (111). Do not reintroduce
+# bootstrap_reference_data here: its migrate_locked subprocesses connect to
+# mko_bazuna, and its `|| true` masked every real DDL failure.
 
 set -e
 
@@ -14,16 +29,14 @@ set -e
 # flag still prevents the project package itself from being installed.
 unset UV_NO_INSTALL_PROJECT
 uv sync --frozen --no-install-project --group dev
-# Install extracted DDL + seed data (idempotent). Runs on mko_bazuna;
-# test_mko_bazuna is handled by the autouse fixture in conftest.py (T4e).
-# With DisableMigrations (tests use --run-syncdb), migrate creates tables
-# for unmigrated apps (currencies). Required before load_exchange_rates.
-# bootstrap_reference_data runs all three steps (migrate + setup_search_triggers
-# + load_exchange_rates) as one locked subprocess sequence via migrate_locked.
-# Fail-open (|| true) preserves the lenient test-entrypoint policy: a DDL or
-# trigger error must not block the test suite from running.
-uv run python src/backend/manage.py bootstrap_reference_data || true
-# Run pytest with short traceback format and duration reporting for slowness visibility.
+# Run pytest with short traceback format and duration reporting for slowness
+# visibility. The test database and its reference data (search triggers,
+# exchange rates) come from pytest-django plus the session-autouse
+# _restore_test_schema_post_db_setup fixture in src/backend/conftest.py; this
+# script performs no database setup of its own. That fixture calls
+# `setup_search_triggers` without `--backfill`, whereas migrate_locked passes
+# it: intentional, because the trigger fires on every insert and a test database
+# has no pre-existing rows whose search vectors would need backfilling.
 # PYTEST_OPTS lets callers (e.g. `make test-recreate`) override ALL pytest flags
 # (single-token flags only; multi-token values like -m "not seed" are fragile here
 # because this expansion is unquoted). For marker-based exclusion use
