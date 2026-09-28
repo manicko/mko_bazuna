@@ -353,6 +353,7 @@ class TestDownloadPhotoBoundedRead:
 
         async def fake_download(file_id, destination=None):
             # Simulate aiogram writing the payload in 64KB chunks through the writer.
+            assert destination is not None
             step = 64 * 1024
             for i in range(0, len(too_large), step):
                 destination.write(too_large[i : i + step])
@@ -370,6 +371,7 @@ class TestDownloadPhotoBoundedRead:
         payload = b"x" * 1024
 
         async def fake_download(file_id, destination=None):
+            assert destination is not None
             destination.write(payload)
             return destination
 

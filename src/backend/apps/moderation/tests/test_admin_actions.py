@@ -526,7 +526,7 @@ class TestBulkRejectRowLockConcurrency:
             """
             started.set()
             try:
-                with transaction.atomic():
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                     Ad.objects.filter(pk=ad_id).delete()
             except BaseException as exc:  # noqa: BLE001
                 errors.append(exc)
@@ -535,7 +535,7 @@ class TestBulkRejectRowLockConcurrency:
                 connection.close()
 
         # --- Main thread: acquire the row lock (as bulk_reject does) ---
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
             assert locked_ad.id == ad_id
 

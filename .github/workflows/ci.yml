@@ -159,6 +159,8 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
     steps:
       - uses: actions/checkout@v4
 
@@ -176,11 +178,12 @@ jobs:
         working-directory: src/backend
 
       - name: Run ruff
-        run: uv run ruff check .
-        working-directory: src/backend
+        run: uv run ruff check src/
 
   typecheck:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
     steps:
       - uses: actions/checkout@v4
 
@@ -198,8 +201,7 @@ jobs:
         working-directory: src/backend
 
       - name: Run basedpyright
-        run: uv run basedpyright .
-        working-directory: src/backend
+        run: uv run basedpyright src/
 
   lint-templates:
     runs-on: ubuntu-latest
