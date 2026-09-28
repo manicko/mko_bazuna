@@ -13,7 +13,7 @@ A Telegram-driven classifieds board (Avito-like) with a Django website. Sellers 
 - **Package Manager:** `uv` (Python)
 - **Test (fast gate):** `make test` — skips nightly `seed` suite (~300s); auto-starts test DB. Start DB only: `make test-db`.
 - **Test (full suite):** `make test-all` (~35 min, includes `seed`).
-- **Test (fresh schema):** `make test-recreate` (`--no-reuse-db --create-db`).
+- **Test (fresh schema):** `make test-recreate` (`--create-db`).
 - **Lint:** `uv run ruff check <path>` · **Auto-fix:** `uv run ruff check --fix <path>`
 - **Typecheck:** `uv run basedpyright <path>`
 - **Pre-commit:** `pre-commit install` after cloning to enable commit-time `gitleaks protect` secret scanning (config in `.pre-commit-config.yaml`; auto-discovers `.gitleaks.toml`)

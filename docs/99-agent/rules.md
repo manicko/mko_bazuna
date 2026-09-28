@@ -53,7 +53,7 @@ This file contains coding standards and rules for the Mko Bazuna project.
 - **Ad creation:** Use `from conftest import create_test_ad(user, category, city, *, title, description, status, price, source, **kwargs)` — it sets status-specific timestamps automatically. Add `status=AdStatus.PUBLISHED` explicitly if the test requires it.
 - **Backdating `created_at`:** `create_test_ad` cannot backdate `created_at` (auto_now_add=True). Use: `ad = create_test_ad(...)` then `Ad.objects.filter(pk=ad.pk).update(created_at=...)` then `ad.refresh_from_db()`.
 - **Assertions:** Use plain `assert` statements — do NOT use `self.assertEqual`, `self.assertTrue`, etc.
-- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--no-reuse-db --create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and `create_test_ad`.
+- **Local `uv run pytest` runs require `--create-db`** (no `--reuse-db` — stale-schema errors, ~527 on reuse). When using the Docker entrypoint via `make test`/`make test-all`, the entrypoint defaults to `--reuse-db` (safe: the test PG container persists via a named volume); use `make test-recreate` (`--create-db`) to force a fresh schema. CI may use `--reuse-db` (ephemeral service DB). Root conftest at `src/backend/conftest.py` provides canonical fixtures and `create_test_ad`.
 
 ### i18n / Language Testing
 
@@ -152,7 +152,7 @@ Guidelines:
 - **Test DB:** PostgreSQL 18 in Docker (`mko-bazuna-test` project, host port 5433).
 - **`--reuse-db`:** The Docker entrypoint (`docker/entrypoint-test.sh`) defaults to `--reuse-db`, caching the `test_mko_bazuna` schema between runs (~1.5 s saved per run). CI may also use `--reuse-db` since the service DB is ephemeral.
 - **`test-clean-db`:** Pre-flight target that drops stale `test_mko_bazuna*` and `gw*` databases (from crashed xdist workers) before `test-recreate`. Run automatically as the first step of `make test-recreate`.
-- **`test-recreate`:** Drops and rebuilds the test DB schema (`--no-reuse-db --create-db`). Use after migration changes or interrupted runs.
+- **`test-recreate`:** Drops and rebuilds the test DB schema (`--create-db`). Use after migration changes or interrupted runs.
 - **Local `uv run pytest`** always requires `--create-db` (no `--reuse-db`) — the test DB on `localhost:5432` is not reachable; tests must run in Docker.
 
 ### Parallel execution

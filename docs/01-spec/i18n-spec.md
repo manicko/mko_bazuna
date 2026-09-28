@@ -254,8 +254,14 @@ Message content is then built with the ad and city rendered in that locale (`ad.
 `ad.city.get_name(locale)`). Immediate alerts and the daily digest are the two paths where
 `User.telegram_language` drives alert-message rendering.
 
-The **daily digest** path (`apps/search/management/commands/send_alerts.py`, I18N-001, run once
-daily via cron with an advisory lock for idempotency) mirrors the immediate-alert pattern.
+The **daily digest** path (`apps/search/management/commands/send_alerts.py`, I18N-001) mirrors
+the immediate-alert pattern. `send_alerts` is dispatched by the scheduler's `DAILY_COMMANDS` on
+the first hourly tick at or after 08:00 UTC each calendar day — there is no cron entry in the
+containerised deployment. Its advisory lock (`AdvisoryLockId.ALERT_DELIVERY_TASK`) is for
+**concurrency** control, not repeat protection; the run-level idempotency mechanism is the
+durable daily marker ([`db-schema.md`](../02-database/db-schema.md#scheduler_daily_state-singleton)),
+which records the day only after every daily command exits 0, so a restart mid-day does not
+re-fire the set.
  `_format_digest` (L187-203) accepts a `locale` parameter, wraps its `gettext()` call in
 `translation_override(locale)`, and renders each ad title via `ad.get_title(locale)` (truncated to
 50 characters) instead of the Russian-only `ad.title`. The call site (`_send_user_digests`,

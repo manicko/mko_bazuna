@@ -501,7 +501,7 @@ directly unless you have set `COMPOSE_PROJECT_NAME` explicitly (see
 | `make test-down` | Stop test environment (preserves DB for `--reuse-db`) |
 | `make test-clean-db` | Drop stale test databases (`test_mko_bazuna*` + `gw*` shards) from the persistent test PG volume |
 | `make test-logs` | Follow test environment logs |
-| `make test-recreate` | Drop and rebuild test DB schema (`--no-reuse-db --create-db`) — runs `test-clean-db` first |
+| `make test-recreate` | Drop and rebuild test DB schema (`--create-db`) — runs `test-clean-db` first |
 
 ## Test Environment
 
@@ -543,7 +543,7 @@ make test-down
 | `make test` | Start the test DB if not running, then run the one-shot `test` container (dev-dependency sync + pytest; the test DB schema and reference data are restored by the autouse conftest fixture). |
 | `make test-down` | Stop and remove test containers/networks. The DB **volume is preserved** so `--reuse-db` survives between sessions. |
 | `make test-clean-db` | Drop stale `test_mko_bazuna*` and `gw*` databases (from crashed xdist workers) from the persistent test PG volume. Pre-flight for `test-recreate`. |
-| `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--no-reuse-db --create-db`). Runs `test-clean-db` first to clear stuck connections. |
+| `make test-recreate` | Drop and rebuild the test DB schema, ignoring the `--reuse-db` cache (`--create-db`). Runs `test-clean-db` first to clear stuck connections. |
 | `make test-logs` | Follow logs from the test project (db + test run output). |
 
 ### `--reuse-db` strategy
@@ -556,7 +556,7 @@ uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup
 ```
 
 - `--reuse-db` caches the `test_mko_bazuna` schema between runs (skips the ~1.5 s migration replay).
-- `--create-db` forces a full schema drop+rebuild; it is **not** in the entrypoint default. `make test-recreate` adds `--no-reuse-db --create-db -n auto --dist loadgroup` to bypass the cache when the schema is stale.
+- `--create-db` forces a full schema drop+rebuild; it is **not** in the entrypoint default. `make test-recreate` adds `--create-db -n auto --maxprocesses=4 --dist loadgroup` to bypass the cache when the schema is stale.
 - The test DB has its own named volume (`mko-bazuna-test_postgres_data`) because the test override
   does **not** override the base `volumes:` key — Compose prefixes it with the project name,
   yielding the persistent volume above.
@@ -566,7 +566,7 @@ uv run pytest --reuse-db --tb=short --durations=10 -n auto --dist loadgroup
 To bypass the cache when the schema is stale:
 
 ```bash
-make test-recreate   # runs: pytest --no-reuse-db --create-db --tb=short -n auto --dist loadgroup
+make test-recreate   # runs: pytest --create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup
 ```
 
 ### Fast iteration
@@ -721,6 +721,31 @@ cycle in which every dispatched command exited `0` (plus an unconditional refres
 process's first cycle). A legitimately slow first cycle — a full hourly set, each command
 bounded by `SCHEDULER_COMMAND_TIMEOUT` — would otherwise consume the `3 × 30 s` retry
 budget and mark a healthy container `unhealthy`.
+
+#### What `unhealthy` means and how to respond
+
+An `unhealthy` status now means the scheduler is not producing the success signal the
+healthcheck expects: either the daily or hourly set is failing, or the scheduler loop
+itself is stuck (so no clean cycle has refreshed the marker within the staleness window).
+
+Crucially, this failure is **neither self-healing nor self-announcing**. Docker's
+`restart: unless-stopped` policy fires on *container process exit*, not on health status,
+and plain `docker compose up` does **not** restart a container that merely reports
+`unhealthy` — only Swarm/Kubernetes reconcile on health. The scheduler container therefore
+**keeps running** indefinitely in a failing or stuck state until a human intervenes; a
+persistently failing cycle does not trigger any automatic restart.
+
+To diagnose:
+
+```bash
+docker inspect --format '{{.RestartCount}} {{.State.Health.Status}}' <scheduler-container>
+```
+
+`RestartCount` tells you whether the process has actually exited and been restarted (a
+separate, louder failure mode), while `State.Health.Status` reflects the liveness-marker
+signal. The only place the *reason* appears is the scheduler's own `ERROR` log lines (for
+example `Command ... exited with code ...` from a failing dispatched command) — inspect the
+service logs for those before acting.
 
 ### Running Sweeps
 

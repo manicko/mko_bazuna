@@ -406,7 +406,7 @@ marker:
    each clean cycle completes (via `settings.SCHEDULER_LIVENESS_FILE`)
 3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (read from the environment by `healthcheck-scheduler.sh`; default `0` disables the
    check, set to `7200` on the prod scheduler service), the marker's mtime must be
-   within that window (detects retry-loop / stuck scheduler)
+   within that window (detects retry-loop / stuck scheduler or a failing cycle)
 
 > **Note:** The scheduler runs every hour, so `SCHEDULER_HEALTH_STALE_SECONDS` must be
 > greater than the hourly cycle (3600 s). The production value of 7200 s allows one missed clean

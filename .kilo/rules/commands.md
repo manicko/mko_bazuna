@@ -53,7 +53,7 @@ $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f doc
 | Start DB | `$dc up -d db` | Once per session (persistent volume → `--reuse-db` caching) |
 | Fast gate | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Default dev iteration (skips `seed`) |
 | Full suite | `$dc run --rm test` | Changes touch seeding/images |
-| Fresh schema | `$dc run --rm --env PYTEST_OPTS="--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test` | After migration changes or interrupted run |
+| Fresh schema | `$dc run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test` | After migration changes or interrupted run |
 | Stop | `$dc down` | Done (preserves named volume) |
 
 **Run a single test / file** — pass pytest args via `PYTEST_OPTS`:
