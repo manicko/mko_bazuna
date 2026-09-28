@@ -377,6 +377,55 @@ patch targets must use `telegram_bot.services.ad_data.orm.delete_photo`.
 Test patch targets referencing `telegram_bot.services.ad_data` (e.g. in
 `test-audit-block-f-findings.md`) remain valid — the façade preserves the import path.
 
+## Login Token Lifecycle Seam (ENT-005)
+
+`apps/users/services/login_token.py` owns the `LoginToken` lifecycle end to end:
+issuance (web), claim (bot, phase 1), consume (web, phase 2). The two callers
+are `users.views.consent.login_issue` / `login_status` (web) and
+`telegram_bot.handlers.login.handle_login_orm` (bot, via the thin
+`_claim_login_token` wrapper). Web-side SHA-256 hashing lives only in this
+module. Cross-link: the token protocol's rationale (192-bit CSPRNG, POST-only +
+CSRF, two-phase background) is in
+[`technical-specification.md` §H](../01-spec/technical-specification.md) and
+[`db-schema.md`](../02-database/db-schema.md) — single source of truth, not
+re-documented here.
+
+### The two predicates and why they are not unified
+
+The claim and consume operations have **different** predicates and must never
+be unified into a shared helper:
+
+- Claim (bot) — `telegram_id IS NULL AND consumed_at IS NULL AND expires_at > now`.
+  A single `UPDATE ... RETURNING` statement with no prior read: there is no
+  read-then-write window, and Postgres re-evaluates the `WHERE` under READ
+  COMMITTED after the row lock, so a concurrent claim matches zero rows.
+- Consume (web) — `telegram_id = <observed> AND consumed_at IS NULL AND
+  expires_at > now`. The consume must read first (it needs `token.telegram_id`
+  to pick the user); its read may be stale, but every guard is re-asserted
+  inside the `UPDATE` and the affected-row count is the arbiter.
+
+The shared live-ness conjuncts are deliberately re-spelled in both functions
+rather than factored out. Phase 04 rated the two-phase claim zero-TOCTOU and
+sound; there is no defect to fix by merging them.
+
+### The caller-owns-the-transaction rule
+
+The service functions open no `transaction.atomic()` of their own: the bot's
+`handle_login_orm` owns its single `atomic()` (and calls `claim_token` inside
+it), and the web's `login_status` owns its `atomic()` (and calls
+`consume_token` inside it). The caller owns the transaction; the service owns
+the predicate.
+
+### The `AUT-007` boundary and the two existing deleters
+
+`issue_token` issues a fresh token per page view, so a browser can hold several
+live tokens; no invalidation of prior outstanding tokens is implemented here.
+That is `AUT-007` (phase 04, VAL-002), filed separately and retained-not-merged
+with `ENT-005`; when it lands it lands inside `issue_token` in this module.
+This module does **not** delete tokens — `users/services/deletion.py`'s
+`withdraw_consent` and `core/management/commands/cleanup_login_tokens.py`
+remain the only two deleters.
+
 ## Bot Command Menu
 
 The bot registers a localized command menu at startup (EC-3). In `telegram_bot/lifecycle.py`,
