@@ -30,8 +30,8 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   `profiles: ["scheduler"]`) runs the hourly sweeps + daily jobs via the extracted module
   `apps.core.utils.scheduler` (`python -m apps.core.utils.scheduler` from
   `docker/entrypoint-scheduler.sh`); it writes a file-based liveness marker
-  (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`) after each hourly
-  cycle, consumed by `healthcheck-scheduler.sh` with staleness governed by
+  (`SCHEDULER_LIVENESS_FILE`, default `/tmp/mko_bazuna_scheduler_alive`) after each
+  clean cycle, consumed by `healthcheck-scheduler.sh` with staleness governed by
    `SCHEDULER_HEALTH_STALE_SECONDS` (env var; default `0`/disabled, `7200` in prod). Each command is dispatched via
   `subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)`; a command that
   exceeds the timeout (`TimeoutExpired`) is logged and skipped so the cycle continues

@@ -402,14 +402,14 @@ interval 30s). It performs three checks against the file-based marker:
 1. **PID 1 alive** — `kill -0 1`
 2. **Readiness marker exists** — `SCHEDULER_LIVENESS_FILE` (default
    `/tmp/mko_bazuna_scheduler_alive`), written by `apps.core.utils.scheduler` after
-   each hourly cycle completes (via `settings.SCHEDULER_LIVENESS_FILE`)
+   each clean cycle completes (via `settings.SCHEDULER_LIVENESS_FILE`)
 3. **Marker freshness** — if `SCHEDULER_HEALTH_STALE_SECONDS > 0` (read from the environment by `healthcheck-scheduler.sh`; default `0` disables the
    check, set to `7200` on the prod scheduler service), the marker's mtime must be
    within that window (detects retry-loop / stuck scheduler)
 
 > **Note:** The scheduler runs every hour, so `SCHEDULER_HEALTH_STALE_SECONDS` must be
-> greater than the hourly cycle (3600 s). The production value of 7200 s allows one missed cycle
-> before the healthcheck reports failure.
+> greater than the hourly cycle (3600 s). The production value of 7200 s allows one missed clean
+> cycle before the healthcheck reports failure.
 
 Verify scheduler health via Docker:
 
