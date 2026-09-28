@@ -374,13 +374,6 @@ jobs:
           sarif_file: gitleaks-results.sarif
           category: gitleaks
 
-  # Deploy-check gate (OPS-001): run manage.py check --deploy against the
-  # production settings module so deployment warnings (W-series) fail the
-  # build. The previous step ran against config.settings.test and produced
-  # 6 false-positive warnings that masked real gaps. No DB service container
-  # is required: check --deploy is static (no custom deploy checks, no DB
-  # connection). All required production env vars are set to valid non-secret
-  # placeholders so the full prod settings import path is exercised.
   load-test:
     runs-on: ubuntu-latest
     needs: build
@@ -507,6 +500,13 @@ jobs:
           fi
           echo "p95 ${ACTUAL_P95}ms within SLO of ${P95_SLO}ms"
 
+  # Deploy-check gate (OPS-001): run manage.py check --deploy against the
+  # production settings module so deployment warnings (W-series) fail the
+  # build. The previous step ran against config.settings.test and produced
+  # 6 false-positive warnings that masked real gaps. No DB service container
+  # is required: check --deploy is static (no custom deploy checks, no DB
+  # connection). All required production env vars are set to valid non-secret
+  # placeholders so the full prod settings import path is exercised.
   deploy-check:
     runs-on: ubuntu-latest
     env:
@@ -518,6 +518,8 @@ jobs:
       ALLOWED_HOSTS: example.com
       CSRF_TRUSTED_ORIGINS: https://example.com
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+      EMAIL_HOST: smtp.example.com
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
 
