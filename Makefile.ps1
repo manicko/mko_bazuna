@@ -51,7 +51,7 @@ function Show-Help {
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
     Write-Host "  test-logs      Follow test environment logs"
     Write-Host "  test-clean-db  Drop stale test databases (test_mko_bazuna + gw* shards)"
-    Write-Host "  test-recreate  Drop and rebuild test DB schema (--no-reuse-db)"
+    Write-Host "  test-recreate  Drop and rebuild test DB schema (--create-db)"
     Write-Host "  lint           Run ruff linter inside web container"
     Write-Host "  format         Auto-fix lint issues (including import sorting) inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
@@ -144,7 +144,7 @@ function Invoke-TestRecreate {
     # connections from crashed xdist workers before pytest spawns new ones).
     Invoke-TestCleanDb
     $env:COMPOSE_PROJECT_NAME = $TestProject
-    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--no-reuse-db --create-db --tb=short -n auto --dist loadgroup" test
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_OPTS=--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 

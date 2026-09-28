@@ -37,6 +37,7 @@ _CI_NIGHTLY_YML = _ROOT / ".github" / "workflows" / "ci-nightly.yml"
 _PYPROJECT = _ROOT / "pyproject.toml"
 _ENTRYPOINT = _ROOT / "docker" / "entrypoint-test.sh"
 _MAKEFILE = _ROOT / "Makefile"
+_MAKEFILE_PS1 = _ROOT / "Makefile.ps1"
 
 
 # --- ci.yml parity -------------------------------------------------------
@@ -207,3 +208,22 @@ def test_makefile_test_recreate_depends_on_clean_db() -> None:
     """test-recreate must depend on test-clean-db (pre-flight cleanup)."""
     text = _MAKEFILE.read_text()
     assert "test-recreate: test-clean-db" in text
+
+
+def test_makefile_test_recreate_opts_match() -> None:
+    """test-recreate's PYTEST_OPTS must be byte-identical across Makefile and
+    Makefile.ps1, and neither may use --no-reuse-db (pytest-django 4.x has no
+    such option; it was a usage error that failed the fresh-schema gate)."""
+    make_opts = _MAKEFILE.read_text()
+    ps1_opts = _MAKEFILE_PS1.read_text()
+
+    make_flag = "--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup"
+    ps1_flag = "--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup"
+
+    assert make_flag in make_opts, "Makefile must use the canonical test-recreate PYTEST_OPTS"
+    assert ps1_flag in ps1_opts, "Makefile.ps1 must use the canonical test-recreate PYTEST_OPTS"
+    assert make_flag == ps1_flag, "test-recreate PYTEST_OPTS must be identical in Makefile and Makefile.ps1"
+
+    assert "--no-reuse-db" not in make_opts, "Makefile must not use the nonexistent --no-reuse-db flag"
+    assert "--no-reuse-db" not in ps1_opts, "Makefile.ps1 must not use the nonexistent --no-reuse-db flag"
+
