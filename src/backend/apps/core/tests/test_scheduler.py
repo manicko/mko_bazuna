@@ -21,6 +21,10 @@ path is exercised without spawning children.
 from __future__ import annotations
 
 import logging
+import signal
+import threading
+import time
+from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -39,6 +43,24 @@ from apps.core.utils.scheduler import (
 )
 
 pytestmark = [pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Bounded stop-latency test constants
+# ---------------------------------------------------------------------------
+
+
+# How long the scheduler waits between cycles in these tests. Only has to be
+# comfortably larger than _STOP_LATENCY_BOUND_SECONDS so a regression to an
+# uninterruptible wait cannot pass by accident.
+_WAIT_INTERVAL_SECONDS = 30.0
+
+# Hard upper bound for "the loop returned after the stop request". The fixed
+# implementation returns in microseconds, so this leaves ~6 orders of magnitude
+# of headroom for a loaded xdist worker, while staying 10x below
+# _WAIT_INTERVAL_SECONDS so the test still fails if the wait ever becomes
+# uninterruptible again.
+_STOP_LATENCY_BOUND_SECONDS = 3.0
 
 
 # ---------------------------------------------------------------------------
@@ -483,6 +505,154 @@ class TestGracefulShutdown:
         assert installed.get(scheduler_mod.signal.SIGTERM) is scheduler_mod._handle_shutdown_signal
         assert installed.get(scheduler_mod.signal.SIGINT) is scheduler_mod._handle_shutdown_signal
         assert shutdown_called == [True]
+
+
+# ---------------------------------------------------------------------------
+# TestBoundedStopLatency — ENT-002: the wait ends promptly once the stop flag
+# is set, and a stop raised mid-cycle short-circuits the remaining commands.
+# ---------------------------------------------------------------------------
+
+
+class TestBoundedStopLatency:
+    """Bound the scheduler's stop latency (ENT-002).
+
+    The stop flag aborts both the inter-cycle wait and the remainder of the
+    current cycle. These tests drive the real ``_handle_shutdown_signal`` from
+    the main test thread while the loop runs in a worker thread, so a regression
+    to an uninterruptible wait fails with a diagnostic instead of hanging.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_stop_event(self) -> Iterator[None]:
+        """Keep the module-global stop flag clean across randomized test order.
+
+        ``pytest-randomly`` is installed, so another test may leave the flag
+        set. Without this, ``run_scheduler`` would break on its first
+        top-of-loop check and both tests would be vacuous.
+        """
+        scheduler_mod._stop_event.clear()
+        yield
+        scheduler_mod._stop_event.clear()
+
+    def test_stop_request_during_wait_exits_loop_promptly(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The default wait is interruptible: the real handler ends it at once.
+
+        Red before the ENT-002 fix: the default ``sleep_func`` was
+        ``time.sleep``, so the loop stayed parked for the whole
+        ``_WAIT_INTERVAL_SECONDS`` and never returned within the bound. This is
+        the assertion the pre-existing tests cannot make — they only ever prove
+        the flag is *set*, which is the blind spot this test closes.
+        """
+        cycle_done = threading.Event()
+        loop_exited = threading.Event()
+        errors: list[BaseException] = []
+
+        def instant_run_command(_name: str) -> int:
+            cycle_done.set()
+            return 0
+
+        def run_loop() -> None:
+            try:
+                # No sleep_func argument: this is the production default wait.
+                run_scheduler(
+                    run_command_fn=instant_run_command,
+                    now_func=lambda: _utc(2025, 6, 15, 12),
+                    interval_seconds=_WAIT_INTERVAL_SECONDS,
+                )
+            except BaseException as exc:
+                errors.append(exc)
+            finally:
+                loop_exited.set()
+
+        worker = threading.Thread(target=run_loop, daemon=True, name="scheduler-wait")
+        worker.start()
+        try:
+            with caplog.at_level(logging.INFO, logger="apps.core.utils.scheduler"):
+                assert cycle_done.wait(timeout=5), "scheduler never ran its first cycle"
+                # Let the cycle finish and the loop reach its wait. The assertion
+                # below does not depend on this timing: even if the stop request
+                # landed before the wait, the fixed wait returns immediately.
+                time.sleep(0.2)
+                assert not loop_exited.is_set(), "loop exited before the stop request"
+
+                started = time.monotonic()
+                # The real handler, wired by main() for SIGTERM.
+                scheduler_mod._handle_shutdown_signal(signal.SIGTERM, None)
+                exited = loop_exited.wait(timeout=_STOP_LATENCY_BOUND_SECONDS)
+                elapsed = time.monotonic() - started
+
+            assert exited, (
+                "run_scheduler did not return within "
+                f"{_STOP_LATENCY_BOUND_SECONDS}s of the stop request "
+                f"(interval={_WAIT_INTERVAL_SECONDS}) — the wait is not interruptible"
+            )
+            assert elapsed < _STOP_LATENCY_BOUND_SECONDS
+            assert not errors, f"loop thread raised: {errors}"
+            assert "requesting graceful scheduler shutdown" in caplog.text
+        finally:
+            # Unblock the worker whichever way the test went. If this is a
+            # regression the worker is still parked in the uninterruptible wait;
+            # it exits at its next top-of-loop check once the flag is set.
+            scheduler_mod._stop_event.set()
+            worker.join(timeout=_WAIT_INTERVAL_SECONDS + 5.0)
+            scheduler_mod._stop_event.clear()
+
+    def test_stop_request_during_cycle_skips_remaining_commands(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A stop raised mid-cycle short-circuits the commands not yet started.
+
+        Red before the fix (every command still dispatches, then the loop parks
+        in the wait) and red against a wait-only fix (the wait is already the
+        last thing the cycle reaches, so the cycle still runs to completion on
+        its way out).
+        """
+        dispatched: list[str] = []
+        loop_exited = threading.Event()
+        errors: list[BaseException] = []
+
+        def stop_on_first_command(name: str) -> int:
+            dispatched.append(name)
+            if name == HOURLY_COMMANDS[0]:
+                # Stand in for SIGTERM arriving while the first command runs.
+                scheduler_mod._handle_shutdown_signal(signal.SIGTERM, None)
+            return 0
+
+        def run_loop() -> None:
+            try:
+                run_scheduler(
+                    run_command_fn=stop_on_first_command,
+                    now_func=lambda: _utc(2025, 6, 15, 12),
+                    interval_seconds=_WAIT_INTERVAL_SECONDS,
+                )
+            except BaseException as exc:
+                errors.append(exc)
+            finally:
+                loop_exited.set()
+
+        worker = threading.Thread(target=run_loop, daemon=True, name="scheduler-cycle")
+        worker.start()
+        try:
+            with caplog.at_level(logging.INFO, logger="apps.core.utils.scheduler"):
+                assert loop_exited.wait(timeout=_STOP_LATENCY_BOUND_SECONDS), (
+                    "run_scheduler did not return within "
+                    f"{_STOP_LATENCY_BOUND_SECONDS}s of a mid-cycle stop request"
+                )
+
+            assert not errors, f"loop thread raised: {errors}"
+            # Only the in-flight command ran; the other 8 hourly and 2 daily
+            # commands were skipped.
+            assert dispatched == [HOURLY_COMMANDS[0]]
+            # A shortened cycle is never silent.
+            assert "skipping remaining command" in caplog.text
+        finally:
+            scheduler_mod._stop_event.set()
+            worker.join(timeout=_WAIT_INTERVAL_SECONDS + 5.0)
+            scheduler_mod._stop_event.clear()
 
 
 # ---------------------------------------------------------------------------

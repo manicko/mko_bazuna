@@ -254,8 +254,11 @@ WorkingDirectory=/opt/mko-bazuna/src/backend
 # the module entry point, mirroring the Docker entrypoint-scheduler.sh.
 ExecStart=/opt/venv/bin/python -m apps.core.utils.scheduler
 # Graceful shutdown: the scheduler installs SIGTERM/SIGINT handlers that set a
-# stop flag checked at the top of each loop iteration; the loop breaks after the
-# current cycle and closes Django DB connections in a finally teardown (ENT-002).
+# stop flag. The inter-cycle wait is interruptible (backed by the stop event), a
+# stop during a cycle short-circuits the commands not yet started, and the
+# in-flight command is never interrupted. The loop then breaks at its next
+# top-of-loop check and closes Django DB connections in a finally teardown
+# (ENT-002).
 # systemd's default KillSignal=SIGTERM is therefore handled cleanly on stop.
 Restart=always
 

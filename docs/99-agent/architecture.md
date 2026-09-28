@@ -35,8 +35,10 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
    `SCHEDULER_HEALTH_STALE_SECONDS` (env var; default `0`/disabled, `7200` in prod). Each command is dispatched via
   `subprocess.run(check=False, timeout=settings.SCHEDULER_COMMAND_TIMEOUT)`; a command that
   exceeds the timeout (`TimeoutExpired`) is logged and skipped so the cycle continues
-  (ENT-001). On `SIGTERM`/`SIGINT` the scheduler sets a stop flag checked at the top of each
-  loop iteration and exits cleanly after the current cycle, closing Django DB connections in
+  (ENT-001). On `SIGTERM`/`SIGINT` the scheduler sets a stop flag: the inter-cycle
+  wait is interruptible (backed by the stop event), a stop during a cycle short-circuits the
+  commands not yet started, and the in-flight command is never interrupted. The loop then
+  breaks at its next top-of-loop check and closes Django DB connections in
   a `finally` teardown (ENT-002).
 - **Search:** Native PostgreSQL full-text search.
 - **Multi-currency pricing:** Sellers enter an original amount + `CurrencyCode` (EUR/RSD/BAM);

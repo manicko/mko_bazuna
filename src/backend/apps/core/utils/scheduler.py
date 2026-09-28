@@ -12,7 +12,10 @@ Design (Block A — faithful extraction):
   * ``should_run_daily()`` — pure, independently testable timing predicate.
   * ``run_one_cycle()`` — unit-testable single tick (no infinite loop, no sleep).
   * ``run_scheduler()`` — production infinite loop with injectable
-    ``sleep_func`` / ``now_func`` / ``run_command_fn`` for testability.
+    ``sleep_func`` / ``now_func`` / ``run_command_fn`` for testability. The
+    inter-cycle wait is backed by the module stop event (interruptible), and a
+    stop request short-circuits the commands not yet started in the current
+    cycle (see :func:`_stop_aware_dispatch`).
   * ``main()`` — Django setup + entry point for standalone / Docker execution.
 
 The original ``check=False`` and ``except Exception: pass`` semantics are
@@ -27,7 +30,6 @@ import signal
 import subprocess
 import sys
 import threading
-import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -255,34 +257,100 @@ def _build_subprocess_runner(manage_py: Path, python_executable: str) -> Callabl
     return run_command
 
 
+def _wait_for_interval(seconds: float) -> None:
+    """Wait up to ``seconds``, returning early once shutdown has been requested.
+
+    The default ``sleep_func`` of :func:`run_scheduler`. Blocking on the module
+    ``_stop_event`` rather than on ``time.sleep`` makes the inter-cycle wait
+    interruptible: ``_handle_shutdown_signal`` sets the event, this returns
+    immediately, and the loop's top-of-iteration check breaks the cycle. If the
+    event is already set when the wait is reached, the wait returns at once.
+
+    A caller-supplied ``sleep_func`` replaces this entirely and owns the wait
+    semantics for the whole loop — see :func:`run_scheduler`.
+    """
+    _stop_event.wait(seconds)
+
+
+def _stop_aware_dispatch(
+    run_command: Callable[[str], int],
+) -> Callable[[str], int]:
+    """Wrap a command dispatcher so it declines work once shutdown is requested.
+
+    :func:`run_scheduler` hands the returned callable to :func:`run_one_cycle`
+    in place of the raw dispatcher, so a stop request arriving *during* a cycle
+    short-circuits the commands that have not started yet instead of waiting
+    out every remaining command. The command already in flight is never
+    interrupted; its child process runs to completion under the existing
+    ``SCHEDULER_COMMAND_TIMEOUT``.
+
+    Skipped commands are not lost work: the loop runs a full cycle on its first
+    iteration after start, and the service is restarted immediately after a
+    graceful stop, so every skipped sweep runs on the next start.
+
+    Returns the wrapped dispatcher's exit code unchanged. A skipped command
+    returns ``0`` — nothing failed, it was deliberately not run, and the
+    return value is currently unobserved by ``run_one_cycle``.
+    """
+    def dispatch(name: str) -> int:
+        if _stop_event.is_set():
+            logger.info("Stop requested — skipping remaining command %s", name)
+            return 0
+        return run_command(name)
+
+    return dispatch
+
+
 def run_scheduler(
     manage_py: str | Path | None = None,
     python_executable: str | None = None,
-    sleep_func: Callable[[float], None] = time.sleep,
+    sleep_func: Callable[[float], None] = _wait_for_interval,
     now_func: Callable[[], datetime] = _utcnow,
     run_command_fn: Callable[[str], int] | None = None,
     interval_seconds: float = SCHEDULE_INTERVAL_SECONDS,
 ) -> None:
     """Infinite scheduler loop — hourly sweeps + daily jobs.
 
-    Delegates to :func:`run_one_cycle` each tick, then sleeps
-    ``interval_seconds``. All collaborators are injectable for testability:
+    Delegates to :func:`run_one_cycle` each tick, then waits
+    ``interval_seconds``. All collaborators are injectable for testability.
+
+    Shutdown contract: a stop request (SIGTERM/SIGINT, handled by
+    :func:`_handle_shutdown_signal`) is observed at two points. The inter-cycle
+    wait is interruptible — the default ``sleep_func`` blocks on the module stop
+    event, so the flag ends the wait immediately instead of at the end of the
+    interval. A flag set *during* a cycle short-circuits the commands that have
+    not started yet (see :func:`_stop_aware_dispatch`); the command already in
+    flight is never interrupted and runs to completion under
+    ``SCHEDULER_COMMAND_TIMEOUT``. The loop then breaks at its next top-of-loop
+    check, so a stop is bounded by one in-flight command rather than by the
+    interval.
 
     Args:
         manage_py: Path to ``manage.py`` (auto-resolved if ``None``).
         python_executable: Python binary for subprocess dispatch
             (defaults to ``sys.executable``).
-        sleep_func: Sleep callable (inject ``lambda s: None`` in tests to
-            make the loop terminate quickly).
+        sleep_func: Callable invoked once per cycle to wait out
+            ``interval_seconds``. The default (:func:`_wait_for_interval`)
+            returns early as soon as a stop is requested. A caller-supplied
+            ``sleep_func`` takes over the wait entirely and therefore owns the
+            stop semantics for the whole loop: it must return control to the
+            loop within ``interval_seconds`` and must not block past a stop
+            request, or the loop will never observe the flag. Tests that inject
+            a no-op wait own their own termination — raise, or set the module
+            stop event.
         now_func: Time callable for daily-scheduling decisions.
         run_command_fn: Command dispatch callable (inject a mock to avoid
-            subprocess spawns in tests).
+            subprocess spawns in tests). It is wrapped by
+            :func:`_stop_aware_dispatch` before being handed to
+            :func:`run_one_cycle`.
         interval_seconds: Tick interval in seconds (default 3600).
     """
     python_executable = python_executable or sys.executable
     resolved_manage_py = Path(manage_py) if manage_py else _default_manage_py()
     if run_command_fn is None:
         run_command_fn = _build_subprocess_runner(resolved_manage_py, python_executable)
+
+    dispatch = _stop_aware_dispatch(run_command_fn)
 
     # Fail-fast: validate all scheduled commands are discoverable before
     # entering the infinite loop. Prevents silent crash-loops.
@@ -297,7 +365,7 @@ def run_scheduler(
         try:
             last_daily = run_one_cycle(
                 now_func=now_func,
-                run_command=run_command_fn,
+                run_command=dispatch,
                 last_daily=last_daily,
             )
         except Exception:
