@@ -1,289 +1,130 @@
-# 99 — Audit Findings Validation
-
-> Audit phase. LLM-auditor instruction. Architecture-agnostic: described via
-> ARCHITECTURAL LAYERS, ZONES OF RESPONSIBILITY, KEY RISKS, GOALS. NOT tied to
-> specific files, modules, or functions. Must stay valid if the architecture
-> changes.
->
-> **Output mode:** `problems-only` — report only findings; do not narrate a clean
-> bill of health. Emits a rolling anchored-summary checkpoint at each stage of the
-> 4-step audit pipeline.
+---
+name: 99-validate
+status: draft
+validated: no
+executor: validator
+problems-only: true
+---
 
-## 1. Goal
+# Phase 99 — Audit Findings Validation
 
-Validate each audit finding for technical correctness, current applicability,
-architectural fit, and operational value; produce a self-contained validated
-report per phase. This is the *Researcher verification* stage of the realized
-4-step pipeline (Auditor analysis → Researcher verification → Token-safe
-docs-specialist edits → Final consistency audit).
+## Purpose
 
-## 2. System Under Audit (layers & zones)
+Validate another auditor's claims about the system — the reported defect, the support behind it, the band it was given, the recommendation attached to it — and produce a disposition record a
+reader can act on without re-running the audit. This file names what to examine and under which angle; the executing validator discovers the concrete artifacts.
 
-**Layers:** auditor findings → validation store → validated reports → final
-consistency audit.
+**Scope Boundaries** — 99 audits audit **output** and the audit tooling's own artefacts; the fifteen content phases audit the system, and no content phase's concern is 99's, except where a
+finding's validity depends on a cross-phase claim. 99 never modifies source code, never renumbers an existing finding identifier, and never repairs a shared artefact from inside a
+per-phase run; the only document it writes is its own validated report.
 
-**Zones of responsibility:** findings ingestion (R1), cross-finding analysis (R2),
-per-finding validation (R3), rollout-safety assessment (R4), report assembly,
-rolling-checkpoint emission.
+## Audit Blocks
 
-**Key risks:** stale findings approved as valid; conflicting evidence left
-unresolved; unsafe rollout ordering; reports that depend on source files (violates
-Phase 3 token-safety).
+Each block is independent — execute any one with no knowledge of the others, and each carries its own evidence, which here is a **disposition record**: what was re-derived, what
+reproduced the claim, what refuted it, or what could not be settled and why.
 
-## 3. Prerequisites
+**A PASS row in the input report's own verification table is methodology, never a verdict, and no adjudication is gated on the input's check list.**
 
-- Docker + PostgreSQL test DB (host port 5433) with `--reuse-db` caching.
-- Completed auditor phase handbooks (`.kilo/commands/audit/phases/NN-*.md`).
-- Validation store path — per-phase copies named
-  `{phase_number}-{phase_name}-validated.md`.
-- Project specification, README, Pydantic models / `StrEnum` values,
-  configuration templates (for the dead-code mandatory cross-reference, §5).
-- Linter + type-checker (`ruff`, `basedpyright`) available in the test image.
+The shared findings template instructs the validator to re-execute that list, which reinstates a gate removed deliberately, against reports themselves produced under it.
 
-## 4. Runtime Verification (mandatory)
+### 1. The claim re-derived from the executing path
 
-A rolling anchored-summary checkpoint is emitted after each of R1–R4.
+*Ignore the quoted snippet, the comment and the line anchor. Does the path still do what the claim says, at the location it says, after the drift? Resolve every location reference
+mechanically first — a reference into lines that do not exist is a wrong approval by default, not a formatting slip. A comment, docstring or runbook line that contradicts the
+executing path is itself a finding, never a source of truth; so is the asserted cause, which can be false while the finding it supports survives.*
+Evidence: per finding — the executing path, whether the anchor resolved, the claim tested on its own terms, and the asserted cause tested separately.
 
-**R1 — Copy Source Findings**
-Copy the auditor's per-phase findings file as the base for the validated report
-in the validation store, named per phase (e.g.
-`{phase_number}-{phase_name}-validated.md`). All edits are applied inline to this
-copy. The final file must be fully self-contained — the reader should never need
-to consult the original.
+### 2. Support that is only a green control
 
-Checkpoint 1 fields: stage = *Auditor analysis*, findings-in-scope count,
-evidence anchor, blockers.
+*For every check, test, gate or shipped regression a claim leans on, separate three questions — does it exist, what scope does it declare, what did it actually examine — and then
+separate a fourth: whether it ran at all is not whether it decided anything. A control that ran and reported clean substantiates nothing, however central it is to the argument. A
+claim whose entire support is a green control is not confirmed — and a control that is present, configured and deciding nothing is a finding in the audit itself, not a pass.*
+Evidence: per control — existence, declared scope, the item count actually examined, and the path by which a verdict would have reached a decision.
 
-**R2 — Cross-Finding Analysis**
-Scan findings across all phases:
+### 3. The grade against the audited phase's own rubric
 
-- **Same root cause** → mark as merge candidate. Note which finding IDs overlap
-  and which absorbs which.
-- **Conflicting evidence** (e.g. one phase says "all commands work", another
-  says "run command crashes") → flag as cross-phase conflict. CRITICAL.
-- **Dependency chains** → note if fixing one finding depends on another.
+*The source phase's severity section is the rubric of record; grade by effect and blast radius anchored to present state. A mechanism absent from an enumerated band is not thereby a
+lower band, and a band left empty is a valid outcome rather than a gap. Grade the finding, not the mechanism: a real defect whose asserted cause is factually wrong is not thereby
+mis-graded, and a claim that cannot fail is either vacuous or real and graded too low.*
+Evidence: per finding — the band the audited rubric assigns, the band carried, and the mechanism it was downgraded on, if any.
 
-Checkpoint 2 fields: stage = *Researcher verification*, cross-phase conflict
-count, merge-candidate count.
-
-**R3 — Validate Each Finding**
-For every finding, verify:
-
-1. **Technical correctness** — is the problem real? Check the actual code.
-2. **Current applicability** — is the codebase still in this state?
-3. **Architectural fit** — does the recommendation align with project patterns?
-4. **Operational value** — is the fix worth the effort at this project scale?
-
-Checkpoint 3 fields: stage = *Per-finding validation*, per-finding decision tally
-(Validated / Reclassified / Merged / Rejected).
-
-**R4 — Assess Rollout Safety**
-Check: circular dependencies, hidden dependency chains, unsafe rollout ordering,
-fragile insertion points. Add any detected issues as new findings.
-
-## 5. Audit Dimensions (checks + evidence)
-
-### Type-Specific Rules
-
-**[SPEC-DEVIATION]**
-- Determine: code should change, or docs should change?
-- If code is better than docs → reclassify as `[DOC-UPDATE]`.
-- If docs are better than code → keep as spec deviation.
-
-**[BEST-PRACTICE]**
-- Reject if overengineered or adds complexity without clear maintenance benefit.
-- Reject if ROI is negative for project scale.
-- **Splitting large files / smaller functions and modules is high ROI** — shorter
-  code units are easier to edit, review, and maintain with lower risk of
-  corruption. Do not reject modularization findings as "overengineering" unless
-  the split introduces unnecessary indirection or abstraction.
-
-**[DOC-UPDATE]**
-- Verify the proposed doc change accurately reflects code reality.
-
-### Dead-Code Findings — mandatory spec cross-reference
-
-1. Check the project specification document for the feature.
-2. Check the project README for the feature.
-3. Check Pydantic models / `StrEnum` values.
-4. Check configuration templates.
-
-If the spec, models, or config reference the component → **reject the "dead code"
-label** and reclassify as `[SPEC-DEVIATION]` (missing integration, not dead code).
-
-### Rejection Criteria
-
-Reject findings that are: already implemented, stale, duplicates, low ROI,
-architecture-breaking, operationally unsafe, overly complex, or conflicting
-with project direction.
-
-**Every rejection must include a clear reason.**
-
-## 6. Cross-Cutting (owned here, not duplicated)
-
-This section is owned by Phase 99 and is not duplicated in any other phase.
-
-- **Same root cause** → merge candidate (see §11 Reporting — Merged).
-- **Conflicting evidence** between phases → cross-phase conflict (CRITICAL).
-- **Dependency chains** → rollout-ordering constraint (see §4 R4 and §8).
-
-## 7. Edge Cases
-
-- **Conflict vs. complement** — a finding may conflict with one in another phase
-  (escalate as `VAL-`) or legitimately complement it (retain both, cross-ref).
-- **Merge where evidence is incomplete** — preserve original content for
-  reference; add a `Validation Note` block (§11) listing merged IDs.
-- **Findings that span multiple phases** — split or cross-reference; the
-  absorbing finding carries the merged content.
-- **Stale-but-similar** — a finding may be rejected as stale while a sibling
-  finding (same root cause) is validated; record the relationship in
-  §11 Merged Findings.
-
-## 8. Severity Taxonomy
-
-| Severity | Meaning | Checkpoint impact |
-|----------|---------|-------------------|
-| **Critical** | Cross-phase conflict; rollout-safety blocker | Must resolve before downstream stage proceeds |
-| **High** | Stale/overbroad BEST-PRACTICE; rejected finding | Document in summary; blocks merge into report |
-| **Medium** | Reclassified or merged finding | Note in checkpoint; proceed |
-| **Low** | DOC-UPDATE candidate | Approve inline |
-
-## 9. Recommended Sequence
-
-The realized 4-step pipeline, with a rolling anchored-summary checkpoint emitted
-at each stage:
-
-```text
- ┌──────────────────────────────┐   CHKPT 1   ┌──────────────────────────────┐
- │ 1. Auditor analysis          │  ──────────▶  │ findings-in-scope +          │
- │    (phase handbooks)         │              │ evidence anchors captured    │
- └──────────────────────────────┘             └──────────────────────────────┘
-          │  R1 copy                      │
-          ▼                              ▼
- ┌──────────────────────────────┐   CHKPT 2   ┌──────────────────────────────┐
- │ 2. Researcher verification/   │  ──────────▶  │ cross-phase conflicts +       │
- │    refinement                 │              │ merge candidates tallied      │
- │    → .kilo/research/<NN>.md   │              │ per-finding decisions begun   │
- └──────────────────────────────┘             └──────────────────────────────┘
-          │  R3 + R4 validate              │
-          ▼                              ▼
- ┌──────────────────────────────┐   CHKPT 3   ┌──────────────────────────────┐
- │ 3. Token-safe docs-specialist│  ──────────▶  │ final per-finding decision    │
- │    in-place edits            │              │ tally (V / RC / M / R)        │
- │    (≤2 agents parallel;       │              │ reports self-contained        │
- │     NO source reads)          │              │ checkpoint closure            │
- └──────────────────────────────┘             └──────────────────────────────┘
-          │  §11 Reporting                 │
-          ▼                              ▼
- ┌──────────────────────────────┐   CHKPT 4   ┌──────────────────────────────┐
- │ 4. Final consistency audit   │  ──────────▶  │ pipeline integrity OK;        │
- │    (checkpoint closure)      │              │ all checkpoints closed        │
- └──────────────────────────────┘             └──────────────────────────────┘
-```
-
-Stage gates (no downstream stage starts until its entry checkpoint is green):
-
-- **Stage 1 → 2:** Checkpoint 1 must confirm findings are copied and ingestible.
-- **Stage 2 → 3:** The research file (`<NN>.md`) must contain verified evidence
-  and concrete recommendations; docs-specialist reads **only** `99-*.md`
-  handbooks + research files — **no source reads**.
-- **Stage 3 → 4:** Inline edits applied; report is self-contained, no live
-  source-file references in checklists.
-- **Stage 4:** Final consistency audit closes all open checkpoints and emits
-  Checkpoint 4 (closed).
-
-## 10. Finding Prefix
-
-Validation-level findings discovered *during* this phase use prefix
-**`VAL-`** (e.g. `VAL-001` for a cross-phase conflict, `VAL-002` for a detected
-rollout-safety issue). These represent issues with the audit inputs
-themselves (conflict, merge, stale, unsafe rollout ordering) rather than
-source-code defects, and are recorded at the end of the Findings section
-(§11 — Reporting).
-
-## 11. Reporting
-
-Decisions are applied inline to the copied findings file:
-
-| Action | How to apply |
-|--------|-------------|
-| **Validated** | Keep as-is. |
-| **Reclassified** | Update the `Type` field. Add a `Validation Note` block below the heading. |
-| **Merged** | Keep content for reference. Add a `Validation Note` block listing merged IDs and target location. |
-| **Rejected** | Replace the finding block with: `### {ID}: ~~{title}~~ [REJECTED]` + `> **Rejection reason:** {explanation}` |
-| **Cross-phase conflicts** | Add as new finding entries (`VAL-`) at the end of the Findings section. |
-| **Rollout safety issues** | Add as new finding entries (`VAL-`) if detected. |
-
-### Validation Note Format
-
-Add directly after the `### {ID}:` heading for merged or reclassified findings:
-
-```markdown
-> **Validation Note:**
-> - **Action:** {merged | reclassified}
-> - **Detail:** {rationale}
-> - **See also:** {other finding IDs or sections}
-```
-
-### Rolling Checkpoint Format
-
-Each stage emits an anchored-summary checkpoint. Records stage, findings count,
-key decisions, evidence anchor, and checkpoint status (open → closed).
-
-```markdown
-## Checkpoint N — {stage name}
-
-- **Stage:** {Auditor analysis | Researcher verification | Per-finding validation | Final audit}
-- **Findings in scope:** {count} (Validated {n}, Reclassified {n}, Merged {n}, Rejected {n})
-- **Evidence anchor:** {self-contained file / line reference — no live source reads}
-- **Dependencies / blockers:** {none | …}
-- **Checkpoint status:** {open | closed}
-```
-
-### Validation Summary
-
-Append at the end of the file:
-
-```markdown
-## Validation Summary
-
-| Action | Count | Details |
-|--------|-------|---------|
-| Validated (unchanged) | N | — |
-| Reclassified | N | ID1, ID2 |
-| Merged | N | ID3 → ID4 |
-| Rejected | N | ID5, ID6 |
-| VAL- (cross-phase / rollout) | N | VAL-001, ... |
-
-### Rejected Findings
-
-| ID | Title | Reason |
-|----|-------|--------|
-| ID5 | ... | ... |
-
-### Merged Findings
-
-| Original ID | Merged Into | Rationale |
-|-------------|-------------|----------|
-| ID3 | ID4 (Phase XX) | ... |
-
-### Reclassified Findings
-
-| ID | Original Type | New Type | Rationale |
-|----|---------------|----------|-----------|
-| ID1 | BEST-PRACTICE | SPEC-DEVIATION | ... |
-```
-
-## Constraints
-
-- DO NOT modify source code.
-- DO NOT generate implementation code.
-- DO NOT redesign architecture.
-- ONLY validate safety, consistency, and applicability.
-- Prefer conservative decisions. Prefer rejection over unsafe approval.
-- Phase 3 (docs-specialist) edits are token-safe: **no source file reads**;
-  only `99-*.md` handbooks and research files (`.kilo/research/99-*.md`) are
-  read. ≤2 agents in parallel.
-- No file renames.
-- Every report must be self-contained — the reader never needs to consult the
-  original auditor finding or any source file.
+### 4. Which side moves: code or documentation
+
+*Decide from which artefact is load-bearing and which the rest of the corpus depends on. No verdict is reserved in advance for any finding class, and re-typing runs in both
+directions. A dead-code label is not substantiated until the specification corpus has been asked whether the component is intended: a component no code path reaches, but that the
+specification or a configuration surface expects, is a missing integration, not dead code.*
+Evidence: per finding — which artefact is load-bearing, the specification-corpus answer, and the Type the finding carries after adjudication.
+
+### 5. Whether the recommendation can be carried out
+
+*Does the recommendation name a target that exists and is stable, does applying it remove the defect it claims to remove, what does it depend on, and what else breaks — and in which
+order. A recommendation that is vague, offers alternatives, or names no implementation approach is substantiated but unusable: a distinct outcome from rejection, recorded as such
+rather than passed over or counted as a failure.*
+Evidence: per recommendation — target resolved, dependencies, what fixing it breaks, and its order in the roadmap.
+
+### 6. Cross-phase conflict, ownership and merge
+
+*Ownership decisions accumulate across the family, so a claim filed under a phase that does not own it — or two phases claiming the same concern — is a defect in the audit, and
+detecting it is a first-class obligation, not an optional extra. Compare against whatever sibling reports exist, declare which are raw and which already validated, and record
+rather than silently edit a merge whose target sits in a phase already written out. Same root cause is a merge; an adjacent concern is a cross-reference; two phases reaching
+opposite conclusions about the same subject is a conflict.*
+Evidence: per contested finding — the rival claim, the phase that owns the concern, the disposition, and the set of sibling reports compared against.
+
+### 7. Namespace integrity — the ruling this phase owns
+
+*Establish six shapes per prefix: the declared prefix; the identifiers past runs minted; provenance markers embedded in shipped code, configuration, tests and documentation; a
+phase-qualified compound form that resolves to none of the others; a controlled template's own list of prefixes; and one namespace reused across phases. Then render a ruling
+rather than only counting collisions — whether a new run reuses the declared namespace or mints a second one beside it, and whether the in-source markers are load-bearing
+provenance to be migrated by a follow-up or drift to be retired. A validator that enumerates a collision and stops has not done this block.*
+Evidence: per prefix — declared, minted, in-source marker count, the compound form where present, reuse across phases, and the ruling applied.
+
+### 8. The report template as a controlled artefact
+
+*The template this phase produces against is itself under validation. Establish whether the prefixes it enumerates cover every phase that exists; whether the severity-rubric
+pointer pattern it declares matches the filenames phases actually carry, or whether it has ever resolved; how many reports carry that field at all under its declared name,
+omitted, or renamed; whether the front-matter fields a validated report must set are present and honest; and whether every field the template mandates per finding survives
+into the report. Record the defects — never repair the template from inside a per-phase run.*
+Evidence: the template's prefix enumeration against the phase list; the declared pointer pattern resolved against a real filename; per field — present, omitted, or renamed; each
+defect recorded, not edited.
+
+### 9. Does the input rest on its own enumerated checks?
+
+*Across this family the executed phases have shared one signature: their own named checks pass while their real findings arrive from an angle the phase never names — in some
+phases the pre-pass states as expected the very mechanism that produced a finding, and in one the admissibility rule would have excluded every finding the run reported. Ask of
+this input whether any substantive finding rests on its own phase's enumerated check list as its support, and whether the report contains at least one angle the list never
+named. The answer is what it is; this block asks, it does not conclude.*
+Evidence: per finding — whether its support is the input's own check list, an independent observation, or neither; and any finding arising from an angle the list does not name.
+
+### 10. The validated report as an artefact, and what was not settled
+
+*Every finding in scope carries a verdict, its own identifier and location, and the re-derivation behind it; the disposition tally agrees with the per-finding verdicts;
+identifiers are preserved, never renumbered; the audited namespace and the validation namespace never share a table. The report is readable on its own, which requires the anchor
+and the evidence rather than their removal. Every claim that could not be settled in this environment is listed with the reason and is never recorded as confirmed; where only a
+stated sample could be re-derived, record the sample and the rate.*
+Evidence: the disposition tally against the per-finding verdicts; each unresolvable or missing mandatory field; each claim left unsettled and why.
+
+## Severity Taxonomy
+
+These bands grade **defects in the audit**, never the audited finding: a finding keeps the band its own phase's rubric gave it, and a validator may re-grade it only against that rubric. Rate what is true now, not the worst consequence if triggered.
+
+**A PASS row in the input report's own verification table is methodology, never a verdict, and no adjudication is gated on the input's check list.**
+
+- **CRITICAL** — a wrong approval: a claim confirmed that the system does not support, or an absence recorded as established. A reader acts on it, remediation is built on it, and
+  nothing downstream can distinguish it from a correct report. An empty band is a valid outcome.
+- **HIGH** — a real defect released: a true finding rejected, merged away, or graded below what its own rubric implies, so work that must be done never reaches the roadmap.
+- **MEDIUM** — a report the reader must repair before acting: a finding filed under a phase that does not own it, two claims about the same subject that disagree, a disposition
+  tally that does not match the per-finding verdicts, an identifier resolving to more than one finding.
+- **LOW** — drift with no remediation consequence today: template metadata that does not resolve, an unenumerated prefix, a naming or wording inconsistency.
+
+## Report Output
+
+- Findings path: `.ai/audit/99-validation/{NN}-{phase-name}-validated-findings.md` — one validated report per phase, carrying the audited phase's own prefix and identifiers
+- Template: `.ai/audit/templates/audit-findings.md` — follow it for front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
+- Finding-ID prefix: the audited phase's own prefix, preserved. Validation-level findings discovered *during* validation use `VAL-` and occupy a separate section — never
+  interleaved into the findings table, because the two would share a `Severity` column carrying two different scales.
+- Dispositions, one per finding in scope, and no verdict withheld: **confirmed** (kept as filed), **re-typed**, **re-graded**, **merged**, **not substantiated**, and **unsettled**
+  where the environment cannot decide the claim either way. A claim that cannot be substantiated is **rejected** — never adjusted into vagueness, which releases a false positive
+  into a validated report. Withhold approval and record why; never delete a true finding to avoid the decision. A finding confirmed unchanged still carries a disposition: that
+  row is the deliverable, not a passing check.
+- `problems-only: true` — suppress commentary about the validation itself, **not** dispositions
+- Empty state, exactly: `No problems found in this phase.`
+- Incremental append, ≤100 lines per pass — never write the entire report in a single call

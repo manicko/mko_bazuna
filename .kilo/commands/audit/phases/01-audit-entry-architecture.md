@@ -6,251 +6,121 @@ executor: auditor
 problems-only: true
 ---
 
-# Phase 01 Audit — Entry Points & Process Architecture
+# Phase 01 — Entry Points & Process Architecture
 
 ## Purpose
 
-Reusable handbook for auditing the entry points and process architecture of an **N-process Django system**, where the long-lived process set is environment-dependent:
+A reusable handbook for auditing the **entry surfaces and process topology** of a multi-process Django deployment that shares one project, one configuration surface, and one database.
 
-- **Web process** — synchronous gunicorn WSGI, server-rendered HTMX MPA.
-- **Bot process** — asynchronous aiogram event loop; calls `django.setup()` and shares the persistence layer.
-- **Scheduler process** (prod only, profile-gated) — long-lived celery-beat-style loop dispatching idempotent sweep/rollup/alert management commands.
+The long-lived set is environment-dependent: a synchronous WSGI web tier, an asynchronous event-driven bot tier sharing the same persistence layer, and a conditionally-enabled background-job loop. Alongside them sit one-shot bootstrap services and a schema/reference-data gate that must complete before any long-lived process serves. A production tier may add infrastructure components (connection pooler, backup, edge proxy) that a development tier leaves disabled.
 
-All share one Django project + one PostgreSQL database. Migration/reference bootstrap runs exactly once (under an advisory lock) before any long-lived process starts — see [Process topology](#process-topology). A reverse proxy fronts the long-lived processes for TLS termination and `/media/` serving; it is **optional in dev**.
+This file states *what* to examine and *under which angle*. Concrete artifacts — services, files, modules, commands, identifiers, values — are discovered by the executing auditor, never named here.
 
-*Auditing is role-based — never reference concrete file/module/class names. Refer to the web WSGI entrypoint, the bot process entrypoint, the scheduler loop, the migration gate, the settings module, the URL router, the shared ORM/persistence layer, and the advisory-lock subsystem.*
+**Scope Boundaries** — owned here: entry surfaces, process topology, startup/stop lifecycle, and the schema/reference-data bootstrap guarantee. Not owned here: the health, liveness and readiness **endpoint** plus its probe/orchestration contract (12); async↔sync ORM dispatch, transaction, advisory-lock and connection-pool/pooler semantics (03), the event-loop bridge mechanism (09); secrets and settings **values** (02); media file-handling mechanics (07); test-suite adequacy (11), this phase keeping only the schema-mutating *entry path* angle.
 
-## Output Mode
-
-`problems-only: true` — **only problems, bugs, and deviations are documented.**
-
-- Do NOT write sections that say "X is correct" or "no issues found in Y".
-- Do NOT include checklist rows where the check passes — omit them entirely.
-- If a dimension has zero findings after investigation, **omit the dimension entirely**.
-- Every finding must be actionable: real problem + runtime evidence + exact consequence.
+Design deliberately asymmetric between processes, tiers or transports is not a defect on its own. Report it only where the code's own documentation or comments misstate it.
 
 ---
 
-## Process topology
+## Audit Blocks
 
-### Startup chain (one-shot bootstrap)
+Each block is independent — execute any one with no knowledge of the others.
 
-Compose-ordered one-shot services run to completion before the long-lived processes serve traffic:
-`db (healthy)` → `migrate` (`bootstrap_reference_data` → `migrate_locked`: `migrate --run-syncdb` + `setup_search_triggers --backtrack` + `load_exchange_rates` + optional `backfill_translations`, under session advisory lock **MIGRATE = 100**) → `load_cities` (lock 104) → `load_catalog` (lock 104) → fork: `{create_admin (lock 101), web, bot, seed (profile-gated, lock 110)}`; in prod, `scheduler` also joins the fork depending on `migrate` + `load_catalog`.
+Evidence is a class, not a check list: observed output, a reproduced behaviour, or a static proof that a stated property does not hold; the method is the auditor's. A passing check is methodology, never a finding, and any sound evidence is admissible — nothing here gates a finding on this phase's own checks. Skip a runtime check only when the environment makes it genuinely impossible, and record why.
 
-### Reverse proxy note
+### 1. Deployment Topology and Startup Dependencies
 
-nginx terminates TLS and serves `/media/` in production (web does not publish `:8000`). In dev (`docker-compose.dev.override.yml`) nginx is **profile-gated** (`profiles: ["use-nginx"]`) and web publishes `:8000` directly — auditors must not treat nginx as a hard prod-only requirement when reviewing dev stacks.
+Establish, per environment/deployment tier, which components are long-lived, one-shot, or conditionally enabled, and which ordering and readiness edges are declared between them.
+Compare tiers against one another rather than reading any single tier in isolation: a component enabled but used by nothing, a conditionally-enabled component nothing depends on or points at, and a declared ordering that does not match a component's real boot requirement are all findings.
+Record what a supervisor observes when a dependency is unavailable at boot and again during steady state — clean exit, restart loop, or silent hang.
 
-## Architectural Layers (zones of responsibility)
+Evidence: the per-tier component inventory with its long-lived, one-shot or conditional role; each declared ordering edge against the component's real boot requirement; what a supervisor observes at boot and in steady state.
 
-| Layer | Zone of responsibility | Key risks |
-|-------|------------------------|-----------|
-| Bootstrap / entry | Load settings once; `django.setup()`; establish DB connectivity; start serving. | Import-time side effects; ORM access before setup; divergent settings. |
-| Migration orchestration | Run schema migrations exactly once under an advisory lock before either process boots. | Double migrations; concurrent runs; no dependency on completion. |
-| Scheduled-job orchestration | Long-lived scheduler loop dispatches idempotent management commands (hourly sweeps + daily jobs); each command owns its advisory lock ID; distinct from the one-shot migration gate (lock 100). | Lock-ID collisions / overlapping sweeps / missed daily cadence / drift from the hourly loop. |
-| Web transport | Accept HTTP; route to thin views; delegate to service/core. | Business logic in views; blocking loops; missing pooling. |
-| Bot transport | Receive updates on the event loop; route to thin handlers; delegate. | Unwrapped ORM in async; blocking IO; no reconnect/shutdown handling. |
-| Service / core | Business logic, isolated from transport. | Reverse imports from entry layer; shared mutable local state. |
-| Persistence | Shared ORM over PostgreSQL; transactions; media filesystem. | Cross-process state assumptions; connection leaks; uncoordinated media writes. |
+### 2. Entry-Surface Inventory and Import-Time Behaviour
 
----
+Enumerate every entry surface — process bootstraps, the WSGI serving module, container and command-line entry scripts, background-loop entry points, management-command dispatch — and for each establish what work happens at import versus what is deferred.
+Check whether importing a surface can reach the database, network, or filesystem; whether configuration load, application-registry initialisation, and first ORM use are ordered deliberately on every surface; and whether each surface's configuration source is explicit about which variant it selects and why.
+Also establish what the automated lint and static-typing gates actually include — an entry surface the gates never analyse is invisible risk.
 
-## Discovery Stage
+Evidence: the entry-surface inventory with import-time versus deferred work per surface; the database, network or filesystem an import can reach; the surfaces the lint and static-typing gates never analyse.
 
-Map the architecture before checking anything. Use roles, not names.
+### 3. Web Serving Tier — Worker Model and Shutdown Contract
 
-1. **Entry point discovery** — Locate the web WSGI entrypoint and the bot
-   process entrypoint. Trace the Django bootstrap in each. Verify both reference
-   the **same settings module**. Verify the bot calls `django.setup()` **before**
-   any ORM/model import.
-2. **Scheduler discovery** — Locate the long-lived scheduler entrypoint (the hourly/daily command loop, profile-gated `scheduler`). Confirm the hourly + daily command sets, map each command to its advisory-lock ID, and verify the scheduler depends on `migrate` + `load_catalog` completion before dispatching sweeps.
-3. **Migration orchestration discovery** — Locate the one-shot migration runner.
-   Verify it takes an **advisory lock** to prevent concurrent runs. Verify **both**
-   processes depend on migration completion before starting.
-4. **Web↔Bot boundary mapping** — Enumerate all entry handlers (HTTP routes +
-   bot handlers). Trace their imports into service/core layers. Verify **no
-   reverse imports** (entry layer must not be imported by lower layers). Identify
-   shared-state assumptions (database, media filesystem).
-5. **Async/sync boundary mapping** — Find where the async bot loop touches the
-   synchronous ORM. Identify the sync-to-async (or equivalent) wrapping around
-   every ORM call. Identify blocking IO in async handlers.
+Establish the synchronous serving tier's worker/threading model, application preloading, request and graceful timeouts, worker recycling, and arbiter behaviour when a worker dies.
+Verify every value the serving configuration depends on is actually supplied by the deployment definition; a dependency satisfied by only one tier is a real defect.
+Measure drain/stop latency and exit code against the orchestrator's termination grace period, and look for state that leaks across worker generations on recycle or crash.
 
----
+Evidence: the serving tier's worker, preload, timeout, recycle and arbiter settings against what each tier actually supplies; measured drain latency and exit code against the grace period; state observed to survive a recycle or crash.
 
-## Mandatory Runtime Verification
+### 4. Async Bot Runtime — Dispatch Chain and Per-Update Lifecycle
 
-**Run before evaluating any dimension. Skip only if impossible — document why.**
+Establish the event-driven process's effective update-handling chain: the real ordering of its dispatch and registration layers and what each does per update, where work leaves the event loop, the connection lifecycle per update, and its error/retry registration.
+Verify the ordering actually in effect at runtime rather than the order layers are registered; whether a layer can short-circuit the layers behind it and whether that is intended; and whether the hand-managed connection lifecycle is equivalent to what the synchronous tier receives for free.
+Confirm the process does not claim readiness before it can actually serve work, and enumerate the failure surfaces of the chain and what each surfaces as.
 
-### R1 — Import Verification
-Import both entry modules in isolation. Verify **no import-time side effects**
-(no DB access, no model queries, no network) and **no circular imports**.
-Capture `python -c "import ..."` output and tracebacks.
+Evidence: the dispatch chain in the order it runs at runtime; per layer, its per-update work, whether it short-circuits what follows, and its failure surface; the hand-managed connection lifecycle against the synchronous tier's.
 
-### R2 — Process Boot Test
-Boot each process in isolation. Capture the init sequence (logs). Confirm:
-- DB connectivity check precedes request/handler handling.
-- Migration completes before boot starts (or boot is gated on migration).
-Record the exact boot order; anomalies are evidence.
+### 5. Background Job Loop — Cadence, Dispatch and Restart Safety
 
-### R3 — Linter + Type Checker
-Run the project linter and type checker (`ruff`, `basedpyright`). Record exit
-codes. Focus on **async/sync boundary type errors**.
+Establish the long-lived periodic loop: its cadence model, its job registry, per-job execution and timeout, failure isolation between jobs, and the liveness signal it publishes about itself.
+Is every registered job reachable from a dispatcher, and every guarded or idempotent operation reachable from a job? Does per-job dedupe or idempotency state survive a restart, a clock re-alignment, or a skipped tick?
+Can a stuck loop be distinguished from a failing one, and a healthy idle loop from a dead one, by an observer outside the process?
 
-### R4 — Test-Suite Run
-Run the test suite. Record pass/fail. Note any failure touching entry/process
-layers.
+Evidence: the cadence, registry, per-job bound and failure isolation; the registered jobs and guarded operations no dispatcher reaches; dedupe or idempotency state across a restart, a clock re-alignment and a skipped tick; the liveness signal as an outside observer sees it.
 
-### R5 — Migration Guard Verification
-Start both processes near-simultaneously; confirm migrations execute **exactly
-once** and that concurrent starts cannot trigger duplicate/parallel migrations.
-Inspect advisory-lock acquisition and release on failure.
+### 6. Schema and Reference-Bootstrap Gate
 
-### R6 — Process Isolation Verification
-Confirm neither process assumes **process-local mutable state** persists across
-the two processes. Confirm shared state lives only in the DB / media FS.
+Enumerate every path that can mutate schema or reference data — the orchestrated one-shot bootstrap services, ad-hoc command-line invocation, automation pipelines, and the test harness.
+Which guard does each path take, and does it take one at all? What are the guard's acquisition semantics — blocking or skip, bounded or unbounded, observable to an operator?
+Does the once-only guarantee come from declared ordering, from the guard, or from neither — and does the guard's own documented semantics match what it actually does?
 
----
+Evidence: every schema- or reference-mutating path with the guard it takes, or none; that guard's acquisition semantics; where the once-only guarantee actually comes from; the guard's documented semantics against what it does.
 
-## Audit Dimensions
+### 7. Cross-Process Shared State and Side-Effect Coordination
 
-Each dimension is a table of `Check | Description`. **Evidence required** per
-dimension: runtime output (boot logs, import errors, lint/type exit codes, test
-results, lock traces) or static analysis proving the deviation.
+Establish everything the processes coordinate through: the shared database, the media filesystem, the shared cache, and any out-of-band marker or state files.
+Separate what is genuinely shared from what is per-process or per-restart. Which multi-resource side effects can interleave between processes, between tiers, or across a restart? Where does a single-writer assumption exist that nothing enforces?
+Treat any in-memory dedupe or idempotency marker as a finding candidate until its persistence across restart is demonstrated.
 
-### (a) Process Initialization Correctness
+Evidence: the shared-state inventory, marked genuinely shared against per-process or per-restart; the multi-resource side effects that can interleave; the single-writer assumptions nothing enforces; the in-memory marker whose persistence across restart is unproven.
 
-| Check | Description |
-|-------|-------------|
-| Both processes boot | Each entrypoint starts and reaches ready state independently. |
-| Settings loaded once | Exactly one settings module; no per-process divergent config. |
-| `django.setup()` before ORM (bot) | Bot entrypoint calls setup before any ORM/model import. |
-| No import-time Django access | Entry modules perform no DB/ORM access at import time. |
+### 8. Entry-Layer Discipline and Dependency Direction
 
-### (b) Migration-Once Guarantee
+Establish the transport modules — HTTP views, bot handlers, entry scripts — and the layers they are meant to delegate to.
+Parse → delegate → respond, nothing more: no domain rules, no multi-step persistence, no stateful sanitisation. Does any lower layer import back from the entry layer? Does the import graph stay acyclic across layers?
+Where two transports implement the same protocol, is the implementation shared or duplicated? Duplication is the question — deliberate asymmetry between transports is not itself a defect.
 
-| Check | Description |
-|-------|-------------|
-| Advisory lock held | Migration runner takes a DB advisory lock; concurrent runs blocked. |
-| Compose/lifetime dependency | Both processes depend on migration completion before starting. |
-| No migration calls in entrypoints | Entrypoints never run migrations themselves. |
-| Lock released on failure | Lock is released if migration fails, allowing a clean retry. |
+Evidence: the transport-module to layer map; the domain or persistence work found inside an entry module; every back-import and import cycle; each protocol implemented more than once.
 
-### (c) Entry-Handler Thinness
+### 9. Route Surface Wiring and Entry-Point Reachability
 
-| Check | Description |
-|-------|-------------|
-| Thin handlers | Entry handlers parse → delegate → respond only. |
-| No business logic in entry | No domain rules/sanitization/stateful logic in views/handlers. |
-| No ORM loops in entry | No query loops or bulk persistence in the entry layer. |
+Establish the URL surface as assembled at project and per-app level, plus non-HTTP entry registrations: admin, monitoring endpoints, handler routers, registered periodic operations.
+Check namespacing and collisions across includes, each route's downstream path, endpoints mounted outside the normal view → service → persistence path, and aliases retained for compatibility.
+Any registered route, handler, router, or operation with no inbound trigger is a finding.
 
-### (d) Layer Boundary & Dependency Direction
-
-| Check | Description |
-|-------|-------------|
-| Entry imports only service/core | Entry layer imports only service/core, never the reverse. |
-| Acyclic dependencies | No cycles across layers. |
-| Consistent ORM access patterns | Both processes use the same ORM access conventions. |
-
-### (e) Process Isolation & Shared State
-
-| Check | Description |
-|-------|-------------|
-| Media writes coordinated | Media filesystem writes are safe under concurrent web/bot writes. |
-| No process-local state assumed | No in-memory state assumed persistent across processes. |
-| Transactions scoped correctly | Transactions are correctly scoped across async/sync boundaries. |
-
-### (f) Async/Sync Boundary
-
-| Check | Description |
-|-------|-------------|
-| Single event loop | Bot uses one event loop; no stray loops/threads. |
-| ORM access wrapped/guarded | Every ORM call from async is wrapped (sync-to-async or equivalent). |
-| No blocking IO in async | No blocking FS/network in async handlers. |
-| Graceful shutdown | Both processes handle interrupt/signal and release resources. |
-| DB connections released | Connections returned/closed on shutdown. |
-
----
-
-## Cross-Cutting Concerns
-
-Checks + evidence, not duplicated elsewhere:
-
-- **Startup ordering / races** — web and bot race at boot; verify a defined
-  start order or independent safe boot.
-- **Shared secret source at boot** — secrets loaded once; no secret leakage in
-  logs/tracebacks.
-- **Environment separation** — dev vs prod entry behavior: `DEBUG`, TLS, secure
-  cookies differ correctly.
-- **Graceful degradation on DB-down** — boot with DB unavailable yields
-  non-zero exit + restart policy (not silent hang).
-- **Restart-policy expectations** — long-lived processes have defined restart
-  semantics (crash → restart, no duplicate migration).
-
----
-
-## Dead-Code / Orphan-Entry Detection
-
-Registered routes/handlers/entry branches that are unreachable or never wired.
-
-**How to evidence:**
-- Static analysis: enumerate all registered routes/handlers and trace each to a
-  reachable trigger (HTTP path, bot command/callback).
-- Reachability: confirm no dead registration with zero inbound route.
-- Report any entry branch with no wiring as a finding (`ENT-` prefix).
-
----
-
-## Edge-Case Checklist
-
-| Scenario | What to verify |
-|----------|----------------|
-| Migration fails mid-way | Lock released; partial state recoverable; clean retry. |
-| One process starts before migration done | Boot fails fast or waits, never serves stale schema. |
-| Bot reconnects while web down | Bot reconnect logic independent of web; no shared lock held. |
-| Settings import side effects | Importing settings performs no IO/queries. |
-| DB down after both started | Both detect and exit/restart; no stuck threads. |
-| Missing env/secrets | Boot fails with clear error, non-zero exit. |
-| Multiple migration containers simultaneously | Advisory lock prevents parallel runs. |
-| Missing TLS cert | nginx/entry fails fast with clear error. |
-| Missing bot token | Bot boot fails fast with clear error, non-zero exit. |
+Evidence: the assembled route and registration surface with each entry's downstream path; collisions and namespacing across includes; endpoints mounted outside the view → service → persistence path; every entry with no inbound trigger.
 
 ---
 
 ## Severity Taxonomy
 
-- **CRITICAL** — migrations run twice/concurrently; business logic in entry
-  layer; import-time ORM side effects; unwrapped ORM in async handler; missing
-  migration lock.
-- **HIGH** — no connection-pool limits; blocking IO in async; no graceful
-  shutdown; reverse imports from entry layer.
-- **MEDIUM** — uncoordinated media writes; divergent dev/prod behavior; unclear
-  restart policy; missing env fails silently.
-- **LOW** — cosmetic boot logs; minor unreachable entry branches; non-blocking
-  lint warnings.
+Grade by **effect and blast radius**, not by mechanism name; rate what is true now, not the worst consequence if triggered.
+
+- **CRITICAL** — data loss or corruption; a once-only guarantee that is not actually guaranteed; concurrent or duplicate schema mutation; a process that serves work before it can safely do so.
+- **HIGH** — service unavailability, or silently wrong results that a user or a seller would act on; a documented startup, stop, or liveness contract that does not hold.
+- **MEDIUM** — degraded operability: a defect an operator cannot distinguish from normal behaviour, or environment-tier divergence that is not intentional.
+- **LOW** — cosmetic or documentation-only drift with no runtime consequence.
+
+An empty band is a valid outcome — do not populate it with a hypothetical, and do not promote an item for sounding alarming.
 
 ---
 
 ## Report Output
 
-Write findings to: `.ai/audit/01-entry-architecture/findings.md` using template
-`.ai/audit/templates/audit-findings.md`.
-
-**Write the file incrementally — append blocks of ≤100 lines each. Never write
-the entire report in a single call.**
-
-Use prefix `ENT-` for finding IDs.
-
-**`problems-only: true` rules:**
-- The report contains **only findings** — real problems discovered during
-  investigation.
-- Do NOT include sections, dimensions, or checklist rows where everything is
-  correct.
-- If after completing all Runtime Verification steps and all Audit Dimensions,
-  no problems were found, write a single line: `No problems found in this phase.`
-- Every finding MUST include:
-  1. **Runtime evidence** — boot logs, import errors, lock traces, lint/type
-     exit codes, test failures, reachability output.
-  2. **Not just** "violates invariant X" — show the exact layer/role that
-     violates it and the exact consequence (e.g., duplicate schema migration,
-     ORM accessed before setup, unwrapped async DB call).
+- Findings path: `.ai/audit/01-entry-architecture/findings.md`
+- Template: `.ai/audit/templates/audit-findings.md` — follow it for front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
+- Finding-ID prefix: `ENT-`
+- Incremental append, ≤100 lines per pass
+- `problems-only: true` — findings only, omit passing checks; every finding needs runtime evidence and the exact consequence
+- "Violates invariant X" is not a finding: name the exact role that violates the property and the exact consequence; evidence fences are captioned, tied to a specific claim, and overflow to the Appendices
+- Empty state, exactly: `No problems found in this phase.`

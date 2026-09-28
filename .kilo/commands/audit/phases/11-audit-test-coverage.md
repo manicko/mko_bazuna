@@ -1,300 +1,132 @@
-# 11 — Test Coverage
+---
+name: 11-test-coverage
+status: draft
+validated: no
+executor: auditor
+problems-only: true
+---
 
-> Audit phase. LLM-auditor instruction. Architecture-agnostic: described via
-> ARCHITECTURAL LAYERS, ZONES OF RESPONSIBILITY, KEY RISKS, GOALS. NOT tied to
-> specific files, modules, or functions. Must stay valid if the architecture changes.
->
-> **Output mode:** `problems-only` — report only findings; do not narrate a clean bill of health.
+# Phase 11 — Test Coverage
 
-## 1. Goal
+## Purpose
 
-Verify the test suite is a trustworthy safety net for every security- and
-correctness-critical behavior owned by phases 01–09: the ad-lifecycle state
-machine, the login-token two-phase claim/expiry/replay, the PII-erasure sweep,
-contact-gating, FTS visibility, the media sweep, and translation fallback. Tests
-must be meaningful (not tautological), deterministic, isolated, and compliant
-with the production-code-king rule.
+Audits the test suite as what it is — a distributed system with its own bootstrap, its own process model, its own parallelism, and its own failure modes — and asks of it the one question: if the product made
+the wrong decision, would anything notice? The lens is the gap between the assurance the suite appears to carry and the assurance it delivers: behaviour reached but never asserted, doubles that remove the
+property under test, a helper layer whose defaults are a second contract with the product, boundaries covered from one side only, a harness whose own machinery decides what can and cannot be tested, failures
+nobody can reproduce, and gates that are declared, loaded, green, or inert. This file names what to examine and under which angle; the executing auditor discovers the concrete artifacts.
 
-## 2. System Under Audit (layers & zones)
+Scope boundaries — other phases own: production-code convention defects and dead code (10); pipeline and container posture (12); transaction, lock, and pooler semantics (03); lifecycle correctness (05);
+settings values and environment policy (02); namespace rulings and cross-phase conflict resolution (99). This phase owns whether the suite would notice, and the fidelity of what it asserts once it does.
 
-| Zone | Concern |
-|------|---------|
-| **Persistence / Model-Test** | ORM behavior, status transitions, data invariants. |
-| **Service-Logic-Test** | Business-logic validation, moderation rules, sweeps. |
-| **Web-View-Test** | Request/response, search visibility, contact gating. |
-| **Bot-Handler / FSM-Test** | Bot flow, login-token claim, contact deep-link, FSM persisted as DRAFT rows in the shared ORM. |
-| **Integration / E2E-Test** | Cross-process ORM sharing; full flows against the real DB. |
-| **External-Mock** | Telegram gateway + translator mocked; no real calls, no PII egress. |
-| **Migration-Test** | Schema reproducibility; migrations idempotent; no drift. |
-| **Fixture / Factory** | Synthetic data only (no PII/secrets); isolated DB + media store. |
-| **CI-Gating** | Lint + type-check + test (+ coverage) enforced on PR; deterministic. |
+## Audit Blocks
 
-## 3. Prerequisites
+Each block is independent — execute any one with no knowledge of the others. Every block carries its own evidence. Evidence is a class, not a check list: a derived inventory with a stated absence, a reproduced
+divergence between two sites, or an observed pass against a decision the test purports to cover; the method is the auditor's. A passing check is methodology, never a finding, and any sound evidence is
+admissible — nothing here gates a finding on this phase's own checks. Where the environment prevents the suite from being run at all, establish what is establishable by other means and state plainly, in the
+report, what could not be verified and why; an unreachable suite is a limit on the report, never a finding.
 
-- Test suite runnable via the documented command (pytest over the whole repo).
-- Coverage tooling available (line + branch).
-- Real DB available for tests per project spec (no SQLite fallback masking drift).
-- External dependencies mockable (no network/cost in CI).
-- No code modification — audit only.
+### 1. Exercised, not merely reachable
 
-## 4. Runtime Verification (mandatory)
+*Derive from the code — never from a list carried in this or any other file — the set of decisions the system acts on: a value chosen, a transition permitted or refused, a record selected or excluded, a limit
+ applied. For each, ask what value of the decision its assertions would reject. A branch whose effect nothing observes, a returned value nothing inspects, a refusal whose absence no test would notice, a
+ rendered surface no test renders, an assertion that holds for every value the decision can take: each reads as coverage and is not. A table that enumerates inputs while asserting one shared postcondition
+ discriminates no more than an empty assertion, and a chain of assertions in which any one would fail for a reason unrelated to the property it names proves the chain, not the property. Include a mechanism
+ whose stated purpose is to fire on one path, and establish what tests the paths it must not fire on.*
+Evidence: the derived decision set with a per-decision verdict; one decision whose effect no assertion can observe; one test whose assertions survive the decision being
+inverted.
 
-Execute, then capture evidence (pass/fail/skip, duration, coverage numbers, grep hits):
+### 2. What the doubles remove
 
-1. **Suite baseline** — run full suite → capture counts + duration.
-2. **Critical-path coverage** — measure branch coverage on each critical behavior: lifecycle transitions, login-token claim/expiry/replay, PII-erasure sweep, contact-gating (all conditions), FTS visibility (PUBLISHED-only), media sweep (file+row atomicity), translation fallback. Assert each is actually exercised (not mocked away).
-3. **Critical-path isolation** — run each critical test alone → confirm it asserts real behavior (e.g. consumed token rejected, sweep removes only expired revocations, each gating condition blocks independently, non-PUBLISHED ads excluded from search).
-4. **Mock discipline** — grep tests for real external calls (gateway/translator) → assert mocked; assert no PII/secrets in test data.
-5. **Test quality** — flag tests that mock the function under test or assert nothing real (tautology); flag tests coupled to private internals that break on refactor without behavior change.
-6. **Two-process testing** — confirm bot FSM is tested against the REAL shared ORM (DRAFT persistence), not a fake; confirm web+bot consistency where relevant.
-7. **Migration test** — confirm a test verifies migrations apply cleanly + are idempotent.
-8. **Determinism** — run suite twice → identical results; confirm timezone/randomness/order handled explicitly.
-9. **Prod-code-king** — flag any test that asserts wrong business logic or forces a production distortion; recommend fix/removal.
-10. **CI gating** — confirm lint→type-check→test enforced; coverage reporting + threshold configured (or flag absence).
+*For every boundary a test replaces — a patched collaborator, a stubbed deferral or scheduling primitive, an in-memory stand-in for real persistence, a source-text inspection standing in for a runtime
+ observation, a reconstructed call chain — establish what property of the real thing can no longer be observed, and whether any test anywhere observes it. Replacing an external transport is correct, cheap, and
+ is not this block's finding; replacing the mechanism under test removes the subject. A double standing in for a mechanism that exists to enforce an ordering leaves the ordering untested while making it look
+ tested, and an assertion reduced to matching the shape of the source observes the source text rather than the behaviour. Build the inventory from what the tests actually replace, not from a declared convention
+ about what ought to be replaced.*
+Evidence: the double inventory with the property each removes; one property observed by no test; one stand-in standing in for a shared resource.
 
-## 5. Audit Dimensions (checks + evidence)
+### 3. The fixture data contract
 
-### (a) Coverage of critical paths — CRITICAL
-Every critical behavior from phases 01–09 has meaningful tests.
-- Evidence: coverage on each path; tests assert real ORM/behavioral state.
+*Establish what states and values the helper layer manufactures by default, whether the product can produce each, and what stays green precisely because it cannot. A default that silently produces a surprising
+ value turns every consumer into a test of a fiction; a helper that absorbs a database constraint means no test ever has to satisfy it. Also establish whether a fixed value the production vocabulary already
+ names is restated as a bare literal by a helper — the test layer's instance of a value that now has two homes, where one copy drifts silently and every consumer is tested against the stale one. And establish
+ whether the key space helper defaults must populate is ordered and non-overlapping by anything but the test's own convention, so two independently valid setups collide on an identity no constraint separates.
+ Where more than one helper universe exists, establish that they agree on the contract, and where they do not, which one the assertions are actually testing. Whether helper data carries real identifiers or
+ secrets, and whether any of it reaches outside the test run, is the same contract asked of hygiene. The project rule that production code is king is the frame here, not a prohibition on the finding.*
+Evidence: the helper-default inventory with a producible/unproducible verdict and the call-site count per unproducible default; the restated fixed values; the constraints
+the helper layer absorbs; the divergences between helper universes.
 
-### (b) Mock discipline — CRITICAL
-External deps mocked; no real calls; no PII in test data.
-- Evidence: grep clean; synthetic fixtures; no network in CI.
+### 4. Both sides of every boundary
 
-### (c) Test quality — HIGH
-Assertions validate behavior, not implementation; no tautological tests.
-- Evidence: tests fail on behavior regression, not on refactor; meaningful asserts.
+*Establish, for each boundary the architecture creates — process, transaction, storage, cache, clock, file system — what is asserted from each side and what from one side only. A behaviour that exists only
+ because two components agree is covered only where both are exercised, and a boundary crossed in production but stubbed in every test is a boundary with no test. Establish first whether a stand-in for a shared
+ resource is in use: presupposing one produces a false pass, and so does presupposing its absence. Cross-refer a defect another phase owns rather than re-filing it, and record the test that stands between that
+ defect and its fix.*
+Evidence: the boundary inventory with a per-side assertion verdict; the boundaries asserted from one side only; the cross-references to findings owned elsewhere, each with
+the test that gates their remediation.
 
-### (d) Two-process testing — HIGH
-Bot FSM tested against the real shared ORM (DRAFT persistence); web+bot consistency covered.
-- Evidence: real-DB FSM tests; no fake-ORM false confidence.
+### 5. The harness as a system
 
-### (e) Migration tests — HIGH
-Migrations verified reproducible + idempotent.
-- Evidence: migration test exists; re-run yields no drift/data loss.
+*Establish how the test schema is built, how reference data is restored, how parallel execution partitions and isolates, what bounds a runaway query, and what each registered marker is wired to. Then establish
+ the substitution semantics of the invocation: what a caller loses when the default options are overridden, and whether the two execution paths this project supports reach the same runtime configuration.
+ Several arrangements here are deliberate and hard-won, and each is a claim to verify rather than a defect: a step excluded from the fast path, where nothing detects the failures running it would otherwise
+ surface; two helper universes separated by an execution model neither can cross; an import-path shim retained so that existing patch targets still resolve after their module moved.
+ Establish what each costs, what still holds it in place, and what a change would have to preserve. Finally: which tests the harness cannot currently host, and which missing coverage each explains. Establish
+ what a data-level schema change does to the run — its effect, not only whether a migration applies cleanly and twice — since a schema built by a strategy other than the migration path cannot see it.*
+Evidence: the schema, reference-data, isolation, and marker-wiring facts; the override-substitution delta; the deliberate arrangements with what holds each in place; the
+tests the harness cannot host and the gap each names.
 
-### (f) Determinism — HIGH
-No flakiness from timezone/randomness/DB order.
-- Evidence: two identical runs; explicit time/order handling.
+### 6. Reproducibility and debuggability
 
-### (g) Prod-code-king compliance — CRITICAL
-Tests don't distort production; bad tests fixed/removed.
-- Evidence: no test-only branches in prod; wrong-logic tests flagged.
+*Given a red run in automation, establish whether it can be reproduced: what varies per run and whether the variation is recorded where a reader of the log will find it, what is unbounded while a test runs,
+ what a parallel run does that a serial run does not, and what a reused resource carries forward into the next run. Do not settle for running the suite twice and comparing. Order-independence is a per-test property
+ and not a suite property: a shuffling plugin makes no individual test independent, so establish which tests depend on a resource another test left behind and which depend on being first. A test that reads the
+ same clock, the same ambient environment, or the same process-wide state as the code it exercises is not isolated from the code it tests.*
+Evidence: the per-run variable inventory with what is recorded and where; the unbounded resources and their owners; the process-wide state a test shares with production
+code; what state a reused resource carries between runs; the recovery procedure for a red automated run.
 
-### (h) Fixtures hygiene — HIGH
-No real PII/secrets; isolated DB + media store.
-- Evidence: fixture scan clean; temp media root used.
+### 7. What actually blocks a merge
 
-### (i) CI gating + coverage reporting + speed — MEDIUM
-Lint+type-check+test+coverage enforced; suite fast enough for CI.
-- Evidence: CI config gates all; coverage threshold set; duration acceptable.
+*For each declared gate — static analysis, types, tests, coverage, translation completeness, security and dependency and secret scanning, deploy check, scheduled suites — establish whether it is loaded, whether
+ it is green, and what its scope excludes. Four absences are distinct and must be told apart: a gate declared and never loaded, a gate loaded and red, a gate whose scope omits a whole process tree, and a gate
+ whose configuration sits in the repository but is never read from the directory it runs in. Where the gate is a type checker, ask what it is configured to enforce, what its configured scope includes, and what
+ noise class is sanctioned: assert no strictness bar the project did not set, and treat no diagnostic count as the finding. This phase owns only whether the test tree is inside that gate's scope and whether the
+ gate is currently red — the population of diagnostics in production code and its sanctioned suppressions is another phase's. Where the gate produces a coverage measure, establish what the artefact it produced
+ can actually see before its number is quoted: which configuration it read, from which working directory, what it omitted, and which process trees are absent from the report. That is a question about the
+ effective scope of a measurement, not a bar to clear.*
+Evidence: the gate inventory — loaded or not, green or not, scope; the gates whose scope excludes a process tree; the type checker's configured mode and sanctioned noise
+class; the coverage artefact's effective source selection.
 
-## 6. Cross-Cutting (owned here, not duplicated)
-This phase verifies the TEST SAFETY NET for behaviors owned by other phases:
-- Phase 05 lifecycle, Phase 04 login-token, Phase 06 PII/consent, Phase 07 media,
-  Phase 08 search/FTS, Phase 09 integrations. The behaviors belong to those
-  phases; this phase confirms they are actually tested and the tests are trustworthy.
+### 8. Declared test-layer contracts
 
-## 7. Edge Cases
-- A "test" mocks the very function it claims to test (zero-assertion tautology).
-- Test passes but would not catch a regression (no assertion on changed behavior).
-- Bot FSM test uses a fake ORM instead of the real shared one (false confidence).
-- Timezone-dependent test passes locally, fails in UTC CI.
-- Randomness/DB-order non-determinism.
-- Migration test missing → schema drift undetected.
-- Fixture with a real identity / secret.
-- Test that, to pass, required a production distortion (prod-code-king violation).
-- E2E test hitting the real translator (cost/flaky).
+*Establish whether each property the test layer asserts about itself — in a helper's docstring, a settings comment, an entry-point comment, a marker description, a test that asserts the text of a configuration
+ file — is true of the code it describes, and whether anything checks it. A comment that describes the harness differently from how the harness behaves is a finding here, not a source. A test whose subject is
+ the text of a configuration file passes when the text matches and fails when a line is reformatted, so establish what it can actually detect: which property of the running system a change to that text would
+ have to break, and whether that is the property it is being relied on for. A registered marker is not evidence of use and a used marker is not evidence of justification; a helper nothing calls is a question of
+ purpose, not of deletion. Scope here is the test layer; production-code convention and dead code are another phase's.*
+Evidence: the declared-property inventory with a holds/does-not-hold verdict; one comment the code contradicts; one assertion about configuration whose failure modes are
+not the ones it appears to guard.
 
-## 8. Severity Taxonomy
+## Severity Taxonomy
 
-- **CRITICAL**
-  - A security-critical path has ZERO tests (login-token replay, PII erasure, contact-gating, FTS visibility, lifecycle transitions, media sweep).
-  - Tests assert WRONG business logic and pressure production distortion.
-  - Tests make REAL external calls with PII.
-  - Fixture contains real PII/secrets.
-  - Forbidden lifecycle transition not blocked by tests.
-- **HIGH**
-  - Critical path tested only with mocks asserting nothing real / tautological.
-  - Bot FSM not tested against the shared ORM.
-  - No migration test.
-  - Flaky / non-deterministic tests in CI.
-  - Coverage <50% on security-critical modules.
-  - Two-process consistency untested.
-- **MEDIUM**
-  - Branch coverage <80% on critical code.
-  - Tests coupled to implementation details.
-  - No coverage reporting / threshold.
-  - Slow suite hurting CI.
-- **LOW**
-  - Missing type hints in tests.
-  - Minor fixture duplication.
-  - No test markers for slow/integration.
+Grade by **effect and blast radius**, not by mechanism name; rate what is true now, not the worst consequence if triggered. The bands are effect classes, not a closed list of mechanisms, so a defect whose
+mechanism is not named here still lands by the consequence it is producing. A band with no present occupant is left empty, not filled.
 
-## 9. Recommended Sequence
-1. Run suite → baseline.
-2. Coverage on critical paths.
-3. Mock discipline + fixtures hygiene.
-4. Test quality (tautology / impl-coupling).
-5. Two-process + migration + determinism.
-6. Prod-code-king + CI gating.
+- **CRITICAL** — the suite's green is affirmatively false today: a shipped assertion the product cannot satisfy, or a decision the system acts on whose effect no assertion anywhere can observe, where the
+  unobserved effect is one a user or a seller receives.
+- **HIGH** — a gap that will be mistaken for coverage and is silent today: a decision exercised only through a stand-in for the thing it decides, a boundary asserted from one side only, a property the harness
+  depends on that nothing holds it to, a gate declared and never loaded, a measurement whose effective scope is not the scope it is read for.
+- **MEDIUM** — bounded and real, with a specific audience: a gate loaded and red over a known accepted-noise class, a resource left unbounded so that one test can take the run down, state carried forward
+  between runs, a cost that makes a gate get disabled.
+- **LOW** — self-description and hygiene with no runtime consequence today: a test-layer comment that misdescribes the harness, a duplicated helper with no divergence yet, a marker registered and inert, a test
+  whose subject is configuration text it cannot actually detect a change in.
 
-## 10. Finding Prefix
-Use `TST-` for all findings in this phase.
+## Report Output
 
-## 11. Reporting
-- `problems-only: true`.
-- Each finding: severity, zone, evidence (test name/line/coverage number/grep hit), and recommendation with effort/priority.
-- Append incrementally (≤100 lines per write) to the phase findings file per `docs/99-agent/rules.md`.
-
-## 12. Findings (verified)
-
-Verified findings live in this section; the full auditor-verification memo (with
-line-level evidence) is in `.kilo/research/11-testing.md`. Findings are prefixed
-`TST-` per §10.
-
-### TST-001 — Mischaracterized settings topology (HIGH / refinement)
-
-Finding TST-001 — Mischaracterized settings topology (HIGH). The auditor's "two
-test settings (backend vs bot)" is not supported by source:
-
-- **One** settings module is shared by *both* suites: `config.settings.test`.
-  Verified across all compose services — `DJANGO_SETTINGS_MODULE=config.settings.test`
-  on `test`, `bot`, `web`, `migrate`, `load_cities`, `load_catalog`, `seed`,
-  `create_admin` (`docker-compose.test.yml:62,81,106,121,131,142,151,162`).
-- The **second** settings module is `config.settings.test_migrations`
-  (`test_migrations.py`), used *only* by `apps/core/tests/test_migrations.py`
-  (`test_migrations.py:30` → `config.settings.test_migrations`). It re-enables
-  `MIGRATION_MODULES = {}` and uses a unique `test_migration_repro` DB so the
-  subprocess does not collide with xdist workers — purely a migration-
-  reproducibility concern, **not** a bot-backend split.
-- The root `conftest.py` (repo root, shared) centralizes `pytest_plugins` and
-  re-exports `create_test_ad` so both trees resolve fixtures; the bot conftest
-  (`telegram_bot/tests/conftest.py`) itself says bot tests "cannot import the
-  backend conftest" by tree (lines 93-110) but they *do* share the **same
-  settings module**.
-- Bot FSM is tested against the real shared ORM (`create_test_ad` imported via
-  `from conftest import create_test_ad`, `telegram_bot/tests/conftest.py:109-110`)
-  — satisfying dimension (d), just not via a separate settings file.
-
-✅ **Recommendation (Priority 1):** Treat the two settings as `test.py`
-(fast-suite, `DisableMigrations`) vs `test_migrations.py` (migration-repro
-subprocess). No bot-specific settings module exists; document this to prevent
-future contributors from inventing one.
-
-### TST-002 — CI runs pytest natively, not via Docker Compose (CONFIRMED / MEDIUM / phrasing refinement)
-
-TST-002 — (CONFIRMED/MEDIUM): "pytest + Docker real PostgreSQL" is imprecise:
-CI runs `uv run pytest` natively with a `postgres:18-alpine` service container,
-not inside Docker; the Docker path is the local `make test`. Intent (no SQLite)
-is met.
-
-- CI runs `uv run pytest` natively on `ubuntu-latest` with a `postgres:18-alpine`
-  service container (`ci.yml:58-75,138`), **not** inside Docker.
-- The Docker-Compose path is **local** only: `make test` spawns the `test` compose
-  service in Docker against a PG 18 container on host port 5433
-  (`docker-compose.test.yml:43-54,68-95`; `Makefile:113-115`).
-- No SQLite anywhere: `grep sqlite src/backend` → 0 matches.
-- `entrypoint-test.sh:43-45` defaults to `--reuse-db`; `make test-recreate`
-  forces `--create-db` (`Makefile:178`).
-
-✅ **Recommendation:** No change. Intent met; only the phrasing in any summary
-should be corrected from "Docker" to "service container (CI) / Docker Compose
-(local make test)".
-
-### TST-003 — `real_images` marker in active use (CONFIRMED USED, no action)
-
-TST-003 — (CONFIRMED USED, no action): `real_images` marker is in active,
-meaningful use. `apps/seed/tests/conftest.py:36-46` autouse fixture patches
-`seed_service.ImageGenerator` to a no-op stub and *opts out* for tests marked
-`real_images` (e.g. `test_media_cleanup`, `test_seed.py:912`), which assert on
-the real image pipeline. Registry entry is justified; do **not** prune.
-
-### TST-004 — Migration reproducibility + idempotency tested (CONFIRMED, no action)
-
-TST-004 — (CONFIRMED, no action): Migration reproducibility + idempotency IS
-tested via `apps/core/tests/test_migrations.py` (`test_makemigrations_check`,
-`test_migration_idempotency`, `@pytest.mark.slow`, `xdist_group("migrations")`)
-using `config.settings.test_migrations` in an isolated subprocess + fresh
-`test_migration_repro` DB. Addresses phase-spec edge case "Migration test
-missing → schema drift undetected". *(Evidence: `test_migrations.py:2-145`.)*
-
-### TST-005 — Mock discipline sound (CONFIRMED, no action)
-
-TST-005 — (CONFIRMED, no action): Mock discipline appears sound: bot tests build
-`Bot(token=settings.BOT_TOKEN)` with a placeholder token and never call the real
-Telegram API; `compilemessages` + `makemessages` run without DB per
-`commands.md`. (Static grep for real external calls not run in this pass —
-low-risk given the i18n job runs the no-DB extraction path.)
-
-### Verified CONFIRMED findings (kept as-is)
-
-These phase-spec dimensions (§5 a–i) are satisfied by the current source:
-
-- **DisableMigrations for speed** — `config/settings/test.py:88-96` defines
-  `DisableMigrations` (returns `True` for `__contains__`, `None` for
-  `__getitem__`) and sets `MIGRATION_MODULES = DisableMigrations()` for **all**
-  apps (including Django built-ins, per lines 71-87). Compensated by the
-  session-scoped autouse fixture at `src/backend/conftest.py:111-165`
-  (`_restore_test_schema_post_db_setup`), which under
-  `AdvisoryLockId.TEST_SCHEMA_SETUP` (111) runs `call_command("migrate",
-  "--run-syncdb")` + `load_exchange_rates` + `setup_search_triggers` in-process.
-- **Bot isolation via xdist group** — 9 bot files pin to
-  `xdist_group("bot_concurrent")` via `pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))`:
-  `test_unsubscribe.py:24`, `test_save_photo_integration.py:40`,
-  `test_price_payload.py:34`, `test_ad_data_locale.py:28`,
-  `test_ad_create_condition.py:35`, `test_ad_create.py:25`,
-  `test_account_state_middleware.py:35`, `test_login.py:43`,
-  `test_create_draft_ad.py:19`. `--dist loadgroup` is the CI/entrypoint
-  distribution mode (`ci.yml:138`; `entrypoint-test.sh:43-45`), so `bot_concurrent`
-  tests are pinned to a worker set separate from `xdist_group("migrations")`
-  (used by `apps/core/tests/test_migrations.py:26`). Bot tests use
-  `pytest.mark.django_db(transaction=True)` (9 files, e.g.
-  `test_ad_create.py:21`); the `_reap_worker_connections` autouse fixture
-  (`telegram_bot/tests/conftest.py:245-254`) + `connection_created` signal
-  tracker (`conftest.py:218-242`) closes worker backends after each test.
-- **pytest markers** — 8 registered markers in `pyproject.toml:170-179`
-  (`strict_config = true; minversion = "8.4"`), all in active use:
-  `unit`, `integration`, `seed`, `concurrent`, `settings`, `slow`,
-  `real_images`, `xdist_group`.
-- **Migration test** — see TST-004.
-- **Coverage gate** — `[tool.coverage.run] branch = true` +
-  `[tool.coverage.report] fail_under = 80` + `show_missing = true`
-  (`pyproject.toml:182-190`); CI runs `--cov` and uploads `coverage.xml`
-  (`ci.yml:138,153-158`).
-
-### Cross-phase resolution notes (relevant to this phase's safety net)
-
-- **HSTS preload (`#09-EXT-03`) — RESOLVED.** `nginx.conf:42` now includes
-  `preload`; `prod.py:135` sets `SECURE_HSTS_PRELOAD = True`. (One residual
-  LOW: nginx emits a duplicated HSTS header alongside Django's
-  `SecurityMiddleware`; both include `preload`, so they don't conflict — just
-  redundant.) — Per Phase 09, `.kilo/research/09-integration.md`.
-- **SAST absent (`#OPS-003`) — OPEN GAP (Phase 12, not Phase 11).** CI runs
-  `pip-audit` + Trivy + `gitleaks` but no SAST tool (repo-wide
-  `grep -i "bandit|semgrp"` over `.github/` → 0 matches; `pyproject.toml` dev
-  group has no SAST tool; ruff `lint.select` is `E,F,I,B,UP,G` — `S` (bandit)
-  **not** enabled). `test_ci_security.py` asserts only the 3 present scanners
-  and never SAST, so the gap is **untested**. This is a Phase 12
-  (production-ops) concern; it does **not** affect Phase 11's testing safety
-  net, which is sound. — Per Phase 12, `.kilo/research/12-deployment.md`.
-
-### Overall Recommendation
-
-**Status: Phase 11 testing scaffold is well-engineered and trustworthy.** The
-auditor's core findings stand; only TST-001 (settings topology mischaracterization)
-requires a correction to the mental model, and TST-002 is a phrasing refinement.
-The suite satisfies phase-spec dimensions (a)–(i): real PostgreSQL,
-`DisableMigrations` + schema-restore, `unit`/`integration`/`seed` markers,
-xdist-group bot isolation with `transaction=True` + worker-connection reaping,
-subprocess migration repro/idempotency, 80% branch coverage gate, and full CI
-gating (lint/typecheck/test+coverage+SLI/i18n/security/deploy-check) plus
-nightly seed + monthly restore-test. No production-code distortion detected in
-the testing layer.
-
-**Priority 1:** Correct documentation/mental model re: TST-001.
-**Priority 2:** None pending.
-**Priority 3:** No further action required — the testing safety net is a net
-positive for Phases 01–09 invariants (lifecycle, login-token, PII sweep,
-contact-gating, FTS visibility, media sweep, translation fallback).
+- Findings path: `.ai/audit/11-test-coverage/findings.md` — cumulative: a new run appends or supersedes, it does not restart
+- Template: `.ai/audit/templates/audit-findings.md` — follow it for front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
+- Finding-ID prefix: `TST-` — **already in use** in shipped source and operations documentation from a prior cycle, with at least one identifier already resolving to two different findings; check for a
+  collision before minting an ID and report it rather than creating a second namespace
+- Incremental append, ≤100 lines per pass
+- `problems-only: true` — findings only, omit passing checks; every finding needs runtime evidence and the exact consequence
+- Empty state, exactly: `No problems found in this phase.`
+- If a shipped test asserts the current behaviour as intended, still file the finding and record the test as a remediation blocker.

@@ -1,153 +1,134 @@
-# 14 — Internationalization & Localization Correctness
+---
+name: 14-i18n
+status: draft
+validated: no
+executor: auditor
+problems-only: true
+---
 
-> Audit phase. LLM-auditor instruction. Architecture-agnostic: described via
-> ARCHITECTURAL LAYERS, ZONES OF RESPONSIBILITY, KEY RISKS, GOALS. NOT tied to
-> specific files, modules, or functions. Must stay valid if the architecture changes.
->
-> **Output mode:** `problems-only` — report only findings; do not narrate a clean bill of health.
+# Phase 14 — Internationalization & Localization Correctness
 
-## 1. Goal
+## Purpose
 
-Verify that runtime locale resolution, fallback-chain semantics, per-user
-language binding, DB-based i18n (JSONB fields + locale cache keys), and the
-completeness of the i18n test gate are all correct: only the selected language
-is rendered, fallback chains resolve as documented (raw `.name`/`.title` access
-is banned by the completeness gate), per-user language propagates to bot-rendered
-notifications, the test gate is comprehensive (title tags, hreflang, plural
-forms, locale switching, inline-JS), and RTL/Bidi readiness is maintained for
-the supported scripts.
+Audits the two chains that decide what language a person reads in, and everything downstream of them: where a request's language comes from and how far it is validated, which consumer decides what a person is
+seeing, where a locale is activated and restored, how localized data is stored and falls back, what format localization renders, what each cache tier keys on, what a translation pipeline leaves behind, whether the
+catalogs are whole, what the automated controls actually examine, and what the declared language set can express.
 
-## 2. System Under Audit (layers & zones)
+Scope boundaries — other phases own: settings values, secrets and the environment-variant decision, including cookie attribute policy (02); identity binding and the account-state gate, this phase owning only the
+locale the account record carries (04); the cross-backend behavioural difference between the two processes (03); fixed-value and enum discipline (10); the basis on which content may leave the system, and the translation client's transport,
+retry and egress (06, 09); pipeline job gating and container locale availability (12); test-suite adequacy (11).
 
-| Zone | Concern |
-|------|---------|
-| **Runtime Locale Resolution** | A request-time middleware resolves the active language from priority order (query param → cookie → Accept-Language → default) with language normalization (`en-US`→`en`, fallback→`bs`/`ru`) and persists the choice in a long-TTL cookie. |
-| **Fallback-Chain Resolution** | Name/title/description resolution on Category, City, and LookupItem follows a `locale → ru → name` fallback chain via the documented accessors. The completeness gate **bans** raw `.name`/`.title` access — `pytest.fail()` is raised by `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` on any raw accessor bypass (test-time enforcement, not a runtime exception). |
-| **Per-User Language Binding** | The identity's stored Telegram language is propagated to bot-rendered notification content (alert messages, saved-search notifications). |
-| **DB-Based i18n** | Catalog names use a JSONB `name_i18n` field populated per language; the submenu cache key carries a `<locale>` segment so locale bleed cannot occur. |
-| **Completeness Coverage** | The CI completeness test gate (no-hardcoded-visible-text, extraction completeness, no-empty-msgstr, mo-compiled) is comprehensive — covering title tags, hreflang, plural-form rules, locale switching correctness, and inline-JS i18n holes. |
-| **Script & Direction** | The supported scripts (Russian Cyrillic, Bosnian Latin + Cyrillic) are rendered with correct `dir` attribute discipline and text-direction handling. |
-| **Test-Gate Exemptions** | DB-based i18n exemptions (e.g. `feature_tag.html` via the lookup-name accessor) are intentional and documented — not gaps the gate silently misses. |
+Cache-key ownership is split three ways. Phase 13 owns the key's composition and lifetime: what a cache key encodes and omits, and a freshness/version token's lifetime against the lifetime of the data
+it retires, and the key's behaviour under concurrent access. Phase 08 owns the cached result-set itself: staleness, whether a stored entry may still serve a buyer-facing result set, and whether a content
+change propagates to every stored form. Phase 14 owns whether the language component of a key is correct and where that component's value comes from.
 
-## 3. Prerequisites
+This file names what to examine and under which angle; the executing auditor discovers the concrete artifacts.
 
-- Services runnable and seeded across all content languages (ru, bs, en).
-- Ability to issue requests with varying Accept-Language, `lang` cookie, and `lang` query param.
-- Bots/identities with per-user Telegram language configured.
-- The external translation service mocked (no real calls in tests).
-- Ability to inspect rendered HTML for title tags, hreflang, `dir`, and inline JS.
-- Ability to run the completeness test gate and inspect `.po`/`.mo` artifacts.
+## Audit Blocks
 
-## 4. Runtime Verification (mandatory)
+Each block is independent — execute any one with no knowledge of the others, and each carries its own evidence. Evidence is a class, not a check list: observed behaviour, a static proof that a stated property does
+not hold, or a reproduced divergence between two paths. A passing check is methodology, never a finding, and any sound evidence is admissible — nothing here gates a finding on this phase's own list.
 
-Execute, then capture evidence (rendered HTML, HTTP headers, cache keys, notification text):
+### 1. Where a request's language comes from, and what each source is normalized against
 
-1. **Locale priority** — request the same page with `lang` param, `lang` cookie, differing `Accept-Language`, and none → assert the priority order resolves correctly; assert `en-US` normalizes to `en` and the fallback default applies.
-2. **Name fallback** — render a Category/City/LookupItem with a missing `name_i18n` locale entry → assert it falls back through the documented chain (not a raw `.name` bypass); assert autocomplete uses the accessor, not `.name`.
-3. **Per-user bot language** — trigger an alert/saved-search notification for a `bs`-language identity → assert the notification text renders in `bs`, not the site default.
-4. **Cache locale segment** — render a submenu in `ru`, then in `bs` → assert distinct cache keys per locale; assert NO stale-language serve.
-5. **Completeness gate breadth** — run the gate → confirm the gate covers title tags, hreflang, plural-form rules, locale switching, and inline-JS i18n (the gate bans raw `.name`/`.title` access via `pytest.fail()`; it is comprehensive, not a narrow 4-test subset).
-6. **Exemption surface** — confirm which templates/accessors are exempt from the gate and that the exhaustion is intentional.
-7. **Script/direction** — render Bosnian content in both Latin and Cyrillic contexts → assert `dir` attribute discipline; assert no mojibake in mixed-script pages.
+*Take every input that can select the language for a request — an explicit request parameter, a stored preference carried by the client, a client-declared language header, a configured default, and any further tier
+the code maintains. Per source, establish whether the value is canonicalised and checked against the configured set before it takes effect, or passed through, and what an unrecognized value does to every consumer
+downstream. A tier written and never read is a finding in its own right: the code believes it has a source it does not have.*
+Evidence: the input inventory with a normalized / passed-through verdict each; one unrecognized value and what each consumer renders with it.
 
-## 5. Audit Dimensions (checks + evidence)
+### 2. Every consumer that decides what language a person is seeing
 
-### (a) Locale-priority resolution & normalization — CRITICAL
-The active language resolves by the documented priority chain and normalizes variants; the cookie persists with a long TTL.
-- Evidence: `lang` param wins over cookie wins over Accept-Language wins over default; `en-US`→`en`; fallback default applied; `lang` cookie TTL set to ~1 year. A middleware ordering that lets cookie override param, or no normalization, is a finding.
+*Inventory every place that answers what language this person wants — the request path, each interactive command, each notification path. Per consumer: which key identifies the person, which tier it falls back to,
+how long that tier lives, and whether the key is the platform identity, the account's own identifier, or a value carried out of conversational state. Establish whether they agree on the key and on what a person is,
+and reproduce any two that disagree — across a restart, or across an anonymous-to-registered transition.*
+Evidence: the consumer inventory with key, fallback tier and lifetime each; one person two consumers resolve differently, and the transition that produces it.
 
-### (b) Fallback-chain correctness (no raw `.name` bypass) — CRITICAL
-Category/City/LookupItem names resolve via the documented `locale → ru → name` chain through the accessors, never a raw `.name` read.
-- Evidence: accessor-based resolution on rendered pages and in autocomplete; the documented bug where autocomplete calls raw `.name` without `LANGUAGE_CODE` is a finding.
+### 3. Locale activation scope and restoration
 
-### (c) Per-user language in bot notifications — HIGH
-Bot-rendered alerts and saved-search notifications honor the identity's stored Telegram language.
-- Evidence: notification content rendered in the user's language, not the site default; the bot notification path reads the user's language field.
+*Establish where the language is activated, how wide that scope is, and what puts it back. Include every path that renders text for a person outside the request or update pipeline, and any work handed to another
+thread, pool or worker, which would render under whatever locale that worker happens to carry. Establish whether an activation is scoped to one unit of work or leaks past it, whether an error path restores it, and
+what a leaked locale would look like to the next caller.*
+Evidence: the activation sites with their scope and their restoration; the render paths that run outside the pipeline; one path that renders without a locale of its own.
 
-### (d) DB-based i18n & cache locale segmentation — CRITICAL
-`name_i18n` JSONB population is correct; the submenu cache key carries a `<locale>` segment so a Russian-rendered entry is never served to a Bosnian visitor.
-- Evidence: cache keys include a `<locale>` segment per the i18n spec; populated `name_i18n` rows; the documented bug where the submenu cache key omits language is a finding.
+### 4. Localized data: the storage shape and the whole fallback chain
 
-### (e) Completeness-gate breadth — RESOLVED
-The completeness gate is comprehensive: it is the CI test-time gate that bans raw `.name`/`.title`/`.get_name` access and covers the full i18n surface:
-- **21 tests in CI** (22 invocations via `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`).
-- **Dimensions covered:** title tags (`test_title_tags_translated`), hreflang (`test_hreflang_present` via `components/locale_head.html`), plural forms (`test_plural_forms` header + `test_plural_forms_runtime` for `{% blocktrans count %}`), locale switching (`test_locale_switch_re_render`), and inline-JS i18n (`test_no_hardcoded_js_strings`).
-- The gate raises `pytest.fail()` (not a runtime exception) on violations, including `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` for raw accessor access.
-- A comprehensive gate with no uncovered holes is the target state — no gap remains.
+*For each entity that stores a value per language, establish the storage shape — a keyed map, one column per language, a constructed attribute name — and the entire chain, layer by layer, not only the first two
+layers. At each layer ask whether the fallback exists at all or the code merely assumes one is there; a last layer naming a field the entity does not carry is a wrong assumption, not a defect. Then take a value that
+is not one of the configured languages: what does it produce on each chain, and can a client supply one?*
+Evidence: per entity the storage shape, the full chain, and a per-layer verdict on whether the fallback exists; one non-configured value and what each chain renders.
 
-### (f) Title tags, hreflang, plurals — RESOLVED (covered by gate)
-Page `<title>` carries the localized string; `hreflang` is emitted for the supported language matrix; plural-form rules select the correct form per language.
-- Evidence: `test_title_tags_translated` (per-language `<title>` localization), `test_hreflang_present` (every page template renders `<link rel="alternate" hreflang>` via `components/locale_head.html`), `test_plural_forms` (each `.po` `Plural-Forms` header matches CLDR), `test_plural_forms_runtime` (`{% blocktrans count %}` selects correct CLDR plural form at runtime).
-- A missing title tag, hreflang, or wrong plural form is a finding only if the gate is bypassed — the gate is comprehensive.
+### 5. Format localization: numbers, currency, dates, times, plural counts
 
-### (g) Locale switching & inline-JS i18n — RESOLVED (covered by gate)
-Locale switchers update the cookie/param and re-render correctly; inline JavaScript that emits user-visible strings is wrapped in `{% blocktrans %}`/gettext and re-translated on switch.
-- Evidence: `test_locale_switch_re_render` (switcher sets the right cookie and the next render uses the new language), `test_no_hardcoded_js_strings` (scans inline `<script>` blocks for untranslated prose literals and raises `pytest.fail()` on violation), `test_no_raw_get_name_in_templates` and `test_bot_no_raw_model_field_access` (no inline-JS string bypasses gettext).
-- A locale-switcher bug or an unwrapped inline-JS string is a finding only if the gate is bypassed — the gate is comprehensive.
+*Treat every formatted value a reader sees as locale-dependent output that no message catalog governs. Establish what produces it; whether the type handed to a formatting helper is the type it actually localises, or
+a pre-rendered string that bypasses it; whether the pattern comes from the configured locale or is written into the template; and whether the time base the site computes in is the one it operates in. Include a value
+correct in one language and wrong in another, and a value interpolated raw into an otherwise translated sentence.*
+Evidence: the formatted-output inventory with producer, input type and locale source each; one value correct under one language and wrong under another; one raw value inside a translated string.
 
-### (h) RTL / Bidi direction — MEDIUM
-The `dir` attribute is set correctly per language/script context; mixed-script (Latin + Cyrillic Bosnian) renders without mojibake.
-- Evidence: `dir="ltr"`/`dir="rtl"` discipline on `html`/container elements; mixed-script pages tokenize correctly. Missing `dir` discipline is a finding.
+### 6. Cache tiers: what is cached, and whether the language is part of its identity
 
-### (i) Test-gate exemptions — LOW
-DB-based i18n exemptions (e.g. `feature_tag.html` via the lookup-name accessor) are intentional and documented, and the gate enforces that `feature_tag.html` is the **only** exempt template.
-- Evidence: exemption documented in the project rules (`docs/99-agent/rules.md`); the scan excludes `admin/`, `analytics/moderation_dashboard.html`, and `components/feature_tag.html` per the completeness gate source (`test_i18n_completeness.py:75-79`). An undocumented exemption beyond these is a finding.
+*For each cache tier, establish what the payload is — rendered output, a domain object, a number, a language value — and therefore whether the key must carry the language. Read the one-sided cells in both
+directions: a key that omits a component its payload depends on, and a key that carries one it does not. Establish where each key component comes from and whether it is validated before it becomes part of the key; a
+component taken straight from a client-supplied value makes the key space unbounded and the entry unreachable by a legitimate client.*
+Evidence: the tier inventory with payload, key components and their provenance each; one key missing a component its payload depends on; one key carrying a component it does not, and the value that feeds it.
 
-## 6. Cross-Cutting (owned here, not duplicated)
+### 7. The translation pipeline's stored result
 
-This phase owns **runtime i18n/localization correctness** and the **completeness of the i18n test gate**. It explicitly does NOT audit:
+*Establish what text exists in each language for a piece of content and what produces the non-source translations. Then establish what is written when that production degrades — whether the original, a partial
+result, or nothing — and what a reader in the affected language subsequently sees, given that chain's fallbacks. Establish whether the degradation is detectable afterwards, by an operator or by any reader. Establish
+also which tier records a person's own language choice and which identity that writer reads, since a choice persisted to a tier the request path does not read is a stored result no reader of the chain will find. The
+client's transport, retry and egress belong to another phase.*
+Evidence: the storage shape and its chain; the degraded result that is persisted, and what each language's reader sees; whether anything distinguishes a degraded entry from a translated one; the writer of a stored language choice and the identity it reads.
 
-- **Phase 06 (PII consent semantics)** — locale selection. Phase 06 owns consent state; this phase owns language resolution and fallback semantics.
-- **Phase 08 (per-language FTS search-vector mechanism)** — how the FTS index is built/maintained per language. Phase 08 owns the search-vector mechanism; this phase audits runtime locale resolution and fallback *correctness* (not the search-index mechanism).
-- **Phase 09 dimension (c) — translation client egress (timeout, circuit-breaker, no PII sent)** — translation-client *resilience* and PII-to-third-party. Phase 09(c) owns the translation client failure handling; this phase audits *locale/fallback correctness* of the rendered content and per-user language binding.
-- **Phase 10 (code-quality / no-hardcoded-text test gate)** — source-level i18n hygiene. Phase 10 owns the no-hardcoded-text rule and module quality; this phase audits runtime locale behavior and the *comprehensiveness* of the completeness gate.
-- **Phase 11 (test-coverage for i18n completeness gate)** — test coverage of the completeness gate itself. Phase 11 verifies the test safety net; this phase audits *runtime i18n correctness* and whether the gate is *comprehensive*. (Phase 11 confirms the gate exists and passes; this phase confirms the gate is comprehensive.)
+### 8. Catalogue integrity in both directions, and which locale is exempt
 
-## 7. Edge Cases
+*Establish the extraction → catalog → compiled-catalog chain and where it can break in each direction: a string the source uses that no catalog carries, a catalog entry no source produces, a compiled artifact
+missing or older than its source. Establish which language is the source and that the completeness assertion is correctly waived for it and only for it. Compiled catalogs are build outputs rather than tracked
+sources, so a missing or skipped compile step cannot be seen from the source tree alone.*
+Evidence: the chain with a break identified in each direction; the exempt locale and the scope of its exemption; the step that produces the compiled artifact and the paths it runs on.
 
-- Category/City name missing for the active locale, present in `ru` → must fall through `ru`, not return empty/raw `.name`.
-- Autocomplete input using raw `.name` without `LANGUAGE_CODE` → renders in the wrong/default language (documented problem 09).
-- `en-US` variant sent in Accept-Language → must normalize to `en`, not fail to match.
-- Identity with no stored Telegram language → notification falls back to the site default without error.
-- Submenu cache key omits locale → Russian submenu served to a Bosnian visitor (documented problem 09).
-- Locale switcher sets the cookie but the next render still uses the old language → middleware ordering or cookie-visibility bug.
-- Inline JS string not wrapped in gettext → ships in the site default language after a switch.
-- Mixed Latin+Cyrillic Bosnian content → `dir="ltr"` discipline must not break bidirectional runs.
-- `feature_tag.html` exempt from the completeness gate → must be the *only* exemption and must be documented.
+### 9. The localization controls: what each one actually enumerates
 
-## 8. Severity Taxonomy
+*Take every automated control over localization — a shipped test, a collector behind it, a pipeline job — and separate three questions per control: does it exist, what scope does it declare, what did it actually
+examine. Establish what a green result does and does not license. A control whose declared and actual scope differ is a finding however green it is: ask whether the scope it declares matches what it
+actually examines, whether the items it enumerates are the ones its framework resolves, and whether its assertion exercises the page that includes the artifact. Then take each declared exemption one at a time — including the
+surface exempt because its text comes from the database — and establish what covers it instead, and whether the list is as narrow as the documentation claims.*
+Evidence: per control — existence, declared scope, the file, item and series count it actually examined; each exemption with the mechanism that covers it, or the absence of one.
 
-- **CRITICAL**
-  - Raw `.name`/`.title`/`.get_name` bypass for Category/City/LookupItem rendering or autocomplete, when the completeness gate (`test_no_raw_get_name_in_templates`, `test_bot_no_raw_model_field_access`) fails to flag it — i.e. a gate violation that slipped through (documented problem 09).
-  - Submenu cache key omits locale → locale bleed (Russian served to Bosnian) despite the gate (documented problem 09).
-  - Per-user bot language not propagated to notifications.
-  - `name_i18n` population absent or incorrect for a supported language.
-- **HIGH**
-  - Locale priority chain broken (cookie overrides `lang` param; no normalization).
-- **MEDIUM**
-  - Locale switcher does not re-render in the new language.
-  - Inline JS strings bypass gettext.
-  - RTL/Bidi `dir` discipline missing on mixed-script pages.
-  - **RESOLVED:** The completeness gate is narrow / lacks title-tag, hreflang, plural, or locale-switch coverage — the gate is now comprehensive (21 tests in CI; covers all four dimensions). A narrow gate is no longer a finding class.
-- **LOW**
-  - `lang` cookie TTL not the documented ~1 year.
-  - Undocumented exemption from the completeness gate beyond the intentional `feature_tag.html` exclusion.
+### 10. Script representability: what the declared language set can express
 
-## 9. Recommended Sequence
+*Establish end to end whether a reader whose language requires a different script can be served that script: in the declared language configuration, in the message catalogs, in the per-language stored content, and
+in the per-language columns. A configuration that names languages without naming scripts cannot express a script-tagged request, and per-language columns have no script dimension at all — establish where that stops
+and what the reader receives. Establish what the direction attribute is derived from, and whether that derivation can be wrong for content the system itself stores.*
+Evidence: the declared language set against the scripts in use; one script-tagged request and where it is reduced; the direction attribute's source and one stored value it cannot describe.
 
-1. Discovery — map the locale middleware, fallback accessors, per-user language field, DB-based i18n + cache keys, completeness gate, title/hreflang/plural handling, and exemptions.
-2. Runtime verification (§4).
-3. Per-dimension checks (§5 a–i).
-4. Cross-cutting (§6) and edge cases (§7).
-5. Consolidate findings.
+### 11. The language preference's round trip: what is written, when, and what the response declares
 
-## 10. Finding Prefix
+*Establish who persists a chosen language, under what condition, and whether the client-side and server-side writers agree on that condition — one ungated and one gated is a contract stated twice and implemented
+once. Establish what the response declares about which inputs vary its body, whether that declaration covers every source that can change the language, and whether it still holds for a partial response that renders
+none of the tokens a full page renders. Where a stated contract does not hold, report the contract and the behaviour, not only the gap between them.*
+Evidence: the writers with their conditions and the attribute each emits; the response declaration against the sources that can change the body; a partial response and whether the declaration survives it.
 
-Use `I18N-` for all findings in this phase.
+## Severity Taxonomy
 
-## 11. Reporting
+Grade by **effect and blast radius**, not by mechanism name; rate what is true now, not the worst consequence if triggered. The bands are effect classes, not a closed list of mechanisms, so a defect whose
+mechanism is not named here still lands by the consequence it is producing.
 
-- `problems-only: true`.
-- Each finding: severity, zone, evidence (rendered HTML / HTTP header / cache key / notification text / grep hit), and recommendation with effort/priority.
-- Append incrementally (≤100 lines per write) to the phase findings file per `docs/99-agent/rules.md`.
-- Completeness gate count: the i18n completeness gate is **21 tests in CI** (22 invocations across `test_i18n_completeness.py` [16 tests] + `test_i18n_pipeline.py` [6 tests], minus 1 duplicate `test_no_empty_msgstr`). The phase document cites the gate scope directly rather than the `docs/99-agent/rules.md` "(11 tests)" cross-reference, which is outdated.
+- **CRITICAL** — a reader acts on a value that is wrong for their language and cannot tell: a monetary, temporal or numeric quantity rendered so the reader would read a
+different quantity from the one stored, on a surface the reader is expected to act on. An empty band is a valid outcome — do not populate it with a hypothetical, and do not promote an item for sounding alarming.
+- **HIGH** — a reader is shown content in a language they did not select, or two consumers of one stored value disagree about which value applies, so a whole surface is wrong
+before anyone notices; a quantity, a time base or a date pattern whose rendering is wrong for every reader regardless of the language selected; an automated control that reports clean over a surface it never
+examined, on a path where an unexamined change would ship.
+- **MEDIUM** — degraded correctness with a workaround: a fallback that lands on a value from another language or another identity than intended, where the reader can still
+act; a formatting defect confined to one surface; a control that examines a subset of the surface it declares.
+- **LOW** — documentation and hygiene drift with no reader-visible consequence today: a comment, docstring, specification line or exemption list describing a contract the code
+beside it does not implement; a declared exemption wider than the surface it was granted for.
+
+## Report Output
+
+- Findings path: `.ai/audit/14-i18n/findings.md`
+- Template: `.ai/audit/templates/audit-findings.md` — follow it for front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
+- Finding-ID prefix: `I18N-` — **already in use** in the specification and project-rules documents from a prior cycle, with several identifiers already resolving to two
+different findings; report the collision rather than minting a second namespace
+- Incremental append, ≤100 lines per pass
+- `problems-only: true` — findings only, omit passing checks; every finding needs runtime evidence and the exact consequence
+- Empty state, exactly: `No problems found in this phase.`

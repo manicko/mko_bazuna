@@ -1,138 +1,135 @@
-# 13 — Performance & Scalability
+---
+name: 13-performance
+status: draft
+validated: no
+executor: auditor
+problems-only: true
+---
 
-> Audit phase. LLM-auditor instruction. Architecture-agnostic: described via
-> ARCHITECTURAL LAYERS, ZONES OF RESPONSIBILITY, KEY RISKS, GOALS. NOT tied to
-> specific files, modules, or functions. Must stay valid if the architecture changes.
->
-> **Output mode:** `problems-only` — report only findings; do not narrate a clean bill of health.
+# Phase 13 — Performance & Scalability
 
-## 1. Goal
+## Purpose
 
-Assert that the system's performance and scalability strategy is defined, measured,
-and enforced: spec-derived SLOs with error budgets are defined, measured, and
-alerted on; the caching strategy is correct under invalidation and cache-stampede
-conditions; connection pooling is appropriate for target scale; query performance is
-governed by profiling discipline (not FTS-index freshness alone); and load/stress
-testing is part of the CI or release process.
+What the system costs per request, per event and per scheduled run; whether those costs are bounded; and whether the numbers the system believes
+about itself are measured or asserted. This file names what to examine and under which angle — the executing auditor discovers the concrete artifacts.
 
-Evidence (Phase 13 research — Verdict: all 6 findings RESOLVED against the current
-tree): spec-derived SLOs are defined as `PerformanceSLO(IntEnum)`; error budgets are
-tracked via burn-rate alerts (`prometheus-slo-alerts.yaml`) over 14.4-min windows; a
-live SLO dashboard (`grafana-slo-dashboard.json`) wires django-Prometheus metrics to
-SLO constants; and CI gates regressions via the `TestSearchResponseSLORegression`
-exit-code gate. Findings PERF-001 (no SLOs)…PERF-006 (cache convention) are all closed
-and regression-locked.
+Scope boundaries — this phase owns the measurable consequence of latency, throughput and capacity, and nothing else. Owned elsewhere: the connection pooler's configuration semantics (03), whether the
+production path enables the pooler at all (12), its place in the process topology (01); plan stability, unbounded scans and missing indexes on the search path, and what a cached result set may still serve
+(08); the language component of a key (14); ORM dispatch, transaction and wait-bound semantics in the event-driven process (03) and the bridge mechanism itself (09); whether a scheduled sweep is safe to run twice (03).
 
-## 2. System Under Audit (layers & zones)
+## Audit Blocks
 
-| Zone | Concern |
-|------|---------|
-| **Response Budgets / SLOs** | Spec-defined latency targets (e.g. search <2s, filter <1s) are measured, alerted on, and backed by error budgets with dashboards. |
-| **Caching Strategy** | All cache tiers share a single cache and route reads through a single-flight, stale-while-revalidate (SWR) wrapper: version-bump invalidation makes stale keys unreachable via TTL (no global prefix-wipe); cache keys are locale-segmented per the i18n spec; and the bounded SWR stale-TTL window spans every tier (not search-only), so cache-stampede and stale-content-serving risks are governed on all tiers. |
-| **Connection Pool** | The database connection-pooling strategy (PgBouncer opt-in vs per-request connection) is appropriate for target concurrency; pooler-prepared-statement compatibility is verified. |
-| **Query Performance** | Beyond FTS index freshness, query performance is governed by profiling discipline: `EXPLAIN ANALYZE` review, indexing beyond the GIN FTS vector, and `select_related`/`select_for_update` usage on non-media views. |
-| **Load Testing** | A load/stress test exists in CI or release process and is run against seeded volume; regressions are gated. |
+Each block is independent — execute any one with no knowledge of the others, and each carries its own evidence. Evidence is a class, not a check list: observed behaviour, reproduced output, or a
+static proof that a stated property does not hold. Two questions here cannot be settled in the environment at hand — a latency or load measurement against seeded production-volume data, and any
+measurement under real traffic; establish each from what is observable (the declared constant, the configured worker count, the plan shape, statement and parameter counts, the per-request statement
+inventory) and state plainly what could not be verified and why. A passing check is methodology, never a finding, and any sound evidence is admissible: nothing here gates a finding on this phase's own list.
 
-## 3. Prerequisites
+### 1. Response budgets — what is declared, what is covered, what acts on it
 
-- Access to the CI workflow definitions and dependency manifest.
-- Ability to run the search and filter paths against a seeded database.
-- Ability to inspect the cache-key schema and the cache-invalidation call sites.
-- Ability to run `EXPLAIN ANALYZE` on representative queries.
-- Ability to run a load/stress tool (locust/k6/hey or equivalent) against a seeded stack.
-- Linter and type-checker available.
+*Establish which request paths carry real traffic and which carry a budget: a declared target no alert watches, an alert pinned to one path while a busier path has none, a constant written once and read in
+more than one place. Establish whether any measurement behind a stated target is a distribution rather than a single sample, and whether the value a consumer compares against is the value the system declares.*
+Evidence: the budget inventory with the path each covers against the paths carrying the traffic; per alert, the
+series it queries and whether anything emits it; the declared constant against the value each consumer compares.
 
-## 4. Runtime Verification (mandatory)
+### 2. A gate that reports green and decides nothing
 
-Execute, then capture evidence (timing, query plans, cache hit/miss, load-test output):
+*Take every automated control that emits a pass/fail on latency, query shape or load, and separate three questions: does it exist, what scope does it declare, what did it actually
+examine. Establish where the compared value comes from — the declared source, or a threshold restated beside it as a literal; whether a metric is read positionally from a result file
+whose format a dependency can change; and whether a selector matching nothing yields a value a guard then accepts. A threshold not bound to the constant it names cannot drift with it,
+and a control that passes on an empty result cannot fail. Establish separately whether a verdict holds while the component it checks is non-functional in the deployed configuration.*
+Evidence: per control — existence, declared scope, the items it actually examined, the origin of the compared value, and one case where it reports success while its subject is bad.
 
-1. **SLO measurement** — measure public search and filter latency against spec targets over a seeded catalog → assert an SLO dashboard/alert exists; assert error-budget burn-down is tracked (not a single static threshold).
-2. **Caching behavior** — trigger a cacheable path, then mutate the underlying data → assert invalidation; assert cache keys are locale-segmented; assert a cache miss under concurrent first-hit does not stampede (bounded recomputation).
-3. **Pooling** — confirm the default production path uses per-request connections (`CONN_MAX_AGE` unset/zero) and PgBouncer is opt-in only → assert the pooler is NOT on the default deploy path.
-4. **Query profiling — RESOLVED** — run `EXPLAIN ANALYZE` on representative search/filter/list queries; assert index usage (no `Seq Scan` at seed scale); assert a profiling/review discipline exists (`profile_search.py`, `profile_queries` management command, `docs/ops/profiling.md`, `make profile`).
-5. **Load testing — RESOLVED** — enumerate CI/release for a load/stress test; capture evidence (`locustfile.py`, CI `load-test` job, `make load`); assert p95 < `PerformanceSLO.P95_SLO_MS` is gated in CI with a non-zero exit code.
+### 3. What the performance discipline actually exercises
 
-## 5. Audit Dimensions (checks + evidence)
+*Establish what the shipped performance instruments cover: which request shapes a load profile reaches and whether each target resolves to a route, what dataset
+volume they require, and which production query shapes the profiling path builds and omits. A harness requiring a volume no shipped environment reaches, one
+spending much of its journey on responses that return early, and one whose asserted targets cannot be met where it must run, are each a discipline in name only.*
+Evidence: the load profile's target inventory with a resolves verdict each and the request share returning early; the profiling path's built
+shapes against the shapes the production request path emits; the volume a harness requires against the volume any shipped environment creates.
 
-### (a) Response budgets & SLOs — CRITICAL — RESOLVED
-Spec-derived latency targets are measured and alerted on; error budgets and dashboards exist.
-- Evidence: spec-derived SLOs defined as `PerformanceSLO(IntEnum)`; live SLO dashboard wiring django-Prometheus latency histograms + cache-hit-rate gauge to SLO constants; burn-rate alerts (`search_slo_burn_rate`, `search_p95_latency_slo`, `cache_hit_rate_slo`) with error-budget burn-down over 14.4-min windows; CI `TestSearchResponseSLORegression` gates SLO breaches. Regression-locked by `test_slo_constants.py`, `test_search_slo.py`, `test_observability.py`. Finding 13-PERF-001 closed.
+### 4. What a cache key encodes and what a version token retires
 
-### (b) Caching strategy — correctness & stampede — HIGH — RESOLVED
-Cache invalidation is correct, cache keys are locale-segmented, and concurrent first-hit does not stampede.
-- Evidence: all cache tiers route reads through a single-flight SWR wrapper with a stale-serve window; invalidation uses version-bump (`cache.incr`) so old keys become unreachable via TTL — no concurrent global prefix-wipe; cache keys include a locale segment. Regression-locked by `test_lookup_cache_swr.py` (single-flight, stale-serve, version-bump, signal invalidation), `test_cache_key_convention.py`, `test_lookup_invalidation.py`. Finding 13-PERF-002 closed.
+*Establish what a key encodes and omits, and a version token's own lifetime against the lifetime of what it retires: a token expiring while the data it retired is still live restores a version already
+left behind. Establish whether a key carrying caller-supplied segments varies wherever a caller can vary it, and whether two concurrent readers resolve one key differently. Claims that token-bumped
+invalidation makes retired entries unreachable by expiry rather than by a global wipe, and that a single-flight stale-while-revalidate wrapper bounds the stale window, are claims to confirm or refute, not
+the design to assume. Phase 13 owns the key's composition and lifetime: what a cache key encodes and omits, and a freshness/version token's lifetime against the lifetime of the data it
+retires, and the key's behaviour under concurrent access. Phase 08 owns the cached result-set itself: staleness, whether a stored entry may still serve a buyer-facing result set, and whether a
+content change propagates to every stored form. Phase 14 owns whether the language component of a key is correct and where that component's value comes from.*
+Evidence: the key inventory with encoded and omitted components; the token's lifetime against the data's; one key two concurrent readers resolve differently.
 
-### (c) Cache-key locale segmentation — HIGH — RESOLVED
-The submenu/cache keys include the active locale so a Russian-rendered entry is not served to a Bosnian visitor.
-- Evidence: cache keys contain a locale segment per the i18n spec (key format `<namespace>:v<N>:<segments...>`); the documented submenu-key-omits-language bug is closed. Regression-locked by `test_cache_key_convention.py` (asserts key shape) + locale-segment assertions in `test_lookup_cache_swr.py`. Finding 13-PERF-006 closed.
+### 5. Cache behaviour across processes and across backends
 
-### (d) Connection-pooling strategy at scale — HIGH — RESOLVED (no finding filed)
-The production connection strategy sustains target concurrency; the pooler (when enabled) is compatible with prepared statements.
-- Evidence: default deploy path uses `CONN_MAX_AGE=0` (fresh connection per request, sync gunicorn workers); PgBouncer is profile-gated opt-in only (NOT on the default deploy path); `prepare_threshold: None` on the pooler path makes the pooler prepared-statement compatible. Verified correct — no finding filed.
+*Establish what the deployed cache backend provides that the environment the shipped guards run in does not. A shared store has primitives a per-process one lacks;
+an invalidation utility behind a capability guard is a working invalidation in one environment and a logged no-op in the other; a single-flight lock is per-process
+in one and shared in the other. Establish whether the invariants are regression-locked only under the backend the guards run with: a test's fidelity to the
+deployed configuration is part of what it proves, and a guard's own description of a limitation it never exercises is evidence about the system, not a defence of it.*
+Evidence: the deployed backend against the one the shipped cache guards run under, with the primitives each provides;
+one invalidation path with a per-environment verdict; one guard asserting a behaviour the deployed backend cannot exhibit.
 
-### (e) Query performance discipline — HIGH — RESOLVED
-Beyond FTS freshness, queries are governed by profiling and indexing discipline.
-- Evidence: `EXPLAIN ANALYZE` profiling harness (`profile_search.py` cProfile over the full search stack; `profile_queries` management command asserting no `Seq Scan on ads` at seed scale ≥10k rows on 6 representative querysets); indexes beyond the GIN FTS vector; `select_related`/`select_for_update` discipline on listing views; `docs/ops/profiling.md` documents review cadence (PR ⇒ 10% p95 regression ⇒ CI breach ⇒ on-call incident). Regression-locked. Finding 13-PERF-004 closed.
+### 6. What a hit and a miss cost
 
-### (f) Load & stress testing — CRITICAL — RESOLVED
-A load/stress test is part of CI and is run against seeded volume with regressions gated.
-- Evidence: `locust` declared as a dev dependency; `src/benchmark/locustfile.py` defines the buyer journey (`BuyerJourneyUser`, 8 `@task` methods); CI `load-test` job seeds 120 published ads, runs locust headless (50 users, 60 s), and asserts p95 < `PerformanceSLO.P95_SLO_MS` (500 ms) with `--exit-code` gating; `make load` / `make profile` for local dev. Regression-locked. Finding 13-PERF-005 closed.
+*Establish the cost of the served-from-cache path, not only of the miss: statement size, bind-parameter count, conditional-branch count, and which part of the plan
+scales with the stored set rather than with the page. Establish what N concurrent first-hitters each pay on a cold miss, whether a lock serialises the writers or the
+callers, and what a caller that loses the race is told to do next. A lock that stops duplicate writes while every loser recomputes anyway is not a stampede guard.*
+Evidence: on the hit path — statement bytes, bind count, branch count, and the plan element that scales with the
+stored set; on a cold miss — the work each of N concurrent first-hitters performs and the loser's documented instruction.
 
-### (g) Caching / stale-content risk — MEDIUM — RESOLVED
-The cache-serving-stale-content risk is bounded (stale-while-revalidate + TTL discipline).
-- Evidence: every cache tier is wrapped in the SWR single-flight wrapper exposing `ttl` + `stale_ttl` — a stale-serve window bounds staleness on all tiers (search, lookups, submenu); a cold miss falls back to a safe `default` rather than blocking. Regression-locked by stale-serve assertions in `test_lookup_cache_swr.py`. Finding 13-PERF-003 closed.
+### 7. Query cost under caller-controlled input
 
-## 6. Cross-Cutting (owned here, not duplicated)
+*Establish what a plan does as the caller widens a filter: a multi-value selection becoming one join per value, a repeated value set, a tree expansion following more than one parent relation. Establish whether a
+bound exists on what a caller may supply, and whether growth is additive or multiplicative — a join tree whose inner scan stays constant while the rows above it multiply is not readable from any single plan node.*
+Evidence: the cost curve against a widening filter with the item count at each point; the bound in force on the caller-supplied value, or its absence; one filter whose join count grows with input.
 
-This phase owns the **performance and scalability strategy**: SLOs, the caching strategy, connection pooling at scale, and load testing. It explicitly does NOT audit:
+### 8. Per-object and per-event work outside the main query
 
-- **Phase 03 (DB concurrency atomicity, async/sync bridge correctness)** — the correctness of the async/sync bridge or transaction atomicity. Phase 03 owns bridge correctness; this phase owns whether pooling is the right strategy for target scale.
-- **Phase 08 (FTS search mechanism and FTS-specific latency)** — the FTS index freshness, ranking, and search-recall behavior. Phase 08 owns the search mechanism; this phase audits general query performance, caching, SLOs, and load testing.
-- **Phase 10 (code quality / module size / code-level logging)** — code-level quality gates. Phase 10 owns source hygiene; this phase owns the runtime performance/scalability strategy.
+*Establish what one page view or one event costs beyond its main query: related-object lookups, per-object existence probes, and prefetch detection that cannot fire for the relation shape it tests. Establish
+whether a per-object cost is paid once per rendered row, whether it disappears when the row is present and returns when it is absent, and what one event costs in the event-driven process — round trips,
+statements, and what that count scales with. The mechanism carrying work across the loop boundary and the semantics of the wait are another phase's; the consequence in round trips and statements is this one's.*
+Evidence: per-page statement counts attributed to their call sites; one per-object path that fires only when the row is absent; one event's round-trip and statement count and what it scales with.
 
-## 7. Edge Cases
+### 9. Serialisation and materialisation per request
 
-- SLO defined but no alert → burn-down never triggers.
-- Cache invalidated but recomputed synchronously under load → stampede / latency spike.
-- Submenu cache key omits locale → Russian content served to Bosnian visitor (documented problem 09).
-- PgBouncer enabled but prepares statements not reset → "prepared statement already exists" errors under reuse.
-- Per-request connection (`CONN_MAX_AGE=0`) under high concurrency → connection storm beyond DB capacity.
-- `delete_pattern` invalidation misses a key prefix → stale content served indefinitely.
-- Load test runs only locally, never in CI → regressions slip to release.
-- Search within budget in dev (small DB) but unbounded under seeded production volume.
+*Establish what is pulled regardless of page size: a reference set materialised into every request by shared context, the same set fetched twice on one path, a
+hierarchy rebuilt per request where a cached rendering of the same tree already exists. Establish what a request transfers per page view — payload, element
+count, repeated records — and whether a cost negligible at a shipped fixture's scale is bounded by design or bounded only by an assumption that will not hold.*
+Evidence: per-request materialisation volume with the row count each set carries; a set fetched more than once on one request; per-page-view payload and element counts; the fixture's scale against the bound, if any.
 
-## 8. Severity Taxonomy
+### 10. Background and batch work: cost, transaction width, lock hold
 
-- **CRITICAL — RESOLVED** (all closed; evidence: §5(a) & §4.1)
-  - No SLO/error-budget/dashboard for spec-derived latency targets → **RESOLVED** — SLO constants with error budgets, live dashboard, burn-rate alerts, CI regression gate (see §5(a) & §4.1).
-  - No load/stress test in CI or release process → **RESOLVED** — CI-gated load test asserting p95 vs SLO constant (see §5(f) & §4.5).
-- **HIGH — RESOLVED** (all closed; evidence: §5(b), §5(c), §5(d), §5(e))
-  - Cache invalidation audited only for existence, not correctness; no stampede guard → **RESOLVED** — version-bump invalidation + single-flight SWR across all cache tiers (see §5(b)).
-  - Submenu cache key omits locale (stale-language serve, documented problem 09) → **RESOLVED** — locale-segmented cache keys per convention (see §5(c)).
-  - `CONN_MAX_AGE=0` with no pooling rationale at target scale → **RESOLVED (no finding filed)** — per-request default with PgBouncer opt-in (see §5(d)).
-  - No `EXPLAIN ANALYZE` / profiling discipline on listing/filter views → **RESOLVED** — profiling harness asserting no seq-scan at seed scale (see §5(e) & §4.4).
-  - PgBouncer prepared-statement compatibility unverified → **RESOLVED (no finding filed)** — pooler prepared-statement compatibility verified (see §5(d)).
-- **MEDIUM — RESOLVED** (all closed; evidence: §5(g) & §4.1)
-  - Cache-serving-stale-content risk unbounded (no stale-while-revalidate / no TTL) → **RESOLVED** — bounded SWR stale-TTL window on every cache tier (see §5(g)).
-  - SLOs defined but no burn-down alert (silent budget exhaustion) → **RESOLVED** — burn-rate alerts with error-budget framing (see §5(a) & §4.1).
-- **LOW — RESOLVED** (all closed; evidence: §5(c) & §5(f)/§4.5)
-  - No cache-key naming convention documented → **RESOLVED** — documented cache-key convention with key-shape tests (see §5(c)).
-  - Load test present but not gating (informational only) → **RESOLVED** — p95 assertion gates CI exit code (see §5(f) & §4.5).
+*Establish what a scheduled or one-shot run costs against production data volume rather than a fixture's: the work performed per unit of data, whether it is expressible as a
+set operation or issued per row, and whether the resulting statement count scales linearly with the table. Establish how wide the transaction it runs in is, what it holds
+for its duration, and what a concurrent run or a live request does while it holds it. Whether such a sweep is safe to run twice is another phase's; its cost is this one's.*
+Evidence: per run — statements issued, wall time, and the item count the cost scales with; the transaction's width and the locks held; one run whose duration competes with a live request.
 
-## 9. Recommended Sequence
+### 11. The ceiling each tier imposes
 
-1. Discovery — map SLOs, cache schema + invalidation call sites, pooling path, profiling discipline, load-test coverage.
-2. Runtime verification (§4).
-3. Per-dimension checks (§5 a–g).
-4. Cross-cutting (§6) and edge cases (§7).
-5. Consolidate findings.
+*Establish, per long-lived tier, what bounds concurrent work. In the synchronous serving tier: the worker model, whether the worker count derives from the deployment target's declared CPU and memory allocation or
+is hard-coded, and what a representative request's cost implies for the ceiling — and whether that request is CPU-bound or I/O-bound, because only one answer responds to more workers. Establish the same for the
+event-driven process, where all persistence work may funnel through one shared bounded worker thread; establish whether anything bounds how long work waits for it, since an unbounded wait is a latency property
+rather than a mechanism question. Establish the measurable consequence of the connection pooler's presence or absence for the traffic in front of it — not how it is configured, and not whether production enables it.*
+Evidence: per tier — worker model, the ceiling it implies, and the source of the worker count against the deployment target's declared allocation; the CPU/I-O split of a
+representative request; the serialisation point in the event-driven process and any bound on the wait there; the connection count the serving tier actually reaches against the store's.
 
-## 10. Finding Prefix
+## Severity Taxonomy
 
-Use `PERF-` for all findings in this phase.
+Grade by **effect and blast radius**, not by mechanism name; rate what is true now, not the worst consequence if triggered. The bands are effect classes, not a closed list of mechanisms, so a defect
+whose mechanism is not named here still lands by the consequence it is producing.
 
-## 11. Reporting
+- **CRITICAL** — a control believed to be active that is not, on the path that decides whether a performance risk is caught before it ships: nothing distinguishes a checked subject
+  from an unchecked one, and a reviewer cannot tell the difference. An empty band is a valid outcome — do not populate it with a hypothetical, and do not promote an item for sounding alarming.
+- **HIGH** — cost that is real now and scales with a quantity the caller or the data controls, on a path that is on: one input able to exhaust a shared resource the whole system depends
+  on, or a cost linear in a production table that runs unattended against live traffic.
+- **MEDIUM** — a cost demonstrated but conditional on volume, catalogue size, or a configuration not yet in effect, where the design is unbounded rather than the present value being large;
+  a cache or query path whose correctness holds only in the environment its guards run in.
+- **LOW** — a stated objective with nothing that measures it; a guard, comment or runbook line that no longer describes the behaviour beside it; a discipline whose declared scope is wider
+  than its coverage.
 
-- `problems-only: true`.
-- Each finding: severity, zone, evidence (timing / query plan / cache-key / load-test output / grep hit), and recommendation with effort/priority.
-- Append incrementally (≤100 lines per write) to the phase findings file per `docs/99-agent/rules.md`.
+## Report Output
+
+- Findings path: `.ai/audit/13-performance/findings.md`
+- Template: `.ai/audit/templates/audit-findings.md` — follow it for front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
+- Finding-ID prefix: `PERF-` — **already in use** in shipped source, tests, workflows and reports from a prior cycle, with at least one identifier already resolving to two different
+  findings; check for a collision before minting an ID and report it rather than creating a second namespace
+- Incremental append, ≤100 lines per pass
+- `problems-only: true` — findings only, omit passing checks; every finding needs runtime evidence and the exact consequence
+- Empty state, exactly: `No problems found in this phase.`
