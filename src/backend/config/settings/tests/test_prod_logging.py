@@ -54,6 +54,10 @@ def _prod_env_overrides(**overrides: str) -> dict[str, str]:
     env["DEBUG"] = "False"
     env["DJANGO_SECRET_KEY"] = overrides.pop("DJANGO_SECRET_KEY", TEST_SECRET_KEY)
     env["BOT_TOKEN"] = overrides.pop("BOT_TOKEN", "test-bot-token-for-testing-only")
+    # Must be explicit: without it the builder inherits whatever the ambient
+    # environment supplies, which differs between the Docker test container
+    # (.env.test) and the CI test job (no .env). See BLOCK 5 decision D1.
+    env["BOT_USERNAME"] = overrides.pop("BOT_USERNAME", "test_bot_for_testing_only")
     env["GOOGLE_TRANSLATE_API_KEY"] = overrides.pop(
         "GOOGLE_TRANSLATE_API_KEY", "test-translate-key-for-testing-only"
     )

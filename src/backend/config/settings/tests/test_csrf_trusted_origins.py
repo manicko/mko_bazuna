@@ -52,6 +52,10 @@ def _prod_env(**overrides: str) -> dict[str, str]:
         "DJANGO_SECRET_KEY", TEST_SECRET_KEY
     )
     env["BOT_TOKEN"] = overrides.pop("BOT_TOKEN", "test-bot-token-for-testing-only")
+    # Explicit for the same reason as test_prod_logging._prod_env_overrides: the
+    # ambient environment differs between the Docker test container (.env.test)
+    # and the CI test job (no .env). See BLOCK 5 decision D1.
+    env["BOT_USERNAME"] = overrides.pop("BOT_USERNAME", "test_bot_for_testing_only")
     env["GOOGLE_TRANSLATE_API_KEY"] = overrides.pop(
         "GOOGLE_TRANSLATE_API_KEY", "test-translate-key-for-testing-only"
     )

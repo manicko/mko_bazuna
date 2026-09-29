@@ -518,6 +518,9 @@ jobs:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       DJANGO_SECRET_KEY: "ci-deploy-check-secret-key-not-for-production-use-1234567890"
       BOT_TOKEN: ci-test-bot-token
+      # Underscores: a real Telegram handle matches ^[A-Za-z0-9_]{3,32}$, and the
+      # prod.py guard now requires BOT_USERNAME, so this fixture must be realistic.
+      BOT_USERNAME: ci_test_bot
       GOOGLE_TRANSLATE_API_KEY: ci-test-translate-key
       SITE_URL: https://example.com
       ALLOWED_HOSTS: example.com

@@ -118,8 +118,11 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
-# Telegram bot token (required for bot process, validated via Env schema)
-# Allow empty string for development when bot is not needed
+# Telegram bot token (required for bot process). The env(...) entry above declares
+# a cast and a default, not a schema: the actual placeholder/dummy validation lives
+# in config/settings/secret_validation.py and is applied by the guard in
+# config/settings/prod.py. Allow empty string for development when bot is not
+# needed; production requires it.
 BOT_TOKEN = env("BOT_TOKEN", default="")
 
 # Google Cloud Translation API key (v2 Basic, API-key auth via ?key= query param).
@@ -311,6 +314,11 @@ LOGIN_URL = "/login/issue/"
 
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
+# Required and non-empty in production. This is a SEED value: migration
+# 0003_add_bot_username copies it into SiteConfig.bot_username once, and from then
+# on the database is the source of truth (get_bot_username() reads the model, not
+# this setting), so changing it later does not change a deployed site. Use
+# `manage.py repair_bot_username` or the Django admin to correct a stored value.
 BOT_USERNAME = env("BOT_USERNAME", default="")
 
 # File-based liveness marker path for the bot container healthcheck.

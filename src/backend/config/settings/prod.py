@@ -5,15 +5,11 @@ Imports base settings and applies production safety configuration.
 
 import logging
 import os
-import re
 
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403, F401
-
-# Matches values shipped as templates in .env.*.example files, e.g.
-# <generate-with-django-secret-key-generator>, <your-bot-token-from-botfather>
-_SECRET_PLACEHOLDER_RE = re.compile(r"^<[^>]+>$")
+from .secret_validation import is_placeholder, validate_bot_username
 
 DEBUG = False
 
@@ -87,7 +83,7 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
 # ---------------------------------------------------------------------------
 # Secret-validation bypass
 # ---------------------------------------------------------------------------
-# The seven secret guards below must run for every production settings module.
+# The eight secret guards below must run for every production settings module.
 # Two control flags can suppress them, each with a different scope:
 #
 #   DJANGO_BUILD=1   — set ONLY in the Docker image builder stage
@@ -156,9 +152,10 @@ if _ONESHOT_REQUESTED and _is_production_settings_module():
 def _validate_production_secret(var_name: str, value: str) -> None:
     """Fail-fast validation for production secrets.
 
-    Rejects values that look like dev-only dummies, match shipped placeholder
-    templates, or (for DJANGO_SECRET_KEY) are too short — all of which would
-    leave the app signed with a publicly-knowable or forgeable key.
+    Rejects values that look like dev-only dummies or match shipped placeholder
+    templates — the placeholder pattern lives in
+    config/settings/secret_validation.py, the single home shared by every
+    settings module — or (for DJANGO_SECRET_KEY) are too short.
 
     Raises ImproperlyConfigured with a value-free message naming the env var
     and remediation guidance. Does NOT log the value itself.
@@ -168,7 +165,7 @@ def _validate_production_secret(var_name: str, value: str) -> None:
             f"{var_name} appears to use a dev-only dummy value. "
             "Provide a real value via the .env.prod runtime file."
         )
-    if _SECRET_PLACEHOLDER_RE.match(value):
+    if is_placeholder(value):
         raise ImproperlyConfigured(
             f"{var_name} appears to be a placeholder value from a .env template. "
             "Replace it with the real value in .env.prod."
@@ -282,3 +279,26 @@ if not _SKIP_SECRET_VALIDATION:
             "REDIS_URL must be set in production. "
             "Provide it via the .env.prod runtime file."
         )
+
+# Fail fast: BOT_USERNAME is required in production. It is a public Telegram
+# handle rather than a secret, but it is persisted into SiteConfig.bot_username
+# by migration 0003 and read back from the database, so a template or malformed
+# value produces dead t.me/ deep links site-wide — invisibly, because the
+# telegram_deep_link template tag base64-encodes it behind href="#".
+#
+# It lives inside the secret-validation block because that block is the
+# project's single "this variable must be real when we serve traffic"
+# mechanism. Widening the block to cover a non-secret value is a deliberate
+# choice, made here; it is not justified by confidentiality.
+#
+# Skipped during the Docker image build (DJANGO_BUILD=1), which runs
+# collectstatic under this module with no .env at all, and under
+# config.settings.oneshot, which is what the dev bootstrap one-shots load. In
+# that bootstrap path the guard cannot help: migration 0003's full_clean() is
+# what stops a bad value reaching the database there.
+#
+# A correct value in .env.prod does NOT repair a row already seeded with a
+# placeholder — the database is the source of truth after 0003. Run
+# `manage.py repair_bot_username`, or edit SiteConfig in the Django admin.
+if not _SKIP_SECRET_VALIDATION:
+    validate_bot_username("BOT_USERNAME", BOT_USERNAME)  # noqa: F405

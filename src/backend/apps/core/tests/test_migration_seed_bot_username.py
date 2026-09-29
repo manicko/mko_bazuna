@@ -74,3 +74,23 @@ def test_seed_falls_back_to_default(seed_bot_username) -> None:
 
     config.refresh_from_db()
     assert config.bot_username == "bazuna_bot"
+
+
+@override_settings(BOT_USERNAME="<your-bot-username>")
+def test_seed_falls_back_when_value_fails_validator(seed_bot_username) -> None:
+    """The seed never writes a value the model's own validator rejects.
+
+    This is the provable bypass from CFG-005: the migration declared a
+    RegexValidator and then wrote through QuerySet.update(), which never calls
+    full_clean(). A value failing the validator now resolves to the field
+    default — the seed writes nothing invalid AND the migration never aborts a
+    replay over a malformed operational env value. Correcting an already-seeded
+    row is ``manage.py repair_bot_username``'s job.
+    """
+    config = SiteConfig.get_singleton()
+    assert config.bot_username == "bazuna_bot"  # factory default
+
+    seed_bot_username(django_apps, None)
+
+    config.refresh_from_db()
+    assert config.bot_username == "bazuna_bot"

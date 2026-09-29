@@ -42,7 +42,7 @@ Django admin, with a 1-hour cache:
 | Layer | Component | Location |
 |---|---|---|
 | Storage | `SiteConfig.bot_username` (`CharField`, `RegexValidator ^[A-Za-z0-9_]{3,32}$`) | `apps/core/models.py` |
-| Seed migration | `0003_add_bot_username` — seeds from `settings.BOT_USERNAME` env var (seed value only) | `apps/core/migrations/0003_add_bot_username.py` |
+| Seed migration | `0003_add_bot_username` — seeds from `settings.BOT_USERNAME` env var (seed value only; an empty or invalid value resolves to the field default, never written) | `apps/core/migrations/0003_add_bot_username.py` |
 | Service | `get_bot_username()` / `get_bot_username_async()` — cached, 1-hour TTL, falls back to `bazuna_bot` | `apps/core/services/site_config.py` |
 | Cache | `get_cached_site_config()` / `set_cached_site_config()` — key `site_config:v1` | `apps/core/utils/cache.py` |
 | Invalidations | `post_save` receiver on `SiteConfig` clears cache | `apps/core/signals.py` |
@@ -51,6 +51,33 @@ Django admin, with a 1-hour cache:
 All templates and views resolve the bot username through `get_bot_username()`
 **only** — `settings.BOT_USERNAME` is a seed value consumed exclusively by the
 migration and is **not** a runtime source after migration 0003.
+
+#### Repairing a placeholder username
+
+If `.env.prod` still carried the `<your-bot-username>` template value when
+migration `0003_add_bot_username` ran, the singleton holds a value its own
+validator rejects and every `t.me/` deep link on the site is dead. The value is
+base64-encoded behind `href="#"`, so nothing on the rendered page shows it.
+
+The database is the source of truth after `0003`, so correcting `.env.prod` alone
+changes nothing. Repair the stored value instead — fix the env **first**, then run
+the command:
+
+    # 1. Set BOT_USERNAME in .env.prod to the real handle (no @ prefix).
+    # 2. Preview:
+    manage.py repair_bot_username --dry-run
+    # 3. Apply:
+    manage.py repair_bot_username
+
+The command repairs the stored value only when it fails the validator; a valid
+value, including one set through the Django admin, is never overwritten. It uses
+`save()`, so the one-hour bot-username cache is invalidated and the change is
+visible immediately. Editing the singleton in the Django admin is an equivalent
+manual path — `bot_username` is an editable, validated field there.
+
+Since `config.settings.prod` now requires `BOT_USERNAME`, a non-empty real handle
+is also enforced at boot for `web` and `bot`; the placeholder is rejected before
+the site can serve a dead link.
 
 ### Deep-link rendering: the `telegram_deep_link` template tag
 
