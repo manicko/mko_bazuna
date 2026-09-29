@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from apps.ads.models import Ad, AdImage
+from apps.ads.models import Ad
 from apps.core.enums import AdStatus, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 
@@ -59,14 +59,6 @@ class Command(BaseCommand):
                     )
                     return
 
-                # Collect storage keys for physical media cleanup before ORM cascade
-                ad_ids = list(queryset.values_list("id", flat=True))
-                storage_keys = [
-                    key
-                    for img in AdImage.objects.filter(ad_id__in=ad_ids)
-                    for key in img.storage_keys()
-                ]
-
                 # Delete atomically - CASCADE will handle ad_images
                 # ModeratorActionLog.ad_id will be SET NULL due to on_delete=models.SET_NULL
                 deleted_count, _ = queryset.delete()
@@ -75,8 +67,6 @@ class Command(BaseCommand):
         # via transaction.on_commit(), which runs after this transaction commits.
 
         logger.info(
-            "Deleted %d ads with REJECTED status older than 90 days. "
-            "Removed %d media files.",
+            "Deleted %d ads with REJECTED status older than 90 days.",
             deleted_count,
-            len(storage_keys),
         )

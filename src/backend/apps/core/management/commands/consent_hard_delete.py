@@ -13,7 +13,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from apps.ads.models import AdImage
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
@@ -65,15 +64,6 @@ class Command(BaseCommand):
                 # Collect user IDs for logging before processing
                 user_ids = list(queryset.values_list("id", flat=True))
 
-                # Collect storage keys for physical media cleanup before ORM cascade.
-                # Use AdImage.storage_keys() to include thumbnail derivatives
-                # (thumbnail_small/medium/large), not just the main image key.
-                storage_keys = [
-                    key
-                    for img in AdImage.objects.filter(ad__user_id__in=user_ids)
-                    for key in img.storage_keys()
-                ]
-
                 # Null out analytics_events.user_id (preserves aggregate history)
                 AnalyticsEvent.objects.filter(user_id__in=user_ids).update(user_id=None)
 
@@ -90,9 +80,7 @@ class Command(BaseCommand):
 
         logger.info(
             "Hard-deleted %d users (cascaded %d rows incl. ads/images) "
-            "with consent revoked over 30 days ago. "
-            "Removed %d media files.",
+            "with consent revoked over 30 days ago.",
             len(user_ids),
             deleted_count,
-            len(storage_keys),
         )
