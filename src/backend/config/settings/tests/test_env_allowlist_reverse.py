@@ -18,7 +18,7 @@ defect this module exists to catch.
 The asymmetry this module deliberately does not assert
 ------------------------------------------------------
 Only the forward direction is asserted. The reverse — "every allowlisted name
-is read somewhere in Python" — is **false by construction**: 13 of the 49
+is read somewhere in Python" — is **false by construction**: 12 of the 49
 allowlist entries have no Python read, and every one of them is deliberate.
 They are read by shell scripts, by Compose interpolation, or injected by the
 test container. ``SCHEDULER_HEALTH_STALE_SECONDS`` is the worked example: it is

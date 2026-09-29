@@ -8,9 +8,10 @@ It inherits from ``prod`` on purpose, and the arrow is a deliberate dependency
 inversion: bootstrap is *weaker* than production, yet this module star-imports
 the stronger module. The benefit is that every setting added to ``prod.py``
 (every guard, prod's structured LOGGING, the Sentry init, the transport pins,
-``STATICFILES_STORAGE`` and ``ALLOWED_HOSTS``) is picked up here automatically
-instead of silently going stale in a copied block. Do not replace the
-star-import with a copy of prod's configuration.
+the static-files ``STORAGES`` backend (owned by ``base.py``) and
+``ALLOWED_HOSTS``) is picked up here automatically instead of silently going
+stale in a copied block. Do not replace the star-import with a copy of prod's
+configuration.
 
 The ``DJANGO_ONESHOT`` bypass reaches this module only because the deployment
 descriptor (Compose ``environment:``) resolves

@@ -41,6 +41,10 @@ ALLOWED_ENV_VARS = frozenset({
     # Both are ignored by config.settings.prod; never add either to .env.prod.
     "DJANGO_BUILD", "DJANGO_ONESHOT",
     # --- Shell/entrypoint/compose-injected (not consumed by Python env()) ---
+    # ADMIN_PASSWORD is the exception: create_admin_user reads it through
+    # os.environ.get() rather than env(), and it arrives by env_file / Compose
+    # environment:, not from the .env read above. It is therefore consumed (the
+    # reverse AST scan reports it), just not by env().
     "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_TELEGRAM_ID",
     "SEED_USERS", "SEED_ADS", "FIX_PERMISSIONS", "SKIP_ENV_CHECK",
     "TLS_CERT_PATH", "PROMETHEUS_MULTIPROC_DIR",

@@ -24,11 +24,21 @@ resolves to the field default (``bazuna_bot``) rather than being written or
 raised on. This closes the validator bypass without turning a malformed
 operational env value into an aborted ``migrate`` run; correcting an
 already-seeded row is ``manage.py repair_bot_username``'s job.
+
+That fallback is never silent: it logs a warning naming the cause and the repair
+path. In production the ``prod.py`` BOT_USERNAME guard normally stops a bad value
+long before this migration runs, so the warning is the dev/bootstrap path's only
+diagnostic — without it the block would manufacture the very dead link this
+module's companion command exists to remove.
 """
+
+import logging
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import migrations, models
+
+logger = logging.getLogger(__name__)
 
 # The validator regex as declared on the field below. Kept inline so this
 # historical migration stays frozen: it must not import live application code
@@ -60,6 +70,15 @@ def seed_bot_username(apps, schema_editor):
         _BOT_USERNAME_RE(configured)
         bot_username = configured
     except ValidationError:
+        # Bounded in production by the prod.py BOT_USERNAME guard, which rejects
+        # an empty/placeholder/malformed value before this migration can run —
+        # but nothing bounds the dev oneshot path (config.settings.oneshot),
+        # where this is the only signal that a dead t.me/ row was seeded.
+        logger.warning(
+            "BOT_USERNAME setting is empty, a template placeholder, or malformed; "
+            "SiteConfig.bot_username resolves to the field default. Run manage.py "
+            "repair_bot_username after correcting .env.prod."
+        )
         bot_username = fallback
     # Only seed rows that are still at the factory default — never
     # overwrite an admin-edited value on re-run (migration-workflow.md:285).
