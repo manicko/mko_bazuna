@@ -39,7 +39,7 @@ django-mptt is not yet validated against Django 6.0.
 ```
 # Core / Web
 django>=5.2.16,<6.0              # LTS until Apr 2028; <6.0 protects django-mptt.
-psycopg[binary]>=3.2.0            # psycopg 3 (Django 5.2 native driver). For PgBouncer tx mode set OPTIONS={"prepare_threshold": None}.
+psycopg[binary]>=3.2.0            # psycopg 3 (Django 5.2 native driver). For PgBouncer tx mode set OPTIONS={"prepare_threshold": None, "options": "-c lock_timeout=10s"}.
 django-environ>=0.11.0            # Typed .env casting. python-dotenv is TRANSITIVE (do not declare).
 django-mptt>=0.18.0               # Hierarchical categories. First Django 5.2-compatible release. Unmaintained — keep <6.0.
 django-filter>=26.1               # List filters. Requires Django>=5.2.
@@ -73,7 +73,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 - **uv:** pin `uv>=0.11.28` in Dockerfile.
 - **gunicorn:** pin `gunicorn>=26.0`.
 - **whitenoise:** add if used for `/static/` (media still needs nginx).
-- **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None`.
+- **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None` and add `options="-c lock_timeout=10s"` (03-DB-004); list `options` in the pooler's `ignore_startup_parameters`.
 - **nginx:** `nginx:alpine` tracks 1.30.x.
 
 ## Key Compatibility Decisions
@@ -81,7 +81,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 | Item | Decision | Note |
 |------|----------|------|
 | django | `>=5.2.16,<6.0` | LTS; `<6.0` protects unmaintained django-mptt. |
-| psycopg3 | `>=3.2.0` | Recommended driver; `prepare_threshold=None` for PgBouncer. |
+| psycopg3 | `>=3.2.0` | Recommended driver; `prepare_threshold=None` plus `options="-c lock_timeout=10s"` for PgBouncer. |
 | django-mptt | `>=0.18.0` | First Django 5.2-compatible. Plan replacement before any Django 6.0 move. |
 | django-filter | `>=26.1` | List filters. Requires Django>=5.2. |
 | aiogram FSM | use `Ad.DRAFT` in ORM | No built-in PG FSM storage; never Redis/Mongo. |

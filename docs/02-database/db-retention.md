@@ -44,6 +44,10 @@ The `purge_deleted_ads` command acquires PostgreSQL advisory lock ID 11
 (`AdvisoryLockId.PURGE_DELETED_ADS`) to prevent concurrent execution across
 container restarts. Other sweeps use their own advisory lock IDs.
 
+Every advisory-lock acquisition in the system, not only this one, is bounded by
+the same connection-level `lock_timeout`; it is a connection setting, so it is
+not configured per command.
+
 ## Purge Sweep Commands
 
 ### purge_deleted_ads (AD-002)
@@ -68,7 +72,11 @@ docker compose --env-file .env.dev \
   `deleted_at` is older than 120 days (hardcoded).
 - Hard-deletes matching rows (cascading to `ad_images` via `on_delete=CASCADE`).
 - Uses `IX_ads_purge_deleted` partial index for efficient filtering.
-- Acquires advisory lock 11; a contending run **blocks** until the lock is granted (no lock timeout is configured).
+- Acquires advisory lock 11; a contending run blocks until the lock is granted, **bounded by the
+  connection-level `lock_timeout`** (`LOCK_TIMEOUT_SECONDS`, default 10 s, set in
+  `config/settings/base.py` `DATABASES["default"]["OPTIONS"]["options"]`). After the bound the run
+  fails with `canceling statement due to lock timeout` (SQLSTATE `55P03`) and is retried on the next
+  hourly scheduler tick.
 - `--dry-run` logs the count without deleting.
 
 ### Other sweeps
@@ -110,6 +118,9 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 ## Configuration
 
 All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations. The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days).
+
+Separately, `LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait; it is a
+connection setting, not a retention value.
 
 ## Scheduler
 

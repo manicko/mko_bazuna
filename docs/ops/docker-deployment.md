@@ -421,6 +421,30 @@ restart the affected container(s), and account for the consequences.
    ```
 4. The translation service reads the key at call time via `settings.GOOGLE_TRANSLATE_API_KEY`, so no other containers need restarting and no user-facing state is invalidated.
 
+### Lock timeouts (`canceling statement due to lock timeout`)
+
+Every process opens its connections with a connection-level `lock_timeout`
+(`LOCK_TIMEOUT_SECONDS`, default 10 s, rendered as libpq's
+`options="-c lock_timeout=10s"` in `DATABASES["default"]["OPTIONS"]`). The log
+line to search for is:
+
+```
+canceling statement due to lock timeout        # SQLSTATE 55P03
+```
+
+A lock timeout means a **long transaction is holding the lock**, usually
+`archive_sweep` (which holds its `select_for_update()` for the whole sweep until
+per-batch commit lands) or a queued `delete_sweep` / `purge_deleted_ads` run. The
+fix is to shorten the holder (per-batch commit), **not** to raise
+`LOCK_TIMEOUT_SECONDS` — a larger value only lengthens the stall. Hourly sweeps
+are retried on the next tick by construction; a web request returns a 503 with
+`Retry-After: 30`; the bot answers a busy message.
+
+If PgBouncer is enabled (opt-in `--profile pgbouncer`), the pooler must list
+`options` in `ignore_startup_parameters`
+(`PGBOUNCER_IGNORE_STARTUP_PARAMETERS=options,extra_float_digits` in
+`docker-compose.prod.yml`) or it refuses every client connection.
+
 ### Deployment Checks
 
 Deployment configuration is validated via Django's `manage.py check --deploy`:
