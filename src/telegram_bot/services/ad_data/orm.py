@@ -56,8 +56,14 @@ async def create_draft_ad(user_id: int) -> Ad:
             if existing.exists():
                 existing.delete()
 
+            # The inner atomic() is a SAVEPOINT: it lets the IntegrityError
+            # below be caught on a healthy connection (needs_rollback cleared,
+            # server transaction released) while keeping the delete + retry in
+            # the outer transaction. Without it the handler's first query would
+            # run against an already-aborted transaction.
             try:
-                return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+                    return Ad.objects.create(user_id=user_id, status=AdStatus.DRAFT)
             except IntegrityError:
                 # Race: a concurrent create_draft_ad slipped through the above
                 # check before the unique index was enforced. Clean up and retry.

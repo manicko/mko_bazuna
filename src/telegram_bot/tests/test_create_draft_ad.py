@@ -187,3 +187,48 @@ class TestCreateDraftAdCrashRecovery:
             Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count
         )()
         assert count == 1, "Original DRAFT should survive transaction rollback"
+
+    @pytest.mark.asyncio
+    async def test_create_draft_ad_recovers_from_unique_constraint_violation(
+        self, user: object
+    ) -> None:
+        """A real uq_ads_single_draft_per_user violation is recovered, not propagated.
+
+        The recovery branch is only reachable through the savepoint: the
+        handler's cleanup query must run against a healthy connection. This
+        test forces the real partial unique index to fire in-transaction (a
+        real ``Model.save()`` -> real ``IntegrityError`` -> ``needs_rollback``)
+        rather than mocking the exception, so it fails against the pre-fix
+        shape and passes only once the savepoint is present.
+
+        Assertion is the invariant "a draft is returned" — never a specific
+        exception class, and never "the seller's draft survived" (the rollback
+        preserves the pre-existing DRAFT with its primary key, which is
+        incidental).
+        """
+        from unittest.mock import patch
+
+        from apps.ads.models import Ad
+        from telegram_bot.services.ad_data import create_draft_ad
+
+        real_create = Ad.objects.create  # shared Manager method, captured once
+        seeded = {"done": False}
+
+        def _create_with_racer(**kwargs: object) -> Ad:
+            # Simulate the racing writer landing between existing.delete() and the
+            # production INSERT. A real second connection would BLOCK on the outer
+            # transaction's uncommitted DELETE (same partial index), so the faithful
+            # deterministic equivalent is an in-transaction racing row.
+            if not seeded["done"]:
+                seeded["done"] = True
+                real_create(user_id=kwargs["user_id"], status=AdStatus.DRAFT)
+            return real_create(**kwargs)  # <- raises the REAL IntegrityError
+
+        with patch.object(Ad.objects, "create", side_effect=_create_with_racer):
+            ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
+
+        assert ad.status == AdStatus.DRAFT
+        count = await sync_to_async(
+            Ad.objects.filter(user_id=user.id, status=AdStatus.DRAFT).count
+        )()
+        assert count == 1
