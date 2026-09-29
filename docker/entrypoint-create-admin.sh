@@ -20,9 +20,12 @@ if [ -z "${ADMIN_PASSWORD}" ]; then
     exit 0
 fi
 
-# Run the create_admin_user command with environment variables
+# Run the create_admin_user command. The admin password is read from
+# ADMIN_PASSWORD in the environment by the command itself, so it is not placed on
+# the command line. This does not change the credential's exposure: it is already
+# in the container's environment via env_file, so `docker inspect` already shows
+# it in cleartext (VAL-002).
 exec /opt/venv/bin/python src/backend/manage.py create_admin_user \
     --username "${ADMIN_USERNAME:-admin}" \
-    --password "${ADMIN_PASSWORD}" \
     --telegram-id "${ADMIN_TELEGRAM_ID:--1}"
 

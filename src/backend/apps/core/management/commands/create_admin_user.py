@@ -5,13 +5,16 @@ Creates a user with a placeholder telegram_id for bot compatibility.
 Admin users authenticate via username/password (USERNAME_FIELD = "username").
 
 Usage:
-    uv run python manage.py create_admin_user --username admin --password <password> --telegram-id -1
+    uv run python manage.py create_admin_user --username admin --telegram-id -1
+    # or, equivalently, with the password supplied by the environment:
+    #   ADMIN_PASSWORD=<password> uv run python manage.py create_admin_user ...
 
 The command is idempotent - it will skip creation if a user with the same
 telegram_id already exists.
 """
 
 import logging
+import os
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -36,8 +39,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--password",
             type=str,
-            required=True,
-            help="Admin password (must be non-empty)",
+            required=False,
+            default=None,
+            help=(
+                "Admin password (must be non-empty). If omitted, falls back to the "
+                "ADMIN_PASSWORD environment variable."
+            ),
         )
         parser.add_argument(
             "--telegram-id",
@@ -59,7 +66,17 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         username = options["username"]
-        password = options["password"]
+        # Resolution order: an explicitly supplied --password always wins, even when it is
+        # empty -- an empty value must still fail the validation below rather than
+        # silently picking up a different password from the environment. The fallback
+        # exists so the secret is no longer *forced* through argv. It does not reduce the
+        # credential's exposure: ADMIN_PASSWORD is already in the container's environment
+        # via env_file, so `docker inspect` already returns it in cleartext (VAL-002).
+        password = (
+            options["password"]
+            if options["password"] is not None
+            else os.environ.get("ADMIN_PASSWORD", "")
+        )
         telegram_id = options["telegram_id"]
         email = options["email"]
         dry_run = options["dry_run"]

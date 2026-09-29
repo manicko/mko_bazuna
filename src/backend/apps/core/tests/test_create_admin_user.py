@@ -7,6 +7,7 @@ Verifies:
 - Dry-run mode does not create any records
 - Empty password validation
 - Advisory lock usage
+- Password resolution from the ADMIN_PASSWORD environment fallback
 """
 
 from io import StringIO
@@ -238,3 +239,47 @@ class TestCreateAdminUser:
         assert "tg_" in stdout_output
         # Raw telegram_id must not appear in any log output
         assert str(telegram_id) not in caplog.text
+
+    def test_password_resolved_from_environment_when_flag_absent(self, monkeypatch):
+        """With --password omitted the command reads ADMIN_PASSWORD (CFG-003)."""
+        monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
+        call_command("create_admin_user", username="envadmin", telegram_id=-1)
+        assert User.objects.get(username="envadmin").check_password(
+            "test-admin-password"
+        )
+
+    def test_explicit_password_flag_wins_over_environment(self, monkeypatch):
+        """--password takes precedence over ADMIN_PASSWORD when both are present."""
+        monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
+        call_command(
+            "create_admin_user",
+            username="flagadmin",
+            password="flag-wins",
+            telegram_id=-1,
+        )
+        user = User.objects.get(username="flagadmin")
+        assert user.check_password("flag-wins")
+        assert not user.check_password("test-admin-password")
+
+    def test_empty_password_flag_does_not_fall_back_to_environment(self, monkeypatch):
+        """An explicitly empty --password must fail, not silently use the environment.
+
+        Guards D2: a falsiness-triggered fallback would hand the operator a different
+        password than the one they typed.
+        """
+        monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
+        with pytest.raises(CommandError, match="Password cannot be empty"):
+            call_command(
+                "create_admin_user",
+                username="emptyflag",
+                password="",
+                telegram_id=-1,
+            )
+        assert not User.objects.filter(username="emptyflag").exists()
+
+    def test_no_password_flag_and_no_env_password_raises(self, monkeypatch):
+        """Neither flag nor environment: the existing empty-password error fires."""
+        monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+        with pytest.raises(CommandError, match="Password cannot be empty"):
+            call_command("create_admin_user", username="nopassnoenv", telegram_id=-1)
+        assert not User.objects.filter(username="nopassnoenv").exists()
