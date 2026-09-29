@@ -507,6 +507,11 @@ jobs:
   # is required: check --deploy is static (no custom deploy checks, no DB
   # connection). All required production env vars are set to valid non-secret
   # placeholders so the full prod settings import path is exercised.
+  # The env block below is also read by the test job's
+  # config/settings/tests/test_deploy_check_env_parity.py, which imports
+  # config.settings.prod with exactly this set. Keep the block a non-empty YAML
+  # mapping, and never add DJANGO_BUILD or DJANGO_ONESHOT here: either one
+  # suppresses the guards and makes this gate pass without checking anything.
   deploy-check:
     runs-on: ubuntu-latest
     env:
