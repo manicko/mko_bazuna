@@ -32,9 +32,19 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 #   1 SELECT (prefetch images)
 #   1 SELECT (prefetch features)
 #   1 SELECT (prefetch user__trust_score)
-#   1 INSERT (AnalyticsEvent)
+#   1 INSERT (AnalyticsEvent) — autocommit production path only
 #   + template/header queries
-_QUERY_BOUND = 16
+#
+# Budget: 16 + SAVEPOINT + SET CONSTRAINTS + RELEASE SAVEPOINT = 19.
+# `record_event` wraps its INSERT in a savepoint and forces the two
+# analytics_events FK checks IMMEDIATE (03-DB-002) whenever a caller-owned
+# transaction is active.  That is the WORST CASE — an in-transaction caller.
+# Production `ad_detail` is autocommit (no ATOMIC_REQUESTS, no atomic() in
+# listings.py), so the guard takes the cheap branch and pays 0 extra
+# statements.  The +3 is observable here only because pytest.mark.django_db
+# wraps every test in Django's atomic block, making in_atomic_block True.
+# Do NOT re-tighten this to 16: that would re-break a correct fix.
+_QUERY_BOUND = 19
 
 
 class TestAdDetailQueryCount:
