@@ -41,6 +41,16 @@ permission:
      "docker network*": allow
      "docker volume*": allow
      "docker system*": allow
+     "docker compose down*": allow
+     "docker volume rm*": allow
+     "docker volume prune*": allow
+     "docker system prune -a*": allow
+     "docker rm*": allow
+     "docker rm -f*": allow
+     "docker rmi -f*": allow
+     "docker image prune -a*": allow
+     "docker container prune*": allow
+     "docker network prune*": allow
 
      "kubectl get*": allow
      "kubectl describe*": allow
@@ -115,18 +125,7 @@ permission:
      "git gc --prune=now*": ask
      "git update-ref -d*": ask
 
-     "docker compose down*": allow
-     "docker compose down --volumes*": allow
-     "docker compose down -v*": allow
-     "docker volume rm*": allow
-     "docker volume prune*": allow
-     "docker system prune -a*": allow
-     "docker rm*": allow
-     "docker rm -f*": allow
-     "docker rmi -f*": allow
-     "docker image prune -a*": allow
-     "docker container prune*": allow
-     "docker network prune*": allow
+
 
      "kubectl delete *": ask
      "kubectl delete pod*": ask

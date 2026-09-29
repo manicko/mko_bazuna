@@ -116,8 +116,6 @@ permission:
      "git update-ref -d*": ask
 
      "docker compose down*": allow
-     "docker compose down --volumes*": allow
-     "docker compose down -v*": allow
      "docker volume rm*": allow
      "docker volume prune*": allow
      "docker system prune -a*": allow

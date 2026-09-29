@@ -92,8 +92,6 @@ permission:
      "git gc --prune=now*": ask
      "git update-ref -d*": ask
      "docker compose down*": ask
-     "docker compose down --volumes*": ask
-     "docker compose down -v*": ask
      "docker volume rm*": ask
      "docker volume prune*": ask
      "docker system prune -a*": ask
