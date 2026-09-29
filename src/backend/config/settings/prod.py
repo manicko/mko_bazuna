@@ -249,6 +249,11 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
+# Mail transport is pinned, not operator-configurable: base.py honours the
+# EMAIL_BACKEND env var, and a console backend would write message bodies
+# (password-reset tokens, confirmations, support-ticket text) to stdout.
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
 # Static files via whitenoise (with input.css excluded from post-processing)
 STATICFILES_STORAGE = "theme.storage.ThemeStaticFilesStorage"
 
