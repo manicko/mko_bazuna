@@ -144,9 +144,10 @@ The same `.env.*` files are also **bind-mounted** into the container at `/app/sr
 `volumes:` entries like `./.env.test:/app/src/.env:ro`) so Django's `django-environ` can read
 them as a file — but only for services whose settings actually call `read_env()` (see below).
 
-The `.env.*` files are gitignored (`.gitignore` lines 145–148); `.env.example`,
-`.env.dev.example`, `.env.test.example`, and `.env.prod.example` are the tracked templates to
-copy from.
+The `.env.*` files are gitignored (`.gitignore` lines 145–148); `.env.dev.example`,
+`.env.test.example`, and `.env.prod.example` are the tracked templates to copy from, while
+`.env.example` is a cross-tier reference stub (deliberately not exhaustive) that points at
+those three.
 
 ### Precedence Chain (highest to lowest)
 

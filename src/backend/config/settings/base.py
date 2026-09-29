@@ -15,9 +15,13 @@ logger = logging.getLogger(__name__)
 # Allowlist of environment variables that may be loaded from the .env file.
 # Any .env key not listed here triggers a warning (Gate E, Option A) to surface
 # typos like `BOT_T0KEN`. Includes both Python-consumed vars (env()/env.*()/
-# os.getenv in base.py & prod.py) and shell/entrypoint/compose-injected vars.
+# os.getenv in base.py, prod.py and apps/core/utils/migrate_locked.py) and
+# shell/entrypoint/compose-injected vars.
+# The reverse direction is asserted by
+# config/settings/tests/test_env_allowlist_reverse.py.
 ALLOWED_ENV_VARS = frozenset({
-    # --- Python-consumed (env()/env.*()/os.getenv in base.py & prod.py) ---
+    # --- Python-consumed (env()/env.*()/os.getenv in base.py, prod.py,
+    #     apps/core/utils/migrate_locked.py) ---
     "DJANGO_SECRET_KEY", "DJANGO_SETTINGS_MODULE",
     "DEBUG", "BOT_TOKEN", "GOOGLE_TRANSLATE_API_KEY",
     "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS",
@@ -30,6 +34,7 @@ ALLOWED_ENV_VARS = frozenset({
     "EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD",
     "EMAIL_USE_TLS", "EMAIL_TIMEOUT", "EMAIL_BACKEND",
     "DEFAULT_FROM_EMAIL", "SUPPORT_NOTIFICATION_RECIPIENTS",
+    "RUN_TRANSLATION_BACKFILL",
     # --- Bootstrap control flags (honoured only from the process environment) ---
     # DJANGO_BUILD: Docker image builder stage only (collectstatic, no .env file).
     # DJANGO_ONESHOT: dev bootstrap one-shots, which run config.settings.oneshot.
