@@ -276,6 +276,13 @@ msgstr "Oglas poslat na moderaciju! Bićeš obavešten kad bude objavljen."
 msgid "Ad failed moderation. Please check your content and try again."
 msgstr "Oglas nije prošao moderaciju. Proveri sadržaj i pokušaj ponovo."
 
+msgid "The system is busy. Please try again in a moment."
+msgstr "Sistem je zauzet. Pokušajte ponovo za trenutak."
+
+msgid "The server is busy processing another change. Please try again shortly."
+msgstr ""
+"Server je zauzet obradom druge izmjene. Pokušajte ponovo malo kasnije."
+
 msgid "Send 'confirm' to submit or 'cancel' to abort."
 msgstr "Pošalji 'confirm' za slanje ili 'cancel' za otkazivanje."
 

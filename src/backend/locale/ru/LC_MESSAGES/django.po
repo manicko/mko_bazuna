@@ -284,6 +284,14 @@ msgid "Ad failed moderation. Please check your content and try again."
 msgstr ""
 "Объявление не прошло модерацию. Проверьте содержимое и попробуйте снова."
 
+msgid "The system is busy. Please try again in a moment."
+msgstr "Система занята. Пожалуйста, попробуйте ещё раз через мгновение."
+
+msgid "The server is busy processing another change. Please try again shortly."
+msgstr ""
+"Сервер занят обработкой другого изменения. Пожалуйста, повторите попытку "
+"чуть позже."
+
 msgid "Send 'confirm' to submit or 'cancel' to abort."
 msgstr "Отправьте 'confirm' для отправки или 'cancel' для отмены."
 

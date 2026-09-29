@@ -21,7 +21,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -32,6 +32,7 @@ from apps.core.utils.cache import (
     get_cached_anon_language,
     invalidate_anon_language_cache,
 )
+from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import LoginToken, User
 from apps.users.services.login_token import claim_token
@@ -131,14 +132,30 @@ async def handle_login_deep_link(
     raw_token = match.group(1)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    # Combined ORM: claim token + get or create user
-    login_token, user, created = await handle_login_orm(
-        token_hash=token_hash,
-        telegram_id=message.from_user.id,
-        username=message.from_user.username,
-        first_name=message.from_user.first_name,
-        last_name=message.from_user.last_name,
-    )
+    # Combined ORM: claim token + get or create user.
+    #
+    # A lock timeout here is transient: aiogram's catch-all would only log it,
+    # leaving the seller with no message at all. Catch it, answer the busy
+    # message and let them re-open the deep link (the token claim was rolled
+    # back, so the one-time link survives). Anything that is not a lock timeout
+    # keeps its existing behaviour.
+    try:
+        login_token, user, created = await handle_login_orm(
+            token_hash=token_hash,
+            telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name,
+        )
+    except OperationalError as exc:
+        if not is_lock_timeout(exc):
+            raise
+        logger.warning(
+            "Lock timeout claiming login token for telegram_id=%s (SQLSTATE 55P03)",
+            mask_telegram_id(message.from_user.id),
+        )
+        await message.answer(_("The system is busy. Please try again in a moment."))
+        return
 
     if not login_token:
         await message.answer(_("This login link is invalid, expired, or already used."))

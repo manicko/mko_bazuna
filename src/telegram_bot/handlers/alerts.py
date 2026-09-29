@@ -16,9 +16,10 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.utils.translation import get_language, gettext as _
 
+from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.search.models import SavedSearch
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
@@ -262,4 +263,16 @@ def _resolve_owned(token: str, chat_id: int | None, active: bool) -> SavedSearch
             )
             return saved_search
     except SavedSearch.DoesNotExist:
+        return None
+    except OperationalError as exc:
+        # A lock timeout is a transient contention failure. None is already the
+        # failure signal and both callers answer "Failed to disable/enable
+        # notifications", so this is an honest degradation with no new string.
+        # Re-raise anything that is not a lock timeout unchanged.
+        if not is_lock_timeout(exc):
+            raise
+        logger.warning(
+            "Lock timeout toggling saved search %s (SQLSTATE 55P03)",
+            token,
+        )
         return None

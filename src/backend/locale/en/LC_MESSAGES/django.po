@@ -227,6 +227,12 @@ msgstr ""
 msgid "Ad failed moderation. Please check your content and try again."
 msgstr ""
 
+msgid "The system is busy. Please try again in a moment."
+msgstr ""
+
+msgid "The server is busy processing another change. Please try again shortly."
+msgstr ""
+
 msgid "Send 'confirm' to submit or 'cancel' to abort."
 msgstr ""
 

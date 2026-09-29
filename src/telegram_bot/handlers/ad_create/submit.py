@@ -16,10 +16,12 @@ from decimal import Decimal
 from aiogram import types
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
+from django.db import OperationalError
 from django.utils.translation import gettext as _
 
 from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.core.enums import LanguageLocale
+from apps.core.utils.db_lock_timeout import is_lock_timeout
 from telegram_bot.handlers.ad_create import AdCreateForm, router
 from telegram_bot.services.ad_data import translate_all_languages
 
@@ -57,32 +59,49 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             original_desc, LanguageLocale.values()
         )
 
-        # Update ad with multi-language content and run moderation
-
-        is_valid, errors = await sync_to_async(submit_ad)(
-            SubmitAdInput(
-                ad_id=data["ad_id"],
-                title_ru=title_translations.get("ru", original_title),
-                desc_ru=desc_translations.get("ru", original_desc),
-                title_bs=title_translations.get("bs", original_title),
-                desc_bs=desc_translations.get("bs", original_desc),
-                title_en=title_translations.get("en", original_title),
-                desc_en=desc_translations.get("en", original_desc),
-                original_language=LanguageLocale.from_code(
-                    message.from_user.language_code,
-                    fallback=LanguageLocale.BOSNIAN,
-                ).value,
-                category_id=data.get("category_id"),
-                city_id=data.get("city_id"),
-                price_amount=data.get("price_amount") or Decimal("0"),
-                price_currency=data.get("price_currency"),
-                photos=data.get("photos", []),
-                user_id=data.get("user_id"),
-                listing_purpose_id=data.get("listing_purpose_id"),
-                feature_ids=data.get("feature_ids"),
-                listing_condition_id=data.get("condition_id"),
+        # Update ad with multi-language content and run moderation.
+        #
+        # A lock timeout is a TRANSIENT contention failure, not a content
+        # failure: it must not be reported as one, and it must not clear the FSM
+        # state (that would destroy the seller's typed dialog for a condition
+        # that resolves in seconds). Catch it here, answer the busy message and
+        # keep the state so the seller can press confirm again.
+        try:
+            is_valid, errors = await sync_to_async(submit_ad)(
+                SubmitAdInput(
+                    ad_id=data["ad_id"],
+                    title_ru=title_translations.get("ru", original_title),
+                    desc_ru=desc_translations.get("ru", original_desc),
+                    title_bs=title_translations.get("bs", original_title),
+                    desc_bs=desc_translations.get("bs", original_desc),
+                    title_en=title_translations.get("en", original_title),
+                    desc_en=desc_translations.get("en", original_desc),
+                    original_language=LanguageLocale.from_code(
+                        message.from_user.language_code,
+                        fallback=LanguageLocale.BOSNIAN,
+                    ).value,
+                    category_id=data.get("category_id"),
+                    city_id=data.get("city_id"),
+                    price_amount=data.get("price_amount") or Decimal("0"),
+                    price_currency=data.get("price_currency"),
+                    photos=data.get("photos", []),
+                    user_id=data.get("user_id"),
+                    listing_purpose_id=data.get("listing_purpose_id"),
+                    feature_ids=data.get("feature_ids"),
+                    listing_condition_id=data.get("condition_id"),
+                )
             )
-        )
+        except OperationalError as exc:
+            if not is_lock_timeout(exc):
+                raise
+            logger.warning(
+                "Lock timeout submitting ad %s (SQLSTATE 55P03); keeping FSM state",
+                data.get("ad_id"),
+            )
+            await message.answer(
+                _("The system is busy. Please try again in a moment.")
+            )
+            return
 
         if is_valid:
             await message.answer(
@@ -92,8 +111,12 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             await state.clear()
 
         else:
+            # Render the real moderation error (mirrors ad_edit), falling back
+            # to the generic message when the service returned no reason.
             await message.answer(
-                _("Ad failed moderation. Please check your content and try again.")
+                errors[0]
+                if errors
+                else _("Ad failed moderation. Please check your content and try again.")
             )
 
             await state.clear()
