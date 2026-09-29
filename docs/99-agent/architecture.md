@@ -103,8 +103,9 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
    `ImproperlyConfigured` at import time if `REDIS_URL` is empty, because an unset URL
    would silently fall back to `MemoryStorage` for the bot FSM (ephemeral state) and an
    empty cache location. The guard is skipped under `DJANGO_BUILD=1` (image build) and
-   `DJANGO_ONESHOT=1` (dev one-shot services); the real URL is provided at runtime via
-   `.env.prod`.
+   for dev one-shot services, which run the bootstrap module `config.settings.oneshot`
+   with `DJANGO_ONESHOT=1`; under `config.settings.prod` the `DJANGO_ONESHOT` flag is
+   inert and the guard always runs. The real URL is provided at runtime via `.env.prod`.
 
 ## Environment Variable Resolution
 
@@ -521,7 +522,7 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 | Setting | base.py default | dev.py | test.py | prod.py |
 |---|---|---|---|---|
 | `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` |
-| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1` at build or `DJANGO_ONESHOT=1` on dev one-shots) |
+| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1` at build or for dev one-shots via `config.settings.oneshot` + `DJANGO_ONESHOT=1`) |
 | `EMAIL_PORT` | `587` | — | — | — |
 | `EMAIL_HOST_USER` | `""` | — | — | — |
 | `EMAIL_HOST_PASSWORD` | `""` | — | — | — |

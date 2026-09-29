@@ -85,32 +85,63 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
         )
 
 # ---------------------------------------------------------------------------
-# Secret-validation bypass flags
+# Secret-validation bypass
 # ---------------------------------------------------------------------------
-# Two bypass env vars exist, each serving a distinct purpose:
+# The seven secret guards below must run for every production settings module.
+# Two control flags can suppress them, each with a different scope:
 #
-#   DJANGO_BUILD=1   — set ONLY in Dockerfile during image build
-#                     (collectstatic --noinput). Allows the build-placeholder
-#                     SECRET_KEY to pass. No env_file or runtime secrets are
-#                     present during build.
+#   DJANGO_BUILD=1   — set ONLY in the Docker image builder stage
+#                     (collectstatic --noinput) and in Makefile's restore-test
+#                     target. There is no .env file during a build
+#                     (.dockerignore excludes **/.env*), so the build uses
+#                     placeholder secrets and must be allowed to import.
+#                     Honoured unconditionally; the build stage cannot be
+#                     distinguished by a settings module.
 #
-#   DJANGO_ONESHOT=1 — set on dev one-shot bootstrap services (migrate,
-#                     load_cities, load_catalog, create_admin, seed) via
-#                     docker-compose.dev.override.yml ONLY in development
-#                     (all one-shot services now use config.settings.prod).
-#                     Allows dev placeholder/dummy secrets to pass for services
-#                     that do not serve HTTP traffic and do not need a real
-#                     BOT_TOKEN or GOOGLE_TRANSLATE_API_KEY.
+#   DJANGO_ONESHOT=1 — a dev bootstrap flag. It is honoured ONLY while the
+#                     process is loading a settings module whose name does not
+#                     end in ".prod". The dev one-shot services (migrate,
+#                     load_cities, load_catalog, create_admin, seed) select the
+#                     bootstrap module via
+#                     DJANGO_SETTINGS_MODULE=config.settings.oneshot in the
+#                     deployment descriptor (Compose environment:), which is
+#                     set before read_env() runs and which overwrite=False
+#                     cannot overwrite. Under config.settings.prod the flag is
+#                     inert — it can never suppress a guard here.
 #
-# In production, NEITHER flag is set for one-shot services:
-#   docker-compose.prod.yml does NOT set DJANGO_ONESHOT (and the base
-#   docker-compose.yml no longer sets DJANGO_BUILD for one-shot services).
-#   Full secret validation runs against the real .env.prod values.
-# Long-lived web and bot services never set either flag.
+# Long-lived web and bot services never set either flag; full secret
+# validation always runs for them.
 # ---------------------------------------------------------------------------
+_PROD_SETTINGS_MODULE_SUFFIX = ".prod"
+
+
+def _is_production_settings_module() -> bool:
+    """Return True when the process is loading a production settings module.
+
+    DJANGO_SETTINGS_MODULE is set in the process environment before settings
+    import (manage.py, wsgi.py and asgi.py all setdefault it, and Compose sets
+    it per service). read_env() uses overwrite=False, so a value written into
+    a .env file cannot move an already-set process onto a non-production
+    module. That is the trust boundary this predicate relies on.
+    """
+    return os.getenv("DJANGO_SETTINGS_MODULE", "").endswith(
+        _PROD_SETTINGS_MODULE_SUFFIX
+    )
+
+
+_ONESHOT_REQUESTED = bool(os.getenv("DJANGO_ONESHOT"))
 _SKIP_SECRET_VALIDATION = bool(
-    os.getenv("DJANGO_BUILD") or os.getenv("DJANGO_ONESHOT")
+    os.getenv("DJANGO_BUILD")
+    or (_ONESHOT_REQUESTED and not _is_production_settings_module())
 )
+if _ONESHOT_REQUESTED and _is_production_settings_module():
+    logging.getLogger(__name__).warning(
+        "DJANGO_ONESHOT is set but ignored: this process loaded the production "
+        "settings module (DJANGO_SETTINGS_MODULE=%s), which always validates "
+        "secrets. Remove DJANGO_ONESHOT from the environment and from the .env "
+        "file; dev bootstrap services use config.settings.oneshot instead.",
+        os.getenv("DJANGO_SETTINGS_MODULE", ""),
+    )
 
 
 # Fail fast: SECRET_KEY is required in production and must pass strength checks.
@@ -160,11 +191,10 @@ if not _SKIP_SECRET_VALIDATION:
 
 # Fail fast: BOT_TOKEN is required in production. The bot process cannot
 # function without a valid token; an empty value indicates a deployment error.
-# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
-# (DJANGO_ONESHOT=1) so collectstatic and bootstrap commands succeed with
-# placeholder values; the real token is provided at runtime via .env.prod.
-# In production, web/bot services do not set either flag, so real tokens are
-# enforced at boot.
+# Skipped during the Docker image build (DJANGO_BUILD=1) so collectstatic
+# succeeds with the build placeholder. Dev bootstrap one-shots run
+# config.settings.oneshot, not this module. The real token is provided at
+# runtime via .env.prod, and web/bot services always enforce it here.
 if not _SKIP_SECRET_VALIDATION:
     if not BOT_TOKEN:  # noqa: F405
         raise ImproperlyConfigured(
@@ -174,9 +204,10 @@ if not _SKIP_SECRET_VALIDATION:
     _validate_production_secret("BOT_TOKEN", BOT_TOKEN)  # noqa: F405
 
 # Fail fast: GOOGLE_TRANSLATE_API_KEY is required in production.
-# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
-# (DJANGO_ONESHOT=1) so bootstrap commands succeed with placeholder values;
-# the real key is provided at runtime via .env.prod.
+# Skipped during the Docker image build (DJANGO_BUILD=1) so collectstatic
+# succeeds with the build placeholder. Dev bootstrap one-shots run
+# config.settings.oneshot, not this module. The real key is provided at
+# runtime via .env.prod.
 if not _SKIP_SECRET_VALIDATION:
     if not GOOGLE_TRANSLATE_API_KEY:  # noqa: F405
         raise ImproperlyConfigured(
@@ -197,9 +228,9 @@ if not os.getenv("SITE_URL") and not _SKIP_SECRET_VALIDATION:  # noqa: F405
 
 # Fail fast: EMAIL_HOST is required in production so transactional emails
 # (password resets, alert notifications, seller confirmations) are deliverable.
-# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
-# (DJANGO_ONESHOT=1) so collectstatic/bootstrap commands succeed; the real
-# SMTP config is provided at runtime via .env.prod.
+# Skipped during the Docker image build (DJANGO_BUILD=1) so collectstatic
+# succeeds. Dev bootstrap one-shots run config.settings.oneshot, not this
+# module. The real SMTP config is provided at runtime via .env.prod.
 if not _SKIP_SECRET_VALIDATION:
     if not EMAIL_HOST:  # noqa: F405
         raise ImproperlyConfigured(
@@ -231,9 +262,10 @@ if not ALLOWED_HOSTS:  # noqa: F405
 # Fail fast: CSRF_TRUSTED_ORIGINS is required in production behind a
 # TLS-terminating proxy. Without it, Django rejects all POST requests with a
 # valid CSRF token (HTTP 403) because the Origin/Referer header is not in the
-# allow-list. Skip during Docker build (DJANGO_BUILD=1) and dev one-shot
-# services (DJANGO_ONESHOT=1) so collectstatic/bootstrap commands succeed with
-# placeholder values; the real origins are provided at runtime via .env.prod.
+# allow-list. Skipped during the Docker image build (DJANGO_BUILD=1) so
+# collectstatic succeeds with the build placeholder. Dev bootstrap one-shots
+# run config.settings.oneshot, not this module. The real origins are provided
+# at runtime via .env.prod.
 if not CSRF_TRUSTED_ORIGINS and not _SKIP_SECRET_VALIDATION:  # noqa: F405
     raise ValueError("CSRF_TRUSTED_ORIGINS must be set in production")
 
@@ -241,8 +273,9 @@ if not CSRF_TRUSTED_ORIGINS and not _SKIP_SECRET_VALIDATION:  # noqa: F405
 # base.py's env("REDIS_URL", default="") returns "" for a present-but-empty value,
 # so without this guard a deployment missing REDIS_URL would silently fall back to
 # MemoryStorage for the bot FSM (ephemeral state) and an empty cache location.
-# Skip during Docker build (DJANGO_BUILD=1) and dev one-shot services
-# (DJANGO_ONESHOT=1); the real URL is provided at runtime via .env.prod.
+# Skipped during the Docker image build (DJANGO_BUILD=1). Dev bootstrap one-shots
+# run config.settings.oneshot, not this module. The real URL is provided at
+# runtime via .env.prod.
 if not _SKIP_SECRET_VALIDATION:
     if not REDIS_URL:  # noqa: F405
         raise ImproperlyConfigured(

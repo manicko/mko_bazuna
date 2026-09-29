@@ -24,6 +24,9 @@ _ROOT = Path(__file__).resolve().parent
 while not (_ROOT / "pyproject.toml").exists():
     _ROOT = _ROOT.parent
 
+# Bootstrap/build control flags honoured only from the process environment.
+_BYPASS_FLAGS = {"DJANGO_BUILD", "DJANGO_ONESHOT"}
+
 
 def _example_keys(filename: str) -> set[str]:
     """Extract `KEY=` names (skipping comments/blank lines) from an example file."""
@@ -92,3 +95,15 @@ def test_known_env_vars_no_warning(caplog: pytest.LogCaptureFixture) -> None:
             {"DJANGO_SECRET_KEY", "BOT_TOKEN", "POSTGRES_PORT", "SITE_URL"}
         )
     assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+@pytest.mark.parametrize("filename", [".env.prod.example", ".env.example"])
+def test_bypass_flags_absent_from_env_templates(filename: str) -> None:
+    """DJANGO_BUILD and DJANGO_ONESHOT must never appear in a .env template.
+
+    Both are honoured only from the process environment. Shipping either in a
+    template would teach operators to put a guard-disabling flag in a secret
+    file — the exact CFG-001 trigger.
+    """
+    present = _BYPASS_FLAGS & _example_keys(filename)
+    assert not present, f"{filename} must not define {sorted(present)}"

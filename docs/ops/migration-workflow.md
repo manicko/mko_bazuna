@@ -137,9 +137,23 @@ outside Docker land on production settings (and enforce the prod secret guards) 
 explicitly in `environment:`, so the default does not affect the Compose path. Standalone
 invocation outside that path (e.g. running
 `python src/backend/apps/core/utils/migrate_locked.py` directly) requires
-`DJANGO_SETTINGS_MODULE` to be set explicitly, or the build/one-shot guard flags
-`DJANGO_BUILD=1` / `DJANGO_ONESHOT=1` to be present — prod settings enforce strict secret
-validation otherwise.
+`DJANGO_SETTINGS_MODULE` to be set explicitly, or the `DJANGO_BUILD=1` build flag to be
+present — prod settings enforce strict secret validation otherwise.
+
+**Running one-shot commands by hand in dev (CFG-001):** a developer running a bootstrap
+`manage.py <command>` against the dev database no longer gets the secret-validation bypass
+implicitly. `DJANGO_ONESHOT=1` is inert under `config.settings.prod` (it would only emit a
+"DJANGO_ONESHOT is set but ignored" warning and the guards still run), and `manage.py`
+defaults the settings module to `config.settings.prod`. To restore the bypass for a
+hand-typed command, select the bootstrap module explicitly:
+
+```bash
+DJANGO_SETTINGS_MODULE=config.settings.oneshot DJANGO_ONESHOT=1 \
+  python src/backend/manage.py <command>
+```
+
+Omitting this now fails on the first production guard rather than silently doing the wrong
+thing — the desired behaviour for a production-defaulted invocation.
 
 `apps/core/utils/advisory_lock.py` uses `pg_advisory_lock` (session scope) for the migrate path.
 This is safe in dev because **no PgBouncer is attached to the migration database** — the lock is

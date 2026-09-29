@@ -27,9 +27,13 @@ _COMPOSE = _ROOT / "docker-compose.yml"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 _DEV_OVERRIDE_COMPOSE = _ROOT / "docker-compose.dev.override.yml"
 
-# One-shot bootstrap services. In dev they run against prod settings with
-# dev placeholder secrets (see DJANGO_ONESHOT handling in prod.py).
+# One-shot bootstrap services. In dev they run the bootstrap settings module
+# (config.settings.oneshot) with dev placeholder secrets and DJANGO_ONESHOT=1;
+# see the DJANGO_ONESHOT handling in prod.py and config/settings/oneshot.py.
 _ONE_SHOT_SERVICES = ["migrate", "load_cities", "load_catalog", "create_admin", "seed"]
+
+# The dev-only bootstrap settings module that one-shot services resolve to.
+_BOOTSTRAP_MODULE = "config.settings.oneshot"
 
 # Hardening keys required on every long-lived / hardened service.
 _HARDENING_KEYS = [
@@ -253,13 +257,15 @@ def test_resource_limits_use_env_substitution() -> None:
 
 
 def test_compose_oneshot_flags() -> None:
-    """One-shot services carry DJANGO_ONESHOT=1 in dev but never in prod.
+    """One-shot services carry DJANGO_ONESHOT=1 and the bootstrap module in dev,
+    but neither the bypass flag nor the bootstrap module ever appears in prod.
 
     One-shot bootstrap services (migrate, load_cities, load_catalog,
-    create_admin, seed) use prod settings. In development they need DJANGO_ONESHOT=1
-    so the prod.py secret-validation guards bypass dev placeholder secrets. In
+    create_admin, seed) use the bootstrap settings module in development, where
+    DJANGO_ONESHOT=1 is honoured because the module is not a *.prod module. In
     production neither DJANGO_BUILD nor DJANGO_ONESHOT may appear — full secret
-    validation runs against the real .env.prod values.
+    validation runs against the real .env.prod values — and the dev-only
+    bootstrap module must not be referenced by any other stack.
     """
     # Prod: no one-shot service block may carry either bypass flag.
     for service in _ONE_SHOT_SERVICES:
@@ -271,9 +277,20 @@ def test_compose_oneshot_flags() -> None:
             f"{service} in prod compose must not set DJANGO_ONESHOT"
         )
 
-    # Dev: every one-shot service must carry DJANGO_ONESHOT=1.
+    # Dev: every one-shot service must run the bootstrap settings module and
+    # carry the flag that module honours.
     for service in _ONE_SHOT_SERVICES:
         block = _service_block(_DEV_OVERRIDE_COMPOSE, service)
+        assert f"DJANGO_SETTINGS_MODULE={_BOOTSTRAP_MODULE}" in block, (
+            f"{service} in dev override must set "
+            f"DJANGO_SETTINGS_MODULE={_BOOTSTRAP_MODULE}"
+        )
         assert "DJANGO_ONESHOT=1" in block, (
             f"{service} in dev override must set DJANGO_ONESHOT=1"
+        )
+
+    # The bootstrap module is dev-only: no other stack may reference it.
+    for path in (_COMPOSE, _PROD_COMPOSE):
+        assert _BOOTSTRAP_MODULE not in path.read_text(encoding="utf-8"), (
+            f"{path.name} must not reference {_BOOTSTRAP_MODULE}"
         )

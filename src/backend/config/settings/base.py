@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # os.getenv in base.py & prod.py) and shell/entrypoint/compose-injected vars.
 ALLOWED_ENV_VARS = frozenset({
     # --- Python-consumed (env()/env.*()/os.getenv in base.py & prod.py) ---
-    "DJANGO_SECRET_KEY", "DJANGO_SETTINGS_MODULE", "DJANGO_BUILD", "DJANGO_ONESHOT",
+    "DJANGO_SECRET_KEY", "DJANGO_SETTINGS_MODULE",
     "DEBUG", "BOT_TOKEN", "GOOGLE_TRANSLATE_API_KEY",
     "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS",
     "DATABASE_URL",
@@ -30,6 +30,11 @@ ALLOWED_ENV_VARS = frozenset({
     "EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD",
     "EMAIL_USE_TLS", "EMAIL_TIMEOUT", "EMAIL_BACKEND",
     "DEFAULT_FROM_EMAIL", "SUPPORT_NOTIFICATION_RECIPIENTS",
+    # --- Bootstrap control flags (honoured only from the process environment) ---
+    # DJANGO_BUILD: Docker image builder stage only (collectstatic, no .env file).
+    # DJANGO_ONESHOT: dev bootstrap one-shots, which run config.settings.oneshot.
+    # Both are ignored by config.settings.prod; never add either to .env.prod.
+    "DJANGO_BUILD", "DJANGO_ONESHOT",
     # --- Shell/entrypoint/compose-injected (not consumed by Python env()) ---
     "ADMIN_USERNAME", "ADMIN_PASSWORD", "ADMIN_TELEGRAM_ID",
     "SEED_USERS", "SEED_ADS", "FIX_PERMISSIONS", "SKIP_ENV_CHECK",

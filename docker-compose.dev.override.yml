@@ -49,13 +49,13 @@ services:
   load_catalog:
     entrypoint: /app/entrypoint-catalog.sh
     environment:
-      # migrate/load_catalog use prod settings (base compose); give them dev
-      # values so the prod guard checks for SITE_URL and GOOGLE_TRANSLATE_API_KEY
-      # are satisfied without editing .env.dev.
+      # Bootstrap settings module: dev one-shots are not production, so the
+      # DJANGO_ONESHOT bypass is honoured here and nowhere else.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       - DJANGO_ONESHOT=1
+      - DJANGO_SETTINGS_MODULE=config.settings.oneshot
     volumes:
       - .:/app
       - ./docker/entrypoint-catalog.sh:/app/entrypoint-catalog.sh
@@ -67,13 +67,13 @@ services:
 
   migrate:
     environment:
-      # migrate uses prod settings (base compose); give it dev values so the
-      # prod guard checks for SITE_URL, GOOGLE_TRANSLATE_API_KEY, and
-      # CSRF_TRUSTED_ORIGINS are satisfied without editing .env.dev.
+      # Bootstrap settings module: dev one-shots are not production, so the
+      # DJANGO_ONESHOT bypass is honoured here and nowhere else.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       - DJANGO_ONESHOT=1
+      - DJANGO_SETTINGS_MODULE=config.settings.oneshot
 
   # Dev: load_cities runs after migrate completes.
   # profiles: !reset [] replaces the ["seed"] profile gate from base compose,
@@ -83,13 +83,13 @@ services:
   load_cities:
     entrypoint: /app/entrypoint-cities.sh
     environment:
-      # load_cities uses prod settings (base compose); give it dev values so
-      # the prod guard checks are satisfied without editing .env.dev, and set
-      # DJANGO_ONESHOT=1 to bypass the one-shot secret-validation guards.
+      # Bootstrap settings module: dev one-shots are not production, so the
+      # DJANGO_ONESHOT bypass is honoured here and nowhere else.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       - DJANGO_ONESHOT=1
+      - DJANGO_SETTINGS_MODULE=config.settings.oneshot
     volumes:
       - .:/app
       - ./docker/entrypoint-cities.sh:/app/entrypoint-cities.sh
@@ -107,13 +107,13 @@ services:
   create_admin:
     entrypoint: /app/entrypoint-create-admin.sh
     environment:
-      # create_admin uses prod settings (base compose); give it dev values so
-      # the prod guard checks are satisfied without editing .env.dev, and set
-      # DJANGO_ONESHOT=1 to bypass the one-shot secret-validation guards.
+      # Bootstrap settings module: dev one-shots are not production, so the
+      # DJANGO_ONESHOT bypass is honoured here and nowhere else.
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       - DJANGO_ONESHOT=1
+      - DJANGO_SETTINGS_MODULE=config.settings.oneshot
     volumes:
       - .:/app
       - ./docker/entrypoint-create-admin.sh:/app/entrypoint-create-admin.sh
@@ -129,19 +129,18 @@ services:
   # In production, docker-compose.prod.yml retains profiles: ["seed"] so seed
   # only runs on explicit --profile seed demand.
   #
-  # Like the other one-shot bootstrap services, seed runs against prod settings
-  # (config.settings.prod, inherited from the base compose) with DJANGO_ONESHOT=1
-  # so the prod.py secret-validation guards bypass dev placeholder/dummy secrets
-  # from .env.dev. Seed does not serve HTTP and has no dependency on BOT_TOKEN
+  # Like the other one-shot bootstrap services, seed runs config.settings.oneshot
+  # with DJANGO_ONESHOT=1 so the secret-validation guards bypass dev
+  # placeholder/dummy secrets from .env.dev. The bootstrap module star-imports
+  # prod, so seed still inherits prod's structured LOGGING, DEBUG=False and the
+  # base Redis cache. Seed does not serve HTTP and has no dependency on BOT_TOKEN
   # (it is a pure DB/media population command), so the bypass is safe here.
-  # The dev override does NOT set DJANGO_SETTINGS_MODULE or REDIS_URL — both are
-  # inherited from the base compose (config.settings.prod and
-  # redis://redis:6379/0 respectively).
   seed:
     profiles: !reset []
     entrypoint: /app/entrypoint-seed.sh
     environment:
       - DJANGO_ONESHOT=1
+      - DJANGO_SETTINGS_MODULE=config.settings.oneshot
       - SITE_URL=${SITE_URL:-http://localhost:8000}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-dev-only-dummy-key-not-for-production}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}

@@ -362,13 +362,16 @@ def test_prod_bot_token_accepts_real_token() -> None:
     assert "ImproperlyConfigured" not in stderr
 
 
-def test_django_oneshot_bypasses_all_secrets() -> None:
-    """DJANGO_ONESHOT=1 skips all prod secret guards, including EMAIL_HOST.
+def test_django_oneshot_does_not_bypass_prod_secrets() -> None:
+    """DJANGO_ONESHOT no longer opens the prod guards for a *.prod module.
 
-    One-shot bootstrap services (migrate, load_cities, load_catalog,
-    create_admin, seed) run against prod settings but carry dev-only placeholder
-    secrets and no SMTP config. DJANGO_ONESHOT=1 must bypass every
-    secret-validation guard so those containers boot without editing .env.dev.
+    The former test_django_oneshot_bypasses_all_secrets asserted the opposite:
+    that DJANGO_ONESHOT=1 skips every prod secret guard. That was CFG-001's
+    defect — an operator who copied the flag out of the dev override into a
+    production env file would silently disable every guard. The bypass now
+    reaches only config.settings.oneshot, and only because the deployment
+    descriptor selected that module. Under config.settings.prod the flag is
+    inert, the guards run, and a value-free warning explains the situation.
     """
     env = _prod_env_overrides(
         DJANGO_SECRET_KEY="dev-only-dummy-key-not-for-production",
@@ -385,6 +388,7 @@ def test_django_oneshot_bypasses_all_secrets() -> None:
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, result.stderr
-    assert "ImproperlyConfigured" not in result.stderr
-    assert "ValueError" not in result.stderr
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "DJANGO_SECRET_KEY" in result.stderr
+    assert "DJANGO_ONESHOT is set but ignored" in result.stderr
