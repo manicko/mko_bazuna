@@ -354,8 +354,8 @@ The production override file (`docker-compose.prod.yml`) includes:
 |----------|----------|-------------|
 | `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions, CSRF, password-reset) are invalidated. |
 | `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
-| `BOT_TOKEN` | Yes | Telegram bot token from @BotFather (placeholder `<...>` values are rejected at boot). Rotate if compromised: get a new token from @BotFather, update `BOT_TOKEN` in `.env.prod`, then run `docker compose ... up -d bot`. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is needed. After rotation, the old token is immediately invalidated. |
-| `BOT_USERNAME` | Yes | Telegram handle without `@`; 3-32 chars, `[A-Za-z0-9_]` only. The template value `<your-bot-username>` is rejected at boot (`prod.py` guard, CFG-005). Seeded into `SiteConfig` by migration `0003`; correct an already-seeded row with `manage.py repair_bot_username` (or the Django admin) — see `docs/01-spec/contact-us.md`. |
+| `BOT_TOKEN` | Yes | Telegram bot token from @BotFather (placeholder `<...>` values are rejected at boot). An **empty** value is legal in development: the bot logs `BOT_TOKEN not set - skipping bot startup (development mode)` and the rest of the stack runs normally. A *placeholder* value is rejected by the bot entrypoint (`telegram_bot/main.py`) and fails the bot process only — it no longer aborts the whole dev stack at Django settings import. Rotate if compromised: get a new token from @BotFather, update `BOT_TOKEN` in `.env.prod`, then run `docker compose ... up -d bot`. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is needed. After rotation, the old token is immediately invalidated. |
+| `BOT_USERNAME` | Yes (prod) | Telegram handle without `@`; 3-32 chars, `[A-Za-z0-9_]` only. **Required in production**: `prod.py` rejects an empty, placeholder (`<your-bot-username>`) or malformed value at boot, so `web` and `bot` will not start until it is real. It is also a seed value only — migration `0003` copies it into the `SiteConfig` singleton once and no render path reads the env var afterwards, so a value that was wrong at migration time leaves a dead `t.me/` row behind. Correct an already-seeded row with `manage.py repair_bot_username` (or the Django admin) — see [`contact-us.md`](../01-spec/contact-us.md). |
 | `ALLOWED_HOSTS` | Yes (prod) | Comma-separated list of host/domain names the app can serve. `prod.py` raises `ValueError` if empty |
 | `SITE_URL` | Yes* | Public site URL for absolute links in Telegram alerts (no trailing slash). Example: `https://mko-bazuna.example.com` |
 | `IMMEDIATE_ALERTS_ENABLED` | No (default: `false`) | Enable near-real-time publish-time Telegram alerts to buyers with matching saved searches. Daily backfill runs regardless |
@@ -424,9 +424,26 @@ restart the affected container(s), and account for the consequences.
 ### Deployment Checks
 
 Deployment configuration is validated via Django's `manage.py check --deploy`:
-- **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, `REDIS_URL=redis://redis:6379/0`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
+- **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `BOT_USERNAME` (a handle matching `^[A-Za-z0-9_]{3,32}$`), `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, `EMAIL_HOST=smtp.example.com`, `REDIS_URL=redis://localhost:6379/0`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
+- **Drift gate:** that `env:` block is a contract, not just fixtures. `config/settings/tests/test_deploy_check_env_parity.py` parses it out of `ci.yml` and imports `config.settings.prod` with exactly that set, so a new production guard fails the test suite until its key is added to the block in the same change. Never add `DJANGO_BUILD` or `DJANGO_ONESHOT` there: either one suppresses the guards and makes the gate pass while checking nothing.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
-- This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time strength validation on `DJANGO_SECRET_KEY`, `BOT_TOKEN`, and `GOOGLE_TRANSLATE_API_KEY`: each must not be a `<...>` placeholder or the `dev-only-dummy` sentinel, and `DJANGO_SECRET_KEY` must additionally be ≥ 50 characters. `REDIS_URL` must be non-empty (fail-fast guard, CFG-001). A non-empty placeholder or weak key is rejected at boot, preventing session/CSRF/password-reset token forgery. The validation is bypassed in two cases: during the Docker image build (`DJANGO_BUILD=1`, build-time `collectstatic`), and for dev one-shot services, which run the bootstrap module `config.settings.oneshot` with `DJANGO_ONESHOT=1` (set on `migrate`, `load_cities`, `load_catalog`, `create_admin`, and `seed` in `docker-compose.dev.override.yml`) — these do not serve HTTP and are fed placeholder/dummy tokens from `.env.dev` during bootstrap. Under `config.settings.prod` the `DJANGO_ONESHOT` flag is ignored (with a boot warning) and the guards always run. In production, `docker-compose.prod.yml` one-shot services run **full** secret validation against the real `.env.prod` values (no bypass flag); the long-lived `web` and `bot` services also never set either flag, so the real secret values are enforced at boot.
+- This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time validation on nine variables, all gated on the same `_SKIP_SECRET_VALIDATION` block:
+
+  | Variable | Rule | Failure |
+  |---|---|---|
+  | `DJANGO_SECRET_KEY` | non-empty; not a `<...>` placeholder or the `dev-only-dummy` sentinel; ≥ 50 characters | `ImproperlyConfigured` |
+  | `BOT_TOKEN` | non-empty; not a `<...>` placeholder | `ImproperlyConfigured` |
+  | `BOT_USERNAME` | non-empty; not a `<...>` placeholder; `^[A-Za-z0-9_]{3,32}$` (it is persisted into `SiteConfig.bot_username`, and a bad value makes every `t.me/` deep link dead) | `ImproperlyConfigured` |
+  | `GOOGLE_TRANSLATE_API_KEY` | non-empty; not a `<...>` placeholder | `ImproperlyConfigured` |
+  | `SITE_URL` | non-empty | `ImproperlyConfigured` |
+  | `EMAIL_HOST` | non-empty | `ImproperlyConfigured` |
+  | `REDIS_URL` | non-empty (otherwise silent fallback to `MemoryStorage`/`LocMemCache`) | `ImproperlyConfigured` |
+  | `ALLOWED_HOSTS` | non-empty | `ValueError` |
+  | `CSRF_TRUSTED_ORIGINS` | non-empty | `ValueError` |
+
+  A non-empty placeholder or weak key is rejected at boot, preventing session/CSRF/password-reset token forgery. `EMAIL_BACKEND` is also **pinned** unconditionally to `smtp.EmailBackend` — it is not operator-configurable in production, so a console backend cannot be injected.
+
+  The validation is bypassed in two cases: during the Docker image build (`DJANGO_BUILD=1`, build-time `collectstatic`), and for dev one-shot services, which run the bootstrap module `config.settings.oneshot` with `DJANGO_ONESHOT=1` (set on `migrate`, `load_cities`, `load_catalog`, `create_admin`, and `seed` in `docker-compose.dev.override.yml`) — these do not serve HTTP and are fed placeholder/dummy tokens from `.env.dev` during bootstrap. Under `config.settings.prod` the `DJANGO_ONESHOT` flag is ignored (with a boot warning) and the guards always run. In production, `docker-compose.prod.yml` one-shot services run **full** secret validation against the real `.env.prod` values (no bypass flag); the long-lived `web` and `bot` services also never set either flag, so the real secret values are enforced at boot.
 
 > **CI security scanning (SAST):** The CI `security` job runs `bandit` (finding 12-OPS-008)
 > against `src/backend` and `src/telegram_bot` per the `[tool.bandit]` config in
@@ -919,6 +936,21 @@ docker compose --env-file .env.dev \
     --telegram-id -1 \
     --email admin@example.com
 ```
+
+`--password` is optional: when it is omitted the command falls back to the `ADMIN_PASSWORD`
+environment variable, so the secret does not have to be forced through `argv`:
+
+```bash
+docker compose --env-file .env.dev \
+  -f docker-compose.yml -f docker-compose.dev.override.yml \
+  run --rm web uv run python src/backend/manage.py create_admin_user \
+    --username admin \
+    --telegram-id -1
+```
+
+An explicit `--password` always wins, even when it is empty — the command then fails with
+`Password cannot be empty` rather than silently picking up `ADMIN_PASSWORD`. If neither source
+supplies a non-empty password the command exits non-zero and creates nothing.
 
 ### Dry-Run Mode
 

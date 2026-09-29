@@ -385,13 +385,19 @@ Category search works TWO ways: (1) FTS matches the category word via `category_
 Admin-editable site/brand name and Telegram bot username. Replaces 22 hardcoded
 `"Mko Bazuna"` occurrences across page `<title>` tags, header/footer brand links,
 the auth & privacy `blocktrans`, and the admin review page with a single
-runtime-configurable value. The bot username replaces the cleartext
-`BOT_USERNAME` env var as the source of truth for all deep-link rendering
-(Spec 18). Modeled on the `ModerationCriteria` singleton pattern — exactly one
-row (`pk=1`, created lazily via `get_or_create(pk=1)` and seeded explicitly by
-the `0002_seed_default` data migration using `RunPython`, then `0003_add_bot_username`
-seeds `bot_username` from the `BOT_USERNAME` env var, the first project
-migration to seed data this way; under `DisableMigrations` (tests) the lazy
+runtime-configurable value. The stored `bot_username` — not the `BOT_USERNAME`
+env var — is the source of truth for all deep-link rendering (Spec 18); the env
+var is a seed value for migration `0003` and a production boot guard, and no
+render path reads it. Modeled on the `ModerationCriteria` singleton
+pattern — exactly one row (`pk=1`, created lazily via `get_or_create(pk=1)` and
+seeded explicitly by the `0002_seed_default` data migration using `RunPython`,
+then `0003_add_bot_username` seeds `bot_username` from the `BOT_USERNAME` env var,
+validating it against the field's own `RegexValidator` and calling `full_clean()`
+before `save()` — an empty, placeholder or malformed value resolves to the field
+default instead of being written, and an admin-edited value is never overwritten.
+It is the first project
+migration to seed data this way; under
+`DisableMigrations` (tests) the lazy
 `get_or_create` in `get_singleton()` is the fallback):
 ```
 id (PK)
@@ -413,8 +419,12 @@ on `/start` and `/post`) and `get_bot_username_async()` (deep-link construction)
 shared-cache model (Redis in prod, `LocMemCache` in tests). `get_site_name()` and
 `get_bot_username()` defensively fall back to `"Bazuna"` and `"bazuna_bot"`
 respectively if the row or cache is unavailable. The `BOT_USERNAME` env var is now a
-**seed value only** (consumed by migration `0003`); all runtime reads go through the
-`get_bot_username()` service. See [`contact-us.md`](../01-spec/contact-us.md) for the
+**seed value plus a production boot guard only** — migration `0003` consumes it once,
+and `config/settings/prod.py` rejects an empty, placeholder or malformed value at
+import (contract: `config/settings/secret_validation.py`); all runtime reads go through the
+`get_bot_username()` service. Correcting `.env.prod` does **not** repair an
+already-seeded row: run `manage.py repair_bot_username`, or edit the singleton in the
+Django admin. See [`contact-us.md`](../01-spec/contact-us.md) for the
 full deep-link obfuscation and rate-limiting architecture.
 
 After the site name, the bot username is the second field of this singleton; see

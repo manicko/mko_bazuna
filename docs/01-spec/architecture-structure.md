@@ -23,7 +23,7 @@ Source-tree layout and Docker deployment topology for phases 1 and 2. Two long-l
 ```
 src/
 ├── backend/                       # Django project
-│   ├── config/                    # settings.py, urls.py, asgi.py, wsgi.py
+│   ├── config/                    # settings/ package (base, dev, test, prod, oneshot, secret_validation), urls.py, asgi.py, wsgi.py
 │   ├── apps/                      # INSTALLED_APPS = ['apps.xxx']
 │   │   ├── core/                  # shared utils, abstract models, managers, signals
 │   │   │   ├── management/commands/  # sweep commands (archive, delete, consent, drafts, tokens, purge)
@@ -329,6 +329,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 9 | `alert_delivery_task` |
 | 11 | `purge_deleted_ads` |
 | 12 | `recompute_normalized_prices` |
+| 13 | `repair_bot_username` (one-shot repair of `SiteConfig.bot_username`; see [`contact-us.md`](contact-us.md)) |
 | 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates; optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 | 102 | `backfill_thumbnails` |
@@ -337,7 +338,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 110 | `seed` (session-scoped, prevents concurrent seed operations) |
 | 111 | `test_schema_setup` (xdist fixture, resets test DB) |
 
-> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. IDs 13–99 are reserved for future scheduled jobs.
+> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. IDs 14–99 are reserved for future scheduled jobs.
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not

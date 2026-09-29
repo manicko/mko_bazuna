@@ -200,6 +200,22 @@ When multiple mechanisms provide the same variable, the following precedence app
   `_warn_unknown_env_vars()`, which logs a non-fatal warning for any loaded key not in the
   `ALLOWED_ENV_VARS` frozenset (e.g. a typo like `BOT_T0KEN`). The warning names the key and
   suggests adding it to the allowlist if intentional; it does not block startup.
+  The allowlist is gated in **both** directions:
+  `config/settings/tests/test_env_allowlist.py` asserts that every `KEY=` in the four tracked
+  `.env.*.example` templates is allowlisted (and that `DJANGO_BUILD` / `DJANGO_ONESHOT` are absent
+  from them), while `config/settings/tests/test_env_allowlist_reverse.py` AST-scans the Python tree
+  and asserts that every `os.getenv` / `env(...)` read is allowlisted. A new env var therefore
+  lands with its `ALLOWED_ENV_VARS` entry **and** its template updates in one commit.
+- **Shared secret-validation helpers (`config/settings/secret_validation.py`):** the `^<[^>]+>$`
+  placeholder pattern and the bot-username contract (`is_placeholder`,
+  `is_valid_bot_username`, `validate_bot_username`) live in one module instead of being compiled
+  separately in each settings module. `prod.py` imports it; the `repair_bot_username` management
+  command imports `is_valid_bot_username`, so "what the boot guard accepts" and "what the repair
+  command repairs" cannot drift. It must never import another settings module or `apps.*`
+  (settings are imported before the app registry exists, and `prod.py` importing it would cycle).
+  `BOT_USERNAME_PATTERN` duplicates `SiteConfig.bot_username`'s `RegexValidator` because settings
+  cannot import the model; the two are held together by
+  `test_bot_username_validation.py::test_bot_username_helper_agrees_with_model_validator`.
 
 **Database resolution** (`base.py` lines 181–202): `base.py` checks `os.getenv("DATABASE_URL")`
 first. If set, it parses the URL via `env.db()` and the `POSTGRES_*` fallback is skipped
@@ -522,7 +538,7 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 
 | Setting | base.py default | dev.py | test.py | prod.py |
 |---|---|---|---|---|
-| `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` |
+| `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` — **pinned; the env var is ignored** |
 | `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1` at build or for dev one-shots via `config.settings.oneshot` + `DJANGO_ONESHOT=1`) |
 | `EMAIL_PORT` | `587` | — | — | — |
 | `EMAIL_HOST_USER` | `""` | — | — | — |
@@ -534,6 +550,11 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 
 - `EMAIL_*` are the classic Django SMTP settings; `prod.py` raises `ImproperlyConfigured` if
   `EMAIL_HOST` is empty at runtime (ensures transactional email deliverability).
+- **`EMAIL_BACKEND` is not operator-configurable in production.** `base.py` still honours the env
+  var, but `prod.py` re-pins `EMAIL_BACKEND` to `smtp.EmailBackend` unconditionally after the
+  import, so a console or locmem backend cannot be injected into a deployed environment (message
+  bodies — confirmations, support-ticket text — would otherwise be written to stdout instead of
+  delivered). `dev.py` and `test.py` still override it.
 - `SUPPORT_NOTIFICATION_RECIPIENTS` is an optional `env.list` of admin email addresses that
   support-ticket notifications are delivered to. When empty, the email delivery service falls back
   to the `email` addresses of active `EMAIL`-type `SupportContact` rows.
