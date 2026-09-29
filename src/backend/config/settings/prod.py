@@ -254,8 +254,14 @@ SECURE_HSTS_PRELOAD = True
 # (password-reset tokens, confirmations, support-ticket text) to stdout.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-# Static files via whitenoise (with input.css excluded from post-processing)
-STATICFILES_STORAGE = "theme.storage.ThemeStaticFilesStorage"
+# Static files are served via whitenoise. The storage backend is owned by
+# base.py's STORAGES["staticfiles"]["BACKEND"]; there is deliberately no
+# STATICFILES_STORAGE assignment here. Django removed that setting in 5.1, so a
+# value assigned to it is never read — Django does not validate module-level
+# names, and its security checks do not reference the setting, so a stale
+# assignment fails silently while looking like the effective configuration.
+# See test_settings_defaults.test_prod_staticfiles_backend_is_theme_storage for
+# the pin on the real decision.
 
 # Allow hosts from environment (required)
 if not ALLOWED_HOSTS:  # noqa: F405

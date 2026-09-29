@@ -18,24 +18,37 @@ DEBUG = True
 # Disable SSL/TLS redirect and secure cookies for the test client, which issues
 # plain HTTP requests. Without this, SecurityMiddleware 301-redirects every
 # request to HTTPS and breaks all DB-backed view tests.
-# Mirrors config/settings/dev.py (test settings must behave like dev, not prod).
+# Mirrors config/settings/dev.py (test settings must behave like dev, not prod):
+# all six transport settings are reset here, and
+# test_settings_defaults.test_dev_and_test_share_the_transport_tuple asserts the
+# two modules stay in agreement.
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+# The HSTS triple is inherited from base.py (3600 / True / False) unless it is
+# reset here. Left inherited, a browser — or any browser-driven tool — pointed at
+# a test-mode server would cache `Strict-Transport-Security: max-age=3600;
+# includeSubDomains` after one request and upgrade every subsequent http://
+# request to HTTPS for an hour. dev.py zeroes the triple for exactly this reason;
+# this module must not differ.
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
 
 # pytest-django creates/destroys test database automatically
 # Base database connection is for pytest to create test_<name> database
 DATABASES["default"]["NAME"] = "mko_bazuna"  # noqa: F405
 
 # Use a non-hashed, non-manifest static storage during tests.
-# The production/dev storage (ThemeStaticFilesStorage) is a
-# CompressedManifestStaticFilesStorage that requires a staticfiles.json
-# manifest produced by ``collectstatic``. Tests never run ``collectstatic``,
-# so the manifest does not exist and template ``{% static %}`` lookups raise
-# ``ValueError: Missing staticfiles manifest entry``. Switching to
+# base.py's STORAGES["staticfiles"] backend is ThemeStaticFilesStorage, a
+# whitenoise CompressedManifestStaticFilesStorage that requires a
+# staticfiles.json manifest produced by ``collectstatic``. Tests never run
+# ``collectstatic``, so the manifest does not exist and template ``{% static %}``
+# lookups raise ``ValueError: Missing staticfiles manifest entry``. Switching to
 # StaticFilesStorage (which serves original, un-hashed paths) is the standard
 # Django testing pattern and avoids any dependency on a build-time artifact.
-# Production and dev settings remain unchanged.
+# This is a deliberate test-only override; nothing in this module changes
+# base.py's STORAGES (and prod.py has no static-files assignment of its own).
 STORAGES = {  # noqa: F405
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
