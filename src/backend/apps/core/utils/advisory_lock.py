@@ -48,6 +48,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           9  ALERT_DELIVERY_TASK          search-alert delivery (production path)
           11  PURGE_DELETED_ADS            deleted-ad purge
           12  RECOMPUTE_NORMALIZED_PRICES  price normalization
+          13  REPAIR_BOT_USERNAME          BOT_USERNAME repair
           102  BACKFILL_THUMBNAILS          thumbnail backfill
           103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
 
@@ -59,7 +60,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
 
     ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
-    was removed in DB-007. IDs 13-99 are reserved for future scheduled jobs.
+    was removed in DB-007. IDs 14-99 are reserved for future scheduled jobs.
     """
     if not session:
         if not transaction.get_connection().in_atomic_block:
@@ -74,8 +75,8 @@ def advisory_lock(lock_id: int, *, session: bool = False):
             # Log acquisition intent BEFORE pg_advisory_lock so a contending
             # run (which blocks until the lock is granted) is not a silent
             # hang. Deliberately placed only in the session branch: the
-            # transaction-scoped branch's log/on_commit flow is untouched
-            # (see DB-010) and phase 03's DB-004 owns any timeout wording.
+            # transaction-scoped branch logs acquisition then release around
+            # its yield, and phase 03 DB-004 owns any timeout wording.
             logger.info("Requesting session advisory lock %s", lock_id)
             cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
             logger.info("Acquired session advisory lock %s", lock_id)
@@ -87,7 +88,9 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         else:
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
             logger.info("Acquired transaction advisory lock %s", lock_id)
-            transaction.on_commit(
-                lambda: logger.info("Released transaction advisory lock %s", lock_id)
-            )
-            yield
+            try:
+                yield
+            finally:
+                # pg_advisory_xact_lock releases on both commit and rollback;
+                # log the release here so it is observed on the failure path too.
+                logger.info("Released transaction advisory lock %s", lock_id)
