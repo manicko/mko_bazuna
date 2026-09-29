@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import environ
 
@@ -35,6 +36,7 @@ ALLOWED_ENV_VARS = frozenset({
     "EMAIL_USE_TLS", "EMAIL_TIMEOUT", "EMAIL_BACKEND",
     "DEFAULT_FROM_EMAIL", "SUPPORT_NOTIFICATION_RECIPIENTS",
     "RUN_TRANSLATION_BACKFILL",
+    "LOCK_TIMEOUT_SECONDS",
     # --- Bootstrap control flags (honoured only from the process environment) ---
     # DJANGO_BUILD: Docker image builder stage only (collectstatic, no .env file).
     # DJANGO_ONESHOT: dev bootstrap one-shots, which run config.settings.oneshot.
@@ -259,12 +261,50 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database - PostgreSQL ONLY (no SQLite fallback per zone C5)
 # Use DATABASE_URL for 12-factor config (single source of truth)
 # If DATABASE_URL is set, use it; otherwise fall back to discrete POSTGRES_* vars
+
+# Bound on how long any statement waits for a row, table or advisory lock
+# (03-DB-004, timeout half). This is the ONLY bound on lock waits in the whole
+# system: without it a contended lock stalls a gunicorn worker until its 60 s
+# SIGKILL and parks the bot's single asgiref thread_sensitive worker behind every
+# other ORM call. Removing this setting is a regression, and
+# docs/02-database/db-retention.md documents it.
+#
+# The value is in SECONDS and is rendered with an explicit "s" suffix below,
+# because a bare PostgreSQL GUC number is interpreted as MILLISECONDS — the
+# suffix makes a 1000x unit error inexpressible through this API. 0 disables the
+# bound. It is a CONNECT-TIME setting, not a per-command one, so it also bounds
+# pg_advisory_xact_lock and the login UPDATE ... RETURNING row lock.
+LOCK_TIMEOUT_SECONDS: int = env.int("LOCK_TIMEOUT_SECONDS", default=10)
+
+
+def _db_options() -> dict[str, Any]:
+    """psycopg connection OPTIONS shared by BOTH DATABASES branches.
+
+    ``prepare_threshold=None`` — PgBouncer async safety (zone C5).
+    ``options`` — libpq's startup-packet run-time options. ``lock_timeout``
+    bounds every wait for a row, table or advisory lock (03-DB-004 timeout
+    half). The explicit ``s`` suffix is load-bearing: a bare GUC number is
+    MILLISECONDS. 0 disables the bound.
+
+    Both branches must call this helper: the DATABASE_URL branch REPLACES
+    ``env.db()``'s OPTIONS wholesale (which is also why any ``?options=-c ...``
+    in DATABASE_URL is silently clobbered), so a key added to only one branch
+    would be absent in the other. Under PgBouncer transaction pooling the
+    ``options`` startup parameter is only accepted when the pooler lists it in
+    ``ignore_startup_parameters`` (see docker-compose.prod.yml).
+    """
+    return {
+        "prepare_threshold": None,
+        "options": f"-c lock_timeout={LOCK_TIMEOUT_SECONDS}s",
+    }
+
+
 if os.getenv("DATABASE_URL"):
     # Parse DATABASE_URL using django-environ's built-in parsing
     DATABASES = {"default": env.db()}
     # PgBouncer async safety (zone C5) - only for PostgreSQL
     if "postgresql" in DATABASES["default"]["ENGINE"]:
-        DATABASES["default"]["OPTIONS"] = {"prepare_threshold": None}
+        DATABASES["default"]["OPTIONS"] = _db_options()
 else:
     DATABASES = {
         "default": {
@@ -276,9 +316,7 @@ else:
             "PORT": env("POSTGRES_PORT", default="5432"),
             # PgBouncer async safety (zone C5)
             "CONN_MAX_AGE": 0,
-            "OPTIONS": {
-                "prepare_threshold": None,
-            },
+            "OPTIONS": _db_options(),
         }
     }
 

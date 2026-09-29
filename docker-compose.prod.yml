@@ -176,6 +176,12 @@ services:
       - PGBOUNCER_USER=${POSTGRES_USER:?POSTGRES_USER must be set}
       - PGBOUNCER_AUTH_TYPE=md5
       - PGBOUNCER_POOL_MODE=transaction
+      # The app sends libpq's `options` startup parameter (-c lock_timeout=Ns,
+      # 03-DB-004). PgBouncer rejects every startup parameter it does not know,
+      # so it must be listed here or clients are refused once this profile is
+      # enabled. No-op today: the profile is not in the deployed path (deploy.yml
+      # passes no --profile), but correct-by-construction the moment it is.
+      - PGBOUNCER_IGNORE_STARTUP_PARAMETERS=options,extra_float_digits
     ports:
       - "6432:6432"
     depends_on:
