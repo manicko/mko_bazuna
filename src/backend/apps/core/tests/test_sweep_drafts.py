@@ -1,8 +1,9 @@
 """
 Split from test_sweep_commands.py: Tests for the sweep_drafts command.
 
-Draft sweep deletes DRAFT-status ads older than 30 minutes, guarded by an
-advisory lock (lock id 4). Also covers the 0003 dedup migration.
+Draft sweep deletes DRAFT-status ads with no seller activity for 30 minutes
+(measured on ``Ad.updated_at``), guarded by an advisory lock (lock id 4).
+Also covers the 0003 dedup migration.
 """
 
 from __future__ import annotations
@@ -40,7 +41,16 @@ def collapse_per_user_drafts():
 class TestSweepDrafts:
     """Tests for sweep_drafts command (advisory lock 4, 30-minute window)."""
 
-    def test_dry_run_does_not_delete(self, seller, category, city):
+    def test_dry_run_does_not_delete(self, seller, category, city, caplog):
+        """``--dry-run`` deletes nothing, and the fixture is proven eligible.
+
+        The predicate measures **inactivity**: it back-dates ``updated_at``, not
+        ``created_at``.  The ``caplog`` assertion is what makes this test
+        non-vacuous — it proves the sweep actually *saw* one eligible row and
+        would have deleted it, so the survival assertion is a real ``--dry-run``
+        guarantee and not merely the absence of an eligible row.
+        """
+        import logging
 
         old = create_test_ad(
             seller,
@@ -49,13 +59,22 @@ class TestSweepDrafts:
             status=AdStatus.DRAFT,
         )
         Ad.objects.filter(pk=old.pk).update(
-            created_at=timezone.now() - timedelta(minutes=90)
+            updated_at=timezone.now() - timedelta(minutes=90)
         )
         old.refresh_from_db()
-        call_command("sweep_drafts", "--dry-run")
+        with caplog.at_level(logging.INFO, logger="apps.core.management.commands.sweep_drafts"):
+            call_command("sweep_drafts", "--dry-run")
+        # Non-vacuity: the sweep counted one eligible draft and would delete it.
+        assert "DRY RUN: Would delete 1 draft ads" in caplog.text
         assert Ad.objects.filter(pk=old.pk).exists()
 
     def test_deletes_drafts_older_than_30_minutes(self, seller, category, city, user):
+        """An inactive draft (old ``updated_at``) is deleted; an active one survives.
+
+        The predicate measures **inactivity**, not age: both rows' ``updated_at``
+        are back-dated, and the two-sided assertion is what makes this a
+        predicate test rather than a delete test.
+        """
 
         old = create_test_ad(
             seller,
@@ -64,7 +83,7 @@ class TestSweepDrafts:
             status=AdStatus.DRAFT,
         )
         Ad.objects.filter(pk=old.pk).update(
-            created_at=timezone.now() - timedelta(minutes=90)
+            updated_at=timezone.now() - timedelta(minutes=90)
         )
         old.refresh_from_db()
         recent = create_test_ad(
@@ -74,12 +93,57 @@ class TestSweepDrafts:
             status=AdStatus.DRAFT,
         )
         Ad.objects.filter(pk=recent.pk).update(
-            created_at=timezone.now() - timedelta(minutes=5)
+            updated_at=timezone.now() - timedelta(minutes=5)
         )
         recent.refresh_from_db()
         call_command("sweep_drafts")
         assert not Ad.objects.filter(pk=old.pk).exists()
         assert Ad.objects.filter(pk=recent.pk).exists()
+
+    def test_old_created_at_with_fresh_updated_at_survives(
+        self, seller, category, city
+    ):
+        """A draft whose ``created_at`` is ancient but ``updated_at`` is fresh survives.
+
+        This is the direct regression guard for 03-DB-003: an in-progress dialog
+        is older than 30 minutes since ``/post`` but has been heartbeated, so it
+        must NOT be reaped.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DRAFT,
+        )
+        Ad.objects.filter(pk=ad.pk).update(
+            created_at=timezone.now() - timedelta(hours=5),
+            updated_at=timezone.now(),
+        )
+        ad.refresh_from_db()
+        call_command("sweep_drafts")
+        assert Ad.objects.filter(pk=ad.pk).exists()
+
+    def test_old_updated_at_is_deleted_even_with_older_created_at(
+        self, seller, category, city
+    ):
+        """An old ``updated_at`` is deleted even when ``created_at`` is older still.
+
+        Pins that the predicate is ``updated_at`` ONLY — it did not become
+        "``created_at`` OR ``updated_at``".
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.DRAFT,
+        )
+        Ad.objects.filter(pk=ad.pk).update(
+            created_at=timezone.now() - timedelta(hours=5),
+            updated_at=timezone.now() - timedelta(minutes=90),
+        )
+        ad.refresh_from_db()
+        call_command("sweep_drafts")
+        assert not Ad.objects.filter(pk=ad.pk).exists()
 
     def test_does_not_touch_published_drafts(self, seller, category, city):
 
@@ -101,10 +165,18 @@ class TestSweepDrafts:
     def test_collects_thumbnail_keys_for_media_cleanup(
         self, seller, category, city, monkeypatch
     ):
-        """Sweep drafts passes all storage keys (image + thumbnails) to delete_photo.
+        """The AdImage ``pre_delete`` signal unlinks every key when the sweep cascades.
 
-        Verifies PC-004: the sweep uses AdImage.storage_keys() so thumbnail
-        derivatives are not orphaned on disk alongside the main image.
+        The sweep itself passes **nothing** to ``delete_photo``: it calls
+        ``queryset.delete()`` and the ``AdImage`` ``pre_delete`` signal collects
+        ``AdImage.storage_keys()`` (image + all three thumbnail derivatives) and
+        unlinks them via ``transaction.on_commit()``.  The sweep's only obligation
+        is to make the row eligible for the cascade.  (The prior docstring
+        credited the sweep with passing the keys — that was BLOCK 1 /
+        ``03-DB-011`` documentation debt: the key pre-collection was removed and
+        the signal has been the mechanism since.)
+
+        The predicate measures **inactivity**, so ``updated_at`` is back-dated.
         """
         ad = create_test_ad(
             seller,
@@ -113,7 +185,7 @@ class TestSweepDrafts:
             status=AdStatus.DRAFT,
         )
         Ad.objects.filter(pk=ad.pk).update(
-            created_at=timezone.now() - timedelta(minutes=90)
+            updated_at=timezone.now() - timedelta(minutes=90)
         )
         ad.refresh_from_db()
         img = AdImage.objects.create(
