@@ -1404,3 +1404,6 @@ msgid ""
 "\n"
 "%(text)s"
 msgstr ""
+
+msgid "Ad not found"
+msgstr ""

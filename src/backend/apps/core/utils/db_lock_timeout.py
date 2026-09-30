@@ -18,8 +18,8 @@ shutdown is **not** a lock timeout and must keep its existing behaviour.
 Implementation note: Django's ``DatabaseErrorWrapper`` does **not** re-export
 ``sqlstate`` on the wrapper (``exc.sqlstate`` is ``None``); the driver error is
 one level down on ``exc.__cause__``. Matching is on SQLSTATE only — the message
-text is locale- and version-fragile, and ``57014`` (``statement_timeout``) is a
-different, separately-deferred policy.
+text is locale- and version-fragile, and ``57014`` is a different,
+separately-deferred policy.
 """
 
 import logging
@@ -31,10 +31,13 @@ logger = logging.getLogger(__name__)
 # lock timeout". Always raised as psycopg.errors.LockNotAvailable.
 LOCK_TIMEOUT_SQLSTATE: Final[str] = "55P03"
 
-# PostgreSQL SQLSTATE for a cancelled statement: "canceling statement due to
-# statement timeout". Deliberately NOT matched by is_lock_timeout — the project
-# ships no statement_timeout (BLOCK 5 deferral).
-STATEMENT_TIMEOUT_SQLSTATE: Final[str] = "57014"
+# PostgreSQL SQLSTATE "query_canceled": a statement cancelled by *any* producer.
+# It is raised by statement_timeout, but also by pg_cancel_backend(),
+# PgBouncer's server cancel and idle_session_timeout — so it does NOT attribute
+# the cancel to statement_timeout. Deliberately NOT matched by is_lock_timeout:
+# the project ships no statement_timeout (BLOCK 5 deferral) and a lock timeout
+# is ``55P03``, not ``57014``.
+STATEMENT_CANCELED_SQLSTATE: Final[str] = "57014"
 
 
 def is_lock_timeout(exc: BaseException) -> bool:
@@ -42,10 +45,9 @@ def is_lock_timeout(exc: BaseException) -> bool:
 
     Reads the driver error's SQLSTATE from ``exc.__cause__``, because Django's
     ``DatabaseErrorWrapper`` does not re-export ``sqlstate`` on the wrapper it
-    raises. A ``statement_timeout`` (``57014``), a connection refusal or any
-    error without a wrapped driver cause returns False, so callers can
-    re-raise everything that is not a lock timeout and preserve its existing
-    behaviour.
+    raises. ``57014`` (``query_canceled``), a connection refusal or any error
+    without a wrapped driver cause returns False, so callers can re-raise
+    everything that is not a lock timeout and preserve its existing behaviour.
 
     Args:
         exc: The exception to classify, typically a

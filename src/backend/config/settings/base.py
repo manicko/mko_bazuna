@@ -272,9 +272,12 @@ ASGI_APPLICATION = "config.asgi.application"
 #
 # The value is in SECONDS and is rendered with an explicit "s" suffix below,
 # because a bare PostgreSQL GUC number is interpreted as MILLISECONDS — the
-# suffix makes a 1000x unit error inexpressible through this API. 0 disables the
-# bound. It is a CONNECT-TIME setting, not a per-command one, so it also bounds
-# pg_advisory_xact_lock and the login UPDATE ... RETURNING row lock.
+# suffix makes a 1000x unit error inexpressible through this API. The valid
+# range is 0..2147483647 milliseconds server-side; 0 disables the bound. A
+# negative value is clamped to 0 in ``_db_options`` because PostgreSQL would
+# otherwise FATAL every process at boot ("outside the valid range for parameter
+# \"lock_timeout\""). It is a CONNECT-TIME setting, not a per-command one, so it
+# also bounds pg_advisory_xact_lock and the login UPDATE ... RETURNING row lock.
 LOCK_TIMEOUT_SECONDS: int = env.int("LOCK_TIMEOUT_SECONDS", default=10)
 
 
@@ -285,18 +288,23 @@ def _db_options() -> dict[str, Any]:
     ``options`` — libpq's startup-packet run-time options. ``lock_timeout``
     bounds every wait for a row, table or advisory lock (03-DB-004 timeout
     half). The explicit ``s`` suffix is load-bearing: a bare GUC number is
-    MILLISECONDS. 0 disables the bound.
+    MILLISECONDS. ``0`` disables the bound and is the only disabling value; a
+    negative ``LOCK_TIMEOUT_SECONDS`` is clamped to ``0`` here so it degrades to
+    "disabled" instead of a boot-time FATAL ("outside the valid range for
+    parameter \"lock_timeout\"").
 
     Both branches must call this helper: the DATABASE_URL branch REPLACES
     ``env.db()``'s OPTIONS wholesale (which is also why any ``?options=-c ...``
     in DATABASE_URL is silently clobbered), so a key added to only one branch
     would be absent in the other. Under PgBouncer transaction pooling the
     ``options`` startup parameter is only accepted when the pooler lists it in
-    ``ignore_startup_parameters`` (see docker-compose.prod.yml).
+    ``ignore_startup_parameters`` (see docker-compose.prod.yml) — but the pooler
+    then discards it, dropping this bound; the bound only survives a pooler via
+    a server-side ``lock_timeout`` default.
     """
     return {
         "prepare_threshold": None,
-        "options": f"-c lock_timeout={LOCK_TIMEOUT_SECONDS}s",
+        "options": f"-c lock_timeout={max(LOCK_TIMEOUT_SECONDS, 0)}s",
     }
 
 

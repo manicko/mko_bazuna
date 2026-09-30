@@ -73,7 +73,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 - **uv:** pin `uv>=0.11.28` in Dockerfile.
 - **gunicorn:** pin `gunicorn>=26.0`.
 - **whitenoise:** add if used for `/static/` (media still needs nginx).
-- **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None` and add `options="-c lock_timeout=10s"` (03-DB-004); list `options` in the pooler's `ignore_startup_parameters`.
+- **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None` and add `options="-c lock_timeout=10s"` (03-DB-004); list `options` in the pooler's `ignore_startup_parameters` (unprefixed `IGNORE_STARTUP_PARAMETERS` for the pinned image). Note the pooler then **discards** `options`, so the bound is voided and a **server-side** `lock_timeout` default is additionally required — enabling the profile without one yields silent unbounded waits.
 - **nginx:** `nginx:alpine` tracks 1.30.x.
 
 ## Key Compatibility Decisions
@@ -81,7 +81,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 | Item | Decision | Note |
 |------|----------|------|
 | django | `>=5.2.16,<6.0` | LTS; `<6.0` protects unmaintained django-mptt. |
-| psycopg3 | `>=3.2.0` | Recommended driver; `prepare_threshold=None` plus `options="-c lock_timeout=10s"` for PgBouncer. |
+| psycopg3 | `>=3.2.0` | Recommended driver; `prepare_threshold=None` plus `options="-c lock_timeout=10s"` for PgBouncer (the pooler must list `options` in `ignore_startup_parameters`, and then needs a server-side `lock_timeout` default because it discards `options`). |
 | django-mptt | `>=0.18.0` | First Django 5.2-compatible. Plan replacement before any Django 6.0 move. |
 | django-filter | `>=26.1` | List filters. Requires Django>=5.2. |
 | aiogram FSM | use `Ad.DRAFT` in ORM | No built-in PG FSM storage; never Redis/Mongo. |

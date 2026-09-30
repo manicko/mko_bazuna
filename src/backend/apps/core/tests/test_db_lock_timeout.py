@@ -155,16 +155,27 @@ class TestDatabaseOptionsRenderTheBound:
             "PostgreSQL GUC number is MILLISECONDS — the 's' suffix is "
             "load-bearing."
         )
-        # The bare-millisecond form must never be produced.
-        assert not rendered.endswith("=10"), (
-            "the rendered option looks like a bare GUC number (milliseconds)"
-        )
+
+    def test_lock_timeout_seconds_negative_is_clamped_to_disabled(self) -> None:
+        """A negative ``LOCK_TIMEOUT_SECONDS`` degrades to 0, not a boot crash.
+
+        PostgreSQL FATALs every process on a negative ``lock_timeout`` (it is
+        outside ``0 ms .. 2147483647 ms``); the helper clamps the value to ``0``
+        so a bad env value disables the bound instead.
+        """
+        import config.settings.base as base
+
+        original = base.LOCK_TIMEOUT_SECONDS
+        try:
+            base.LOCK_TIMEOUT_SECONDS = -1000
+            assert base._db_options()["options"] == "-c lock_timeout=0s"
+        finally:
+            base.LOCK_TIMEOUT_SECONDS = original
 
     def test_lock_timeout_seconds_default_is_nonzero(self) -> None:
-        """The default bound is enabled (0 would disable it)."""
+        """The shipped default leaves the bound enabled (0 would disable it)."""
         from config.settings.base import LOCK_TIMEOUT_SECONDS
 
-        assert LOCK_TIMEOUT_SECONDS == 10
         assert LOCK_TIMEOUT_SECONDS != 0
 
     def test_prepare_threshold_is_preserved(self) -> None:

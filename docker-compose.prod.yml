@@ -179,9 +179,24 @@ services:
       # The app sends libpq's `options` startup parameter (-c lock_timeout=Ns,
       # 03-DB-004). PgBouncer rejects every startup parameter it does not know,
       # so it must be listed here or clients are refused once this profile is
-      # enabled. No-op today: the profile is not in the deployed path (deploy.yml
-      # passes no --profile), but correct-by-construction the moment it is.
-      - PGBOUNCER_IGNORE_STARTUP_PARAMETERS=options,extra_float_digits
+      # enabled. The name is UNPREFIXED on purpose: this image's ini template is
+      # `ignore_startup_parameters = ${IGNORE_STARTUP_PARAMETERS:-...}` — the
+      # entrypoint reads bare env names, NOT `PGBOUNCER_*` (a `PGBOUNCER_`-
+      # prefixed name is silently dropped and the refusal persists).
+      #
+      # WARNING: listing `options` here only stops the refusal. PgBouncer then
+      # DISCARDS the whole `options` parameter, so the client's connection-level
+      # `lock_timeout` is GONE and pooled `SHOW lock_timeout` returns `0`
+      # (unbounded) — silent unbounded lock waits, the exact failure 03-DB-004
+      # exists to prevent. `track_extra_parameters = lock_timeout` does not help
+      # on 1.25.2. Enabling this profile therefore ADDITIONALLY requires a
+      # SERVER-SIDE default (`ALTER DATABASE mko_bazuna SET lock_timeout =
+      # '10s'` / `postgresql.conf`). That is phase 12's decision and is NOT
+      # shipped here, so this profile is BLOCKED until it is in place.
+      # (The service is separately unusable: wrong `PGBOUNCER_*` prefix,
+      # `POSTGRES_*` instead of `DATABASE_URL`, and a non-existent pinned tag —
+      # outside BLOCK 5; see docs/ops/docker-deployment.md.)
+      - IGNORE_STARTUP_PARAMETERS=options,extra_float_digits
     ports:
       - "6432:6432"
     depends_on:

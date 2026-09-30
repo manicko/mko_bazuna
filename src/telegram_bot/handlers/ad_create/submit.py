@@ -112,9 +112,11 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
 
         else:
             # Render the real moderation error (mirrors ad_edit), falling back
-            # to the generic message when the service returned no reason.
+            # to the generic message when the service returned no reason. The
+            # service wraps its strings in gettext_lazy, so ``str`` forces the
+            # catalog lookup here, under the request/row locale.
             await message.answer(
-                errors[0]
+                str(errors[0])
                 if errors
                 else _("Ad failed moderation. Please check your content and try again.")
             )

@@ -1530,6 +1530,9 @@ msgstr ""
 "\n"
 "%(text)s"
 
+msgid "Ad not found"
+msgstr "Oglas nije pronađen"
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

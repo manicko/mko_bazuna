@@ -440,10 +440,34 @@ fix is to shorten the holder (per-batch commit), **not** to raise
 are retried on the next tick by construction; a web request returns a 503 with
 `Retry-After: 30`; the bot answers a busy message.
 
+> **BLOCKED — do not enable the `pgbouncer` profile yet.** Enabling it with only
+> the `ignore_startup_parameters` env var produces **silent unbounded lock
+> waits** (see below): the pooler discards the `options` bound and nothing logs
+> it. Enabling the profile additionally requires a **server-side** `lock_timeout`
+> default (`ALTER DATABASE mko_bazuna SET lock_timeout = '10s'`, or
+> `postgresql.conf`), which is **not** shipped in this repo — it is phase 12's
+> (production-ops) decision. Until that default exists, leaving the profile off
+> is required.
+
 If PgBouncer is enabled (opt-in `--profile pgbouncer`), the pooler must list
-`options` in `ignore_startup_parameters`
-(`PGBOUNCER_IGNORE_STARTUP_PARAMETERS=options,extra_float_digits` in
-`docker-compose.prod.yml`) or it refuses every client connection.
+`options` in `ignore_startup_parameters`. The variable is **unprefixed**
+(`IGNORE_STARTUP_PARAMETERS=options,extra_float_digits` in
+`docker-compose.prod.yml`): this image's ini template is
+`ignore_startup_parameters = ${IGNORE_STARTUP_PARAMETERS:-…}`, which the
+entrypoint reads from the bare env name — a `PGBOUNCER_`-prefixed name is
+silently dropped and the pooler then refuses every client with
+`FATAL: unsupported startup parameter in options: lock_timeout`.
+
+Listing `options` is **necessary but not sufficient**. PgBouncer discards the
+whole `options` startup parameter, so the client's connection-level
+`lock_timeout` is gone: `SHOW lock_timeout` on a pooled connection returns `0`
+(unbounded). `track_extra_parameters = lock_timeout` does **not** substitute on
+PgBouncer 1.25.2. The bound only survives a pooler through a **server-side**
+default — `ALTER DATABASE mko_bazuna SET lock_timeout = '10s'` or
+`postgresql.conf` — and that default is deliberately not shipped here (phase 12
+owns it). Consequently the `pgbouncer` service in `docker-compose.prod.yml` is
+present but not usable, for reasons outside BLOCK 5 (its `PGBOUNCER_*`/`POSTGRES_*`
+env shape is also wrong for this image).
 
 ### Deployment Checks
 

@@ -25,6 +25,7 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from pydantic import field_validator
 
 from apps.ads.models import Ad
@@ -135,6 +136,12 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     re-coercion is needed here.  When ``price_currency`` is ``None`` the ad's
     existing ``price_currency`` is preserved (web "keep-current" semantic; the
     bot flow never sends ``None`` per ``price.py`` FSM handlers).
+
+    The ``False`` branch's error strings are user-facing on both surfaces (the
+    bot's ``process_preview`` answers them verbatim; the web edit forms render
+    them too), so they are wrapped in ``gettext_lazy`` at this source. Callers
+    must ``str()`` the value before rendering — Django templates and aiogram
+    both coerce a lazy proxy on use.
     """
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.
@@ -170,7 +177,7 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         try:
             ad = Ad.objects.select_for_update().get(id=input.ad_id)
         except Ad.DoesNotExist:
-            return False, ["Ad not found"]
+            return False, [str(_("Ad not found"))]
 
         # Update ad fields — Russian remains the base content
         ad.title = input.title_ru
@@ -242,4 +249,4 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     if passed:
         return True, []
     else:
-        return False, ["Ad failed moderation checks"]
+        return False, [str(_("Ad failed moderation checks"))]

@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 from django.db import OperationalError
+from django.utils import translation  # noqa: F401 - used by localisation tests
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -168,9 +169,91 @@ class TestProcessPreviewLockTimeout:
             await process_preview(message, state)
 
 
+class TestProcessPreviewLocalisedErrors:
+    """The moderation error a bot seller sees is localised, not English.
+
+    ``test_i18n_completeness.py`` cannot see this defect because the strings
+    originate in ``apps.ads.services.submission`` and are not ``_()``-wrapped
+    *at the call site*; this test is behavioural — it drives the real handler
+    and asserts on the **rendered** value under a non-English locale, exercising
+    the real service (not a mocked return) so the gettext catalog lookup and the
+    ``str()`` coercion at the source are both covered.
+    """
+
+    def _payload(self, seller, category, city) -> dict:
+        return {
+            "ad_id": None,
+            "title": "Naslov oglasa",
+            "description": "Opis oglasa dovoljne dužine za test.",
+            "price_amount": 100,
+            "price_currency": "EUR",
+            "photos": [],
+            "user_id": seller.telegram_id,
+            "category_id": category.id,
+            "city_id": city.id,
+        }
+
+    @pytest.mark.asyncio
+    async def test_moderation_failure_is_rendered_in_russian(
+        self, seller, category, city
+    ) -> None:
+        """``Ad failed moderation checks`` reaches a ru seller in Russian.
+
+        Drives the real ``submit_ad`` against a non-existent ad id so the
+        service returns its own gettext-wrapped ``Ad not found`` — the bot's
+        most common failure path — and asserts the message the seller receives
+        is the Russian catalogue value, never the English literal.
+        """
+        from telegram_bot.handlers.ad_create import process_preview
+
+        data = self._payload(seller, category, city)
+        data["ad_id"] = 999_999_999  # forces submit_ad's Ad.DoesNotExist branch
+        state = _build_state(data)
+        message = _build_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.submit.translate_all_languages",
+                _mock_translate,
+            ),
+            translation.override("ru"),
+        ):
+            await process_preview(message, state)
+
+        message.answer.assert_awaited()
+        rendered = str(message.answer.await_args.args[0])
+        assert rendered == "Объявление не найдено"
+        assert rendered != "Ad not found"
+        state.clear.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_moderation_failure_is_rendered_in_bosnian(
+        self, seller, category, city
+    ) -> None:
+        """The same error reaches a bs seller in Bosnian."""
+        from telegram_bot.handlers.ad_create import process_preview
+
+        data = self._payload(seller, category, city)
+        data["ad_id"] = 999_999_999
+        state = _build_state(data)
+        message = _build_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.submit.translate_all_languages",
+                _mock_translate,
+            ),
+            translation.override("bs"),
+        ):
+            await process_preview(message, state)
+
+        rendered = str(message.answer.await_args.args[0])
+        assert rendered == "Oglas nije pronađen"
+        assert rendered != "Ad not found"
+
+
 class TestResolveOwnedLockTimeout:
     """``_resolve_owned`` degrades to ``None`` on a lock timeout."""
-
     def test_lock_timeout_returns_none(self, seller) -> None:
         from apps.search.models import SavedSearch
         from telegram_bot.handlers.alerts import _resolve_owned

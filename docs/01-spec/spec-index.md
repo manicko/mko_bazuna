@@ -54,7 +54,7 @@ Telegram-driven classifieds board (Avito-like) with a Django website. Sellers po
 - **web:** sync WSGI (gunicorn), server-rendered HTMX MPA
 - **bot:** aiogram, runs `django.setup()`, shares the ORM
 - Each process holds its own psycopg3 pool (`CONN_MAX_AGE=0`)
-- PgBouncer (tx mode) recommended with `OPTIONS={"prepare_threshold": None, "options": "-c lock_timeout=10s"}` (the pooler must list `options` in `ignore_startup_parameters`)
+- PgBouncer (tx mode) recommended with `OPTIONS={"prepare_threshold": None, "options": "-c lock_timeout=10s"}`. The pooler must list `options` in `ignore_startup_parameters` (unprefixed `IGNORE_STARTUP_PARAMETERS`, not `PGBOUNCER_*`) or it refuses clients — and it then **discards** `options`, voiding the bound (`SHOW lock_timeout` → `0`). Enabling the profile additionally requires a **server-side** `lock_timeout` default (`ALTER DATABASE … SET lock_timeout`), not shipped here (phase 12); until then the profile is blocked (silent unbounded waits).
 - **Migrations run exactly once** before web+bot start. The dev migration workflow (threshold-based consolidation, advisory-lock `migrate` service) is documented in [`docs/ops/migration-workflow.md`](../../ops/migration-workflow.md).
 - aiogram has **no built-in PG FSM storage**: the step-by-step dialog is persisted as an `Ad` row with status `DRAFT` in the shared ORM
 

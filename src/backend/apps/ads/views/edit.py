@@ -288,7 +288,6 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         )
 
 
-
 @require_POST
 @login_required
 def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
