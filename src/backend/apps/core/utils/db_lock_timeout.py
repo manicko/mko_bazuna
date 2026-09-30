@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 # lock timeout". Always raised as psycopg.errors.LockNotAvailable.
 LOCK_TIMEOUT_SQLSTATE: Final[str] = "55P03"
 
-# PostgreSQL SQLSTATE "query_canceled": a statement cancelled by *any* producer.
-# It is raised by statement_timeout, but also by pg_cancel_backend(),
-# PgBouncer's server cancel and idle_session_timeout — so it does NOT attribute
-# the cancel to statement_timeout. Deliberately NOT matched by is_lock_timeout:
-# the project ships no statement_timeout (BLOCK 5 deferral) and a lock timeout
-# is ``55P03``, not ``57014``.
-STATEMENT_CANCELED_SQLSTATE: Final[str] = "57014"
+# ``57014`` is ``query_canceled``: a statement cancelled by *any* producer —
+# ``statement_timeout``, ``pg_cancel_backend()``, PgBouncer's server cancel and
+# ``idle_session_timeout`` — so it does NOT attribute the cancel to
+# ``statement_timeout``. It is deliberately NOT matched by ``is_lock_timeout``:
+# a lock timeout is ``55P03``, not ``57014``. No constant is defined for it — the
+# value has no consumer, and a module-level name for a non-policy would invite
+# one to be written.
 
 
 def is_lock_timeout(exc: BaseException) -> bool:

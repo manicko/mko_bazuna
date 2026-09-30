@@ -178,6 +178,24 @@ class TestDatabaseOptionsRenderTheBound:
 
         assert LOCK_TIMEOUT_SECONDS != 0
 
+    def test_lock_timeout_seconds_above_maximum_is_clamped(self) -> None:
+        """A unit-typo value is clamped to the ceiling, not rendered verbatim.
+
+        A bare PostgreSQL GUC number is milliseconds, so ``10000`` typed for ten
+        seconds would render as ``10000s`` — a multi-minute wait that defeats the
+        bound. The helper clamps to ``_MAX_LOCK_TIMEOUT_SECONDS``.
+        """
+        import config.settings.base as base
+
+        original = base.LOCK_TIMEOUT_SECONDS
+        try:
+            base.LOCK_TIMEOUT_SECONDS = 10_000
+            assert base._db_options()["options"] == (
+                f"-c lock_timeout={base._MAX_LOCK_TIMEOUT_SECONDS}s"
+            )
+        finally:
+            base.LOCK_TIMEOUT_SECONDS = original
+
     def test_prepare_threshold_is_preserved(self) -> None:
         """The PgBouncer async-safety key survives the OPTIONS change."""
         from django.conf import settings

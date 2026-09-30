@@ -16,6 +16,7 @@ from any real commit or rollback.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from unittest.mock import patch
 
 import pytest
@@ -25,7 +26,7 @@ from apps.core.utils.advisory_lock import advisory_lock
 pytestmark = [pytest.mark.unit]
 
 
-def _run_lock_block(lock_id: int, body) -> None:
+def _run_lock_block(lock_id: int, body: Callable[[], None]) -> None:
     """Enter ``advisory_lock`` under a patched connection and run ``body``."""
     with (
         patch(

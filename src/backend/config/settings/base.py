@@ -272,13 +272,23 @@ ASGI_APPLICATION = "config.asgi.application"
 #
 # The value is in SECONDS and is rendered with an explicit "s" suffix below,
 # because a bare PostgreSQL GUC number is interpreted as MILLISECONDS — the
-# suffix makes a 1000x unit error inexpressible through this API. The valid
-# range is 0..2147483647 milliseconds server-side; 0 disables the bound. A
-# negative value is clamped to 0 in ``_db_options`` because PostgreSQL would
-# otherwise FATAL every process at boot ("outside the valid range for parameter
-# \"lock_timeout\""). It is a CONNECT-TIME setting, not a per-command one, so it
-# also bounds pg_advisory_xact_lock and the login UPDATE ... RETURNING row lock.
+# suffix makes a 1000x unit error inexpressible through this API. The valid range
+# for this constant is 0.._MAX_LOCK_TIMEOUT_SECONDS SECONDS (server-side the GUC
+# accepts 0..2147483647 MILLISECONDS); 0 disables the bound. A value outside the
+# range is clamped in ``_db_options``: a negative one to 0, because PostgreSQL
+# would otherwise FATAL every process at boot ("outside the valid range for
+# parameter \"lock_timeout\""), and one above the maximum down to it, so a typo
+# (e.g. ``10000`` for 10 s) cannot turn every lock wait into a multi-minute stall
+# that defeats the bound's purpose. It is a CONNECT-TIME setting, not a
+# per-command one, so it also bounds pg_advisory_xact_lock and the login
+# UPDATE ... RETURNING row lock.
 LOCK_TIMEOUT_SECONDS: int = env.int("LOCK_TIMEOUT_SECONDS", default=10)
+
+# Ceiling for LOCK_TIMEOUT_SECONDS. The bound exists to fail fast under
+# contention; a multi-minute value is indistinguishable from "no bound" for every
+# caller that owns a request, a gunicorn worker or the bot's single asgiref
+# thread_sensitive worker.
+_MAX_LOCK_TIMEOUT_SECONDS: int = 600
 
 
 def _db_options() -> dict[str, Any]:
@@ -289,9 +299,9 @@ def _db_options() -> dict[str, Any]:
     bounds every wait for a row, table or advisory lock (03-DB-004 timeout
     half). The explicit ``s`` suffix is load-bearing: a bare GUC number is
     MILLISECONDS. ``0`` disables the bound and is the only disabling value; a
-    negative ``LOCK_TIMEOUT_SECONDS`` is clamped to ``0`` here so it degrades to
-    "disabled" instead of a boot-time FATAL ("outside the valid range for
-    parameter \"lock_timeout\"").
+    value below 0 is clamped to ``0`` (a negative ``lock_timeout`` FATALs every
+    process at boot) and one above ``_MAX_LOCK_TIMEOUT_SECONDS`` down to it, so a
+    unit-typo cannot make every wait multi-minute.
 
     Both branches must call this helper: the DATABASE_URL branch REPLACES
     ``env.db()``'s OPTIONS wholesale (which is also why any ``?options=-c ...``
@@ -304,7 +314,10 @@ def _db_options() -> dict[str, Any]:
     """
     return {
         "prepare_threshold": None,
-        "options": f"-c lock_timeout={max(LOCK_TIMEOUT_SECONDS, 0)}s",
+        "options": (
+            f"-c lock_timeout="
+            f"{min(max(LOCK_TIMEOUT_SECONDS, 0), _MAX_LOCK_TIMEOUT_SECONDS)}s"
+        ),
     }
 
 
