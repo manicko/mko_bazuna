@@ -29,7 +29,7 @@ long each ad status is retained before permanent deletion.
 | `ON_MODERATION_FAILED` | 7 days | `purge_failed_ads` | `IX_ads_purge_failed` |
 | `ARCHIVED` | 2 months (from archived_at) | `delete_sweep` | `IX_ads_delete_sweep` |
 | `PUBLISHED` | 2 months (auto-archive) | `archive_sweep` | `IX_ads_archive_sweep` |
-| `DRAFT` | 30 minutes | `sweep_drafts` (advisory lock 4) | `IX_ads_draft_sweep` |
+| `DRAFT` | 30 minutes **of inactivity** | `sweep_drafts` (advisory lock 4) | `IX_ads_draft_sweep` |
 
 ### Soft-delete model
 
@@ -87,8 +87,41 @@ docker compose --env-file .env.dev \
 | `delete_sweep` | 60 days | Hard-delete ARCHIVED ads older than 60 days (from archived_at) |
 | `purge_failed_ads` | 7 days | Delete ON_MODERATION_FAILED ads older than 7 days |
 | `purge_rejected_ads` | 90 days | Delete REJECTED ads older than 90 days |
-| `sweep_drafts` | 30 minutes | Delete DRAFT ads older than 30 minutes |
+| `sweep_drafts` | 30 minutes | Delete DRAFT ads with no seller activity for 30 minutes (`Ad.updated_at`) |
 | `consent_hard_delete` | 30 days | Hard-delete user PII after 30-day consent withdrawal |
+
+**`DRAFT` retention measures inactivity, not age.** The predicate is
+`status = DRAFT AND updated_at < now() - interval '30 minutes'`. `updated_at` is
+refreshed by the Telegram dialog heartbeat
+(`telegram_bot.services.ad_data.orm.touch_draft`), which every handler registered on
+an `AdCreateForm` state calls on entry, and by the web edit form's direct-save branch
+for the ad's owner (`apps/ads/views/edit.py::ad_edit`). A seller who is actively
+stepping through the dialog is therefore never reaped, however long the dialog takes;
+a seller who stops for 30 minutes is. The window itself is unchanged and still
+hardcoded — no environment variable or CLI argument (beyond `--dry-run`) is read for
+it.
+
+**Do not revert the predicate to `created_at`.** `created_at` measures age since
+`/post`; with no heartbeat it reaps a seller who is still typing (finding 03-DB-003).
+If the sweep ever reverts to `created_at`, the heartbeat becomes dead code and the
+defect returns silently — no test in the suite fails.
+
+**Do not remove the heartbeat.** Coverage is enforced by
+`src/telegram_bot/tests/test_ad_create_heartbeat_coverage.py`, an AST guard that
+fails if any handler registered on an `AdCreateForm` state does not call
+`touch_draft`, or if any `AdCreateForm` state has no such handler. Adding a new
+dialog state without a heartbeat fails that test.
+
+**Staging TTL is an independent backstop, not a partner of `DRAFT` retention.**
+`sweep_orphaned_media._STAGING_TTL_SECONDS` (2 h, hourly) is measured from each file's
+**mtime**, while `DRAFT` retention is measured from the **database** `updated_at`. The
+dialog heartbeat refreshes both (`touch_draft` for the row,
+`telegram_bot.services.ad_data.media.touch_staging_photos` for the `staging/` files the
+FSM still references), so a live dialog keeps both alive on one clock. The
+pre-03-DB-003 comment "2 hours — safely beyond the 30-minute DRAFT retention" was true
+only while the draft always died first and **is no longer the justification**. The
+2-hour value is a hard backstop for *abandoned* uploads, not a bound on dialog length;
+a dialog that goes silent still loses its row (30 min) before its files (2 h).
 
 ## §3 Post-Withdrawal Data Retention
 

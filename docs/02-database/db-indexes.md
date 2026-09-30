@@ -79,11 +79,13 @@ models.Index(
 )  # REJECTED @90d (zone D4)
 models.Index(
     name="IX_ads_draft_sweep",
-    fields=["status", "created_at"],
+    fields=["status", "updated_at"],
     condition=Q(status=AdStatus.DRAFT),
-)  # sweep_drafts: delete DRAFT older than 30 min
+)  # sweep_drafts: delete DRAFT with no seller activity for 30 min
 ```
 Standalone `status`/`category_id`/`city_id` indexes not needed — covered by composites. `listing_purpose_id` is backed by the partial `IX_ads_pub_purpose`; `listing_condition_id` by `IX_ads_pub_condition`; `price_normalized_eur` is backed by `IX_ads_price_normalized_eur` (partial where not null).
+
+`updated_at` (not `created_at`) must lead the index after `ads/0008_change_ix_ads_draft_sweep` (03-DB-003): with the old column the predicate becomes a heap `Filter` over every draft row. Measured on 40 600 ads / 410 drafts: 454 buffers and `Rows Removed by Filter: 360` before, 13 buffers and an `Index Cond` after.
 
 ## Check Constraints & Unique Constraints — ads (AD-001)
 

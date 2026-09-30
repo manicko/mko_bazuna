@@ -34,7 +34,17 @@ logger = logging.getLogger(__name__)
 _SEED_SUBDIR = "seed"
 
 # Abandoned in-flight uploads older than this are reclaimed by the sweep.
-# 2 hours — safely beyond the 30-minute DRAFT retention (sweep_drafts.py).
+#
+# This is an INDEPENDENT BACKSTOP, not a partner of DRAFT retention
+# (sweep_drafts.py): this TTL is measured from each file's mtime, while DRAFT
+# retention is measured from the database's Ad.updated_at.  The dialog heartbeat
+# refreshes both — touch_draft for the row, touch_staging_photos for the
+# staging/ files the FSM still references — so a live dialog keeps both alive on
+# one clock.  The old justification ("2 hours — safely beyond the 30-minute
+# DRAFT retention") was true only while the draft always died first and is no
+# longer the reason (finding 03-DB-003).  2 hours is a hard backstop for
+# *abandoned* uploads, not a bound on dialog length: a dialog that goes silent
+# still loses its row (30 min) before its files (2 h).
 _STAGING_TTL_SECONDS = 2 * 60 * 60
 
 
@@ -80,7 +90,9 @@ def _reclaim_stale_staging(media_root: str, ttl_seconds: int) -> int:
     submission.  If a seller abandons the flow without sending ``/cancel``,
     these files would persist indefinitely (they are excluded from the orphan
     sweep).  This function reclaims files whose modification time exceeds the
-    TTL, mirroring the safety margin of the 30-minute DRAFT retention.
+    TTL — an independent backstop for abandoned uploads, refreshed on a live
+    dialog by ``touch_staging_photos`` so both it and DRAFT retention share one
+    clock (finding 03-DB-003).
 
     Args:
         media_root: Absolute path to ``MEDIA_ROOT``.
