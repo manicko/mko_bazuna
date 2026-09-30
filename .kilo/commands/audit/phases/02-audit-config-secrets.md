@@ -17,7 +17,9 @@ a web process and a bot process that share one project and one database.
 Other phases own: entry/bootstrap process (01), connection pooling and runtime DB
 concurrency (03), authentication (04), fixed-value enum discipline and
 boundary-DTO validation (10), test-suite quality and coverage (11), TLS and
-certificate lifecycle and health probes (12).
+certificate lifecycle and health probes (12); whether a rendered page's actual
+subresource fetches agree with the policy values this phase declares is 16's;
+this phase owns the values themselves.
 
 ## Audit Blocks
 

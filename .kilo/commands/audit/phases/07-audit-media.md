@@ -12,7 +12,7 @@ problems-only: true
 
 Audits the media path end to end: what an incoming image is admitted against, where its bytes are written and under what key, what is derived from them, what the serving path hands out and on whose word, what removes them, what reconciles the store against the records, and how several long-lived processes share one store while they do it. This file names what to examine and under which angle; the executing auditor discovers the concrete artifacts.
 
-Scope Boundaries — other phases own: sweep execution safety, meaning bounded, interruptible, locked and repeatable (03); what a retention operation selects and which clock it reads (05); the erasure cascade into physical file removal (06); search visibility (08); the platform download client and transport (09); enum and boundary-DTO discipline (10); test adequacy (11); probes and storage operations (12); authorization (15).
+Scope Boundaries — other phases own: sweep execution safety, meaning bounded, interruptible, locked and repeatable (03); what a retention operation selects and which clock it reads (05); the erasure cascade into physical file removal (06); search visibility (08); the platform download client and transport (09); enum and boundary-DTO discipline (10); test adequacy (11); probes and storage operations (12); authorization (15). What a rendered document does with an image once it is already referenced is 16's.
 
 ## Audit Blocks
 

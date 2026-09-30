@@ -74,7 +74,7 @@ Each researcher returns an independent structured opinion containing:
 **Launch Agent:** `doc-specialist`
 
 - Create the audit phase task following the structure and conventions of existing phases 
-- Assign the next available phase number (`12`, `13`, etc.) 
+- Assign the next available phase number — the lowest unassigned number in `phases/`, skipping `99`, which is reserved for the validator; check the existing `NN-audit-*.md` filenames before assigning and never reuse a taken number 
 - Define a distinct audit responsibility not already adequately covered 
 - Keep the scope minimal and non-overlapping 
 - Preserve consistency with existing phase formats
@@ -102,5 +102,5 @@ Ask it to verify:
 - Combined high-level architecture overview + audit coverage map from Step 1.
 - Four independent researcher perspectives on phase coverage.
 - Validator decision on the minimal set of required new phases (or confirmation that none are needed).
-- New phase specification files (if required) numbered 12+.
+- New phase specification files (if required), numbered with the next unassigned number above the existing content phases and never `99`.
 - Final auditor validation report confirming process integrity.

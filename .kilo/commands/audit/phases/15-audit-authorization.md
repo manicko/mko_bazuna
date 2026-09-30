@@ -19,6 +19,9 @@ decision *returns* and not the attributes of the transport carrying it (02); ide
 phase owning the per-request gate, and neither phase filing the same middleware decision (04); lifecycle correctness and moderation-gate
 correctness (05); the consent consequence of an access decision (06); media ownership, this phase owning only whether an account-owned object
 can be reached by another (07); the inbound surface form (09); fixed-value discipline (10); the privileged surface's pipeline posture (12).
+A client-settable value the server reads to choose what it renders is 16's; which surfaces a request-forgery check reaches, and what an access
+decision returns, are this phase's. A derived definition with no production caller is 10's; the exported predicate this phase
+already grades is its own, and the authority an account state carries on a surface is 15's where 17 owns only the effect on the derived value.
 A mechanism another phase owns is recorded as a deferral with its owner named, and the block still covers the decision this phase makes.
 
 ## Audit Blocks

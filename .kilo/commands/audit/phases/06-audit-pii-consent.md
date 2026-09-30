@@ -18,7 +18,10 @@ Scope Boundaries — this phase owns consent semantics, erasure completeness, PI
 and egress basis. Other phases own: identity binding and the account-state gate mechanism
 (04); transaction and lock execution safety, and retention-operation execution safety
 (03, 05); media file-handling mechanics (07 — this phase owns only the erasure cascade into
-physical removal); authorization (15); settings and secrets values (02).
+physical removal); whether a stored aggregate outliving its subject is arithmetically
+supported is 17's; the residue and the erasure cascade are this phase's; authorization
+(15); settings and secrets values (02); what executes in the client is 16's; a consent
+gate a third-party widget enforces server-side is this phase's.
 
 This file names what to examine and under which angle; the auditor finds the artifacts.
 

@@ -13,7 +13,7 @@ problems-only: true
 Validate another auditor's claims about the system — the reported defect, the support behind it, the band it was given, the recommendation attached to it — and produce a disposition record a
 reader can act on without re-running the audit. This file names what to examine and under which angle; the executing validator discovers the concrete artifacts.
 
-**Scope Boundaries** — 99 audits audit **output** and the audit tooling's own artefacts; the fifteen content phases audit the system, and no content phase's concern is 99's, except where a
+**Scope Boundaries** — 99 audits audit **output** and the audit tooling's own artefacts; the seventeen content phases audit the system, and no content phase's concern is 99's, except where a
 finding's validity depends on a cross-phase claim. 99 never modifies source code, never renumbers an existing finding identifier, and never repairs a shared artefact from inside a
 per-phase run; the only document it writes is its own validated report.
 

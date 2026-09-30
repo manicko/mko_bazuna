@@ -16,7 +16,7 @@ The long-lived set is environment-dependent: a synchronous WSGI web tier, an asy
 
 This file states *what* to examine and *under which angle*. Concrete artifacts — services, files, modules, commands, identifiers, values — are discovered by the executing auditor, never named here.
 
-**Scope Boundaries** — owned here: entry surfaces, process topology, startup/stop lifecycle, and the schema/reference-data bootstrap guarantee. Not owned here: the health, liveness and readiness **endpoint** plus its probe/orchestration contract (12); async↔sync ORM dispatch, transaction, advisory-lock and connection-pool/pooler semantics (03), the event-loop bridge mechanism (09); secrets and settings **values** (02); media file-handling mechanics (07); test-suite adequacy (11), this phase keeping only the schema-mutating *entry path* angle.
+**Scope Boundaries** — owned here: entry surfaces, process topology, startup/stop lifecycle, and the schema/reference-data bootstrap guarantee. Not owned here: the health, liveness and readiness **endpoint** plus its probe/orchestration contract (12); async↔sync ORM dispatch, transaction, advisory-lock and connection-pool/pooler semantics (03), the event-loop bridge mechanism (09); whether the job that produces an aggregate is dispatched at all is this phase's; the aggregate it produces is 17's; secrets and settings **values** (02); media file-handling mechanics (07); test-suite adequacy (11), this phase keeping only the schema-mutating *entry path* angle.
 
 Design deliberately asymmetric between processes, tiers or transports is not a defect on its own. Report it only where the code's own documentation or comments misstate it.
 

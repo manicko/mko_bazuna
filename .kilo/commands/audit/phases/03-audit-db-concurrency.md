@@ -21,7 +21,11 @@ discovers the concrete artifacts. Owned here: ORM-dispatch, transaction,
 advisory-lock and connection-pool semantics. Owned elsewhere: process startup,
 bootstrap ordering and the schema gate at the *process* level → 01; the event-loop
 bridge mechanism → 09; pooler sizing and measurable latency consequences → 13; the
-claim-guard race → 04.
+claim-guard race → 04. → 17: the arithmetic of a derived value — the scope of
+numerator against denominator, what counts as one occurrence, the window it claims
+to cover, and the range and rounding applied — is 17's; this phase owns only
+whether the value is re-derived when its input moves, which recompute coverage
+already claims here.
 
 ## Audit Blocks
 

@@ -16,6 +16,8 @@ is told when something is wrong; and what a failure costs in data. This file nam
 **Scope Boundaries** — taken in: the health, liveness and readiness endpoint and probe contract (from 01), and the edge tier, transport security and certificate lifecycle (from 09, 02). Deferred by this phase: which origins
 and cookie attributes are honoured, per environment → 02; which surfaces a request-forgery check reaches and whether it runs on each → 15, as are object-level access and staff-surface authorization; process lifecycle and boot ordering → 01;
 settings and secrets → 02; pooler configuration semantics → 03, owning only whether the production path enables the pooler at all; measured latency → 13; integration claims → 09; source-level logging hygiene → 10; test-suite adequacy → 11.
+→ 16: a response-header policy as configured, and the origins a rendered page actually fetches under it, are 16's; the edge transport, address resolution, and the collection endpoint a violation is reported to are this phase's.
+Which checks gate, and by what trigger, stays here.
 
 ## Audit Blocks
 

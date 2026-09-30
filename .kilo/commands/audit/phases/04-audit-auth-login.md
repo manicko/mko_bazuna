@@ -23,10 +23,14 @@ semantics in the async process (03), PII and consent (06), test adequacy (11),
 TLS (12), object-level access control and staff/admin authorization (15). With
 15: this phase owns identity resolution and binding and the session-layer
 consequences, 15 owning the per-request gate, and neither phase files the same
-middleware decision. Which surfaces a request-forgery check reaches and whether
-it runs on each is 15's; which origins and cookie attributes are honoured per
-environment is 02's. The claim race and the login-token guarantee are this
-phase's end-to-end.
+middleware decision. What the server does with a value the client asserts is
+16's; the identity that value binds to, and the session-layer consequences, are
+this phase's. The authority a subject-controlled account attribute carries is
+this phase's and 15's; the effect such an attribute has on a derived outcome is
+17's. Which surfaces a request-forgery check reaches and whether it runs on
+each is 15's; which origins and cookie attributes are honoured per environment
+is 02's. The claim race and the login-token guarantee are this phase's
+end-to-end.
 
 ## Audit Blocks
 

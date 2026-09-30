@@ -16,7 +16,9 @@ discovers the concrete artifacts.
 
 Scope boundary — other phases own: settings values and environment policy (02); transaction, lock, and pooler semantics (03); lifecycle correctness (05); the event-loop bridge mechanism (09); test adequacy (11); pipeline and container
 posture (12); measurable performance consequences (13); authorization (15). This phase owns convention and consistency inside the code, and asks of every claimed property whether anything checks it — not what a lifecycle decision
-should be, what a request is allowed to do, or how the service is run and deployed.
+should be, what a request is allowed to do, or how the service is run and deployed. Two live implementations of one derived quantity, and an aggregate definition no caller reaches, are this phase's HIGH and LOW bands; 17 establishes
+the arithmetic showing whether they agree and records the duplication itself as a deferral here. A declared rendered-surface or accessibility contract measured against the document is 16's measurement; a contract that
+merely has no enforcement point is this phase's.
 
 ## Audit Blocks
 

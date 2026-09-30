@@ -16,6 +16,8 @@ about itself are measured or asserted. This file names what to examine and under
 Scope boundaries — this phase owns the measurable consequence of latency, throughput and capacity, and nothing else. Owned elsewhere: the connection pooler's configuration semantics (03), whether the
 production path enables the pooler at all (12), its place in the process topology (01); plan stability, unbounded scans and missing indexes on the search path, and what a cached result set may still serve
 (08); the language component of a key (14); ORM dispatch, transaction and wait-bound semantics in the event-driven process (03) and the bridge mechanism itself (09); whether a scheduled sweep is safe to run twice (03).
+Whether a rollup or a recompute is arithmetically right is 17's; this phase keeps statement count, write amplification, transaction width and lock hold. What a response instructs the client to do is 16's; response
+latency and what a response costs are this phase's.
 
 ## Audit Blocks
 

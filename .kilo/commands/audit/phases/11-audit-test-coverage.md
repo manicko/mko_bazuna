@@ -17,6 +17,7 @@ nobody can reproduce, and gates that are declared, loaded, green, or inert. This
 
 Scope boundaries — other phases own: production-code convention defects and dead code (10); pipeline and container posture (12); transaction, lock, and pooler semantics (03); lifecycle correctness (05);
 settings values and environment policy (02); namespace rulings and cross-phase conflict resolution (99). This phase owns whether the suite would notice, and the fidelity of what it asserts once it does.
+What the rendered outcome is, and what a derived quantity equals, are 16's and 17's; this phase owns whether the suite would notice either.
 
 ## Audit Blocks
 
