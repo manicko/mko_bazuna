@@ -5,6 +5,7 @@ Uses real PostgreSQL (NOT SQLite) per spec.
 """
 
 from .base import *  # noqa: F403, F401
+from .base import _db_options
 
 # English is the msgid source language — tests asserting on English UI strings
 # (e.g. "Clear all filters", "Page navigation") pass without explicit language
@@ -38,6 +39,18 @@ SECURE_HSTS_PRELOAD = False
 # pytest-django creates/destroys test database automatically
 # Base database connection is for pytest to create test_<name> database
 DATABASES["default"]["NAME"] = "mko_bazuna"  # noqa: F405
+
+# Preserve the connection-level ``lock_timeout`` bound carried in base.py's
+# ``OPTIONS["options"]``. base.py builds it via ``_db_options()`` for both
+# DATABASES branches (03-DB-004/BLOCK 5); test settings must not drop it, or
+# ``SHOW lock_timeout`` is 0 (unbounded) for the whole suite and the bounded-wait
+# behaviour is never exercised under test. Reuse the same helper so the rendered
+# ``-c lock_timeout=<N>s`` string stays a single source of truth; the inherited
+# ``prepare_threshold`` key is untouched.
+DATABASES["default"]["OPTIONS"] = {  # noqa: F405
+    **DATABASES["default"].get("OPTIONS", {}),  # noqa: F405
+    "options": _db_options()["options"],
+}
 
 # Use a non-hashed, non-manifest static storage during tests.
 # base.py's STORAGES["staticfiles"] backend is ThemeStaticFilesStorage, a

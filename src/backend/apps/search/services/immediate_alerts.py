@@ -267,6 +267,10 @@ async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
                             parse_mode="HTML",
                             reply_markup=payload["reply_markup"],
                         )
+                        # Retry succeeded: write the receipt so the pair is not
+                        # re-sent by the next daily digest. Mirrors the daily
+                        # path in send_alerts.py, which marks after retry success.
+                        await _mark_delivered(payload["pair"])
                     except AiogramError as retry_exc:
                         logger.warning(
                             "Immediate alert retry failed to chat %s: %s",

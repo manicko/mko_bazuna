@@ -125,6 +125,24 @@ class AdEditInput(BaseInputModel):
             return None
 
 
+def _permanent_thumbnail_key(
+    generated_key: str | None, permanent_keys: list[str]
+) -> str | None:
+    """Strip the staging prefix from a generated thumbnail key and queue it.
+
+    ``plan_staging_promotion`` runs before the thumbnails are generated, so the
+    newly written ``staging/<key>`` thumbnail files are not seen by its rewrite
+    and would otherwise never be promoted. This applies the same prefix strip and
+    adds the result to ``permanent_keys`` so it is moved post-commit.
+    """
+    if generated_key is None:
+        return None
+    permanent = generated_key.removeprefix(STAGING_PREFIX)
+    if permanent not in permanent_keys:
+        permanent_keys.append(permanent)
+    return permanent
+
+
 def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     """Update ad with multi-language content, create images, and delegate to auto_moderate.
 
@@ -155,39 +173,73 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     committed.  A staged file that is missing raises before the transaction and
     becomes a recoverable seller message.
     """
-    # Pre-flight: every staged file must still exist.  A reaped photo must
-    # never become an AdImage row pointing at a file that is not there.  This
-    # runs before any I/O or transaction, and makes the thumbnail loop's broad
-    # except (below) unambiguously about *generation* failures.
-    for photo in input.photos:
-        if not photo.storage_key.startswith(STAGING_PREFIX):
-            continue
-        if not os.path.exists(
-            os.path.join(settings.MEDIA_ROOT, photo.storage_key)
-        ):
-            return False, [
-                str(
-                    _(
-                        "One of your photos is no longer available. "
-                        "Please upload it again."
-                    )
+    # Capture each photo's staged key and read path BEFORE the plan rewrites the
+    # staging keys in place.  Staged photos are read from ``staging/<key>`` and
+    # keep the staging prefix on the generated thumbnails (stripped and queued
+    # below); non-staging photos (seed data, web-edit fixtures) are read from and
+    # generate against their permanent key, exactly as before.  Pure list build —
+    # no I/O — so the plan's existence check is still the first filesystem touch.
+    staged_keys: list[str | None] = [
+        photo.storage_key if photo.storage_key.startswith(STAGING_PREFIX) else None
+        for photo in input.photos
+    ]
+    read_paths: list[str] = [
+        os.path.join(settings.MEDIA_ROOT, staged_key)
+        if staged_key is not None
+        else os.path.join(settings.MEDIA_ROOT, photo.storage_key)
+        for photo, staged_key in zip(input.photos, staged_keys, strict=True)
+    ]
+
+    # Key rewriting happens BEFORE any I/O or transaction because it is PURE — an
+    # in-memory rewrite of SubmittedPhoto fields plus an existence check, with no
+    # filesystem mutation.  The physical move is scheduled post-commit.  A staged
+    # file missing here (reaped after upload) raises FileNotFoundError, caught
+    # below as a recoverable seller message: this is the ONE existence rule, and
+    # running the plan first makes "file missing" impossible by construction for
+    # the thumbnail loop and digest capture that follow, so their behaviour is
+    # unambiguously about generation/read failures, not absence.
+    try:
+        permanent_keys = plan_staging_promotion(input.photos)
+    except FileNotFoundError:
+        return False, [
+            str(
+                _(
+                    "One of your photos is no longer available. "
+                    "Please upload it again."
                 )
-            ]
+            )
+        ]
 
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
-    # so a DB rollback does not leave filesystem and DB desynced.
-    for photo in input.photos:
+    # so a DB rollback does not leave filesystem and DB desynced.  Staged photos
+    # read the staged path captured above (the plan has already rewritten
+    # ``photo.storage_key`` to the permanent key), and their generated thumbnail
+    # keys carry the staging prefix — the plan ran before these files existed and
+    # could not rewrite them, so they are stripped and queued for promotion.
+    for photo, read_path, staged_key in zip(
+        input.photos, read_paths, staged_keys, strict=True
+    ):
         try:
-            original_path = os.path.join(settings.MEDIA_ROOT, photo.storage_key)
-            with open(original_path, "rb") as f:
+            with open(read_path, "rb") as f:
                 photo_bytes = f.read()
             thumbnail_service = ThumbnailService(settings.MEDIA_ROOT)
-            thumbnail_keys = thumbnail_service.generate_thumbnails(
-                photo_bytes, photo.storage_key
+            generated = thumbnail_service.generate_thumbnails(
+                photo_bytes, staged_key if staged_key is not None else photo.storage_key
             )
-            photo.thumbnail_small = thumbnail_keys.get(ThumbnailSizeStrEnum.SMALL)
-            photo.thumbnail_medium = thumbnail_keys.get(ThumbnailSizeStrEnum.MEDIUM)
-            photo.thumbnail_large = thumbnail_keys.get(ThumbnailSizeStrEnum.LARGE)
+            if staged_key is not None:
+                photo.thumbnail_small = _permanent_thumbnail_key(
+                    generated.get(ThumbnailSizeStrEnum.SMALL), permanent_keys
+                )
+                photo.thumbnail_medium = _permanent_thumbnail_key(
+                    generated.get(ThumbnailSizeStrEnum.MEDIUM), permanent_keys
+                )
+                photo.thumbnail_large = _permanent_thumbnail_key(
+                    generated.get(ThumbnailSizeStrEnum.LARGE), permanent_keys
+                )
+            else:
+                photo.thumbnail_small = generated.get(ThumbnailSizeStrEnum.SMALL)
+                photo.thumbnail_medium = generated.get(ThumbnailSizeStrEnum.MEDIUM)
+                photo.thumbnail_large = generated.get(ThumbnailSizeStrEnum.LARGE)
         except Exception:
             logger.exception(
                 "Failed to generate thumbnails for %s", photo.storage_key
@@ -196,21 +248,18 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
             photo.thumbnail_medium = None
             photo.thumbnail_large = None
 
-    # Capture the staged originals before plan_staging_promotion rewrites the
-    # fields: under deferred promotion the bytes are still at staging/<key>, so
-    # the SHA-256 passed to AdImageService must come from there (03-DB-005).
-    # The list keeps each digest aligned with ``input.photos`` by index.
+    # Capture the staged originals for the SHA-256 passed to AdImageService: under
+    # deferred promotion the bytes are still at staging/<key>, so the digest must
+    # come from the staged key captured above (03-DB-005).  The list keeps each
+    # digest aligned with ``input.photos`` by index.
     staged_digests: list[str | None] = [
-        FileHashService.calculate_sha256(os.path.join(settings.MEDIA_ROOT, key))
-        if (key := photo.storage_key).startswith(STAGING_PREFIX)
+        FileHashService.calculate_sha256(
+            os.path.join(settings.MEDIA_ROOT, staged_key)
+        )
+        if staged_key is not None
         else None
-        for photo in input.photos
+        for staged_key in staged_keys
     ]
-
-    # Key rewriting happens BEFORE the transaction because it is PURE — an
-    # in-memory rewrite of SubmittedPhoto fields plus an existence check, with
-    # no filesystem mutation.  The physical move is scheduled post-commit.
-    permanent_keys = plan_staging_promotion(input.photos)
 
     # DB transaction: save + images + status transition
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped

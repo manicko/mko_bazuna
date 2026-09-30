@@ -132,19 +132,13 @@ class Command(BaseCommand):
         # rows undelivered and retryable by the next run (03-DB-007). The mark is
         # a synchronous single statement on this connection — no lock, no
         # transaction — so it stays honest under any process.
-        rows_by_user: dict[int, list[SavedSearchNotification]] = {}
-        for notification in notifications_to_create:
-            rows_by_user.setdefault(
-                notification.saved_search.user_id, []
-            ).append(notification)
-
         delivered_user_ids: set[int] = set()
         users_attempted = len(user_ads)
         users_sent = 0
         try:
             users_sent = asyncio.run(
                 self._send_user_digests(
-                    settings.BOT_TOKEN, user_ads, rows_by_user, delivered_user_ids
+                    settings.BOT_TOKEN, user_ads, delivered_user_ids
                 )
             )
         except AiogramError as exc:
@@ -281,7 +275,6 @@ class Command(BaseCommand):
         self,
         bot_token: str,
         user_ads: dict[int, list],
-        rows_by_user: dict[int, list[SavedSearchNotification]] | None = None,
         delivered_user_ids: set[int] | None = None,
     ) -> int:
         """Send consolidated digest messages; return users messaged.
@@ -293,10 +286,9 @@ class Command(BaseCommand):
         ``handle()`` uses to decide whether the day's dispatch succeeded.
 
         Each user whose ``send_message`` (primary or retry) succeeds is added to
-        ``delivered_user_ids``. ``handle()`` then writes that user's delivery
-        receipts from ``rows_by_user`` once this coroutine has returned. A user
-        with no ``chat_id`` is skipped BEFORE the send, so it is never added and
-        its rows stay correctly unmarked and retryable (03-DB-007).
+        ``delivered_user_ids``. A user with no ``chat_id`` is skipped BEFORE the
+        send, so it is never added and its rows stay correctly unmarked and
+        retryable (03-DB-007).
         """
         from apps.users.models import User
 
