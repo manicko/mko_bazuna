@@ -498,6 +498,11 @@ msgstr "У вас нет прав на повторное активирован
 msgid "Access denied"
 msgstr "Доступ запрещён"
 
+msgid ""
+"One of your photos is no longer available. Please upload it again."
+msgstr ""
+"Одно из ваших фото больше недоступно. Пожалуйста, загрузите его снова."
+
 msgid "Entire country"
 msgstr "Вся страна"
 

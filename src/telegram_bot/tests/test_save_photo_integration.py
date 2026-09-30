@@ -164,13 +164,18 @@ class TestSavePhotoThumbnailsIntegration:
 
 
 class TestSubmitAdStagingMove:
-    """submit_ad promotes staging files to permanent storage before the TX.
+    """submit_ad promotes staging files to permanent storage AFTER the TX commits.
 
-    Files written by ``save_photo`` to ``MEDIA_ROOT/staging/`` must be moved
-    to permanent storage by ``submit_ad`` *before* the ``transaction.atomic()``
-    block, so that AdImage rows reference permanent keys (never staging keys).
-    On TX rollback, the permanent files become unreferenced orphans — the
-    normal orphan sweep reclaims them.
+    Files written by ``save_photo`` to ``MEDIA_ROOT/staging/`` are key-rewritten
+    to their permanent form *before* the ``transaction.atomic()`` block (a pure,
+    in-memory rewrite of ``SubmittedPhoto`` fields), but the physical move runs
+    from a ``transaction.on_commit`` callback registered inside the atomic block.
+    The file therefore stays in ``staging/`` — where the orphan sweep never looks
+    — until its ``AdImage`` row has committed, which closes the window in which a
+    concurrent sweep could classify a promoted-but-uncommitted file as an orphan.
+
+    On TX rollback nothing was promoted, so the staged file simply remains in
+    ``staging/`` and is reclaimed by the existing TTL (``_STAGING_TTL_SECONDS``).
     """
 
     @pytest.mark.asyncio
@@ -178,7 +183,12 @@ class TestSubmitAdStagingMove:
         self, user, tmp_path
     ) -> None:
         """Staging files (original + thumbnails) are moved to permanent MEDIA_ROOT;
-        AdImage rows reference permanent keys."""
+        AdImage rows reference permanent keys.
+
+        The class runs under ``django_db(transaction=True)``, so the
+        ``transaction.on_commit`` promotion has already fired by the time
+        ``submit_ad`` returns and every file-side assertion below holds.
+        """
         from apps.ads.models import AdImage
         from apps.ads.services.submission import SubmitAdInput, submit_ad
         from apps.currencies.enums import CurrencyCode
@@ -253,15 +263,195 @@ class TestSubmitAdStagingMove:
             assert ad_image.thumbnail_large == "photo-large.jpg"
 
     @pytest.mark.asyncio
-    async def test_submit_ad_rollback_leaves_permanent_orphans(
+    async def test_files_are_not_promoted_before_the_row_commits(
         self, user, tmp_path
     ) -> None:
-        """On TX rollback, permanent files are left as unreferenced orphans.
+        """No file is visible in permanent storage while the TX is still open.
 
-        ``move_staging_to_permanent`` runs before ``transaction.atomic()``;
-        if the TX rolls back (e.g. auto_moderate raises), the permanent files
-        are already on disk but no AdImage rows were created.  The normal
-        orphan sweep would reclaim them.
+        Direct guard for finding 03-DB-005.  The promotion runs from an
+        ``on_commit`` callback, so at the moment ``auto_moderate`` is invoked —
+        from *inside* the still-open ``transaction.atomic()`` block — the staging
+        original must still exist and the permanent ``photo.jpg`` must not exist
+        yet.  The interleaving is forced with the ``auto_moderate`` hook, never
+        with sleeps.
+
+        ``auto_moderate`` is imported function-locally inside ``submit_ad``, so
+        the only valid patch target is
+        ``apps.moderation.services.auto_moderation.auto_moderate``.
+        """
+        from apps.ads.models import AdImage
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import STAGING_PREFIX
+        from telegram_bot.services.ad_data import create_draft_ad
+
+        media_root = tmp_path
+
+        observed: dict[str, bool] = {}
+
+        def inspect_filesystem(*_args, **_kwargs) -> bool:
+            """Snapshot the filesystem from inside the open transaction."""
+            observed["staging_exists"] = (media_root / STAGING_PREFIX / "photo.jpg").exists()
+            observed["permanent_exists"] = (media_root / "photo.jpg").exists()
+            return True
+
+        with override_settings(MEDIA_ROOT=str(media_root)):
+            ad = await create_draft_ad(user_id=user.id)
+
+            photo_bytes = _make_test_image(800, 600)
+            storage_key = f"{STAGING_PREFIX}photo.jpg"
+            staging_dir = media_root / STAGING_PREFIX
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            (staging_dir / "photo.jpg").write_bytes(photo_bytes)
+
+            photos = [
+                {
+                    "storage_key": storage_key,
+                    "telegram_file_id": "AgADBQ",
+                    "position": 0,
+                }
+            ]
+
+            with patch(
+                "apps.moderation.services.auto_moderation.auto_moderate",
+                side_effect=inspect_filesystem,
+            ):
+                passed, errors = await sync_to_async(submit_ad)(
+                    SubmitAdInput(
+                        ad_id=ad.id,
+                        title_ru="Title",
+                        desc_ru="Description",
+                        category_id=None,
+                        city_id=None,
+                        price_amount=100,
+                        price_currency=CurrencyCode.EUR,
+                        photos=photos,
+                        user_id=user.id,
+                    )
+                )
+
+            assert passed is True
+
+            # The hook actually ran inside the TX.
+            assert observed, "auto_moderate was never reached"
+
+            # Pre-fix this FAILS: the file was promoted before the TX opened.
+            assert observed["staging_exists"] is True, (
+                "staging original vanished before the row committed"
+            )
+            assert observed["permanent_exists"] is False, (
+                "photo.jpg became visible in permanent storage before the row "
+                "committed — the 03-DB-005 window is open"
+            )
+
+            # And it did commit, so after submit_ad returns the file is promoted.
+            assert (media_root / "photo.jpg").is_file()
+            ad_image = await sync_to_async(AdImage.objects.get)(ad=ad)
+            assert ad_image.image == "photo.jpg"
+
+    @pytest.mark.asyncio
+    async def test_dedup_survives_deferred_promotion(self, user, tmp_path) -> None:
+        """Content dedup still works when the bytes are not at the row's key.
+
+        Under deferred promotion ``AdImageService._compute_sha256(permanent_key)``
+        finds nothing and returns ``""``; the existing ``if digest:`` guard would
+        then silently disable dedup for every submission.  ``submit_ad`` therefore
+        hashes the STAGED bytes and passes ``sha256=`` explicitly.  This control
+        FAILS if that override is removed from the ``submit_ad`` call site: the
+        stored digest would be empty and the second submission would create a
+        second row.
+        """
+        from apps.ads.models import AdImage
+        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.currencies.enums import CurrencyCode
+        from apps.media.services.filesystem import STAGING_PREFIX
+        from apps.media.services.hash_service import FileHashService
+        from telegram_bot.services.ad_data import create_draft_ad
+
+        media_root = tmp_path
+
+        photo_bytes = _make_test_image(800, 600)
+        digest_probe = media_root / "digest-probe.jpg"
+        digest_probe.write_bytes(photo_bytes)
+        expected_digest = FileHashService.calculate_sha256(str(digest_probe))
+
+        with override_settings(MEDIA_ROOT=str(media_root)):
+            first_ad = await create_draft_ad(user_id=user.id)
+
+            def stage(key: str) -> str:
+                storage_key = f"{STAGING_PREFIX}{key}"
+                staging_dir = media_root / STAGING_PREFIX
+                staging_dir.mkdir(parents=True, exist_ok=True)
+                (staging_dir / key).write_bytes(photo_bytes)
+                return storage_key
+
+            def build_input(ad, storage_key: str) -> SubmitAdInput:
+                return SubmitAdInput(
+                    ad_id=ad.id,
+                    title_ru="Title",
+                    desc_ru="Description",
+                    category_id=None,
+                    city_id=None,
+                    price_amount=100,
+                    price_currency=CurrencyCode.EUR,
+                    photos=[
+                        {
+                            "storage_key": storage_key,
+                            "telegram_file_id": "AgADBQ",
+                            "position": 0,
+                        }
+                    ],
+                    user_id=user.id,
+                )
+
+            with patch(
+                "apps.moderation.services.auto_moderation.auto_moderate",
+                return_value=True,
+            ):
+                first_key = stage("first.jpg")
+                passed, first_errors = await sync_to_async(submit_ad)(
+                    build_input(first_ad, first_key)
+                )
+                assert passed is True, first_errors
+
+                first_image = await sync_to_async(AdImage.objects.get)(ad=first_ad)
+
+                # The digest is non-empty and equals the digest of the STAGED bytes.
+                assert first_image.sha256 != "", "deferred promotion emptied the digest"
+                assert first_image.sha256 == expected_digest
+
+                # ``create_draft_ad`` deletes any pre-existing DRAFT for the
+                # user, so the second draft is created only after the first ad
+                # has left DRAFT (submit_ad → ON_MODERATION).
+                second_ad = await create_draft_ad(user_id=user.id)
+                second_key = stage("second.jpg")
+                passed, second_errors = await sync_to_async(submit_ad)(
+                    build_input(second_ad, second_key)
+                )
+                assert passed is True, second_errors
+
+            # Identical bytes → same user → same row, not a second row.
+            count = await sync_to_async(
+                lambda: AdImage.objects.filter(ad__user_id=user.id).count()
+            )()
+            assert count == 1, (
+                "identical bytes created a duplicate row — the sha256 override "
+                "is missing or ineffective"
+            )
+
+    @pytest.mark.asyncio
+    async def test_submit_ad_rollback_leaves_files_in_staging(
+        self, user, tmp_path
+    ) -> None:
+        """On TX rollback nothing was promoted, so files stay in staging/.
+
+        This INVERTS the former ``test_submit_ad_rollback_leaves_permanent_orphans``,
+        which asserted the defect: it expected the file to have been promoted
+        *before* the TX and therefore left as a permanent orphan on rollback.
+        Under the ``on_commit`` design the move never runs when the TX rolls
+        back, so permanent ``photo.jpg`` does not exist, the staging original and
+        its thumbnails still exist, no ``AdImage`` rows were created, and the ad
+        stays DRAFT.  The staged file is reclaimed by the existing TTL.
         """
         from apps.ads.models import AdImage
         from apps.ads.services.submission import SubmitAdInput, submit_ad
@@ -308,19 +498,23 @@ class TestSubmitAdStagingMove:
                         )
                     )
 
-            # Permanent files exist on disk (moved before TX, TX rolled back)
-            assert (media_root / "photo.jpg").is_file(), (
-                "permanent original should exist after rollback"
+            # Nothing reached permanent storage — the move is post-commit.
+            assert not (media_root / "photo.jpg").exists(), (
+                "permanent original must not exist after rollback"
             )
-            assert not (media_root / STAGING_PREFIX / "photo.jpg").exists(), (
-                "staging original should have been moved before TX rollback"
-            )
-
-            # Thumbnail files also moved to permanent (orphans after rollback)
             for suffix in ("small", "medium", "large"):
-                assert (media_root / f"photo-{suffix}.jpg").is_file(), (
-                    f"permanent thumbnail {suffix} should exist after rollback"
+                assert not (media_root / f"photo-{suffix}.jpg").exists(), (
+                    f"permanent thumbnail {suffix} must not exist after rollback"
                 )
+
+            # The staged files remain, awaiting the existing TTL reclamation.
+            assert (media_root / STAGING_PREFIX / "photo.jpg").is_file(), (
+                "staging original should still exist after rollback"
+            )
+            for suffix in ("small", "medium", "large"):
+                assert (
+                    media_root / STAGING_PREFIX / f"photo-{suffix}.jpg"
+                ).is_file(), f"staging thumbnail {suffix} should still exist"
 
             # No AdImage rows created (TX rolled back)
             count = await sync_to_async(

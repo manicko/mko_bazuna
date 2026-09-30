@@ -13,6 +13,7 @@ No database interaction required — pure unit tests.
 import errno
 import io
 import logging
+import os
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -28,7 +29,8 @@ from apps.media.services.filesystem import (
     assert_storage_key_contained,
     delete_photo,
     generate_storage_key,
-    move_staging_to_permanent,
+    plan_staging_promotion,
+    promote_media_files,
     strip_photo_exif,
     validate_jpeg_bytes,
     validate_photo,
@@ -480,8 +482,8 @@ class TestAssertStorageKeyContained:
 # ---------------------------------------------------------------------------
 
 
-class TestMoveStagingToPermanent:
-    """``move_staging_to_permanent`` — staging prefix removal and file promotion."""
+class TestPlanStagingPromotion:
+    """``plan_staging_promotion`` — PURE key rewriting with existence validation."""
 
     @pytest.fixture(autouse=True)
     def _isolate_media_root(
@@ -494,7 +496,11 @@ class TestMoveStagingToPermanent:
             yield
 
     def test_strips_staging_prefix_from_all_fields(self, tmp_path: Path) -> None:
-        """Staging prefix is stripped from storage_key and all thumbnail fields."""
+        """Staging prefix is stripped from storage_key and all thumbnail fields.
+
+        ``plan_staging_promotion`` performs no filesystem mutation, so the
+        staging files must still be present at their original paths afterwards.
+        """
         staging_dir = tmp_path / "staging"
         for name in [
             "uuid.jpg",
@@ -513,21 +519,27 @@ class TestMoveStagingToPermanent:
             )
         ]
 
-        move_staging_to_permanent(photos)
+        permanent_keys = plan_staging_promotion(photos)
 
         assert photos[0].storage_key == "uuid.jpg"
         assert photos[0].thumbnail_small == "uuid-small.jpg"
         assert photos[0].thumbnail_medium == "uuid-medium.jpg"
         assert photos[0].thumbnail_large == "uuid-large.jpg"
 
-        # Files physically moved to permanent location
-        assert (tmp_path / "uuid.jpg").exists()
-        assert (tmp_path / "uuid-small.jpg").exists()
-        assert (tmp_path / "uuid-medium.jpg").exists()
-        assert (tmp_path / "uuid-large.jpg").exists()
+        assert set(permanent_keys) == {
+            "uuid.jpg",
+            "uuid-small.jpg",
+            "uuid-medium.jpg",
+            "uuid-large.jpg",
+        }
+
+        # PURE: no filesystem mutation — the staging files are still in place
+        # and nothing was written to permanent storage.
+        assert (staging_dir / "uuid.jpg").exists()
+        assert not (tmp_path / "uuid.jpg").exists()
 
     def test_leaves_non_staging_keys_untouched(self, tmp_path: Path) -> None:
-        """Keys without the staging prefix are not modified."""
+        """Keys without the staging prefix are not modified and not returned."""
         (tmp_path / "permanent.jpg").write_bytes(b"data")
         (tmp_path / "permanent-small.jpg").write_bytes(b"data")
 
@@ -540,60 +552,16 @@ class TestMoveStagingToPermanent:
             )
         ]
 
-        move_staging_to_permanent(photos)
+        permanent_keys = plan_staging_promotion(photos)
 
         assert photos[0].storage_key == "permanent.jpg"
         assert photos[0].thumbnail_small == "permanent-small.jpg"
         assert photos[0].thumbnail_medium == "perm-medium.jpg"
         assert photos[0].thumbnail_large == "perm-large.jpg"
-
-    def test_updates_key_even_if_file_missing(self) -> None:
-        """The key is updated even when the staging file does not exist on disk."""
-        photos = [SubmittedPhoto(storage_key="staging/missing.jpg")]
-
-        move_staging_to_permanent(photos)
-
-        assert photos[0].storage_key == "missing.jpg"
-
-    def test_exdev_falls_back_to_shutil_move(self, tmp_path: Path) -> None:
-        """OSError(EXDEV) from os.replace triggers the shutil.move fallback."""
-        staging_file = tmp_path / "staging" / "uuid.jpg"
-        staging_file.write_bytes(b"test-data")
-
-        photos = [SubmittedPhoto(storage_key="staging/uuid.jpg")]
-
-        with (
-            patch(
-                "apps.media.services.filesystem.os.replace",
-                side_effect=OSError(errno.EXDEV, "cross-device"),
-            ) as mock_replace,
-            patch("apps.media.services.filesystem.shutil.move") as mock_move,
-        ):
-            move_staging_to_permanent(photos)
-
-        mock_replace.assert_called_once()
-        mock_move.assert_called_once()
-        assert photos[0].storage_key == "uuid.jpg"
-
-    def test_non_exdev_oserror_reraises(self, tmp_path: Path) -> None:
-        """Non-EXDEV OSError from os.replace is re-raised to the caller."""
-        staging_file = tmp_path / "staging" / "uuid.jpg"
-        staging_file.write_bytes(b"test-data")
-
-        photos = [SubmittedPhoto(storage_key="staging/uuid.jpg")]
-
-        with patch(
-            "apps.media.services.filesystem.os.replace",
-            side_effect=OSError(errno.EACCES, "permission denied"),
-        ):
-            with pytest.raises(OSError, match="permission denied"):
-                move_staging_to_permanent(photos)
-
-        # Key must NOT be updated when os.replace raises
-        assert photos[0].storage_key == "staging/uuid.jpg"
+        assert permanent_keys == []
 
     def test_multiple_photos_processed(self, tmp_path: Path) -> None:
-        """Each photo dict in the list is processed independently."""
+        """Each photo in the list is processed independently."""
         staging_dir = tmp_path / "staging"
         for name in ["a.jpg", "b.jpg"]:
             (staging_dir / name).write_bytes(b"data")
@@ -603,7 +571,137 @@ class TestMoveStagingToPermanent:
             SubmittedPhoto(storage_key="staging/b.jpg", thumbnail_small=None),
         ]
 
-        move_staging_to_permanent(photos)
+        permanent_keys = plan_staging_promotion(photos)
 
         assert photos[0].storage_key == "a.jpg"
         assert photos[1].storage_key == "b.jpg"
+        assert set(permanent_keys) == {"a.jpg", "b.jpg"}
+
+    def test_raises_and_leaves_key_untouched_when_file_missing(self) -> None:
+        """A missing staged file raises ``FileNotFoundError`` and rewrites no key.
+
+        This INVERTS the former ``test_updates_key_even_if_file_missing``,
+        which asserted the defect: it rewrote the key to the permanent form
+        even though there was no file to move.  The contract is now *rewrite a
+        key iff the file was actually moved* — a missing staged file is a
+        terminal error the caller must surface, and the sibling
+        ``TestPromoteMediaFiles::test_non_exdev_oserror_reraises`` already
+        asserted the same contract for the move itself.
+        """
+        photos = [SubmittedPhoto(storage_key="staging/missing.jpg")]
+
+        with pytest.raises(FileNotFoundError, match="staging/missing.jpg"):
+            plan_staging_promotion(photos)
+
+        # No key is rewritten when validation fails.
+        assert photos[0].storage_key == "staging/missing.jpg"
+
+
+class TestPromoteMediaFiles:
+    """``promote_media_files`` — the post-commit filesystem move."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_media_root(
+        self,
+        tmp_path: Path,
+    ) -> Iterator[None]:
+        """Redirect MEDIA_ROOT to a temp dir and create the staging subdir."""
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            (tmp_path / "staging").mkdir()
+            yield
+
+    def test_promotes_staging_file_to_permanent(self, tmp_path: Path) -> None:
+        """A staged file is moved from ``staging/<key>`` to ``<key>``."""
+        (tmp_path / "staging" / "uuid.jpg").write_bytes(b"test-data")
+
+        promote_media_files(["uuid.jpg"])
+
+        assert (tmp_path / "uuid.jpg").is_file()
+        assert not (tmp_path / "staging" / "uuid.jpg").exists()
+
+    def test_exdev_falls_back_to_shutil_move(self, tmp_path: Path) -> None:
+        """OSError(EXDEV) from os.replace triggers the shutil.move fallback."""
+        staging_file = tmp_path / "staging" / "uuid.jpg"
+        staging_file.write_bytes(b"test-data")
+
+        with (
+            patch(
+                "apps.media.services.filesystem.os.replace",
+                side_effect=OSError(errno.EXDEV, "cross-device"),
+            ) as mock_replace,
+            patch("apps.media.services.filesystem.shutil.move") as mock_move,
+        ):
+            promote_media_files(["uuid.jpg"])
+
+        mock_replace.assert_called_once()
+        mock_move.assert_called_once()
+
+    def test_non_exdev_oserror_is_logged_and_not_propagated(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A non-EXDEV ``OSError`` is logged, never propagated out of the move.
+
+        This carries forward the intent of the former
+        ``test_non_exdev_oserror_reraises`` (which pinned that ``os.replace``
+        failures are the error path, not a happy path) under the new
+        post-commit contract: because ``promote_media_files`` runs from
+        ``transaction.on_commit`` the row is already committed, so the failure
+        must be recorded rather than raised back into the caller.  It asserts
+        the *behavioural* consequence — an ERROR/WARNING record exists and the
+        file was not moved — not a message's wording.
+        """
+        staging_file = tmp_path / "staging" / "uuid.jpg"
+        staging_file.write_bytes(b"test-data")
+
+        with (
+            caplog.at_level(logging.ERROR, logger="apps.media.services.filesystem"),
+            patch(
+                "apps.media.services.filesystem.os.replace",
+                side_effect=OSError(errno.EACCES, "permission denied"),
+            ),
+        ):
+            promote_media_files(["uuid.jpg"])
+
+        assert any(record.levelno >= logging.ERROR for record in caplog.records), (
+            "expected an ERROR/WARNING record for the failed key"
+        )
+        # The file was not moved, so the key was not promoted.
+        assert (tmp_path / "staging" / "uuid.jpg").exists()
+        assert not (tmp_path / "uuid.jpg").exists()
+
+    def test_one_failed_key_does_not_abort_the_remaining_promotions(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """One failing key is logged and skipped; the rest still move.
+
+        Develops a real race with the shipped convention: this runs POST-COMMIT,
+        so an exception crossing back into the caller would be a lie — the row is
+        already committed.  The per-key handler must log an ERROR/WARNING record
+        and continue rather than propagate.
+        """
+        (tmp_path / "staging" / "a.jpg").write_bytes(b"data-a")
+        (tmp_path / "staging" / "b.jpg").write_bytes(b"data-b")
+
+        real_replace = os.replace
+
+        def replace_fails_for_a(src: str, dst: str) -> None:
+            if os.path.basename(src) == "a.jpg":
+                raise OSError(errno.EACCES, "permission denied")
+            real_replace(src, dst)
+
+        with (
+            caplog.at_level(logging.ERROR, logger="apps.media.services.filesystem"),
+            patch(
+                "apps.media.services.filesystem.os.replace",
+                side_effect=replace_fails_for_a,
+            ),
+        ):
+            promote_media_files(["a.jpg", "b.jpg"])
+
+        # The failure was recorded, not swallowed silently.
+        assert any(
+            record.levelno >= logging.ERROR for record in caplog.records
+        ), "expected an ERROR/WARNING record for the failed key"
+        # The later key still moved despite the earlier failure.
+        assert (tmp_path / "b.jpg").is_file()
+        assert not (tmp_path / "staging" / "b.jpg").exists()

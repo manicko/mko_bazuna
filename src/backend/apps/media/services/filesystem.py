@@ -2,6 +2,16 @@
 Media filesystem utilities for image validation and storage.
 
 Validates photos and generates storage keys per spec.
+
+Staging lifecycle (03-DB-005): in-flight uploads live in
+``MEDIA_ROOT/staging/`` and are **key-rewritten** to their permanent form
+*before* the ad-submission transaction by :func:`plan_staging_promotion` (a
+pure, in-memory operation).  The physical move to permanent storage is
+performed by :func:`promote_media_files`, which the caller schedules via
+``transaction.on_commit`` so that a staged file is never visible to the
+orphan sweep before the ``AdImage`` row that references it has committed.
+A missing staged file is an error, not a silent skip: a rollback leaves the
+file in ``staging/`` for the existing TTL reclamation.
 """
 
 import errno
@@ -11,6 +21,7 @@ import os
 import shutil
 import time
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 
 from django.conf import settings
@@ -41,47 +52,84 @@ STAGING_SUBDIR = "staging"
 STAGING_PREFIX = f"{STAGING_SUBDIR}/"
 
 
-def move_staging_to_permanent(photos: list[SubmittedPhoto]) -> None:
-    """Promote in-flight staging files to permanent MEDIA_ROOT storage.
+def plan_staging_promotion(photos: list[SubmittedPhoto]) -> list[str]:
+    """Purely key-rewrite every staged field and validate its file exists.
 
-    Iterates every key field on each photo (``storage_key`` and all
-    ``thumbnail_*`` variants), strips the ``staging/`` prefix, and atomically
-    renames the file from ``staging/<key>`` to ``<key>``.  Keys that do not
-    carry the staging prefix (e.g. seed data or test fixtures that write
-    directly to permanent storage) are left untouched.
+    For each ``photo``, every key field (``storage_key`` and all
+    ``thumbnail_*`` variants) that carries the ``staging/`` prefix is
+    existence-checked under ``MEDIA_ROOT``; the field is then rewritten
+    **in place** to its permanent form (prefix stripped).  Fields without the
+    staging prefix (seed data, web-edit fixtures) are left untouched.
 
-    Uses ``os.replace`` (atomic on the same filesystem) with a
-    ``shutil.move`` fallback for the ``EXDEV`` cross-filesystem edge case.
-
-    The caller is responsible for running this *before* any
-    ``transaction.atomic()`` block so that a DB rollback leaves the permanent
-    files as unreferenced orphans (reclaimed by the normal orphan sweep)
-    rather than re-desynchronising the filesystem and database.
+    This function performs **no filesystem mutation** — no move, no write, no
+    mkdir.  The caller runs it before opening the ad-submission transaction
+    because it is pure; the physical move is deferred to
+    :func:`promote_media_files` via ``transaction.on_commit`` so no promoted
+    file can be seen by the orphan sweep before its row commits.
 
     Args:
-        photos: List of ``SubmittedPhoto`` instances (as built by the FSM
-            ``process_photos`` handler and coerced by ``SubmitAdInput``).
-            Modified **in place** — each staging key is replaced
-            with its permanent counterpart.
+        photos: List of ``SubmittedPhoto`` instances.  Modified **in place** —
+            each staging key is replaced with its permanent counterpart.
+
+    Returns:
+        The deduplicated list of permanent keys to move (file order, first
+        occurrence wins).
+
+    Raises:
+        FileNotFoundError: if a staged file is absent.  No key is rewritten in
+            that case — the caller converts this into a recoverable error
+            rather than publishing an ad whose image does not exist.
     """
     key_fields = ("storage_key", "thumbnail_small", "thumbnail_medium", "thumbnail_large")
+    permanent_keys: list[str] = []
     for photo in photos:
         for field in key_fields:
             key = getattr(photo, field)
             if not key or not key.startswith(STAGING_PREFIX):
                 continue
-            permanent_key = key.removeprefix(STAGING_PREFIX)
             staging_path = os.path.join(settings.MEDIA_ROOT, key)
-            permanent_path = os.path.join(settings.MEDIA_ROOT, permanent_key)
-            if os.path.exists(staging_path):
-                try:
-                    os.replace(staging_path, permanent_path)
-                except OSError as exc:
-                    if exc.errno == errno.EXDEV:
-                        shutil.move(staging_path, permanent_path)
-                    else:
-                        raise
+            if not os.path.exists(staging_path):
+                raise FileNotFoundError(staging_path)
+            permanent_key = key.removeprefix(STAGING_PREFIX)
             setattr(photo, field, permanent_key)
+            if permanent_key not in permanent_keys:
+                permanent_keys.append(permanent_key)
+    return permanent_keys
+
+
+def promote_media_files(keys: Iterable[str]) -> None:
+    """Move staged files to permanent MEDIA_ROOT storage.
+
+    For each *key*, atomically renames ``staging/<key>`` to ``<key>`` using
+    ``os.replace``, with a ``shutil.move`` fallback for the ``EXDEV``
+    cross-filesystem edge case.  Any other failure is logged; nothing is
+    re-raised (see below).
+
+    This runs **post-commit**, from a ``transaction.on_commit`` callback, so it
+    logs and continues on a per-key failure and **never propagates**: the
+    referencing row is already committed, and an exception crossing back into
+    the caller would misreport a post-commit failure as pre-commit.  Mirrors
+    the shipped convention in ``apps.media.signals``.
+
+    Args:
+        keys: Permanent storage keys to promote (as returned by
+            :func:`plan_staging_promotion`).
+    """
+    for key in keys:
+        staging_path = os.path.join(settings.MEDIA_ROOT, STAGING_PREFIX, key)
+        permanent_path = os.path.join(settings.MEDIA_ROOT, key)
+        try:
+            os.replace(staging_path, permanent_path)
+        except OSError as exc:
+            if exc.errno == errno.EXDEV:
+                try:
+                    shutil.move(staging_path, permanent_path)
+                except OSError:
+                    logger.exception(
+                        "Failed to promote staged file %s across devices", key
+                    )
+            else:
+                logger.exception("Failed to promote staged file %s", key)
 
 
 def assert_storage_key_contained(storage_key: str) -> None:

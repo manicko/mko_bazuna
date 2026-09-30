@@ -41,7 +41,9 @@ class AdImageService:
         return FileHashService.calculate_sha256(str(file_path))
 
     @classmethod
-    def create_or_skip(cls, ad: Ad, image: str, **extra) -> AdImage:
+    def create_or_skip(
+        cls, ad: Ad, image: str, *, sha256: str | None = None, **extra
+    ) -> AdImage:
         """Create an ``AdImage``, returning an existing duplicate if one is found.
 
         Deduplication is scoped per seller: if the ad's owner already has an
@@ -52,25 +54,33 @@ class AdImageService:
         Args:
             ad: Parent ad.  Must already be persisted so that ``user_id``
                 is available for the dedup query.
-            image: Storage key of the image file.
+            image: Storage key of the image file.  Under the deferred-promotion
+                design (03-DB-005) this is the **permanent** key while the
+                bytes are still in ``staging/``, so ``_compute_sha256(image)``
+                would find nothing — callers in that situation must pass
+                *sha256* explicitly.
+            sha256: Pre-computed digest of the image bytes.  When ``None``
+                (the default) the digest is computed from ``MEDIA_ROOT/image``.
+                Pass it whenever the bytes are not at the row's key, or content
+                dedup silently no-ops on the empty digest.
             **extra: Additional ``AdImage`` field values
                 (``telegram_file_id``, ``position``, thumbnail keys, …).
 
         Returns:
             The newly created ``AdImage``, or the existing duplicate row.
         """
-        sha256 = cls._compute_sha256(image)
+        digest = sha256 if sha256 is not None else cls._compute_sha256(image)
 
-        if sha256:
+        if digest:
             duplicate = AdImage.objects.filter(
-                sha256=sha256,
+                sha256=digest,
                 ad__user_id=ad.user_id,
             ).first()
             if duplicate is not None:
                 logger.info(
                     "AdImage dedup: sha256=%s ad_id=%s user_id=%s "
                     "skipped (existing pk=%s)",
-                    sha256[:12],
+                    digest[:12],
                     ad.pk,
                     ad.user_id,
                     duplicate.pk,
@@ -80,6 +90,6 @@ class AdImageService:
         return AdImage.objects.create(
             ad=ad,
             image=image,
-            sha256=sha256,
+            sha256=digest,
             **extra,
         )

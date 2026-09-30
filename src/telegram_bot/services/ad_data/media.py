@@ -146,12 +146,12 @@ async def touch_staging_photos(photos: list[dict[str, Any]]) -> None:
     leaves the staging file's mtime untouched, so without this call the row's
     clock and the file's clock would drift apart and a dialog that stays
     interactive for more than 2 h would publish with a dangling ``AdImage``
-    reference (finding 03-DB-003; the ``move_staging_to_permanent`` silent-skip
-    defect is phase 07's).  Touching the files on the two handlers that can see
-    a non-empty ``photos`` list keeps both artefacts on one clock.
+    reference (finding 03-DB-003).  Touching the files on the two handlers that
+    can see a non-empty ``photos`` list keeps both artefacts on one clock.
 
     Keys without the ``staging/`` prefix are skipped (already permanent or seed
-    data), mirroring :func:`move_staging_to_permanent`.  The ``os.utime`` calls
+    data), mirroring :func:`apps.media.services.filesystem.plan_staging_promotion`.
+    The ``os.utime`` calls
     run via ``asyncio.to_thread`` so the event loop is never blocked, and never
     inside a transaction (the bot's handler path has none).
 

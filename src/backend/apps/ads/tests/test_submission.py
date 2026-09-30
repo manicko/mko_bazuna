@@ -122,6 +122,65 @@ def test_submit_ad_commit_when_auto_moderate_passes(
 
 
 # ---------------------------------------------------------------------------
+# Interleaving B: a staged file reaped before submission is recoverable
+# ---------------------------------------------------------------------------
+
+
+def test_missing_staged_file_reports_a_recoverable_error(
+    seller, category, city, tmp_path
+) -> None:
+    """A reaped staged photo yields a recoverable error, never a photo-less ad.
+
+    Interleaving B, exercised end to end through ``submit_ad``.  The staging
+    file was reclaimed (e.g. by the 2 h TTL) before the seller confirmed.  The
+    pre-flight existence check must catch it *before* the transaction opens and
+    return ``(False, [<recoverable message>])`` — strictly better than the old
+    behaviour, which rewrote the key unconditionally and committed an
+    ``AdImage`` row pointing at a file that never existed.
+
+    Hosted here (rather than in the bot's ``TestSubmitAdStagingMove``) because
+    this module's ``submit_ad`` cases already run under
+    ``django_db(transaction=True)`` and need no async wrapper; the pre-flight
+    return is observed without converting an unrelated class.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+    storage_key = f"{STAGING_PREFIX}reaped.jpg"
+    photos = [{"storage_key": storage_key, "telegram_file_id": "AgADBQ", "position": 0}]
+    payload = SubmitAdInput(
+        ad_id=ad.id,
+        title_ru="Title",
+        desc_ru="Description",
+        category_id=ad.category_id,
+        city_id=ad.city_id,
+        price_amount=Decimal("100"),
+        price_currency=CurrencyCode.EUR,
+        photos=photos,
+        user_id=ad.user_id,
+    )
+
+    # The staged file is absent — the photo was reaped before submission.
+    with override_settings(MEDIA_ROOT=str(tmp_path)):
+        passed, errors = submit_ad(payload)
+
+    assert passed is False
+    assert len(errors) == 1
+    assert "photo" in errors[0].lower()
+    assert "upload" in errors[0].lower()
+
+    # No AdImage row and no rewritten key.
+    assert AdImage.objects.filter(ad=ad).count() == 0
+    assert payload.photos[0].storage_key == storage_key
+    ad.refresh_from_db()
+    assert ad.status == AdStatus.DRAFT
+
+
+# ---------------------------------------------------------------------------
 # Parity test: submit_ad delegates price normalization to the shared utility
 # (10-QLT-001 DRY invariant — closes V-09 test gap)
 # ---------------------------------------------------------------------------

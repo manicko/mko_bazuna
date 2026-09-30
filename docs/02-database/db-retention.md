@@ -123,6 +123,18 @@ only while the draft always died first and **is no longer the justification**. T
 2-hour value is a hard backstop for *abandoned* uploads, not a bound on dialog length;
 a dialog that goes silent still loses its row (30 min) before its files (2 h).
 
+**`staging/` also holds files awaiting post-commit promotion (03-DB-005).**
+`submit_ad` writes the `AdImage` row with the **permanent** key but defers the physical
+`os.replace` to a `transaction.on_commit` callback, so a file is never visible to the
+orphan sweep (`apps.media.management.commands.sweep_orphaned_media._walk_media_files`,
+which excludes `staging/`) before its row commits. That closes the window in which a
+promoted-but-uncommitted file could be classified as an orphan and deleted. The 2 h
+**mtime** TTL is what bounds the remaining gap: between a committed `AdImage` row and
+its promoted file, and — if the process is killed in that sub-millisecond window — it
+reclaims the file and the dangling reference becomes permanent (accepted risk). A
+rolled-back submission promotes nothing, so its staged file stays in `staging/` for the
+same TTL, exactly like an abandoned upload.
+
 ## §3 Post-Withdrawal Data Retention
 
 When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecycle applies:

@@ -1411,3 +1411,8 @@ msgstr ""
 #: src/telegram_bot/handlers/ad_create/submit.py
 msgid "Your draft expired and was deleted. Please start again with /post."
 msgstr ""
+
+#: src/backend/apps/ads/services/submission.py
+msgid ""
+"One of your photos is no longer available. Please upload it again."
+msgstr ""

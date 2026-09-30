@@ -35,7 +35,12 @@ from apps.core.schemas import BaseInputModel
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import normalize_price_to_eur
 from apps.media.schemas import SubmittedPhoto
-from apps.media.services.filesystem import move_staging_to_permanent
+from apps.media.services.filesystem import (
+    STAGING_PREFIX,
+    plan_staging_promotion,
+    promote_media_files,
+)
+from apps.media.services.hash_service import FileHashService
 from apps.media.services.thumbnails import ThumbnailService
 
 logger = logging.getLogger(__name__)
@@ -142,7 +147,33 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     them too), so they are wrapped in ``gettext_lazy`` at this source. Callers
     must ``str()`` the value before rendering — Django templates and aiogram
     both coerce a lazy proxy on use.
+
+    Media promotion (03-DB-005): staged files are **key-rewritten** before the
+    transaction by the pure ``plan_staging_promotion``; the physical move runs
+    from ``transaction.on_commit`` so the file never appears in permanent
+    storage — where the orphan sweep looks — before its ``AdImage`` row has
+    committed.  A staged file that is missing raises before the transaction and
+    becomes a recoverable seller message.
     """
+    # Pre-flight: every staged file must still exist.  A reaped photo must
+    # never become an AdImage row pointing at a file that is not there.  This
+    # runs before any I/O or transaction, and makes the thumbnail loop's broad
+    # except (below) unambiguously about *generation* failures.
+    for photo in input.photos:
+        if not photo.storage_key.startswith(STAGING_PREFIX):
+            continue
+        if not os.path.exists(
+            os.path.join(settings.MEDIA_ROOT, photo.storage_key)
+        ):
+            return False, [
+                str(
+                    _(
+                        "One of your photos is no longer available. "
+                        "Please upload it again."
+                    )
+                )
+            ]
+
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.
     for photo in input.photos:
@@ -165,12 +196,21 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
             photo.thumbnail_medium = None
             photo.thumbnail_large = None
 
-    # Promote staging files to permanent storage BEFORE the transaction.
-    # Thumbnailing already wrote staging/<uuid>-*.jpg variants; this moves the
-    # original + all thumbnails to permanent MEDIA_ROOT so AdImage rows (in the
-    # TX below) reference permanent keys.  On DB rollback the permanent files
-    # become unreferenced orphans reclaimed by the normal orphan sweep.
-    move_staging_to_permanent(input.photos)
+    # Capture the staged originals before plan_staging_promotion rewrites the
+    # fields: under deferred promotion the bytes are still at staging/<key>, so
+    # the SHA-256 passed to AdImageService must come from there (03-DB-005).
+    # The list keeps each digest aligned with ``input.photos`` by index.
+    staged_digests: list[str | None] = [
+        FileHashService.calculate_sha256(os.path.join(settings.MEDIA_ROOT, key))
+        if (key := photo.storage_key).startswith(STAGING_PREFIX)
+        else None
+        for photo in input.photos
+    ]
+
+    # Key rewriting happens BEFORE the transaction because it is PURE — an
+    # in-memory rewrite of SubmittedPhoto fields plus an existence check, with
+    # no filesystem mutation.  The physical move is scheduled post-commit.
+    permanent_keys = plan_staging_promotion(input.photos)
 
     # DB transaction: save + images + status transition
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
@@ -221,8 +261,11 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         if input.feature_ids is not None:
             ad.features.set(input.feature_ids)
 
-        # Create AdImage records with pre-generated thumbnails
-        for photo in input.photos:
+        # Create AdImage records with pre-generated thumbnails.  The digest of
+        # the staged bytes was captured above (they are not at the row's
+        # permanent key), so content dedup keeps working under deferred
+        # promotion.
+        for index, photo in enumerate(input.photos):
             AdImageService.create_or_skip(
                 ad=ad,
                 image=photo.storage_key,
@@ -231,6 +274,7 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
                 thumbnail_small=photo.thumbnail_small,
                 thumbnail_medium=photo.thumbnail_medium,
                 thumbnail_large=photo.thumbnail_large,
+                sha256=staged_digests[index],
             )
 
         # Transition DRAFT -> ON_MODERATION (state machine requires this step)
@@ -246,6 +290,14 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         from apps.moderation.services.auto_moderation import auto_moderate
 
         passed = auto_moderate(ad)
+
+        # Schedule the filesystem move only after the owning rows commit.
+        # Registered INSIDE the atomic block and AFTER the Ad.DoesNotExist
+        # return, so a missing ad schedules no promotion.  The key list is
+        # bound into the closure explicitly.
+        transaction.on_commit(
+            lambda keys=permanent_keys: promote_media_files(keys)
+        )
     if passed:
         return True, []
     else:

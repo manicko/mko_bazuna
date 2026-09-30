@@ -487,6 +487,11 @@ msgstr "Nemate dozvolu da ponovo aktivirate ovaj oglas."
 msgid "Access denied"
 msgstr "Pristup odbijen"
 
+msgid ""
+"One of your photos is no longer available. Please upload it again."
+msgstr ""
+"Jedna od vaših fotografija više nije dostupna. Molimo ponovo je prenesite."
+
 msgid "Entire country"
 msgstr "Cijela zemlja"
 

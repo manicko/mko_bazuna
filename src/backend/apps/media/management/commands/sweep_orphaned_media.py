@@ -8,6 +8,13 @@ set of keys referenced by live ``AdImage`` rows (``image`` +
 ``thumbnail_small/medium/large``), and deletes files whose key is not
 referenced.
 
+``staging/`` holds TWO kinds of files (03-DB-005): in-flight uploads that are
+not yet referenced by any ``AdImage`` row, and files awaiting post-commit
+promotion — a committed ``AdImage`` row whose file is still in ``staging/``
+until ``transaction.on_commit`` moves it.  Both are excluded from the orphan
+sweep here and reclaimed by ``_reclaim_stale_staging`` on the mtime TTL, which
+is precisely what bounds the post-commit gap.
+
 This is a backstop for MED-001/MED-002: any file that escapes every explicit
 deletion path (e.g. a bug in a sweep command or a partial write failure) is
 eventually reclaimed here. Safe to run as a periodic cron job.
@@ -64,9 +71,13 @@ def _walk_media_files(media_root: str) -> list[str]:
     """Walk MEDIA_ROOT and return relative paths, excluding seed/ and staging/.
 
     The ``staging/`` subdirectory holds in-flight uploads that are not yet
-    referenced by any AdImage row.  These are protected from the orphan sweep
-    here and instead reclaimed by ``_reclaim_stale_staging`` based on file age
-    (TTL).  Seed data is excluded because it manages its own lifecycle.
+    referenced by any AdImage row, **and** files awaiting post-commit promotion
+    (a committed AdImage row whose ``transaction.on_commit`` move has not run
+    yet — 03-DB-005).  Both are protected from the orphan sweep here and instead
+    reclaimed by ``_reclaim_stale_staging`` based on file age (TTL).  Excluding
+    ``staging/`` is what makes a promoted file invisible to this walk until its
+    row commits, closing the promote-before-commit race by construction.  Seed
+    data is excluded because it manages its own lifecycle.
     """
     files: list[str] = []
     for dirpath, _dirnames, filenames in os.walk(media_root):
@@ -93,6 +104,13 @@ def _reclaim_stale_staging(media_root: str, ttl_seconds: int) -> int:
     TTL — an independent backstop for abandoned uploads, refreshed on a live
     dialog by ``touch_staging_photos`` so both it and DRAFT retention share one
     clock (finding 03-DB-003).
+
+    A file here may briefly belong to a committed ``AdImage`` row that is still
+    awaiting its post-commit promotion move (03-DB-005).  The 2 h mtime TTL is
+    what bounds that gap: a crash between COMMIT and the ``on_commit`` move
+    leaves a committed row whose file is reclaimed by this same TTL, making the
+    dangling reference permanent (accepted risk).  A rolled-back submission
+    likewise leaves its staged file here for this TTL to reclaim.
 
     Args:
         media_root: Absolute path to ``MEDIA_ROOT``.
@@ -179,15 +197,14 @@ class Command(BaseCommand):
                     self.style.SUCCESS(f"Deleted {deleted} orphaned media files.")
                 )
 
-                # Reclaim abandoned staging files (in-flight uploads older than
-                # TTL).  Excluded from the orphan sweep above; cleaned up here
-                # by age.  Moved inside the lock to serialize all MEDIA_ROOT
-                # mutations (plan 34 MED-001; R1 TX-then-FS safety gate GO).
-                if not dry_run:
-                    reclaimed = _reclaim_stale_staging(media_root, _STAGING_TTL_SECONDS)
-                    if reclaimed:
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Reclaimed {reclaimed} stale staging files."
-                            )
+                # Reclaim abandoned staging files (files older than TTL).
+                # Excluded from the orphan sweep above; cleaned up here by age.
+                # Moved inside the lock to serialize all MEDIA_ROOT mutations
+                # (plan 34 MED-001; R1 TX-then-FS safety gate GO).
+                reclaimed = _reclaim_stale_staging(media_root, _STAGING_TTL_SECONDS)
+                if reclaimed:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Reclaimed {reclaimed} stale staging files."
                         )
+                    )
