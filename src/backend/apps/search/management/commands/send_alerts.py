@@ -34,6 +34,7 @@ from aiogram.exceptions import (
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _, override as translation_override
 
 from apps.ads.models import Ad
@@ -43,6 +44,7 @@ from apps.core.enums import AdvisoryLockId, AnalyticsEventType, LanguageLocale
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
+from apps.search.services.notification_delivery import mark_delivered
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +92,20 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
         """Execute alert delivery with advisory lock.
 
-        Loss window (known, escalated): the send runs outside both the advisory
-        lock and the transaction; a crash between the commit of the
-        notification rows and the last ``send_message`` permanently loses those
-        digests, because the notifications are written, so ``find_matching_ads``
-        will never re-collect those ads, and no delivery-state column exists to
-        distinguish "recorded" from "delivered". Moving the send inside the
-        lock/transaction is **wrong** — a mid-send crash would roll back the
-        notification write and re-enable duplicate delivery, and it would widen
-        the contention window against the lock-free ``deliver_immediate_alerts``
-        publish-time path. The correct fix is a delivery-state column on
-        ``SavedSearchNotification`` (phase 03 DB-007's schema).
+        Delivery state (03-DB-007): a ``SavedSearchNotification`` row is an
+        ATTEMPT RECORD and ``delivered_at`` is the receipt. The receipt is
+        written AFTER this day's digests are dispatched, once both the advisory
+        lock and the transaction have closed — exactly where the send already
+        runs, so the lock/transaction shape is unchanged — and only for the
+        users whose digest Telegram accepted. A pair whose send failed (or whose
+        user has no ``chat_id``) keeps ``delivered_at IS NULL`` and is
+        re-collected by the next run, which is how a lost digest is retried
+        instead of permanently suppressed.
+
+        Moving the send inside the lock/transaction remains **wrong** — a
+        mid-send crash would roll back the notification write and re-enable
+        duplicate delivery, and it would widen the contention window against the
+        lock-free ``deliver_immediate_alerts`` publish-time path.
 
         CommandError policy: raised only when every attempted user failed. A
         no-match day and a partially-failed day both exit 0.
@@ -122,15 +127,40 @@ class Command(BaseCommand):
                 self._persist_alerts(notifications_to_create, analytics_events)
 
         # Send messages outside the transaction and outside the advisory lock
-        # (network I/O). See the docstring for the loss window this creates.
+        # (network I/O). The delivery receipt is written after the digests are
+        # dispatched, once both scopes have closed, so a failed digest leaves the
+        # rows undelivered and retryable by the next run (03-DB-007). The mark is
+        # a synchronous single statement on this connection — no lock, no
+        # transaction — so it stays honest under any process.
+        rows_by_user: dict[int, list[SavedSearchNotification]] = {}
+        for notification in notifications_to_create:
+            rows_by_user.setdefault(
+                notification.saved_search.user_id, []
+            ).append(notification)
+
+        delivered_user_ids: set[int] = set()
         users_attempted = len(user_ads)
         users_sent = 0
         try:
             users_sent = asyncio.run(
-                self._send_user_digests(settings.BOT_TOKEN, user_ads)
+                self._send_user_digests(
+                    settings.BOT_TOKEN, user_ads, rows_by_user, delivered_user_ids
+                )
             )
         except AiogramError as exc:
             logger.error("Daily alert send failed: %s", exc)
+
+        # Mark only the users whose digest was accepted by Telegram. A skipped
+        # user (no chat_id) or a failed send is not in delivered_user_ids, so its
+        # rows keep delivered_at IS NULL and stay collectable.
+        for notification in notifications_to_create:
+            if notification.saved_search.user_id not in delivered_user_ids:
+                continue
+            mark_delivered(
+                notification.saved_search_id,
+                notification.ad_id,
+                sent_at=timezone.now(),
+            )
 
         # A blanket AiogramError swallow exits 0, which lets the scheduler record
         # the day as complete even though nothing was delivered. Raise only when
@@ -211,7 +241,7 @@ class Command(BaseCommand):
 
             bucket.extend(selected_ads)
             notifications_to_create.extend(
-                SavedSearchNotification(saved_search_id=saved_search.id, ad_id=ad.id)
+                SavedSearchNotification(saved_search=saved_search, ad=ad)
                 for ad in selected_ads
             )
             analytics_events.append(
@@ -248,7 +278,11 @@ class Command(BaseCommand):
             AnalyticsEvent.objects.bulk_create(analytics_events)
 
     async def _send_user_digests(
-        self, bot_token: str, user_ads: dict[int, list]
+        self,
+        bot_token: str,
+        user_ads: dict[int, list],
+        rows_by_user: dict[int, list[SavedSearchNotification]] | None = None,
+        delivered_user_ids: set[int] | None = None,
     ) -> int:
         """Send consolidated digest messages; return users messaged.
 
@@ -257,6 +291,12 @@ class Command(BaseCommand):
         digest. The return value counts users whose message was accepted by
         Telegram (skipped and fully-failed users do not count) and is what
         ``handle()`` uses to decide whether the day's dispatch succeeded.
+
+        Each user whose ``send_message`` (primary or retry) succeeds is added to
+        ``delivered_user_ids``. ``handle()`` then writes that user's delivery
+        receipts from ``rows_by_user`` once this coroutine has returned. A user
+        with no ``chat_id`` is skipped BEFORE the send, so it is never added and
+        its rows stay correctly unmarked and retryable (03-DB-007).
         """
         from apps.users.models import User
 
@@ -293,6 +333,8 @@ class Command(BaseCommand):
                     )
                     rendered_ads += len(unique_ads)
                     sent_users += 1
+                    if delivered_user_ids is not None:
+                        delivered_user_ids.add(user_id)
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logger.warning("Failed to send alert to user %d: %s", user_id, e)
                 except (
@@ -314,6 +356,8 @@ class Command(BaseCommand):
                         )
                         rendered_ads += len(unique_ads)
                         sent_users += 1
+                        if delivered_user_ids is not None:
+                            delivered_user_ids.add(user_id)
                     except AiogramError as retry_exc:
                         logger.warning(
                             "Alert retry failed to user %d: %s", user_id, retry_exc

@@ -124,6 +124,80 @@ class TestPerUserDigestCap:
             assert unmatched_in_search <= still_collectable
 
 
+class TestDailyDigestMarksDelivered:
+    """The daily digest marks its rows delivered after a successful send.
+
+    This is the infinite-loop guard for the one-atomic-change rule (03-DB-007):
+    if the daily matcher filters on ``delivered_at`` but the daily write never
+    sets it, the same pair is collected every day forever.
+    """
+
+    def test_daily_digest_marks_delivered_after_send(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city,
+    ) -> None:
+        """A successful digest send marks that user's rows delivered."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="ad")
+        saved_search = SavedSearch.objects.create(
+            user=buyer, category=category, is_active=True
+        )
+
+        mock_bot = MagicMock()
+        mock_bot.send_message = AsyncMock(return_value=None)
+        mock_bot.session.close = AsyncMock()
+
+        with (
+            patch(f"{_MODULE}.Bot", return_value=mock_bot),
+            patch.object(User.objects, "aget", new=AsyncMock(return_value=buyer)),
+        ):
+            call_command("send_alerts")
+
+        rows = SavedSearchNotification.objects.filter(saved_search=saved_search)
+        assert rows.count() == 1
+        assert all(row.delivered_at is not None for row in rows)
+        # And the pair is no longer collectable.
+        assert find_matching_ads(saved_search) == []
+
+    def test_daily_digest_leaves_rows_undelivered_on_failure(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city,
+    ) -> None:
+        """A failed digest send leaves that user's rows undelivered (retryable)."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, title="ad")
+        saved_search = SavedSearch.objects.create(
+            user=buyer, category=category, is_active=True
+        )
+
+        async def always_fail(chat_id, text, parse_mode) -> None:
+            raise TelegramNetworkError(message="net", method=MagicMock())
+
+        mock_bot = MagicMock()
+        mock_bot.send_message = AsyncMock(side_effect=always_fail)
+        mock_bot.session.close = AsyncMock()
+
+        with (
+            patch(f"{_MODULE}.Bot", return_value=mock_bot),
+            patch(f"{_MODULE}.asyncio.sleep", new=AsyncMock()),
+            patch.object(User.objects, "aget", new=AsyncMock(return_value=buyer)),
+        ):
+            with pytest.raises(CommandError):
+                call_command("send_alerts")
+
+        rows = SavedSearchNotification.objects.filter(saved_search=saved_search)
+        assert rows.count() == 1
+        assert all(row.delivered_at is None for row in rows)
+        # The pair stays collectable so a later run can deliver it.
+        assert [ad.id for ad in find_matching_ads(saved_search)] == [
+            rows.get().ad_id
+        ]
+
+
 class TestDeliveryOutcome:
     """CommandError is raised only when every attempted user failed."""
 

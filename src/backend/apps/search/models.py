@@ -160,7 +160,18 @@ class SavedSearch(models.Model):
 
 
 class SavedSearchNotification(models.Model):
-    """Tracks sent notifications to prevent duplicate alerts for the same ad."""
+    """Record of one alert attempt for a (saved search, ad) pair.
+
+    A row here is an ATTEMPT RECORD, not a delivery receipt: ``delivered_at``
+    is the receipt. ``delivered_at IS NULL`` means the pair was recorded but no
+    message was accepted by Telegram, so the pair stays eligible for both the
+    immediate and the daily delivery paths. Both matchers exclude a pair only
+    when ``delivered_at`` is set, which makes a failed or skipped send
+    self-healing instead of terminal.
+
+    One alert per ``(saved_search, ad)`` for the life of the listing — including
+    across a re-publish — is a recorded product decision (03-DB-007).
+    """
 
     saved_search = models.ForeignKey(
         SavedSearch,
@@ -176,7 +187,19 @@ class SavedSearchNotification(models.Model):
     )
     sent_at = models.DateTimeField(
         auto_now_add=True,
-        help_text="When this notification was sent",
+        help_text="When the notification record was created",
+    )
+    delivered_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Receipt: when Telegram accepted the alert for this pair. Written "
+            "AFTER a successful send by both delivery paths. NULL means "
+            "'recorded but not delivered', so the pair stays eligible for the "
+            "immediate and daily paths. One alert per (saved_search, ad) for "
+            "the life of the listing, including across a re-publish, is a "
+            "recorded product decision."
+        ),
     )
 
     class Meta:

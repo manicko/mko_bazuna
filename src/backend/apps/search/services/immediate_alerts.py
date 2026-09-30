@@ -8,9 +8,13 @@ Flow (Approach 1, per alert-delivery-research):
     idempotent ``SavedSearchNotification`` recording -> background daemon thread
     ``asyncio.run(Bot(...))`` send capped by ``asyncio.Semaphore(10)``.
 
-Delivery is idempotent via ``uq_saved_search_ad`` + ``ignore_conflicts``, so
-the daily ``send_alerts`` command never double-sends; users without a stable
-``chat_id`` are logged and skipped (A4/C8).
+Delivery state (03-DB-007): a ``SavedSearchNotification`` row is an ATTEMPT
+RECORD and ``delivered_at`` is the receipt. ``find_matching_saved_searches``
+excludes only pairs whose alert was already DELIVERED, and the receipt is
+written AFTER a successful send (``notification_delivery.mark_delivered``), so a
+recorded-but-undelivered pair stays eligible and is retried by the daily
+``send_alerts`` command rather than lost. Users without a stable ``chat_id`` are
+never recorded (A4/C8); their pair stays collectable.
 """
 
 import asyncio
@@ -94,22 +98,50 @@ def deliver_immediate_alerts(ad_id: int) -> None:
     if not searches:
         return
 
-    # Record notifications idempotently so the daily command never double-sends.
-    for saved_search in searches:
-        record_notifications(saved_search, [ad])
-        saved_search.last_notified_at = timezone.now()
-        saved_search.save(update_fields=["last_notified_at", "updated_at"])
-
-    # Build payloads only for users with a stable chat_id (A4).
-    payloads = [_build_payload(ad, ss) for ss in searches]
-    payloads = [p for p in payloads if p is not None]
+    # Build payloads FIRST, for users with a stable chat_id (A4), and drop the
+    # Nones. Recording happens only for the pairs that actually produced a
+    # payload, so a user with no chat_id is never recorded and the pair stays
+    # collectable (03-DB-007 D-1).
+    payloads = [p for p in (_build_payload(ad, ss) for ss in searches) if p is not None]
 
     if not payloads:
         return
 
+    # Record attempts idempotently for the pairs that will actually be sent.
+    for saved_search in searches:
+        if saved_search.pk not in _payload_ss_ids(payloads):
+            continue
+        record_notifications(saved_search, [ad])
+        saved_search.last_notified_at = timezone.now()
+        saved_search.save(update_fields=["last_notified_at", "updated_at"])
+
     # Dispatch to the bounded global thread pool so concurrent publish
     # bursts never exceed _MAX_DELIVERY_THREADS daemon threads.
     _executor.submit(_run_send, payloads)
+
+
+def _payload_ss_ids(payloads: list[dict]) -> set[int]:
+    """Return the set of ``saved_search_id``s represented in the payloads."""
+    return {ss_id for ss_id, _ad_id in (p["pair"] for p in payloads)}
+
+
+async def _mark_delivered(pair: tuple[int, int]) -> None:
+    """Record the delivery receipt for ``pair`` from the send thread (03-DB-007).
+
+    ``mark_delivered`` is a synchronous, single-statement ORM call, so it is
+    bridged into the event loop with ``sync_to_async``. The mark is written
+    AFTER ``send_message`` succeeds and BEFORE the ``except`` clauses, so a
+    failed send leaves the pair undelivered and therefore retryable. No
+    signature, return-value or exception-handling change.
+    """
+    from asgiref.sync import sync_to_async
+
+    from apps.search.services.notification_delivery import mark_delivered
+
+    saved_search_id, ad_id = pair
+    await sync_to_async(mark_delivered)(
+        saved_search_id, ad_id, sent_at=timezone.now()
+    )
 
 
 def build_alert_message(
@@ -177,6 +209,8 @@ def _build_payload(ad: Ad, saved_search: SavedSearch) -> dict | None:
         "chat_id": user.chat_id,
         "text": text,
         "reply_markup": reply_markup,
+        # Non-serialised side-channel used only for the post-send delivery mark.
+        "pair": (saved_search.pk, ad.pk),
     }
 
 
@@ -207,6 +241,7 @@ async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
                         parse_mode="HTML",
                         reply_markup=payload["reply_markup"],
                     )
+                    await _mark_delivered(payload["pair"])
                 except (TelegramBadRequest, TelegramForbiddenError) as exc:
                     # Permanent failures — dead-letter (no retry).
                     logger.warning(

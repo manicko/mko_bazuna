@@ -2,8 +2,11 @@
 Alert query service for saved search matching.
 
 Provides functions to find PUBLISHED ads matching a saved search's filters
-(FTS query, city, category subtree, price range) and record notifications
-to prevent duplicate alerts.
+(FTS query, city, category subtree, price range) and record notification
+attempts. The dedup decision does NOT live here: it lives in the two matchers'
+``delivered_at`` predicate plus ``notification_delivery.mark_delivered``. A
+``SavedSearchNotification`` row is an attempt record; ``delivered_at`` is the
+delivery receipt.
 
 Reuses FTS patterns from the web search view. The saved search's persisted
 ``language`` picks the matching per-language vector + FTS config (no query
@@ -31,8 +34,10 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
     Applies an FTS query (searched in the saved search's language via
     ``saved_search.language``, no translation), category subtree, city, and
     price filters.  Matches are ranked by relevance and capped at 10 per
-    digest.  Ads already notified via ``SavedSearchNotification`` are
-    excluded via a correlated NOT EXISTS subquery for efficiency.
+    digest.  Ads whose alert was already DELIVERED (``delivered_at IS NOT
+    NULL``) are excluded via a correlated NOT EXISTS subquery; a recorded but
+    undelivered pair stays eligible for retry. Which ads match a search is
+    unchanged — only what counts as already notified.
 
     Args:
         saved_search: The SavedSearch to match against.
@@ -89,10 +94,13 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
     if saved_search.max_price is not None:
         queryset = queryset.filter(price_normalized_eur__lte=saved_search.max_price)
 
-    # Exclude ads already notified (efficient correlated NOT EXISTS subquery)
+    # Exclude ads whose alert was already DELIVERED (efficient correlated NOT
+    # EXISTS subquery). A row with delivered_at IS NULL is an attempt record
+    # only — recorded but not delivered — so the ad stays eligible for retry.
     notified_ads = SavedSearchNotification.objects.filter(
         saved_search=saved_search,
         ad_id=OuterRef("pk"),
+        delivered_at__isnull=False,
     )
     queryset = queryset.filter(~Exists(notified_ads))
 
@@ -101,11 +109,16 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
 
 def record_notifications(saved_search: SavedSearch, ads: list[Ad]) -> int:
     """
-    Bulk-create SavedSearchNotification records, skipping duplicates.
+    Bulk-create SavedSearchNotification attempt records, skipping duplicates.
 
     Uses ``bulk_create`` with ``ignore_conflicts=True`` so that any
     (saved_search, ad) pair that already exists is silently skipped. The
-    unique constraint on ``(saved_search, ad)`` prevents duplicates.
+    unique constraint on ``(saved_search, ad)`` prevents duplicate rows.
+
+    The returned count is NOT a delivery signal: it counts attempts passed in,
+    not messages delivered. The dedup decision lives in the matchers'
+    ``delivered_at`` predicate plus ``notification_delivery.mark_delivered``.
+    This function still WRITES rows; it does not mark them delivered.
 
     Args:
         saved_search: The saved search that triggered the notification.
@@ -142,7 +155,15 @@ def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
 
     Only ``is_active=True`` searches are considered (reuses the
     ``IX_saved_searches_user_active`` index). Membership in a category subtree
-    is tested via the ad's ``category_id``.
+    is tested via the ad's ``category_id``. Searches whose alert for this ad
+    was already DELIVERED are excluded by a correlated ``~Exists``; a recorded
+    but undelivered pair stays eligible, so a failed immediate send is retried
+    on the next publish.
+
+    The recipient predicate below (``is_active`` + city/price/category/FTS) is
+    the audience definition and is NOT touched. The ``chat_id`` check stays a
+    DELIVERY PRECONDITION applied at the record/payload stage, not an audience
+    filter (PII-104, phase 06).
 
     Args:
         ad: A PUBLISHED Ad to match saved searches against.
@@ -153,6 +174,19 @@ def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
     candidates = SavedSearch.objects.filter(is_active=True).select_related(
         "user", "city", "category"
     )
+
+    # Exclude searches whose alert for THIS ad was already DELIVERED, via a
+    # correlated NOT EXISTS on the candidate queryset (never exclude(): a
+    # multi-valued-relation exclude() multiplies joins). A row with
+    # delivered_at IS NULL stays eligible, so a failed immediate send is retried
+    # by the next publish tick. This is the delivery-state contract, not an
+    # audience filter: the recipient predicate below is untouched.
+    delivered_pairs = SavedSearchNotification.objects.filter(
+        saved_search_id=OuterRef("pk"),
+        ad_id=ad.pk,
+        delivered_at__isnull=False,
+    )
+    candidates = candidates.filter(~Exists(delivered_pairs))
 
     matches: list[SavedSearch] = []
     for saved_search in candidates:

@@ -616,17 +616,27 @@ db_table: ad_favorites
 ---
 
 ### SavedSearchNotification
-Tracks notification delivery to prevent duplicates per search-ad pair.
+Record of one alert attempt for a (saved search, ad) pair (03-DB-007). The row is an
+**attempt record**; `delivered_at` is the **receipt**. `delivered_at IS NULL` means
+"recorded but not delivered" and the pair stays eligible for both the immediate and the
+daily delivery paths, so a failed or skipped send is retried rather than lost.
 
 ```
 id (PK)
 saved_search_id (FK → saved_searches.id, CASCADE)
 ad_id (FK → ads.id, CASCADE)
-sent_at (TIMESTAMP)
+sent_at (TIMESTAMP)          # when the notification record was created (auto_now_add)
+delivered_at (TIMESTAMP, NULL, no default)  # when Telegram accepted the alert; written AFTER a successful send
 
 Unique constraint: (saved_search_id, ad_id)
 db_table: saved_search_notifications
 ```
+
+`delivered_at` is written **after** a successful send by both delivery paths
+(`notification_delivery.mark_delivered`). It is **backfilled from `sent_at`** for
+pre-existing rows so a deploy is behaviour-preserving. **One alert per
+`(saved_search_id, ad_id)` for the life of the listing — including across a re-publish —
+is a recorded product decision**, not an accident.
 
 ---
 

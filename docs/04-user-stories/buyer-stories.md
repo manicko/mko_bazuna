@@ -66,7 +66,8 @@ is published, the buyer receives a notification delivered via Telegram (near-rea
 time, gated by `IMMEDIATE_ALERTS_ENABLED`; a daily backfill command runs regardless). Each notification
 includes the ad title, city, price, an absolute ad link, and an inline `[Turn off alerts]` button
 (callback), with a `/start` deep-link fallback for unsubscribe. Notifications are deduplicated per
-search-ad pair (`uq_saved_search_ad`) so the same ad does not trigger multiple alerts for the same
+search-ad pair by the delivery-state contract (a pair is excluded from both delivery paths only
+once it has been delivered) so the same ad does not trigger multiple alerts for the same
 saved search. Buyers may also manage subscriptions from the User Cabinet under
 `Saved searches`. See decision O and [search-patterns.md](../01-spec/search-patterns.md).
 

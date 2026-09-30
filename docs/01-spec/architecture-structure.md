@@ -298,6 +298,12 @@ Under cron there is no scheduler marker in the loop, so a retried or manually re
 collects nothing new) but **not** by a run-level marker. Do not invoke `send_alerts` more
 than once per day under cron.
 
+**Alert dedup invariant (03-DB-007).** The daily `send_alerts` `NOT EXISTS` now filters on
+**delivered** state (`delivered_at IS NOT NULL`), not on row existence, so a failed digest is
+retried on the next run rather than suppressed forever. The near-real-time publish-time path is
+**separately gated** by `IMMEDIATE_ALERTS_ENABLED` and is deduplicated by the same delivery-state
+contract: a pair delivered by either path is never delivered again by the other.
+
 ### Scheduled-job concurrency (advisory locks)
 
 All nine hourly sweep commands (plus the two daily commands and the once-only `migrate`

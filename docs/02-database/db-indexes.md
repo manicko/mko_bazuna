@@ -229,7 +229,20 @@ models.CharField("query_normalized", max_length=200, db_index=True)
 ## Indexes — saved_search_notifications
 ```python
 models.UniqueConstraint(fields=["saved_search", "ad"], name="uq_saved_search_ad")
+models.Index(name="idx_saved_search_notif_sid", fields=["saved_search_id"])
 ```
+The delivery-state contract (03-DB-007) adds a `delivered_at` predicate to both
+matchers. **No new index is needed — recorded decision:**
+
+- `find_matching_ads` filters `~Exists(... saved_search=…, ad_id=OuterRef("pk"),
+  delivered_at__isnull=False)` — `uq_saved_search_ad` is an **exact prefix match** for
+  the two indexed columns, and `delivered_at` is a cheap heap-level residual filter.
+- `find_matching_saved_searches` adds a correlated `~Exists` on the candidate queryset
+  (`saved_search_id=OuterRef("pk"), ad_id=ad.pk, delivered_at__isnull=False`). It drives
+  off `saved_searches.id` and probes the same index prefix (`idx_saved_search_notif_sid`),
+  leaving the outer query's cost unchanged.
+
+A documented no-change is a decision; an undocumented one is an omission.
 
 ## Indexes — seller_trust_scores
 ```python

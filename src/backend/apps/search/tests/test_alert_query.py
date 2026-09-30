@@ -11,8 +11,11 @@ Covers:
 - ``deliver_immediate_alerts``: idempotent recording + gate behavior (AL-001)
 """
 
+from unittest.mock import patch
+
 import pytest
 from django.core.management import call_command
+from django.utils import timezone
 
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
@@ -23,6 +26,7 @@ from apps.search.services.alert_query import (
     find_matching_saved_searches,
     record_notifications,
 )
+from apps.search.services.immediate_alerts import deliver_immediate_alerts
 from apps.users.models import User
 from conftest import create_test_ad
 
@@ -54,6 +58,32 @@ def other_city() -> City:
         name="Москва",
         region="Central",
         slug="moscow",
+    )
+
+
+class _SyncExecutor:
+    """Run submitted callables inline so send-path assertions are deterministic.
+
+    The production executor is a real ``ThreadPoolExecutor``: submissions run on
+    another thread and any exception is captured in the worker, not propagated
+    to the caller. Tests that assert on what was submitted (or on an exception
+    escaping) replace it with this inline stand-in.
+    """
+
+    def submit(self, fn, *args):
+        fn(*args)
+
+        class _Immediate:
+            """Minimal Future stand-in; the caller ignores it."""
+
+        return _Immediate()
+
+
+@pytest.fixture
+def sync_executor(monkeypatch) -> None:
+    """Replace the immediate-alert thread pool with an inline executor."""
+    monkeypatch.setattr(
+        "apps.search.services.immediate_alerts._executor", _SyncExecutor()
     )
 
 
@@ -324,21 +354,50 @@ class TestFindMatchingAds:
         assert len(results) == 1
         assert results[0].id == cheap.id
 
-    def test_excludes_already_notified_ads(
+    def test_excludes_delivered_ads(
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
-        """Ads already in SavedSearchNotification are excluded."""
+        """An ad whose notification was delivered is excluded (03-DB-007).
+
+        This is the inversion of the previous ``test_excludes_already_notified_ads``,
+        which created a bare row — recorded, not delivered — and asserted
+        exclusion. Under the delivery-state contract only a DELIVERED pair
+        (``delivered_at IS NOT NULL``) is excluded.
+        """
         ad = create_test_ad(
             seller, category, city, title="Уже отправлено", status=AdStatus.PUBLISHED
         )
         saved_search = SavedSearch.objects.create(
             user=buyer, query="отправлено", language="ru", is_active=True
         )
-        # Record notification
-        SavedSearchNotification.objects.create(saved_search=saved_search, ad=ad)
+        SavedSearchNotification.objects.create(
+            saved_search=saved_search, ad=ad, delivered_at=timezone.now()
+        )
 
         results = find_matching_ads(saved_search)
         assert len(results) == 0
+
+    def test_includes_recorded_but_undelivered_ads(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """A recorded but undelivered pair stays COLLECTABLE (03-DB-007).
+
+        A row with ``delivered_at IS NULL`` means "an attempt was recorded but
+        the message was never accepted"; it must remain eligible so the pair is
+        retried rather than lost forever.
+        """
+        ad = create_test_ad(
+            seller, category, city, title="Записано но не отправлено",
+            status=AdStatus.PUBLISHED,
+        )
+        saved_search = SavedSearch.objects.create(
+            user=buyer, query="отправлено", language="ru", is_active=True
+        )
+        SavedSearchNotification.objects.create(saved_search=saved_search, ad=ad)
+
+        results = find_matching_ads(saved_search)
+        assert len(results) == 1
+        assert results[0].id == ad.id
 
     def test_no_filters_returns_all_published_ads(
         self, seller: User, buyer: User, category: Category, city: City
@@ -690,11 +749,42 @@ class TestDeliverImmediateAlerts:
     """Tests for deliver_immediate_alerts idempotency (no double-send)."""
 
     def test_records_notification_idempotently(
-        self, seller: User, buyer: User, category: Category, city: City, monkeypatch
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city: City,
+        monkeypatch,
+        sync_executor,
     ) -> None:
-        # Keep the background Telegram send from running in tests.
+        """Two calls for the same ad submit payloads exactly once (03-DB-007).
+
+        The previous version of this test monkeypatched ``_run_send`` with a
+        no-op and asserted only the row count, so it could not observe that the
+        second call submitted the payload a second time: it asserted ROW-level
+        idempotency under a name claiming MESSAGE-level idempotency. Re-running
+        must not double-send, so this version records the submitted payloads and
+        asserts there was exactly one submission, while keeping the row-count
+        assertion that pins ``ignore_conflicts`` on the immediate path.
+        """
+        submitted: list[list] = []
+
+        from apps.search.services import notification_delivery
+
+        # Record what was submitted, and mark it delivered the way the real
+        # send does. The mark is what makes the SECOND call submit nothing: an
+        # UNdelivered pair is legitimately re-submitted (that is the retry), so
+        # a recorder that does not mark would see two submissions by design.
+        def _mark(payloads: list) -> None:
+            submitted.append(payloads)
+            for payload in payloads:
+                ss_id, ad_id = payload["pair"]
+                notification_delivery.mark_delivered(
+                    ss_id, ad_id, sent_at=timezone.now()
+                )
+
         monkeypatch.setattr(
-            "apps.search.services.immediate_alerts._run_send", lambda payloads: None
+            "apps.search.services.immediate_alerts._run_send", _mark
         )
 
         from apps.search.services.immediate_alerts import deliver_immediate_alerts
@@ -709,12 +799,15 @@ class TestDeliverImmediateAlerts:
         assert (
             SavedSearchNotification.objects.filter(saved_search=ss, ad=ad).count() == 1
         )
+        assert len(submitted) == 1
 
-        # Re-running (re-publish / backfill) must not double-send.
+        # Re-running (re-publish / backfill) must not double-send, because the
+        # first delivery marked the pair delivered.
         deliver_immediate_alerts(ad.id)
         assert (
             SavedSearchNotification.objects.filter(saved_search=ss, ad=ad).count() == 1
         )
+        assert len(submitted) == 1
 
     def test_non_published_ad_is_noop(
         self, seller: User, category: Category, city: City
@@ -724,6 +817,178 @@ class TestDeliverImmediateAlerts:
         draft = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         deliver_immediate_alerts(draft.id)
         assert SavedSearchNotification.objects.count() == 0
+
+    def test_no_chat_id_records_nothing_and_stays_collectable(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        """A user with no ``chat_id`` is never recorded, so the pair stays collectable.
+
+        Pins D-1 (03-DB-007): the record loop must run only for the pairs that
+        actually produced a payload. The previous order recorded a row for the
+        user and then dropped the payload, permanently suppressing the alert.
+        """
+        # ``chat_id`` is NOT NULL in the database, so a falsy (0) value stands
+        # in for "no chat_id": ``_build_payload`` treats it as absent.
+        buyer.chat_id = 0
+        buyer.save(update_fields=["chat_id"])
+
+        ad = create_test_ad(
+            seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED
+        )
+        saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
+
+        deliver_immediate_alerts(ad.id)
+
+        assert not SavedSearchNotification.objects.filter(
+            saved_search=saved_search, ad=ad
+        ).exists()
+        assert [a.id for a in find_matching_ads(saved_search)] == [ad.id]
+
+    def test_failed_send_leaves_pair_undelivered_and_collectable(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city: City,
+        monkeypatch,
+        sync_executor,
+    ) -> None:
+        """A failed send leaves the row undelivered and therefore collectable.
+
+        Pins D-2 (03-DB-007): the marker is written AFTER a successful send, so
+        a failure yields ``delivered_at IS NULL`` and the pair is retried.
+        """
+
+        def _boom(payloads: list) -> None:
+            raise RuntimeError("send failed")
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._run_send", _boom
+        )
+
+        from apps.search.services.immediate_alerts import deliver_immediate_alerts
+
+        ad = create_test_ad(
+            seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED
+        )
+        saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
+
+        with pytest.raises(RuntimeError, match="send failed"):
+            deliver_immediate_alerts(ad.id)
+
+        row = SavedSearchNotification.objects.get(saved_search=saved_search, ad=ad)
+        assert row.delivered_at is None
+        assert [a.id for a in find_matching_ads(saved_search)] == [ad.id]
+
+    def test_republish_submits_nothing_on_second_call(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city: City,
+        monkeypatch,
+        sync_executor,
+    ) -> None:
+        """A second delivery for the same ad submits no payload (03-DB-007).
+
+        Pins D-3: a delivered pair is excluded by ``find_matching_saved_searches``
+        as well, so a content-neutral re-publish does not re-notify.
+        """
+        submitted: list[list] = []
+
+        from apps.search.services import notification_delivery
+
+        def _mark(payloads: list) -> None:
+            submitted.append(payloads)
+            for payload in payloads:
+                ss_id, ad_id = payload["pair"]
+                notification_delivery.mark_delivered(
+                    ss_id, ad_id, sent_at=timezone.now()
+                )
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._run_send", _mark
+        )
+
+        ad = create_test_ad(
+            seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED
+        )
+        SavedSearch.objects.create(user=buyer, is_active=True)
+
+        deliver_immediate_alerts(ad.id)
+        assert len(submitted) == 1
+
+        # Re-publish tick: the delivered pair must be excluded.
+        deliver_immediate_alerts(ad.id)
+        assert len(submitted) == 1
+
+    def test_cross_path_dedup(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city: City,
+        monkeypatch,
+        sync_executor,
+    ) -> None:
+        """A pair delivered by either path is never delivered by the other.
+
+        Replaces the source plan's acceptance criterion that the audit proved
+        false (the immediate path records before dispatch; the daily path's
+        ``NOT EXISTS`` treated any row as a receipt). Assertions are on
+        DELIVERY, not on a return value.
+        """
+        from apps.search.management.commands.send_alerts import Command
+
+        submitted: list[list] = []
+
+        from apps.search.services import notification_delivery
+
+        def _mark(payloads: list) -> None:
+            submitted.append(payloads)
+            for payload in payloads:
+                ss_id, ad_id = payload["pair"]
+                notification_delivery.mark_delivered(ss_id, ad_id, sent_at=timezone.now())
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._run_send", _mark
+        )
+
+        ad = create_test_ad(
+            seller, category, city, title="Красный велосипед", status=AdStatus.PUBLISHED
+        )
+        saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
+
+        # 1. Immediate path delivers the pair.
+        deliver_immediate_alerts(ad.id)
+        assert len(submitted) == 1
+        assert SavedSearchNotification.objects.filter(
+            saved_search=saved_search, ad=ad, delivered_at__isnull=False
+        ).exists(), "immediate path did not mark the pair delivered"
+
+        # 2. The daily path must not re-deliver it: the delivered row excludes
+        #    it from find_matching_ads, so no digest is sent.
+        cmd = Command()
+        user_ads, notifications, events = cmd._collect_alerts()
+        assert ad.id not in {a.id for ads in user_ads.values() for a in ads}
+        assert notifications == []
+
+        # 3. Now the reverse: a fresh pair delivered only by the daily path is
+        #    excluded by the immediate matcher.
+        ad2 = create_test_ad(
+            seller, category, city, title="Красный велосипед 2",
+            status=AdStatus.PUBLISHED,
+        )
+        row = SavedSearchNotification.objects.create(
+            saved_search=saved_search, ad=ad2
+        )
+        notification_delivery.mark_delivered(
+            saved_search.id, ad2.id, sent_at=timezone.now()
+        )
+        assert find_matching_saved_searches(ad2) == []
+        assert [a.id for a in find_matching_ads(saved_search)] == []
+        row.refresh_from_db()
+        assert row.delivered_at is not None
 
 
 class TestBuildAlertMessageLocalization:
@@ -816,3 +1081,42 @@ class TestImmediateAlertsGate:
         )
 
         assert SavedSearchNotification.objects.count() == 0
+
+    def test_gate_enabled_reaches_sender_only_when_on(
+        self, seller: User, buyer: User, category: Category, city: City, monkeypatch
+    ) -> None:
+        """The real gate coverage the no-op test cannot give (03-DB-007).
+
+        With ``IMMEDIATE_ALERTS_ENABLED=True`` the publish-time signal reaches
+        ``deliver_immediate_alerts`` (observed via the send bridge); with
+        ``False`` it does not. This is an ADDITION beside
+        ``test_gate_off_does_not_deliver_on_publish``, which is left
+        byte-identical and is not counted as gate coverage.
+        """
+        from django.db import transaction
+        from django.test import override_settings
+
+        from apps.search.services import immediate_alerts
+
+        calls: list[int] = []
+        monkeypatch.setattr(
+            immediate_alerts, "deliver_immediate_alerts", calls.append
+        )
+
+        with (
+            patch.object(transaction, "on_commit", side_effect=lambda fn: fn()),
+            override_settings(IMMEDIATE_ALERTS_ENABLED=False),
+        ):
+            create_test_ad(
+                seller, category, city, title="Off", status=AdStatus.PUBLISHED
+            )
+        assert calls == []
+
+        with (
+            patch.object(transaction, "on_commit", side_effect=lambda fn: fn()),
+            override_settings(IMMEDIATE_ALERTS_ENABLED=True),
+        ):
+            create_test_ad(
+                seller, category, city, title="On", status=AdStatus.PUBLISHED
+            )
+        assert len(calls) == 1
