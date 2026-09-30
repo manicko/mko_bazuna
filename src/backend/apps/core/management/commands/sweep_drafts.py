@@ -1,7 +1,10 @@
 """
 Management command to sweep draft ads after 30-minute retention.
 
-Deletes ads with DRAFT status where created_at is older than 30 minutes.
+Deletes ads with DRAFT status whose ``updated_at`` is older than 30 minutes —
+i.e. with no seller activity. ``updated_at`` is kept fresh by the bot's dialog
+heartbeat (``telegram_bot.services.ad_data.orm.touch_draft``); do not filter on
+``created_at`` (finding 03-DB-003).
 Uses advisory lock 4 for idempotent, safe concurrent execution.
 """
 
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     """Sweep draft ads after 30-minute retention window."""
 
-    help = "Delete ads with DRAFT status older than 30 minutes"
+    help = "Delete ads with DRAFT status and no seller activity for 30 minutes"
 
     def add_arguments(self, parser) -> None:
         """Add dry-run argument to the command."""
@@ -40,19 +43,19 @@ class Command(BaseCommand):
 
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.SWEEP_DRAFTS):
-                # Query draft ads older than 30 minutes
+                # Query draft ads with no seller activity for 30 minutes
                 cutoff_date = timezone.now() - timedelta(minutes=30)
 
                 queryset = Ad.objects.filter(
                     status=AdStatus.DRAFT,
-                    created_at__lt=cutoff_date,
+                    updated_at__lt=cutoff_date,
                 )
 
                 count = queryset.count()
 
                 if dry_run:
                     logger.info(
-                        "DRY RUN: Would delete %d draft ads older than 30 minutes",
+                        "DRY RUN: Would delete %d draft ads with no seller activity for 30 minutes",
                         count,
                     )
                     return
@@ -64,6 +67,6 @@ class Command(BaseCommand):
         # via transaction.on_commit(), which runs after this transaction commits.
 
         logger.info(
-            "Deleted %d draft ads older than 30 minutes.",
+            "Deleted %d draft ads with no seller activity for 30 minutes.",
             deleted_count,
         )

@@ -215,6 +215,32 @@ class TestSweepDrafts:
     def test_lock_id_is_sweep_drafts(self):
         assert AdvisoryLockId.SWEEP_DRAFTS == 4
 
+    @pytest.mark.django_db(transaction=True)
+    def test_draft_sweep_index_leads_on_updated_at(self):
+        """``IX_ads_draft_sweep`` indexes ``updated_at`` (03-DB-003).
+
+        The index is load-bearing for the flipped predicate: with ``created_at``
+        the sweep degenerates into a heap ``Filter`` over every draft row. This
+        test is deliberately NON-transactional (``django_db(transaction=True)``)
+        so it exercises the real committed schema and never leaves a flush.
+
+        It asserts the model-declared index (what ``syncdb`` builds, and what the
+        ``ads/0008_*`` migration is supposed to build).  ``DisableMigrations``
+        means no gate replays the migration file, so the migration itself is
+        verified manually on a scratch database.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE tablename = 'ads' AND lower(indexname) = lower('IX_ads_draft_sweep')"
+            )
+            row = cursor.fetchone()
+
+        assert row is not None, "IX_ads_draft_sweep is missing from pg_indexes"
+        indexdef = row[0]
+        assert "updated_at" in indexdef
+        assert "created_at" not in indexdef
+
     def test_dedup_migration_collapses_duplicate_drafts(
         self, seller, category, city, collapse_per_user_drafts
     ):

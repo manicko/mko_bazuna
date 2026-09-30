@@ -319,7 +319,7 @@ class Ad(models.Model):
             ),
             models.Index(
                 name="IX_ads_draft_sweep",
-                fields=["status", "created_at"],
+                fields=["status", "updated_at"],
                 condition=Q(status=AdStatus.DRAFT),
             ),
         ]
