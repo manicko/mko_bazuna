@@ -8,11 +8,13 @@ but ``apps.*`` must never import ``telegram_bot.*``.
 import logging
 
 from asgiref.sync import sync_to_async
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, transaction
+from django.utils import timezone
 
 from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
+from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.locations.models import City
 from apps.media.services.filesystem import delete_photo
 
@@ -22,6 +24,7 @@ __all__ = [
     "create_draft_ad",
     "_get_ad_status",
     "delete_draft",
+    "touch_draft",
     "search_categories",
     "get_city_by_name",
     "get_all_cities",
@@ -93,9 +96,52 @@ async def _get_ad_status(ad_id: int) -> AdStatus | None:
     return await _get()
 
 
+async def touch_draft(ad_id: int) -> None:
+    """Refresh a DRAFT ad's ``updated_at`` so the idle-timeout sweep keeps it alive.
+
+    This is the dialog heartbeat for finding 03-DB-003: ``sweep_drafts`` reaps a
+    ``DRAFT`` once it has had no interaction for 30 minutes, measured on
+    ``Ad.updated_at``.  Every handler registered on an ``AdCreateForm`` state
+    calls this on entry, so a dialog that stays interactive is never reaped
+    however long it takes.
+
+    The write MUST be a single-column ``QuerySet.update()``, never a full
+    ``save()``.  ``auto_now`` is a ``Model.save()`` pre-save hook only;
+    ``QuerySet.update()`` emits raw SQL and never fires it.  A full ``save()``
+    from a stale in-memory ``Ad`` rewrites all 31 columns and was measured to
+    clobber a concurrent ``submit_ad``: a stale ``title`` plus ``status='draft'``
+    written over a just-published ad, while ``published_at`` stays set — a row
+    that is simultaneously DRAFT (so the sweep deletes it 30 minutes later) and
+    already gone from the site.  The ``CHECK`` constraints do not stop it.
+
+    The ``status=AdStatus.DRAFT`` filter is a second, independent guarantee: once
+    the ad leaves DRAFT the predicate matches 0 rows, so this can never resurrect
+    or revert a published ad.
+
+    Fail-soft: a lock timeout (SQLSTATE 55P03) is transient contention — the
+    heartbeat can wait behind ``submit_ad``'s row lock — not a dialog failure.
+    A missed heartbeat only degrades that one dialog to the pre-fix 30-minute
+    creation-age behaviour; it must never cost the seller their step.
+    """
+
+    @sync_to_async
+    def _touch() -> None:
+        try:
+            Ad.objects.filter(id=ad_id, status=AdStatus.DRAFT).update(
+                updated_at=timezone.now()
+            )
+        except OperationalError as exc:
+            if not is_lock_timeout(exc):
+                raise
+            logger.warning(
+                "Lock timeout touching draft ad %s; skipping heartbeat", ad_id
+            )
+
+    await _touch()
+
+
 async def delete_draft(ad_id: int) -> None:
     """Delete a draft ad and clean up its photo files."""
-
     @sync_to_async
     def _delete() -> None:
         try:

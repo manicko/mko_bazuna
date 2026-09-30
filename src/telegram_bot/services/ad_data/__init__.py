@@ -36,6 +36,7 @@ from telegram_bot.services.ad_data.keyboards import (
 from telegram_bot.services.ad_data.media import (
     download_photo,
     save_photo,
+    touch_staging_photos,
 )
 from telegram_bot.services.ad_data.orm import (
     _get_ad_status,
@@ -46,6 +47,7 @@ from telegram_bot.services.ad_data.orm import (
     get_city,
     get_city_by_name,
     search_categories,
+    touch_draft,
 )
 from telegram_bot.services.ad_data.translation import translate_all_languages
 
@@ -59,11 +61,13 @@ __all__ = [
     "create_draft_ad",
     "_get_ad_status",
     "delete_draft",
+    "touch_draft",
     "search_categories",
     "get_city_by_name",
     "get_all_cities",
     "download_photo",
     "save_photo",
+    "touch_staging_photos",
     "get_category",
     "get_city",
     "translate_all_languages",

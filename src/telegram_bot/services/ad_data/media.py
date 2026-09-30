@@ -8,6 +8,7 @@ import asyncio
 import io
 import logging
 import os
+from typing import Any
 
 from aiogram import Bot
 from django.conf import settings
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "download_photo",
     "save_photo",
+    "touch_staging_photos",
 ]
 
 
@@ -133,3 +135,42 @@ async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
             logger.warning("Storage key collision: %s, regenerating", key)
 
             key = generate_storage_key()
+
+
+async def touch_staging_photos(photos: list[dict[str, Any]]) -> None:
+    """Refresh the mtime of every ``staging/`` file a live dialog still references.
+
+    ``sweep_orphaned_media._STAGING_TTL_SECONDS`` (2 h, hourly) reclaims abandoned
+    in-flight uploads by file **mtime**, and cannot see the database.  The row
+    heartbeat (:func:`ad_data.orm.touch_draft`) refreshes ``Ad.updated_at`` but
+    leaves the staging file's mtime untouched, so without this call the row's
+    clock and the file's clock would drift apart and a dialog that stays
+    interactive for more than 2 h would publish with a dangling ``AdImage``
+    reference (finding 03-DB-003; the ``move_staging_to_permanent`` silent-skip
+    defect is phase 07's).  Touching the files on the two handlers that can see
+    a non-empty ``photos`` list keeps both artefacts on one clock.
+
+    Keys without the ``staging/`` prefix are skipped (already permanent or seed
+    data), mirroring :func:`move_staging_to_permanent`.  The ``os.utime`` calls
+    run via ``asyncio.to_thread`` so the event loop is never blocked, and never
+    inside a transaction (the bot's handler path has none).
+
+    Fail-soft: ``FileNotFoundError`` means the file is already gone — there is
+    nothing left to protect — and any other ``OSError`` is logged and skipped.
+    A missing touch must never break a dialog step.
+    """
+
+    def _touch(media_path: str) -> None:
+        os.utime(media_path)
+
+    for photo in photos:
+        key = photo.get("storage_key")
+        if not key or not key.startswith(STAGING_PREFIX):
+            continue
+        media_path = os.path.join(settings.MEDIA_ROOT, key)
+        try:
+            await asyncio.to_thread(_touch, media_path)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            logger.warning("Failed to touch staging file %s: %s", key, exc)
