@@ -7,6 +7,15 @@ commit/rollback, so acquiring the lock in autocommit (outside ``atomic()``)
 would release it before the count-to-mutate sequence runs, letting concurrent
 scheduler workers race.
 
+Once per-batch commit lands (finding 03-DB-008), ``archive_sweep`` and
+``recompute_normalized_prices`` are the exception: a transaction-scoped lock
+would be released by the first batch ``COMMIT``, so they hold a **session-scoped**
+lock (``pg_advisory_lock``) taken once and released when the sweep ends — and
+therefore cannot be inside an enclosing ``atomic()`` (an enclosing ``atomic()``
+would turn each per-batch ``atomic()`` into a savepoint, so nothing would ever
+commit). See ``_SESSION_SCOPED_BATCHERS``. Every other command keeps the
+transaction-scoped, PgBouncer-safe shape this module enforces.
+
 These tests observe run-time behaviour rather than static source structure: a
 spy replaces ``advisory_lock`` and each command is driven through
 ``call_command``; we assert the spy is invoked with the correct
@@ -34,6 +43,11 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # path is exercised; the dry-run path now also uses a transaction-scoped lock
 # (matching the production path) but is not exercised by the spy because
 # call_command does not pass --dry-run.
+#
+# Exceptions to the transaction-scoped rule: the two commands in
+# ``_SESSION_SCOPED_BATCHERS`` lock with a session-scoped lock for the whole
+# sweep (see the module docstring). Their entries below are asserted positively
+# (``session is True`` / ``in_atomic is False``); the rest are byte-identical.
 SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("archive_sweep", AdvisoryLockId.ARCHIVE_SWEEP),
     ("delete_sweep", AdvisoryLockId.DELETE_SWEEP),
@@ -49,6 +63,15 @@ SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("send_alerts", AdvisoryLockId.ALERT_DELIVERY_TASK),
     ("recompute_normalized_prices", AdvisoryLockId.RECOMPUTE_NORMALIZED_PRICES),
 ]
+
+# 03-DB-008: these two batch inside per-batch transactions, so they hold a
+# SESSION-scoped advisory lock (pg_advisory_lock) — a transaction-scoped one
+# would be released by the first batch COMMIT — and therefore cannot be inside
+# an enclosing atomic(). Every other entry keeps the transaction-scoped,
+# PgBouncer-safe shape, which the assertion below still enforces.
+_SESSION_SCOPED_BATCHERS = frozenset(
+    {"archive_sweep", "recompute_normalized_prices"}
+)
 
 # Every sweep command binds ``advisory_lock`` through
 # ``from apps.core.utils.advisory_lock import advisory_lock`` at import time, so
@@ -122,6 +145,20 @@ class TestSweepLockOrdering:
                 f"{command_name}: advisory_lock was not called"
             )
             _lock_id, session, in_atomic = by_lock_id[expected_lock_id]
+            if command_name in _SESSION_SCOPED_BATCHERS:
+                # 03-DB-008: per-batch commit requires a session-scoped lock
+                # held across every batch, which in turn forbids an enclosing
+                # atomic() (it would make each per-batch atomic() a savepoint).
+                assert session is True, (
+                    f"{command_name}: per-batch sweep must hold a session-scoped "
+                    "(pg_advisory_lock) advisory lock across every batch"
+                )
+                assert in_atomic is False, (
+                    f"{command_name}: per-batch sweep must NOT be inside an "
+                    "enclosing transaction.atomic() — that would turn each "
+                    "per-batch atomic() into a savepoint (03-DB-008)"
+                )
+                continue
             assert in_atomic is True, (
                 f"{command_name}: advisory_lock acquired outside "
                 "transaction.atomic() — pg_advisory_xact_lock would release "

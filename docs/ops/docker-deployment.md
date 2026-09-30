@@ -432,13 +432,32 @@ line to search for is:
 canceling statement due to lock timeout        # SQLSTATE 55P03
 ```
 
-A lock timeout means a **long transaction is holding the lock**, usually
-`archive_sweep` (which holds its `select_for_update()` for the whole sweep until
-per-batch commit lands) or a queued `delete_sweep` / `purge_deleted_ads` run. The
-fix is to shorten the holder (per-batch commit), **not** to raise
-`LOCK_TIMEOUT_SECONDS` — a larger value only lengthens the stall. Hourly sweeps
-are retried on the next tick by construction; a web request returns a 503 with
-`Retry-After: 30`; the bot answers a busy message.
+A lock timeout means a **long transaction is holding the lock**, usually a
+queued `delete_sweep` / `purge_deleted_ads` run contending with an `Ad` row lock
+held by a web edit or bot action.
+
+`archive_sweep` and `recompute_normalized_prices` batch in 500-row transactions
+(`03-DB-008`), so the worst observed batch transaction is well under a second
+rather than tens of seconds. `archive_sweep` uses a session-scoped advisory lock
+(`pg_advisory_lock`) because a transaction-scoped lock would be released at the
+first batch commit; **this is not PgBouncer transaction-mode safe — revisit both
+commands before enabling the pgbouncer profile.**
+
+**A non-zero exit from `archive_sweep` now means partial success, not total
+failure:** batches 1..N-1 are committed and the failed batch is rolled back. The
+command's own log carries the batch index and cursor
+(`archive_sweep batch %d: …`, `archive_sweep aborted at batch %d …`); the
+scheduler only reports "exited with code 1" and cannot supply that detail. The
+next hourly tick re-derives the eligible set from scratch and finishes the work
+— nothing is lost.
+
+Two bounds, two different things: `SCHEDULER_COMMAND_TIMEOUT` (1800 s) kills the
+**child process** so one command cannot stall the cycle; `LOCK_TIMEOUT_SECONDS`
+(10 s) bounds **one lock wait** on one connection. Do not raise
+`LOCK_TIMEOUT_SECONDS` to work around a lock wait — find the contention. A larger
+value only lengthens the stall. Hourly sweeps are retried on the next tick by
+construction; a web request returns a 503 with `Retry-After: 30`; the bot answers
+a busy message.
 
 > **BLOCKED — do not enable the `pgbouncer` profile yet.** Enabling it with only
 > the `ignore_startup_parameters` env var produces **silent unbounded lock

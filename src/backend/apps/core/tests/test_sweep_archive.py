@@ -7,14 +7,15 @@ guarded by an advisory lock (lock id 1).
 
 from __future__ import annotations
 
-import inspect
 import threading
 import time
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
 from django.db import connection, transaction
+from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from apps.ads.models import Ad
@@ -108,20 +109,80 @@ class TestArchiveSweep:
         assert stale.status == AdStatus.ARCHIVED
         assert get_search_version() > version_before
 
-    def test_archive_sweep_handle_uses_select_for_update_and_atomic(self) -> None:
-        """archive_sweep.handle source contains select_for_update inside
-        transaction.atomic (DB-010 fix).
+    def test_archive_sweep_locks_batch_with_select_for_update(self) -> None:
+        """``archive_sweep`` genuinely calls ``select_for_update()`` at runtime.
 
-        Mirrors the structural assertion pattern from
-        ``test_edit_views_locking.py`` (``TestEditViewsLocking``) which guards
-        against accidental removal of the ``select_for_update()`` /
-        ``transaction.atomic()`` row-locking pattern in Ad-mutating code paths.
+        Replaces an ``inspect.getsource`` token assertion (finding 03-DB-008):
+        token presence is the wrong oracle, because a *vestigial*
+        ``with transaction.atomic():`` left in ``handle`` (now only a savepoint)
+        keeps both tokens present while silently defeating the per-batch commit.
+        This asserts a real call instead — the ``QuerySet.select_for_update``
+        runtime-spy pattern from
+        ``test_db_lock_timeout_boundary.py::TestBulkLockTimeout``.
         """
-        from apps.core.management.commands.archive_sweep import Command
+        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        original = QuerySet.select_for_update
 
-        source = inspect.getsource(Command.handle)
-        assert "transaction.atomic" in source
-        assert "select_for_update" in source
+        def _spy(queryset: QuerySet, *args: object, **kwargs: object) -> QuerySet:
+            calls.append((args, kwargs))
+            return original(queryset, *args, **kwargs)
+
+        with patch.object(QuerySet, "select_for_update", _spy):
+            call_command("archive_sweep")
+
+        assert calls, "archive_sweep never called select_for_update()"
+
+    @pytest.mark.django_db(transaction=True)
+    def test_batches_commit_independently(
+        self, seller, category, city, monkeypatch
+    ) -> None:
+        """Each batch commits independently; a later failure keeps earlier work.
+
+        The direct assertion of finding 03-DB-008: ``transaction=True`` is
+        required so each per-batch ``atomic()`` is a real transaction (not a
+        savepoint). A small batch size makes the population span at least three
+        batches, and ``Ad.transition_to`` fails on the second batch. Pre-fix the
+        whole sweep is one transaction and rolls back — no row is ``ARCHIVED``,
+        which is exactly why this test is RED against the pre-fix code.
+        """
+        from apps.core.management.commands import archive_sweep
+
+        monkeypatch.setattr(archive_sweep, "_BATCH_SIZE", 2)
+
+        stale = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                status=AdStatus.PUBLISHED,
+                published_at=timezone.now() - timedelta(days=90),
+            )
+            for _ in range(6)
+        ]
+        stale.sort(key=lambda ad: (ad.published_at, ad.pk))
+        batch_one_pks = {ad.pk for ad in stale[:2]}
+
+        original_transition_to = Ad.transition_to
+        failing_pk = stale[2].pk
+
+        def _transition_to(self: Ad, target, *args, **kwargs):
+            if self.pk == failing_pk:
+                raise RuntimeError("injected failure in batch 2")
+            return original_transition_to(self, target, *args, **kwargs)
+
+        monkeypatch.setattr(Ad, "transition_to", _transition_to)
+
+        with pytest.raises(RuntimeError, match="injected failure in batch 2"):
+            call_command("archive_sweep")
+
+        archived_pks = set(
+            Ad.objects.filter(pk__in=batch_one_pks, status=AdStatus.ARCHIVED)
+            .values_list("pk", flat=True)
+        )
+        assert archived_pks == batch_one_pks, (
+            "batch 1 must be committed when a later batch fails — the per-batch "
+            "commit is not taking effect (03-DB-008)"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -155,6 +155,31 @@ All retention values are hardcoded in the respective management command source f
 Separately, `LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait; it is a
 connection setting, not a retention value.
 
+**Transaction batching (finding 03-DB-008).** `archive_sweep` and
+`recompute_normalized_prices` process their rows in per-batch transactions of
+`_BATCH_SIZE = 500`, each committing before the next batch is read. `_BATCH_SIZE`
+is a hardcoded module constant — a transaction-batching size, **not** a retention
+duration, and deliberately not an environment variable or a CLI argument: it is
+the number that bounds the production lock hold, so it must not be
+operator-variable.
+
+Because a transaction-scoped advisory lock (`pg_advisory_xact_lock`) is released
+by the first batch `COMMIT`, these two commands hold a **session-scoped** lock
+(`pg_advisory_lock(AdvisoryLockId.ARCHIVE_SWEEP)` /
+`…RECOMPUTE_NORMALIZED_PRICES`) taken once and released when the sweep ends.
+Every other sweep command keeps the transaction-scoped, PgBouncer-safe shape.
+**A session-scoped advisory lock is not safe under PgBouncer transaction-mode
+pooling; enabling the pgbouncer profile requires revisiting these two commands.**
+
+`archive_sweep` acquires its lock (id 1) before the count-to-mutate sequence; a
+contending run blocks until the lock is granted, **bounded by the connection-level
+`lock_timeout`** (`LOCK_TIMEOUT_SECONDS`, default 10 s).
+
+The retention-values sentence above is scoped to **durations**, not to the
+transaction-batching constant. `recompute_normalized_prices` has **no retention
+duration** — it is bounded by the table, not by a time window — and its
+`_BATCH_SIZE` is a transaction size, not a retention value.
+
 ## Scheduler
 
 All sweep commands run hourly via the `scheduler` service, which dispatches

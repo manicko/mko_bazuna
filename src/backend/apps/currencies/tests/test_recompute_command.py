@@ -8,14 +8,15 @@ correctly-computed ``price_normalized_eur`` with a stale value (lost update).
 
 from __future__ import annotations
 
-import inspect
 import threading
 import time
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
 from django.db import connection, transaction
+from django.db.models.query import QuerySet
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -96,22 +97,87 @@ class TestRecomputeNormalizedPrices:
         ad.refresh_from_db()
         assert ad.price_normalized_eur == Decimal("999")
 
-    def test_process_batch_uses_select_for_update(self) -> None:
-        """``_process_batch`` locks the batch rows with ``select_for_update``.
+    def test_recompute_locks_batch_with_select_for_update(self) -> None:
+        """``recompute_normalized_prices`` genuinely calls
+        ``select_for_update()`` at runtime.
 
-        DB-001: the batch read must acquire a row lock (inside the
-        ``transaction.atomic()`` block opened by ``handle()``) so a concurrent
-        web/bot edit changing ``price_amount`` cannot race between the read and
-        the blind ``bulk_update`` on ``price_normalized_eur``.
+        Replaces an ``inspect.getsource(Command._process_batch)`` token
+        assertion (finding 03-DB-008). Under the per-batch design the batch is
+        fetched and locked by the caller (``_recompute``) in the per-batch
+        transaction, so the lock legitimately leaves ``_apply_batch``. This
+        asserts a real ``QuerySet.select_for_update`` call rather than a
+        substring — the runtime-spy pattern from
+        ``test_db_lock_timeout_boundary.py::TestBulkLockTimeout``.
+        """
+        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        original = QuerySet.select_for_update
+
+        def _spy(queryset: QuerySet, *args: object, **kwargs: object) -> QuerySet:
+            calls.append((args, kwargs))
+            return original(queryset, *args, **kwargs)
+
+        with patch.object(QuerySet, "select_for_update", _spy):
+            call_command("recompute_normalized_prices")
+
+        assert calls, "recompute_normalized_prices never called select_for_update()"
+
+    @pytest.mark.django_db(transaction=True)
+    def test_batches_commit_independently(
+        self, exchange_rates, seller, category, city, monkeypatch
+    ) -> None:
+        """Each batch commits independently; a later failure keeps earlier work.
+
+        Mirror of ``test_sweep_archive.py::test_batches_commit_independently``
+        for finding 03-DB-008. ``transaction=True`` makes each per-batch
+        ``atomic()`` a real transaction; a small batch size spans at least three
+        batches, and ``bulk_update`` fails on the second. Pre-fix the whole
+        recompute is one transaction and rolls back — no row is updated, which is
+        exactly why this test is RED against the pre-fix code.
         """
         from apps.currencies.management.commands import (
             recompute_normalized_prices,
         )
 
-        source = inspect.getsource(
-            recompute_normalized_prices.Command._process_batch
+        monkeypatch.setattr(recompute_normalized_prices, "_BATCH_SIZE", 2)
+
+        ads = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                status=AdStatus.PUBLISHED,
+                price=100,
+                price_currency=CurrencyCode.BAM,
+                price_normalized_eur=999,
+            )
+            for _ in range(6)
+        ]
+        ads.sort(key=lambda ad: ad.pk)
+        batch_one_pks = {ad.pk for ad in ads[:2]}
+
+        original_bulk_update = Ad.objects.bulk_update
+        call_count = 0
+
+        def _bulk_update(objs, fields, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("injected failure in batch 2")
+            return original_bulk_update(objs, fields, *args, **kwargs)
+
+        monkeypatch.setattr(Ad.objects, "bulk_update", _bulk_update)
+
+        with pytest.raises(RuntimeError, match="injected failure in batch 2"):
+            call_command("recompute_normalized_prices")
+
+        updated_pks = set(
+            Ad.objects.filter(pk__in=batch_one_pks, price_normalized_eur=Decimal("51.2000"))
+            .values_list("pk", flat=True)
         )
-        assert "select_for_update" in source
+        assert updated_pks == batch_one_pks, (
+            "batch 1 must be committed when a later batch fails — the per-batch "
+            "commit is not taking effect (03-DB-008)"
+        )
 
 
 class TestRecomputeRowLockConcurrency:
