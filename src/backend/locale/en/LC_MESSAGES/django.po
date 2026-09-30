@@ -32,6 +32,9 @@ msgstr ""
 msgid "Failed to copy ad: {error}"
 msgstr ""
 
+msgid "Failed to copy ad."
+msgstr ""
+
 #, python-format
 msgid ""
 "✅ Ad #%(ad_id)s copied to draft #%(new_id)s.\n"

@@ -56,9 +56,9 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
     except PermissionError:
         await message.answer(_("You can only copy your own ads."))
         return
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to copy ad %d for user %d", ad_id, user_id)
-        await message.answer(_("Failed to copy ad: {error}").format(error=e))
+        await message.answer(_("Failed to copy ad."))
         return
 
     # Set FSM state to purpose selection (pre-filled from copy)

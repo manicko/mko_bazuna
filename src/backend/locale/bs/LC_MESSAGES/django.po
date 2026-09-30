@@ -33,6 +33,9 @@ msgstr "Možeš kopirati samo svoje oglase."
 msgid "Failed to copy ad: {error}"
 msgstr "Ne uslovi kopiranje oglasa: {error}"
 
+msgid "Failed to copy ad."
+msgstr "Nije uspjelo kopiranje oglasa."
+
 #, python-format
 msgid ""
 "✅ Ad #%(ad_id)s copied to draft #%(new_id)s.\n"

@@ -162,6 +162,46 @@ class TestCmdCopy:
         assert "failed" in called_text.lower()
 
     @pytest.mark.asyncio
+    async def test_copy_unexpected_error_hides_driver_text(
+        self, seller, source_ad
+    ) -> None:
+        """Raw database/driver text never reaches the seller's chat."""
+        from telegram_bot.handlers.ad_copy import cmd_copy
+
+        state = MagicMock()
+        state.get_data = AsyncMock(return_value={"user_id": seller.id})
+
+        message = MagicMock()
+        message.from_user = MagicMock(id=seller.chat_id)
+        message.text = f"/copy {source_ad.id}"
+        message.answer = AsyncMock()
+
+        driver_text = (
+            "duplicate key value violates unique constraint "
+            '"uq_ads_single_draft_per_user"\n'
+            "DETAIL:  Key (user_id, status)=(1, draft) already exists.\n"
+            "CONTEXT:  INSERT INTO ads (user_id, status) VALUES (1, 'draft')"
+        )
+        error = RuntimeError(driver_text)
+
+        with patch(
+            "telegram_bot.handlers.ad_copy.copy_ad",
+            new=MagicMock(side_effect=error),
+        ):
+            await cmd_copy(message, state)
+
+        message.answer.assert_awaited_once()
+        called_text = message.answer.call_args[0][0]
+        assert "failed" in called_text.lower()
+        assert "uq_ads_single_draft_per_user" not in called_text
+        assert "DETAIL" not in called_text
+        assert "CONTEXT" not in called_text
+        assert "INSERT INTO" not in called_text
+        assert "Key (" not in called_text
+        assert "duplicate key value" not in called_text
+        assert str(error) not in called_text
+
+    @pytest.mark.asyncio
     async def test_copy_not_logged_in(self) -> None:
         """When user_id is absent from state, the bot prompts to log in."""
         from telegram_bot.handlers.ad_copy import cmd_copy

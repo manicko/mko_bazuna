@@ -8,11 +8,15 @@ Verifies the ad-duplication contract (Spec: ad re-listing):
     - Image positions are preserved.
     - Ownership is enforced (PermissionError for non-owners).
     - A missing source raises Ad.DoesNotExist.
+    - An existing DRAFT owned by the seller is replaced by the copy, so the
+      seller ends with exactly one DRAFT (single-draft policy shared with
+      ``create_draft_ad``).
 
-The source ad must be in a non-DRAFT status because of the
-``uq_ads_single_draft_per_user`` unique constraint — the seller cannot have
-an existing DRAFT when ``copy_ad`` runs. Storage keys use
-``f"{uuid.uuid4().hex}.jpg"`` to satisfy ``KEY_FORMAT_REGEX``.
+The source ad must be in a non-DRAFT status so a copy from it is
+unambiguous, though ``copy_ad`` itself does not require this: if the seller
+already holds a DRAFT it is deleted inside the same transaction before the
+copy is created. Storage keys use ``f"{uuid.uuid4().hex}.jpg"`` to satisfy
+``KEY_FORMAT_REGEX``.
 """
 
 from __future__ import annotations
@@ -74,6 +78,37 @@ def feature_items() -> list[LookupItem]:
 
 class TestCopyAd:
     """Coverage for apps.ads.services.copy_service.copy_ad."""
+
+    def test_copy_ad_replaces_existing_draft(
+        self, seller, category, city, purpose_item: LookupItem
+    ) -> None:
+        """A seller with an existing DRAFT ends with exactly one DRAFT — the copy."""
+        source = create_test_ad(
+            seller,
+            category,
+            city,
+            listing_purpose=purpose_item,
+            status=AdStatus.PUBLISHED,
+        )
+        existing_draft = create_test_ad(
+            seller, category, city, status=AdStatus.DRAFT
+        )
+
+        new_ad = copy_ad(source.id, seller.id)
+        new_ad.refresh_from_db()
+
+        # The invariant: a draft is returned, and it is the copy.
+        assert new_ad.pk != source.pk
+        assert new_ad.pk != existing_draft.pk
+        assert new_ad.status == AdStatus.DRAFT
+
+        # Exactly one DRAFT remains for this seller, and it is the copy.
+        drafts = list(
+            Ad.objects.filter(user=seller, status=AdStatus.DRAFT).values_list(
+                "id", flat=True
+            )
+        )
+        assert drafts == [new_ad.id]
 
     def test_copy_ad_happy_path(
         self,
