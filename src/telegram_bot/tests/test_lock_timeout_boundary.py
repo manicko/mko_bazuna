@@ -20,9 +20,6 @@ import pytest
 from django.db import OperationalError
 from django.utils import translation  # noqa: F401 - used by localisation tests
 
-from apps.core.enums import AdStatus
-from conftest import create_test_ad
-
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
@@ -107,7 +104,7 @@ class TestProcessPreviewLockTimeout:
 
     @pytest.mark.asyncio
     async def test_genuine_moderation_failure_still_clears_state(
-        self, seller, category, city
+        self, seller
     ) -> None:
         """A real ad that fails moderation still renders the moderation error.
 
@@ -117,8 +114,9 @@ class TestProcessPreviewLockTimeout:
         the branch keeps its ``state.clear()``.
         """
         from telegram_bot.handlers.ad_create import process_preview
+        from telegram_bot.services.ad_data import create_draft_ad
 
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+        ad = await create_draft_ad(user_id=seller.id)
         state = _build_state(
             {
                 "ad_id": ad.id,
