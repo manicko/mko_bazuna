@@ -28,6 +28,7 @@ class TestProcessCity:
         from telegram_bot.handlers.ad_create.city import process_city
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = None
         message.answer = AsyncMock()
@@ -51,6 +52,7 @@ class TestProcessCity:
             new=AsyncMock(return_value=city),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.set_state = AsyncMock()
 
@@ -78,6 +80,7 @@ class TestProcessCity:
                 new=AsyncMock(return_value=[]),
             ):
                 state = MagicMock()
+                state.get_data = AsyncMock(return_value={})
                 message = MagicMock()
                 message.text = "Nonexistent"
                 message.answer = AsyncMock()
@@ -112,6 +115,7 @@ class TestProcessCity:
                 ),
             ):
                 state = MagicMock()
+                state.get_data = AsyncMock(return_value={})
                 state.update_data = AsyncMock()
                 state.set_state = AsyncMock()
 

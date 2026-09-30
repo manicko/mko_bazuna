@@ -33,6 +33,7 @@ class TestProcessTitle:
         from telegram_bot.handlers.ad_create.text import process_title
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = None
         message.answer = AsyncMock()
@@ -47,6 +48,7 @@ class TestProcessTitle:
         from telegram_bot.handlers.ad_create.text import process_title
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.set_state = AsyncMock()
 
@@ -66,6 +68,7 @@ class TestProcessTitle:
         from telegram_bot.handlers.ad_create.text import process_title
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = "x" * 300  # exceeds max length
         message.answer = AsyncMock()
@@ -90,6 +93,7 @@ class TestProcessDescription:
         from telegram_bot.handlers.ad_create.text import process_description
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = None
         message.answer = AsyncMock()
@@ -104,6 +108,7 @@ class TestProcessDescription:
         from telegram_bot.handlers.ad_create.text import process_description
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.set_state = AsyncMock()
 
@@ -123,6 +128,7 @@ class TestProcessDescription:
         from telegram_bot.handlers.ad_create.text import process_description
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = "x" * 3000  # exceeds max length
         message.answer = AsyncMock()

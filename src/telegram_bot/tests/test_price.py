@@ -38,6 +38,7 @@ class TestProcessPriceCurrency:
         from telegram_bot.handlers.ad_create.price import process_price_currency
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
 
         callback = MagicMock()
@@ -63,6 +64,7 @@ class TestProcessPriceCurrency:
         from telegram_bot.handlers.ad_create.price import process_price_currency
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
 
         callback = MagicMock()
@@ -82,6 +84,7 @@ class TestProcessPriceCurrency:
         from telegram_bot.handlers.ad_create.price import process_price_currency
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
 
         callback = MagicMock()
         callback.data = f"{BotCallbackPrefix.PRICE_CURRENCY}xx"
@@ -143,6 +146,7 @@ class TestProcessPrice:
         from telegram_bot.handlers.ad_create.price import process_price
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.get_data = AsyncMock(
             return_value={"price_currency": CurrencyCode.EUR}
@@ -196,6 +200,7 @@ class TestMoveFromPriceToPhotos:
         from telegram_bot.handlers.ad_create.price import _move_from_price_to_photos
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.set_state = AsyncMock()
 
         message = MagicMock()

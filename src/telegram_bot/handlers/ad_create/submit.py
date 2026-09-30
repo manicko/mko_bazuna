@@ -23,7 +23,11 @@ from apps.ads.services.submission import SubmitAdInput, submit_ad
 from apps.core.enums import LanguageLocale
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from telegram_bot.handlers.ad_create import AdCreateForm, router
-from telegram_bot.services.ad_data import translate_all_languages
+from telegram_bot.services.ad_data import (
+    touch_draft,
+    touch_staging_photos,
+    translate_all_languages,
+)
 
 from .entry import cmd_cancel
 
@@ -40,11 +44,16 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
     if not message.from_user:
         return
 
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
+
+    await touch_staging_photos(data.get("photos", []))
+
     text = message.text.strip().lower()
 
     if text == "confirm":
-        data = await state.get_data()
-
         original_title = data.get("title", "")
 
         original_desc = data.get("description", "")

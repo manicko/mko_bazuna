@@ -10,12 +10,17 @@ from django.utils.translation import gettext as _
 
 from telegram_bot.handlers.ad_create import AdCreateForm, router
 from telegram_bot.schemas.message_payloads import DescriptionPayload, TitlePayload
-from telegram_bot.services.ad_data import build_currency_keyboard
+from telegram_bot.services.ad_data import build_currency_keyboard, touch_draft
 
 
 @router.message(AdCreateForm.title)
 async def process_title(message: types.Message, state: FSMContext) -> None:
     """Process title input with Pydantic validation."""
+
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     if not message.text:
         await message.answer(_("Please send the ad title."))
@@ -42,6 +47,11 @@ async def process_title(message: types.Message, state: FSMContext) -> None:
 @router.message(AdCreateForm.description)
 async def process_description(message: types.Message, state: FSMContext) -> None:
     """Process description input with Pydantic validation."""
+
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     if not message.text:
         await message.answer(_("Please send the ad description."))

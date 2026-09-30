@@ -11,12 +11,17 @@ from aiogram.fsm.context import FSMContext
 from django.utils.translation import get_language, gettext as _
 
 from telegram_bot.handlers.ad_create import AdCreateForm, router
-from telegram_bot.services.ad_data import get_all_cities, get_city_by_name
+from telegram_bot.services.ad_data import get_all_cities, get_city_by_name, touch_draft
 
 
 @router.message(AdCreateForm.city)
 async def process_city(message: types.Message, state: FSMContext) -> None:
     """Process city selection."""
+
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     if not message.text:
         await message.answer(_("Please send a city name."))

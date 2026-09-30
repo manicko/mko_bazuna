@@ -35,6 +35,7 @@ class TestProcessCategory:
         from telegram_bot.handlers.ad_create.category import process_category
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         message = MagicMock()
         message.text = None
         message.answer = AsyncMock()
@@ -57,6 +58,7 @@ class TestProcessCategory:
             new=AsyncMock(return_value=[category]),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.set_state = AsyncMock()
 
@@ -80,6 +82,7 @@ class TestProcessCategory:
             new=AsyncMock(return_value=[]),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             message = MagicMock()
             message.text = "xyz"
             message.answer = AsyncMock()
@@ -105,6 +108,7 @@ class TestProcessCategory:
             new=AsyncMock(return_value=[cat1, cat2]),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             message = MagicMock()
             message.text = "electro"
             message.answer = AsyncMock()
@@ -135,6 +139,7 @@ class TestProcessPurpose:
             new=AsyncMock(return_value=purpose),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.get_data = AsyncMock(return_value={"category_id": 42})
 
@@ -162,6 +167,7 @@ class TestProcessPurpose:
             new=AsyncMock(return_value=None),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             callback = MagicMock()
             callback.data = f"{BotCallbackPrefix.PURPOSE}unknown"
             callback.answer = AsyncMock()
@@ -189,6 +195,7 @@ class TestProcessCondition:
             new=AsyncMock(return_value=condition),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.get_data = AsyncMock(return_value={"category_id": 42})
 
@@ -215,6 +222,7 @@ class TestProcessCondition:
             new=AsyncMock(return_value=None),
         ):
             state = MagicMock()
+            state.get_data = AsyncMock(return_value={})
             callback = MagicMock()
             callback.data = f"{BotCallbackPrefix.CONDITION}unknown"
             callback.answer = AsyncMock()
@@ -237,6 +245,7 @@ class TestProcessFeatures:
         from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         state = MagicMock()
+        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.set_state = AsyncMock()
         state.get_data = AsyncMock(return_value={"feature_ids": [1, 2]})
@@ -270,6 +279,7 @@ class TestProcessFeatures:
                 return_value=MagicMock(),
             ):
                 state = MagicMock()
+                state.get_data = AsyncMock(return_value={})
                 state.update_data = AsyncMock()
                 state.get_data = AsyncMock(return_value={"feature_ids": [], "category_id": 1})
 

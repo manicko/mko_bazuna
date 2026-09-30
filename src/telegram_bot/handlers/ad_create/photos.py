@@ -14,7 +14,12 @@ from django.utils.translation import gettext as _
 from apps.media.services.filesystem import generate_storage_key, validate_photo
 from telegram_bot.handlers.ad_create import MAX_PHOTO_BYTES, AdCreateForm, router
 from telegram_bot.schemas.message_payloads import PhotoCountPayload
-from telegram_bot.services.ad_data import download_photo, save_photo
+from telegram_bot.services.ad_data import (
+    download_photo,
+    save_photo,
+    touch_draft,
+    touch_staging_photos,
+)
 from telegram_bot.services.rate_limit import check_upload_rate_limit
 
 from .preview import show_preview
@@ -25,6 +30,11 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
     """Process photo uploads with validation."""
 
     data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
+
+    await touch_staging_photos(data.get("photos", []))
 
     photos = data.get("photos", [])
 

@@ -24,12 +24,18 @@ from telegram_bot.services.ad_data import (
     get_resolved_features,
     get_resolved_purposes,
     search_categories,
+    touch_draft,
 )
 
 
 @router.message(AdCreateForm.category)
 async def process_category(message: types.Message, state: FSMContext) -> None:
     """Process category selection."""
+
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     if not message.text:
         await message.answer(
@@ -220,6 +226,11 @@ async def process_purpose(callback: types.CallbackQuery, state: FSMContext) -> N
     if not callback.data or not callback.message:
         return
 
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
+
     slug = callback.data.replace(BotCallbackPrefix.PURPOSE, "")
 
     purpose_item = await get_lookup_item_by_slug(slug)
@@ -247,6 +258,11 @@ async def process_condition(callback: types.CallbackQuery, state: FSMContext) ->
     if not callback.data or not callback.message:
         return
 
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
+
     slug = callback.data.replace(BotCallbackPrefix.CONDITION, "")
     condition_item = await get_lookup_item_by_slug(slug)
     if not condition_item:
@@ -269,6 +285,9 @@ async def process_features(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     selected_ids = set(data.get("feature_ids", []))
 

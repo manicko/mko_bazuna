@@ -14,7 +14,7 @@ from apps.currencies.enums import CurrencyCode
 from telegram_bot.handlers.ad_create import AdCreateForm, router
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.schemas.message_payloads import PricePayload
-from telegram_bot.services.ad_data import build_currency_keyboard
+from telegram_bot.services.ad_data import build_currency_keyboard, touch_draft
 
 
 @router.callback_query(AdCreateForm.price)
@@ -25,6 +25,11 @@ async def process_price_currency(
 
     if not callback.data or not callback.message:
         return
+
+    data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     if callback.data == BotCallbackPrefix.PRICE_FREE:
         await state.update_data(
@@ -64,6 +69,9 @@ async def process_price(message: types.Message, state: FSMContext) -> None:
     """Process the numeric price amount input with Pydantic validation."""
 
     data = await state.get_data()
+
+    if data.get("ad_id") is not None:
+        await touch_draft(data["ad_id"])
 
     currency: CurrencyCode | None = data.get("price_currency")
 
