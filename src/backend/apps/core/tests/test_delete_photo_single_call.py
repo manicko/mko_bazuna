@@ -12,7 +12,7 @@ Parametrized across:
   - purge_failed_ads    (ON_MODERATION_FAILED ads > 7 days, lock 6)
   - purge_rejected_ads  (REJECTED ads > 90 days, lock 7)
   - purge_deleted_ads   (DELETED ads > 120 days, lock 11)
-  - sweep_drafts        (DRAFT ads > 30 min, lock 4)
+  - sweep_drafts        (DRAFT ads idle > 30 min, lock 4)
   - consent_hard_delete (users, consent revoked > 30 days, lock 3)
 
 Service:
@@ -129,7 +129,7 @@ class TestDeletePhotoSingleCall:
             pytest.param(
                 "sweep_drafts",
                 AdStatus.DRAFT,
-                "created_at",
+                "updated_at",
                 timedelta(minutes=90),
                 id="sweep_drafts",
             ),
