@@ -183,9 +183,11 @@ Every other sweep command keeps the transaction-scoped, PgBouncer-safe shape.
 **A session-scoped advisory lock is not safe under PgBouncer transaction-mode
 pooling; enabling the pgbouncer profile requires revisiting these two commands.**
 
-`archive_sweep` acquires its lock (id 1) before the count-to-mutate sequence; a
+`archive_sweep` acquires its lock (id 1) before its per-batch mutation loop; a
 contending run blocks until the lock is granted, **bounded by the connection-level
-`lock_timeout`** (`LOCK_TIMEOUT_SECONDS`, default 10 s).
+`lock_timeout`** (`LOCK_TIMEOUT_SECONDS`, default 10 s). (The dry-run branch's
+`count()` is issued only under `--dry-run`, so it does not run on the production
+path.)
 
 The retention-values sentence above is scoped to **durations**, not to the
 transaction-batching constant. `recompute_normalized_prices` has **no retention

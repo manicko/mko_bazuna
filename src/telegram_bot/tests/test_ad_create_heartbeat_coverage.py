@@ -144,6 +144,18 @@ def test_state_set_matches_guarded_handlers() -> None:
 
     declared = _ad_create_form_states()
 
+    # Non-empty floor: a rename of ``AdCreateForm`` (or its package) would make
+    # both sides empty and the equality below pass vacuously — "everything
+    # covered" must be distinguishable from "nothing scanned".
+    assert declared, (
+        "No AdCreateForm states were scanned — the guard is vacuous. "
+        "Did the class, package or state-declaration shape change?"
+    )
+    assert guarded, (
+        "No router-registered AdCreateForm handlers were scanned — the guard "
+        "is vacuous. Did the decorator shape or handlers directory change?"
+    )
+
     assert declared == covered, (
         "AdCreateForm states and the states guarded by router handlers must "
         "match exactly.\n"

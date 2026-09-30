@@ -107,10 +107,13 @@ class Command(BaseCommand):
                         for ad in ads:
                             ad.transition_to(AdStatus.ARCHIVED)
                             archived += 1
-                        last = ads[-1]
-                        cursor = _Cursor(
-                            published_at=last.published_at, pk=last.pk
-                        )
+                    # Assign the cursor AFTER the batch COMMITs: inside the
+                    # atomic it would still describe the rolled-back batch if the
+                    # COMMIT failed, so the abort path below would report a
+                    # cursor for work that was never committed.
+                    cursor = _Cursor(
+                        published_at=ads[-1].published_at, pk=ads[-1].pk
+                    )
                     batches += 1
                     logger.info(
                         "archive_sweep batch %d: archived %d ad(s), "

@@ -122,7 +122,11 @@ class Command(BaseCommand):
                         checked, changed = self._apply_batch(
                             normalizer, ads, dry_run
                         )
-                        last_pk = ads[-1].pk
+                    # Assign AFTER the batch COMMITs: inside the atomic this
+                    # field would name the rolled-back batch on a failed COMMIT,
+                    # which is exactly the case the abort log exists to
+                    # diagnose.
+                    last_pk = ads[-1].pk
                     batch_no += 1
                     total_checked += checked
                     total_changed += changed

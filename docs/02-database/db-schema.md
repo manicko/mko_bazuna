@@ -638,6 +638,12 @@ pre-existing rows so a deploy is behaviour-preserving. **One alert per
 `(saved_search_id, ad_id)` for the life of the listing — including across a re-publish —
 is a recorded product decision**, not an accident.
 
+Whether **editing a live ad** should re-alert matching buyers is an **open product
+question**; today it does not. Any future epoch for that decision must be a
+**content-revision column, not `Ad.published_at`** — `published_at` is reset by
+`ad_reactivate` and price/photo edits too, so it would re-alert on the wrong half
+of the transitions.
+
 ---
 
 ### PopularSearch

@@ -13,9 +13,10 @@ Covers:
 from __future__ import annotations
 
 import logging
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from django.db.models import F
+from aiogram.exceptions import TelegramServerError
 from django.utils import timezone
 
 from apps.categories.models import Category
@@ -28,6 +29,20 @@ from apps.users.models import User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+
+def _backfill_migration_module():
+    """Import the shipped ``0004`` backfill migration module.
+
+    The module name starts with a digit, so a static ``import`` is impossible;
+    ``importlib`` loads the real artefact the deploy runs rather than an inline
+    replay that would stay green if the migration were rewritten.
+    """
+    import importlib
+
+    return importlib.import_module(
+        "apps.search.migrations.0004_backfill_delivered_at"
+    )
 
 
 class TestMarkDelivered:
@@ -81,6 +96,61 @@ class TestMarkDelivered:
         assert row.delivered_at == marked_at
 
 
+class TestImmediateRetryMarksDelivered:
+    """A transient failure followed by a successful retry writes the receipt.
+
+    Mirrors the daily ``send_alerts`` path, which marks after retry success. The
+    immediate path must do the same, or the pair stays ``delivered_at IS NULL``
+    and the next daily digest re-sends an already-delivered alert (03-DB-007).
+    """
+
+    @pytest.mark.django_db(transaction=True)
+    def test_retry_success_records_receipt_and_excludes_from_digest(
+        self, seller: User, buyer: User, category: Category, city: City
+    ) -> None:
+        import asyncio
+
+        # ``transaction=True`` commits the row so the ``sync_to_async`` delivery
+        # thread (a different DB connection) can see it: under the default
+        # per-test transaction the mark's UPDATE would match zero rows and the
+        # receipt would silently be lost.
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
+        row = SavedSearchNotification.objects.create(saved_search=saved_search, ad=ad)
+        assert row.delivered_at is None
+
+        transient = TelegramServerError(
+            message="internal server error", method=MagicMock()
+        )
+        payload = {
+            "chat_id": 12345,
+            "text": "test message",
+            "reply_markup": None,
+            "pair": (saved_search.id, ad.id),
+        }
+
+        with patch("apps.search.services.immediate_alerts.Bot") as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(side_effect=[transient, None])
+            mock_bot.session.close = AsyncMock()
+
+            from apps.search.services.immediate_alerts import _send_payloads
+
+            with patch(
+                "apps.search.services.immediate_alerts.asyncio.sleep",
+                new=AsyncMock(),
+            ):
+                asyncio.run(_send_payloads("test-token", [payload]))
+
+            # The primary send failed and the retry succeeded — two attempts.
+            assert mock_bot.send_message.await_count == 2
+
+        row.refresh_from_db()
+        assert row.delivered_at is not None
+        # The daily matcher now excludes the pair (no duplicate re-send).
+        assert find_matching_ads(saved_search) == []
+
+
 class TestBackfillBehaviourPreservation:
     """The backfill keeps pre-existing rows suppressed (03-DB-007 / F-1)."""
 
@@ -93,17 +163,33 @@ class TestBackfillBehaviourPreservation:
         production: with a no-backfill column the filter change would make every
         previously notified pair eligible again and the live, ungated 08:00 UTC
         daily digest would re-notify every subscribed buyer the next day.
+        The real migration's forward function is imported and executed, so the
+        shipped artefact — not an inline replay — is what is pinned.
         """
+        from django.apps import apps as django_apps
+
+        migration = _backfill_migration_module()
+
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
         row = SavedSearchNotification.objects.create(saved_search=saved_search, ad=ad)
 
-        # Replay the migration's set-based forward operation.
-        SavedSearchNotification.objects.filter(delivered_at__isnull=True).update(
-            delivered_at=F("sent_at")
-        )
+        migration.backfill_delivered_at(django_apps, None)
 
         row.refresh_from_db()
         assert row.delivered_at == row.sent_at
         # And the row stays excluded, exactly as before the deploy.
         assert find_matching_ads(saved_search) == []
+
+    def test_backfill_reverse_is_noop(self) -> None:
+        """The shipped migration's reverse is ``RunPython.noop``.
+
+        A reverse that NULLed ``delivered_at`` would re-arm the mass
+        re-notification the backfill exists to prevent.
+        """
+        from django.db import migrations
+
+        operation = _backfill_migration_module().Migration.operations[0]
+        assert isinstance(operation, migrations.RunPython)
+        assert operation.reverse_code is migrations.RunPython.noop
+

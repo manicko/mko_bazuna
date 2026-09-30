@@ -76,9 +76,11 @@ def plan_staging_promotion(photos: list[SubmittedPhoto]) -> list[str]:
         occurrence wins).
 
     Raises:
-        FileNotFoundError: if a staged file is absent.  No key is rewritten in
-            that case — the caller converts this into a recoverable error
-            rather than publishing an ad whose image does not exist.
+        FileNotFoundError: if a staged file is absent.  No key **at or after**
+            the failing one is rewritten — fields already processed have their
+            keys rewritten before the raise.  The caller converts this into a
+            recoverable error rather than publishing an ad whose image does not
+            exist.
     """
     key_fields = ("storage_key", "thumbnail_small", "thumbnail_medium", "thumbnail_large")
     permanent_keys: list[str] = []

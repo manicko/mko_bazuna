@@ -66,7 +66,7 @@ def mark_delivered(
         return True
 
     logger.warning(
-        "Alert delivery already recorded for saved_search_id=%s ad_id=%s (%s)",
+        "Alert delivery already delivered for saved_search_id=%s ad_id=%s (%s)",
         saved_search_id,
         ad_id,
         DeliveryOutcome.SKIPPED_ALREADY_DELIVERED,

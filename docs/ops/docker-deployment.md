@@ -437,8 +437,15 @@ queued `delete_sweep` / `purge_deleted_ads` run contending with an `Ad` row lock
 held by a web edit or bot action.
 
 `archive_sweep` and `recompute_normalized_prices` batch in 500-row transactions
-(`03-DB-008`), so the worst observed batch transaction is well under a second
-rather than tens of seconds. `archive_sweep` uses a session-scoped advisory lock
+(`03-DB-008`), so a batch transaction is bounded rather than tens of seconds.
+Per command: `recompute`'s worst observed batch is **well under a second**
+(≈358 ms), which holds comfortably under the 10 s bound. `archive_sweep`'s worst
+observed batch is ≈3.1 s (≈3.2× headroom) and its hold scales with
+**per-statement latency**, because each row costs **two round-trips**
+(`transition_to` reads and writes per row) — at 500 rows that is ~1000
+round-trips per batch, so an increase in round-trip time (a busier host, a
+pooler, a slower link) moves the batch hold toward the bound. `archive_sweep`
+uses a session-scoped advisory lock
 (`pg_advisory_lock`) because a transaction-scoped lock would be released at the
 first batch commit; **this is not PgBouncer transaction-mode safe — revisit both
 commands before enabling the pgbouncer profile.**

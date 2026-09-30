@@ -585,8 +585,8 @@ class TestPlanStagingPromotion:
         even though there was no file to move.  The contract is now *rewrite a
         key iff the file was actually moved* — a missing staged file is a
         terminal error the caller must surface, and the sibling
-        ``TestPromoteMediaFiles::test_non_exdev_oserror_reraises`` already
-        asserted the same contract for the move itself.
+        ``TestPromoteMediaFiles::test_non_exdev_oserror_is_logged_and_not_propagated``
+        already asserted the same contract for the move itself.
         """
         photos = [SubmittedPhoto(storage_key="staging/missing.jpg")]
 
@@ -595,6 +595,33 @@ class TestPlanStagingPromotion:
 
         # No key is rewritten when validation fails.
         assert photos[0].storage_key == "staging/missing.jpg"
+
+    def test_missing_second_photo_leaves_earlier_keys_rewritten(
+        self, tmp_path: Path
+    ) -> None:
+        """Keys before the failing one are rewritten; keys at/after are not.
+
+        The loop mutates as it iterates and raises mid-list, so a multi-photo
+        submission that fails on the second photo leaves the first photo's key
+        in its permanent form — the docstring's "no key at or after the failing
+        one is rewritten" is exactly this, and a single-photo case cannot pin it.
+        """
+        staging_dir = tmp_path / "staging"
+        (staging_dir / "first.jpg").write_bytes(b"staged")
+        # ``staging/second.jpg`` is deliberately absent.
+
+        photos = [
+            SubmittedPhoto(storage_key="staging/first.jpg", thumbnail_small=None),
+            SubmittedPhoto(storage_key="staging/second.jpg", thumbnail_small=None),
+        ]
+
+        with pytest.raises(FileNotFoundError, match="staging/second.jpg"):
+            plan_staging_promotion(photos)
+
+        # The first photo was processed before the raise: its key is rewritten.
+        assert photos[0].storage_key == "first.jpg"
+        # The failing photo's key is untouched.
+        assert photos[1].storage_key == "staging/second.jpg"
 
 
 class TestPromoteMediaFiles:
