@@ -1407,3 +1407,7 @@ msgstr ""
 
 msgid "Ad not found"
 msgstr ""
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid "Your draft expired and was deleted. Please start again with /post."
+msgstr ""

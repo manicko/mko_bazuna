@@ -24,6 +24,7 @@ from apps.core.enums import LanguageLocale
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from telegram_bot.handlers.ad_create import AdCreateForm, router
 from telegram_bot.services.ad_data import (
+    _get_ad_status,
     touch_draft,
     touch_staging_photos,
     translate_all_languages,
@@ -120,6 +121,26 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             await state.clear()
 
         else:
+            # Distinguish "the draft is gone" from a real content failure. A
+            # reaped draft (sweep_drafts, finding 03-DB-003) or one deleted by a
+            # concurrent /post leaves submit_ad's Ad.DoesNotExist branch, whose
+            # generic "Ad not found" is not seller-recoverable. Probe the row's
+            # existence on the FAILURE PATH ONLY — the happy path is untouched.
+            # Both causes share the same remedy (start again), so merging them is
+            # correct. state.clear() is deliberately left unchanged: phase 05's
+            # AD-016 owns the FSM-state decision.
+            if await _get_ad_status(data["ad_id"]) is None:
+                await message.answer(
+                    _(
+                        "Your draft expired and was deleted. "
+                        "Please start again with /post."
+                    )
+                )
+
+                await state.clear()
+
+                return
+
             # Render the real moderation error (mirrors ad_edit), falling back
             # to the generic message when the service returned no reason. The
             # service wraps its strings in gettext_lazy, so ``str`` forces the

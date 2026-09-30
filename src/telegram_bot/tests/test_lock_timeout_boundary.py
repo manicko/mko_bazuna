@@ -20,6 +20,9 @@ import pytest
 from django.db import OperationalError
 from django.utils import translation  # noqa: F401 - used by localisation tests
 
+from apps.core.enums import AdStatus
+from conftest import create_test_ad
+
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
@@ -103,13 +106,22 @@ class TestProcessPreviewLockTimeout:
         state.clear.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_genuine_moderation_failure_still_clears_state(self) -> None:
-        """The genuine-failure branch keeps its message AND its state.clear()."""
+    async def test_genuine_moderation_failure_still_clears_state(
+        self, seller, category, city
+    ) -> None:
+        """A real ad that fails moderation still renders the moderation error.
+
+        The ad row must EXIST so the draft-expired probe finds it: the
+        distinguishable draft-expired message (03-DB-003) must never replace a
+        genuine content failure. The message is the service's ``errors[0]`` and
+        the branch keeps its ``state.clear()``.
+        """
         from telegram_bot.handlers.ad_create import process_preview
 
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
         state = _build_state(
             {
-                "ad_id": 1,
+                "ad_id": ad.id,
                 "title": "Valid Title",
                 "description": "Valid description text for the ad.",
                 "price_amount": 100,
@@ -197,12 +209,14 @@ class TestProcessPreviewLocalisedErrors:
     async def test_moderation_failure_is_rendered_in_russian(
         self, seller, category, city
     ) -> None:
-        """``Ad failed moderation checks`` reaches a ru seller in Russian.
+        """A reaped draft reaches a ru seller in Russian, as a distinct message.
 
-        Drives the real ``submit_ad`` against a non-existent ad id so the
-        service returns its own gettext-wrapped ``Ad not found`` — the bot's
-        most common failure path — and asserts the message the seller receives
-        is the Russian catalogue value, never the English literal.
+        Drives the real ``submit_ad`` against a non-existent ad id (the
+        ``Ad.DoesNotExist`` branch — the reaped-draft path, 03-DB-003) through
+        the real ``process_preview``. The row-existence probe returns ``None``,
+        so the seller gets the dedicated draft-expired message — asserted here in
+        the Russian catalogue value, and provably not the untranslated literal
+        and not ``"Ad not found"``.
         """
         from telegram_bot.handlers.ad_create import process_preview
 
@@ -222,7 +236,10 @@ class TestProcessPreviewLocalisedErrors:
 
         message.answer.assert_awaited()
         rendered = str(message.answer.await_args.args[0])
-        assert rendered == "Объявление не найдено"
+        assert rendered == (
+            "Черновик объявления истёк и был удалён. "
+            "Пожалуйста, начните заново командой /post."
+        )
         assert rendered != "Ad not found"
         state.clear.assert_awaited()
 
@@ -230,7 +247,7 @@ class TestProcessPreviewLocalisedErrors:
     async def test_moderation_failure_is_rendered_in_bosnian(
         self, seller, category, city
     ) -> None:
-        """The same error reaches a bs seller in Bosnian."""
+        """The same draft-expired message reaches a bs seller in Bosnian."""
         from telegram_bot.handlers.ad_create import process_preview
 
         data = self._payload(seller, category, city)
@@ -248,7 +265,9 @@ class TestProcessPreviewLocalisedErrors:
             await process_preview(message, state)
 
         rendered = str(message.answer.await_args.args[0])
-        assert rendered == "Oglas nije pronađen"
+        assert rendered == (
+            "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
+        )
         assert rendered != "Ad not found"
 
 

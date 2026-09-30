@@ -1533,6 +1533,10 @@ msgstr ""
 msgid "Ad not found"
 msgstr "Oglas nije pronađen"
 
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid "Your draft expired and was deleted. Please start again with /post."
+msgstr "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"
