@@ -894,6 +894,31 @@ location /protected-media/ {
 - `Content-Disposition: inline` for all media
 - Storage keys are UUID v4 (unguessable, non-sequential)
 
+### Client IP Trust Model
+
+Django resolves the rate-limit client IP in `apps/core/utils/client_ip.py`
+through a peer gate, not by trusting forwarding headers blindly:
+
+- **Peer gate first.** `REMOTE_ADDR` (the socket peer) is read first. If it is
+  loopback, private, or listed in `settings.TRUSTED_PROXY_NETWORKS`, the gate is
+  open and forwarded headers may be consulted. Otherwise the peer itself is
+  returned and **no header is read** — a public client cannot choose its own
+  rate-limit bucket through `X-Real-IP` or `X-Forwarded-For`.
+- **Header precedence when trusted.** `X-Real-IP` (set by nginx with
+  `proxy_set_header`, which overwrites any client-supplied value) wins; else
+  `X-Forwarded-For` is walked **right-to-left** to the first non-private entry;
+  else the socket peer. All nginx sites use `$proxy_add_x_forwarded_for`, which
+  appends the real client, so the leftmost hop is attacker-controlled and is
+  never read.
+- **Dev never exercises the untrusted branch.** The default dev stack
+  (`docker-compose.dev.override.yml`) publishes Django directly on `:8000`, so
+  the peer is loopback — the gate is always open on loopback, and `X-Real-IP`
+  supplied directly to Django is trusted in the same way as through nginx.
+- **A production public peer is refused by design.** When the direct peer is a
+  public address, the forwarding headers are ignored outright; only a genuine
+  trusted proxy hop opens the gate.
+
+
 ## Database Operations
 
 ### Backup

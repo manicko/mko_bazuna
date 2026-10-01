@@ -42,6 +42,11 @@ SECURE_HSTS_PRELOAD = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
+# No extra trusted proxy networks in dev: the default dev stack publishes Django
+# directly on :8000, so the peer is loopback and the gate in
+# apps/core/utils/client_ip.py is already open.
+TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()
+
 # Development uses in-process cache (no Redis needed).
 CACHES = {
     "default": {

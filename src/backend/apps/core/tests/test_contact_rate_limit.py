@@ -50,13 +50,23 @@ class TestDeepLinkRenderRateLimit:
         # 10.0.0.2 is untouched
         assert check_deep_link_render_rate_limit(_make_request(ip="10.0.0.2")) is True
 
-    def test_x_forwarded_for_takes_precedence(self) -> None:
-        """X-Forwarded-For (nginx) is preferred over REMOTE_ADDR."""
+    def test_untrusted_peer_ignores_x_forwarded_for(self) -> None:
+        """An untrusted public peer keeps its own key; X-Forwarded-For is ignored.
+
+        The peer gate in ``apps.core.utils.client_ip.get_client_ip`` reads the
+        socket peer first and returns it without a header read when the peer is
+        not loopback, private, or listed in ``TRUSTED_PROXY_NETWORKS``. A
+        public peer that sets ``X-Forwarded-For`` therefore buckets under its own
+        address (the old ``X-Forwarded-For``-wins rule is deliberately gone).
+        """
         request = HttpRequest()
-        request.META["REMOTE_ADDR"] = "10.0.0.1"
-        request.META["HTTP_X_FORWARDED_FOR"] = "203.0.113.5"
-        # First call from the XFF IP is allowed (fresh counter).
+        request.META["REMOTE_ADDR"] = "203.0.113.9"
+        request.META["HTTP_X_FORWARDED_FOR"] = "198.51.100.5"
+        # First call from the peer is allowed, on a fresh counter keyed by the
+        # peer address, not the spoofed header value.
         assert check_deep_link_render_rate_limit(request) is True
+        assert cache.get("telegram_dl_rl:203.0.113.9") == 1
+        assert cache.get("telegram_dl_rl:198.51.100.5") is None
 
     def test_rate_limit_check_handles_cache_incr_value_error(self) -> None:
         """ValueError from cache.incr (race: key expired between add/incr) →

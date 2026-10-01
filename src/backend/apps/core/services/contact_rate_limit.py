@@ -12,6 +12,8 @@ from typing import Final
 from django.core.cache import cache
 from django.http import HttpRequest
 
+from apps.core.utils.client_ip import get_client_ip
+
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_REQUESTS: Final[int] = 60
@@ -19,14 +21,6 @@ RATE_LIMIT_REQUESTS: Final[int] = 60
 RATE_LIMIT_PERIOD: Final[int] = 600  # 10 minutes
 
 _RATE_LIMIT_KEY_PATTERN: Final[str] = "telegram_dl_rl:{ip}"
-
-
-def _get_client_ip(request: HttpRequest) -> str:
-    """Extract the client IP, honoring X-Forwarded-For from nginx."""
-    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded:
-        return x_forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
 
 
 def check_deep_link_render_rate_limit(request: HttpRequest) -> bool:
@@ -37,7 +31,7 @@ def check_deep_link_render_rate_limit(request: HttpRequest) -> bool:
     exceeded 60 renders in the last 600 seconds. The calling view is
     responsible for producing the 429 response.
     """
-    key = _RATE_LIMIT_KEY_PATTERN.format(ip=_get_client_ip(request))
+    key = _RATE_LIMIT_KEY_PATTERN.format(ip=get_client_ip(request))
 
     try:
         added = cache.add(key, 1, timeout=RATE_LIMIT_PERIOD)

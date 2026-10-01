@@ -184,6 +184,15 @@ SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
+# Networks whose direct peer may be trusted to set the client-IP forwarding
+# headers X-Real-IP / X-Forwarded-For (see apps/core/utils/client_ip.py). A peer
+# that is loopback or private is ALWAYS trusted; entries here extend that trust
+# to a proxy reached across a non-private hop. Deliberately a literal, not an
+# env-driven value: no compose file declares `networks:`, so nginx's container
+# address is Docker-allocated and per-deployment, which means there is no correct
+# value an operator could supply from inside the repo. Empty by default.
+TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()
+
 # HSTS: nginx also emits this header; Django-level is defense-in-depth.
 # Override in prod.py with a longer duration.
 SECURE_HSTS_SECONDS = 3600

@@ -16,6 +16,10 @@ LANGUAGE_CODE = "en"
 
 DEBUG = True
 
+# No extra trusted proxy networks in tests: Django's test client peers from
+# loopback, so the gate in apps/core/utils/client_ip.py is already open.
+TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()
+
 # Disable SSL/TLS redirect and secure cookies for the test client, which issues
 # plain HTTP requests. Without this, SecurityMiddleware 301-redirects every
 # request to HTTPS and breaks all DB-backed view tests.

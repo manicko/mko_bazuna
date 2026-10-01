@@ -14,6 +14,7 @@ import ipaddress
 from django.http import HttpRequest
 
 from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
+from apps.core.utils.client_ip import get_client_ip
 from apps.users.models import ConsentRecord, User
 
 
@@ -63,7 +64,7 @@ def record_consent_action(
     """
     if request is not None:
         session_key = request.session.session_key
-        ip_address = _anonymize_ip(request.META.get("REMOTE_ADDR") or None)
+        ip_address = _anonymize_ip(get_client_ip(request))
         user_agent = (request.META.get("HTTP_USER_AGENT") or "")[:500]
     else:
         session_key = None

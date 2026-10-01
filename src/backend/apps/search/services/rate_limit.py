@@ -12,6 +12,8 @@ from typing import Final
 from django.core.cache import cache
 from django.http import HttpRequest
 
+from apps.core.utils.client_ip import get_client_ip
+
 logger = logging.getLogger(__name__)
 
 # Maximum number of requests per IP within the time window.
@@ -46,7 +48,7 @@ def rate_limit_check(
     Returns:
         ``True`` if the request may proceed, ``False`` if rate-limited.
     """
-    ip = _get_client_ip(request)
+    ip = get_client_ip(request)
     key = _RATE_LIMIT_KEY_PATTERN.format(namespace=namespace, ip=ip)
 
     try:
@@ -65,21 +67,3 @@ def rate_limit_check(
         cache.set(key, 1, timeout=RATE_LIMIT_PERIOD)
         return True
 
-
-def _get_client_ip(request: HttpRequest) -> str:
-    """
-    Extract the client IP address from the request.
-
-    Checks ``HTTP_X_FORWARDED_FOR`` first (for reverse-proxy setups),
-    then falls back to ``REMOTE_ADDR``.
-
-    Args:
-        request: The incoming HTTP request.
-
-    Returns:
-        The client IP address string, or ``"unknown"`` if not available.
-    """
-    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded:
-        return x_forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
