@@ -372,22 +372,24 @@ class TestLoginStatusNoPii:
     def test_login_consume_no_raw_telegram_id(self, caplog) -> None:
         """login_status must not log raw telegram_id after token consumption."""
         telegram_id = 999888777
-        raw_token = "a" * 32
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         User.objects.create(
             telegram_id=telegram_id,
             chat_id=telegram_id,
             password="x",
         )
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(minutes=5),
-            consumed_at=None,
-        )
 
+        # Issue through the real path so the row is bound to the client's
+        # login_browser_id cookie and the expected status stays 200.
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         with caplog.at_level("INFO"):
             response = client.post("/login/status/", {"token": raw_token})
 

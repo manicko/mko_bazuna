@@ -102,6 +102,150 @@ class TestLoginIssue:
 # ---------------------------------------------------------------------------
 
 
+class TestLoginTokenBinding:
+    """The login token is bound to the browser that requested it (04-AUT-001).
+
+    Every token here is obtained through the real ``/login/issue/`` path so the
+    issuing client holds the ``login_browser_id`` cookie the view set. The
+    phase-1 claim is performed through the service — exactly what the bot's
+    ``handle_login_orm`` does — so the two-process handshake is exercised
+    without importing the bot package.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clear_rate_limit_cache(self):
+        """Clear rate-limiter cache between tests."""
+        from django.core.cache import cache
+
+        cache.clear()
+        yield
+        cache.clear()
+
+    def _issue(self, client: Client) -> str:
+        """GET the issuing URL and return the raw token (client holds the cookie)."""
+        issued = client.get("/login/issue/")
+        assert issued.status_code == 200
+        return issued.context["raw_token"]
+
+    def _claim(self, raw_token: str, telegram_id: int) -> None:
+        from apps.users.services.login_token import claim_token
+
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
+    def test_token_from_another_browser_is_rejected(self) -> None:
+        """A raw token issued to browser A cannot be redeemed from browser B.
+
+        Three assertions — the three ways a binding can be decorative: the
+        attacker is refused, the legitimate token is not burned, and A can
+        still redeem it.
+        """
+        telegram_id = 700000500
+        make_user(telegram_id, username="binding_owner")
+
+        browser_a = Client()
+        raw_token = self._issue(browser_a)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        self._claim(raw_token, telegram_id)
+
+        # Browser B (no login_browser_id cookie, or a different one) is refused.
+        browser_b = Client()
+        rejected = browser_b.post("/login/status/", {"token": raw_token})
+        assert rejected.status_code == 410
+
+        # The attack must not destroy the legitimate session: the token is not
+        # burned ...
+        assert LoginToken.objects.get(token_hash=token_hash).consumed_at is None
+
+        # ... and A can still redeem it.
+        accepted = browser_a.post("/login/status/", {"token": raw_token})
+        assert accepted.status_code == 200
+        assert "_auth_user_id" in browser_a.session
+
+    def test_same_browser_redeems_end_to_end(self) -> None:
+        """Issue → bot claim → redeem in the same browser yields 200 + a session."""
+        telegram_id = 700000501
+        make_user(telegram_id, username="binding_same")
+
+        client = Client()
+        raw_token = self._issue(client)
+        self._claim(raw_token, telegram_id)
+
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 200
+        assert "_auth_user_id" in client.session
+
+    def test_repeat_issue_does_not_invalidate_the_binding(self) -> None:
+        """Two issues from one browser keep one binding; the first still redeems."""
+        telegram_id = 700000502
+        make_user(telegram_id, username="binding_repeat")
+
+        client = Client()
+        first_raw = self._issue(client)
+        second_raw = self._issue(client)
+        # Both tokens are claimed by the bot.
+        self._claim(first_raw, telegram_id)
+        self._claim(second_raw, telegram_id)
+
+        # The first token still redeems — a re-mint would have broken it.
+        response = client.post("/login/status/", {"token": first_raw})
+        assert response.status_code == 200
+
+    def test_repeat_issue_reuses_the_same_browser_binding(self) -> None:
+        """One browser → the same stored binding; two browsers → different ones."""
+        browser_a = Client()
+        first_raw = self._issue(browser_a)
+        second_raw = self._issue(browser_a)
+
+        browser_b = Client()
+        third_raw = self._issue(browser_b)
+
+        def binding_of(raw: str) -> str | None:
+            return LoginToken.objects.get(
+                token_hash=hashlib.sha256(raw.encode()).hexdigest()
+            ).browser_binding
+
+        first_binding = binding_of(first_raw)
+        assert first_binding is not None
+        assert first_binding == binding_of(second_raw)
+        assert first_binding != binding_of(third_raw)
+
+    def test_an_unbound_row_is_refused(self) -> None:
+        """A NULL binding is refused (G-1a fail-closed) and the token is not burned."""
+        telegram_id = 700000503
+        make_user(telegram_id, username="binding_unbound")
+
+        client = Client()
+        raw_token = self._issue(client)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        self._claim(raw_token, telegram_id)
+
+        # Force the legacy/unbound state back with an UPDATE.
+        LoginToken.objects.filter(token_hash=token_hash).update(browser_binding=None)
+
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 410
+        assert LoginToken.objects.get(token_hash=token_hash).consumed_at is None
+
+    def test_a_malformed_browser_cookie_is_refused(self) -> None:
+        """An attacker-shaped cookie is replaced at issue time, never persisted."""
+        client = Client()
+        client.cookies["login_browser_id"] = "x" * 500
+
+        response = client.get("/login/issue/")
+        assert response.status_code == 200
+        raw_token = response.context["raw_token"]
+
+        stored = LoginToken.objects.get(
+            token_hash=hashlib.sha256(raw_token.encode()).hexdigest()
+        )
+        # The malformed value was never persisted; a fresh 22-char id was minted.
+        assert stored.browser_binding is not None
+        assert len(stored.browser_binding) == 64
+        # And the response replaced the attacker cookie with the minted one.
+        assert response.cookies["login_browser_id"].value != "x" * 500
+
+
 class TestLoginStatus:
     """Tests for login_status view (token polling)."""
 
@@ -119,63 +263,62 @@ class TestLoginStatus:
 
     def test_login_status_204_pending(self) -> None:
         """An unclaimed token (telegram_id is None) returns 204."""
-        raw_token = "pending_token_32chars_abcde_abcdefghij"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        assert issued.status_code == 200
+        raw_token = issued.context["raw_token"]
+
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 204
 
     def test_login_status_410_expired(self) -> None:
         """An expired token returns 410."""
-        raw_token = "expired_token_32chars_abcde_abcdefghij"
+        client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            expires_at=timezone.now() - timedelta(minutes=5),
+
+        # Issue through the real path (so the row is bound), then force the
+        # precondition back with an UPDATE — this must still prove expiry.
+        LoginToken.objects.filter(token_hash=token_hash).update(
+            expires_at=timezone.now() - timedelta(minutes=5)
         )
 
-        client = Client()
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
 
     def test_login_status_410_already_consumed(self) -> None:
         """An already-consumed token returns 410."""
-        raw_token = "consumed_token_32chars_abcde_abcdefghij"
+        telegram_id = 700000320
+        make_user(telegram_id, username="consumed_user")
+        client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=123456,
-            expires_at=timezone.now() + timedelta(hours=1),
+
+        LoginToken.objects.filter(token_hash=token_hash).update(
+            telegram_id=telegram_id,
             consumed_at=timezone.now(),
         )
 
-        client = Client()
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
 
     def test_login_status_200_claimed_and_user_exists(self) -> None:
         """A claimed token with a matching user returns 200 and establishes session."""
         telegram_id = 700000300
-        User.objects.create(
-            telegram_id=telegram_id,
-            chat_id=telegram_id,
-            username="weblogin_user",
-        )
-
-        raw_token = "claimed_token_32chars_abcde_abcdefghij"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
+        make_user(telegram_id, username="weblogin_user")
 
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        # The bot's phase-1 claim, performed through the service.
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 200
 
@@ -192,15 +335,15 @@ class TestLoginStatus:
             is_banned=True,
         )
 
-        raw_token = "banned_token_32chars_abcde_abcdefghij"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
 
@@ -213,15 +356,15 @@ class TestLoginStatus:
         telegram_id = 700000310
         make_user(telegram_id, username="disabled_user", is_active=False)
 
-        raw_token = "disabled_token_32chars_abcde_abcdefghi"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         response = client.post("/login/status/", {"token": raw_token})
 
         assert response.status_code == 410
@@ -236,15 +379,15 @@ class TestLoginStatus:
         telegram_id = 700000311
         make_user(telegram_id, username="disabled_burn", is_active=False)
 
-        raw_token = "disabled_burn_32chars_abcde_abcdefghi"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         first = client.post("/login/status/", {"token": raw_token})
         assert first.status_code == 410
 
@@ -263,15 +406,15 @@ class TestLoginStatus:
         telegram_id = 700000312
         make_user(telegram_id, username="enabled_user", is_active=True)
 
-        raw_token = "enabled_token_32chars_abcde_abcdefghij"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         response = client.post("/login/status/", {"token": raw_token})
 
         assert response.status_code == 200
@@ -342,15 +485,15 @@ class TestLoginTokenSecurity:
             username="atomic_user",
         )
 
-        raw_token = "atomic_token_32chars_abcde_abcdefghij"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
-
         client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
         # First poll — should consume and return 200.
         first = client.post("/login/status/", {"token": raw_token})
         assert first.status_code == 200
@@ -367,6 +510,10 @@ class TestLoginTokenSecurity:
         200 and ``consumed_at`` transitions from NULL to set (single-update
         atomicity). This isolates the "telegram_id set, not yet consumed"
         state before asserting the full session-establishment path elsewhere.
+
+        The bot supplies no binding and ``claim_token``'s ``WHERE`` clause does
+        not reference one — this test passing is part of the proof that
+        ``src/telegram_bot/`` needs no change.
         """
         telegram_id = 700000360
         User.objects.create(
@@ -375,16 +522,16 @@ class TestLoginTokenSecurity:
             username="bot_phase_user",
         )
 
-        raw_token = "bot_phase_32chars_abcde_abcdefghij"
+        client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        LoginToken.objects.create(
-            token_hash=token_hash,
-            telegram_id=telegram_id,
-            expires_at=timezone.now() + timedelta(hours=1),
-        )
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
         # Token has telegram_id set but consumed_at is NULL → first poll claims it.
-        client = Client()
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 200
 
@@ -420,14 +567,21 @@ def budva_city() -> City:
 
 
 def _claim_login(client: Client, user: User, username: str) -> None:
-    """Create a claimed login token for *user* and complete the web login."""
-    raw_token = f"{username}_32chars_abcde_abcdefghij"
+    """Create a claimed login token for *user* and complete the web login.
+
+    Issues through ``/login/issue/`` so the row is bound to the browser id
+    cookie the ``client`` fixture now holds, then performs the bot's phase-1
+    claim through the service. The three ``TestLoginPreferredCitySync``
+    dependents reach this unchanged.
+    """
+    issued = client.get("/login/issue/")
+    raw_token = issued.context["raw_token"]
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    LoginToken.objects.create(
-        token_hash=token_hash,
-        telegram_id=user.telegram_id,
-        expires_at=timezone.now() + timedelta(hours=1),
-    )
+
+    from apps.users.services.login_token import claim_token
+
+    assert claim_token(token_hash, user.telegram_id, timezone.now()) is not None
+
     response = client.post("/login/status/", {"token": raw_token})
     assert response.status_code == 200
 

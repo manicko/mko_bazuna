@@ -30,11 +30,21 @@ sound — there is no defect here.
 
 The ``RETURNING`` / model-shape coupling
 ----------------------------------------
-The ``RETURNING`` list in ``claim_token`` is ``LoginToken``'s **complete**
-field set (``id, token_hash, telegram_id, created_at, expires_at,
-consumed_at``), so ``zip(..., strict=True)`` + ``LoginToken(**…)`` raise
-``TypeError`` if ``login_tokens`` ever gains a column without the list being
-updated. It is a schema contract, not a convenience.
+``RETURNING_COLUMNS`` is ``LoginToken``'s **complete** field set and the
+``claim_token`` SQL's ``RETURNING`` clause is **built from it** (``", ".join``),
+so a model column and the SQL can never drift apart.
+
+The risk is **silent**, not loud, and the plan's earlier "raises ``TypeError``"
+claim was inverted. ``django/db/models/base.py::Model.__init__`` iterates the
+**model's** fields and pops each attname inside a ``try``, falling back to
+``field.get_default()`` on ``KeyError``. A model field **missing** from the
+``RETURNING`` list is therefore silently left at its default (``None``) — no
+exception, a fully green suite, and the binding dropped on every bot claim.
+``TypeError`` fires only in the **opposite** direction (a ``RETURNING`` name the
+model lacks). ``strict=True`` in the ``zip`` below is vacuous because both
+sequences come from the same ``cursor.execute``, and order divergence is not a
+runtime concern (``dict(zip(...))`` discards order and ``LoginToken(**d)`` is
+keyword-only) — matching order is a **consistency** obligation, tested as such.
 
 The ``AUT-007`` boundary
 ------------------------
@@ -61,6 +71,7 @@ used and the call sites are deliberately **not** consolidated.
 import datetime
 import hashlib
 import logging
+import re
 import secrets
 from enum import StrEnum
 from typing import Final, NamedTuple
@@ -82,6 +93,37 @@ TOKEN_TTL_SECONDS: Final[int] = 300
 # URL-safe chars (~192-bit CSPRNG), matching the bot regex `{32}`.
 RAW_TOKEN_ENTROPY_BYTES: Final[int] = 24
 
+# Entropy of the browser id in bytes: secrets.token_urlsafe(16) yields a
+# 22-char URL-safe value (128 bits). The binding is a **correlator**, not an
+# authenticator — the 192-bit raw token remains the only authenticator — so
+# 128 bits of unkeyed entropy is proportionate, and the stored value is a
+# SHA-256 digest of it (the raw id is never stored).
+BROWSER_ID_ENTROPY_BYTES: Final[int] = 16
+
+# First-party essential cookie carrying the raw browser id across the two-phase
+# handshake. The name is owned here (the service mints the id) and imported by
+# the view, mirroring PREFERRED_CITY_COOKIE_NAME's ownership pattern.
+LOGIN_BROWSER_ID_COOKIE: Final[str] = "login_browser_id"
+
+# A well-formed browser id is exactly the URL-safe shape secrets.token_urlsafe
+# produces. A presented cookie value that does not match is treated as absent
+# and re-minted, never persisted unvalidated.
+_BROWSER_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9_-]{22}$")
+
+# The complete ``LoginToken`` field set, in declaration order. The claim SQL's
+# ``RETURNING`` clause is built from this tuple, so a new model column cannot
+# go missing from the SQL. See the module docstring for why a stale
+# ``RETURNING`` fails silently rather than raising.
+RETURNING_COLUMNS: Final[tuple[str, ...]] = (
+    "id",
+    "token_hash",
+    "telegram_id",
+    "created_at",
+    "expires_at",
+    "consumed_at",
+    "browser_binding",
+)
+
 
 class ConsumeOutcome(StrEnum):
     """Outcome of a web-side token consume, used to map to an HTTP status."""
@@ -89,6 +131,7 @@ class ConsumeOutcome(StrEnum):
     NOT_FOUND = "not_found"
     GONE = "gone"
     PENDING = "pending"
+    UNBOUND = "unbound"
     LOST_RACE = "lost_race"
     CONSUMED = "consumed"
 
@@ -106,10 +149,12 @@ class ConsumeResult(NamedTuple):
 
 
 class IssuedToken(NamedTuple):
-    """Typed result of ``issue_token`` — the raw token and its hash pair."""
+    """Typed result of ``issue_token`` — the raw token, its hash, and the raw
+    browser id that the view must set as a cookie."""
 
     raw_token: str
     token_hash: str
+    browser_id: str
 
 
 def _hash_raw_token(raw_token: str) -> str:
@@ -117,21 +162,58 @@ def _hash_raw_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
-def issue_token() -> IssuedToken:
+def _hash_browser_id(browser_id: str) -> str:
+    """Return the plain (unkeyed) SHA-256 hex digest of ``browser_id``.
+
+    Mirrors ``_hash_raw_token``: only the digest is ever persisted. The binding
+    is a correlator, so an unkeyed digest is proportionate.
+    """
+    return hashlib.sha256(browser_id.encode()).hexdigest()
+
+
+def _resolve_browser_id(presented: str | None) -> str:
+    """Reuse a well-formed presented browser id, else mint a fresh one.
+
+    Reuse (not re-mint) is what makes a repeat issue safe: ``login_issue``
+    issues a fresh token per page view and several clients prefetch, so
+    minting on every issue would leave token #1 bound to the old id while the
+    cookie now holds a new one. An absent or malformed value is re-minted —
+    an attacker-supplied cookie value must never reach the database.
+    """
+    if presented is not None and _BROWSER_ID_PATTERN.fullmatch(presented):
+        return presented
+    return secrets.token_urlsafe(BROWSER_ID_ENTROPY_BYTES)
+
+
+def issue_token(browser_id: str | None = None) -> IssuedToken:
     """Mint a fresh login token and persist only its SHA-256 hash.
 
-    Returns the ``(raw_token, token_hash)`` pair. The raw token is never
-    stored — the only two ways to obtain it are this return value and the
-    POST body. ``telegram_id`` and ``consumed_at`` are left at their ``NULL``
-    defaults.
+    Returns the ``(raw_token, token_hash, browser_id)`` triple. The raw token
+    is never stored — the only two ways to obtain it are this return value and
+    the POST body. ``telegram_id`` and ``consumed_at`` are left at their
+    ``NULL`` defaults.
+
+    The browser binding is the SHA-256 digest of the resolved browser id; only
+    the digest is stored (``browser_binding``), never the raw id. A well-formed
+    presented ``browser_id`` is reused; an absent or malformed one is minted.
+
+    Args:
+        browser_id: The raw browser id from the incoming ``login_browser_id``
+            cookie, or ``None`` when the cookie is absent.
     """
     raw_token = secrets.token_urlsafe(RAW_TOKEN_ENTROPY_BYTES)
     token_hash = _hash_raw_token(raw_token)
+    resolved_browser_id = _resolve_browser_id(browser_id)
     LoginToken.objects.create(
         token_hash=token_hash,
         expires_at=timezone.now() + datetime.timedelta(seconds=TOKEN_TTL_SECONDS),
+        browser_binding=_hash_browser_id(resolved_browser_id),
     )
-    return IssuedToken(raw_token=raw_token, token_hash=token_hash)
+    return IssuedToken(
+        raw_token=raw_token,
+        token_hash=token_hash,
+        browser_id=resolved_browser_id,
+    )
 
 
 def claim_token(
@@ -183,8 +265,8 @@ def claim_token(
                AND telegram_id IS NULL
                AND consumed_at IS NULL
                AND expires_at > %s
-            RETURNING id, token_hash, telegram_id, created_at, expires_at, consumed_at
-            """,
+            RETURNING """
+            + ", ".join(RETURNING_COLUMNS),
             [telegram_id, token_hash, now],
         )
         row = cursor.fetchone()
@@ -195,7 +277,7 @@ def claim_token(
     return LoginToken(**dict(zip(columns, row, strict=True)))
 
 
-def consume_token(raw_token: str) -> ConsumeResult:
+def consume_token(raw_token: str, *, browser_id: str | None) -> ConsumeResult:
     """Consume a login token on the web side, atomically marking it used.
 
     The consume **must** read first (it needs ``token.telegram_id`` to pick
@@ -217,11 +299,25 @@ def consume_token(raw_token: str) -> ConsumeResult:
     ``UPDATE``, so a concurrent row deletion (``withdraw_consent`` /
     ``cleanup_login_tokens``) cannot open a second window.
 
+    The browser binding is checked **after** ``PENDING`` and **before** the
+    ``UPDATE``, and re-asserted inside the ``UPDATE``'s filter so it cannot be
+    lost to a stale read. A row whose ``browser_binding`` is ``NULL``, or whose
+    presented browser id is absent, malformed, or digests to a different value,
+    returns ``UNBOUND`` and is **never burned** — an attacker who fails the
+    binding check must not be able to destroy a legitimate user's in-flight
+    login. Because this gate precedes the ``UPDATE``, it is the *only*
+    non-``CONSUMED`` path that does not burn the token.
+
+    ``browser_id`` is **required and keyword-only**: a default would let a
+    future caller silently skip the binding check.
+
     Args:
         raw_token: The raw token from ``request.POST["token"]``.
+        browser_id: The raw browser id from the ``login_browser_id`` cookie, or
+            ``None`` when the cookie is absent.
 
     Returns:
-        A ``ConsumeResult`` whose ``outcome`` discriminates the five cases.
+        A ``ConsumeResult`` whose ``outcome`` discriminates the six cases.
     """
     token_hash = _hash_raw_token(raw_token)
 
@@ -239,14 +335,29 @@ def consume_token(raw_token: str) -> ConsumeResult:
     if token.telegram_id is None:
         return ConsumeResult(ConsumeOutcome.PENDING, token_hash, None)
 
+    # Binding gate — fail closed, and deliberately NO burn. A NULL stored
+    # binding, an absent/malformed presented id, or a digest mismatch all
+    # refuse the token without consuming it (unlike every other 410 path).
+    if (
+        token.browser_binding is None
+        or browser_id is None
+        or not _BROWSER_ID_PATTERN.fullmatch(browser_id)
+    ):
+        return ConsumeResult(ConsumeOutcome.UNBOUND, token_hash, token.telegram_id)
+    if _hash_browser_id(browser_id) != token.browser_binding:
+        return ConsumeResult(ConsumeOutcome.UNBOUND, token_hash, token.telegram_id)
+
     # Bot has claimed the token — atomically mark consumed (single UPDATE).
     # Optimistic concurrency: filter conditions ensure only an unclaimed,
-    # unexpired token with matching telegram_id is touched.
+    # unexpired token with a matching telegram_id AND a matching browser
+    # binding is touched — the binding is re-asserted here, not trusted from
+    # the read above.
     updated = LoginToken.objects.filter(
         token_hash=token_hash,
         telegram_id=token.telegram_id,
         consumed_at__isnull=True,
         expires_at__gt=timezone.now(),
+        browser_binding=_hash_browser_id(browser_id),
     ).update(consumed_at=timezone.now())
 
     if updated == 0:

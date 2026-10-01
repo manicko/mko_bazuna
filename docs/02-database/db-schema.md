@@ -86,11 +86,13 @@ telegram_id (BIGINT, nullable)          # filled by BOT on /start login_<token>
 created_at (TIMESTAMP)
 expires_at (TIMESTAMP)                  # +5 min from creation
 consumed_at (TIMESTAMP, nullable)       # filled by WEB on login completion
+browser_binding (CHAR(64), nullable)    # SHA-256 digest of the issuing browser's login_browser_id cookie; raw id NEVER stored; NULL = row predates the binding and is never redeemable
 ```
 Two-phase atomic claim (each = one UPDATE under transaction):
 1. Bot: `UPDATE login_tokens SET telegram_id=<tg> WHERE token_hash=? AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > now()`
-2. Web: `UPDATE login_tokens SET consumed_at=now() WHERE token_hash=? AND telegram_id = <observed> AND consumed_at IS NULL AND expires_at > now()`
+2. Web: `UPDATE login_tokens SET consumed_at=now() WHERE token_hash=? AND telegram_id = <observed> AND consumed_at IS NULL AND expires_at > now() AND browser_binding = <presented digest>`
 Token validation: SHA-256 hash stored (raw token never persisted). Claim via atomic `UPDATE ... RETURNING` with `WHERE token_hash = %s AND telegram_id IS NULL AND consumed_at IS NULL AND expires_at > %s` — only first valid claimer wins (zero-TOCTOU). 192-bit token entropy makes brute-force infeasible. Background task deletes expired/consumed tokens. Session cookies: `SECURE` + `HTTPONLY` + `SAMESITE=Lax`.
+The web consume re-asserts the browser binding alongside `telegram_id` / `consumed_at` / `expires_at`: a row whose binding is `NULL`, or whose presented browser id is absent, malformed, or digests to a different value, is refused with HTTP `410` and is **not** burned (fail closed). The `login_browser_id` cookie is a session cookie (`HttpOnly`, `SameSite=Lax`, `Secure`, `path=/`, no `max_age`), classified essential.
 Token consumption is POST-only (token submitted in request body, never as a URL query parameter) and guarded by CSRF protection.
 
 ---

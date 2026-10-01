@@ -207,8 +207,8 @@ Backs the GDPR/ePrivacy accept/decline/withdraw flow (decision F, zone R3).
 ## CookieCategory
 Non-essential cookie categories offered by the consent banner (Plan 21 D-9). Used as the
 vocabulary for the `consent_analytics` / `consent_preferences` cookies and the
-`consent_records.categories` JSON payload. Only `Essential` cookies (sessionid, csrftoken)
-are always on.
+`consent_records.categories` JSON payload. Only `Essential` cookies (`sessionid`,
+`csrftoken`, `login_browser_id`) are always on.
 
 | Value | Meaning | Cookie |
 |-------|---------|--------|

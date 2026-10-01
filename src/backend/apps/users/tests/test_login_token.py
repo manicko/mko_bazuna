@@ -32,6 +32,10 @@ import pytest
 from django.utils import timezone
 
 from apps.users.models import LoginToken, User
+from apps.users.services.login_token import (
+    RETURNING_COLUMNS,
+    _hash_browser_id,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -41,6 +45,12 @@ _URLSAFE_CHARS = frozenset(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
 )
 
+# The browser id every directly-built row in this module is bound to. Under
+# G-1a's fail-closed policy a row with no binding is refused (UNBOUND), so the
+# helper below must bind its rows to keep the existing consume cases meaningful.
+# Exactly 22 URL-safe chars — the shape secrets.token_urlsafe(16) produces.
+_BROWSER_ID = "testbrowserid0abcdefgh"
+
 
 def _make_token(
     raw_token: str,
@@ -49,7 +59,7 @@ def _make_token(
     consumed_at=None,
     expires_at=None,
 ) -> LoginToken:
-    """Create a ``LoginToken`` row for a known raw token."""
+    """Create a ``LoginToken`` row for a known raw token, bound to a browser."""
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     if expires_at is None:
         expires_at = timezone.now() + timedelta(hours=1)
@@ -58,6 +68,7 @@ def _make_token(
         telegram_id=telegram_id,
         consumed_at=consumed_at,
         expires_at=expires_at,
+        browser_binding=_hash_browser_id(_BROWSER_ID),
     )
 
 
@@ -170,6 +181,40 @@ class TestClaimToken:
         # A different user cannot re-claim an already-claimed token.
         assert _claim(token.token_hash, 700000007) is None
 
+    def test_claim_token_returning_matches_model_fields(self) -> None:
+        """``RETURNING_COLUMNS`` and the claim SQL must cover every model field.
+
+        Three discriminating assertions, because a stale ``RETURNING`` fails
+        *silently* (``Model.__init__`` defaults a missing field to ``None``);
+        a behavioural "no exception" check would prove nothing.
+        """
+        model_attnames = [f.attname for f in LoginToken._meta.concrete_fields]
+
+        # (a) SECURITY: a model column absent from RETURNING would be silently
+        # dropped to its default on every bot claim.
+        assert set(RETURNING_COLUMNS) == set(model_attnames), (
+            "RETURNING_COLUMNS must cover every LoginToken field; a missing "
+            "column is silently defaulted (not an error) by Model.__init__."
+        )
+
+        # (b) CONSISTENCY (not security): declaration order drives the
+        # concrete_fields order; divergence is fixed by reordering, which is free.
+        assert tuple(RETURNING_COLUMNS) == tuple(model_attnames), (
+            "RETURNING_COLUMNS order is a consistency obligation with "
+            "LoginToken's declaration order, not a security one."
+        )
+
+        # (c) ROUND TRIP: a real claim returns an instance whose binding is
+        # actually populated (catches a behavioural loss the set check misses).
+        from apps.users.services.login_token import claim_token, issue_token
+
+        issued = issue_token(browser_id=_BROWSER_ID)
+        claimed = claim_token(issued.token_hash, 700000008, timezone.now())
+        assert claimed is not None
+        assert claimed.browser_binding is not None
+        stored = LoginToken.objects.get(token_hash=issued.token_hash)
+        assert claimed.browser_binding == stored.browser_binding
+
 
 # ---------------------------------------------------------------------------
 # TestConsumeToken
@@ -182,7 +227,7 @@ class TestConsumeToken:
     def test_unknown_token_not_found(self) -> None:
         from apps.users.services.login_token import ConsumeOutcome, consume_token
 
-        result = consume_token("z" * 32)
+        result = consume_token("z" * 32, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.NOT_FOUND
         assert result.telegram_id is None
 
@@ -191,7 +236,7 @@ class TestConsumeToken:
 
         raw = "e" * 32
         _make_token(raw, expires_at=timezone.now() - timedelta(hours=1))
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.GONE
 
     def test_consumed_token_gone(self) -> None:
@@ -199,7 +244,7 @@ class TestConsumeToken:
 
         raw = "g" * 32
         _make_token(raw, telegram_id=700000010, consumed_at=timezone.now())
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.GONE
 
     def test_unclaimed_live_token_pending(self) -> None:
@@ -207,7 +252,7 @@ class TestConsumeToken:
 
         raw = "h" * 32
         token = _make_token(raw)
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.PENDING
         assert result.telegram_id is None
         # The read must not mutate the row — consumed_at stays NULL.
@@ -219,7 +264,7 @@ class TestConsumeToken:
 
         raw = "i" * 32
         _make_token(raw, telegram_id=700000011)
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.CONSUMED
         assert result.telegram_id == 700000011
         # The UPDATE actually stamped consumed_at.
@@ -232,7 +277,7 @@ class TestConsumeToken:
         raw = "j" * 32
         token = _make_token(raw)
         token.delete()
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.NOT_FOUND
 
 
@@ -260,7 +305,7 @@ class TestClaimConsumeAgreement:
 
         raw = "l" * 32
         token = _make_token(raw, telegram_id=700000022)
-        assert consume_token(raw).outcome.value == "consumed"
+        assert consume_token(raw, browser_id=_BROWSER_ID).outcome.value == "consumed"
         # Other direction of phase separation: after CONSUMED, no X can claim.
         for x in (700000023, 700000024):
             assert _claim(token.token_hash, x) is None
@@ -278,7 +323,7 @@ class TestClaimConsumeAgreement:
         raw = "m" * 32
         token = _make_token(raw)
         assert _claim(token.token_hash, 700000030) is not None
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.CONSUMED
         assert result.telegram_id == 700000030
         token.refresh_from_db()
@@ -289,7 +334,7 @@ class TestClaimConsumeAgreement:
 
         raw = "n" * 32
         token = _make_token(raw)
-        result = consume_token(raw)
+        result = consume_token(raw, browser_id=_BROWSER_ID)
         # The case with real discriminating power: if the read's
         # ``telegram_id is None`` guard were deleted, the same input falls
         # through to the UPDATE, matches zero rows, and returns LOST_RACE
@@ -299,6 +344,29 @@ class TestClaimConsumeAgreement:
         assert result.telegram_id is None
         token.refresh_from_db()
         assert token.consumed_at is None
+
+
+# ---------------------------------------------------------------------------
+# TestBindingDoesNotReachTheBot
+# ---------------------------------------------------------------------------
+
+
+class TestBindingDoesNotReachTheBot:
+    """The bot is never handed a binding — proven at the source level.
+
+    A signature-introspection test would require importing aiogram into the
+    backend suite (or editing a bot test file), and ``src/telegram_bot/`` must
+    stay byte-unchanged. Reading the handler as text is the same technique
+    ``TestLoginHandshakeOwnership::test_bot_handler_has_no_raw_sql`` uses.
+    """
+
+    def test_bot_claim_is_not_given_a_binding(self) -> None:
+        source = (
+            Path(__file__).parents[4].joinpath("telegram_bot", "handlers", "login.py")
+        ).read_text()
+
+        assert "claim_token(token_hash, telegram_id, now)" in source
+        assert "browser" not in source
 
 
 # ---------------------------------------------------------------------------

@@ -42,7 +42,12 @@ from apps.users.services import (
     withdraw_consent,
 )
 from apps.users.services.login_rate_limit import login_rate_limit_check
-from apps.users.services.login_token import ConsumeOutcome, consume_token, issue_token
+from apps.users.services.login_token import (
+    LOGIN_BROWSER_ID_COOKIE,
+    ConsumeOutcome,
+    consume_token,
+    issue_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -319,13 +324,13 @@ def login_issue(request: HttpRequest) -> HttpResponse:
         logger.warning("Rate limit exceeded for login_issue")
         return HttpResponse(status=429)
 
-    issued = issue_token()
+    issued = issue_token(browser_id=request.COOKIES.get(LOGIN_BROWSER_ID_COOKIE))
 
     bot_username = get_bot_username()
 
     logger.info("Issued login token hash=%s...", issued.token_hash[:8])
 
-    return render(
+    response = render(
         request,
         "users/login_issue.html",
         {
@@ -333,6 +338,19 @@ def login_issue(request: HttpRequest) -> HttpResponse:
             "raw_token": issued.raw_token,
         },
     )
+    # First-party essential cookie binding this token to this browser for the
+    # duration of the two-phase handshake. No max_age: session-scoped, so it
+    # cannot outlive the ≤300 s token. HttpOnly — essential security state, not
+    # consent-gated, and therefore never cleared on decline.
+    response.set_cookie(
+        LOGIN_BROWSER_ID_COOKIE,
+        issued.browser_id,
+        httponly=True,
+        samesite="Lax",
+        secure=True,
+        path="/",
+    )
+    return response
 
 
 def _reconcile_preferred_city_on_login(request: HttpRequest, user: User) -> None:
@@ -401,7 +419,10 @@ def login_status(request: HttpRequest) -> HttpResponse:
     # consume_token opens no transaction of its own — the current outer
     # atomic() covers exactly the read and the guarded UPDATE, nothing after.
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-        result = consume_token(raw_token)
+        result = consume_token(
+            raw_token,
+            browser_id=request.COOKIES.get(LOGIN_BROWSER_ID_COOKIE),
+        )
 
         if result.outcome is ConsumeOutcome.NOT_FOUND:
             return HttpResponse(status=410)
@@ -409,6 +430,16 @@ def login_status(request: HttpRequest) -> HttpResponse:
             return HttpResponse(status=410)
         if result.outcome is ConsumeOutcome.PENDING:
             return HttpResponse(status=204)
+        if result.outcome is ConsumeOutcome.UNBOUND:
+            # The issuing browser's binding does not match. The token is NOT
+            # burned (service side), so the legitimate holder can still redeem.
+            # No telegram_id and no binding value in this line — only the
+            # established token-hash correlation prefix.
+            logger.warning(
+                "Login token %s... refused: browser binding mismatch",
+                result.token_hash[:8],
+            )
+            return HttpResponse(status=410)
         if result.outcome is ConsumeOutcome.LOST_RACE:
             return HttpResponse(status=410)
         # CONSUMED — the token is marked used; capture the identity for the
