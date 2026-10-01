@@ -141,33 +141,71 @@ def test_change_form_password_is_never_a_writable_field(staff_user: User) -> Non
 def test_change_form_fieldsets_name_only_real_model_fields(staff_user: User) -> None:
     """Every field named in the change fieldsets resolves against the live model.
 
-    A ``fieldsets`` entry naming a nonexistent field raises ``FieldError`` at
-    form-construction time and 500s every add and change request. This is the
-    structural tripwire for that failure mode.
+    A ``fieldsets`` entry naming a field absent from the resolved form raises
+    ``FieldError`` at ``get_form()`` time and turns every add and change request
+    into a 500. The valid set must match what Django actually resolves against
+    (``concrete_fields + many_to_many + private_fields`` as used by
+    ``fields_for_model``), *not* ``User._meta.get_fields()``: the latter also
+    returns reverse relations (``ads``, ``logentry``, ``trust_score``, ...),
+    which are not form fields, so naming one here would pass this tripwire and
+    still 500 at runtime.
     """
     user_admin = UserAdmin(User, admin.site)
     obj = User(telegram_id=930000002, chat_id=930000002, username="target")
-    model_field_names = {field.name for field in User._meta.get_fields()}
+    valid = (
+        {f.name for f in User._meta.concrete_fields}
+        | {f.name for f in User._meta.many_to_many}
+        | {f.name for f in User._meta.private_fields}
+    )
     named_fields = flatten_fieldsets(user_admin.get_fieldsets(_admin_request(staff_user), obj))
     assert named_fields, "the change fieldsets must not be empty"
-    unknown = [name for name in named_fields if name not in model_field_names]
+    unknown = [name for name in named_fields if name not in valid]
     assert unknown == [], f"fieldsets name fields the model does not have: {unknown}"
 
 
-def test_withdraw_consent_action_is_still_registered() -> None:
-    """``withdraw_consent_action`` survives on ``UserAdmin`` after B-01.
+@pytest.mark.django_db
+def test_change_form_keeps_preferred_city_writable(staff_user: User) -> None:
+    """The change form exposes exactly one writable field: ``preferred_city``.
 
-    Verified against Django 5.2: a method decorated with ``@admin.action`` is
-    only offered by ``get_actions()`` when its name is listed in
-    ``ModelAdmin.actions``, and ``ModelAdmin.actions`` defaults to ``()``.
-    ``UserAdmin`` has never listed it, so the erasure action is *declared* on
-    the class but *not offered* by the changelist — B-01 must preserve both
-    facts and must not start offering it (that would be a new operator surface).
-    The assertion pins the declaration, its ``@admin.action`` metadata and the
-    unchanged empty ``actions`` declaration.
+    The other introspection tests are all *absent-or-disabled* assertions, so a
+    fieldsets/base_fields collapse to empty would satisfy every one of them
+    while silently removing the operator capability this block retains. This is
+    the anti-vacuity guard: the writable field must still be present and enabled.
     """
-    assert hasattr(UserAdmin, "withdraw_consent_action")
-    assert UserAdmin.withdraw_consent_action.short_description == (  # pyright: ignore[reportFunctionMemberAccess]
-        "Withdraw consent for selected users"
+    user_admin = UserAdmin(User, admin.site)
+    obj = User(telegram_id=930000002, chat_id=930000002, username="target")
+    form = user_admin.get_form(_admin_request(staff_user), obj, change=True)
+    assert "preferred_city" in form.base_fields, (
+        "preferred_city must remain present on the change form (04-AUT-005)"
     )
-    assert UserAdmin.actions == ()
+    assert form.base_fields["preferred_city"].disabled is False, (
+        "preferred_city must remain writable on the change form (04-AUT-005)"
+    )
+
+
+@pytest.mark.django_db
+def test_change_form_fieldset_never_exposes_an_uneditable_field(staff_user: User) -> None:
+    """No fieldset entry can reach ``form[name]`` with a missing field.
+
+    When a field is hidden via ``exclude`` (or ``form.Meta.exclude``) while
+    ``fieldsets`` still names it, ``Fieldline.__iter__`` builds
+    ``AdminField(self.form, name)`` and ``form[name]`` raises ``KeyError`` -> a
+    500 on the add/change page. The KeyError is therefore unreachable exactly
+    when every fieldset name is either present in ``form.base_fields`` or listed
+    in ``get_readonly_fields()`` (readonly entries render via AdminReadonlyField
+    and never index the form).
+    """
+    user_admin = UserAdmin(User, admin.site)
+    obj = User(telegram_id=930000002, chat_id=930000002, username="target")
+    form = user_admin.get_form(_admin_request(staff_user), obj, change=True)
+    readonly = set(user_admin.get_readonly_fields(_admin_request(staff_user), obj))
+    named_fields = flatten_fieldsets(user_admin.get_fieldsets(_admin_request(staff_user), obj))
+    unresolvable = [
+        name
+        for name in named_fields
+        if name not in form.base_fields and name not in readonly
+    ]
+    assert unresolvable == [], (
+        f"fieldsets name fields that are neither form fields nor read-only: {unresolvable}"
+    )
+

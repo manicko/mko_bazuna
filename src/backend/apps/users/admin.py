@@ -33,6 +33,16 @@ class UserAdmin(admin.ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
 
+    # The group headings below ("Identity", "Account state", "Preferences",
+    # "Audit") are bare literals, not ``gettext_lazy`` msgids, and Django emits
+    # them into the admin HTML, so they are user-visible English-only labels on
+    # a staff-only surface. This is a deliberate scope decision: translating
+    # them requires adding ``ru``/``bs`` msgids, and the ``.po`` catalogs are
+    # owned by whoever owns the i18n phase, not this one. The i18n completeness
+    # gate does not cover ``apps/*/admin.py`` (``test_no_hardcoded_visible_text``
+    # scans templates only), so nothing here will flag them; the decision is
+    # recorded here instead. Field *names* in the tuples are model fields, not
+    # labels, and need no translation.
     fieldsets = (
         (
             None,
