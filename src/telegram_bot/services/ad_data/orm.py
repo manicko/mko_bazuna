@@ -52,7 +52,7 @@ async def create_draft_ad(user_id: int) -> Ad:
     def _create() -> Ad:
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             # Remove any pre-existing in-progress DRAFT for this user before
-            # creating a fresh one (Option D: delete + recreate). AdImage rows
+            # creating a fresh one (Option A: delete + recreate). AdImage rows
             # CASCADE-delete via the FK. Orphaned media files are reclaimed by
             # sweep_orphaned_media.
             existing = Ad.objects.filter(user_id=user_id, status=AdStatus.DRAFT)

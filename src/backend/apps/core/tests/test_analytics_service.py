@@ -4,7 +4,7 @@ Tests for the ``record_event`` analytics service.
 Covers the happy path (event persisted with all fields), the minimal-argument
 call (only ``event_type``), the anonymous ``user_id`` case, the failure path
 (persistence error is caught, logged at ERROR with traceback, and ``None`` is
-returned), and the DB-002 contract: inside a caller-owned transaction a real
+returned), and the 03-DB-002 contract: inside a caller-owned transaction a real
 server-side FK violation must be contained in ``record_event``'s own savepoint
 so the caller's business write still commits.
 """
@@ -129,7 +129,7 @@ class TestRecordEvent:
 
 
 class TestRecordEventFix:
-    """DB-002: ``record_event`` must never abort the caller's transaction.
+    """03-DB-002: ``record_event`` must never abort the caller's transaction.
 
     Both FKs on ``analytics_events`` are ``DEFERRABLE INITIALLY DEFERRED``, so a
     bare INSERT inside a caller-owned transaction defers the FK check to the
