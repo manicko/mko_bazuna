@@ -917,6 +917,16 @@ through a peer gate, not by trusting forwarding headers blindly:
 - **A production public peer is refused by design.** When the direct peer is a
   public address, the forwarding headers are ignored outright; only a genuine
   trusted proxy hop opens the gate.
+- **Residual: a private client is trusted as a peer (accepted, not fixed).** A
+  client that connects from a private, ULA, or link-local address itself passes
+  the peer gate, so a right-to-left `X-Forwarded-For` walk that reaches such an
+  entry skips it as a "private proxy hop" and returns the attacker's leftmost
+  prefix — e.g. `8.8.8.8, fd00::1234` resolves to `8.8.8.8`. This is
+  defence-in-depth only and is left as-is: the primary path is unaffected
+  because nginx sets `X-Real-IP` at every location, so a trusted peer with a
+  client address never reaches the walk in production. Only an operator who
+  fronts Django with a proxy that sends `X-Forwarded-For` but omits `X-Real-IP`
+  would expose it.
 
 
 ## Database Operations

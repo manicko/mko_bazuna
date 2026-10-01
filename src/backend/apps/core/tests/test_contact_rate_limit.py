@@ -58,15 +58,20 @@ class TestDeepLinkRenderRateLimit:
         not loopback, private, or listed in ``TRUSTED_PROXY_NETWORKS``. A
         public peer that sets ``X-Forwarded-For`` therefore buckets under its own
         address (the old ``X-Forwarded-For``-wins rule is deliberately gone).
+
+        Both addresses must be genuinely public: the TEST-NET ranges report
+        ``is_private is True`` in Python 3.14, so a reserved spoofed value would
+        be skipped by the forwarded-hop walk and the test would pass even with
+        the gate removed — for the wrong reason.
         """
         request = HttpRequest()
-        request.META["REMOTE_ADDR"] = "203.0.113.9"
-        request.META["HTTP_X_FORWARDED_FOR"] = "198.51.100.5"
+        request.META["REMOTE_ADDR"] = "1.2.3.4"
+        request.META["HTTP_X_FORWARDED_FOR"] = "8.8.8.8"
         # First call from the peer is allowed, on a fresh counter keyed by the
         # peer address, not the spoofed header value.
         assert check_deep_link_render_rate_limit(request) is True
-        assert cache.get("telegram_dl_rl:203.0.113.9") == 1
-        assert cache.get("telegram_dl_rl:198.51.100.5") is None
+        assert cache.get("telegram_dl_rl:1.2.3.4") == 1
+        assert cache.get("telegram_dl_rl:8.8.8.8") is None
 
     def test_rate_limit_check_handles_cache_incr_value_error(self) -> None:
         """ValueError from cache.incr (race: key expired between add/incr) →

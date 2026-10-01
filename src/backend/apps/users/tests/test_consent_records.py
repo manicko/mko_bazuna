@@ -10,11 +10,12 @@ with a session_key.
 from __future__ import annotations
 
 import pytest
+from django.http import HttpRequest
 from django.test import Client
 
 from apps.core.enums import ConsentChoice, ConsentVersion
 from apps.users.models import ConsentRecord
-from apps.users.services.consent_record import _anonymize_ip
+from apps.users.services.consent_record import _anonymize_ip, record_consent_action
 from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -111,3 +112,42 @@ class TestAnonymizeIp:
     def test_none_input_returns_none(self) -> None:
         """None input yields None."""
         assert _anonymize_ip(None) is None
+
+
+class _Session:
+    """Minimal session stub exposing only what ``record_consent_action`` reads."""
+
+    def __init__(self, values: dict[str, str]) -> None:
+        self._values = values
+
+    def __getattr__(self, name: str) -> str | None:
+        return self._values.get(name)
+
+
+class TestConsentRecordDegradedRemoteAddr:
+    """The HTTP context must survive absent or malformed peer metadata.
+
+    ``get_client_ip`` never raises, but its ``"unknown"`` sentinel is not a
+    parseable address; ``record_consent_action`` maps it back to ``None`` so a
+    missing or malformed ``REMOTE_ADDR`` stores a null IP instead of raising
+    ``AddressValueError`` (the 04-AUT-003 regression).
+    """
+
+    def test_absent_remote_addr_stores_null_ip(self) -> None:
+        """An HttpRequest without REMOTE_ADDR records a null IP, no exception."""
+        request = HttpRequest()
+        request.session = _Session({"session_key": "degraded-absent"})
+
+        record = record_consent_action(None, ConsentChoice.ACCEPTED, {}, request=request)
+
+        assert record.ip_address is None
+
+    def test_malformed_remote_addr_stores_null_ip(self) -> None:
+        """An unparseable REMOTE_ADDR records a null IP, no exception."""
+        request = HttpRequest()
+        request.session = _Session({"session_key": "degraded-malformed"})
+        request.META["REMOTE_ADDR"] = "not-an-ip"
+
+        record = record_consent_action(None, ConsentChoice.DECLINED, {}, request=request)
+
+        assert record.ip_address is None

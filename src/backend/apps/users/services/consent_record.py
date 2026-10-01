@@ -64,7 +64,12 @@ def record_consent_action(
     """
     if request is not None:
         session_key = request.session.session_key
-        ip_address = _anonymize_ip(get_client_ip(request))
+        # `get_client_ip` returns the literal "unknown" when no usable peer
+        # exists; `_anonymize_ip` cannot parse that and would raise. Map the
+        # sentinel back to None so an absent peer stores a null IP instead of
+        # 500-ing, matching the pre-04-AUT-003 `or None` semantics.
+        resolved_ip = get_client_ip(request)
+        ip_address = _anonymize_ip(None if resolved_ip == "unknown" else resolved_ip)
         user_agent = (request.META.get("HTTP_USER_AGENT") or "")[:500]
     else:
         session_key = None

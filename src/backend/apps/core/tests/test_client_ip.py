@@ -165,8 +165,14 @@ class TestConsumerAgreement:
         assert cache.get(f"search_rl:{expected}") == 1
 
 
-class TestPublicPeerAlwaysUntrusted:
-    """The central invariant: a public peer is untrusted even with a config knob."""
+class TestPublicPeerUntrustedUnlessOperatorListed:
+    """A public peer is untrusted unless an operator lists a network containing it.
+
+    The code guarantees *no public peer is trusted unless an operator explicitly
+    lists a network that contains it* — not that public peers are always
+    untrusted. ``TRUSTED_PROXY_NETWORKS = ("0.0.0.0/0",)`` would honour a public
+    peer's headers, which is correct operator-configured behaviour.
+    """
 
     @override_settings(TRUSTED_PROXY_NETWORKS=_TRUSTED_NETWORK)
     def test_public_peer_stays_untrusted_with_trusted_networks_set(self) -> None:
@@ -183,12 +189,34 @@ class TestPublicPeerAlwaysUntrusted:
         assert result == _UNTRUSTED_PEER
 
     @override_settings(TRUSTED_PROXY_NETWORKS=_TRUSTED_NETWORK)
-    def test_listed_network_is_trusted(self) -> None:
-        """A peer inside TRUSTED_PROXY_NETWORKS opens the gate."""
+    def test_listed_private_network_is_trusted(self) -> None:
+        """A private peer inside TRUSTED_PROXY_NETWORKS opens the gate.
+
+        A private peer is already trusted via ``is_private``; this exercises the
+        listed-network branch only for the mixed trust decision.
+        """
         result = get_client_ip(
             _request(
                 {
                     "REMOTE_ADDR": "10.1.2.3",
+                    "HTTP_X_REAL_IP": _SPOOF_B,
+                }
+            )
+        )
+        assert result == _SPOOF_B
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=("1.2.3.0/24",))
+    def test_listed_network_with_public_peer_opens_gate(self) -> None:
+        """A non-private peer inside a listed network is trusted.
+
+        ``1.2.3.4`` is genuinely public, so this can only open the gate through
+        the ``TRUSTED_PROXY_NETWORKS`` read loop — a private peer would pass on
+        ``is_private`` alone and give the setting zero coverage.
+        """
+        result = get_client_ip(
+            _request(
+                {
+                    "REMOTE_ADDR": "1.2.3.4",
                     "HTTP_X_REAL_IP": _SPOOF_B,
                 }
             )
