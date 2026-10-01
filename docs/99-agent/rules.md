@@ -30,6 +30,14 @@ This file contains coding standards and rules for the Mko Bazuna project.
 - **Code review:** Read full function/class before rewriting.
 - **Linting:** After edits run `uv run ruff check <path>` and `uv run basedpyright <path>`.
 
+### Finding-id citations
+
+- **Format:** A finding id is cited as `NN-<PREFIX>-00N` — a two-digit phase, a hyphen, the finding prefix, a hyphen, then the finding number (e.g. `03-DB-004`).
+- **Always phase-scoped:** A citation **must** carry its phase prefix. A bare `DB-004` is ambiguous because ids are reissued every cycle and the audit records that resolved the old ones are deleted.
+- **Self-contained comments:** A comment that defends a past fix should be self-contained — describe the invariant it protects, or name the guarding symbol or test — so it is useful without an id lookup.
+- **Cross-phase references:** Where a cross-phase reference is genuinely needed, name the phase in words (for example, "the phase-06 predicate").
+- **English only:** Citation text and its surrounding comment are written in English.
+
 ### Testing Conventions
 
 - **Framework:** pytest-django. Test classes are plain `class TestX:` — do NOT use `django.test.TestCase` or `unittest.TestCase`.

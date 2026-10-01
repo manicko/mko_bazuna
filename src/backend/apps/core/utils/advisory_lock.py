@@ -31,7 +31,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
         current database transaction. Callers **must** wrap the entire operation
         inside ``transaction.atomic()`` to ensure the lock covers the full
         count-to-mutate sequence. This function asserts that a transaction is active
-        to prevent the autocommit-release bug (DB-001).
+        to prevent the autocommit-release bug.
 
     Lock ID allocation (see AdvisoryLockId enum in apps.core.enums):
 
@@ -60,7 +60,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
 
     ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
-    was removed in DB-007. IDs 14-99 are reserved for future scheduled jobs.
+    was removed. IDs 14-99 are reserved for future scheduled jobs.
     """
     if not session:
         if not transaction.get_connection().in_atomic_block:
@@ -76,7 +76,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
             # run (which blocks until the lock is granted) is not a silent
             # hang. Deliberately placed only in the session branch: the
             # transaction-scoped branch logs acquisition then release around
-            # its yield, and phase 03 DB-004 owns any timeout wording.
+            # its yield, and 03-DB-004 owns any timeout wording.
             logger.info("Requesting session advisory lock %s", lock_id)
             cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
             logger.info("Acquired session advisory lock %s", lock_id)

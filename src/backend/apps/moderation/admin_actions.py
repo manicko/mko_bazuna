@@ -154,11 +154,11 @@ def bulk_approve(queryset, moderator_id: int) -> int:
     """
     count = 0
     try:
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  lock Ad rows through every transition
             # Lock rows in PK order to match sweep lock ordering (no deadlock).
             # transition_to's refresh_from_db() raises Ad.DoesNotExist if a row was
             # hard-deleted mid-bulk (e.g. before the lock was acquired) — skip it
-            # per-ad rather than aborting the whole bulk. MaxAdsExceeded (DB-002)
+            # per-ad rather than aborting the whole bulk. MaxAdsExceeded
             # is already caught per-ad and preserved here.
             for ad in (
                 queryset.filter(status=AdStatus.ON_MODERATION)
@@ -192,7 +192,7 @@ def bulk_approve(queryset, moderator_id: int) -> int:
     except OperationalError as exc:
         if not is_lock_timeout(exc):
             raise
-        # DB-004: the locking SELECT ... FOR UPDATE precedes every row body, so a
+        # 03-DB-004: the locking SELECT ... FOR UPDATE precedes every row body, so a
         # lock timeout here fails the bulk with NOTHING committed. Fail loudly;
         # a silently partial bulk is strictly worse, and a per-row continue is
         # not available for the primary path (the lock statement is outside the
@@ -216,7 +216,7 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
     """
     count = 0
     try:
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  lock Ad rows through every transition
             # Lock rows in PK order. reject_ad()→set_rejected()→transition_to()
             # calls refresh_from_db(); a row hard-deleted mid-bulk raises
             # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.
@@ -240,7 +240,7 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
     except OperationalError as exc:
         if not is_lock_timeout(exc):
             raise
-        # DB-004: fail the bulk with nothing committed rather than hanging.
+        # 03-DB-004: fail the bulk with nothing committed rather than hanging.
         logger.error("bulk_reject aborted by lock timeout (SQLSTATE 55P03)")
         raise
     return count
@@ -289,7 +289,7 @@ def bulk_delete(queryset, moderator_id: int, reason: str) -> int:
     """
     count = 0
     try:
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  DB-003: lock Ad rows through every transition
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped  lock Ad rows through every transition
             # Lock rows in PK order. soft_delete_ad()→transition_to(DELETED) calls
             # refresh_from_db(); a row hard-deleted mid-bulk raises
             # Ad.DoesNotExist — skip it per-ad rather than aborting the bulk.
@@ -308,7 +308,7 @@ def bulk_delete(queryset, moderator_id: int, reason: str) -> int:
     except OperationalError as exc:
         if not is_lock_timeout(exc):
             raise
-        # DB-004: fail the bulk with nothing committed rather than hanging.
+        # 03-DB-004: fail the bulk with nothing committed rather than hanging.
         logger.error("bulk_delete aborted by lock timeout (SQLSTATE 55P03)")
         raise
     return count

@@ -172,7 +172,7 @@ def set_moderation_failed(ad: Ad, reason: str = "Auto-moderation failed") -> Non
     """Set ad status to ON_MODERATION_FAILED and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
-    audit log entry are committed or rolled back together (DB-002).
+    audit log entry are committed or rolled back together.
 
     Args:
         ad: The Ad instance that failed moderation.
@@ -187,7 +187,7 @@ def set_rejected(ad: Ad, moderator_id: int, reason: str) -> None:
     """Set ad status to REJECTED, populate moderated_by, and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
-    audit log entry are committed or rolled back together (DB-002).
+    audit log entry are committed or rolled back together.
 
     Args:
         ad: The Ad instance to reject.
@@ -208,7 +208,7 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
     """Set ad status to PUBLISHED with optional moderator and log the action.
 
     Wrapped in ``transaction.atomic()`` to ensure the status transition and
-    audit log entry are committed or rolled back together (DB-002).
+    audit log entry are committed or rolled back together.
 
     The user row is locked with ``select_for_update()`` and the active-ads
     count is re-counted inside the transaction — this is the authoritative,
@@ -226,7 +226,7 @@ def set_published(ad: Ad, moderator_id: int | None = None) -> None:
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         # Lock the user row to serialize concurrent publish attempts for the
-        # same user, closing the TOCTOU race on max_ads_per_user (DB-002).
+        # same user, closing the TOCTOU race on max_ads_per_user.
         User.objects.select_for_update().get(pk=ad.user_id)
 
         max_ads = ModerationCriteria.get_singleton().max_ads_per_user

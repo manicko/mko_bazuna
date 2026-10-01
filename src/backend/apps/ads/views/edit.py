@@ -110,12 +110,12 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         return render(request, "ads/edit.html", context)
 
     # POST: process edit
-    # DB-003: re-fetch the Ad under a row lock inside a transaction so the
+    # re-fetch the Ad under a row lock inside a transaction so the
     # status-driven branch below and the subsequent transition_to() operate
     # on a locked, consistent row. The GET path returns before this block, so
     # the lock is scoped to POST mutations only (mirrors review.py reject_ad).
     #
-    # DB-004: a lock timeout aborts the transaction. Catch it OUTSIDE the
+    # 03-DB-004: a lock timeout aborts the transaction. Catch it OUTSIDE the
     # atomic block (any query after the failure inside the block is dead),
     # re-fetch the ad on a fresh transaction and re-render the edit form with
     # the busy message so the seller's typed content is preserved. Re-raise
