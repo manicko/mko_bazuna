@@ -60,6 +60,11 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
     Physical media deletion for a replaced draft is not done here: the
     ``AdImage`` ``pre_delete`` signal defers file removal to
     ``transaction.on_commit()``, so it happens after this transaction commits.
+    That is correct only when the replaced draft shares no storage key with a
+    surviving ad: images are copied by reusing the source keys (no file
+    duplication), so a key still referenced by another ``AdImage`` is retained
+    by the signal's existence check rather than deleted. Without that check,
+    replacing a draft here would delete files the published source still uses.
 
     Args:
         source_ad_id: ID of the ad to copy.

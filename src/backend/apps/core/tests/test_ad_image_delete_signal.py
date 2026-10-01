@@ -144,3 +144,61 @@ class TestAdImageDeleteSignal:
         for key in keys:
             assert not (isolated_media_root / key).exists()
         assert not AdImage.objects.filter(pk=img.pk).exists()
+
+    def test_file_is_kept_while_another_adimage_references_the_key(
+        self, seller, category, city, isolated_media_root, monkeypatch
+    ):
+        """A media file survives while another AdImage row still references its key.
+
+        The exact seller photo-loss scenario unlocked by the draft-replacing
+        ``copy_ad``: ``/copy A`` makes the new DRAFT share ad A's image key,
+        and a second ``/copy A`` deletes the first draft.  The cascade deletes
+        that draft's ``AdImage`` and fires ``pre_delete``; because ad A (and
+        the freshly created draft) still reference the key, the file must not
+        be deleted.
+        """
+        from apps.ads.services.copy_service import copy_ad
+
+        source = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        key = "b2-shared-original.jpg"
+        AdImage.objects.create(ad=source, image=key, position=0)
+        (isolated_media_root / key).write_bytes(b"image data")
+
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(isolated_media_root))
+
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+            first_copy = copy_ad(source.id, seller.id)
+            # on_commit fires here; source + first_copy share ``key``.
+
+        # Second copy replaces first_copy: its AdImage is cascade-deleted and
+        # its pre_delete signal fires, but ad A and the new draft still hold
+        # the same storage key.
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+            second_copy = copy_ad(source.id, seller.id)
+
+        assert (isolated_media_root / key).exists()
+        assert AdImage.objects.filter(ad=second_copy, image=key).exists()
+        assert AdImage.objects.filter(ad=source, image=key).exists()
+        assert not AdImage.objects.filter(ad=first_copy).exists()
+
+    def test_unreferenced_file_is_still_deleted(
+        self, seller, category, city, isolated_media_root, monkeypatch
+    ):
+        """An AdImage whose key is referenced nowhere else still loses its file.
+
+        Counter-test for the "exclude the instance itself" guard: without it
+        the existence check would always find the row being deleted and stop
+        deleting *any* file.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        img = AdImage.objects.create(ad=ad, image="b2-lone-original.jpg")
+        key = img.image
+        (isolated_media_root / key).write_bytes(b"image data")
+
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(isolated_media_root))
+
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+            img.delete()
+
+        assert not (isolated_media_root / key).exists()
+        assert not AdImage.objects.filter(pk=img.pk).exists()
