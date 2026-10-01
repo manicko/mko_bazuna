@@ -8,12 +8,17 @@ Verifies:
 - Empty password validation
 - Advisory lock usage
 - Password resolution from the ADMIN_PASSWORD environment fallback
+- Enforcement of AUTH_PASSWORD_VALIDATORS on the create path only (after the
+  three early returns), via TestCreateAdminUserPasswordPolicy
 """
 
 from io import StringIO
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import UserAttributeSimilarityValidator
+from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 
 from apps.core.enums import AdvisoryLockId
@@ -50,7 +55,7 @@ class TestCreateAdminUser:
         call_command(
             "create_admin_user",
             username="customadmin",
-            password="pass123",
+            password="pass123-strong",
             telegram_id=999,
         )
 
@@ -63,7 +68,7 @@ class TestCreateAdminUser:
         call_command(
             "create_admin_user",
             username="emailadmin",
-            password="pass123",
+            password="pass123-strong",
             email="admin@example.com",
         )
 
@@ -201,7 +206,7 @@ class TestCreateAdminUser:
         call_command(
             "create_admin_user",
             username="rerunadmin",
-            password="pass123",
+            password="pass123-strong",
             telegram_id=-10,
             stdout=out1,
         )
@@ -210,7 +215,7 @@ class TestCreateAdminUser:
         call_command(
             "create_admin_user",
             username="rerunadmin",
-            password="pass123",
+            password="pass123-strong",
             telegram_id=-10,
             stdout=out2,
         )
@@ -254,11 +259,11 @@ class TestCreateAdminUser:
         call_command(
             "create_admin_user",
             username="flagadmin",
-            password="flag-wins",
+            password="flag-wins-strong",
             telegram_id=-1,
         )
         user = User.objects.get(username="flagadmin")
-        assert user.check_password("flag-wins")
+        assert user.check_password("flag-wins-strong")
         assert not user.check_password("test-admin-password")
 
     def test_empty_password_flag_does_not_fall_back_to_environment(self, monkeypatch):
@@ -283,3 +288,131 @@ class TestCreateAdminUser:
         with pytest.raises(CommandError, match="Password cannot be empty"):
             call_command("create_admin_user", username="nopassnoenv", telegram_id=-1)
         assert not User.objects.filter(username="nopassnoenv").exists()
+
+
+class TestCreateAdminUserPasswordPolicy:
+    """The bootstrap path enforces AUTH_PASSWORD_VALIDATORS.
+
+    The validation call sits after every early return, so an idempotent re-run
+    against an existing operator stays a silent no-op. These tests pin both the
+    enforcement and the ordering.
+    """
+
+    def test_weak_password_is_rejected_and_creates_no_user(self):
+        """A password below the minimum length raises and writes no row."""
+        before = User.objects.count()
+        with pytest.raises(CommandError, match="password policy"):
+            call_command(
+                "create_admin_user",
+                username="weakadmin",
+                password="short",
+                telegram_id=-1,
+            )
+        assert User.objects.count() == before
+        assert not User.objects.filter(username="weakadmin").exists()
+
+    def test_strong_password_creates_an_authenticable_admin(self):
+        """The anti-vacuity control: a valid password reaches, and completes, create.
+
+        Asserts the stored credential is hashed and authenticates, so a test that
+        never exercised the create path cannot pass.
+        """
+        raw = "V4lid-Str0ng!Pass"
+        call_command(
+            "create_admin_user",
+            username="strongadmin",
+            password=raw,
+            telegram_id=-1,
+        )
+        user = User.objects.get(username="strongadmin")
+        assert user.password != raw
+        assert user.check_password(raw) is True
+
+    def test_existing_telegram_id_skips_without_validating(self):
+        """An existing telegram_id returns the WARNING even if the password is weak.
+
+        Pins the ordering decision: validation must not run above the early
+        returns, or a normal bootstrap re-run would start failing.
+        """
+        User.objects.create(
+            username="existing", telegram_id=-1, chat_id=-1
+        )
+        out = StringIO()
+        call_command(
+            "create_admin_user",
+            username="newadmin",
+            password="short",
+            telegram_id=-1,
+            stdout=out,
+        )
+        assert "already exists, skipping" in out.getvalue()
+        assert not User.objects.filter(username="newadmin").exists()
+
+    def test_existing_username_skips_without_validating(self):
+        """An existing username returns the WARNING even if the password is weak."""
+        User.objects.create(username="existing", telegram_id=-2, chat_id=-2)
+        out = StringIO()
+        call_command(
+            "create_admin_user",
+            username="existing",
+            password="short",
+            telegram_id=-1,
+            stdout=out,
+        )
+        assert "already exists, skipping" in out.getvalue()
+        assert User.objects.filter(username="existing").count() == 1
+
+    def test_empty_password_keeps_the_existing_error(self):
+        """The empty-password message is unchanged by the policy block."""
+        with pytest.raises(CommandError, match="Password cannot be empty"):
+            call_command(
+                "create_admin_user",
+                username="emptyadmin",
+                password="",
+                telegram_id=-1,
+            )
+        assert not User.objects.filter(username="emptyadmin").exists()
+
+    def test_similarity_validator_is_wired_but_inert_without_a_user(self):
+        """Pin the similarity validator's actual behaviour on the bootstrap path.
+
+        Django's ``UserAttributeSimilarityValidator.validate`` returns immediately
+        when ``user`` is ``None``. The command has no ``User`` instance before the
+        row is created, and the brief forbids constructing a throwaway unsaved one,
+        so similarity is inert *here* by design. This test is therefore not
+        vacuous: it proves the validator is present in the configured policy and
+        that it genuinely rejects when handed a user, while pinning the documented
+        bootstrap behaviour (creation succeeds).
+        """
+        configured = [entry["NAME"] for entry in settings.AUTH_PASSWORD_VALIDATORS]
+        assert (
+            "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+            in configured
+        )
+
+        validator = UserAttributeSimilarityValidator()
+        with pytest.raises(ValidationError, match="too similar"):
+            validator.validate("administrator1", user=User(username="administrator"))
+
+        username = "administrator"
+        call_command(
+            "create_admin_user",
+            username=username,
+            password=f"{username}1",
+            telegram_id=-1,
+        )
+        assert User.objects.filter(username=username).exists()
+
+    def test_dry_run_creates_no_user_and_skips_validation(self):
+        """Dry-run returns before validation and still writes nothing."""
+        out = StringIO()
+        call_command(
+            "create_admin_user",
+            username="dryadmin",
+            password="short",
+            telegram_id=-1,
+            dry_run=True,
+            stdout=out,
+        )
+        assert "DRY RUN" in out.getvalue()
+        assert not User.objects.filter(username="dryadmin").exists()

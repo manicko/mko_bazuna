@@ -381,6 +381,35 @@ LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 LOGIN_URL = "/login/issue/"
 
+# Password policy enforced by django.contrib.auth.password_validation. The policy
+# applies wherever Django validates a password: the admin add view
+# (UserCreationForm) and the bootstrap path (create_admin_user). The minimum
+# length is a literal, not an environment variable, so the setting stays free of
+# the env-allowlist contract (CFG, test_env_allowlist_reverse.py).
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        # Rejects a password too similar to the username/email: blocks a
+        # credential built from the account identifier itself.
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        # Rejects a password shorter than the minimum: stops trivially short
+        # bootstrap credentials.
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },
+    {
+        # Rejects passwords on Django's common-password list: blocks well-known
+        # leaked credentials.
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        # Rejects all-numeric passwords: blocks PIN-like credentials with no
+        # character variety.
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
 # Telegram Bot username for contact deep-links
 # Format: without @ prefix, e.g., "MyBot" not "@MyBot"
 # Required and non-empty in production. This is a SEED value: migration

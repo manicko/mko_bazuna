@@ -17,7 +17,10 @@ import logging
 import os
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
@@ -120,6 +123,20 @@ class Command(BaseCommand):
                     )
                 )
                 return
+
+            # Enforce the project password policy. This runs after every early
+            # return so an idempotent re-run against an existing operator stays a
+            # silent no-op rather than failing on the stored password's strength.
+            # No user instance is available yet and none is fabricated, so
+            # UserAttributeSimilarityValidator is inert here (it returns when
+            # user is None); length, common-password and numeric checks apply.
+            try:
+                validate_password(password)
+            except ValidationError as exc:
+                raise CommandError(
+                    _("Password does not meet the password policy: %(errors)s")
+                    % {"errors": "; ".join(exc.messages)}
+                ) from exc
 
             # Create the admin user
             user = User.objects.create(
