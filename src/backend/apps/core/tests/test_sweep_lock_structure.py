@@ -28,6 +28,7 @@ from datetime import timedelta
 from unittest.mock import DEFAULT, AsyncMock, MagicMock
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 from django.db import transaction
 from django.utils import timezone
@@ -48,6 +49,13 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 # ``_SESSION_SCOPED_BATCHERS`` lock with a session-scoped lock for the whole
 # sweep (see the module docstring). Their entries below are asserted positively
 # (``session is True`` / ``in_atomic is False``); the rest are byte-identical.
+#
+# This is the ONE list of transaction-scoped lock-taking management commands:
+# every command that acquires a transaction-scoped advisory lock must appear
+# here so its ``session is False`` / ``in_atomic is True`` guarantee stays
+# covered. ``EXPECTED_SWEEP_COMMANDS`` pins the name set independently of this
+# list, so an accidental omission or a stray append fails loudly instead of
+# silently changing coverage.
 SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("archive_sweep", AdvisoryLockId.ARCHIVE_SWEEP),
     ("delete_sweep", AdvisoryLockId.DELETE_SWEEP),
@@ -62,7 +70,32 @@ SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("backfill_thumbnails", AdvisoryLockId.BACKFILL_THUMBNAILS),
     ("send_alerts", AdvisoryLockId.ALERT_DELIVERY_TASK),
     ("recompute_normalized_prices", AdvisoryLockId.RECOMPUTE_NORMALIZED_PRICES),
+    ("repair_bot_username", AdvisoryLockId.REPAIR_BOT_USERNAME),
 ]
+
+# The exact set of transaction-scoped lock-taking commands covered above.
+# Kept as an explicit constant (rather than derived from ``SWEEP_COMMANDS``) so
+# the coverage assertion below is independent of the list it guards: adding or
+# removing an entry is a deliberate act that must update this set, rather than a
+# change that silently satisfies or silently breaks the coupling.
+EXPECTED_SWEEP_COMMANDS: frozenset[str] = frozenset(
+    {
+        "archive_sweep",
+        "delete_sweep",
+        "consent_hard_delete",
+        "cleanup_login_tokens",
+        "sweep_drafts",
+        "sweep_orphaned_media",
+        "purge_failed_ads",
+        "purge_rejected_ads",
+        "purge_deleted_ads",
+        "rollup_daily_metrics",
+        "backfill_thumbnails",
+        "send_alerts",
+        "recompute_normalized_prices",
+        "repair_bot_username",
+    }
+)
 
 # 03-DB-008: these two batch inside per-batch transactions, so they hold a
 # SESSION-scoped advisory lock (pg_advisory_lock) — a transaction-scoped one
@@ -91,6 +124,7 @@ _LOCK_TARGET_MODULES: tuple[str, ...] = (
     "apps.media.management.commands.sweep_orphaned_media",
     "apps.search.management.commands.send_alerts",
     "apps.currencies.management.commands.recompute_normalized_prices",
+    "apps.core.management.commands.repair_bot_username",
 )
 
 
@@ -134,10 +168,24 @@ class TestSweepLockOrdering:
         # sender so the spy test stays hermetic and token-free.
         monkeypatch.setattr(send_alerts.Command, "_send_user_digests", AsyncMock())
 
+        # repair_bot_username refuses (CommandError) before reaching its lock
+        # when BOT_USERNAME is empty or malformed — .env.test ships the
+        # placeholder "test-bot", which fails the handle pattern. Supply a
+        # valid format so the production lock path is actually exercised; this
+        # is test setup only and does not touch any command's logic.
+        monkeypatch.setattr(settings, "BOT_USERNAME", "test_bot_username_repair")
+
         for command_name, _expected_id in SWEEP_COMMANDS:
             call_command(command_name)
 
-        assert len(lock_calls) == len(SWEEP_COMMANDS)
+        # Coverage is pinned to an explicit name set, not to
+        # ``len(SWEEP_COMMANDS)``: the assertion must fail when a lock-taking
+        # command is missing from the list or a duplicate hides one, which
+        # ``len(lock_calls) == len(SWEEP_COMMANDS)`` cannot detect. The lock-call
+        # count is checked against the independent constant for the same reason:
+        # one call per listed command means exactly one lock site each.
+        assert {name for name, _ in SWEEP_COMMANDS} == EXPECTED_SWEEP_COMMANDS
+        assert len(lock_calls) == len(EXPECTED_SWEEP_COMMANDS)
 
         by_lock_id = {entry[0]: entry for entry in lock_calls}
         for command_name, expected_lock_id in SWEEP_COMMANDS:

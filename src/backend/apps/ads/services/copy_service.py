@@ -47,12 +47,18 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
     the create means a failed create rolls the delete back, leaving the seller
     exactly as they were.
 
+    Default, not a ratified product decision: this delete-then-recreate policy
+    was applied as Option A by default because the product owner was
+    unavailable to sign off. It is a reversible default awaiting product
+    confirmation, not a settled decision a reader should treat as final.
+
     Savepoint rationale: the create is wrapped in a nested
     ``transaction.atomic()`` — a SAVEPOINT — with the ``try`` *outside* it.
-    That savepoint is what makes the ``IntegrityError`` below catchable: it
-    clears ``needs_rollback`` and releases the server-side transaction, so the
-    handler's first query runs on a healthy connection, while the delete and
-    the retry stay in the outer transaction. If the ``try`` were placed inside
+    That savepoint is what makes the ``IntegrityError`` below catchable: on
+    error it issues ``ROLLBACK TO SAVEPOINT`` and clears ``needs_rollback``,
+    so the handler's first query (``features.set()`` below) runs on a healthy
+    connection, while the delete and the retry stay in the outer transaction
+    (the outer ``BEGIN`` remains open). If the ``try`` were placed inside
     the ``with``, ``__exit__`` would not yet have run when the handler
     executed and its first query would hit an already-aborted transaction.
     Do not "simplify" the savepoint away.
@@ -99,11 +105,11 @@ def copy_ad(source_ad_id: int, seller_user_id: int) -> Ad:
         if existing.exists():
             existing.delete()
 
-        # The inner atomic() is a SAVEPOINT: it lets the IntegrityError be
-        # caught on a healthy connection (needs_rollback cleared, server
-        # transaction released) while keeping the delete + retry in the outer
-        # transaction. Without it the handler's first query would run against
-        # an already-aborted transaction.
+        # The inner atomic() is a SAVEPOINT: on error it issues ROLLBACK TO
+        # SAVEPOINT and clears needs_rollback, so the IntegrityError is caught
+        # on a healthy connection (the outer BEGIN stays open) while keeping
+        # the delete + retry in the outer transaction. Without it the handler's
+        # first query would run against an already-aborted transaction.
         try:
             with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                 new_ad = _build_ad_copy(source, seller_user_id)
