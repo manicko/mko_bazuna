@@ -20,12 +20,13 @@ DEBUG = True
 # plain HTTP requests. Without this, SecurityMiddleware 301-redirects every
 # request to HTTPS and breaks all DB-backed view tests.
 # Mirrors config/settings/dev.py (test settings must behave like dev, not prod):
-# all six transport settings are reset here, and
+# all seven transport settings are reset here, and
 # test_settings_defaults.test_dev_and_test_share_the_transport_tuple asserts the
 # two modules stay in agreement.
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+LOGIN_BROWSER_ID_COOKIE_SECURE = False
 # The HSTS triple is inherited from base.py (3600 / True / False) unless it is
 # reset here. Left inherited, a browser — or any browser-driven tool — pointed at
 # a test-mode server would cache `Strict-Transport-Security: max-age=3600;

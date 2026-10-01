@@ -11,6 +11,12 @@ DEBUG = True
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+# The login-binding cookie is plain HTTP in the default dev stack
+# (docker-compose.dev.override.yml publishes Django directly on :8000 with no
+# proxy). It must therefore follow this module, not base.py, or a browser
+# silently discards it. Kept in the transport tuple so dev/test parity is
+# machine-checked.
+LOGIN_BROWSER_ID_COOKIE_SECURE = False
 
 # Console logging for development
 LOGGING = {

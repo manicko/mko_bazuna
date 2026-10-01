@@ -34,9 +34,13 @@ while not (_ROOT / "pyproject.toml").exists():
 # hand back StaticFilesStorage, not this.
 _THEME_STATICFILES_BACKEND = "theme.storage.ThemeStaticFilesStorage"
 
-# The six transport-security settings dev and test must agree on. Named as a
+# The seven transport-security settings dev and test must agree on. Named as a
 # module-level constant (project rule 10), never inline literals, so the parity
-# tuple is one edit away from gaining a seventh member.
+# tuple is one edit away from gaining an eighth member. The seventh,
+# LOGIN_BROWSER_ID_COOKIE_SECURE, is the Secure flag for the login-binding
+# cookie: it belongs here rather than hardcoded in login_issue, so a dev stack
+# on a non-localhost HTTP origin (Django published directly on :8000) is
+# covered by the same machine check as sessionid/csrftoken.
 _TRANSPORT_SETTINGS = (
     "SECURE_SSL_REDIRECT",
     "SESSION_COOKIE_SECURE",
@@ -44,6 +48,7 @@ _TRANSPORT_SETTINGS = (
     "SECURE_HSTS_SECONDS",
     "SECURE_HSTS_INCLUDE_SUBDOMAINS",
     "SECURE_HSTS_PRELOAD",
+    "LOGIN_BROWSER_ID_COOKIE_SECURE",
 )
 
 # Import both modules in one process and print `NAME=<repr>` per setting, so a
@@ -154,7 +159,7 @@ def test_prod_staticfiles_backend_is_theme_storage() -> None:
 
 
 def test_dev_and_test_share_the_transport_tuple() -> None:
-    """config.settings.dev and config.settings.test agree on all six transport settings.
+    """config.settings.dev and config.settings.test agree on all seven transport settings.
 
     ``test.py``'s comment claims it mirrors ``dev.py``. It resets
     ``SECURE_SSL_REDIRECT``, ``SESSION_COOKIE_SECURE`` and ``CSRF_COOKIE_SECURE``
@@ -164,8 +169,8 @@ def test_dev_and_test_share_the_transport_tuple() -> None:
     transport setting out of agreement fails here.
 
     ``test_migrations.py`` does ``from .test import *`` and therefore inherits
-    every one of the six values, which is intended (it is a test-mode module and
-    must not emit HSTS any more than ``test`` does). Covering it would add a
+    every one of the seven values, which is intended (it is a test-mode module
+    and must not emit HSTS any more than ``test`` does). Covering it would add a
     third subprocess import for a module whose only divergence is migration
     discovery and the test-database name, so it is deliberately left to inherit
     rather than pinned separately.

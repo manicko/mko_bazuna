@@ -16,6 +16,7 @@ translation service — search runs per-language on pre-translated FTS vectors
 
 import logging
 
+from django.conf import settings
 from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -342,12 +343,21 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     # duration of the two-phase handshake. No max_age: session-scoped, so it
     # cannot outlive the ≤300 s token. HttpOnly — essential security state, not
     # consent-gated, and therefore never cleared on decline.
+    #
+    # ``secure`` is read from the transport tuple (LOGIN_BROWSER_ID_COOKIE_SECURE),
+    # never hardcoded and never ``request.is_secure()``. A hardcode bypasses the
+    # machine-checked dev/test parity in test_settings_defaults.py, and
+    # ``request.is_secure()`` behind a misconfigured SECURE_PROXY_SSL_HEADER
+    # silently drops the cookie to non-Secure in production. The ``__Host-``
+    # prefix in LOGIN_BROWSER_ID_COOKIE additionally requires ``Secure`` and
+    # ``Path=/`` and forbids ``Domain`` — all three are supplied here, and the
+    # D-1 invariant test pins them.
     response.set_cookie(
         LOGIN_BROWSER_ID_COOKIE,
         issued.browser_id,
         httponly=True,
         samesite="Lax",
-        secure=True,
+        secure=settings.LOGIN_BROWSER_ID_COOKIE_SECURE,
         path="/",
     )
     return response
@@ -409,7 +419,10 @@ def login_status(request: HttpRequest) -> HttpResponse:
     Returns:
         HttpResponse 200 — token consumed, session established (session cookie set)
         HttpResponse 204 — pending (bot has not claimed the token yet)
-        HttpResponse 410 — gone (token invalid, expired, already consumed, user banned, or account disabled)
+        HttpResponse 410 — gone (token invalid, expired, already consumed, user
+            banned, account disabled, or the presented browser binding does not
+            match the issuing one — ``UNBOUND``, which shares this status
+            deliberately so the response is not an oracle for *which* cause)
     """
     raw_token = request.POST.get("token", "")
     if not raw_token:

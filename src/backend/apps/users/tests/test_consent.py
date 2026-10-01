@@ -21,6 +21,7 @@ from apps.core.enums import AdStatus, ConsentChoice
 from apps.locations.models import City
 from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.schemas import ConsentSubmission
+from apps.users.services.login_token import LOGIN_BROWSER_ID_COOKIE
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -380,7 +381,7 @@ class TestLoginStatusNoPii:
         )
 
         # Issue through the real path so the row is bound to the client's
-        # login_browser_id cookie and the expected status stays 200.
+        # __Host-login_browser_id cookie and the expected status stays 200.
         client = Client()
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
@@ -398,6 +399,48 @@ class TestLoginStatusNoPii:
         assert str(telegram_id) not in caplog.text
         # Masked value should be present for log correlation
         assert "tg_" in caplog.text
+
+    def test_login_unbound_refusal_logs_no_pii(self, caplog) -> None:
+        """The UNBOUND refusal log line must not leak the browser binding (D-4).
+
+        ``TestLoginStatusNoPii`` previously exercised only the 200/CONSUMED
+        path, so nothing would catch a future edit adding the browser id or the
+        raw binding digest to the mismatch warning. This drives the *mismatch*
+        path and asserts the warning carries none of: the presented browser id,
+        its stored SHA-256 digest, or the raw telegram id.
+        """
+        telegram_id = 999888778
+        browser_id = "attackerbrowserid00xy"
+        User.objects.create(
+            telegram_id=telegram_id,
+            chat_id=telegram_id,
+            password="x",
+        )
+
+        issuer = Client()
+        issued = issuer.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
+        # A different browser presents a different well-formed id -> mismatch.
+        attacker = Client()
+        attacker.cookies[LOGIN_BROWSER_ID_COOKIE] = browser_id
+
+        with caplog.at_level("WARNING"):
+            response = attacker.post("/login/status/", {"token": raw_token})
+
+        assert response.status_code == 410
+        # Neither the presented browser id, nor its digest, nor the raw
+        # telegram id may appear in the refusal warning.
+        assert browser_id not in caplog.text
+        assert hashlib.sha256(browser_id.encode()).hexdigest() not in caplog.text
+        assert str(telegram_id) not in caplog.text
+        # The correlation prefix-only line is still emitted.
+        assert token_hash[:8] in caplog.text
 
 
 # ---------------------------------------------------------------------------

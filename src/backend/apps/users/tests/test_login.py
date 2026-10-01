@@ -11,11 +11,12 @@ import hashlib
 from datetime import timedelta
 
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 
 from apps.locations.models import City
 from apps.users.models import LoginToken, User
+from apps.users.services.login_token import LOGIN_BROWSER_ID_COOKIE
 from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -106,7 +107,7 @@ class TestLoginTokenBinding:
     """The login token is bound to the browser that requested it (04-AUT-001).
 
     Every token here is obtained through the real ``/login/issue/`` path so the
-    issuing client holds the ``login_browser_id`` cookie the view set. The
+    issuing client holds the ``__Host-login_browser_id`` cookie the view set. The
     phase-1 claim is performed through the service — exactly what the bot's
     ``handle_login_orm`` does — so the two-process handshake is exercised
     without importing the bot package.
@@ -148,7 +149,8 @@ class TestLoginTokenBinding:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         self._claim(raw_token, telegram_id)
 
-        # Browser B (no login_browser_id cookie, or a different one) is refused.
+        # Browser B (no __Host-login_browser_id cookie, or a different one) is
+        # refused.
         browser_b = Client()
         rejected = browser_b.post("/login/status/", {"token": raw_token})
         assert rejected.status_code == 410
@@ -230,7 +232,7 @@ class TestLoginTokenBinding:
     def test_a_malformed_browser_cookie_is_refused(self) -> None:
         """An attacker-shaped cookie is replaced at issue time, never persisted."""
         client = Client()
-        client.cookies["login_browser_id"] = "x" * 500
+        client.cookies[LOGIN_BROWSER_ID_COOKIE] = "x" * 500
 
         response = client.get("/login/issue/")
         assert response.status_code == 200
@@ -243,7 +245,41 @@ class TestLoginTokenBinding:
         assert stored.browser_binding is not None
         assert len(stored.browser_binding) == 64
         # And the response replaced the attacker cookie with the minted one.
-        assert response.cookies["login_browser_id"].value != "x" * 500
+        assert response.cookies[LOGIN_BROWSER_ID_COOKIE].value != "x" * 500
+
+    def test_cookie_name_satisfies_the_host_prefix_contract(self) -> None:
+        """``__Host-`` is the load-bearing part of the bypass fix (D-1).
+
+        A cookie named without the prefix can be set for a parent domain by any
+        sibling subdomain (RFC 6265 §5.3), letting an attacker choose the
+        binding value on a victim's first login. ``__Host-`` forbids that, but
+        only if the response cookie also carries ``Secure`` and ``Path=/`` and
+        no ``Domain`` attribute.
+
+        The test settings deliberately set
+        ``LOGIN_BROWSER_ID_COOKIE_SECURE = False`` (plain-HTTP test client, see
+        D-3), so ``Secure`` is asserted under an ``override_settings`` flip to
+        the production value: that proves the view honours the transport flag
+        and that the ``__Host-`` contract is satisfiable, while name/path/domain
+        are asserted structurally on the real response.
+        """
+        assert LOGIN_BROWSER_ID_COOKIE.startswith("__Host-")
+
+        client = Client()
+        response = client.get("/login/issue/")
+        assert response.status_code == 200
+
+        morsel = response.cookies[LOGIN_BROWSER_ID_COOKIE]
+        assert morsel["path"] == "/"
+        assert morsel["domain"] == ""
+        # Test settings disable Secure for the HTTP test client ...
+        assert not morsel["secure"]
+
+        with override_settings(LOGIN_BROWSER_ID_COOKIE_SECURE=True):
+            secure_response = Client().get("/login/issue/")
+        # ... and the view emits Secure when the transport flag says so, which
+        # is the production value (base.py).
+        assert secure_response.cookies[LOGIN_BROWSER_ID_COOKIE]["secure"]
 
 
 class TestLoginStatus:

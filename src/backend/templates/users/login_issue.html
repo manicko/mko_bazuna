@@ -22,6 +22,16 @@
                 </p>
                 {% telegram_deep_link "login" raw_token classes="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors" %}
                 <p id="login-status" class="text-xs text-gray-400 mt-4 hidden">{% trans "Waiting for Telegram confirmation..." %}</p>
+                {# Shown only when polling returns 410: the token is gone. Offers a
+                   recovery link so a user is never stranded (the affordance does
+                   not reveal whether the cause was expiry or a binding refusal —
+                   the 410 is deliberately not an oracle). The label reuses the
+                   existing "Login via Telegram" msgid so no new .po entry is
+                   required (the .po files are owned by another agent). #}
+                <p id="login-recovery" class="text-sm text-gray-600 mt-4 hidden">
+                    <a href="{% url 'consent:login_issue' %}"
+                       class="underline text-blue-600 hover:text-blue-700">{% trans "Login via Telegram" %}</a>
+                </p>
                 <p class="text-xs text-gray-400 mt-4">
                     {% trans "Don't have Telegram?" %}
                     <a href="https://telegram.org"
@@ -37,6 +47,7 @@
             var pollUrl = "{% url 'consent:login_status' %}";
             var csrfToken = "{{ csrf_token|escapejs }}";
             var statusEl = document.getElementById("login-status");
+            var recoveryEl = document.getElementById("login-recovery");
             var deepLinkEl = document.querySelector('a[data-start^="login_"]');
 
             statusEl.classList.remove("hidden");
@@ -56,6 +67,9 @@
                         } else if (resp.status === 410) {
                             clearInterval(interval);
                             statusEl.textContent = "{% trans "This login link is invalid, expired, or already used." %}";
+                            // Reveal the recovery link so the user can re-issue
+                            // instead of being stranded on a dead token.
+                            recoveryEl.classList.remove("hidden");
                         }
                     })
                     .catch(function () {

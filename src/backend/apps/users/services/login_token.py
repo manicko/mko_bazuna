@@ -103,7 +103,18 @@ BROWSER_ID_ENTROPY_BYTES: Final[int] = 16
 # First-party essential cookie carrying the raw browser id across the two-phase
 # handshake. The name is owned here (the service mints the id) and imported by
 # the view, mirroring PREFERRED_CITY_COOKIE_NAME's ownership pattern.
-LOGIN_BROWSER_ID_COOKIE: Final[str] = "login_browser_id"
+#
+# The ``__Host-`` prefix is load-bearing, not cosmetic: without it the binding is
+# client-chosen. RFC 6265 §5.3 lets *any* sibling subdomain set a domain cookie
+# (``Set-Cookie: login_browser_id=<attacker value>; Domain=.example.com; Path=/``)
+# and nothing forbids the name, so a subdomain with XSS or a dangling-CNAME
+# takeover can supply the value on a victim's first login — the exact moment the
+# control matters — and then redeem the token. ``__Host-`` restricts the cookie to
+# a host-only, ``Secure``, ``Path=/`` origin, which converts "the client chose a
+# value" into "only this exact origin can set a value". The ``__Host-`` contract
+# requires all three attributes; the view's ``set_cookie`` call supplies them and
+# ``login_issue.html``-driven tests pin the invariant.
+LOGIN_BROWSER_ID_COOKIE: Final[str] = "__Host-login_browser_id"
 
 # A well-formed browser id is exactly the URL-safe shape secrets.token_urlsafe
 # produces. A presented cookie value that does not match is treated as absent
@@ -198,8 +209,9 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     presented ``browser_id`` is reused; an absent or malformed one is minted.
 
     Args:
-        browser_id: The raw browser id from the incoming ``login_browser_id``
-            cookie, or ``None`` when the cookie is absent.
+        browser_id: The raw browser id from the incoming
+            ``__Host-login_browser_id`` cookie, or ``None`` when the cookie is
+            absent.
     """
     raw_token = secrets.token_urlsafe(RAW_TOKEN_ENTROPY_BYTES)
     token_hash = _hash_raw_token(raw_token)
@@ -308,13 +320,18 @@ def consume_token(raw_token: str, *, browser_id: str | None) -> ConsumeResult:
     login. Because this gate precedes the ``UPDATE``, it is the *only*
     non-``CONSUMED`` path that does not burn the token.
 
-    ``browser_id`` is **required and keyword-only**: a default would let a
-    future caller silently skip the binding check.
+    ``browser_id`` is **required and keyword-only**. The reason is
+    diagnosability, not fail-closedness: a default of ``None`` fails *closed*
+    (the client presents nothing, a fresh id mismatches, and the outcome is
+    ``UNBOUND``), but ``UNBOUND`` is deliberately indistinguishable from expiry
+    at the HTTP layer, so a forgotten argument would surface as a nearly
+    undiagnosable ``410``. A required keyword-only parameter turns that into a
+    ``TypeError`` caught at review time.
 
     Args:
         raw_token: The raw token from ``request.POST["token"]``.
-        browser_id: The raw browser id from the ``login_browser_id`` cookie, or
-            ``None`` when the cookie is absent.
+        browser_id: The raw browser id from the ``__Host-login_browser_id``
+            cookie, or ``None`` when the cookie is absent.
 
     Returns:
         A ``ConsumeResult`` whose ``outcome`` discriminates the six cases.
