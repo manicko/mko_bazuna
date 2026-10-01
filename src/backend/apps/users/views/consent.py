@@ -16,7 +16,6 @@ translation service — search runs per-language on pre-translated FTS vectors
 
 import logging
 
-from django.conf import settings
 from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -45,6 +44,7 @@ from apps.users.services import (
 from apps.users.services.login_rate_limit import login_rate_limit_check
 from apps.users.services.login_token import (
     LOGIN_BROWSER_ID_COOKIE,
+    LOGIN_BROWSER_ID_COOKIE_SECURE,
     ConsumeOutcome,
     consume_token,
     issue_token,
@@ -344,20 +344,22 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     # cannot outlive the ≤300 s token. HttpOnly — essential security state, not
     # consent-gated, and therefore never cleared on decline.
     #
-    # ``secure`` is read from the transport tuple (LOGIN_BROWSER_ID_COOKIE_SECURE),
-    # never hardcoded and never ``request.is_secure()``. A hardcode bypasses the
-    # machine-checked dev/test parity in test_settings_defaults.py, and
-    # ``request.is_secure()`` behind a misconfigured SECURE_PROXY_SSL_HEADER
-    # silently drops the cookie to non-Secure in production. The ``__Host-``
-    # prefix in LOGIN_BROWSER_ID_COOKIE additionally requires ``Secure`` and
-    # ``Path=/`` and forbids ``Domain`` — all three are supplied here, and the
-    # D-1 invariant test pins them.
+    # Both the name and ``secure`` come from the service's settings-resolved pair
+    # (LOGIN_BROWSER_ID_COOKIE / LOGIN_BROWSER_ID_COOKIE_SECURE), never hardcoded
+    # here. On a transport-secure origin the pair is ``__Host-login_browser_id`` +
+    # ``Secure``; on a plain-HTTP origin it is ``login_browser_id`` + no ``Secure``.
+    # Deriving both from one setting is what makes "``__Host-`` without ``Secure``"
+    # — which every conformant user agent rejects, breaking login — unrepresentable.
+    # ``secure`` is never ``request.is_secure()``: behind a misconfigured
+    # SECURE_PROXY_SSL_HEADER that silently drops the prefix in production. The
+    # ``__Host-`` contract additionally requires ``Path=/`` and forbids ``Domain``;
+    # both are supplied here and pinned by the cookie-contract test.
     response.set_cookie(
         LOGIN_BROWSER_ID_COOKIE,
         issued.browser_id,
         httponly=True,
         samesite="Lax",
-        secure=settings.LOGIN_BROWSER_ID_COOKIE_SECURE,
+        secure=LOGIN_BROWSER_ID_COOKIE_SECURE,
         path="/",
     )
     return response

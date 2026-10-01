@@ -37,10 +37,11 @@ _THEME_STATICFILES_BACKEND = "theme.storage.ThemeStaticFilesStorage"
 # The seven transport-security settings dev and test must agree on. Named as a
 # module-level constant (project rule 10), never inline literals, so the parity
 # tuple is one edit away from gaining an eighth member. The seventh,
-# LOGIN_BROWSER_ID_COOKIE_SECURE, is the Secure flag for the login-binding
-# cookie: it belongs here rather than hardcoded in login_issue, so a dev stack
-# on a non-localhost HTTP origin (Django published directly on :8000) is
-# covered by the same machine check as sessionid/csrftoken.
+# LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX, resolves BOTH the login-binding cookie's
+# ``__Host-`` name and its Secure flag (see login_token.py): it belongs here
+# rather than hardcoded in login_issue, so a dev stack on a non-localhost HTTP
+# origin (Django published directly on :8000) is covered by the same machine
+# check as sessionid/csrftoken.
 _TRANSPORT_SETTINGS = (
     "SECURE_SSL_REDIRECT",
     "SESSION_COOKIE_SECURE",
@@ -48,8 +49,18 @@ _TRANSPORT_SETTINGS = (
     "SECURE_HSTS_SECONDS",
     "SECURE_HSTS_INCLUDE_SUBDOMAINS",
     "SECURE_HSTS_PRELOAD",
-    "LOGIN_BROWSER_ID_COOKIE_SECURE",
+    "LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX",
 )
+
+# The production value of the login-binding transport setting. base.py's True is
+# the entire sibling-subdomain bypass fix (it yields the ``__Host-`` name and its
+# mandatory Secure flag together); dev/test carry False for plain HTTP. Pinned
+# separately by test_login_binding_host_prefix_is_enabled_in_production, because
+# the parity test above only compares dev against test and would stay green if a
+# well-meaning edit flipped base.py to False on all three modules at once.
+_LOGIN_BINDING_HOST_PREFIX_PROD = True
+_LOGIN_BINDING_HOST_PREFIX_DEV = False
+_LOGIN_BINDING_HOST_PREFIX_TEST = False
 
 # Import both modules in one process and print `NAME=<repr>` per setting, so a
 # mismatch is visible as two differing lines rather than a bare assertion.
@@ -187,3 +198,89 @@ def test_dev_and_test_share_the_transport_tuple() -> None:
         f"tuple (setting: (dev, test)): {mismatches}. test.py's comment asserts "
         "parity with dev.py; reset the setting in test.py, or correct the comment."
     )
+
+
+# Import the settings module and the login-binding service in one subprocess and
+# print the resolved name, flag, and settings value, so the pairing is observed
+# exactly as the view will emit it (settings evaluated at import time, then the
+# service's derivation applied). PROBE_MODULE is the full settings module path so
+# the probe reads the same module the service resolves against.
+_LOGIN_BINDING_PROBE_CODE = (
+    "import os; "
+    "os.environ['DJANGO_SETTINGS_MODULE'] = os.environ['PROBE_MODULE']; "
+    "import django; "
+    "django.setup(); "
+    "from apps.users.services.login_token import ("
+    "LOGIN_BROWSER_ID_COOKIE as name, "
+    "LOGIN_BROWSER_ID_COOKIE_SECURE as secure, "
+    "LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX as prefix); "
+    "print(f'prefix={prefix!r}'); "
+    "print(f'name={name!r}'); "
+    "print(f'secure={secure!r}')"
+)
+
+
+def _probe_login_binding(env_name: str) -> dict[str, str]:
+    """Return the resolved login-binding ``{prefix, name, secure}`` for an env.
+
+    ``env_name`` is the settings suffix (``base``/``dev``/``test``). ``base`` is
+    evaluated with production-like env vars so it imports cleanly, mirroring the
+    prod probe above; ``dev``/``test`` use the ambient env (they skip .env
+    reading).
+    """
+    if env_name == "base":
+        env = _prod_env_overrides()
+    else:
+        env = {k: v for k, v in os.environ.items()}
+        env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
+    module_path = f"config.settings.{env_name}"
+    env["DJANGO_SETTINGS_MODULE"] = module_path
+    env["PROBE_MODULE"] = module_path
+    result = _run_in_subprocess(env, _LOGIN_BINDING_PROBE_CODE)
+    assert result.returncode == 0, result.stderr
+    resolved: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition("=")
+        resolved[key] = value
+    assert set(resolved) == {"prefix", "name", "secure"}, (
+        f"the login-binding probe did not report every value for {env_name}: "
+        f"got {sorted(resolved)}"
+    )
+    return resolved
+
+
+def test_login_binding_host_prefix_is_enabled_in_production() -> None:
+    """base.py enables the ``__Host-`` login-binding control; dev/test disable it.
+
+    ``test_dev_and_test_share_the_transport_tuple`` only compares ``dev`` against
+    ``test``, so it stays green if a well-meaning edit flips ``base.py`` to
+    ``False`` on all three modules at once — silently reopening the sibling-
+    subdomain bypass in production. This pins the value that carries the entire
+    fix, per module.
+    """
+    base = _probe_login_binding("base")
+    dev = _probe_login_binding("dev")
+    test = _probe_login_binding("test")
+    assert base["prefix"] == repr(_LOGIN_BINDING_HOST_PREFIX_PROD), base
+    assert dev["prefix"] == repr(_LOGIN_BINDING_HOST_PREFIX_DEV), dev
+    assert test["prefix"] == repr(_LOGIN_BINDING_HOST_PREFIX_TEST), test
+
+
+def test_login_binding_name_and_secure_flag_agree_per_module() -> None:
+    """The resolved name and ``Secure`` flag agree under every settings module.
+
+    The defect this guards is exactly a name/flag disagreement: a
+    ``__Host-``-prefixed cookie emitted without ``Secure`` is rejected by every
+    conformant user agent, so the cookie is discarded and each login becomes a
+    ``410``. The invariant is stated as a rule — ``__Host-`` iff ``Secure`` — so
+    it holds for any module and fails on either half of the original bug.
+    """
+    for env_name in ("base", "dev", "test"):
+        resolved = _probe_login_binding(env_name)
+        has_prefix = resolved["name"].startswith("'__Host-")
+        is_secure = resolved["secure"] == "True"
+        assert has_prefix == is_secure, (
+            f"{env_name}: name {resolved['name']} and secure {resolved['secure']} "
+            "disagree; a __Host- cookie without Secure is discarded by every "
+            "conformant user agent"
+        )

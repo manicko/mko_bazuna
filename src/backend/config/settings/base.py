@@ -163,16 +163,23 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
-# Secure flag for the ``__Host-login_browser_id`` login-binding cookie. It lives
-# in this transport tuple, not hardcoded in the view, so it is subject to the
-# same machine-checked dev/test parity as the two cookie-secure settings above
+# The login-binding cookie's ``__Host-`` prefix. This one setting resolves BOTH
+# the cookie's name and its ``Secure`` flag (see login_token.py): when True the
+# emitted cookie is ``__Host-login_browser_id`` with ``Secure``; when False it is
+# plain ``login_browser_id`` with no ``Secure``. The two must never disagree — a
+# ``__Host-`` cookie without ``Secure`` is discarded by every conformant user
+# agent, so the login cookie vanishes and every login becomes a 410 — which is
+# why they are derived from a single setting rather than configured separately.
+#
+# It lives in the transport tuple, not hardcoded in the view, so it is subject to
+# the same machine-checked dev/test parity as the two cookie-secure settings above
 # (test_settings_defaults.test_dev_and_test_share_the_transport_tuple). It is a
 # deliberate settings flag rather than ``request.is_secure()``: behind a
 # misconfigured SECURE_PROXY_SSL_HEADER the request-derived form silently drops
-# the cookie to non-Secure in production, which a fixed setting cannot do. The
-# ``__Host-`` prefix on the cookie additionally requires this flag to be True on
-# every origin that serves the login handshake.
-LOGIN_BROWSER_ID_COOKIE_SECURE = True
+# the prefix to off in production, which a fixed setting cannot do. On an
+# HTTP-only origin the prefix control is absent by design (there is no transport
+# security to anchor it to), not by oversight.
+LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX = True
 
 # Trusted origins for CSRF protection (Origin/Referer header validation).
 # Required in production behind a TLS-terminating proxy (SECURE_PROXY_SSL_HEADER

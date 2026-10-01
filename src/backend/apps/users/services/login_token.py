@@ -76,6 +76,7 @@ import secrets
 from enum import StrEnum
 from typing import Final, NamedTuple
 
+from django.conf import settings
 from django.db import connection
 from django.utils import timezone
 
@@ -101,8 +102,10 @@ RAW_TOKEN_ENTROPY_BYTES: Final[int] = 24
 BROWSER_ID_ENTROPY_BYTES: Final[int] = 16
 
 # First-party essential cookie carrying the raw browser id across the two-phase
-# handshake. The name is owned here (the service mints the id) and imported by
-# the view, mirroring PREFERRED_CITY_COOKIE_NAME's ownership pattern.
+# handshake. The name and its ``Secure`` flag are **derived from one setting**
+# (``LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX``) and therefore cannot disagree; the
+# service owns the pair and the view imports both, mirroring
+# PREFERRED_CITY_COOKIE_NAME's ownership pattern.
 #
 # The ``__Host-`` prefix is load-bearing, not cosmetic: without it the binding is
 # client-chosen. RFC 6265 §5.3 lets *any* sibling subdomain set a domain cookie
@@ -113,8 +116,41 @@ BROWSER_ID_ENTROPY_BYTES: Final[int] = 16
 # a host-only, ``Secure``, ``Path=/`` origin, which converts "the client chose a
 # value" into "only this exact origin can set a value". The ``__Host-`` contract
 # requires all three attributes; the view's ``set_cookie`` call supplies them and
-# ``login_issue.html``-driven tests pin the invariant.
-LOGIN_BROWSER_ID_COOKIE: Final[str] = "__Host-login_browser_id"
+# the invariant is pinned by the cookie-contract test.
+#
+# Why name and flag are one resolved pair
+# ---------------------------------------
+# A ``__Host-``-prefixed cookie **without** ``Secure`` is rejected by every
+# conformant user agent (Chromium 154, Firefox, Safari), so the cookie is
+# discarded, ``login_status`` reads ``browser_id=None``, the binding gate returns
+# ``UNBOUND``, and every dev login is a ``410``. The prefix and its mandatory
+# ``Secure`` flag are therefore a single invariant: emitting one without the
+# other is not a cosmetic mismatch but a broken login. Deriving both from
+# ``LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX`` makes that state unrepresentable —
+# there is no code path on which the emitted name can carry the prefix while the
+# emitted flag is ``False``.
+#
+# The HTTP-only-origin trade-off (deliberate, not an oversight)
+# -------------------------------------------------------------
+# ``dev.py`` and ``test.py`` serve plain HTTP (Django is published directly on
+# :8000; nginx is behind a profile). ``__Host-`` cannot be satisfied over plain
+# HTTP, so those modules set the prefix off and emit the unprefixed name with no
+# ``Secure`` flag. On an HTTP-only origin there is **no transport security
+# anyway**, and the sibling-subdomain injection the prefix closes was never
+# defeatable there in a way the prefix could help with, so the control is absent
+# by design. ``base.py`` (production, behind TLS) keeps it on. Because the pair
+# is resolved per settings module and cookies never cross origins, a client only
+# ever sees the name belonging to its own origin — there is no cross-environment
+# conflict. Do **not** "simplify" this into a single hardcoded name.
+LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX: Final[bool] = bool(
+    settings.LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX
+)
+LOGIN_BROWSER_ID_COOKIE: Final[str] = (
+    "__Host-login_browser_id"
+    if LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX
+    else "login_browser_id"
+)
+LOGIN_BROWSER_ID_COOKIE_SECURE: Final[bool] = LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX
 
 # A well-formed browser id is exactly the URL-safe shape secrets.token_urlsafe
 # produces. A presented cookie value that does not match is treated as absent
@@ -209,8 +245,9 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     presented ``browser_id`` is reused; an absent or malformed one is minted.
 
     Args:
-        browser_id: The raw browser id from the incoming
-            ``__Host-login_browser_id`` cookie, or ``None`` when the cookie is
+        browser_id: The raw browser id from the incoming login-binding cookie
+            (``__Host-login_browser_id`` on a transport-secure origin,
+            ``login_browser_id`` otherwise), or ``None`` when the cookie is
             absent.
     """
     raw_token = secrets.token_urlsafe(RAW_TOKEN_ENTROPY_BYTES)
@@ -330,8 +367,10 @@ def consume_token(raw_token: str, *, browser_id: str | None) -> ConsumeResult:
 
     Args:
         raw_token: The raw token from ``request.POST["token"]``.
-        browser_id: The raw browser id from the ``__Host-login_browser_id``
-            cookie, or ``None`` when the cookie is absent.
+        browser_id: The raw browser id from the login-binding cookie
+            (``__Host-login_browser_id`` on a transport-secure origin,
+            ``login_browser_id`` otherwise), or ``None`` when the cookie is
+            absent.
 
     Returns:
         A ``ConsumeResult`` whose ``outcome`` discriminates the six cases.

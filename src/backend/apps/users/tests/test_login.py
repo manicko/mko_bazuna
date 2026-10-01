@@ -11,7 +11,7 @@ import hashlib
 from datetime import timedelta
 
 import pytest
-from django.test import Client, override_settings
+from django.test import Client
 from django.utils import timezone
 
 from apps.locations.models import City
@@ -248,38 +248,43 @@ class TestLoginTokenBinding:
         assert response.cookies[LOGIN_BROWSER_ID_COOKIE].value != "x" * 500
 
     def test_cookie_name_satisfies_the_host_prefix_contract(self) -> None:
-        """``__Host-`` is the load-bearing part of the bypass fix (D-1).
+        """If the emitted name carries ``__Host-`` it must also carry ``Secure``.
 
-        A cookie named without the prefix can be set for a parent domain by any
-        sibling subdomain (RFC 6265 §5.3), letting an attacker choose the
-        binding value on a victim's first login. ``__Host-`` forbids that, but
-        only if the response cookie also carries ``Secure`` and ``Path=/`` and
-        no ``Domain`` attribute.
+        ``__Host-`` is the load-bearing part of the bypass fix: without it any
+        sibling subdomain can set the binding for a parent domain (RFC 6265
+        §5.3) and choose the value on a victim's first login. The prefix is only
+        honoured, however, when the same response also carries ``Secure`` and
+        ``Path=/`` and no ``Domain`` — a ``__Host-``-prefixed cookie **without**
+        ``Secure`` is rejected by every conformant user agent (Chromium 154,
+        Firefox, Safari), the cookie is discarded, and every login degrades to a
+        ``410``.
 
-        The test settings deliberately set
-        ``LOGIN_BROWSER_ID_COOKIE_SECURE = False`` (plain-HTTP test client, see
-        D-3), so ``Secure`` is asserted under an ``override_settings`` flip to
-        the production value: that proves the view honours the transport flag
-        and that the ``__Host-`` contract is satisfiable, while name/path/domain
-        are asserted structurally on the real response.
+        The invariant asserted is the rule, not a fixed flag: **whenever the
+        emitted name starts with ``__Host-``, ``morsel["secure"]`` must be
+        ``True``**. This test therefore fails on exactly the defect that shipped
+        (``__Host-`` + no ``Secure``) and passes on both the secure and
+        non-secure configurations. ``Path`` and the absent ``Domain`` are
+        structural and asserted unconditionally.
+
+        The name/flag pairing is derived from one setting in the service and
+        pinned per settings module by
+        ``config.settings.tests.test_settings_defaults``; this test verifies the
+        view emits the pair consistently.
         """
-        assert LOGIN_BROWSER_ID_COOKIE.startswith("__Host-")
-
         client = Client()
         response = client.get("/login/issue/")
         assert response.status_code == 200
 
         morsel = response.cookies[LOGIN_BROWSER_ID_COOKIE]
+        # Structural: always Path=/ with no Domain, in both configurations.
         assert morsel["path"] == "/"
         assert morsel["domain"] == ""
-        # Test settings disable Secure for the HTTP test client ...
-        assert not morsel["secure"]
-
-        with override_settings(LOGIN_BROWSER_ID_COOKIE_SECURE=True):
-            secure_response = Client().get("/login/issue/")
-        # ... and the view emits Secure when the transport flag says so, which
-        # is the production value (base.py).
-        assert secure_response.cookies[LOGIN_BROWSER_ID_COOKIE]["secure"]
+        # The invariant: __Host- iff Secure. Under test settings the name is
+        # plain (no prefix), so Secure is False; this is legal.
+        if LOGIN_BROWSER_ID_COOKIE.startswith("__Host-"):
+            assert morsel["secure"]
+        else:
+            assert not morsel["secure"]
 
 
 class TestLoginStatus:

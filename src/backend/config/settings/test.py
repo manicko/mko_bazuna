@@ -30,7 +30,7 @@ TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
-LOGIN_BROWSER_ID_COOKIE_SECURE = False
+LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX = False
 # The HSTS triple is inherited from base.py (3600 / True / False) unless it is
 # reset here. Left inherited, a browser — or any browser-driven tool — pointed at
 # a test-mode server would cache `Strict-Transport-Security: max-age=3600;

@@ -13,10 +13,13 @@ SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 # The login-binding cookie is plain HTTP in the default dev stack
 # (docker-compose.dev.override.yml publishes Django directly on :8000 with no
-# proxy). It must therefore follow this module, not base.py, or a browser
-# silently discards it. Kept in the transport tuple so dev/test parity is
-# machine-checked.
-LOGIN_BROWSER_ID_COOKIE_SECURE = False
+# proxy). Off => the cookie is named ``login_browser_id`` and is emitted without
+# ``Secure`` (see login_token.py, which derives both from this one setting); a
+# ``__Host-``-prefixed cookie without ``Secure`` is rejected by every conformant
+# user agent, which would silently discard the cookie and turn every dev login
+# into a 410. The prefix control is therefore absent on an HTTP-only origin by
+# design. Kept in the transport tuple so dev/test parity is machine-checked.
+LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX = False
 
 # Console logging for development
 LOGGING = {

@@ -381,7 +381,8 @@ class TestLoginStatusNoPii:
         )
 
         # Issue through the real path so the row is bound to the client's
-        # __Host-login_browser_id cookie and the expected status stays 200.
+        # login-binding cookie (plain ``login_browser_id`` under test settings)
+        # and the expected status stays 200.
         client = Client()
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
@@ -410,7 +411,12 @@ class TestLoginStatusNoPii:
         its stored SHA-256 digest, or the raw telegram id.
         """
         telegram_id = 999888778
-        browser_id = "attackerbrowserid00xy"
+        # A well-formed 22-char URL-safe id (matches _BROWSER_ID_PATTERN), so the
+        # presented value passes the shape check and drives the *digest-mismatch*
+        # branch — the branch that must never log the digest — not the
+        # malformed-presented-id sub-branch. A 21-char id would fullmatch-fail
+        # and exercise the wrong path while the PII assertion still passed.
+        browser_id = "attackerbrowserid00xyz"
         User.objects.create(
             telegram_id=telegram_id,
             chat_id=telegram_id,
