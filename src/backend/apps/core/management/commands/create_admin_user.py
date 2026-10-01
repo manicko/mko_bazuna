@@ -127,11 +127,13 @@ class Command(BaseCommand):
             # Enforce the project password policy. This runs after every early
             # return so an idempotent re-run against an existing operator stays a
             # silent no-op rather than failing on the stored password's strength.
-            # No user instance is available yet and none is fabricated, so
-            # UserAttributeSimilarityValidator is inert here (it returns when
-            # user is None); length, common-password and numeric checks apply.
+            # UserAttributeSimilarityValidator returns early when user is None, so
+            # an unpersisted candidate carrying username/email is passed to keep
+            # the similar-credential rule live on this path. It only reads
+            # attributes and _meta field metadata; it is never saved.
+            candidate = User(username=username, email=email)
             try:
-                validate_password(password)
+                validate_password(password, user=candidate)
             except ValidationError as exc:
                 raise CommandError(
                     _("Password does not meet the password policy: %(errors)s")

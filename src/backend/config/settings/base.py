@@ -155,6 +155,8 @@ LANGUAGES = [
 LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]
 
 # Security settings (TLS/SSL ready)
+# The cookie-secure overrides in dev.py/test.py are development-only relaxations
+# of these production defaults.
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
@@ -389,12 +391,15 @@ LOGIN_URL = "/login/issue/"
 AUTH_PASSWORD_VALIDATORS = [
     {
         # Rejects a password too similar to the username/email: blocks a
-        # credential built from the account identifier itself.
+        # credential built from the account identifier itself. On the bootstrap
+        # path this only fires because create_admin_user passes an unpersisted
+        # candidate user to validate_password; with no user it is inert.
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        # Rejects a password shorter than the minimum: stops trivially short
-        # bootstrap credentials.
+        # Rejects a password shorter than the minimum. 10 is the shortest value
+        # that clears trivial guesses while staying memorable for a bootstrap
+        # credential; the default of 8 is too weak for an operator secret.
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
         "OPTIONS": {"min_length": 10},
     },

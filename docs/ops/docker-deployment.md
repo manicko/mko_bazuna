@@ -1026,6 +1026,17 @@ An explicit `--password` always wins, even when it is empty — the command then
 `Password cannot be empty` rather than silently picking up `ADMIN_PASSWORD`. If neither source
 supplies a non-empty password the command exits non-zero and creates nothing.
 
+The supplied password is validated against `AUTH_PASSWORD_VALIDATORS` before the user is
+created. A real run is refused unless the password:
+
+- contains at least 10 characters;
+- is not on Django's common-password list;
+- is not entirely numeric;
+- is not too similar to the username or email.
+
+`--dry-run` returns *before* this validation, so a successful dry-run is not evidence that the
+same password will be accepted by a real run — always pass a policy-compliant password below.
+
 ### Dry-Run Mode
 
 Verify what would be created without making changes:
@@ -1035,7 +1046,7 @@ docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
-    --password test123 \
+    --password V4lid-Str0ng!Pass \
     --telegram-id -1 \
     --dry-run
 ```

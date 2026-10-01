@@ -9,16 +9,14 @@ Verifies:
 - Advisory lock usage
 - Password resolution from the ADMIN_PASSWORD environment fallback
 - Enforcement of AUTH_PASSWORD_VALIDATORS on the create path only (after the
-  three early returns), via TestCreateAdminUserPasswordPolicy
+  three early returns), via TestCreateAdminUserPasswordPolicy. All four
+  configured rules are exercised end-to-end on the command path.
 """
 
 from io import StringIO
 
 import pytest
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import UserAttributeSimilarityValidator
-from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 
 from apps.core.enums import AdvisoryLockId
@@ -373,35 +371,79 @@ class TestCreateAdminUserPasswordPolicy:
             )
         assert not User.objects.filter(username="emptyadmin").exists()
 
-    def test_similarity_validator_is_wired_but_inert_without_a_user(self):
-        """Pin the similarity validator's actual behaviour on the bootstrap path.
+    def test_username_derived_password_is_rejected(self):
+        """A bootstrap password built from the username is refused, no row written.
 
-        Django's ``UserAttributeSimilarityValidator.validate`` returns immediately
-        when ``user`` is ``None``. The command has no ``User`` instance before the
-        row is created, and the brief forbids constructing a throwaway unsaved one,
-        so similarity is inert *here* by design. This test is therefore not
-        vacuous: it proves the validator is present in the configured policy and
-        that it genuinely rejects when handed a user, while pinning the documented
-        bootstrap behaviour (creation succeeds).
+        The command passes an unpersisted ``User(username=..., email=...)`` to
+        ``validate_password``, which keeps ``UserAttributeSimilarityValidator``
+        live on this path. Without that user the validator returns early and the
+        username-derived secret below would be accepted.
         """
-        configured = [entry["NAME"] for entry in settings.AUTH_PASSWORD_VALIDATORS]
-        assert (
-            "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
-            in configured
-        )
-
-        validator = UserAttributeSimilarityValidator()
-        with pytest.raises(ValidationError, match="too similar"):
-            validator.validate("administrator1", user=User(username="administrator"))
-
         username = "administrator"
-        call_command(
-            "create_admin_user",
-            username=username,
-            password=f"{username}1",
-            telegram_id=-1,
-        )
-        assert User.objects.filter(username=username).exists()
+        before = User.objects.count()
+        with pytest.raises(CommandError, match="too similar to the username"):
+            call_command(
+                "create_admin_user",
+                username=username,
+                password=f"{username}1",
+                telegram_id=-1,
+            )
+        assert User.objects.count() == before
+        assert not User.objects.filter(username=username).exists()
+
+    def test_email_derived_password_is_rejected(self):
+        """The unpersisted candidate carries email too, so an email-derived
+        credential is refused as well."""
+        email = "operator@example.com"
+        before = User.objects.count()
+        with pytest.raises(CommandError, match="password policy"):
+            call_command(
+                "create_admin_user",
+                username="bootstrap-admin",
+                password=email,
+                email=email,
+                telegram_id=-1,
+            )
+        assert User.objects.count() == before
+        assert not User.objects.filter(username="bootstrap-admin").exists()
+
+    def test_common_password_is_rejected_and_creates_no_user(self):
+        """A long password on Django's common list is refused by that rule alone.
+
+        ``basketball`` is 10 characters (so it clears the length rule) and is
+        present in Django's common-password list. The assertion pins the specific
+        common-password message, so removing ``CommonPasswordValidator`` from the
+        policy turns this test red instead of leaving a gap.
+        """
+        before = User.objects.count()
+        with pytest.raises(CommandError, match="too common"):
+            call_command(
+                "create_admin_user",
+                username="commonadmin",
+                password="basketball",
+                telegram_id=-1,
+            )
+        assert User.objects.count() == before
+        assert not User.objects.filter(username="commonadmin").exists()
+
+    def test_entirely_numeric_password_is_rejected_and_creates_no_user(self):
+        """A long all-numeric password is refused by the numeric rule alone.
+
+        ``3141592653`` is 10 digits (clearing the length rule) and is absent from
+        Django's common-password list (so the common rule does not fire), leaving
+        ``NumericPasswordValidator`` as the only rule that rejects it. The
+        assertion pins the specific numeric message.
+        """
+        before = User.objects.count()
+        with pytest.raises(CommandError, match="entirely numeric"):
+            call_command(
+                "create_admin_user",
+                username="numericadmin",
+                password="3141592653",
+                telegram_id=-1,
+            )
+        assert User.objects.count() == before
+        assert not User.objects.filter(username="numericadmin").exists()
 
     def test_dry_run_creates_no_user_and_skips_validation(self):
         """Dry-run returns before validation and still writes nothing."""
