@@ -294,25 +294,43 @@ WantedBy=multi-user.target
 
 **Note (cron alternative):** the bare-metal `cron` block above fires both commands directly.
 Under cron there is no scheduler marker in the loop, so a retried or manually re-invoked
-`send_alerts` is protected by `uq_saved_search_ad` + `find_matching_ads`' `NOT EXISTS` (it
-collects nothing new) but **not** by a run-level marker. Do not invoke `send_alerts` more
-than once per day under cron.
+`send_alerts` is protected only by `uq_saved_search_ad` plus `find_matching_ads`' `NOT EXISTS`
+(it re-collects only pairs whose delivery receipt is still absent) but **not** by a run-level
+marker. Do not invoke `send_alerts` more than once per day under cron.
 
-**Alert dedup invariant (03-DB-007).** The daily `send_alerts` `NOT EXISTS` now filters on
+**Alert dedup invariant (03-DB-007).** The daily `send_alerts` `NOT EXISTS` filters on
 **delivered** state (`delivered_at IS NOT NULL`), not on row existence, so a failed digest is
 retried on the next run rather than suppressed forever. The near-real-time publish-time path is
 **separately gated** by `IMMEDIATE_ALERTS_ENABLED` and is deduplicated by the same delivery-state
 contract: a pair delivered by either path is never delivered again by the other.
+
+That contract is **sequential**, not concurrent: two paths racing on the same pair can both send
+before either receipt commits. The duplicate is **detected, not prevented** —
+`notification_delivery.mark_delivered` issues one conditional `UPDATE` in autocommit (no
+`transaction.atomic()`, no advisory lock) and returns `False` when a competing call already
+recorded the receipt. **`mark_delivered` returning `False` in production logs is the escalation
+signal** that the concurrent case is real.
 
 ### Scheduled-job concurrency (advisory locks)
 
 All nine hourly sweep commands (plus the two daily commands and the once-only `migrate`
 step) — run against the same shared PostgreSQL database as the live web and bot
 processes. To prevent concurrent sweeps (or a sweep and a migration) from colliding on
-the same rows, every command acquires a **transaction-scoped PostgreSQL advisory lock**
-(`apps.core.utils.advisory_lock`, `pg_advisory_xact_lock`) before doing its work. The
-lock is released automatically on transaction commit/rollback, so it is safe under
-PgBouncer transaction pooling. The `migrate` step instead uses a **session-scoped** lock
+the same rows, every command acquires a PostgreSQL advisory lock
+(`apps.core.utils.advisory_lock`) before doing its work. The default is
+**transaction-scoped** (`pg_advisory_xact_lock`), released automatically on transaction
+commit/rollback and therefore safe under PgBouncer transaction pooling.
+
+**Two commands are the exception (03-DB-008).** `archive_sweep` and
+`recompute_normalized_prices` commit **per batch** (500 rows), so a transaction-scoped
+lock would be dropped by the first batch `COMMIT` and lose mutual exclusion between
+batches. Both therefore take a **session-scoped** lock (`pg_advisory_lock`,
+`session=True`) once for the whole run. That is **not** PgBouncer transaction-mode
+safe, which is the second reason the `pgbouncer` profile is blocked — see
+[`docker-deployment.md`](../ops/docker-deployment.md#lock-timeouts-canceling-statement-due-to-lock-timeout).
+Every other sweep keeps the transaction-scoped shape.
+
+The `migrate` step instead uses a **session-scoped** lock
 (`pg_advisory_lock`, via `apps.core.utils.migrate_locked.main` running under `AdvisoryLockId.MIGRATE`)
 because it runs before PgBouncer is attached. Inside that session lock, `migrate_locked`
 runs all three required post-migration setup steps (plus an optional env-gated `backfill_translations`
@@ -324,7 +342,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 
 | Lock ID | Held by |
 |---------|---------|
-| 1 | `archive_sweep` |
+| 1 | `archive_sweep` (session-scoped, per-batch commits) |
 | 2 | `delete_sweep` |
 | 3 | `consent_hard_delete` |
 | 4 | `sweep_drafts` |
@@ -334,7 +352,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 8 | `rollup_daily_metrics` |
 | 9 | `alert_delivery_task` |
 | 11 | `purge_deleted_ads` |
-| 12 | `recompute_normalized_prices` |
+| 12 | `recompute_normalized_prices` (session-scoped, per-batch commits) |
 | 13 | `repair_bot_username` (one-shot repair of `SiteConfig.bot_username`; see [`contact-us.md`](contact-us.md)) |
 | 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates; optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |

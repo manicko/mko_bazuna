@@ -162,8 +162,10 @@ already holds it, a new run blocks; once released, a re-run sees all migrations 
 and is a no-op.
 
 > PgBouncer (transaction mode) is **production-only** and is not involved in the dev migrate flow.
-> Transaction-scoped `pg_advisory_xact_lock` is used by the scheduled sweep jobs instead (see
-> `docs/99-agent/architecture.md`).
+> Transaction-scoped `pg_advisory_xact_lock` is used by the scheduled sweep jobs instead, except
+> `archive_sweep` and `recompute_normalized_prices`, which hold a **session-scoped** lock across
+> their per-batch commits (03-DB-008). See
+> [architecture-structure.md](../01-spec/architecture-structure.md#scheduled-job-concurrency-advisory-locks).
 
 ## Daily Workflow
 

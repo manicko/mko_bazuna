@@ -36,7 +36,10 @@ Strictly step-by-step dialog: category → city → title → description → pr
 photos, each confirmed. Category from the closed admin tree (bot suggests top 3–5; free-text as new
 category rejected). 1–5 **Telegram-compressed** photos only (documents rejected). Preview before
 send. On submit → `ON_MODERATION`, not visible until checks pass. Abandoned drafts auto-deleted on
-idle timeout (~30 min); no partial ads saved. See decisions I, E.
+idle timeout (~30 min) — the clock measures **inactivity**, and every step of the dialog refreshes
+it, so a seller who is still filling the form keeps the draft however long it takes. The seller is
+told their draft was reaped, not that it was not found. A seller has at most one draft in
+progress; starting a new ad or copying an existing one replaces it. See decisions I, E.
 
 ### US-S5 — Edit ad
 Seller edits description/price/photos. **Text edits** (title/description) →

@@ -143,6 +143,9 @@ category_name (VARCHAR, editable=False)             # zone D1 (hybrid C): denorm
 status (StrEnum — see AdStatus)                    # see db-enums.md
 source (StrEnum: TELEGRAM | SEED)                   # TELEGRAM = bot source (decision B); SEED = seed-generated demo data
 created_at / updated_at
+                    # updated_at (not created_at) drives DRAFT retention: the 30-min sweep
+                    # measures seller INACTIVITY (03-DB-003), refreshed by the bot dialog
+                    # heartbeat and the web edit form. Do not revert the predicate.
 published_at (TIMESTAMP, nullable)                 # drives archive_sweep timer (60d); UPDATED on every PUBLISHED transition (timer reset)
 original_published_at (TIMESTAMP, nullable)        # set once on FIRST publish; IMMUTABLE, audit only
 archived_at (TIMESTAMP, nullable)                  # drives delete_sweep timer (60d from archive, AD-005)
@@ -327,6 +330,13 @@ thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
 thumbnail_large (VARCHAR, nullable)  # 1280x960 thumbnail storage key
 ```
 Only compressed Telegram photos (`message.photo`) accepted; `message.document` rejected. Bot downloads bytes and stores in our storage; `image` holds the served URL/key. `file_id` is NOT a URL and not usable in `<img src>` — stored as metadata only.
+
+A storage key is **not** unique to one row: `copy_ad` points the copy at the source ad's
+keys instead of duplicating files, so one key can be legitimately referenced by several
+`AdImage` rows. Deletion is therefore guarded in the `AdImage` `pre_delete` signal
+(`apps.media.signals`) — `delete_photo()` is skipped while another `AdImage` row still
+references that key. That existence check is the minimal fix; **proper refcounting
+(AD-003) is still open**, and `delete_photo()` itself remains unconditional.
 
 > Zone R6 / R8 (storage-boundary validation): `ad_images.image` key is ad-scoped + UUID v4
 > (unguessable, non-sequential). JPEG validated strictly (magic bytes / PIL) on save; non-JPEG

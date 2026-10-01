@@ -85,7 +85,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Two distinct consent states (zone R3, decision K):** DECLINE (browse-only, no erasure; also hides the user's PUBLISHED ads from public search/listings and invalidates the search cache) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + 30-day PII erasure). Banner behavior in decision K.
 - **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, hardcoded 30 days; index `IX_users_erasure_sweep`):
   - NULL `telegram_id` + `username`; SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`
-   - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` (`apps.media.services.filesystem`) after transaction commits (TX-then-FS pattern)
+   - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` (`apps.media.services.filesystem`) after transaction commits (TX-then-FS pattern), except for a storage key still referenced by another `AdImage` row (`copy_ad` shares keys rather than duplicating files), which the `pre_delete` signal skips
   - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
   - **PII logging:** All `telegram_id` values in logger calls and `stdout.write` output are masked via `mask_telegram_id()` (SHA-256 hash, non-reversible, `tg_` prefix) from `apps/core/utils/sanitize.py`. Raw telegram_id must never appear in logs.
   - **Withdrawal UI:** Authenticated sellers can withdraw consent via a "Withdraw Data" POST button on the seller dashboard (`/dashboard/`), beside the Logout link. Requires CSRF token + confirmation dialog. Triggers `consent_withdraw` view → `withdraw_consent()`, and flushes the web session via `logout(request)` so a withdrawn (soft-deleted) identity is logged out immediately and can no longer reach seller features (a follow-up `GET /dashboard/` re-redirects to `/login/issue/`).
@@ -175,7 +175,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 
 ### O. Saved searches and autocomplete
 - **Autocomplete** (`AutocompleteView`): hybrid suggestions from three sources — user search history (`SearchHistory`), popular searches (`PopularSearch`), and entity matching (categories + cities). Rate-limited (30 req/min per IP via cache). Results deduplicated and capped at 10.
-- **Saved searches** (`SavedSearch`, `SavedSearchNotification`): buyers save search queries with city/category/price filters. New matching ads trigger notifications (deduplicated per search-ad pair).
+- **Saved searches** (`SavedSearch`, `SavedSearchNotification`): buyers save search queries with city/category/price filters. New matching ads trigger notifications (one alert per search-ad pair for the life of the listing, deduplicated on the **delivery receipt** `SavedSearchNotification.delivered_at` rather than on row existence, so an undelivered pair is retried — 03-DB-007).
 - **Search history** (`SearchHistory`): per-user search query tracking with deduplication and 50-entry cap. Supports both authenticated and anonymous users.
 
 ### P. Seller dashboard statistics

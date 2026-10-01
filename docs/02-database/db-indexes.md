@@ -98,7 +98,7 @@ Six `CheckConstraint`s enforce timestamp presence at the DB level:
 - `ck_ads_failed_and_rejected_mutually_exclusive`: `NOT (moderation_failed_at IS NOT NULL AND rejected_at IS NOT NULL)`
 
 Unique constraint:
-- `uq_ads_single_draft_per_user`: `UNIQUE (user_id) WHERE status='draft'` — enforces one in-progress DRAFT per user (AD-009). Created after a data-dedup migration (migration 0003) collapses any pre-existing per-user DRAFTs.
+- `uq_ads_single_draft_per_user`: `UNIQUE (user_id) WHERE status='draft'` — enforces one in-progress DRAFT per user (AD-009). Created after a data-dedup migration (migration 0003) collapses any pre-existing per-user DRAFTs. It is a **backstop, not the enforcement path**: both draft creators (`create_draft_ad`, `copy_ad`) delete the seller's existing `DRAFT` and recreate it inside one transaction (03-DB-009). A concurrent race is absorbed by savepoint-and-retry. That delete-then-recreate policy is a **reversible default, not a ratified product decision**; the constraint stays as the DB-level guarantee either way.
 
 ## Indexes — users
 ```python
