@@ -391,7 +391,7 @@ def login_status(request: HttpRequest) -> HttpResponse:
     Returns:
         HttpResponse 200 — token consumed, session established (session cookie set)
         HttpResponse 204 — pending (bot has not claimed the token yet)
-        HttpResponse 410 — gone (token invalid, expired, already consumed, or user banned)
+        HttpResponse 410 — gone (token invalid, expired, already consumed, user banned, or account disabled)
     """
     raw_token = request.POST.get("token", "")
     if not raw_token:
@@ -436,6 +436,18 @@ def login_status(request: HttpRequest) -> HttpResponse:
     if not can_login(user):
         logger.warning(
             "Login denied for telegram_id=%s: banned",
+            mask_telegram_id(telegram_id),
+        )
+        return HttpResponse(status=410)
+
+    # Refuse a disabled account before the view's first session write.
+    # auth_login() performs no is_active check, so without this guard the view
+    # would hand out a session cookie whose identity Django discards on the next
+    # request (ModelBackend.get_user returns None for an inactive user). This is
+    # deliberately a view-local guard, not a term in can_login.
+    if not user.is_active:
+        logger.warning(
+            "Login denied for telegram_id=%s: account disabled",
             mask_telegram_id(telegram_id),
         )
         return HttpResponse(status=410)

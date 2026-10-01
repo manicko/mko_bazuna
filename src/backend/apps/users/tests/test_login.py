@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from apps.locations.models import City
 from apps.users.models import LoginToken, User
+from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -202,6 +203,79 @@ class TestLoginStatus:
         client = Client()
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 410
+
+    def test_login_status_refuses_a_disabled_account(self) -> None:
+        """An is_active=False user is refused: 410 and no session cookie.
+
+        The token is valid and already claimed, so this exercises exactly the
+        guard between the user lookup and the first session write.
+        """
+        telegram_id = 700000310
+        make_user(telegram_id, username="disabled_user", is_active=False)
+
+        raw_token = "disabled_token_32chars_abcde_abcdefghi"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        client = Client()
+        response = client.post("/login/status/", {"token": raw_token})
+
+        assert response.status_code == 410
+        assert "_auth_user_id" not in client.session
+
+    def test_login_status_burns_the_token_for_a_disabled_account(self) -> None:
+        """The denial still consumes the token, matching the ban/decline paths.
+
+        The burn is the intended consequence: the two-phase handshake must
+        restart. A replay of the same raw token is refused with 410.
+        """
+        telegram_id = 700000311
+        make_user(telegram_id, username="disabled_burn", is_active=False)
+
+        raw_token = "disabled_burn_32chars_abcde_abcdefghi"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        client = Client()
+        first = client.post("/login/status/", {"token": raw_token})
+        assert first.status_code == 410
+
+        token = LoginToken.objects.get(token_hash=token_hash)
+        assert token.consumed_at is not None
+
+        replay = client.post("/login/status/", {"token": raw_token})
+        assert replay.status_code == 410
+
+    def test_login_status_200_and_session_for_an_enabled_account(self) -> None:
+        """Control: an is_active=True account still gets 200 and a session.
+
+        Anti-over-reach guard — a blanket refusal would pass the disabled-account
+        tests but must fail here.
+        """
+        telegram_id = 700000312
+        make_user(telegram_id, username="enabled_user", is_active=True)
+
+        raw_token = "enabled_token_32chars_abcde_abcdefghij"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        LoginToken.objects.create(
+            token_hash=token_hash,
+            telegram_id=telegram_id,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        client = Client()
+        response = client.post("/login/status/", {"token": raw_token})
+
+        assert response.status_code == 200
+        assert "_auth_user_id" in client.session
 
     def test_login_status_405_on_get(self) -> None:
         """GET requests are rejected with 405 (token must come via POST body)."""
