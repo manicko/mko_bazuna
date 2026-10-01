@@ -51,6 +51,9 @@ _URLSAFE_CHARS = frozenset(
 # Exactly 22 URL-safe chars — the shape secrets.token_urlsafe(16) produces.
 _BROWSER_ID = "testbrowserid0abcdefgh"
 
+# A second, distinct well-formed browser id for cross-binding supersession tests.
+_OTHER_BROWSER_ID = "otherbrowserid0abcdefg"
+
 
 def _make_token(
     raw_token: str,
@@ -140,6 +143,143 @@ class TestIssueToken:
         second = issue_token()
         assert first.raw_token != second.raw_token
         assert first.token_hash != second.token_hash
+
+
+# ---------------------------------------------------------------------------
+# TestIssueTokenSupersession
+# ---------------------------------------------------------------------------
+
+
+class TestIssueTokenSupersession:
+    """``issue_token`` supersedes a browser's earlier live *unclaimed* token.
+
+    All assertions go through ``claim_token`` / ``consume_token`` — never a raw
+    SQL row count — so the tests measure redeemability, not table shape.
+    """
+
+    def test_second_issue_supersedes_the_first(self) -> None:
+        """The first token is neither claimable nor redeemable after a re-issue."""
+        from apps.users.services.login_token import (
+            ConsumeOutcome,
+            claim_token,
+            consume_token,
+            issue_token,
+        )
+
+        first = issue_token(browser_id=_BROWSER_ID)
+        second = issue_token(browser_id=_BROWSER_ID)
+
+        # The first is superseded: the bot cannot claim it ...
+        assert claim_token(first.token_hash, 700000100, timezone.now()) is None
+        # ... and the web cannot redeem it (it reads GONE, not PENDING).
+        gone = consume_token(first.raw_token, browser_id=_BROWSER_ID)
+        assert gone.outcome is ConsumeOutcome.GONE
+
+        # The second is live: claimable ...
+        assert claim_token(second.token_hash, 700000100, timezone.now()) is not None
+        # ... and redeemable end to end by the issuing browser.
+        consumed = consume_token(second.raw_token, browser_id=_BROWSER_ID)
+        assert consumed.outcome is ConsumeOutcome.CONSUMED
+        assert consumed.telegram_id == 700000100
+
+    def test_second_token_stays_claimable_and_consumable(self) -> None:
+        """The token created *after* the UPDATE must survive it.
+
+        This is the only test that catches an ``UPDATE`` mistakenly placed
+        *after* the ``create``: a later ``UPDATE`` can only burn rows that
+        already existed, so the just-created row would itself be
+        superseded — the second token would read ``GONE`` rather than
+        ``CONSUMED``, and every login would break.
+        """
+        from apps.users.services.login_token import (
+            ConsumeOutcome,
+            claim_token,
+            consume_token,
+            issue_token,
+        )
+
+        issue_token(browser_id=_BROWSER_ID)
+        second = issue_token(browser_id=_BROWSER_ID)
+
+        assert claim_token(second.token_hash, 700000101, timezone.now()) is not None
+        result = consume_token(second.raw_token, browser_id=_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.CONSUMED
+        assert result.telegram_id == 700000101
+
+    def test_issue_does_not_supersede_another_browser(self) -> None:
+        """One browser's issue never reaches another browser's live token."""
+        from apps.users.services.login_token import (
+            ConsumeOutcome,
+            claim_token,
+            consume_token,
+            issue_token,
+        )
+
+        other = issue_token(browser_id=_OTHER_BROWSER_ID)
+        issue_token(browser_id=_BROWSER_ID)  # a different profile issues
+
+        # The other browser's token is untouched: still claimable ...
+        assert claim_token(other.token_hash, 700000102, timezone.now()) is not None
+        # ... and still redeemable by its own browser.
+        result = consume_token(other.raw_token, browser_id=_OTHER_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.CONSUMED
+        assert result.telegram_id == 700000102
+
+    def test_supersession_does_not_touch_a_claimed_token(self) -> None:
+        """A token the bot already claimed is mid-handshake and must not burn.
+
+        ``telegram_id IS NULL`` is the load-bearing conjunct: without it a
+        same-site prefetch of ``/login/issue/`` would kill a login whose user
+        already tapped the Telegram button.
+        """
+        from apps.users.services.login_token import (
+            ConsumeOutcome,
+            claim_token,
+            consume_token,
+            issue_token,
+        )
+
+        first = issue_token(browser_id=_BROWSER_ID)
+        assert claim_token(first.token_hash, 700000103, timezone.now()) is not None
+
+        # A second issue from the same browser must leave the claimed token
+        # alone ...
+        second = issue_token(browser_id=_BROWSER_ID)
+        assert second.token_hash != first.token_hash
+
+        # ... so it is still redeemable end to end.
+        result = consume_token(first.raw_token, browser_id=_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.CONSUMED
+        assert result.telegram_id == 700000103
+
+    def test_supersession_ignores_null_bindings(self) -> None:
+        """A ``NULL``-binding row is not burned: no ``OR browser_binding IS NULL``.
+
+        Supersession is scoped to the issuing browser only; a legacy/unbound
+        row is already unredeemable (``UNBOUND``) and must be left as-is.
+        """
+        from apps.users.services.login_token import (
+            ConsumeOutcome,
+            claim_token,
+            consume_token,
+            issue_token,
+        )
+
+        raw = "o" * 32
+        unbound = _make_token(raw)
+        LoginToken.objects.filter(pk=unbound.pk).update(browser_binding=None)
+        # Claim it so ``consume_token`` reaches the binding gate (an unclaimed
+        # row would read PENDING before the gate is consulted).
+        assert claim_token(unbound.token_hash, 700000104, timezone.now()) is not None
+
+        issue_token(browser_id=_BROWSER_ID)
+
+        # The NULL-binding row is not superseded: it reads UNBOUND, and its
+        # consumed_at is still NULL — the burn never touched it.
+        result = consume_token(raw, browser_id=_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.UNBOUND
+        unbound.refresh_from_db()
+        assert unbound.consumed_at is None
 
 
 # ---------------------------------------------------------------------------

@@ -178,20 +178,44 @@ class TestLoginTokenBinding:
         assert "_auth_user_id" in client.session
 
     def test_repeat_issue_does_not_invalidate_the_binding(self) -> None:
-        """Two issues from one browser keep one binding; the first still redeems."""
+        """A re-issue keeps one binding yet supersedes the first token.
+
+        What changed and why: ``B-03`` shipped this test to pin that a repeat
+        issue does not break the *binding* — a re-mint would have left the first
+        token bound to an id the cookie no longer held. ``G-4b`` (``AUT-007``)
+        now also supersedes the browser's earlier live *unclaimed* token at
+        issue time, so the binding guard is kept **and** the supersession is
+        asserted: the binding is still reused, not re-minted, but the first
+        token is no longer redeemable.
+        """
         telegram_id = 700000502
         make_user(telegram_id, username="binding_repeat")
 
         client = Client()
         first_raw = self._issue(client)
         second_raw = self._issue(client)
-        # Both tokens are claimed by the bot.
-        self._claim(first_raw, telegram_id)
-        self._claim(second_raw, telegram_id)
 
-        # The first token still redeems — a re-mint would have broken it.
-        response = client.post("/login/status/", {"token": first_raw})
-        assert response.status_code == 200
+        def binding_of(raw: str) -> str | None:
+            return LoginToken.objects.get(
+                token_hash=hashlib.sha256(raw.encode()).hexdigest()
+            ).browser_binding
+
+        # B-03's re-mint guard: the binding is reused across issues.
+        first_binding = binding_of(first_raw)
+        assert first_binding is not None
+        assert first_binding == binding_of(second_raw)
+
+        # The bot claims only the second (the first is already superseded and
+        # cannot be claimed) ...
+        self._claim(second_raw, telegram_id)
+        first_hash = hashlib.sha256(first_raw.encode()).hexdigest()
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(first_hash, telegram_id, timezone.now()) is None
+
+        # ... and only the second redeems. The first is GONE (410), not 200.
+        assert client.post("/login/status/", {"token": first_raw}).status_code == 410
+        assert client.post("/login/status/", {"token": second_raw}).status_code == 200
 
     def test_repeat_issue_reuses_the_same_browser_binding(self) -> None:
         """One browser → the same stored binding; two browsers → different ones."""

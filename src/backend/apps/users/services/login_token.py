@@ -48,14 +48,38 @@ keyword-only) — matching order is a **consistency** obligation, tested as such
 
 The ``AUT-007`` boundary
 ------------------------
-No invalidation of prior outstanding tokens is implemented here —
-``issue_token`` issues a fresh token per page view, so a browser can hold
-several live tokens. That is ``AUT-007`` (phase 04, VAL-002), filed separately
-and retained-not-merged with ``ENT-005``. When it lands it lands **inside
-``issue_token`` in this module**, not as an ad-hoc patch in a view. Likewise,
-this module **does not delete** tokens — ``users/services/deletion.py``'s
-``withdraw_consent`` and ``core/management/commands/cleanup_login_tokens.py``
-remain the **only two** deleters, and this module must not create a third.
+``issue_token`` supersedes a browser's earlier **live, unclaimed** token at
+issue time, so one browser profile holds at most **one live unclaimed token**.
+The supersession predicate has exactly four conjuncts and all four are
+load-bearing:
+
+- ``browser_binding = <digest of the resolved browser id>`` — scoped to this
+  browser only. There is deliberately **no** ``OR browser_binding IS NULL``
+  disjunct: a ``NULL`` row is already never redeemable (``G-1a`` → ``UNBOUND``
+  in ``consume_token``), so excluding it loses no control, and the disjunct
+  would let one browser's issue reach across bindings.
+- ``telegram_id IS NULL`` — **required**. At issue time no identity exists, so
+  this excludes every token the bot has **already claimed**. A claimed row is
+  mid-handshake; burning it would let a same-site prefetch of ``/login/issue/``
+  kill a login whose user already tapped the Telegram button — strictly worse
+  than ``AUT-007``. This applies ``B-03``'s ``UNBOUND`` non-burning rule to
+  supersession.
+- ``consumed_at IS NULL AND expires_at > now`` — only a currently live token is
+  superseded; an already-consumed or expired row is left untouched.
+
+The verb is ``UPDATE ... SET consumed_at``, **never** ``DELETE``: it reuses an
+existing column (**no migration**), and ``claim_token``'s ``WHERE`` plus
+``consume_token``'s read guard already refuse a burned row as ``GONE``. This
+module therefore remains a **burn, not a third deleter** —
+``users/services/deletion.py``'s ``withdraw_consent`` and
+``core/management/commands/cleanup_login_tokens.py`` stay the **only two**
+deleters.
+
+The predicate is bounded by ``TOKEN_TTL_SECONDS`` (≤300 s): at most one
+unclaimed row per browser can be live at a time, and any row the supersession
+misses expires within the window. The framing is **one live unclaimed token per
+browser profile**, not "one live token per user": ``telegram_id`` is ``NULL``
+at issue time, so a per-user invariant is not expressible here.
 
 Parameter asymmetry (forced by the two call sites): ``claim_token`` accepts a
 ``token_hash`` because the bot hashes before the handler boundary and
@@ -244,6 +268,16 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     the digest is stored (``browser_binding``), never the raw id. A well-formed
     presented ``browser_id`` is reused; an absent or malformed one is minted.
 
+    Before creating the new row, this browser's earlier live, **unclaimed**
+    token is superseded with an ``UPDATE ... SET consumed_at`` — never a
+    ``DELETE``, and never an ``atomic()`` of its own (the caller owns the
+    transaction). The result is **one live unclaimed token per browser
+    profile**; the framing is not "per user" because ``telegram_id`` is
+    ``NULL`` at issue time. A token the bot has already claimed
+    (``telegram_id IS NOT NULL``) is mid-handshake and is **not** touched, and
+    a ``NULL``-binding row is excluded. See the module docstring's
+    ``The AUT-007 boundary`` section for the full predicate rationale.
+
     Args:
         browser_id: The raw browser id from the incoming login-binding cookie
             (``__Host-login_browser_id`` on a transport-secure origin,
@@ -253,6 +287,28 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     raw_token = secrets.token_urlsafe(RAW_TOKEN_ENTROPY_BYTES)
     token_hash = _hash_raw_token(raw_token)
     resolved_browser_id = _resolve_browser_id(browser_id)
+
+    # AUT-007 supersession. UPDATE-before-CREATE, so a second issue supersedes
+    # the first *instead of* leaving both live. Unclaimed tokens only
+    # (``telegram_id IS NULL``): a claimed token is mid-handshake and burning
+    # it would be worse than the defect. No ``OR browser_binding IS NULL``
+    # disjunct — a NULL row is already unredeemable (UNBOUND) and the disjunct
+    # would cross bindings.
+    superseded = LoginToken.objects.filter(
+        browser_binding=_hash_browser_id(resolved_browser_id),
+        telegram_id__isnull=True,
+        consumed_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).update(consumed_at=timezone.now())
+
+    logger.info(
+        "Issued login token hash=%s... superseded %d prior unclaimed token(s) "
+        "for binding %s...",
+        token_hash[:8],
+        superseded,
+        _hash_browser_id(resolved_browser_id)[:8],
+    )
+
     LoginToken.objects.create(
         token_hash=token_hash,
         expires_at=timezone.now() + datetime.timedelta(seconds=TOKEN_TTL_SECONDS),

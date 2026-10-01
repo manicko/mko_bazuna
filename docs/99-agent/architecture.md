@@ -436,13 +436,37 @@ the predicate.
 
 ### The `AUT-007` boundary and the two existing deleters
 
-`issue_token` issues a fresh token per page view, so a browser can hold several
-live tokens; no invalidation of prior outstanding tokens is implemented here.
-That is `AUT-007` (phase 04, VAL-002), filed separately and retained-not-merged
-with `ENT-005`; when it lands it lands inside `issue_token` in this module.
-This module does **not** delete tokens — `users/services/deletion.py`'s
-`withdraw_consent` and `core/management/commands/cleanup_login_tokens.py`
-remain the only two deleters.
+`issue_token` supersedes a browser's earlier **live, unclaimed** token at issue
+time, so one browser profile holds at most **one live unclaimed token**. The
+supersession predicate has exactly four conjuncts and all four are load-bearing:
+
+- `browser_binding = <digest of the resolved browser id>` — scoped to this
+  browser only. There is deliberately **no** `OR browser_binding IS NULL`
+  disjunct: a `NULL` row is already never redeemable (`G-1a` → `UNBOUND` in
+  `consume_token`), so excluding it loses no control, and the disjunct would let
+  one browser's issue reach across bindings.
+- `telegram_id IS NULL` — **required**. At issue time no identity exists, so
+  this excludes every token the bot has **already claimed**. A claimed row is
+  mid-handshake; burning it would let a same-site prefetch of `/login/issue/`
+  kill a login whose user already tapped the Telegram button — strictly worse
+  than `AUT-007`. This applies `B-03`'s `UNBOUND` non-burning rule to
+  supersession.
+- `consumed_at IS NULL AND expires_at > now` — only a currently live token is
+  superseded; an already-consumed or expired row is left untouched.
+
+The verb is `UPDATE ... SET consumed_at`, **never** `DELETE`: it reuses an
+existing column (**no migration**), and `claim_token`'s `WHERE` plus
+`consume_token`'s read guard already refuse a burned row as `GONE`. This module
+therefore remains a **burn, not a third deleter** —
+`users/services/deletion.py`'s `withdraw_consent` and
+`core/management/commands/cleanup_login_tokens.py` stay the **only two**
+deleters.
+
+The predicate is bounded by `TOKEN_TTL_SECONDS` (≤300 s): at most one unclaimed
+row per browser can be live at a time, and any row the supersession misses
+expires within the window. The framing is **one live unclaimed token per browser
+profile**, not "one live token per user": `telegram_id` is `NULL` at issue time,
+so a per-user invariant is not expressible here.
 
 ## Bot Command Menu
 
