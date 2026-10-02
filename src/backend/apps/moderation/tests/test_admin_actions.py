@@ -19,7 +19,8 @@ import pytest
 from django.db import connection, transaction
 
 from apps.ads.models import Ad, AdImage
-from apps.core.enums import AdStatus
+from apps.analytics.models import AnalyticsEvent
+from apps.core.enums import AdStatus, AnalyticsEventType, ApproveOutcome
 from apps.moderation.admin_actions import (
     approve_ad,
     ban_user_for_ad,
@@ -30,6 +31,7 @@ from apps.moderation.admin_actions import (
     reject_ad,
     soft_delete_ad,
 )
+from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
 from conftest import create_test_ad, create_test_ads_bulk
 
@@ -49,6 +51,9 @@ class TestApproveAdRouting:
         self, mock_auto_moderate, seller, category, city
     ):
         """approve_ad calls auto_moderate() instead of assigning fields directly."""
+        # auto_moderate genuinely returns a bool; approve_ad maps it to
+        # ApproveOutcome (True -> PUBLISHED). Make the stub explicit.
+        mock_auto_moderate.return_value = True
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
         moderator = User.objects.create(
             telegram_id=900000204, chat_id=900000204, password="x"
@@ -72,6 +77,101 @@ class TestApproveAdRouting:
 
         ad.refresh_from_db()
         assert ad.status == AdStatus.DRAFT
+
+
+# ---------------------------------------------------------------------------
+# Tests: approve_ad outcome contract (VAL-003)
+# ---------------------------------------------------------------------------
+
+
+class TestApproveAdOutcome:
+    """approve_ad returns an honest ApproveOutcome and never raises."""
+
+    def test_approve_out_of_pair_returns_transition_refused(
+        self, seller, category, city
+    ):
+        """An ad outside the approvable pair yields TRANSITION_REFUSED, no state change."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+        moderator = User.objects.create(
+            telegram_id=900000220, chat_id=900000220, password="x"
+        )
+
+        outcome = approve_ad(ad, moderator.id)
+
+        assert outcome is ApproveOutcome.TRANSITION_REFUSED
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.DRAFT
+
+    def test_approve_on_moderation_returns_published(self, seller, category, city):
+        """A passing ON_MODERATION ad yields PUBLISHED and one audit + one analytics row."""
+        from apps.moderation.models import ModerationCriteria
+
+        criteria = ModerationCriteria.get_singleton()
+        criteria.max_ads_per_user = 10
+        criteria.save()
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        AdImage.objects.create(ad=ad, image="img.jpg", position=0)
+        moderator = User.objects.create(
+            telegram_id=900000221, chat_id=900000221, password="x"
+        )
+
+        outcome = approve_ad(ad, moderator.id)
+
+        assert outcome is ApproveOutcome.PUBLISHED
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+        assert ModeratorActionLog.objects.filter(ad_id=ad.id).count() == 1
+        assert (
+            AnalyticsEvent.objects.filter(
+                ad_id=ad.id,
+                event_type=AnalyticsEventType.AD_PUBLISHED,
+            ).count()
+            == 1
+        )
+
+    def test_approve_failed_ad_returns_transition_refused_no_rows(
+        self, seller, category, city
+    ):
+        """ON_MODERATION_FAILED approval is refused: no audit row, no analytics event.
+
+        The state machine refuses ``ON_MODERATION_FAILED -> PUBLISHED`` and
+        ``auto_moderate``'s own failure handler raises a second ValueError
+        (``on_moderation_failed -> on_moderation_failed``). ``approve_ad`` must
+        contain that and report TRANSITION_REFUSED with zero side effects.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+        moderator = User.objects.create(
+            telegram_id=900000222, chat_id=900000222, password="x"
+        )
+
+        outcome = approve_ad(ad, moderator.id)
+
+        assert outcome is ApproveOutcome.TRANSITION_REFUSED
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert ad.published_at is None
+        assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
+        assert not AnalyticsEvent.objects.filter(ad_id=ad.id).exists()
+
+    def test_approve_criteria_failure_returns_criteria_rejected(
+        self, seller, category, city
+    ):
+        """A failing ON_MODERATION ad yields CRITERIA_REJECTED and ON_MODERATION_FAILED."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        # No image -> auto-moderation fails the min_images rule.
+        moderator = User.objects.create(
+            telegram_id=900000223, chat_id=900000223, password="x"
+        )
+
+        outcome = approve_ad(ad, moderator.id)
+
+        assert outcome is ApproveOutcome.CRITERIA_REJECTED
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert ad.published_at is None
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +402,70 @@ class TestBulkOperations:
         for ad in ads:
             ad.refresh_from_db()
             assert ad.status == AdStatus.PUBLISHED
+
+    def test_bulk_approve_end_to_end_non_zero_count_writes_audit_and_timestamp(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """Regression guard for VAL-003: bulk_approve returns a non-zero count.
+
+        An approvable ON_MODERATION ad must be published with a
+        ``published_at`` and exactly one ``ModeratorActionLog`` row. This is
+        red against the pre-fix code only in combination with the widened
+        filter — the widened filter is what makes an approvable ad reachable.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Approvable Red Car",
+            status=AdStatus.ON_MODERATION,
+        )
+        AdImage.objects.create(ad=ad, image=f"img-{ad.pk}.jpg", position=0)
+        moderator = User.objects.create(
+            telegram_id=900000230, chat_id=900000230, password="x"
+        )
+
+        count = bulk_approve(Ad.objects.all(), moderator.id)
+
+        assert count == 1
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+        assert ModeratorActionLog.objects.filter(ad_id=ad.id).count() == 1
+
+    def test_bulk_approve_failed_only_returns_zero_without_rollback(
+        self,
+        seller: User,
+        category,
+        city,
+    ) -> None:
+        """A failed-only queryset returns 0 cleanly and writes no audit rows.
+
+        The widened filter reaches the failed ads, but the state machine still
+        refuses publication, so each row is skipped at WARNING with the batch
+        returning 0 rather than raising.
+        """
+        ads = create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            2,
+            status=AdStatus.ON_MODERATION_FAILED,
+        )
+        moderator = User.objects.create(
+            telegram_id=900000231, chat_id=900000231, password="x"
+        )
+
+        count = bulk_approve(Ad.objects.all(), moderator.id)
+
+        assert count == 0
+        for ad in ads:
+            ad.refresh_from_db()
+            assert ad.status == AdStatus.ON_MODERATION_FAILED
+            assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
 
     def test_bulk_delete_skips_hard_deleted_row(
         self,

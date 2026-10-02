@@ -165,6 +165,24 @@ class BulkModerationAction(StrEnum):
     FLAG = "flag"
 
 
+class ApproveOutcome(StrEnum):
+    """Result of a single ad approval attempt.
+
+    Distinguishes the three honest outcomes of ``approve_ad`` so callers can
+    surface the real reason to the moderator instead of a 500:
+
+    - ``PUBLISHED``: auto-moderation passed and the ad was published.
+    - ``CRITERIA_REJECTED``: auto-moderation ran and the ad failed the criteria
+      (the ad is set to ``ON_MODERATION_FAILED``).
+    - ``TRANSITION_REFUSED``: the state machine refused the transition (or the
+      ad was not in an approvable status to begin with). No state change.
+    """
+
+    PUBLISHED = "published"
+    CRITERIA_REJECTED = "criteria_rejected"
+    TRANSITION_REFUSED = "transition_refused"
+
+
 class CategoryRejectReason(StrEnum):
     """
     Category reject reasons for UI/admin vocabulary.
@@ -321,6 +339,7 @@ __all__ = [
     "TrustLevel",
     "ModeratorActionType",
     "BulkModerationAction",
+    "ApproveOutcome",
     "CategoryRejectReason",
     "AdPriorityLevel",
     "PriorityFilter",

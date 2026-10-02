@@ -6,16 +6,30 @@ Views for admin-only moderation interface: review queue, approve, reject, ban, d
 
 import logging
 
+from django.contrib import messages
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ApproveOutcome
 from apps.moderation.views.decorators import staff_required
 
 logger = logging.getLogger(__name__)
+
+# Fixed, stable moderator-facing sentences. The refusal text names the real
+# rule and is never the caught exception's string (the escaping ValueError from
+# auto_moderate's double-failure path is misleading).
+_APPROVE_OUTCOME_MESSAGES: dict[ApproveOutcome, str] = {
+    ApproveOutcome.CRITERIA_REJECTED: (
+        "The ad did not pass auto-moderation and was not published."
+    ),
+    ApproveOutcome.TRANSITION_REFUSED: (
+        "The ad could not be published: the ad's current status does not "
+        "allow a transition to published."
+    ),
+}
 
 
 @staff_required
@@ -59,6 +73,11 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     fails, it is set to ON_MODERATION_FAILED. Redirects to the admin
     change page regardless (no 500 on auto-moderation failure).
 
+    The approvable set is ``{ON_MODERATION, ON_MODERATION_FAILED}``, mirroring
+    the reject view. A refusal from the state machine is surfaced as a message;
+    the branch is on the returned outcome only (business logic does not live in
+    the view body).
+
     Args:
         request: HTTP request
         ad_id: The ad ID to approve
@@ -72,11 +91,20 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad = get_object_or_404(
             Ad.objects.select_for_update(),
             id=ad_id,
-            status=AdStatus.ON_MODERATION,
+            status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
         )
-        do_approve(ad, request.user.id)
+        outcome = do_approve(ad, request.user.id)
 
-        logger.info("Admin %s approved ad %s", request.user.id, ad_id)
+        if outcome is ApproveOutcome.PUBLISHED:
+            logger.info("Admin %s approved ad %s", request.user.id, ad_id)
+        else:
+            messages.warning(request, _APPROVE_OUTCOME_MESSAGES[outcome])
+            logger.info(
+                "Admin %s approval of ad %s not applied (%s)",
+                request.user.id,
+                ad_id,
+                outcome,
+            )
 
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 

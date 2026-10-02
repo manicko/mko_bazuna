@@ -362,15 +362,133 @@ class TestApproveAdView:
         category: Category,
         city: City,
     ) -> None:
-        """approve_ad returns 404 for ads not in ON_MODERATION status."""
+        """approve_ad returns 404 for ads genuinely outside the approvable pair.
+
+        ``PUBLISHED`` is in neither ``ON_MODERATION`` nor
+        ``ON_MODERATION_FAILED``; the guard against over-widening keeps this a
+        404.
+        """
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
         client = Client()
         client.force_login(staff_user)
         response = client.post(f"/moderation/approve/{ad.id}/")
 
-        # get_object_or_404 with status=ON_MODERATION will raise 404
         assert response.status_code == 404
+
+    def test_approve_out_of_pair_statuses_return_404(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """DELETED and DRAFT are outside the approvable pair and still 404."""
+        client = Client()
+        client.force_login(staff_user)
+
+        for status in (AdStatus.DELETED, AdStatus.DRAFT):
+            ad = create_test_ad(seller, category, city, status=status)
+            response = client.post(f"/moderation/approve/{ad.id}/")
+            assert response.status_code == 404, status
+
+            ad.refresh_from_db()
+            assert ad.status == status
+
+    def test_approve_failed_ad_returns_2xx_no_transition_no_log(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """ON_MODERATION_FAILED is reachable: 2xx, no transition, no audit row.
+
+        The state machine still refuses ``ON_MODERATION_FAILED -> PUBLISHED``,
+        so the ad is unchanged and no ``ModeratorActionLog`` is written; the
+        refusal is surfaced as a message rather than a 404 or a 500.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(f"/moderation/approve/{ad.id}/")
+
+        assert response.status_code not in (404, 500)
+        assert response.status_code == 302
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert ad.published_at is None
+        assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
+
+    def test_approve_failed_ad_surfaces_message(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """A refused ON_MODERATION_FAILED approval shows a message, not a 500."""
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(f"/moderation/approve/{ad.id}/", follow=True)
+
+        assert response.status_code == 200
+        all_messages = [
+            str(m) for m in response.context["messages"]
+        ] if "messages" in response.context else []
+        assert any("could not be published" in m for m in all_messages), all_messages
+
+
+# ---------------------------------------------------------------------------
+# Tests: bulk moderation JSON endpoint approve outcome honesty
+# ---------------------------------------------------------------------------
+
+
+class TestBulkModerationApproveOutcome:
+    """The JSON endpoint reports a distinct refusal error per id, shape unchanged."""
+
+    def test_bulk_approve_failed_ad_reports_transition_refused(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """An ON_MODERATION_FAILED id yields HTTP 200 with the refusal string."""
+        import json
+
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(
+            "/moderation/api/v1/bulk-action/",
+            data=json.dumps(
+                {"action": "approve", "selected_items": [ad.id]}
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 0
+        assert data["errors"] == [
+            {"id": ad.id, "error": "Transition refused by ad status"}
+        ]
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
 
 
 # ---------------------------------------------------------------------------

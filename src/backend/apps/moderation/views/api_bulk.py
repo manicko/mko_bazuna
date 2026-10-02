@@ -11,7 +11,7 @@ from django.http import HttpRequest, JsonResponse
 from pydantic import ValidationError
 
 from apps.ads.models import Ad
-from apps.core.enums import BulkModerationAction
+from apps.core.enums import ApproveOutcome, BulkModerationAction
 from apps.core.utils.sanitize import pydantic_errors_json
 from apps.moderation.admin_actions import approve_ad, reject_ad
 from apps.moderation.schemas import BulkModerationRequest
@@ -21,6 +21,13 @@ from apps.moderation.views.decorators import staff_required_api
 logger = logging.getLogger(__name__)
 
 MAX_BULK_ACTIONS: Final[int] = 100
+
+# Per-id error strings. "Auto-moderation failed" is kept byte-identical for
+# existing consumers; the refusal string is new and distinct.
+_APPROVE_ERROR_CRITERIA_REJECTED: Final[str] = "Auto-moderation failed"
+_APPROVE_ERROR_TRANSITION_REFUSED: Final[str] = (
+    "Transition refused by ad status"
+)
 
 
 @staff_required_api
@@ -70,9 +77,19 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
         try:
             ad = Ad.objects.get(id=ad_id)
             if action_enum is BulkModerationAction.APPROVE:
-                if not approve_ad(ad, request.user.id):
+                outcome = approve_ad(ad, request.user.id)
+                if outcome is ApproveOutcome.CRITERIA_REJECTED:
                     errors = results.get("errors", [])
-                    errors.append({"id": ad_id, "error": "Auto-moderation failed"})
+                    errors.append(
+                        {"id": ad_id, "error": _APPROVE_ERROR_CRITERIA_REJECTED}
+                    )
+                    results["errors"] = errors
+                    continue
+                if outcome is ApproveOutcome.TRANSITION_REFUSED:
+                    errors = results.get("errors", [])
+                    errors.append(
+                        {"id": ad_id, "error": _APPROVE_ERROR_TRANSITION_REFUSED}
+                    )
                     results["errors"] = errors
                     continue
             elif action_enum is BulkModerationAction.REJECT:

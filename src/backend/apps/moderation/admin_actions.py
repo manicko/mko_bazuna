@@ -10,7 +10,7 @@ import logging
 from django.db import OperationalError, transaction
 
 from apps.ads.models import Ad
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ApproveOutcome
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.moderation.services.auto_moderation import auto_moderate
@@ -25,7 +25,7 @@ from apps.users.models import User
 logger = logging.getLogger(__name__)
 
 
-def approve_ad(ad: Ad, moderator_id: int) -> bool:
+def approve_ad(ad: Ad, moderator_id: int) -> ApproveOutcome:
     """
     Approve an ad for publication.
 
@@ -33,27 +33,50 @@ def approve_ad(ad: Ad, moderator_id: int) -> bool:
     ModerationCriteria and transitions status to PUBLISHED on success,
     or ON_MODERATION_FAILED on failure.
 
+    The approvable set is ``{ON_MODERATION, ON_MODERATION_FAILED}``: a failed
+    ad is reachable for human review, but the state machine (unchanged) still
+    refuses ``ON_MODERATION_FAILED -> PUBLISHED``. That refusal is reported as
+    ``TRANSITION_REFUSED`` rather than escaping as an exception, so no caller
+    surfaces a 500.
+
     Args:
         ad: Ad instance to approve
         moderator_id: Moderator user ID performing the action
 
     Returns:
-        True if the ad passed auto-moderation and was published,
-        False otherwise.
+        ``ApproveOutcome.PUBLISHED`` if auto-moderation passed and the ad was
+        published, ``ApproveOutcome.CRITERIA_REJECTED`` if auto-moderation ran
+        and the ad failed the criteria, ``ApproveOutcome.TRANSITION_REFUSED``
+        if the ad was not approvable or the state machine refused the
+        transition.
     """
-    if ad.status != AdStatus.ON_MODERATION:
-        return False
+    if ad.status not in (AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED):
+        return ApproveOutcome.TRANSITION_REFUSED
 
-    result = auto_moderate(ad, moderator_id=moderator_id)
+    try:
+        result = auto_moderate(ad, moderator_id=moderator_id)
+    except ValueError as exc:
+        # The state machine refused the transition; auto_moderate's own failure
+        # handler may raise a second ValueError from inside its except body, so
+        # the message is derived from the outcome, never from the exception text.
+        logger.warning(
+            "Ad %s (status=%s) approval refused by state machine: %s",
+            ad.id,
+            ad.status,
+            exc,
+        )
+        return ApproveOutcome.TRANSITION_REFUSED
+
     if result:
         logger.info("Ad %s approved by moderator %s", ad.id, moderator_id)
-    else:
-        logger.warning(
-            "Ad %s failed auto-moderation during approval by moderator %s",
-            ad.id,
-            moderator_id,
-        )
-    return result
+        return ApproveOutcome.PUBLISHED
+
+    logger.warning(
+        "Ad %s failed auto-moderation during approval by moderator %s",
+        ad.id,
+        moderator_id,
+    )
+    return ApproveOutcome.CRITERIA_REJECTED
 
 
 def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -161,15 +184,19 @@ def bulk_approve(queryset, moderator_id: int) -> int:
             # per-ad rather than aborting the whole bulk. MaxAdsExceeded
             # is already caught per-ad and preserved here.
             for ad in (
-                queryset.filter(status=AdStatus.ON_MODERATION)
+                queryset.filter(
+                    status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED]
+                )
                 .order_by("pk")
                 .select_for_update()
             ):
                 try:
-                    if not approve_ad(ad, moderator_id):
+                    outcome = approve_ad(ad, moderator_id)
+                    if outcome is not ApproveOutcome.PUBLISHED:
                         logger.warning(
-                            "Skipping ad %s in bulk_approve: auto-moderation failed",
+                            "Skipping ad %s in bulk_approve: %s",
                             ad.id,
+                            outcome,
                         )
                         continue
                 except MaxAdsExceeded as exc:
