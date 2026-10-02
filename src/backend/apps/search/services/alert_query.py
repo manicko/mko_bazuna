@@ -162,6 +162,16 @@ def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
     a city filter, a category-subtree filter, and a price range. Used by the
     near-real-time publish-time delivery (AL-001).
 
+    This function is RECIPIENT-side only: it selects *searches* (and therefore
+    the users who would receive the alert) from an already-fetched ad. The ad's
+    *owner* is deliberately NOT filtered here, because selecting ads is not this
+    function's job. It has exactly one production caller —
+    ``immediate_alerts.deliver_immediate_alerts`` — which fetches the ad and
+    applies ``account_state_q("user__")`` to that ad fetch, so a declined
+    seller's preserved published ad never reaches this matcher (06-PII-104).
+    Gating the owner here would also be wrong: an ``Ad`` filter cannot constrain
+    a ``SavedSearch`` queryset, and its single caller already owns that rule.
+
     Only ``is_active=True`` searches are considered (reuses the
     ``IX_saved_searches_user_active`` index). The search's *owner* is also
     account-state gated — a withdrawn, declined, banned or deactivated user

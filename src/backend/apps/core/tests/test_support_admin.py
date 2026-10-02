@@ -121,6 +121,26 @@ def test_support_ticket_admin_list_filter() -> None:
     assert list(SupportTicketAdmin.list_filter) == ["status", "created_at"]
 
 
+def test_support_ticket_identifier_display_handles_none() -> None:
+    """Both identifier displays render ``None`` without raising (06-PII-106).
+
+    The masks are inherited from ``mask_telegram_id`` (``None -> "None"``)
+    rather than a local branch in the admin. Both columns are still NOT NULL,
+    so no stored row can carry ``None``; an UNSAVED instance is the only way to
+    exercise the inherited None path without a schema change. This pins that the
+    admin adds no branch of its own and that the delegate does not raise.
+    """
+    from apps.core.admin import SupportTicketAdmin
+
+    support_admin = SupportTicketAdmin(SupportTicket, admin.site)
+    unsaved = SupportTicket(chat_id=None, telegram_id=None)
+
+    assert support_admin.chat_id_display(unsaved) == mask_telegram_id(None)
+    assert support_admin.telegram_id_display(unsaved) == mask_telegram_id(None)
+    assert support_admin.chat_id_display(unsaved) == "None"
+    assert support_admin.telegram_id_display(unsaved) == "None"
+
+
 def test_support_ticket_admin_search_fields() -> None:
     """``SupportTicketAdmin.search_fields`` drops ``text`` (06-PII-106).
 

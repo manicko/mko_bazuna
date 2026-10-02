@@ -1,14 +1,18 @@
 """
 Tests for the account-state audience gate on both alert paths (06-PII-104).
 
-Both the daily digest (``send_alerts``) and the publish-time path
-(``alert_query``) select their audience by ``SavedSearch.is_active`` alone, so a
-user who withdrew consent keeps receiving digests for the full 30-day window and
-a declined seller's hidden ad fans out its title and price. This module pins the
-fix: each of the four selection sites excludes an owner in a blocked account
-state, and all four are driven by the one ``account_state_q`` declaration.
+Both the daily digest (``send_alerts`` / ``alert_query``) and the publish-time
+path (``immediate_alerts``) must exclude a blocked account. The daily path gates
+the recipient in ``find_matching_saved_searches`` and the ad owner in
+``find_matching_ads``; the immediate path gates the ad owner at its ad fetch in
+``deliver_immediate_alerts``. Without the owner gate, a decline preserves a
+seller's published ads and any ``post_save`` with ``status == PUBLISHED`` fans
+out that hidden ad's title and price.
 
-Each per-flag case creates its OWN user (unique ``telegram_id``) rather than
+This module pins the fix: each selection site excludes an owner in a blocked
+account state, all sites are driven by the one ``account_state_q`` declaration,
+and the declined-seller case is asserted end to end on both paths. Each
+per-flag case creates its OWN user (unique ``telegram_id``) rather than
 mutating the shared ``seller`` / ``buyer`` fixtures, which use ``get_or_create``
 on a fixed id and survive ``--reuse-db``.
 """
@@ -25,11 +29,12 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.search.management.commands.send_alerts import Command
-from apps.search.models import SavedSearch
+from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import (
     find_matching_ads,
     find_matching_saved_searches,
 )
+from apps.search.services.immediate_alerts import deliver_immediate_alerts
 from apps.users.models import User
 from conftest import create_test_ad, make_user
 
@@ -166,13 +171,16 @@ class TestEachSelectionSiteExcludesBlockedOwner:
 class TestDeclinedSellerAdDoesNotFanOut:
     """An ad whose OWNER is declined matches no subscriber on either path.
 
-    This is the ad-owner direction of the predicate — distinct from the
-    recipient's eligibility, which is a different filter and must still work.
+    The daily path gates the owner in ``find_matching_ads``; the immediate path
+    gates the owner at the ad fetch in ``deliver_immediate_alerts``. Both are
+    asserted here with an eligible-owner control so a fix cannot degenerate
+    into "return nothing".
     """
 
     def test_find_matching_ads_excludes_declined_owner_ad(
         self, category: Category, city: City
     ) -> None:
+        """Daily path: the declined owner's ad is absent, the eligible one present."""
         declined_seller = _owner(10, is_declined=True)
         eligible_seller = _owner(11)
         declined_ad = create_test_ad(
@@ -189,9 +197,68 @@ class TestDeclinedSellerAdDoesNotFanOut:
         assert declined_ad.pk not in matches
         assert eligible_ad.pk in matches
 
+    def test_immediate_path_excludes_declined_owner_ad(
+        self, category: Category, city: City, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Immediate path: ``deliver_immediate_alerts`` sends nothing for it.
+
+        The publish signal fires on ANY ``post_save`` with ``status ==
+        PUBLISHED`` and a decline preserves the seller's published ads, so
+        re-saving a declined seller's ad must not reach the sender. The owner
+        gate lives at the ad fetch; this drives the whole path (fetch -> match
+        -> payload -> send) and asserts the sender is never reached.
+        """
+        declined_seller = _owner(13, is_declined=True)
+        eligible_seller = _owner(14)
+        declined_ad = create_test_ad(
+            declined_seller, category, city, status=AdStatus.PUBLISHED
+        )
+        eligible_ad = create_test_ad(
+            eligible_seller, category, city, status=AdStatus.PUBLISHED
+        )
+
+        subscriber = _owner(15)  # eligible recipient, stable chat_id
+        _active_search(subscriber)
+
+        sent: list[list] = []
+
+        def _record(payloads: list) -> None:
+            sent.append(payloads)
+
+        # Real executor submits on another thread; run inline so the assertion
+        # is deterministic (same idiom as the sync_executor fixture elsewhere).
+        class _Inline:
+            def submit(self, fn, *args):
+                fn(*args)
+                return None
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._executor", _Inline()
+        )
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._run_send", _record
+        )
+
+        deliver_immediate_alerts(declined_ad.id)
+        assert sent == [], "declined seller's ad reached the immediate sender"
+        assert not SavedSearchNotification.objects.filter(ad=declined_ad).exists()
+
+        # Control: the eligible seller's ad DOES deliver to the same subscriber,
+        # so the fix is not "deliver nothing".
+        deliver_immediate_alerts(eligible_ad.id)
+        assert len(sent) == 1
+        assert {p["chat_id"] for p in sent[0]} == {subscriber.chat_id}
+
     def test_find_matching_saved_searches_keeps_recipient_rule_intact(
         self, category: Category, city: City
     ) -> None:
+        """``find_matching_saved_searches`` is recipient-side; its rule still works.
+
+        This function selects *searches* (recipients) from an already-fetched
+        ad; it does not gate the ad's owner — that is the ad fetch in
+        ``deliver_immediate_alerts`` (asserted above). This test pins only the
+        recipient half: a declined recipient is excluded, an eligible one kept.
+        """
         declined_recipient = _owner(20, is_declined=True)
         eligible_recipient = _owner(21)
         declined_search = _active_search(declined_recipient)
@@ -200,21 +267,22 @@ class TestDeclinedSellerAdDoesNotFanOut:
         ad = create_test_ad(_owner(22), category, city, status=AdStatus.PUBLISHED)
         matched_pks = {ss.pk for ss in find_matching_saved_searches(ad)}
 
-        # Recipient eligibility still applies on this path: the declined
-        # recipient is excluded while the eligible recipient is retained.
         assert declined_search.pk not in matched_pks
         assert eligible_search.pk in matched_pks
 
 
-class TestOneDeclarationDrivesAllFourSites:
-    """A single mutation of the declaration moves all four sites together.
+class TestOneDeclarationDrivesAllSites:
+    """A single mutation of the declaration moves every site together.
 
-    Proven, not asserted: the test replaces ``account_state_q`` in the two
-    importing modules with one mutation that drops the ``is_declined`` conjunct,
-    then observes all four sites change together. The real declaration is
-    exercised first in the same test, through the same helper, to show each site
-    excludes the declined owner before the mutation — so a site that would pass
-    either way cannot make the test green.
+    Proven, not asserted: the test replaces ``account_state_q`` in the three
+    importing modules (``alert_query``, ``send_alerts``, ``immediate_alerts``)
+    with one mutation that drops the ``is_declined`` conjunct, then observes all
+    five sites change together: the daily ``_collect_alerts`` and
+    ``_dry_run_check``, the recipient matcher ``find_matching_saved_searches``,
+    the ad matcher ``find_matching_ads``, and the immediate path's ad fetch. The
+    real declaration is exercised first, through the same helper, to show each
+    site excludes the declined owner before the mutation — so a site that would
+    pass either way cannot make the test green.
     """
 
     def test_mutating_declaration_changes_all_sites(
@@ -230,13 +298,33 @@ class TestOneDeclarationDrivesAllFourSites:
             declined, category, city, status=AdStatus.PUBLISHED
         )
 
+        # Inline executor so the immediate-path observation is deterministic.
+        class _Inline:
+            def submit(self, fn, *args):
+                fn(*args)
+                return None
+
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts._executor", _Inline()
+        )
+
         def _declined_is_selected() -> dict[str, bool]:
-            """Whether each of the four sites selects the declined owner."""
+            """Whether each site selects the declined owner."""
             caplog.clear()
             with caplog.at_level("INFO"):
                 Command()._dry_run_check()
             match = _DRY_RUN_USERS_RE.search(caplog.text)
             counted_users = int(match.group(1)) if match else 0
+
+            # The immediate path gates the ad OWNER at its ad fetch; observe it
+            # by recording what would be sent.
+            sent: list[list] = []
+            monkeypatch.setattr(
+                "apps.search.services.immediate_alerts._run_send",
+                lambda payloads: sent.append(payloads),
+            )
+            deliver_immediate_alerts(declined_ad.id)
+
             return {
                 "collect_alerts": declined.pk
                 in _collect_alerts_users(declined_search, declined_ad),
@@ -245,6 +333,7 @@ class TestOneDeclarationDrivesAllFourSites:
                 in _ad_side_users(declined_search, declined_ad),
                 "find_matching_ads": declined.pk
                 in _search_side_users(declined_search, declined_ad),
+                "immediate_ad_fetch": bool(sent),
             }
 
         # Baseline: the real declaration excludes the declined owner everywhere.
@@ -266,6 +355,9 @@ class TestOneDeclarationDrivesAllFourSites:
         )
         monkeypatch.setattr(
             "apps.search.management.commands.send_alerts.account_state_q", mutated
+        )
+        monkeypatch.setattr(
+            "apps.search.services.immediate_alerts.account_state_q", mutated
         )
 
         # After the single mutation every site changes together.

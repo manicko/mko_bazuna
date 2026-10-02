@@ -44,6 +44,7 @@ from apps.search.services.alert_query import (
     find_matching_saved_searches,
     record_notifications,
 )
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -80,17 +81,28 @@ def deliver_immediate_alerts(ad_id: int) -> None:
     ``transaction.on_commit`` so delivery only fires after the PUBLISHED
     commit (F6/F8/R3).
 
+    The ad's *owner* must be account-state eligible: a decline preserves a
+    seller's already-published ads, and this signal fires on ANY ``post_save``
+    with ``status == PUBLISHED``, so without an owner gate a re-save would fan
+    out a declined seller's title and price while the site hides that ad
+    (06-PII-104). The owner gate uses the same positive
+    ``account_state_q("user__")`` prefix filter as ``find_matching_ads`` so the
+    daily and immediate paths read identically.
+
     Args:
         ad_id: Primary key of the PUBLISHED ad.
     """
     ad = (
         Ad.objects.filter(id=ad_id, status=AdStatus.PUBLISHED)
+        .filter(account_state_q("user__"))
         .select_related("city", "category")
         .first()
     )
     if ad is None:
         logger.warning(
-            "Ad %s not found or not PUBLISHED - skipping immediate alerts", ad_id
+            "Ad %s not found, not PUBLISHED, or owner in a blocked account "
+            "state - skipping immediate alerts",
+            ad_id,
         )
         return
 

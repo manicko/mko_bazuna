@@ -3,8 +3,13 @@
 These are unit tests: the guard resolves model metadata and reads the
 declaration, and needs no database. The "importable without a database
 connection" constraint is proven two ways: the declaration is read in a fresh
-interpreter whose database is unusable, and a ``CaptureQueriesContext`` proves
-that reading it executes no SQL. The tripwire is on *declared* columns, not a
+interpreter whose database is unusable, and a ``connection.execute_wrapper``
+around the declaration read proves that it executes no SQL (a
+``CaptureQueriesContext`` was deliberately rejected: its ``__enter__`` calls
+``ensure_connection()``, which pytest-django forbids without the ``django_db``
+marker this unit test exists to avoid). A second fresh-interpreter probe wraps
+``__import__`` while importing the declaration and asserts no ``apps.*`` module
+is pulled in at import time. The tripwire is on *declared* columns, not a
 classifier: it cannot decide whether a column is personally identifiable, only
 that every data column on a listed model was reviewed.
 """
@@ -29,10 +34,19 @@ pytestmark = [pytest.mark.unit]
 
 #: Subprocess probe: configure Django against an unusable database host and an
 #: unparseable ``DATABASE_URL``, then import and read the declaration. If the
-#: import required a connection — or gained an ``apps.*`` model import at module
-#: scope that resolves a model only on access — this fails. The probe resolves
-#: no model: it reads only the declared data.
+#: import required a connection this fails. The probe resolves no model: it
+#: reads only the declared data.
+#:
+#: The probe ALSO enforces the binding constraint "no ``apps.*`` model import"
+#: with an ``__import__`` hook wrapping the ``pii_inventory`` import. A plain
+#: ``sys.modules`` scan cannot see this: ``django.setup()`` preloads every
+#: ``apps.*.models`` module, so a redundant module-scope
+#: ``from apps.core.models import SupportTicket`` in ``pii_inventory`` would be
+#: invisible to a presence check (verified: it still printed the success
+#: sentinel). The hook records every ``apps.*`` import REQUESTED while
+#: ``pii_inventory`` executes, which catches already-loaded model modules too.
 _IMPORT_WITHOUT_DB_CODE = """
+import builtins
 import django
 django.setup()
 from apps.users.services.pii_inventory import (
@@ -45,6 +59,42 @@ entry = PII_ERASURE_ENTRIES[0]
 assert entry[0] and entry[1] and isinstance(entry[2], ErasureAction) and entry[3]
 assert REVIEWED_NON_IDENTITY_COLUMNS
 print("DECLARATION_READ_WITHOUT_DB")
+"""
+
+#: Second subprocess probe run under an ``__import__`` hook that records every
+#: ``apps.*`` module requested while ``pii_inventory`` is imported, then asserts
+#: none but the module itself was. This is the tripwire for the "no ``apps.*``
+#: model import" constraint — it protects the uncreated ``users -> core.models /
+#: ads / trust / moderation`` import edges.
+_NO_APPS_IMPORT_CODE = """
+import builtins
+import django
+django.setup()
+
+_TARGET = "apps.users.services.pii_inventory"
+_requested = []
+_real_import = builtins.__import__
+
+
+def _tracking_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if name.startswith("apps."):
+        _requested.append(name)
+        for sub in fromlist or ():
+            _requested.append(name + "." + sub)
+    return _real_import(name, globals, locals, fromlist, level)
+
+
+builtins.__import__ = _tracking_import
+import apps.users.services.pii_inventory  # noqa: F401
+builtins.__import__ = _real_import
+
+# Importing the module necessarily requests the module itself; any OTHER
+# apps.* request is an import the declaration is not allowed to make.
+extra = sorted({m for m in _requested if m.startswith("apps.") and m != _TARGET})
+assert extra == [], (
+    "pii_inventory imported apps modules at import time: " + repr(extra)
+)
+print("NO_APPS_IMPORT")
 """
 
 #: Column names the guard never treats as review candidates: the implicit
@@ -100,6 +150,33 @@ def _entry_lookup() -> dict[tuple[str, str], tuple[str, str, ErasureAction, str]
     }
 
 
+def _unusable_db_env() -> dict[str, str]:
+    """Environment whose database host/port is unroutable and unparseable."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"DATABASE_URL", "POSTGRES_HOST", "POSTGRES_PORT"}
+    }
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.test"
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    # Discrete POSTGRES_* branch (base.py handles it robustly): an unroutable
+    # host/port so no connection attempt can succeed, while settings
+    # construction itself must not connect.
+    env["POSTGRES_HOST"] = "127.0.0.1"
+    env["POSTGRES_PORT"] = "1"
+    return env
+
+
+def _run_probe(code: str) -> subprocess.CompletedProcess[str]:
+    """Run *code* in a fresh interpreter with an unusable database."""
+    return subprocess.run(
+        [sys.executable, "-c", code],
+        env=_unusable_db_env(),
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_touching_the_declaration_opens_no_database_connection() -> None:
     """Importing and reading the declaration is possible with no usable database.
 
@@ -119,27 +196,26 @@ def test_touching_the_declaration_opens_no_database_connection() -> None:
     The in-process proof that no query is executed during a declaration read
     lives in ``test_reading_the_declaration_executes_no_query``.
     """
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if k not in {"DATABASE_URL", "POSTGRES_HOST", "POSTGRES_PORT"}
-    }
-    env["DJANGO_SETTINGS_MODULE"] = "config.settings.test"
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
-    # Discrete POSTGRES_* branch (base.py handles it robustly): an unroutable
-    # host/port so no connection attempt can succeed, while settings
-    # construction itself must not connect.
-    env["POSTGRES_HOST"] = "127.0.0.1"
-    env["POSTGRES_PORT"] = "1"
-
-    result = subprocess.run(
-        [sys.executable, "-c", _IMPORT_WITHOUT_DB_CODE],
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_probe(_IMPORT_WITHOUT_DB_CODE)
     assert result.returncode == 0, result.stderr
     assert "DECLARATION_READ_WITHOUT_DB" in result.stdout
+
+
+def test_importing_the_declaration_pulls_in_no_apps_model() -> None:
+    """``pii_inventory`` imports no ``apps.*`` module at import time (06-PII-101).
+
+    The declaration's binding constraint is that it imports no ``apps.*`` model,
+    so the ``users -> core.models / ads / trust / moderation`` edges stay
+    uncreated. ``django.setup()`` preloads every ``apps.*.models`` module, so a
+    presence check on ``sys.modules`` cannot see a redundant module-scope import
+    (it was verified to pass with a violator present). This probe instead wraps
+    ``builtins.__import__`` while ``pii_inventory`` executes and asserts no
+    ``apps.*`` module was requested; the hook also catches already-loaded
+    modules.
+    """
+    result = _run_probe(_NO_APPS_IMPORT_CODE)
+    assert result.returncode == 0, result.stderr
+    assert "NO_APPS_IMPORT" in result.stdout
 
 
 def test_reading_the_declaration_executes_no_query() -> None:
