@@ -549,6 +549,58 @@ retention/row-count control, **not** a session-revocation control
 `G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (2→3)
 would break two exact-`==` pinned tests in `apps/core/tests/test_scheduler.py`.
 
+## No Operator-Facing Account Kill-Switch (Emergent from B-01 + B-05)
+
+**Status: the platform has no operator-facing account kill-switch.** This is
+**not a defect in any single block** — it is an **emergent consequence** of two
+independently-accepted blocks, so no single block's validator could see it.
+
+The two facts:
+
+- **`B-01` made `User.is_active` read-only in the admin change form.** This was
+  **correct**: `UserAdmin.has_change_permission` returns `request.user.is_staff`
+  and **ignores `obj`** (verified in
+  [`apps/users/admin.py`](../../src/backend/apps/users/admin.py)), so a writable
+  `is_active` would have let any moderator disable arbitrary users, including
+  superusers. The change form's writable fields are now exactly
+  `['preferred_city']`, and `is_active in readonly_fields` is `True`.
+- **`B-05` hardened the issuance point** so a disabled account receives no
+  session cookie: `login_status` refuses `is_active = False` with a uniform `410`
+  before the first session write (see
+  [`technical-specification.md` §H](../01-spec/technical-specification.md)). Also
+  correct.
+
+**Net effect: the platform now enforces a disabled state at login, but provides
+no supported way to put a user into it.** No production code path anywhere in
+the repository ever writes `User.is_active = False`: the only writer is
+`apps/seed/generators/users.py`, which sets it `True` at creation. The only way
+to disable an account today is `manage.py shell`, which is not an operator
+affordance.
+
+Before phase 04 an accidental moderator click *could* disable a user; **after**
+phase 04 there is no supported way at all. The phase removed a capability while
+correctly closing the vulnerability that made it dangerous.
+
+**Compound with `04-AUT-002`, which is NOT closed** (see
+[Account-State and Session Revocation (04-AUT-002)](#account-state-and-session-revocation-04-aut-002)
+above). A `django_session` row is never invalidated on an account-state change,
+so `is_active` was never a revocation tool — it only blocks *future* issuance.
+With no operator path to set it and no per-request enforcement, **the system
+currently has neither a way to disable an account nor a way to revoke a live
+session.**
+
+**Operationally:** a moderator cannot disable an account, and cannot revoke a
+live session. The reachability facts are enumerated in the operator inventory in
+[`docker-deployment.md`](../ops/docker-deployment.md#the-admin-user-change-form-contract-04-aut-005).
+
+**Route it — this needs assignment, and no phase currently owns it.** Resolving
+it is **not a documentation fix**: it requires a **product decision** plus phase
+15 `15-AUTHZ-003` (which owns the permission predicate). Building an operator
+path here would either reintroduce the moderator escalation `B-01` correctly
+closed, or require `15-AUTHZ-003` to own a new superuser-only surface — so it
+must not be built as part of the phase-04 documentation pass. This record
+escalates the finding to a phase-level status; it does not assign it.
+
 ### Session Lifetime Policy (04-AUT-006)
 
 **Status: `04-AUT-006` is WEAKENED, not closed.** `B-10` declared the session

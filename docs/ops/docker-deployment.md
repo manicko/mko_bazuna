@@ -1173,9 +1173,10 @@ so `AUTH_PASSWORD_VALIDATORS` applies to the new account. It is **superuser-only
 
 | Operator need | Where it is reachable |
 |---|---|
-| Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`) |
+| Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`); **or** the moderation review page → *Ban* (`moderation/views/review.py::ban_user`, routed at `moderation/urls.py`, `@staff_required`) |
 | **Un-ban** a user | **nowhere in the admin** — there is no unban action and no unban service path. `manage.py shell` (`User.objects.filter(…).update(…)`) |
-| Disable an account (`is_active = False`) | **nowhere in the admin** — `is_active` is read-only on the change form and no other in-repo surface writes it. `manage.py shell` |
+| Disable an account (`is_active = False`) | **nowhere in the admin** — `is_active` is read-only on the change form and no other in-repo surface writes it. `manage.py shell` (see [the system-level record](../99-agent/architecture.md#no-operator-facing-account-kill-switch-emergent-from-b-01-b-05)) |
+| Hard-delete a user | **superuser only** — **Users** changelist → select users → *Delete selected* (`UserAdmin`'s `delete_selected`; `has_delete_permission` → `request.user.is_superuser`). **Irreversible**, and **not** a substitute for `is_active = False` (the row is gone, not disabled) |
 | Grant `is_staff` / `is_superuser` / groups | [`create_admin_user`](#manual-creation); the flag flips themselves are not editable |
 | Change a password | [`changepassword`](#password-change) — the admin's *Reset password* link has no route |
 | Toggle browse-only (`is_declined`) | deliberately unavailable — a form write would skip the `on_commit` search-cache bump, leaving stale listings live |
