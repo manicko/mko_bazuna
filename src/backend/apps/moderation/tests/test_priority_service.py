@@ -130,9 +130,9 @@ class TestPriorityService:
         assert result.base_score > 0
 
     def test_get_queued_ads_returns_moderation_ads(self, category, city) -> None:
-        """get_queued_ads returns ads with ON_MODERATION status."""
+        """get_queued_ads returns ads in the approvable pair."""
         user = make_user(990030010)
-        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION_FAILED)
         service = PriorityService()
         service.calculate_and_save(ad)
 
@@ -173,7 +173,7 @@ class TestPriorityService:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(high_ad)
 
@@ -183,7 +183,7 @@ class TestPriorityService:
             city,
             title="Clean title",
             description="Clean description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(low_ad)
 
@@ -208,7 +208,7 @@ class TestPriorityService:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(high_ad)
 
@@ -218,7 +218,7 @@ class TestPriorityService:
             city,
             title="Clean title",
             description="Clean description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(low_ad)
 
@@ -244,7 +244,7 @@ class TestPriorityService:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(high_ad)
 
@@ -254,7 +254,7 @@ class TestPriorityService:
             city,
             title="Clean title",
             description="Clean description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         service.calculate_and_save(low_ad)
 
@@ -373,8 +373,10 @@ class TestModerationQueueView:
         assert "Нет объявлений в очереди модерации".encode() in response.content
 
     def test_queue_shows_ads(self, category, city) -> None:
-        """Queue page shows ads in moderation."""
-        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
+        """Queue page shows ads in the approvable pair."""
+        ad = create_test_ad(
+            self.user, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
         PriorityService().calculate_and_save(ad)
 
         client = Client()
@@ -392,7 +394,7 @@ class TestModerationQueueView:
             category,
             city,
             title="Low priority ad",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(ad)
 
@@ -418,7 +420,7 @@ class TestModerationQueueView:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(high_ad)
 
@@ -427,7 +429,7 @@ class TestModerationQueueView:
             category,
             city,
             title="Low priority ad",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(low_ad)
 
@@ -448,7 +450,7 @@ class TestModerationQueueView:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(high_ad)
 
@@ -457,7 +459,7 @@ class TestModerationQueueView:
             category,
             city,
             title="Low priority ad",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(low_ad)
 
@@ -480,7 +482,7 @@ class TestModerationQueueView:
             category,
             city,
             title="spam scam cheap fake counterfeit",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(high_ad)
 
@@ -489,7 +491,7 @@ class TestModerationQueueView:
             category,
             city,
             title="Low priority ad",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.ON_MODERATION_FAILED,
         )
         PriorityService().calculate_and_save(low_ad)
 
@@ -501,7 +503,9 @@ class TestModerationQueueView:
 
     def test_queue_shows_priority_counts(self, category, city) -> None:
         """Queue page displays priority counts in the filter links."""
-        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(
+            self.user, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
         PriorityService().calculate_and_save(ad)
 
         client = Client()

@@ -63,7 +63,7 @@ class TestPriorityCalculator:
             city,
             title="Spam offer for you",
             description="Normal description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -82,7 +82,7 @@ class TestPriorityCalculator:
             city,
             title="Genuine item",
             description="This is not a scam at all",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -101,7 +101,7 @@ class TestPriorityCalculator:
             city,
             title="SCAM ALERT",
             description="buy now",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -120,7 +120,7 @@ class TestPriorityCalculator:
             city,
             title="spam scam cheap",
             description="fake counterfeit offer",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -139,7 +139,7 @@ class TestPriorityCalculator:
             city,
             title="Clean ad title",
             description="Clean description content",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -158,7 +158,7 @@ class TestPriorityCalculator:
             city,
             title="Spammy title",
             description="Scam description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -195,7 +195,7 @@ class TestUserHistoryScoring:
             city,
             title="New ad",
             description="New description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -223,7 +223,7 @@ class TestUserHistoryScoring:
             city,
             title="New ad",
             description="New description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -256,7 +256,7 @@ class TestUserHistoryScoring:
             city,
             title="New ad",
             description="New description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -284,7 +284,7 @@ class TestUserHistoryScoring:
             city,
             title="New ad",
             description="New description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -319,7 +319,7 @@ class TestUserHistoryScoring:
             city,
             title="New ad",
             description="New description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -350,7 +350,7 @@ class TestPriorityLevelBoundaries:
             city,
             title="Clean",
             description="Clean",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         result = calculator.calculate_priority(ad)
         assert result["base_score"] == 0
@@ -367,7 +367,7 @@ class TestPriorityLevelBoundaries:
             city,
             title="spam scam",
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         result = calculator.calculate_priority(ad)
         assert result["base_score"] == 40
@@ -382,7 +382,7 @@ class TestPriorityLevelBoundaries:
             city,
             title="spam scam cheap",
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         result = calculator.calculate_priority(ad)
         assert result["base_score"] == 60
@@ -397,7 +397,7 @@ class TestPriorityLevelBoundaries:
             city,
             title="spam scam cheap fake",
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         result = calculator.calculate_priority(ad)
         assert result["base_score"] == 80
@@ -412,7 +412,7 @@ class TestPriorityLevelBoundaries:
             city,
             title="spam scam cheap fake counterfeit",
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         result = calculator.calculate_priority(ad)
         assert result["base_score"] == 100
@@ -450,7 +450,7 @@ class TestEscalationRequired:
             city,
             title="spam scam cheap offer",
             description="spam scam cheap offer description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -470,7 +470,7 @@ class TestEscalationRequired:
             city,
             title="Clean",
             description="Clean",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -488,7 +488,7 @@ class TestEscalationRequired:
             city,
             title="spam scam",
             description="spam scam",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -518,7 +518,7 @@ class TestConfidenceScore:
             city,
             title="Any title",
             description="Any description",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -536,7 +536,7 @@ class TestConfidenceScore:
             city,
             title="spam scam cheap fake counterfeit",
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         result = calculator.calculate_priority(ad)
@@ -589,7 +589,7 @@ class TestPriorityServiceBoundaries:
             city,
             title=title,
             description="desc",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         service = PriorityService()
@@ -609,7 +609,7 @@ class TestPriorityServiceBoundaries:
             city,
             title="Clean",
             description="Clean",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
 
         service = PriorityService()
@@ -623,7 +623,7 @@ class TestPriorityServiceBoundaries:
             city,
             title="spam",
             description="x",
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )  # bump user's ad count
         ad.title = "spam"
         ad.save(update_fields=["title"])

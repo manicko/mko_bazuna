@@ -65,7 +65,7 @@ class TestNormalizePriceToEur:
             city,
             price=100,
             price_currency=CurrencyCode.BAM,
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         normalize_price_to_eur(ad, Decimal("100"), CurrencyCode.BAM)
         assert ad.price_normalized_eur == Decimal("51.2000")
@@ -85,7 +85,7 @@ class TestNormalizePriceToEur:
             city,
             price=100,
             price_currency=CurrencyCode.EUR,
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         ExchangeRate.objects.filter(currency=CurrencyCode.EUR.value).update(
             is_current=False
@@ -103,7 +103,7 @@ class TestNormalizePriceToEur:
             city,
             price=100,
             price_currency=CurrencyCode.EUR,
-            status=AdStatus.ON_MODERATION,
+            status=AdStatus.PUBLISHED,
         )
         normalize_price_to_eur(ad, Decimal("100"), None)
         assert ad.price_normalized_eur is None

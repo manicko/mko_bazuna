@@ -71,7 +71,7 @@ class TestLockWaitIsBounded:
         deadline: against the pre-fix code (no bound) the waiter never returns,
         so the test fails on the deadline instead of hanging the suite.
         """
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         ad_id = ad.id
 
         started = threading.Event()
