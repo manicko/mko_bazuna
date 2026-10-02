@@ -35,11 +35,24 @@ named phase.
 | 2 — publish clock on a price edit | `63937ca` | `Ad.reset_publish_clock()` owns the reset; `ad_edit`'s price-only arm resets `published_at` inside its existing single `save()` |
 | 3 — honest approve outcomes | `06da133` | `ApproveOutcome` (`PUBLISHED` / `CRITERIA_REJECTED` / `TRANSITION_REFUSED`); the three approve gates widened to `{ON_MODERATION, ON_MODERATION_FAILED}`; a refused approval writes no audit row and surfaces a message instead of a 500 |
 | 4 — test-factory status contract | `7f78f36`, `11d7195`, `1fe91d7`, `b3ed530` | every `create_test_ad` / `create_test_ads_bulk` call passes `status=` explicitly; regression guards in `apps/core/tests/test_ad_factory_contract.py`; moderation-queue consumers retargeted onto `ON_MODERATION_FAILED`; the factory default is now `PUBLISHED` (was `ON_MODERATION`) |
-| 6A — admin change-form contract | `976b72f` | `AdAdmin` gains an explicit field contract; `AdAdminChangeForm` returns form errors instead of HTTP 500s; `save_model` routes a form-driven status change through the lifecycle matrix and writes exactly one `ModeratorActionLog` row through the existing moderation-log service; `Ad.transition_to` returns its source `AdStatus` |
+| 6A — admin change-form contract | `976b72f` | `AdAdmin` gains an explicit field contract; `AdAdminChangeForm` returns form errors instead of HTTP 500s; `save_model` branches on `change` (add vs. change) and routes a form-driven status change through the lifecycle matrix, writing exactly one `ModeratorActionLog` row through the existing moderation-log service; `Ad.transition_to` returns its source `AdStatus` |
 | 8A — explicit edit allow-list | `9adafe3`, `d1827f6` | `EDITABLE_DIRECT_SAVE_STATUSES` replaces the `ad_edit` catch-all, so every other status gets a defined refusal that writes nothing; the dashboard Edit link is gated by the derived `EDIT_FORM_AVAILABLE_STATUSES` |
-| 9 — bulk moderation per-ad isolation | `f29be0c` | `bulk_moderation_action` iterates `sorted(ad_ids)` with a per-ad `transaction.atomic()` plus `select_for_update()`, and names six failure classes in the new `BulkModerationError`; response shape and HTTP 200 unchanged |
+| 9 — bulk moderation per-ad isolation | `f29be0c` | `bulk_moderation_action` iterates `sorted(ad_ids)` with a per-ad `transaction.atomic()` plus `select_for_update()`, and names six failure classes in the new `BulkModerationError`; response keys and HTTP 200 unchanged, but the missing-ad `error` string value changed from `"Processing failed"` to `"Ad not found"` (see "Observable contract change disclosed") |
 | 10 — `AdImage` position uniqueness | `ec474fe` | `uq_ad_images_ad_position` on `AdImage(ad, position)` plus migration `src/backend/apps/ads/migrations/0009_adimage_uq_ad_position.py`; contiguity deliberately not enforced |
-| 12 — submission outcome vs. moderation failure | `1311021` | `SubmitAdOutcome` / `SubmitAdResult`; `process_preview` re-points the FSM at a fresh draft for a non-content failure and still clears it for a genuine content failure; the already-shipped expired-draft string is reused, so no new msgid was added |
+| 12 — submission outcome vs. moderation failure | `1311021` | `SubmitAdOutcome` / `SubmitAdResult`; `process_preview` re-points the FSM at a fresh draft for a non-content failure and still clears it for a genuine content failure. The reused single expired-draft string was later replaced by one accurate reply per non-content outcome (`DRAFT_GONE` / `INVALID_TRANSITION` / `PHOTO_UNAVAILABLE`); `PHOTO_UNAVAILABLE` also clears the stale photo list and returns the seller to the photos step, so re-confirming cannot loop |
+
+## Finding dispositions
+
+Not every finding in this domain needed a block. These four were dispositioned
+outside the block table — three retired by work that landed under another
+commit, one half-shipped and still carrying an open behaviour half.
+
+| Finding | Disposition | Commit |
+|---|---|---|
+| `AD-003` — `copy_ad` aliases the source ad's photo files | **Retired.** The per-key delete guard (skip `delete_photo` while another `AdImage` row still references the key) shipped in the media pass. | `64a9de6` |
+| `AD-005` — `create_draft_ad`'s `IntegrityError` recovery is dead code | **Already fixed.** The recovery branch now runs inside a nested `transaction.atomic()` (SAVEPOINT), so the retry executes on a healthy connection. | `664b572` |
+| `AD-007` — draft sweep uses `created_at` | **Already fixed.** Draft staleness is measured by inactivity (`updated_at`), so an active dialog is not purged mid-flow. | `2697796` |
+| `AD-015` — `ads_auto_publish=False` does not hide the seller's published ads | **Half shipped.** The `UserAdmin` field-contract half shipped (`a19a0ee`); the **behaviour half is still open and unowned** — flipping `ads_auto_publish=False` still does not hide the ad, because `ListingsQuery.build_queryset` consults only `user__is_declined`. **This needs an owner.** | field contract: `a19a0ee`; behaviour: none |
 
 ## Open owner gates
 
@@ -53,6 +66,17 @@ scheduled.
 | Q4 | Which retention anchor is correct for `delete_sweep`? | BLOCK 7 (`AD-004`, `VAL-005`) | Open. No code shipped; the sweep still filters on `archived_at` |
 | Q5 | What may a seller do to an auto-failed ad: re-moderate, refuse, or hide the affordance? | BLOCK 8B | Open. `purge_failed_ads`' 7-day timer is still not reset, and no `ON_MODERATION_FAILED → ON_MODERATION` matrix edge was added |
 | Q6 | Is `MEDIA-002`'s promoted-file reclaim in scope? | BLOCK 13 (`AD-006`) | Open. No code shipped |
+
+### Work owed to BLOCK 6B
+
+The Validator flagged ~95 lines of lifecycle policy concentrated in
+`AdAdmin.save_model` / `AdAdmin._apply_status_change` /
+`AdAdminChangeForm.clean` against project rule 3 (separation of concerns).
+Extracting that policy into a service is **recommended as part of BLOCK 6B**,
+not now: the write-path decision is exactly Q1's subject matter, and Q1 is an
+unanswered owner gate. BLOCK 6B should extract the admin lifecycle policy into a
+service while it decides Q1. **This phase deliberately did not perform the
+extraction.**
 
 ## Moot blocks
 
@@ -68,6 +92,14 @@ scheduled.
 | No `ModeratorActionLog.moderator` column | The audit row keeps `user_id` (SET NULL on erasure) as its only actor FK. Routing the admin form's status change through the existing service does not imply a new column |
 | `AdImage` contiguity not enforced | `uq_ad_images_ad_position` guarantees uniqueness within one ad and nothing more; gaps are permitted and preserved, because `copy_ad` carries a source ad's positions such as `[0, 2, 5]` through verbatim |
 | `search_vector*` fields excluded, not read-only | The `ads_search_vector_update` trigger rewrites all four columns on every write, so they are dropped from the admin form. Rendering them read-only would advertise editable data that the database then discards |
+| `VAL-001`'s fourth bare audit ID left in `db-schema.md` | `docs/02-database/db-schema.md`'s `archived_at` line still carries a cycle-ambiguous `AD-005` in a comment. The phase appended to that line but deliberately left the bare ID in place: it belongs to the repository-wide legacy-ID sweep and to phase 03, and removing it is gated on a coordinator decision |
+
+## Observable contract change disclosed
+
+| Surface | What changed | Disclosed in |
+|---|---|---|
+| Bulk moderation endpoint per-id `error` value | The response shape (`{"completed", "errors": [{"id", "error"}]}`) and the HTTP 200 are unchanged, but the **string value** for a missing ad changed from the generic `"Processing failed"` to `"Ad not found"`. Out-of-repo consumers keying on that literal must update. | `f29be0c` (AD-010) |
+
 
 ## Where the shipped behaviour is documented
 
