@@ -529,13 +529,39 @@ soft-deleted user) and phase 15 must budget its rewrite.
 
 **No `django_session` janitor exists:** `clearsessions` appears nowhere in
 `src/`, `docs/`, `docker/`, `.github/`, `Makefile` or `Makefile.ps1`, so the
-table is unbounded in row count. `SESSION_ENGINE` and `SESSION_COOKIE_AGE` are
-unset, so the backend is the DB and the lifetime is Django's 14-day default.
-This is a retention/row-count control, **not** a session-revocation control
+table is unbounded in row count. `SESSION_ENGINE` is unset (the backend is the
+DB) and `SESSION_COOKIE_AGE` is now declared in [`base.py`](../../src/backend/config/settings/base.py)
+as `60 * 60 * 24 * 14` (`SESSION_SAVE_EVERY_REQUEST` stays `False`). This is a
+retention/row-count control, **not** a session-revocation control
 (`clear_expired()` deletes only rows past `expire_date`); it is re-filed against
 [`db-retention.md`](../02-database/db-retention.md) / phase 12 (`B-07` gate
 `G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (2→3)
 would break two exact-`==` pinned tests in `apps/core/tests/test_scheduler.py`.
+
+### Session Lifetime Policy (04-AUT-006)
+
+**Status: `04-AUT-006` is WEAKENED, not closed.** `B-10` declared the session
+lifetime and refresh policy explicitly in `config/settings/base.py`
+(`SESSION_COOKIE_AGE = 60 * 60 * 24 * 14` and `SESSION_SAVE_EVERY_REQUEST =
+False`), which retires the finding's premise that the value "falls back to the
+14-day Django default". It does **not** alter the policy:
+
+- **The exposure window is unchanged at 14 days** — the declared value matches
+  the inherited Django default, so no session lives longer or shorter than before.
+- **No product decision has been taken on the value.** The number is a named,
+  owned decision that still belongs to the coordinator / product owner, not to a
+  code commit. Do not record the finding as fixed.
+- **The HIGH residual belongs to phase 15, `15-AUTHZ-001`.** A `django_session`
+  janitor would **not** help: `clear_expired()` deletes only rows already past
+  `expire_date` and cannot shorten a live session, so it does not bound the
+  exposure window (see the `04-AUT-002` section above).
+
+The policy is **write-triggered, not a sliding idle window**: Django re-stamps
+`expire_date` only on a real save. An authenticated session is written at
+`auth_login` and again only on a `?lang=` language switch (pinned by
+`config/settings/tests/test_session_policy.py`); an anonymous session is refreshed
+by each recorded non-empty search. See
+[`technical-specification.md` §H](../01-spec/technical-specification.md).
 
 ## Bot Command Menu
 

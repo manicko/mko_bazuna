@@ -175,23 +175,29 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # visible rather than implicit. 60 * 60 * 24 * 14 = 1209600 seconds (14 days),
 # which matches Django's inherited default; it is written out here on purpose so
 # the window is a visible product decision instead of an invisible framework
-# default. A literal, not an env-driven value: every comparable bound in this
-# codebase is a literal module constant (TOKEN_TTL_SECONDS, RATE_LIMIT_REQUESTS,
-# _MAX_HISTORY, DAILY_HOUR_UTC, LOCK_TIMEOUT_SECONDS, SECURE_HSTS_SECONDS), and
-# an operator-variable window would let the effective exposure be changed from
-# outside the repository.
+# default. A literal, not an env-driven value: the comparable bounds in this
+# codebase that are literals stay literal (TOKEN_TTL_SECONDS, RATE_LIMIT_REQUESTS,
+# _MAX_HISTORY, DAILY_HOUR_UTC, SECURE_HSTS_SECONDS), so an operator-variable
+# window would be the odd one out and would let the effective exposure be changed
+# from outside the repository. LOCK_TIMEOUT_SECONDS is deliberately NOT cited as
+# precedent: it is env.int("LOCK_TIMEOUT_SECONDS", default=10), i.e.
+# operator-tunable, and it is the closest analogue to an operator-variable bound.
 #
-# SESSION_SAVE_EVERY_REQUEST stays False: the lifetime is absolute, not sliding.
-# Django saves the session only when (modified or SAVE_EVERY_REQUEST) and not
-# empty, and the ONLY session write for an authenticated user is auth_login() at
-# login; no read re-stamps the row. Turning this on would not extend a
+# SESSION_SAVE_EVERY_REQUEST stays False: the lifetime is write-triggered, not
+# sliding. Django saves the session only when (modified or SAVE_EVERY_REQUEST)
+# and not empty, so expire_date moves only on a real write. For an authenticated
+# user those writes are auth_login() at login and the ?lang= language switch;
+# ordinary reads never re-stamp the row. Turning this on would not extend a
 # login-once seller's window (no reads happen) and would STRICTLY INCREASE the
 # exposure of a user who keeps browsing, because every read would re-stamp the
 # newest-to-expire sessions. The anti-theft benefit is a function of the window's
 # age, not of the flag.
 #
-# No number for this setting appears in the spec or anywhere else in the
-# repository: changing the value is a product decision, not an engineering one.
+# No number for this setting pre-existed: it was absent from the spec, the code
+# and every .env template, so the value could not be derived from the repository
+# and choosing one is a product decision, not an engineering one. The spec now
+# states the number, so changing the value here requires a paired edit to
+# docs/01-spec/technical-specification.md section H.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 1209600 seconds (14 days)
 SESSION_SAVE_EVERY_REQUEST = False
 # CSRF token cookie: sent only over HTTPS, so the token cannot be replayed from

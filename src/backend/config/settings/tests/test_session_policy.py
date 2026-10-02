@@ -5,17 +5,18 @@
 product decision rather than an implicit framework default. These tests pin the
 *declaration* and, more importantly, the *semantics* the declaration claims:
 
-* the lifetime is **absolute from login** for an authenticated user, because the
-  only authenticated session write in this codebase is ``auth_login()`` at login
-  — no later read re-stamps ``expire_date``;
+* the lifetime is **write-triggered** for an authenticated user: the session is
+  written at ``auth_login()`` at login and again only on a ``?lang=`` language
+  switch, so ordinary reads do not re-stamp ``expire_date``;
 * the lifetime is **refreshed by each recorded search** for an anonymous user,
   because the recorded search is the write that re-stamps the row.
 
-Tests 3 and 4 together are the point: a single test would pass without ever
-touching an authenticated session, which would be theatre. No test hardcodes the
-production value ``1209600`` — the value is a product decision owned elsewhere,
-so these tests are number-independent and survive a later change to 7 days or
-24 hours.
+Tests 3 and 4 together are the point: a test that only exercised an anonymous
+session would pass without ever touching an authenticated session, which would be
+theatre. Test 5 pins the ``?lang=`` exception so the write-triggered semantics are
+executable rather than prose. No test hardcodes the production value ``1209600``
+— the value is a product decision owned elsewhere, so these tests are
+number-independent and survive a later change to 7 days or 24 hours.
 
 This is a settings-diff subject, so it lives in ``config/settings/tests/`` next
 to the other settings tests, not in ``test_settings_defaults.py`` (which is about
@@ -173,6 +174,35 @@ def test_authenticated_session_is_written_once_at_login_and_never_refreshed() ->
         assert response.status_code == 200
 
     assert _persisted_expiry(session_key) == expiry_after_login
+
+
+def test_lang_switch_re_stamps_authenticated_session() -> None:
+    """A ``?lang=`` request from an authenticated user DOES re-stamp ``expire_date``.
+
+    The authenticated lifetime is write-triggered, not frozen after login: the
+    language middleware writes ``request.session["django_language"]`` on a
+    supported ``?lang=`` for an authenticated user, and that write makes
+    ``SessionMiddleware.process_response`` save the row again, so the window
+    moves. Test 3 covers the *no-write* authenticated path (no ``?lang=``); this
+    test pins the exception, so the spec's "again only on a ``?lang=`` language
+    switch" clause is an executable fact rather than prose that can drift.
+
+    Number-independent: it compares two observed expiries, never ``1209600``.
+    """
+    telegram_id = 700000601
+    make_user(telegram_id, username="session_policy_lang")
+
+    from django.core.cache import cache
+
+    cache.clear()
+    client = Client()
+    session_key = _login(client, telegram_id)
+    expiry_after_login = _persisted_expiry(session_key)
+
+    response = client.get("/", {"lang": "en"})
+    assert response.status_code == 200
+
+    assert _persisted_expiry(session_key) > expiry_after_login
 
 
 def test_anonymous_session_is_refreshed_by_each_recorded_search() -> None:
