@@ -19,12 +19,16 @@ from asgiref.sync import sync_to_async
 from django.db import OperationalError
 from django.utils.translation import gettext as _
 
-from apps.ads.services.submission import SubmitAdInput, submit_ad
+from apps.ads.services.submission import (
+    SubmitAdInput,
+    SubmitAdOutcome,
+    submit_ad,
+)
 from apps.core.enums import LanguageLocale
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from telegram_bot.handlers.ad_create import AdCreateForm, router
 from telegram_bot.services.ad_data import (
-    _get_ad_status,
+    create_draft_ad,
     touch_draft,
     touch_staging_photos,
     translate_all_languages,
@@ -77,7 +81,7 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
         # that resolves in seconds). Catch it here, answer the busy message and
         # keep the state so the seller can press confirm again.
         try:
-            is_valid, errors = await sync_to_async(submit_ad)(
+            result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=data["ad_id"],
                     title_ru=title_translations.get("ru", original_title),
@@ -113,45 +117,54 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             )
             return
 
-        if is_valid:
+        if result.outcome is SubmitAdOutcome.PUBLISHED:
             await message.answer(
                 _("Ad submitted for moderation! You'll be notified when it's published.")
             )
 
             await state.clear()
 
-        else:
-            # Distinguish "the draft is gone" from a real content failure. A
-            # reaped draft (sweep_drafts, finding 03-DB-003) or one deleted by a
-            # concurrent /post leaves submit_ad's Ad.DoesNotExist branch, whose
-            # generic "Ad not found" is not seller-recoverable. Probe the row's
-            # existence on the FAILURE PATH ONLY — the happy path is untouched.
-            # Both causes share the same remedy (start again), so merging them is
-            # correct. state.clear() is deliberately left unchanged: phase 05's
-            # AD-016 owns the FSM-state decision.
-            if await _get_ad_status(data["ad_id"]) is None:
-                await message.answer(
-                    _(
-                        "Your draft expired and was deleted. "
-                        "Please start again with /post."
-                    )
-                )
-
-                await state.clear()
-
-                return
-
+        elif result.outcome is SubmitAdOutcome.MODERATION_FAILED:
+            # A genuine content failure: the seller should start a new ad either
+            # way, so the dialog is closed and the moderation reason rendered.
             # Render the real moderation error (mirrors ad_edit), falling back
             # to the generic message when the service returned no reason. The
             # service wraps its strings in gettext_lazy, so ``str`` forces the
             # catalog lookup here, under the request/row locale.
             await message.answer(
-                str(errors[0])
-                if errors
+                str(result.errors[0])
+                if result.errors
                 else _("Ad failed moderation. Please check your content and try again.")
             )
 
             await state.clear()
+
+        else:
+            # Non-destructive outcomes (DRAFT_GONE, INVALID_TRANSITION,
+            # PHOTO_UNAVAILABLE): the draft row is gone (reaped by sweep_drafts
+            # or deleted by a concurrent /post) or unusable, yet the seller's
+            # typed dialog is still the only remaining copy. Do NOT clear the
+            # state — instead RE-POINT it at a fresh DRAFT so the seller can
+            # press confirm again without losing their work.
+            #
+            # create_draft_ad deletes any pre-existing DRAFT first, so nothing
+            # is destroyed: on DRAFT_GONE the draft is already gone, and on
+            # INVALID_TRANSITION the row is DELETED, not DRAFT. A replaced
+            # ad_id makes the next confirm target a live row.
+            #
+            # The draft-expired string is the already-shipped, already-
+            # translated message; the row-existence probe it used to require is
+            # gone because submit_ad now names the outcome.
+            new_ad = await create_draft_ad(data["user_id"])
+
+            await state.update({"ad_id": new_ad.id})
+
+            await message.answer(
+                _(
+                    "Your draft expired and was deleted. "
+                    "Please start again with /post."
+                )
+            )
 
             return
 

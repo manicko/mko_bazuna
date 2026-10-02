@@ -55,6 +55,7 @@ def _build_state(data: dict) -> MagicMock:
     state = MagicMock()
     state.get_data = AsyncMock(return_value=data)
     state.clear = AsyncMock()
+    state.update = AsyncMock()
     state.update_data = AsyncMock()
     return state
 
@@ -108,11 +109,15 @@ class TestProcessPreviewLockTimeout:
     ) -> None:
         """A real ad that fails moderation still renders the moderation error.
 
-        The ad row must EXIST so the draft-expired probe finds it: the
-        distinguishable draft-expired message (03-DB-003) must never replace a
-        genuine content failure. The message is the service's ``errors[0]`` and
-        the branch keeps its ``state.clear()``.
+        A genuine content failure keeps its ``state.clear()``: the seller
+        should start a new ad either way, so the dialog is closed and the
+        service's ``errors[0]`` rendered.  This is the opposite direction from
+        ``DRAFT_GONE`` — the fix must not make the bot non-recoverable here.
         """
+        from apps.ads.services.submission import (
+            SubmitAdOutcome,
+            SubmitAdResult,
+        )
         from telegram_bot.handlers.ad_create import process_preview
         from telegram_bot.services.ad_data import create_draft_ad
 
@@ -137,7 +142,9 @@ class TestProcessPreviewLockTimeout:
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
-                return_value=(False, ["Title is too short"]),
+                return_value=SubmitAdResult(
+                    SubmitAdOutcome.MODERATION_FAILED, ["Title is too short"]
+                ),
             ),
         ):
             await process_preview(message, state)
@@ -198,7 +205,7 @@ class TestProcessPreviewLocalisedErrors:
             "price_amount": 100,
             "price_currency": "EUR",
             "photos": [],
-            "user_id": seller.telegram_id,
+            "user_id": seller.id,
             "category_id": category.id,
             "city_id": city.id,
         }
@@ -210,16 +217,16 @@ class TestProcessPreviewLocalisedErrors:
         """A reaped draft reaches a ru seller in Russian, as a distinct message.
 
         Drives the real ``submit_ad`` against a non-existent ad id (the
-        ``Ad.DoesNotExist`` branch — the reaped-draft path, 03-DB-003) through
-        the real ``process_preview``. The row-existence probe returns ``None``,
-        so the seller gets the dedicated draft-expired message — asserted here in
-        the Russian catalogue value, and provably not the untranslated literal
-        and not ``"Ad not found"``.
+        ``DRAFT_GONE`` outcome) through the real ``process_preview``. The seller
+        gets the dedicated, already-translated draft-expired message — asserted
+        here in the Russian catalogue value, and provably not the untranslated
+        literal and not ``"Ad not found"``. The state is NOT cleared; it is
+        re-pointed at a fresh draft instead.
         """
         from telegram_bot.handlers.ad_create import process_preview
 
         data = self._payload(seller, category, city)
-        data["ad_id"] = 999_999_999  # forces submit_ad's Ad.DoesNotExist branch
+        data["ad_id"] = 999_999_999  # forces submit_ad's DRAFT_GONE outcome
         state = _build_state(data)
         message = _build_message()
 
@@ -239,7 +246,11 @@ class TestProcessPreviewLocalisedErrors:
             "Пожалуйста, начните заново командой /post."
         )
         assert rendered != "Ad not found"
-        state.clear.assert_awaited()
+        # AD-016: the non-destructive outcome re-points instead of clearing.
+        state.clear.assert_not_awaited()
+        state.update.assert_awaited_once()
+        new_ad_id = state.update.await_args.args[0]["ad_id"]
+        assert new_ad_id != 999_999_999
 
     @pytest.mark.asyncio
     async def test_moderation_failure_is_rendered_in_bosnian(

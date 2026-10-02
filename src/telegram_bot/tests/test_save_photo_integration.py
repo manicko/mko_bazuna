@@ -68,7 +68,11 @@ class TestSavePhotoThumbnailsIntegration:
     async def test_thumbnails_populated_on_success(self, user, tmp_path) -> None:
         """Successful generation populates all three ``thumbnail_*`` fields."""
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from telegram_bot.services.ad_data import create_draft_ad
 
         category = await _make_category()
@@ -91,7 +95,7 @@ class TestSavePhotoThumbnailsIntegration:
                 return_value=True,
             ),
         ):
-            passed, errors = await sync_to_async(submit_ad)(
+            result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=ad.id,
                     title_ru="Title",
@@ -105,8 +109,8 @@ class TestSavePhotoThumbnailsIntegration:
                 )
             )
 
-        assert passed is True
-        assert errors == []
+        assert result.outcome is SubmitAdOutcome.PUBLISHED
+        assert result.errors == []
 
         ad_image = await sync_to_async(AdImage.objects.get)(ad=ad)
         assert ad_image.thumbnail_small == "photo-small.jpg"
@@ -117,7 +121,11 @@ class TestSavePhotoThumbnailsIntegration:
     async def test_thumbnails_null_on_generation_failure(self, user, tmp_path) -> None:
         """When ``generate_thumbnails`` raises, all three ``thumbnail_*`` stay null."""
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from telegram_bot.services.ad_data import create_draft_ad
 
         category = await _make_category()
@@ -142,7 +150,7 @@ class TestSavePhotoThumbnailsIntegration:
                 side_effect=ValueError("corrupt input"),
             ),
         ):
-            passed, errors = await sync_to_async(submit_ad)(
+            result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=ad.id,
                     title_ru="Title",
@@ -156,7 +164,7 @@ class TestSavePhotoThumbnailsIntegration:
                 )
             )
 
-        assert passed is True
+        assert result.outcome is SubmitAdOutcome.PUBLISHED
         ad_image = await sync_to_async(AdImage.objects.get)(ad=ad)
         assert ad_image.thumbnail_small is None
         assert ad_image.thumbnail_medium is None
@@ -190,7 +198,11 @@ class TestSubmitAdStagingMove:
         ``submit_ad`` returns and every file-side assertion below holds.
         """
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
         from telegram_bot.services.ad_data import create_draft_ad
@@ -218,7 +230,7 @@ class TestSubmitAdStagingMove:
                 "apps.moderation.services.auto_moderation.auto_moderate",
                 return_value=True,
             ):
-                passed, errors = await sync_to_async(submit_ad)(
+                result = await sync_to_async(submit_ad)(
                     SubmitAdInput(
                         ad_id=ad.id,
                         title_ru="Title",
@@ -232,8 +244,8 @@ class TestSubmitAdStagingMove:
                     )
                 )
 
-            assert passed is True
-            assert errors == []
+            assert result.outcome is SubmitAdOutcome.PUBLISHED
+            assert result.errors == []
 
             # Original moved from staging/ to permanent
             assert (media_root / "photo.jpg").is_file(), (
@@ -280,7 +292,11 @@ class TestSubmitAdStagingMove:
         ``apps.moderation.services.auto_moderation.auto_moderate``.
         """
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
         from telegram_bot.services.ad_data import create_draft_ad
@@ -316,7 +332,7 @@ class TestSubmitAdStagingMove:
                 "apps.moderation.services.auto_moderation.auto_moderate",
                 side_effect=inspect_filesystem,
             ):
-                passed, errors = await sync_to_async(submit_ad)(
+                result = await sync_to_async(submit_ad)(
                     SubmitAdInput(
                         ad_id=ad.id,
                         title_ru="Title",
@@ -330,7 +346,7 @@ class TestSubmitAdStagingMove:
                     )
                 )
 
-            assert passed is True
+            assert result.outcome is SubmitAdOutcome.PUBLISHED
 
             # The hook actually ran inside the TX.
             assert observed, "auto_moderate was never reached"
@@ -362,7 +378,11 @@ class TestSubmitAdStagingMove:
         second row.
         """
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
         from apps.media.services.hash_service import FileHashService
@@ -409,10 +429,12 @@ class TestSubmitAdStagingMove:
                 return_value=True,
             ):
                 first_key = stage("first.jpg")
-                passed, first_errors = await sync_to_async(submit_ad)(
+                first_result = await sync_to_async(submit_ad)(
                     build_input(first_ad, first_key)
                 )
-                assert passed is True, first_errors
+                assert first_result.outcome is SubmitAdOutcome.PUBLISHED, (
+                    first_result.errors
+                )
 
                 first_image = await sync_to_async(AdImage.objects.get)(ad=first_ad)
 
@@ -425,10 +447,12 @@ class TestSubmitAdStagingMove:
                 # has left DRAFT (submit_ad → ON_MODERATION).
                 second_ad = await create_draft_ad(user_id=user.id)
                 second_key = stage("second.jpg")
-                passed, second_errors = await sync_to_async(submit_ad)(
+                second_result = await sync_to_async(submit_ad)(
                     build_input(second_ad, second_key)
                 )
-                assert passed is True, second_errors
+                assert second_result.outcome is SubmitAdOutcome.PUBLISHED, (
+                    second_result.errors
+                )
 
             # Identical bytes → same user → same row, not a second row.
             count = await sync_to_async(

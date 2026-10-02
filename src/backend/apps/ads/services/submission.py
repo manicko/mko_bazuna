@@ -21,7 +21,8 @@ from __future__ import annotations
 import logging
 import os
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from enum import StrEnum
+from typing import Any, NamedTuple
 
 from django.conf import settings
 from django.db import transaction
@@ -44,6 +45,35 @@ from apps.media.services.hash_service import FileHashService
 from apps.media.services.thumbnails import ThumbnailService
 
 logger = logging.getLogger(__name__)
+
+
+class SubmitAdOutcome(StrEnum):
+    """Business outcome of ``submit_ad``, used by callers to branch on cause.
+
+    The enum houses **business** outcomes only.  A lock timeout
+    (``OperationalError`` / SQLSTATE 55P03) is a transient system condition,
+    not a business result, and is deliberately left as an exception that
+    propagates to the handler's lock-timeout boundary (03-DB-004).
+    """
+
+    PUBLISHED = "published"
+    MODERATION_FAILED = "moderation_failed"
+    PHOTO_UNAVAILABLE = "photo_unavailable"
+    DRAFT_GONE = "draft_gone"
+    INVALID_TRANSITION = "invalid_transition"
+
+
+class SubmitAdResult(NamedTuple):
+    """Typed result of ``submit_ad``.
+
+    ``outcome`` is carried in its own field, never in a truthiness position:
+    every ``StrEnum`` member is a non-empty string and therefore truthy, so
+    folding the outcome into a ``passed``/``errors`` slot would make
+    ``if passed:`` silently succeed for every failure outcome.
+    """
+
+    outcome: SubmitAdOutcome
+    errors: list[str]
 
 
 class SubmitAdInput(BaseInputModel):
@@ -143,7 +173,7 @@ def _permanent_thumbnail_key(
     return permanent
 
 
-def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
+def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
     """Update ad with multi-language content, create images, and delegate to auto_moderate.
 
     ``price_amount``/``price_currency`` become the source of truth; when
@@ -160,11 +190,17 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     existing ``price_currency`` is preserved (web "keep-current" semantic; the
     bot flow never sends ``None`` per ``price.py`` FSM handlers).
 
-    The ``False`` branch's error strings are user-facing on both surfaces (the
-    bot's ``process_preview`` answers them verbatim; the web edit forms render
-    them too), so they are wrapped in ``gettext_lazy`` at this source. Callers
-    must ``str()`` the value before rendering — Django templates and aiogram
-    both coerce a lazy proxy on use.
+    Every business outcome is named by :class:`SubmitAdOutcome`: a missing
+    draft is ``DRAFT_GONE`` (distinct from ``MODERATION_FAILED``), a reaped
+    staged file is ``PHOTO_UNAVAILABLE``, a refused state-machine transition is
+    ``INVALID_TRANSITION``, and a committed moderation pass is ``PUBLISHED``.
+    The ``errors`` list carries the user-facing reason for the failure
+    outcomes; its strings are wrapped in ``gettext_lazy`` at this source (the
+    bot's ``process_preview`` and the web edit forms render them), so callers
+    must ``str()`` the value before rendering.
+
+    A lock timeout is **not** an outcome: ``OperationalError`` propagates to
+    the caller's handler boundary (03-DB-004), exactly as before.
 
     Media promotion (03-DB-005): staged files are **key-rewritten** before the
     transaction by the pure ``plan_staging_promotion``; the physical move runs
@@ -201,14 +237,17 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
     try:
         permanent_keys = plan_staging_promotion(input.photos)
     except FileNotFoundError:
-        return False, [
-            str(
-                _(
-                    "One of your photos is no longer available. "
-                    "Please upload it again."
+        return SubmitAdResult(
+            SubmitAdOutcome.PHOTO_UNAVAILABLE,
+            [
+                str(
+                    _(
+                        "One of your photos is no longer available. "
+                        "Please upload it again."
+                    )
                 )
-            )
-        ]
+            ],
+        )
 
     # Generate thumbnails BEFORE the DB transaction (filesystem I/O outside tx)
     # so a DB rollback does not leave filesystem and DB desynced.  Staged photos
@@ -266,7 +305,9 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
         try:
             ad = Ad.objects.select_for_update().get(id=input.ad_id)
         except Ad.DoesNotExist:
-            return False, [str(_("Ad not found"))]
+            return SubmitAdResult(
+                SubmitAdOutcome.DRAFT_GONE, [str(_("Ad not found"))]
+            )
 
         # Update ad fields — Russian remains the base content
         ad.title = input.title_ru
@@ -326,8 +367,19 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
                 sha256=staged_digests[index],
             )
 
-        # Transition DRAFT -> ON_MODERATION (state machine requires this step)
-        ad.transition_to(AdStatus.ON_MODERATION)
+        # Transition DRAFT -> ON_MODERATION (state machine requires this step).
+        # A refusal (e.g. the row left DRAFT concurrently) is a business
+        # outcome, not an exception: surface it to the caller as
+        # INVALID_TRANSITION rather than letting the ValueError escape.
+        try:
+            ad.transition_to(AdStatus.ON_MODERATION)
+        except ValueError:
+            logger.warning(
+                "Invalid transition submitting ad %s from status %s",
+                input.ad_id,
+                ad.status,
+            )
+            return SubmitAdResult(SubmitAdOutcome.INVALID_TRANSITION, [])
 
         # Delegate to shared auto-moderation service
         # Handles: banned_words, duplicate_title, all validations,
@@ -348,6 +400,8 @@ def submit_ad(input: SubmitAdInput) -> tuple[bool, list[str]]:
             lambda keys=permanent_keys: promote_media_files(keys)
         )
     if passed:
-        return True, []
+        return SubmitAdResult(SubmitAdOutcome.PUBLISHED, [])
     else:
-        return False, [str(_("Ad failed moderation checks"))]
+        return SubmitAdResult(
+            SubmitAdOutcome.MODERATION_FAILED, [str(_("Ad failed moderation checks"))]
+        )

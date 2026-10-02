@@ -16,7 +16,13 @@ from django.core.cache import cache
 from pydantic import ValidationError
 
 from apps.ads.models import Ad
-from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
+from apps.ads.services.submission import (
+    AdEditInput,
+    SubmitAdInput,
+    SubmitAdOutcome,
+    SubmitAdResult,
+    submit_ad,
+)
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.models import ExchangeRate
@@ -49,10 +55,14 @@ def _seed_eur_rate():
     )
 
 
-def _make_input(ad: Ad) -> SubmitAdInput:
-    """Build a ``SubmitAdInput`` for *ad* with minimal valid fields."""
+def _make_input(ad: Ad, *, ad_id: int | None = None) -> SubmitAdInput:
+    """Build a ``SubmitAdInput`` for *ad* with minimal valid fields.
+
+    ``ad_id`` overrides the row id when the target row no longer exists (the
+    deleted-draft path), while the remaining fields still come from *ad*.
+    """
     return SubmitAdInput(
-        ad_id=ad.id,
+        ad_id=ad.id if ad_id is None else ad_id,
         title_ru="Test Title",
         desc_ru="Test description text",
         category_id=ad.category_id,
@@ -103,7 +113,7 @@ def test_submit_ad_commit_when_auto_moderate_passes(
     The mock bypasses the real ``_pass_moderation`` (which would set
     ``PUBLISHED``), so the ad stays at ``ON_MODERATION`` — the state set by
     ``transition_to`` inside the committed transaction. ``submit_ad`` returns
-    ``(True, [])``.
+    the ``PUBLISHED`` outcome.
     """
     ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
 
@@ -111,10 +121,10 @@ def test_submit_ad_commit_when_auto_moderate_passes(
         "apps.moderation.services.auto_moderation.auto_moderate",
         return_value=True,
     ) as mock_moderate:
-        passed, errors = submit_ad(_make_input(ad))
+        result = submit_ad(_make_input(ad))
 
-    assert passed is True
-    assert errors == []
+    assert result.outcome is SubmitAdOutcome.PUBLISHED
+    assert result.errors == []
     mock_moderate.assert_called_once()
 
     ad.refresh_from_db()
@@ -166,12 +176,12 @@ def test_missing_staged_file_reports_a_recoverable_error(
 
     # The staged file is absent — the photo was reaped before submission.
     with override_settings(MEDIA_ROOT=str(tmp_path)):
-        passed, errors = submit_ad(payload)
+        result = submit_ad(payload)
 
-    assert passed is False
-    assert len(errors) == 1
-    assert "photo" in errors[0].lower()
-    assert "upload" in errors[0].lower()
+    assert result.outcome is SubmitAdOutcome.PHOTO_UNAVAILABLE
+    assert len(result.errors) == 1
+    assert "photo" in result.errors[0].lower()
+    assert "upload" in result.errors[0].lower()
 
     # No AdImage row and no rewritten key.
     assert AdImage.objects.filter(ad=ad).count() == 0
@@ -205,10 +215,10 @@ def test_submit_ad_price_normalization_delegates_to_shared_utility(
         with patch(
             "apps.ads.services.submission.normalize_price_to_eur"
         ) as mock_normalizer:
-            passed, errors = submit_ad(_make_input(ad))
+            result = submit_ad(_make_input(ad))
 
-    assert passed is True
-    assert errors == []
+    assert result.outcome is SubmitAdOutcome.PUBLISHED
+    assert result.errors == []
 
     mock_normalizer.assert_called_once()
     call_args = mock_normalizer.call_args
@@ -360,3 +370,97 @@ def test_submit_ad_input_accepts_valid_photo_dict() -> None:
     assert photo.thumbnail_small is None
     assert photo.thumbnail_medium is None
     assert photo.thumbnail_large is None
+
+
+
+# ---------------------------------------------------------------------------
+# AD-016: named outcomes — DRAFT_GONE is distinguishable from a content failure
+# ---------------------------------------------------------------------------
+
+
+def test_submit_ad_deleted_draft_returns_draft_gone(
+    seller, category, city
+) -> None:
+    """A deleted/absent draft yields the ``DRAFT_GONE`` outcome.
+
+    Closes the untested ``(False, ["Ad not found"])`` branch: before AD-016 the
+    caller could not tell "the draft is gone" from a real moderation failure.
+    The draft is created and then deleted, so the row is genuinely absent (the
+    reaped-draft / concurrent-``/post`` path).
+    """
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    ad_id = ad.id
+    ad.delete()
+
+    result = submit_ad(_make_input(ad, ad_id=ad_id))
+
+    assert isinstance(result, SubmitAdResult)
+    assert result.outcome is SubmitAdOutcome.DRAFT_GONE
+    assert result.outcome is not SubmitAdOutcome.MODERATION_FAILED
+
+
+def test_submit_ad_moderation_failure_returns_moderation_failed(
+    seller, category, city
+) -> None:
+    """A genuine content failure yields ``MODERATION_FAILED``, distinct from
+    ``DRAFT_GONE``.  The two causes must never collapse onto one outcome.
+    """
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+    with patch(
+        "apps.moderation.services.auto_moderation.auto_moderate",
+        return_value=False,
+    ):
+        result = submit_ad(_make_input(ad))
+
+    assert result.outcome is SubmitAdOutcome.MODERATION_FAILED
+    assert result.outcome is not SubmitAdOutcome.DRAFT_GONE
+    assert result.errors == ["Ad failed moderation checks"]
+
+
+def test_submit_ad_operational_error_propagates_as_exception(
+    seller, category, city
+) -> None:
+    """A lock timeout stays an **exception**, never an outcome member.
+
+    03-DB-004 owns the handler-level lock-timeout boundary; folding
+    ``OperationalError`` into ``SubmitAdOutcome`` would make that boundary
+    double-handle the condition.  ``submit_ad`` must let it propagate.
+    """
+    from django.db import OperationalError
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+    with patch(
+        "apps.moderation.services.auto_moderation.auto_moderate",
+        side_effect=OperationalError("canceling statement due to lock timeout"),
+    ):
+        with pytest.raises(OperationalError):
+            submit_ad(_make_input(ad))
+
+
+def test_submit_ad_invalid_transition_returns_outcome_not_raises(
+    seller, category, city
+) -> None:
+    """A refused state-machine transition is a **business outcome**.
+
+    ``transition_to`` raises ``ValueError`` when the target is not allowed from
+    the row's current status.  ``submit_ad`` must return
+    ``INVALID_TRANSITION`` rather than let it escape (the state machine's
+    business refusal is not an infrastructure fault).  Trap 1 guard: the
+    outcome is carried in its own field, so a caller can branch on it even
+    though every ``StrEnum`` member is truthy.
+    """
+    ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
+
+    with patch(
+        "apps.moderation.services.auto_moderation.auto_moderate",
+        return_value=True,
+    ):
+        result = submit_ad(_make_input(ad))
+
+    assert result.outcome is SubmitAdOutcome.INVALID_TRANSITION
+    assert result.errors == []
+    # The row was untouched: REJECTED is terminal, so no transition happened.
+    ad.refresh_from_db()
+    assert ad.status == AdStatus.REJECTED

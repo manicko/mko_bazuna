@@ -19,7 +19,12 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
-from apps.ads.services.submission import AdEditInput, SubmitAdInput, submit_ad
+from apps.ads.services.submission import (
+    AdEditInput,
+    SubmitAdInput,
+    SubmitAdOutcome,
+    submit_ad,
+)
 from apps.core.enums import AdStatus
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.currencies.enums import CurrencyCode
@@ -165,7 +170,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 # lock guarantees no concurrent mutation, sets fields, saves,
                 # transitions ARCHIVED -> ON_MODERATION, then calls auto_moderate
                 # outside its own atomic.
-                passed, errors = submit_ad(
+                result = submit_ad(
                     SubmitAdInput(
                         ad_id=ad_id,
                         title_ru=dto.title,
@@ -180,7 +185,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     )
                 )
 
-                if passed:
+                if result.outcome is SubmitAdOutcome.PUBLISHED:
                     return redirect("ads:dashboard")
                 else:
                     ad = Ad.objects.prefetch_related("images").get(id=ad_id)
@@ -189,8 +194,8 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         "ads/edit.html",
                         {
                             "ad": ad,
-                            "error": errors[0]
-                            if errors
+                            "error": result.errors[0]
+                            if result.errors
                             else _("Ad failed moderation checks"),
                         },
                     )
@@ -208,7 +213,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     # ensures it is a valid CurrencyCode | None — submit_ad
                     # preserves the ad's current currency when None (web
                     # "keep-current" semantic, Path A).
-                    passed, errors = submit_ad(
+                    result = submit_ad(
                         SubmitAdInput(
                             ad_id=ad_id,
                             title_ru=dto.title,
@@ -223,7 +228,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         )
                     )
 
-                    if passed:
+                    if result.outcome is SubmitAdOutcome.PUBLISHED:
                         logger.info("Ad %s text edited, moved to ON_MODERATION", ad_id)
                         return redirect("ads:dashboard")
 
@@ -233,8 +238,8 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         "ads/edit.html",
                         {
                             "ad": ad,
-                            "error": errors[0]
-                            if errors
+                            "error": result.errors[0]
+                            if result.errors
                             else _("Ad failed moderation checks"),
                         },
                     )

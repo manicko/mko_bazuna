@@ -425,7 +425,11 @@ class TestCancelAfterSubmit:
         from django.test import override_settings
 
         from apps.ads.models import AdImage
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import generate_storage_key
@@ -449,7 +453,7 @@ class TestCancelAfterSubmit:
             }
 
             # Submit — DRAFT -> ON_MODERATION -> PUBLISHED
-            is_valid, errors = await sync_to_async(submit_ad)(
+            result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=ad.id,
                     title_ru="Test Ad",
@@ -463,7 +467,9 @@ class TestCancelAfterSubmit:
                     original_language="en",
                 )
             )
-            assert is_valid, f"submit_ad should pass moderation: {errors}"
+            assert result.outcome is SubmitAdOutcome.PUBLISHED, (
+                f"submit_ad should pass moderation: {result.errors}"
+            )
 
             await sync_to_async(ad.refresh_from_db)()
             assert ad.status == AdStatus.PUBLISHED
@@ -509,7 +515,11 @@ class TestCancelAfterSubmit:
 
         from django.test import override_settings
 
-        from apps.ads.services.submission import SubmitAdInput, submit_ad
+        from apps.ads.services.submission import (
+            SubmitAdInput,
+            SubmitAdOutcome,
+            submit_ad,
+        )
         from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import generate_storage_key
@@ -531,7 +541,7 @@ class TestCancelAfterSubmit:
             }
 
             # Submit -> PUBLISHED
-            is_valid, _ = await sync_to_async(submit_ad)(
+            result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=ad.id,
                     title_ru="Test Ad",
@@ -545,7 +555,7 @@ class TestCancelAfterSubmit:
                     original_language="en",
                 )
             )
-            assert is_valid
+            assert result.outcome is SubmitAdOutcome.PUBLISHED
 
             await sync_to_async(ad.refresh_from_db)()
             assert ad.status != AdStatus.DRAFT
