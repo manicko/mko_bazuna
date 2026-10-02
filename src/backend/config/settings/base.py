@@ -160,6 +160,29 @@ LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+# Session lifetime and refresh policy, declared explicitly so the policy is
+# visible rather than implicit. 60 * 60 * 24 * 14 = 1209600 seconds (14 days),
+# which matches Django's inherited default; it is written out here on purpose so
+# the window is a visible product decision instead of an invisible framework
+# default. A literal, not an env-driven value: every comparable bound in this
+# codebase is a literal module constant (TOKEN_TTL_SECONDS, RATE_LIMIT_REQUESTS,
+# _MAX_HISTORY, DAILY_HOUR_UTC, LOCK_TIMEOUT_SECONDS, SECURE_HSTS_SECONDS), and
+# an operator-variable window would let the effective exposure be changed from
+# outside the repository.
+#
+# SESSION_SAVE_EVERY_REQUEST stays False: the lifetime is absolute, not sliding.
+# Django saves the session only when (modified or SAVE_EVERY_REQUEST) and not
+# empty, and the ONLY session write for an authenticated user is auth_login() at
+# login; no read re-stamps the row. Turning this on would not extend a
+# login-once seller's window (no reads happen) and would STRICTLY INCREASE the
+# exposure of a user who keeps browsing, because every read would re-stamp the
+# newest-to-expire sessions. The anti-theft benefit is a function of the window's
+# age, not of the flag.
+#
+# No number for this setting appears in the spec or anywhere else in the
+# repository: changing the value is a product decision, not an engineering one.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 1209600 seconds (14 days)
+SESSION_SAVE_EVERY_REQUEST = False
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
