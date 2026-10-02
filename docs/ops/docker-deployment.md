@@ -914,9 +914,13 @@ through a peer gate, not by trusting forwarding headers blindly:
   (`docker-compose.dev.override.yml`) publishes Django directly on `:8000`, so
   the peer is loopback — the gate is always open on loopback, and `X-Real-IP`
   supplied directly to Django is trusted in the same way as through nginx.
-- **A production public peer is refused by design.** When the direct peer is a
-  public address, the forwarding headers are ignored outright; only a genuine
-  trusted proxy hop opens the gate.
+- **A production public peer is refused by default — unless an operator lists
+  it.** When the direct peer is a public address and no listed network contains
+  it, the forwarding headers are ignored outright. The guarantee is *no public
+  peer is trusted unless an operator explicitly lists a network containing it*:
+  adding such a network to `TRUSTED_PROXY_NETWORKS` (e.g. `("0.0.0.0/0",)`)
+  deliberately opens the gate for it, which is correct operator-configured
+  behaviour, not a bypass.
 - **Residual: a private client is trusted as a peer (accepted, not fixed).** A
   client that connects from a private, ULA, or link-local address itself passes
   the peer gate, so a right-to-left `X-Forwarded-For` walk that reaches such an
@@ -927,7 +931,6 @@ through a peer gate, not by trusting forwarding headers blindly:
   client address never reaches the walk in production. Only an operator who
   fronts Django with a proxy that sends `X-Forwarded-For` but omits `X-Real-IP`
   would expose it.
-
 
 ## Database Operations
 

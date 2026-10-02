@@ -109,12 +109,24 @@ id (PK)
 user_id (FK → users.id, nullable, SET_NULL)   # NULL for anonymous/guest consent (cookie-only sessions)
 choice (StrEnum — ConsentChoice)              # see db-enums.md
 categories (JSONB)                            # {"analytics": bool, "preferences": bool}
-ip_address (INET, nullable)                   # anonymous records only (audit traceability)
+ip_address (INET, nullable)                   # anonymised CLIENT address, masked /24 (IPv4) or /64 (IPv6) — see the note below
 user_agent (TEXT, nullable)                   # anonymous records only
 consented_at (TIMESTAMP, default now)
 revoked_at (TIMESTAMP, nullable)             # set when choice = WITHDRAWN → triggers consent_hard_delete sweep + 30-day PII erasure
 db_table: consent_records
 ```
+`ip_address` stores the **anonymised client** address, not the direct socket peer. It is
+resolved by `apps/core/utils/client_ip.py::get_client_ip` (peer gate + `X-Real-IP` /
+right-to-left `X-Forwarded-For`) and then masked by
+`apps/users/services/consent_record.py::_anonymize_ip` — IPv4 last octet zeroed (`/24`),
+IPv6 lower 64 bits zeroed (`/64`); an absent or unparseable peer stores `NULL`. This
+replaced an earlier value that held the anonymised **nginx container** address
+(`172.x.0.0`, a constant identical for every production row), which carried zero
+evidentiary value; the masking strength was sized for that coarser input and is now
+materially more identifying (a `/24` is 256 addresses). Both `ip_address` and `user_agent`
+are written whenever the request is present; when `request` is absent (e.g. the Telegram
+bot `/start` path) they are left blank (`NULL` / empty).
+
 Index on `user_id` supports the `consent_hard_delete` sweep. `consent_hard_delete` reads
 `users.consent_revoked_at` (zone F) — the 30-day PII null + hard-delete of the row runs only
 after the full grace window.

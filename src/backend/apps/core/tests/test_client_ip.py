@@ -31,7 +31,14 @@ def _request(meta: dict[str, str]) -> HttpRequest:
 
 
 class TestPublicPeerCannotSpoof:
-    """A public peer's forwarding headers must never be read."""
+    """A public peer outside every listed network cannot have its headers read.
+
+    The guarantee is *no public peer is trusted unless an operator explicitly
+    lists a network containing it* — not that public peers are always untrusted.
+    These tests run under the default ``TRUSTED_PROXY_NETWORKS = ()``, so the
+    peer stays untrusted; an operator listing a network containing the peer
+    would honour its headers by design.
+    """
 
     def test_public_peer_ignores_x_forwarded_for(self) -> None:
         """X-Forwarded-For on an untrusted peer yields the same key as no header."""
