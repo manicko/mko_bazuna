@@ -45,6 +45,7 @@ from apps.core.utils.advisory_lock import advisory_lock
 from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
 from apps.search.services.notification_delivery import mark_delivered
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +165,16 @@ class Command(BaseCommand):
             raise CommandError(f"Alert delivery failed for all {users_attempted} users")
 
     def _dry_run_check(self) -> None:
-        """Log counts of users, saved searches, and potential matches."""
-        active_searches = SavedSearch.objects.filter(is_active=True).select_related(
-            "user"
+        """Log counts of users, saved searches, and potential matches.
+
+        Counts must reflect the account-state eligibility rule, so an operator's
+        dry run does not promise messages that the real run would not send
+        (06-PII-104).
+        """
+        active_searches = (
+            SavedSearch.objects.filter(is_active=True)
+            .filter(account_state_q("user__"))
+            .select_related("user")
         )
         user_count = (
             active_searches.values_list("user_id", flat=True).distinct().count()
@@ -206,6 +214,11 @@ class Command(BaseCommand):
         are collected by the next run. Changing the policy (fair-share
         interleaving, or sorting by match rank across searches) is out of scope.
 
+        The ``account_state_q("user__")`` filter excludes searches owned by a
+        withdrawn, declined, banned or deactivated user, so this live daily
+        path stops messaging identities the site and bot already gate
+        (06-PII-104). It composes with ``is_active`` rather than replacing it.
+
         Must be called inside a transaction with the advisory lock held.
 
         Returns:
@@ -215,8 +228,10 @@ class Command(BaseCommand):
         notifications_to_create: list[SavedSearchNotification] = []
         analytics_events: list[AnalyticsEvent] = []
 
-        for saved_search in SavedSearch.objects.filter(is_active=True).select_related(
-            "user", "city", "category"
+        for saved_search in (
+            SavedSearch.objects.filter(is_active=True)
+            .filter(account_state_q("user__"))
+            .select_related("user", "city", "category")
         ):
             matching_ads = find_matching_ads(saved_search)
             if not matching_ads:

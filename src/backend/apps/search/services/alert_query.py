@@ -23,6 +23,7 @@ from apps.ads.models import Ad
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, LanguageLocale
 from apps.search.models import SavedSearch, SavedSearchNotification
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,17 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
 
     Applies an FTS query (searched in the saved search's language via
     ``saved_search.language``, no translation), category subtree, city, and
-    price filters.  Matches are ranked by relevance and capped at 10 per
-    digest.  Ads whose alert was already DELIVERED (``delivered_at IS NOT
+    price filters. Matches are ranked by relevance and capped at 10 per
+    digest. Ads whose alert was already DELIVERED (``delivered_at IS NOT
     NULL``) are excluded via a correlated NOT EXISTS subquery; a recorded but
-    undelivered pair stays eligible for retry. Which ads match a search is
-    unchanged — only what counts as already notified.
+    undelivered pair stays eligible for retry.
+
+    The ad's *owner* must also be account-state eligible: an ad belonging to a
+    withdrawn, declined, banned or deactivated seller is hidden from public
+    search, listings, direct URL and the media gate, so it must not fan out its
+    title and price to subscribers either. This filters the ad by the *owner's*
+    state using the same single declaration as the recipient selection, via the
+    owner's ``user__`` prefix (06-PII-104).
 
     Args:
         saved_search: The SavedSearch to match against.
@@ -45,9 +52,11 @@ def find_matching_ads(saved_search: SavedSearch) -> list[Ad]:
     Returns:
         List of matching Ad objects (max 10), ordered by relevance.
     """
-    queryset: QuerySet[Ad] = Ad.objects.filter(
-        status=AdStatus.PUBLISHED
-    ).select_related("category", "city")
+    queryset: QuerySet[Ad] = (
+        Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .filter(account_state_q("user__"))
+        .select_related("category", "city")
+    )
 
     # Apply FTS query in the saved search's persisted language (no translation)
     if saved_search.query:
@@ -154,16 +163,17 @@ def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
     near-real-time publish-time delivery (AL-001).
 
     Only ``is_active=True`` searches are considered (reuses the
-    ``IX_saved_searches_user_active`` index). Membership in a category subtree
+    ``IX_saved_searches_user_active`` index). The search's *owner* is also
+    account-state gated — a withdrawn, declined, banned or deactivated user
+    receives no alerts — via the same single declaration as the ad matcher
+    (``account_state_q("user__")``; 06-PII-104). Membership in a category subtree
     is tested via the ad's ``category_id``. Searches whose alert for this ad
     was already DELIVERED are excluded by a correlated ``~Exists``; a recorded
     but undelivered pair stays eligible, so a failed immediate send is retried
     on the next publish.
 
-    The recipient predicate below (``is_active`` + city/price/category/FTS) is
-    the audience definition and is NOT touched. The ``chat_id`` check stays a
-    DELIVERY PRECONDITION applied at the record/payload stage, not an audience
-    filter (PII-104, phase 06).
+    The ``chat_id`` check stays a DELIVERY PRECONDITION applied at the
+    record/payload stage, not an audience filter (06-PII-104).
 
     Args:
         ad: A PUBLISHED Ad to match saved searches against.
@@ -171,16 +181,18 @@ def find_matching_saved_searches(ad: Ad) -> list[SavedSearch]:
     Returns:
         List of active SavedSearch objects matching the ad.
     """
-    candidates = SavedSearch.objects.filter(is_active=True).select_related(
-        "user", "city", "category"
+    candidates = (
+        SavedSearch.objects.filter(is_active=True)
+        .filter(account_state_q("user__"))
+        .select_related("user", "city", "category")
     )
 
     # Exclude searches whose alert for THIS ad was already DELIVERED, via a
     # correlated NOT EXISTS on the candidate queryset (never exclude(): a
     # multi-valued-relation exclude() multiplies joins). A row with
     # delivered_at IS NULL stays eligible, so a failed immediate send is retried
-    # by the next publish tick. This is the delivery-state contract, not an
-    # audience filter: the recipient predicate below is untouched.
+    # by the next publish tick. This is the delivery-state contract, orthogonal
+    # to the account-state audience filter applied above.
     delivered_pairs = SavedSearchNotification.objects.filter(
         saved_search_id=OuterRef("pk"),
         ad_id=ad.pk,
