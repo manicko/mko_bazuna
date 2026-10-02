@@ -8,13 +8,16 @@ asserts anything about nginx.
 
 from __future__ import annotations
 
+import pytest
 from django.http import HttpRequest
 from django.test import override_settings
 
 from apps.core.utils.client_ip import get_client_ip
 
-# `override_settings(TRUSTED_PROXY_NETWORKS=...)` below is why these are
-# django_db-free: no test touches the database, only request metadata and cache.
+# `override_settings(TRUSTED_PROXY_NETWORKS=...)` below is why most of these are
+# django_db-free: they touch only request metadata and cache. The one exception
+# is `TestConsumerAgreement`, which additionally exercises `record_consent_action`
+# and therefore carries `django_db`.
 # Genuinely public addresses: `203.0.113.0/24`, `198.51.100.0/24` and
 # `192.0.2.0/24` are reserved TEST-NET ranges and report ``is_private is True``
 # in Python 3.13+, which would make them look like trusted peers.
@@ -22,6 +25,16 @@ _UNTRUSTED_PEER = "1.2.3.4"
 _SPOOF_A = "8.8.8.8"
 _SPOOF_B = "9.9.9.9"
 _TRUSTED_NETWORK = ("10.0.0.0/8",)
+
+
+class _SessionStub:
+    """Minimal session exposing only what ``record_consent_action`` reads."""
+
+    def __init__(self, values: dict[str, str]) -> None:
+        self._values = values
+
+    def __getattr__(self, name: str) -> str | None:
+        return self._values.get(name)
 
 
 def _request(meta: dict[str, str]) -> HttpRequest:
@@ -142,12 +155,15 @@ class TestKeyStability:
 class TestConsumerAgreement:
     """Every IP-keyed limiter buckets one request under the same key."""
 
+    @pytest.mark.django_db
     def test_all_four_consumers_agree_on_one_key(self) -> None:
-        """login, deep-link, search and autocomplete share the resolved IP."""
+        """login, deep-link, search/autocomplete and consent recording share the IP."""
+        from apps.core.enums import ConsentChoice
         from apps.core.services.contact_rate_limit import (
             check_deep_link_render_rate_limit,
         )
         from apps.search.services.rate_limit import rate_limit_check
+        from apps.users.services.consent_record import record_consent_action
         from apps.users.services.login_rate_limit import login_rate_limit_check
 
         request = _request(
@@ -156,6 +172,7 @@ class TestConsumerAgreement:
                 "HTTP_X_REAL_IP": _SPOOF_A,
             }
         )
+        request.session = _SessionStub({"session_key": "agreement-session"})
         from django.core.cache import cache
 
         cache.clear()
@@ -170,6 +187,13 @@ class TestConsumerAgreement:
         assert cache.get(f"telegram_dl_rl:{expected}") == 1
         assert cache.get(f"autocomplete_rl:{expected}") == 1
         assert cache.get(f"search_rl:{expected}") == 1
+
+        # The consent recorder's fourth client-IP read must resolve the same
+        # value; it stores the anonymized form, so the last octet is zeroed.
+        record = record_consent_action(
+            None, ConsentChoice.ACCEPTED, {}, request=request
+        )
+        assert record.ip_address == "8.8.8.0"
 
 
 class TestPublicPeerUntrustedUnlessOperatorListed:
@@ -227,5 +251,25 @@ class TestPublicPeerUntrustedUnlessOperatorListed:
                     "HTTP_X_REAL_IP": _SPOOF_B,
                 }
             )
+        )
+        assert result == _SPOOF_B
+
+
+class TestTrustedNetworksCannotNarrowPeerTrust:
+    """``TRUSTED_PROXY_NETWORKS`` is purely additive: it can never remove trust.
+
+    ``_is_trusted_peer`` returns on ``is_loopback or is_private`` **before** it
+    consults the setting, so a private peer outside every listed network stays
+    trusted. This ordering is the only thing standing between a mis-set tuple
+    and a site-wide login lockout: an operator who lists a network that does not
+    contain nginx's peer must not thereby stop trusting the real reverse proxy,
+    which would collapse every production client onto nginx's address.
+    """
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=("192.168.1.0/24",))
+    def test_trusted_networks_cannot_narrow_the_private_peer_trust(self) -> None:
+        """A private peer OUTSIDE every listed network is still trusted."""
+        result = get_client_ip(
+            _request({"REMOTE_ADDR": "172.18.0.5", "HTTP_X_REAL_IP": _SPOOF_B})
         )
         assert result == _SPOOF_B

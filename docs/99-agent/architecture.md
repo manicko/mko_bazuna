@@ -408,6 +408,42 @@ CSRF, two-phase background) is in
 [`db-schema.md`](../02-database/db-schema.md) — single source of truth, not
 re-documented here.
 
+**Status: `04-AUT-001` is CLOSED with a mechanism.** The finding's live vectors
+are closed by a **browser binding**:
+
+- `LoginToken.browser_binding` is a SHA-256 digest column (the raw id is never
+  stored), added by migration `0003_logintoken_browser_binding`.
+- The digest is of the `__Host-login_browser_id` cookie value (unprefixed
+  `login_browser_id` on HTTP-only dev/test origins), resolved per settings.
+- `consume_token` fails **closed**: a `NULL` binding, an absent/malformed
+  presented id, or a digest mismatch returns `ConsumeOutcome.UNBOUND`, which the
+  view maps to HTTP **410**, and the token is **not** burned.
+- Delivered by commits `8c65548` / `818c450` / `a0bd928`.
+
+**Residuals, stated so the closure is not read as absolute.** A raw bearer token
+is still rendered into the page (`users/login_issue.html`), so a **shared
+device** or a **stolen raw token value** remains an attack vector — the binding
+narrows *who may redeem* the token, it does not remove the token from the client.
+Separately, the **CSRF / `GET`-writes half** of the finding is **owned by phase
+15 `15-AUTHZ-004`** and is not closed here.
+
+**Gate `G-1h` re-banding — owed to the Validator, never performed.** The source
+audit report justified the HIGH rating with a **`Referer`-header** leak. That
+rationale is **NOT supported** by the shipped code: the token never appears in a
+**first-party web URL** — `login_status` is `@require_POST` and reads
+`request.POST["token"]`, so the only URL that carries it is the Telegram deep
+link to a **third-party** origin, which is the designed transport and is exactly
+why no `Referer` leak occurs. `Referrer-Policy` is set at **three nginx
+locations per file** (`nginx.conf`, `nginx.dev.conf`), and Django's default
+`SECURE_REFERRER_POLICY` is `same-origin`. The **re-worded HIGH rationale** is
+therefore: the live vectors are a **shared device** and a **stolen raw token
+value**. The mechanism is unchanged; only the stated rationale is corrected.
+
+**Recorded deferral.** The `privacy.html` ePrivacy cookie-inventory row for
+`login_browser_id` is **deferred, not fixed** (gate `G-1g`) — see the
+`### Deferred: login_browser_id Missing From the Privacy Page (04-AUT-001)`
+sub-section below.
+
 ### The two predicates and why they are not unified
 
 The claim and consume operations have **different** predicates and must never
@@ -434,7 +470,7 @@ it), and the web's `login_status` owns its `atomic()` (and calls
 `consume_token` inside it). The caller owns the transaction; the service owns
 the predicate.
 
-### The `AUT-007` boundary and the two existing deleters
+### The `04-AUT-007` boundary and the two existing deleters
 
 `issue_token` supersedes a browser's earlier **live, unclaimed** token at issue
 time, so one browser profile holds at most **one live unclaimed token**. The
@@ -449,7 +485,7 @@ supersession predicate has exactly four conjuncts and all four are load-bearing:
   this excludes every token the bot has **already claimed**. A claimed row is
   mid-handshake; burning it would let a same-site prefetch of `/login/issue/`
   kill a login whose user already tapped the Telegram button — strictly worse
-  than `AUT-007`. This applies `B-03`'s `UNBOUND` non-burning rule to
+  than `04-AUT-007`. This applies `B-03`'s `UNBOUND` non-burning rule to
   supersession.
 - `consumed_at IS NULL AND expires_at > now` — only a currently live token is
   superseded; an already-consumed or expired row is left untouched.
@@ -481,6 +517,29 @@ rate-limited (`login_rate_limit_check`, `check_deep_link_render_rate_limit`, bot
 `429`) but not forbidden. Closing it means moving the deep-link page behind a
 POST, which changes the entry point of the whole login funnel. **Recorded here
 as a known gap; this phase did not close it.**
+
+### `04-AUT-007` verdict and the `G-4h` residual
+
+**Status: `04-AUT-007` is WEAKENED, not closed.** The invalidation half is
+delivered: `issue_token` supersedes the issuing browser's earlier **live,
+unclaimed** token, so a repeated issuance no longer accumulates redeemable
+pending tokens — one browser profile holds at most one. The audit's own `R-16`
+check (*"Repeated issuance invalidates the browser's previous outstanding
+token"*) therefore now **PASSES**, pinned by
+`apps/users/tests/test_login_token.py::TestIssueTokenSupersession::test_second_issue_supersedes_the_first`
+(the first token is neither claimable nor redeemable after a re-issue). It is
+**weakened rather than closed** because the residual below survives, and because
+the CSRF / `GET`-writes half is owned by phase 15 `15-AUTHZ-004`.
+
+**The `G-4h` residual, verbatim (the plan requires the exact wording):**
+
+> a raw token leaked from the same browser profile stays redeemable by a holder of that profile's cookie for the remainder of the 300 s TTL.
+
+**Provenance.** `G-4h` is a **Validator** obligation, not an Implementor one
+(execution plan §H routes `B-04` → Validator: *"NOT a gate on the Implementor —
+an owed action"*). The two `B-04` commits have empty bodies and history is not
+rewritten, so this tracked block is where the obligation is discharged. **The
+Planner does not set the finding's status; this record does.**
 
 ## Account-State and Session Revocation (04-AUT-002)
 
@@ -626,6 +685,20 @@ The policy is **write-triggered, not a sliding idle window**: Django re-stamps
 by each recorded non-empty search. See
 [`technical-specification.md` §H](../01-spec/technical-specification.md).
 
+**Known gap: anonymous `django_session` growth.** A non-empty `?q=` search
+request performs **one write per request** against the 30 req/60 s/IP search rate
+limit, so the ceiling is **43,200 anonymous session rows per IP per day**,
+roughly **604,800 resident rows at steady state**. There is **no `clearsessions`
+janitor anywhere in the repository**. Owner: **phase 12** / whoever adds the
+janitor. The `django_session` retention row is phase 12's to add; it is
+deliberately **not** added to
+[`db-retention.md`](../02-database/db-retention.md) by this pass.
+
+**Known gap: ad-edit form loss at session expiry.** Accepted product trade-off of
+gate `G-10a`: a long-lived session means an unsubmitted ad-edit form can be lost
+when the session expires. This is UX friction, **not data loss**. Owner:
+**product**.
+
 ## Login-Issuance Rate-Limit Keying (04-AUT-003)
 
 **Status: `04-AUT-003` is PARTIALLY CLOSED.** The **Python** half is closed; the
@@ -676,9 +749,10 @@ runbook, [`docker-deployment.md`](../ops/docker-deployment.md#applying-a-change-
 **Status: `04-VAL-002` is PARTIALLY CLOSED.** The **tracker-key** half is
 delivered — the in-source finding references are phase-qualified
 (`04-AUT-001`, not `AUT-001`) so a tracker lookup resolves against the phase's
-own identifier space. The **comment** half is now delivered by the same pass
-that closed the residual bare citations (see below). **Neither half was closed
-earlier than this pass; do not read the finding as fully fixed before it.**
+own identifier space. The **in-source comment** half is **DEFERRED, not
+delivered**: the phase's `G-11` gate closed *by boundary* and deliberately did
+not sweep the pre-existing bare citations, so the bare `AUT-00N` references in
+source remain until their own passes qualify them (see gate `G-11`).
 
 ### Deferred: Untranslated `create_admin_user` Password-Policy Msgid (04-AUT-005)
 

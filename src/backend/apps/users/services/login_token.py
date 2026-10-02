@@ -46,8 +46,8 @@ sequences come from the same ``cursor.execute``, and order divergence is not a
 runtime concern (``dict(zip(...))`` discards order and ``LoginToken(**d)`` is
 keyword-only) — matching order is a **consistency** obligation, tested as such.
 
-The ``AUT-007`` boundary
-------------------------
+The ``04-AUT-007`` boundary
+---------------------------
 ``issue_token`` supersedes a browser's earlier **live, unclaimed** token at
 issue time, so one browser profile holds at most **one live unclaimed token**.
 The supersession predicate has exactly four conjuncts and all four are
@@ -62,7 +62,7 @@ load-bearing:
   this excludes every token the bot has **already claimed**. A claimed row is
   mid-handshake; burning it would let a same-site prefetch of ``/login/issue/``
   kill a login whose user already tapped the Telegram button — strictly worse
-  than ``AUT-007``. This applies ``B-03``'s ``UNBOUND`` non-burning rule to
+  than ``04-AUT-007``. This applies ``B-03``'s ``UNBOUND`` non-burning rule to
   supersession.
 - ``consumed_at IS NULL AND expires_at > now`` — only a currently live token is
   superseded; an already-consumed or expired row is left untouched.
@@ -279,7 +279,7 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     ``NULL`` at issue time. A token the bot has already claimed
     (``telegram_id IS NOT NULL``) is mid-handshake and is **not** touched, and
     a ``NULL``-binding row is excluded. See the module docstring's
-    ``The AUT-007 boundary`` section for the full predicate rationale.
+    ``The 04-AUT-007 boundary`` section for the full predicate rationale.
 
     Args:
         browser_id: The raw browser id from the incoming login-binding cookie
@@ -292,7 +292,7 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     resolved_browser_id = _resolve_browser_id(browser_id)
     browser_binding = _hash_browser_id(resolved_browser_id)
 
-    # AUT-007 supersession. UPDATE-before-CREATE, so a second issue supersedes
+    # 04-AUT-007 supersession. UPDATE-before-CREATE, so a second issue supersedes
     # the first *instead of* leaving both live. Unclaimed tokens only
     # (``telegram_id IS NULL``): a claimed token is mid-handshake and burning
     # it would be worse than the defect. No ``OR browser_binding IS NULL``
