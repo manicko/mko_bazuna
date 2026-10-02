@@ -7,6 +7,7 @@ Verifies token invalidation on consent withdrawal and ad soft-deletion.
 import hashlib
 
 import pytest
+from django.test import Client
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
@@ -501,4 +502,57 @@ class TestClearConsentGivenAt:
         user.refresh_from_db()
         assert user.consent_given_at is None
         assert user.consent_revoked_at is not None
+        assert user.is_deleted is True
+
+
+# ---------------------------------------------------------------------------
+# Known gap (04-AUT-002, G-A) — withdraw revokes ONLY the current session
+# ---------------------------------------------------------------------------
+
+
+class TestWithdrawConsentMultiSessionKnownGap:
+    """Pin that ``consent_withdraw`` flushes only the *current* session.
+
+    Known gap: ``apps.users.views.consent.consent_withdraw`` calls
+    ``logout(request)``, which flushes ``request.session`` — the one browser that
+    triggered the withdrawal. A withdrawn user's OTHER live sessions are left
+    intact. ``django_session`` has no user column and ``session_data`` is
+    zlib-compressed and HMAC-signed (never encrypted), so no cheap scan can
+    enumerate them. This test asserts the CURRENT, DEFECTIVE behaviour as a
+    red-to-green specification for phase 15's ``15-AUTHZ-001``: it turns red the
+    moment multi-session revocation lands.
+
+    Owner of the fix: phase 15, ``15-AUTHZ-001``. Produced by B-07 gate G-A.
+    """
+
+    def test_withdraw_consent_leaves_other_sessions_intact(self, user: User) -> None:
+        """A withdrawn user's second, independent session survives the withdrawal.
+
+        Vacuity guard: both sessions are asserted live before the withdrawal, so
+        the test cannot pass on a client that was never logged in.
+
+        ``search_history`` stores anonymous history in the session by design
+        (``apps/search/services/search_history.py``, capped at 50 entries), so a
+        surviving session may retain up to 50 raw search queries.
+        """
+        # Two independent browser sessions for the same user.
+        withdrawing_client = Client()
+        withdrawing_client.force_login(user)
+        other_client = Client()
+        other_client.force_login(user)
+
+        assert "_auth_user_id" in withdrawing_client.session
+        assert "_auth_user_id" in other_client.session
+
+        response = withdrawing_client.post("/consent/withdraw/")
+        assert response.status_code == 302
+        assert response.url == "/dashboard/"
+
+        # The withdrawing browser's own session was flushed (B-03's logout).
+        assert "_auth_user_id" not in withdrawing_client.session
+
+        # Known gap (G-A): the other session is still live and usable.
+        assert "_auth_user_id" in other_client.session
+
+        user.refresh_from_db()
         assert user.is_deleted is True

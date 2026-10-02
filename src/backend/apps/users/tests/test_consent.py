@@ -242,6 +242,61 @@ class TestConsentDeclineView:
 
 
 # ---------------------------------------------------------------------------
+# Tests: Known gap — consent_decline does not revoke the session (04-AUT-002)
+# ---------------------------------------------------------------------------
+
+
+class TestConsentDeclineSessionKnownGap:
+    """Pin that ``consent_decline`` does not revoke the session, and stays usable.
+
+    Known gap: ``consent_decline`` performs no ``logout()``. The session survives,
+    but the decline path is a deliberately retained one-way door — this block
+    (``B-07``, gate ``G-7b``) decided NOT to ship a decline logout, because
+    ``can_login(is_declined=True) is False`` makes the session harmless for
+    login, and ``give_consent`` (reachable only from an AUTHENTICATED
+    ``consent_accept``) is the only clearer of ``is_declined``. Adding a logout
+    would remove the only working session the user has while the decline remains
+    unclearable on the web.
+
+    This is a red-to-green specification for phase 15's ``15-AUTHZ-001``: it
+    turns red if a decline logout is ever shipped. Owner of the eventual fix:
+    phase 15, ``15-AUTHZ-001`` (with phase 06's ``PII-105`` owning decline
+    reversibility). Produced by B-07 gate ``G-7b``.
+    """
+
+    def test_consent_decline_keeps_the_session_and_is_reversible(
+        self, user: User
+    ) -> None:
+        """Pin G-7b: decline keeps the session live and the account re-acceptable.
+
+        Vacuity guard: the session is asserted live before the decline and after
+        it, so the test cannot pass on a client that was never logged in.
+        """
+        client = Client()
+        client.force_login(user)
+        assert "_auth_user_id" in client.session
+
+        decline_response = client.post("/consent/decline/")
+        assert decline_response.status_code == 302
+        assert decline_response.url == "/dashboard/"  # noqa: S105
+
+        user.refresh_from_db()
+        assert user.is_declined is True
+        assert user.ads_auto_publish is False
+
+        # Known gap (G-7b): the session was NOT flushed.
+        assert "_auth_user_id" in client.session
+
+        # Decline is reversible through the authenticated accept path.
+        accept_response = client.post("/consent/accept/")
+        assert accept_response.status_code == 302
+
+        user.refresh_from_db()
+        assert user.is_declined is False
+        assert user.ads_auto_publish is True
+
+
+# ---------------------------------------------------------------------------
 # Tests: consent_withdraw
 # ---------------------------------------------------------------------------
 

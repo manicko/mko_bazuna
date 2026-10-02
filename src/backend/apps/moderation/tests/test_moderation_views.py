@@ -587,6 +587,151 @@ class TestBanUserView:
 
 
 # ---------------------------------------------------------------------------
+# Tests: Known gap — ban_user does not revoke any session (04-AUT-002)
+#
+# These tests deliberately assert the CURRENT, DEFECTIVE behaviour. They are
+# red-to-green specifications for phase 15's 15-AUTHZ-001, not regression
+# guards: each turns red the moment a session-revocation mechanism (or a
+# per-request account-state gate) lands. The gap they pin:
+#
+#   ``04-AUT-002`` — a ``django_session`` row is never invalidated when account
+#   state changes. Of the five account-state transitions only one is reachable
+#   and it is unreachable *for this subject*: ``ban_user`` is ``@staff_required``,
+#   so ``request.user`` is the MODERATOR while the changed identity is
+#   ``ad.user``. ``django.contrib.auth.logout(request)`` takes no target-user
+#   argument, so adding it here would log out the moderator and leave the
+#   banned seller's session fully live.
+#
+# Owner of the fix: phase 15, ``15-AUTHZ-001`` (per-request account-state
+# enforcement). Produced by B-07 gates G-A and G-D.
+# ---------------------------------------------------------------------------
+
+
+class TestBanUserSessionKnownGap:
+    """Pin that ``ban_user`` revokes NO session — neither target nor moderator.
+
+    The web tier has zero per-request account-state enforcement, so a banned
+    seller's live session survives the ban. This class executes that behaviour
+    rather than inferring it, and gives the wrong-target ``logout(request)``
+    trap its own tripwire — the five pre-existing ban tests structurally
+    cannot see it (four assert only ``302`` + ``seller.is_banned``; the fifth is
+    an ``inspect.getsource`` substring check).
+    """
+
+    def test_ban_leaves_the_banned_sellers_session_usable(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """Pin G-A / G-D: the banned seller's session survives ``ban_user``.
+
+        Known gap: ``moderation.views.review.ban_user`` marks ``is_banned`` but
+        performs no session revocation, and the web tier has no per-request
+        account-state gate. Owner: phase 15, ``15-AUTHZ-001``.
+
+        Vacuity guard: the seller is logged in FIRST (a real ``django_session``
+        row is created and asserted live), then the ban mutates state while that
+        session is live. If this ever passes on a client that was never logged
+        in, the assertion is meaningless.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        seller_client = Client()
+        seller_client.force_login(seller)
+        # The seller's session is genuinely live before the ban.
+        assert "_auth_user_id" in seller_client.session
+
+        staff_client = Client()
+        staff_client.force_login(staff_user)
+        response = staff_client.post(
+            f"/moderation/ban/{ad.id}/",
+            data={"ban_reason": "Repeated violations"},
+        )
+
+        assert response.status_code == 302
+        seller.refresh_from_db()
+        assert seller.is_banned is True
+
+        # Known gap (G-A): the banned seller's session is still live.
+        assert "_auth_user_id" in seller_client.session
+
+    def test_ban_does_not_log_out_the_moderator(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """Pin G-D: the MODERATOR's own session survives ``ban_user``.
+
+        This is the tripwire for the wrong-target trap. ``ban_user`` is
+        ``@staff_required``; ``logout(request)`` flushes ``request.session``
+        with no target-user argument. A future edit adding ``logout(request)``
+        to ``ban_user`` would log out the moderator who issued the ban and leave
+        the banned seller live — and all five existing ban tests would stay
+        green. This test is red the moment that happens.
+
+        Owner of the correct fix (per-request account-state gate on the
+        *subject*): phase 15, ``15-AUTHZ-001``.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        staff_client = Client()
+        staff_client.force_login(staff_user)
+        # The moderator's session is genuinely live before the ban.
+        assert "_auth_user_id" in staff_client.session
+
+        response = staff_client.post(
+            f"/moderation/ban/{ad.id}/",
+            data={"ban_reason": "Repeated violations"},
+        )
+
+        assert response.status_code == 302
+        seller.refresh_from_db()
+        assert seller.is_banned is True
+
+        # The moderator's session is still live: the ban did not log them out.
+        assert "_auth_user_id" in staff_client.session
+
+    def test_banned_seller_can_still_reach_the_dashboard(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """Pin G-A: a banned seller's live session still reaches ``/dashboard/``.
+
+        The web tier has zero per-request account-state enforcement, so the
+        banned seller's surviving session is not merely present but usable.
+        Owner: phase 15, ``15-AUTHZ-001``.
+
+        Vacuity guard: log in first, then ban while the session is live.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        seller_client = Client()
+        seller_client.force_login(seller)
+        assert "_auth_user_id" in seller_client.session
+
+        staff_client = Client()
+        staff_client.force_login(staff_user)
+        staff_client.post(
+            f"/moderation/ban/{ad.id}/",
+            data={"ban_reason": "Repeated violations"},
+        )
+
+        seller.refresh_from_db()
+        assert seller.is_banned is True
+
+        # Known gap: the seller is authenticated and the dashboard renders.
+        dashboard = seller_client.get("/dashboard/")
+        assert dashboard.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # Tests: Structural assertions for DB-003 locking (select_for_update)
 # ---------------------------------------------------------------------------
 

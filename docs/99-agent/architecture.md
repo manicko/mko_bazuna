@@ -471,6 +471,72 @@ trigger is a **second tab of the same profile**: opening `/login/issue/` there
 silently supersedes the first tab's still-live unclaimed token, so only the
 second tab's deep-link stays redeemable.
 
+## Account-State and Session Revocation (04-AUT-002)
+
+**Status: `04-AUT-002` is NOT closed.** The web tier has **zero per-request
+account-state enforcement**: `MIDDLEWARE` is a pinned 15-entry list with no gate
+that re-checks `is_banned` / `is_deleted` / `is_declined` on an authenticated
+request. A `django_session` row is therefore never invalidated when account state
+changes.
+
+Of the five account-state transitions, only one is reachable and it is
+unreachable **for its subject**:
+
+- `users/views/consent.py::consent_withdraw` is **CLOSED** — it calls
+  `logout(request)`, which flushes the withdrawing browser's session.
+- `users/views/consent.py::consent_accept` is **correct** — it restores
+  capability; no logout belongs on it.
+- `users/views/consent.py::consent_decline` is deliberately left untouched
+  (`B-07` gate `G-7b`): `can_login(is_declined=True) is False`, and
+  `give_consent` is the only clearer of `is_declined` and is reachable only from
+  an **authenticated** `consent_accept`, so a decline logout would be a
+  permanent one-way door. Acceptance retention (`G-E`) is the missing
+  double-fencing.
+- `users/admin.py::UserAdmin.withdraw_consent_action` is **unreachable and was
+  never registered** in `ModelAdmin.actions`, so the form's `is_deleted` /
+  `is_declined` writes were retired by `B-01` with no compensating operator
+  trigger. **There is no operator-reachable erasure trigger — absent by
+  decision, not by oversight** (`B-07` gate `G-B`). Phase 06's `PII-107` must
+  cite that decision, not the absence.
+- `moderation/views/review.py::ban_user` is **reachable but unfixable with a
+  `logout()`**: it is `@staff_required`, so `request.user` is the **moderator**
+  while the changed identity is `ad.user`. `django.contrib.auth.logout(request)`
+  takes no target-user argument, so adding it would log out the moderator and
+  leave the banned seller's session fully live — a trap the five pre-existing
+  ban tests structurally cannot detect.
+
+`django_session` cannot be enumerated cheaply: it has no user column, and
+`session_data` is `signing.dumps(..., compress=True)` — zlib-compressed, base64,
+HMAC-signed, **never encrypted** — so no `LIKE` scan is possible. An O(live
+sessions) decode scan would also run inside `ban_user`'s already-locked window.
+`ConsentRecord.session_key` is not a shortcut: `auth_login`'s `cycle_key()`
+invalidates it.
+
+**Residual (knowingly accepted, HIGH):** a banned seller who already holds a web
+session keeps it for the remainder of its 14-day life, and can reach the
+dashboard, `ad_edit`, `ad_archive`, `ad_reactivate`, cabinet, search history and
+seller analytics. **The sanction is defeatable:** `ad_edit` and `ad_reactivate`
+have no account-state check and call the real
+`apps.moderation.services.auto_moderation.auto_moderate`, which reads
+`ModerationCriteria` only and **never `is_banned`** — so a banned seller can
+archive an ad, re-post it, and auto-moderation can return it to `PUBLISHED`. A
+ban that lets the seller relist is not a ban. Executed and pinned by
+`apps/ads/tests/test_edit.py::TestBannedSellerRelistKnownGap`. **Owner of the
+fix: phase 15, `15-AUTHZ-001`** (a per-request account-state gate), which is
+also what turns `TestConsentBannerGuard::test_banner_hidden_for_deleted_user`
+red; that test currently encodes the defect (`GET /dashboard/` → `200` for a
+soft-deleted user) and phase 15 must budget its rewrite.
+
+**No `django_session` janitor exists:** `clearsessions` appears nowhere in
+`src/`, `docs/`, `docker/`, `.github/`, `Makefile` or `Makefile.ps1`, so the
+table is unbounded in row count. `SESSION_ENGINE` and `SESSION_COOKIE_AGE` are
+unset, so the backend is the DB and the lifetime is Django's 14-day default.
+This is a retention/row-count control, **not** a session-revocation control
+(`clear_expired()` deletes only rows past `expire_date`); it is re-filed against
+[`db-retention.md`](../02-database/db-retention.md) / phase 12 (`B-07` gate
+`G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (2→3)
+would break two exact-`==` pinned tests in `apps/core/tests/test_scheduler.py`.
+
 ## Bot Command Menu
 
 The bot registers a localized command menu at startup (EC-3). In `telegram_bot/lifecycle.py`,

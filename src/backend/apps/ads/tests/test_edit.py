@@ -926,3 +926,65 @@ class TestEditOtherStatusDirectSave:
         assert ad.title == new_title
         assert ad.status == AdStatus.ON_MODERATION  # unchanged
 
+
+# ---------------------------------------------------------------------------
+# Known gap (04-AUT-002, G-A) — a banned seller can archive and relist an ad
+# ---------------------------------------------------------------------------
+
+
+class TestBannedSellerRelistKnownGap:
+    """Pin that a banned seller's ad can return to PUBLISHED through the real
+    relist chain (``ad_archive`` -> ``ad_reactivate`` -> real ``auto_moderate``).
+
+    Known gap: ``ad_edit`` and ``ad_reactivate`` have NO account-state check, and
+    ``apps.moderation.services.auto_moderation.auto_moderate`` never reads
+    ``is_banned`` — it consults ``ModerationCriteria`` only. A ban that lets the
+    seller relist is not a ban. This test asserts the CURRENT, DEFECTIVE
+    behaviour; it is a red-to-green specification for phase 15's
+    ``15-AUTHZ-001`` and turns red the moment ``ad_edit``/``ad_reactivate`` gain
+    an account-state check or ``auto_moderate`` starts reading ``is_banned``.
+
+    Owner of the fix: phase 15, ``15-AUTHZ-001``. Produced by B-07 gate G-A.
+    """
+
+    def test_banned_seller_can_archive_and_reactivate_an_ad(
+        self,
+        seller,
+        category,
+        city,
+        permissive_criteria,
+    ) -> None:
+        """A banned seller archives then reactivates a PUBLISHED ad; the real
+        ``auto_moderate`` returns it to PUBLISHED.
+
+        The ban is applied AFTER login so a live session drives the chain, and
+        ``auto_moderate`` is NOT mocked: its failure to read ``is_banned`` is the
+        point of the test. Asserts on the ad's final status only.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+        assert "_auth_user_id" in client.session
+
+        # Ban the seller while the session is live.
+        seller.is_banned = True
+        seller.save(update_fields=["is_banned"])
+        seller.refresh_from_db()
+        assert seller.is_banned is True
+
+        # Archive the ad (PUBLISHED -> ARCHIVED).
+        archive_response = client.post(reverse("ads:archive", args=[ad.id]))
+        assert archive_response.status_code == 302
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+
+        # Reactivate it: the view transitions ARCHIVED -> ON_MODERATION and then
+        # calls the real ``auto_moderate``, which does not read ``is_banned``.
+        reactivate_response = client.post(reverse("ads:reactivate", args=[ad.id]))
+        assert reactivate_response.status_code == 302
+
+        ad.refresh_from_db()
+        # Known gap (G-A): the banned seller's ad is PUBLISHED again.
+        assert ad.status == AdStatus.PUBLISHED
+        assert ad.published_at is not None
+
