@@ -198,10 +198,11 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # newest-to-expire sessions. The anti-theft benefit is a function of the window's
 # age, not of the flag.
 #
-# No number for this setting pre-existed: it was absent from the spec, the code
-# and every .env template, so the value could not be derived from the repository
-# and choosing one is a product decision, not an engineering one. The spec now
-# states the number, so changing the value here requires a paired edit to
+# No number for this setting pre-existed: it was not specified in the spec, the
+# code or any .env template; 14 days matches Django's own default rather than
+# being a figure the repository computed. Choosing the number is therefore a
+# product decision, not a derivable engineering constant. The spec now states the
+# number, so changing the value here requires a paired edit to
 # docs/01-spec/technical-specification.md section H.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 1209600 seconds (14 days)
 SESSION_SAVE_EVERY_REQUEST = False

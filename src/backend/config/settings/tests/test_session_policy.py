@@ -13,7 +13,7 @@ product decision rather than an implicit framework default. These tests pin the
 
 Tests 3 and 4 together are the point: a test that only exercised an anonymous
 session would pass without ever touching an authenticated session, which would be
-theatre. Test 5 pins the ``?lang=`` exception so the write-triggered semantics are
+theatre. Test 4 pins the ``?lang=`` exception so the write-triggered semantics are
 executable rather than prose. No test hardcodes the production value ``1209600``
 — the value is a product decision owned elsewhere, so these tests are
 number-independent and survive a later change to 7 days or 24 hours.
@@ -151,13 +151,16 @@ def test_declared_age_bounds_a_real_sessions_expiry() -> None:
     assert not Session.objects.filter(session_key=session_key).exists()
 
 
-def test_authenticated_session_is_written_once_at_login_and_never_refreshed() -> None:
-    """An authenticated session's ``expire_date`` is stamped at login and frozen.
+def test_authenticated_session_is_not_refreshed_by_read_only_requests() -> None:
+    """Read-only requests leave an authenticated session's ``expire_date`` unchanged.
 
-    Read-only requests that trigger no production session write (no ``?lang=``,
-    no search, no consent write) must leave the persisted ``expire_date``
-    unchanged. This is the authenticated half of the central semantic claim: the
-    lifetime is absolute from login, not a sliding idle window.
+    Every request this test makes triggers no production session write, so the
+    persisted ``expire_date`` stamped at login must be byte-identical afterwards
+    (no ``?lang=``, no search, no consent write). The claim is scoped to those
+    requests, not to the lifetime in general: test 4
+    (``test_lang_switch_re_stamps_authenticated_session``) is the counterpart
+    that pins the ``?lang=`` re-stamp, so an authenticated session is
+    write-triggered rather than refreshed on every read.
     """
     telegram_id = 700000600
     make_user(telegram_id, username="session_policy_auth")
@@ -183,8 +186,9 @@ def test_lang_switch_re_stamps_authenticated_session() -> None:
     language middleware writes ``request.session["django_language"]`` on a
     supported ``?lang=`` for an authenticated user, and that write makes
     ``SessionMiddleware.process_response`` save the row again, so the window
-    moves. Test 3 covers the *no-write* authenticated path (no ``?lang=``); this
-    test pins the exception, so the spec's "again only on a ``?lang=`` language
+    moves. ``test_authenticated_session_is_not_refreshed_by_read_only_requests``
+    covers the *no-write* authenticated path (no ``?lang=``); this test pins the
+    exception, so the spec's "again only on a ``?lang=`` language
     switch" clause is an executable fact rather than prose that can drift.
 
     Number-independent: it compares two observed expiries, never ``1209600``.
