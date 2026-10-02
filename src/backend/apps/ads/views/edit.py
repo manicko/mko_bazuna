@@ -239,16 +239,21 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         },
                     )
                 else:
-                    # Price/photo only edit: stay published; recompute normalized price.
+                    # Price/photo only edit: stay published; recompute normalized
+                    # price and restart the auto-archive clock. The clock reset
+                    # shares the existing single save() deliberately: a second
+                    # save() would fire a second post_save and register a second
+                    # transaction.on_commit(deliver_immediate_alerts), which can
+                    # send a duplicate immediate alert.
                     ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
-                    ad.save(
-                        update_fields=[
-                            "price_amount",
-                            "price_currency",
-                            "price_normalized_eur",
-                            "updated_at",
-                        ]
-                    )
+                    update_fields = [
+                        "price_amount",
+                        "price_currency",
+                        "price_normalized_eur",
+                        "updated_at",
+                    ]
+                    ad.reset_publish_clock(update_fields)
+                    ad.save(update_fields=update_fields)
                     logger.info("Ad %s price/photo edited, stays PUBLISHED", ad_id)
 
                 return redirect("ads:dashboard")

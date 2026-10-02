@@ -377,6 +377,21 @@ class Ad(models.Model):
     def __str__(self) -> str:
         return f"Ad {self.id}: {str(self.title)[:50]}"
 
+    def reset_publish_clock(self, update_fields: list[str]) -> None:
+        """Reset ``published_at`` to now and register it in *update_fields*.
+
+        Owns the clock reset so every caller shares one implementation: sets
+        ``self.published_at`` to its own ``timezone.now()`` and appends
+        ``"published_at"`` to the caller's ``update_fields`` list.
+
+        This method does **not** call ``save()``. It only mutates the instance
+        and the caller's list, so the caller must still
+        ``save(update_fields=update_fields)`` — an assignment without the append
+        would be a silent no-op (the column is simply not written).
+        """
+        self.published_at = timezone.now()
+        update_fields.append("published_at")
+
     def transition_to(
         self,
         target: AdStatus,
@@ -446,13 +461,15 @@ class Ad(models.Model):
         update_fields = ["status"]
 
         if target == AdStatus.PUBLISHED:
-            # Reset published_at on every PUBLISHED transition
-            self.published_at = now_val
-            update_fields.append("published_at")
+            # Reset published_at on every PUBLISHED transition. Called before
+            # the original_published_at block so first publish can anchor
+            # original_published_at to the same instant as published_at.
+            self.reset_publish_clock(update_fields)
 
-            # Set original_published_at once (immutable)
+            # Set original_published_at once (immutable). On first publish it
+            # mirrors published_at exactly; on later publishes it is left as-is.
             if self.original_published_at is None:
-                self.original_published_at = now_val
+                self.original_published_at = self.published_at
                 update_fields.append("original_published_at")
 
             # Set published_by if moderator provided

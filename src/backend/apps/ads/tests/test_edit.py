@@ -19,12 +19,15 @@ Reactors under test:
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.db.models.signals import post_save
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.ads.views.edit import _apply_price_change
@@ -329,7 +332,8 @@ class TestPublishedTextEdit:
     immediately, then ``auto_moderate`` is invoked: on pass the ad is promoted
     back to PUBLISHED; on fail it stays ON_MODERATION and the edit form is
     re-rendered with a seller-safe error. Price/photo-only edits stay
-    PUBLISHED (no auto-moderation). Mixed edits follow the text rule.
+    PUBLISHED (no auto-moderation) and restart the auto-archive clock.
+    Mixed edits follow the text rule.
     """
 
     def test_edit_published_text_edit_transitions_to_on_moderation(
@@ -378,19 +382,26 @@ class TestPublishedTextEdit:
         assert ad.title == new_title
         assert ad.description == new_description
 
-    def test_edit_published_price_only_stays_published(
+    def test_edit_published_price_only_resets_publish_clock(
         self, client_, seller, category, city
     ) -> None:
-        """PUBLISHED ad with price-only change -> stays PUBLISHED,
-        published_at unchanged, price_normalized_eur recomputed via PriceNormalizer.
+        """PUBLISHED ad with price-only change -> stays PUBLISHED and the
+        publish clock is reset (published_at moves strictly forward),
+        price_normalized_eur recomputed via PriceNormalizer.
 
         Title and description are unchanged so ``has_text_change`` is False,
         taking the price/photo-only branch (status preserved).
+
+        Reason for the rewrite (project rule 2 — production code is king): the
+        previous version of this test asserted ``published_at`` was *unchanged*
+        and its docstring said so. That encoded the defect fixed in BLOCK 2;
+        decision J, ``Ad.published_at``'s ``help_text`` and ``db-schema.md`` all
+        promise the reset. The code now matches the documentation.
         """
         ad = create_test_ad(
             seller, category, city, status=AdStatus.PUBLISHED, price=100
         )
-        original_published_at = ad.published_at
+        initial_published_at = ad.published_at
         new_price = Decimal("200")
 
         response = client_.post(
@@ -405,16 +416,95 @@ class TestPublishedTextEdit:
 
         assert response.status_code == 302
         assert "dashboard" in response.url
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.PUBLISHED
-        # published_at unchanged (no status transition)
-        assert ad.published_at == original_published_at
+        # Assert on a second, independent fetch: an in-memory check would pass
+        # even if update_fields were wrong and the reset never persisted.
+        reloaded = Ad.objects.get(pk=ad.pk)
+        assert reloaded.status == AdStatus.PUBLISHED
+        # The price edit restarts the auto-archive clock.
+        assert reloaded.published_at > initial_published_at
         # price_normalized_eur recomputed via PriceNormalizer
         expected_normalized = PriceNormalizer().normalize_to_eur(
             new_price, CurrencyCode.EUR
         )
-        assert ad.price_normalized_eur == expected_normalized
-        assert ad.price_amount == new_price
+        assert reloaded.price_normalized_eur == expected_normalized
+        assert reloaded.price_amount == new_price
+
+    def test_edit_published_price_only_does_not_touch_original_published_at(
+        self, client_, seller, category, city
+    ) -> None:
+        """A price-only edit resets ``published_at`` but leaves the immutable
+        ``original_published_at`` untouched.
+
+        ``TestOriginalPublishedAtImmutability`` covers the re-publish path; this
+        covers the price-edit path, which no existing test exercised.
+
+        ``create_test_ad(status=PUBLISHED)`` does not set
+        ``original_published_at`` (only the first ``transition_to(PUBLISHED)``
+        does), so we seed it explicitly to have a real value to preserve.
+        """
+        first_published_at = timezone.now() - timedelta(days=30)
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            original_published_at=first_published_at,
+        )
+        initial_original_published_at = ad.original_published_at
+        assert initial_original_published_at == first_published_at
+
+        response = client_.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": ad.title,
+                "description": ad.description,
+                "price_amount": "200",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        reloaded = Ad.objects.get(pk=ad.pk)
+        assert reloaded.original_published_at == initial_original_published_at
+        assert reloaded.published_at > initial_original_published_at
+
+    def test_edit_published_price_only_fires_single_post_save(
+        self, client_, seller, category, city
+    ) -> None:
+        """The price-only edit produces exactly ONE ``post_save`` for ``Ad``.
+
+        Regression guard for the duplicate-alert hazard: the clock reset shares
+        the single existing ``save()``. A second ``save()`` in the same
+        transaction would fire a second ``post_save`` and register a second
+        ``transaction.on_commit(deliver_immediate_alerts)``, which can send a
+        duplicate Telegram message.
+        """
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        saves: list[int] = []
+
+        def _record_post_save(sender, instance, **kwargs) -> None:
+            if instance.pk == ad.pk:
+                saves.append(instance.pk)
+
+        post_save.connect(_record_post_save, sender=Ad)
+        try:
+            response = client_.post(
+                reverse("ads:edit", args=[ad.id]),
+                data={
+                    "title": ad.title,
+                    "description": ad.description,
+                    "price_amount": "200",
+                    "price_currency": CurrencyCode.EUR.value,
+                },
+            )
+        finally:
+            post_save.disconnect(_record_post_save, sender=Ad)
+
+        assert response.status_code == 302
+        assert len(saves) == 1
 
     def test_edit_published_mixed_edit_transitions_to_on_moderation(
         self, client_, seller, category, city
