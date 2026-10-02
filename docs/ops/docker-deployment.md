@@ -352,7 +352,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions, CSRF, password-reset) are invalidated. |
+| `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions and CSRF tokens) are invalidated. |
 | `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather (placeholder `<...>` values are rejected at boot). An **empty** value is legal in development: the bot logs `BOT_TOKEN not set - skipping bot startup (development mode)` and the rest of the stack runs normally. A *placeholder* value is rejected by the bot entrypoint (`telegram_bot/main.py`) and fails the bot process only — it no longer aborts the whole dev stack at Django settings import. Rotate if compromised: get a new token from @BotFather, update `BOT_TOKEN` in `.env.prod`, then run `docker compose ... up -d bot`. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is needed. After rotation, the old token is immediately invalidated. |
 | `BOT_USERNAME` | Yes (prod) | Telegram handle without `@`; 3-32 chars, `[A-Za-z0-9_]` only. **Required in production**: `prod.py` rejects an empty, placeholder (`<your-bot-username>`) or malformed value at boot, so `web` and `bot` will not start until it is real. It is also a seed value only — migration `0003` copies it into the `SiteConfig` singleton once and no render path reads the env var afterwards, so a value that was wrong at migration time leaves a dead `t.me/` row behind. Correct an already-seeded row with `manage.py repair_bot_username` (or the Django admin) — see [`contact-us.md`](../01-spec/contact-us.md). |
@@ -399,7 +399,7 @@ restart the affected container(s), and account for the consequences.
    ```bash
    docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d web bot
    ```
-4. All signed tokens (sessions, CSRF, password-reset) are invalidated; users must re-authenticate and password-reset links expire.
+4. All signed tokens (sessions and CSRF tokens) are invalidated; users must re-authenticate. Telegram `LoginToken` rows are unaffected — a `LoginToken` is a database row identified by `token_hash`, not a token signed with `DJANGO_SECRET_KEY`.
 
 **`BOT_TOKEN`** — rotate if the token is compromised or exposed.
 
@@ -515,7 +515,7 @@ Deployment configuration is validated via Django's `manage.py check --deploy`:
   | `ALLOWED_HOSTS` | non-empty | `ValueError` |
   | `CSRF_TRUSTED_ORIGINS` | non-empty | `ValueError` |
 
-  A non-empty placeholder or weak key is rejected at boot, preventing session/CSRF/password-reset token forgery. `EMAIL_BACKEND` is also **pinned** unconditionally to `smtp.EmailBackend` — it is not operator-configurable in production, so a console backend cannot be injected. A hand-set `EMAIL_BACKEND` in `.env.prod` is still **read** by `base.py` and then **silently discarded** by the `prod.py` pin, with no boot warning; SMTP is the only supported production transport until a closed transport set exists. (Do not "adopt the `StrEnum` path first" — that set was deliberately never built.)
+  A non-empty placeholder or weak key is rejected at boot, preventing session and CSRF token forgery. `EMAIL_BACKEND` is also **pinned** unconditionally to `smtp.EmailBackend` — it is not operator-configurable in production, so a console backend cannot be injected. A hand-set `EMAIL_BACKEND` in `.env.prod` is still **read** by `base.py` and then **silently discarded** by the `prod.py` pin, with no boot warning; SMTP is the only supported production transport until a closed transport set exists. (Do not "adopt the `StrEnum` path first" — that set was deliberately never built.)
 
   The validation is bypassed in two cases: during the Docker image build (`DJANGO_BUILD=1`, build-time `collectstatic`), and for dev one-shot services, which run the bootstrap module `config.settings.oneshot` with `DJANGO_ONESHOT=1` (set on `migrate`, `load_cities`, `load_catalog`, `create_admin`, and `seed` in `docker-compose.dev.override.yml`) — these do not serve HTTP and are fed placeholder/dummy tokens from `.env.dev` during bootstrap. Under `config.settings.prod` the `DJANGO_ONESHOT` flag is ignored (with a boot warning) and the guards always run. In production, `docker-compose.prod.yml` one-shot services run **full** secret validation against the real `.env.prod` values (no bypass flag); the long-lived `web` and `bot` services also never set either flag, so the real secret values are enforced at boot.
 
@@ -1091,28 +1091,29 @@ docker compose --env-file .env.dev \
 
 ### Password Change
 
-To change the admin password, use Django's built-in password change command:
+To change an admin password, use Django's built-in `changepassword` command. It prompts for the
+new value on stdin (via `getpass`), so it must be run interactively — **do not** pass `-T`:
 
 ```bash
-# Open Django shell in web container
-make shell
-
-# In the shell:
-from django.contrib.auth import get_user_model
-User = get_user_model()
-user = User.objects.get(telegram_id=-1)  # or username='admin'
-user.set_password('new_secure_password')
-user.save()
-exit()
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml \
+  run --rm web /opt/venv/bin/python src/backend/manage.py changepassword <username>
 ```
 
-Or use the `create_admin_user` command again with a new password - it's idempotent and will
-skip if a user with the same `telegram_id` already exists:
+Replace `<username>` with the account's `USERNAME_FIELD` value — for this project that is the
+`username` column (admin accounts created by `create_admin_user` use the `--username` value).
 
-```bash
-# This will skip if telegram_id=-1 already exists
-make create-admin
-```
+Use the venv interpreter path `/opt/venv/bin/python` rather than `uv run`: a one-shot `run`
+container can fail with a read-only `/opt/venv`, and `uv run` may attempt to re-sync the venv.
+
+`changepassword` enforces `AUTH_PASSWORD_VALIDATORS` against the new value **and**, for the first
+time on this path, against the **persisted** user record (the old raw-`set_password` recipe in the
+Django shell bypassed every validator). A value that the old recipe would have accepted is now
+refused and the command exits non-zero. Note that this only applies to the *next* change: a
+credential already stored under the old recipe stays weak until it is changed here.
+
+> `create_admin_user` is **not** an alternative for changing a password. It is idempotent, which
+> means it returns early — before any password write — as soon as a user with the same
+> `telegram_id` (or `username`) exists, so re-running it with a new `--password` is a no-op.
 
 ### Changing the Telegram ID Placeholder
 

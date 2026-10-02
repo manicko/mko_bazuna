@@ -215,7 +215,7 @@ for:
 
 | Variable | Effect of rollback | Restart required |
 |----------|--------------------|------------------|
-| `DJANGO_SECRET_KEY` | All signed tokens (sessions, CSRF, password-reset) become valid again for the old key | `web`, `bot` |
+| `DJANGO_SECRET_KEY` | All signed tokens (sessions and CSRF tokens) become valid again for the old key. Telegram `LoginToken` rows are database rows keyed by `token_hash`, not signed tokens, so they are unaffected | `web`, `bot` |
 | `BOT_TOKEN` | Restored bot token resumes polling from the last offset | `bot` only |
 | `GOOGLE_TRANSLATE_API_KEY` | Translation calls resume with the valid key | `bot` only |
 | `ALLOWED_HOSTS` | Host header validation relaxed/stricter | `web` only |

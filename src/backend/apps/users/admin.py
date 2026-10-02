@@ -28,6 +28,19 @@ class UserAdmin(admin.ModelAdmin):
     before validation, ``save_model`` writes the stored hash back unchanged and
     the widget renders ``hasher.safe_summary()`` (masked). The add view closes
     the same plaintext hole through ``UserCreationForm``.
+
+    Known gap (deferred to phase 15 ``15-AUTHZ-003``): ``ReadOnlyPasswordHashWidget``
+    renders a "Reset password" link pointing at ``../password/``, which **404s**.
+    ``django.contrib.auth.admin.UserAdmin`` serves that URL through its own
+    ``get_urls()`` (``<id>/password/`` -> ``auth_user_password_change``), and that
+    hook also injects the ``password_url`` context variable the widget template
+    falls back from. This class declares no ``get_urls()``, so the link has no
+    target. The button did **not** exist before ``B-01``: it arrived only because
+    ``B-01`` switched the change view to ``UserChangeForm``; the pre-``B-01``
+    auto-built form rendered ``password`` as a plain writable ``CharField`` and
+    showed no such button. It is recorded here rather than fixed deliberately —
+    adding ``get_urls()`` would create a credential-write surface owned by phase
+    15, not by this documentation block.
     """
 
     form = UserChangeForm

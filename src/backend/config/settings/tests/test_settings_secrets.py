@@ -195,6 +195,26 @@ def test_redis_url_required_in_production() -> None:
     assert "REDIS_URL" in result.stderr
 
 
+def test_prod_requires_email_host() -> None:
+    """EMAIL_HOST set present-but-empty with every other prod guard satisfied
+    raises ImproperlyConfigured naming EMAIL_HOST.
+
+    This is the sole precondition for the shipped Telegram -> email support-ticket
+    notification path; the guard turns a misconfigured SMTP host into a boot-time
+    failure rather than a silent support black hole.
+
+    The assertion must name EMAIL_HOST. A bare ``ImproperlyConfigured`` assertion
+    is satisfiable by any earlier guard (SITE_URL, REDIS_URL, ...), so it would
+    not prove this guard fired. Every other prod guard is therefore satisfied
+    explicitly, and EMAIL_HOST is presented-but-empty (rather than deleted) so
+    base.py's read_env() cannot restore it from the bind-mounted .env.test.
+    """
+    env = _prod_env_overrides(EMAIL_HOST="")
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" in stderr
+    assert "EMAIL_HOST" in stderr
+
+
 def test_secret_key_with_dollar_sign_preserved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

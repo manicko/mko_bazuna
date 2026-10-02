@@ -223,11 +223,15 @@ if not os.getenv("SITE_URL") and not _SKIP_SECRET_VALIDATION:  # noqa: F405
         "Provide it via the .env.prod runtime file."
     )
 
-# Fail fast: EMAIL_HOST is required in production so transactional emails
-# (password resets, alert notifications, seller confirmations) are deliverable.
-# Skipped during the Docker image build (DJANGO_BUILD=1) so collectstatic
-# succeeds. Dev bootstrap one-shots run config.settings.oneshot, not this
-# module. The real SMTP config is provided at runtime via .env.prod.
+# Fail fast: EMAIL_HOST is required in production so the one transactional
+# email the application actually sends — the Telegram support-ticket
+# notification — is deliverable. This is the sole send_mail path in the
+# codebase; there is no password-reset, alert-notification or seller-
+# confirmation email flow to name here. Without the guard a misconfigured SMTP
+# host turns the support inbox into a silent black hole rather than a boot
+# failure. Skipped during the Docker image build (DJANGO_BUILD=1) so
+# collectstatic succeeds. Dev bootstrap one-shots run config.settings.oneshot,
+# not this module. The real SMTP config is provided at runtime via .env.prod.
 if not _SKIP_SECRET_VALIDATION:
     if not EMAIL_HOST:  # noqa: F405
         raise ImproperlyConfigured(
@@ -250,8 +254,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 # Mail transport is pinned, not operator-configurable: base.py honours the
-# EMAIL_BACKEND env var, and a console backend would write message bodies
-# (password-reset tokens, confirmations, support-ticket text) to stdout.
+# EMAIL_BACKEND env var, and a console backend would write support-ticket
+# message bodies to stdout. SMTP is the sole outbound transport in production;
+# there is no password-reset or confirmation mail path whose tokens could leak.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Static files are served via whitenoise. The storage backend is owned by
