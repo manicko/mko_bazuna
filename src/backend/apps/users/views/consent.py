@@ -257,7 +257,7 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
     user = request.user
     withdraw_consent(user)
 
-    # AUT-002: flush the session on consent withdrawal so a withdrawn
+    # 04-AUT-002: flush the session on consent withdrawal so a withdrawn
     # (soft-deleted) identity cannot keep using seller features. This must
     # run after withdraw_consent() (DB commit) and before the redirect.
     logout(request)

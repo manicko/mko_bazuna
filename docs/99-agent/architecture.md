@@ -563,6 +563,79 @@ The policy is **write-triggered, not a sliding idle window**: Django re-stamps
 by each recorded non-empty search. See
 [`technical-specification.md` §H](../01-spec/technical-specification.md).
 
+## Login-Issuance Rate-Limit Keying (04-AUT-003)
+
+**Status: `04-AUT-003` is PARTIALLY CLOSED.** The **Python** half is closed; the
+**nginx edge** half is **DEFERRED, not fixed**.
+
+**Python half (closed).** `apps/core/utils/client_ip.py::get_client_ip` is the
+shared peer-gated resolver. The three identical private `_get_client_ip` copies
+in `login_rate_limit.py`, `contact_rate_limit.py` and `rate_limit.py` were
+**deleted, not merged**. The gate reads `REMOTE_ADDR` first and returns the peer
+with **no header read at all** when the peer is not loopback/private/
+`TRUSTED_PROXY_NETWORKS`; only when the gate is open does it prefer
+`X-Real-IP`, else walk `X-Forwarded-For` right-to-left to the first non-private
+hop. A public peer sending either header lands on the **byte-identical** key to
+sending neither.
+
+**Edge half (deferred, why).** `X-Real-IP` is set at **9/9** prod and **6/6**
+dev `proxy_pass` locations and `get_client_ip` returns on it **before**
+`X-Forwarded-For`, so the XFF branch is **unreachable in production** and
+`XFF[0]` being attacker-controlled is **inert by construction**. Separately, the
+edge work **cannot be delivered**: `actions/checkout@v4` runs on an ephemeral
+`ubuntu-latest` runner, the deploy SSH script contains **no `git` command**, and
+the nginx config is a **`:ro` bind mount**, so `up -d` will not recreate the
+service. `real_ip` was **refused as harmful**, not deferred: nginx is the first
+hop, so `set_real_ip_from` has no legitimate value to name, and
+`set_real_ip_from 0.0.0.0/0` would make every client a trusted proxy and —
+because `limit_req_zone` keys on `$binary_remote_addr` — **destroy the nginx
+rate limiting**.
+
+**The exposure this leaves.** In production `REMOTE_ADDR` at Django is always
+nginx's container IP, so the **peer gate is always open** and correctness rests
+on one directive in 15 places. Three textual tests in
+`src/backend/tests/test_nginx_config.py` now pin that invariant, so a future edit
+that deletes, repoints or wildcards it turns a test red.
+
+**Owner and promotion trigger.** Owned by **phase 09** (both `.conf` files) and
+**phase 15 `15-AUTHZ-003`** (the `X-Real-IP` directive is load-bearing and is
+the likelier thing to be touched). It becomes an ordinary change when
+`deploy.yml` gains `git pull` + `nginx -t` + `reload` **with nginx in the
+rollback**, **or** the config is baked into the image instead of bind-mounted.
+**A separate trigger: putting a CDN or load balancer in front of nginx
+invalidates the model and makes `set_real_ip_from` necessary for the first
+time — then this deferral must be revisited immediately, not optionally.** The
+five manual steps for applying an nginx config change are in the operator
+runbook, [`docker-deployment.md`](../ops/docker-deployment.md#applying-a-change-to-the-nginx-configuration).
+
+### Comment-Half Tracker Qualification (04-VAL-002)
+
+**Status: `04-VAL-002` is PARTIALLY CLOSED.** The **tracker-key** half is
+delivered — the in-source finding references are phase-qualified
+(`04-AUT-001`, not `AUT-001`) so a tracker lookup resolves against the phase's
+own identifier space. The **comment** half is now delivered by the same pass
+that closed the residual bare citations (see below). **Neither half was closed
+earlier than this pass; do not read the finding as fully fixed before it.**
+
+### Deferred: Untranslated `create_admin_user` Password-Policy Msgid (04-AUT-005)
+
+**Recorded deferral, not a fix.** The msgid
+`"Password does not meet the password policy: %(errors)s"` was added to
+`apps/core/management/commands/create_admin_user.py::Command.handle` via
+`gettext_lazy as _`. The string is **operator-facing** — it is surfaced by the
+`create_admin_user` one-shot service when an operator-supplied `ADMIN_PASSWORD`
+fails `validate_password`. It is **currently untranslated in `ru`, `bs` and
+`en`**: the msgid has no catalog entry in any of the three `.po` files, so a
+Russian or Bosnian operator sees the English text.
+
+The i18n completeness gate (`test_i18n_completeness.py`) **does not cover it**:
+that gate scans templates and `telegram_bot/handlers/` only, and performs no
+catalog-parity check for Python `gettext_lazy` msgids, so the gap is invisible
+to CI. This is the direct, defensible cost of the phase's "no `.po` modified"
+boundary, which existed because another agent owned the catalogs concurrently.
+The msgid is **queued for the `.po` owner**; translating it is out of scope for
+this pass. The call site carries an inline pointer back to this record.
+
 ## Bot Command Menu
 
 The bot registers a localized command menu at startup (EC-3). In `telegram_bot/lifecycle.py`,

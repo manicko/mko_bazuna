@@ -394,7 +394,7 @@ class TestConsentWithdrawView:
         response = client.post("/consent/withdraw/")
         assert response.status_code == 302
         assert response.url == "/dashboard/"
-        # Session flushed by django.contrib.auth.logout (AUT-002)
+        # Session flushed by django.contrib.auth.logout (04-AUT-002)
         assert "_auth_user_id" not in client.session
 
     def test_withdraw_workflow_returns_anonymous(self, user: User) -> None:

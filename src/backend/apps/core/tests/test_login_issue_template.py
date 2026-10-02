@@ -53,7 +53,7 @@ def test_login_issue_template_uses_telegram_deep_link() -> None:
 def test_login_issue_template_does_not_hide_deep_link_on_load() -> None:
     """``login_issue.html`` must not hide the deep-link button on page load.
 
-    The deep-link button is the only actionable control on the page (AUT-001).
+    The deep-link button is the only actionable control on the page (04-AUT-001).
     Hiding it unconditionally at page load prevents the user from tapping it to
     open Telegram. The polling loop resolves success/expiry instead.
     """

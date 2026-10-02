@@ -135,6 +135,10 @@ class Command(BaseCommand):
             try:
                 validate_password(password, user=candidate)
             except ValidationError as exc:
+                # This msgid is deliberately untranslated in ru/bs/en and is not
+                # covered by the i18n completeness gate; the deferral is recorded
+                # in docs/99-agent/architecture.md (see "Deferred: Untranslated
+                # create_admin_user Password-Policy Msgid").
                 raise CommandError(
                     _("Password does not meet the password policy: %(errors)s")
                     % {"errors": "; ".join(exc.messages)}

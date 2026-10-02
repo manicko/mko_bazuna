@@ -290,6 +290,7 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     raw_token = secrets.token_urlsafe(RAW_TOKEN_ENTROPY_BYTES)
     token_hash = _hash_raw_token(raw_token)
     resolved_browser_id = _resolve_browser_id(browser_id)
+    browser_binding = _hash_browser_id(resolved_browser_id)
 
     # AUT-007 supersession. UPDATE-before-CREATE, so a second issue supersedes
     # the first *instead of* leaving both live. Unclaimed tokens only
@@ -298,7 +299,7 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
     # disjunct — a NULL row is already unredeemable (UNBOUND) and the disjunct
     # would cross bindings.
     superseded = LoginToken.objects.filter(
-        browser_binding=_hash_browser_id(resolved_browser_id),
+        browser_binding=browser_binding,
         telegram_id__isnull=True,
         consumed_at__isnull=True,
         expires_at__gt=timezone.now(),
@@ -309,13 +310,13 @@ def issue_token(browser_id: str | None = None) -> IssuedToken:
         "for binding %s...",
         token_hash[:8],
         superseded,
-        _hash_browser_id(resolved_browser_id)[:8],
+        browser_binding[:8],
     )
 
     LoginToken.objects.create(
         token_hash=token_hash,
         expires_at=timezone.now() + datetime.timedelta(seconds=TOKEN_TTL_SECONDS),
-        browser_binding=_hash_browser_id(resolved_browser_id),
+        browser_binding=browser_binding,
     )
     return IssuedToken(
         raw_token=raw_token,

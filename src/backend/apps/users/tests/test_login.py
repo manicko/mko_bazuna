@@ -1,5 +1,5 @@
 """
-Tests for web login views (login_issue, login_status) — AUT-009.
+Tests for web login views (login_issue, login_status) — 04-AUT-001.
 
 Covers:
 - login_issue: 200 response, token hash stored as SHA-256, 5-min expiry, raw_token in context, rate limiting
@@ -182,7 +182,7 @@ class TestLoginTokenBinding:
 
         What changed and why: ``B-03`` shipped this test to pin that a repeat
         issue does not break the *binding* — a re-mint would have left the first
-        token bound to an id the cookie no longer held. ``G-4b`` (``AUT-007``)
+        token bound to an id the cookie no longer held. ``G-4b`` (``04-AUT-007``)
         now also supersedes the browser's earlier live *unclaimed* token at
         issue time, so the binding guard is kept **and** the supersession is
         asserted: the binding is still reused, not re-minted, but the first
@@ -719,7 +719,7 @@ class TestLoginPreferredCitySync:
 
 
 # ---------------------------------------------------------------------------
-# login_rate_limit_check (AUT-009 rate-limit contract)
+# login_rate_limit_check (04-AUT-003 rate-limit contract)
 # ---------------------------------------------------------------------------
 
 
