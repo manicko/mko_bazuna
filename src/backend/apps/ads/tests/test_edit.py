@@ -30,7 +30,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.ads.views.edit import EDITABLE_DIRECT_SAVE_STATUSES, _apply_price_change
+from apps.ads.views.edit import (
+    EDIT_FORM_AVAILABLE_STATUSES,
+    EDITABLE_DIRECT_SAVE_STATUSES,
+    _apply_price_change,
+)
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
@@ -1220,24 +1224,47 @@ class TestEditStatusAllowListEnumeration:
 
 
 class TestDashboardEditLinkGate:
-    """The dashboard renders the Edit link exactly for allow-listed statuses.
+    """The dashboard renders the Edit link exactly for the affordance set.
 
-    The link must be present for ``DRAFT``/``ON_MODERATION`` and absent for
-    ``ON_MODERATION_FAILED``/``REJECTED``/``ARCHIVED``, matching
-    ``EDITABLE_DIRECT_SAVE_STATUSES``.
+    The link must be present for ``ON_MODERATION``, ``PUBLISHED``, and
+    ``ARCHIVED`` — the dashboard buckets for which ``ad_edit`` can reach a
+    working edit form — and absent for
+    ``ON_MODERATION_FAILED``/``REJECTED``/``DELETED``, matching
+    ``EDIT_FORM_AVAILABLE_STATUSES`` (the UI affordance set), NOT
+    ``EDITABLE_DIRECT_SAVE_STATUSES`` (the direct-save branch set). ``DRAFT`` is
+    in the affordance set but is not a dashboard bucket, so it is pinned by the
+    set-level invariant test rather than the rendered dashboard.
     """
 
     def _edit_url(self, ad: Ad) -> str:
         return reverse("ads:edit", args=[ad.id])
 
+    def test_affordance_set_is_strict_superset_of_branch_set(self) -> None:
+        """The affordance set is a strict superset of the branch set and
+        contains ``DRAFT`` and ``PUBLISHED``.
+
+        This pins the invariant whose violation caused the BLOCK 8A defect: one
+        set was asked to answer two different questions, so gating the Edit link
+        on the branch set hid it for every live ``PUBLISHED`` ad. The affordance
+        set must always be derived from — and therefore always cover —
+        the branch set, with ``PUBLISHED`` present. ``DRAFT`` is asserted here
+        rather than in the rendered-dashboard parametrization because the
+        dashboard has no ``DRAFT`` bucket, so no ad row (and thus no Edit link)
+        is ever rendered for it.
+        """
+        assert EDIT_FORM_AVAILABLE_STATUSES > EDITABLE_DIRECT_SAVE_STATUSES
+        assert AdStatus.DRAFT in EDIT_FORM_AVAILABLE_STATUSES
+        assert AdStatus.PUBLISHED in EDIT_FORM_AVAILABLE_STATUSES
+
     @pytest.mark.parametrize(
         ("status", "expected"),
         [
             (AdStatus.ON_MODERATION, True),
-            (AdStatus.PUBLISHED, False),
+            (AdStatus.PUBLISHED, True),
+            (AdStatus.ARCHIVED, True),
             (AdStatus.ON_MODERATION_FAILED, False),
             (AdStatus.REJECTED, False),
-            (AdStatus.ARCHIVED, False),
+            (AdStatus.DELETED, False),
         ],
     )
     def test_edit_link_presence_per_status(
@@ -1248,15 +1275,19 @@ class TestDashboardEditLinkGate:
         status: AdStatus,
         expected: bool,
     ) -> None:
-        """The Edit link is present iff the status is in the allow-list.
+        """The Edit link is present iff the status is in the affordance set.
 
-        The gate is driven by the **same** ``EDITABLE_DIRECT_SAVE_STATUSES``
-        set the view enforces, so among the dashboard's buckets only
-        ``ON_MODERATION`` shows the link. ``PUBLISHED`` and ``ARCHIVED`` retain
-        their own action affordances (price/photo edits and reactivation) and
-        the view branches for them are untouched; the link gate itself follows
-        the allow-list exactly, per AD-002 / BLOCK 8A acceptance criterion 4.
-        ``DRAFT`` is not a dashboard bucket, so it is covered by the view tests
+        The gate is driven by ``EDIT_FORM_AVAILABLE_STATUSES`` — the statuses
+        for which ``ad_edit`` can succeed — so ``ON_MODERATION``, ``PUBLISHED``,
+        and ``ARCHIVED`` show the link in their dashboard buckets. ``PUBLISHED``
+        has its own working text/price edit branch and ``ARCHIVED`` has a working
+        reactivation path, so hiding the link for either would be a dead
+        affordance in reverse: a working edit the seller cannot reach.
+        ``ON_MODERATION_FAILED``, ``REJECTED``, and ``DELETED`` are the statuses
+        with no working edit path; they must not advertise one.
+
+        ``DRAFT`` is in the affordance set but is not a dashboard bucket, so it
+        is covered by ``test_affordance_set_is_strict_superset_of_branch_set``
         instead of the rendered dashboard.
         """
         ad = create_test_ad(seller, category, city, status=status, price=100)

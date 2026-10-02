@@ -99,7 +99,7 @@
                                         {% endwith %}
                                     {% endif %}
                                     <div class="flex flex-wrap gap-2 text-xs">
-                                        {% if status in editable_statuses %}
+                                        {% if status in edit_form_available_statuses %}
                                             <a href="{% url 'ads:edit' ad.id %}"
                                                class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
                                                 {% trans "Edit" %}

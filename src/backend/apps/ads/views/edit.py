@@ -35,16 +35,36 @@ logger = logging.getLogger(__name__)
 
 #: Statuses whose ad may be edited by a direct save (no status transition).
 #:
-#: This is the single source of truth for the ``ad_edit`` direct-save branch
-#: and for the dashboard's Edit-link gate. The set is deliberately explicit:
-#: previously the catch-all ``else:`` admitted DRAFT, ON_MODERATION,
-#: ON_MODERATION_FAILED, REJECTED, DELETED, and (conditionally) ARCHIVED, so
-#: every status silently took the same write path. Naming the two coherent
-#: statuses — an unsubmitted DRAFT and a pending ON_MODERATION ad — makes every
-#: other status a defined refusal and turns any future re-broadening into a
-#: one-line, auditable diff (finding AD-002, BLOCK 8A).
+#: This is the **branch** set: the single source of truth for which statuses
+#: take the ``ad_edit`` catch-all direct-save branch (``DRAFT`` and
+#: ``ON_MODERATION``). It is deliberately explicit: previously the catch-all
+#: ``else:`` admitted DRAFT, ON_MODERATION, ON_MODERATION_FAILED, REJECTED,
+#: DELETED, and (conditionally) ARCHIVED, so every status silently took the same
+#: write path. Naming the two coherent statuses — an unsubmitted DRAFT and a
+#: pending ON_MODERATION ad — makes every other status a defined refusal and
+#: turns any future re-broadening into a one-line, auditable diff
+#: (finding AD-002, BLOCK 8A).
+#:
+#: This set answers only "which statuses may take the direct save?" It is NOT
+#: the set of statuses whose edit form is reachable — see the UI affordance set
+#: ``EDIT_FORM_AVAILABLE_STATUSES`` below, which is derived from this one.
 EDITABLE_DIRECT_SAVE_STATUSES: frozenset[AdStatus] = frozenset(
     {AdStatus.DRAFT, AdStatus.ON_MODERATION}
+)
+
+#: UI affordance set: the statuses for which ``ad_edit`` can succeed, i.e. the
+#: statuses whose dashboard Edit link must be shown.
+#:
+#: This is the **affordance** set and it is NOT the branch set. ``PUBLISHED``
+#: has its own working branch (text edit -> ``ON_MODERATION``; price-only edit
+#: stays ``PUBLISHED`` with a publish-clock reset) and ``ARCHIVED`` has a
+#: working reactivation path (``is_reactivation`` routes through ``submit_ad``),
+#: yet neither takes the direct save, so neither is in
+#: ``EDITABLE_DIRECT_SAVE_STATUSES`` above. It is derived from that branch set
+#: with ``|`` so the two can never drift: every direct-save status is also an
+#: edit-form status, and the two extra statuses are appended explicitly.
+EDIT_FORM_AVAILABLE_STATUSES: frozenset[AdStatus] = (
+    EDITABLE_DIRECT_SAVE_STATUSES | frozenset({AdStatus.PUBLISHED, AdStatus.ARCHIVED})
 )
 
 
