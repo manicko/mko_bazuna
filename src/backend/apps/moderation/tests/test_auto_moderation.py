@@ -48,14 +48,18 @@ def moderation_criteria():
     return criteria
 
 
-def _create_valid_ad(user, category, city, **kwargs):
-    """Create an Ad that passes all default-criteria checks, with 2 images."""
+def _create_valid_ad(user, category, city, *, status=AdStatus.ON_MODERATION, **kwargs):
+    """Create an Ad that passes all default-criteria checks, with 2 images.
+
+    ``status`` is explicit (not forwarded silently) so this wrapper cannot
+    fabricate a state production never holds.
+    """
     defaults = {
         "title": "Valid Title",
         "description": "Valid description text here",
     }
     defaults.update(kwargs)
-    ad = create_test_ad(user, category, city, **defaults)
+    ad = create_test_ad(user, category, city, status=status, **defaults)
     AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
     AdImage.objects.create(ad=ad, image="img1.jpg", position=1)
     return ad
@@ -97,6 +101,7 @@ class TestCheckFunction:
             self.city,
             title="abc",
             description="Valid description text here",
+            status=AdStatus.ON_MODERATION,
         )
         AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
 
@@ -319,6 +324,7 @@ class TestValidateImageCount:
             self.city,
             title="Valid Title",
             description="Valid description text here",
+            status=AdStatus.ON_MODERATION,
         )
 
         passed, error = check(ad)
@@ -333,6 +339,7 @@ class TestValidateImageCount:
             self.city,
             title="Valid Title",
             description="Valid description text here",
+            status=AdStatus.ON_MODERATION,
         )
         for i in range(7):
             AdImage.objects.create(ad=ad, image=f"img{i}.jpg", position=i)
@@ -349,6 +356,7 @@ class TestValidateImageCount:
             self.city,
             title="Valid Title",
             description="Valid description text here",
+            status=AdStatus.ON_MODERATION,
         )
         for i in range(3):
             AdImage.objects.create(ad=ad, image=f"img{i}.jpg", position=i)
@@ -497,6 +505,7 @@ class TestAutoModerateFunction:
             self.city,
             title="abc",
             description="Valid description text here",
+            status=AdStatus.ON_MODERATION,
         )
         AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
 

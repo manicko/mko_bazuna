@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.models import ExchangeRate
 from apps.currencies.services.exceptions import ExchangeRateNotFoundError
@@ -59,7 +60,12 @@ class TestNormalizePriceToEur:
     ) -> None:
         """A present currency with a valid rate sets the normalized EUR value."""
         ad = create_test_ad(
-            seller, category, city, price=100, price_currency=CurrencyCode.BAM
+            seller,
+            category,
+            city,
+            price=100,
+            price_currency=CurrencyCode.BAM,
+            status=AdStatus.ON_MODERATION,
         )
         normalize_price_to_eur(ad, Decimal("100"), CurrencyCode.BAM)
         assert ad.price_normalized_eur == Decimal("51.2000")
@@ -74,7 +80,12 @@ class TestNormalizePriceToEur:
         ``normalize_price_to_eur`` must swallow it and clear the value.
         """
         ad = create_test_ad(
-            seller, category, city, price=100, price_currency=CurrencyCode.EUR
+            seller,
+            category,
+            city,
+            price=100,
+            price_currency=CurrencyCode.EUR,
+            status=AdStatus.ON_MODERATION,
         )
         ExchangeRate.objects.filter(currency=CurrencyCode.EUR.value).update(
             is_current=False
@@ -87,7 +98,12 @@ class TestNormalizePriceToEur:
     ) -> None:
         """A missing currency clears the normalized value."""
         ad = create_test_ad(
-            seller, category, city, price=100, price_currency=CurrencyCode.EUR
+            seller,
+            category,
+            city,
+            price=100,
+            price_currency=CurrencyCode.EUR,
+            status=AdStatus.ON_MODERATION,
         )
         normalize_price_to_eur(ad, Decimal("100"), None)
         assert ad.price_normalized_eur is None

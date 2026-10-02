@@ -94,7 +94,7 @@ class TestPriorityService:
     def test_calculate_and_save_creates_priority_record(self, category, city) -> None:
         """calculate_and_save creates a new AdModerationPriority record."""
         user = make_user(990030010)
-        ad = create_test_ad(user, category, city)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
         service = PriorityService()
 
         result = service.calculate_and_save(ad)
@@ -107,7 +107,7 @@ class TestPriorityService:
     def test_calculate_and_save_updates_existing_record(self, category, city) -> None:
         """calculate_and_save updates an existing record instead of creating duplicate."""
         user = make_user(990030010)
-        ad = create_test_ad(user, category, city)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
         service = PriorityService()
 
         first = service.calculate_and_save(ad)
@@ -119,7 +119,9 @@ class TestPriorityService:
         """calculate_and_save correctly computes score with banned words."""
         _banned_words_setup("spam", "scam")
         user = make_user(990030010)
-        ad = create_test_ad(user, category, city, title="spam offer")
+        ad = create_test_ad(
+            user, category, city, title="spam offer", status=AdStatus.ON_MODERATION
+        )
         service = PriorityService()
 
         result = service.calculate_and_save(ad)
@@ -130,7 +132,7 @@ class TestPriorityService:
     def test_get_queued_ads_returns_moderation_ads(self, category, city) -> None:
         """get_queued_ads returns ads with ON_MODERATION status."""
         user = make_user(990030010)
-        ad = create_test_ad(user, category, city)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
         service = PriorityService()
         service.calculate_and_save(ad)
 
@@ -167,12 +169,21 @@ class TestPriorityService:
         service = PriorityService()
 
         high_ad = create_test_ad(
-            user, category, city, title="spam scam cheap fake counterfeit"
+            user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(high_ad)
 
         low_ad = create_test_ad(
-            user, category, city, title="Clean title", description="Clean description"
+            user,
+            category,
+            city,
+            title="Clean title",
+            description="Clean description",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(low_ad)
 
@@ -193,12 +204,21 @@ class TestPriorityService:
         service = PriorityService()
 
         high_ad = create_test_ad(
-            user, category, city, title="spam scam cheap fake counterfeit"
+            user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(high_ad)
 
         low_ad = create_test_ad(
-            user, category, city, title="Clean title", description="Clean description"
+            user,
+            category,
+            city,
+            title="Clean title",
+            description="Clean description",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(low_ad)
 
@@ -220,12 +240,21 @@ class TestPriorityService:
         service = PriorityService()
 
         high_ad = create_test_ad(
-            user, category, city, title="spam scam cheap fake counterfeit"
+            user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(high_ad)
 
         low_ad = create_test_ad(
-            user, category, city, title="Clean title", description="Clean description"
+            user,
+            category,
+            city,
+            title="Clean title",
+            description="Clean description",
+            status=AdStatus.ON_MODERATION,
         )
         service.calculate_and_save(low_ad)
 
@@ -261,7 +290,7 @@ class TestCalculateAdPrioritySignal:
     def test_signal_creates_priority_on_moderation_status(self, category, city) -> None:
         """Signal creates AdModerationPriority when ad is saved with ON_MODERATION status."""
         user = make_user(990030020)
-        ad = create_test_ad(user, category, city)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
 
         ad.refresh_from_db()
         assert hasattr(ad, "moderation_priority")
@@ -290,7 +319,7 @@ class TestCalculateAdPrioritySignal:
     ) -> None:
         """Signal does NOT recalculate priority if record already exists."""
         user = make_user(990030020)
-        ad = create_test_ad(user, category, city)
+        ad = create_test_ad(user, category, city, status=AdStatus.ON_MODERATION)
         ad.refresh_from_db()
 
         # Save the same ad again
@@ -345,7 +374,7 @@ class TestModerationQueueView:
 
     def test_queue_shows_ads(self, category, city) -> None:
         """Queue page shows ads in moderation."""
-        ad = create_test_ad(self.user, category, city)
+        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
         PriorityService().calculate_and_save(ad)
 
         client = Client()
@@ -358,7 +387,13 @@ class TestModerationQueueView:
 
     def test_queue_filters_by_priority(self, category, city) -> None:
         """Queue page filters by priority parameter."""
-        ad = create_test_ad(self.user, category, city, title="Low priority ad")
+        ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Low priority ad",
+            status=AdStatus.ON_MODERATION,
+        )
         PriorityService().calculate_and_save(ad)
 
         client = Client()
@@ -379,11 +414,21 @@ class TestModerationQueueView:
         client.force_login(self.staff_user)
 
         high_ad = create_test_ad(
-            self.user, category, city, title="spam scam cheap fake counterfeit"
+            self.user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
+        low_ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Low priority ad",
+            status=AdStatus.ON_MODERATION,
+        )
         PriorityService().calculate_and_save(low_ad)
 
         response = client.get(self.queue_url)
@@ -399,11 +444,21 @@ class TestModerationQueueView:
         client.force_login(self.staff_user)
 
         high_ad = create_test_ad(
-            self.user, category, city, title="spam scam cheap fake counterfeit"
+            self.user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
+        low_ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Low priority ad",
+            status=AdStatus.ON_MODERATION,
+        )
         PriorityService().calculate_and_save(low_ad)
 
         response = client.get(f"{self.queue_url}?priority=all")
@@ -421,11 +476,21 @@ class TestModerationQueueView:
         client.force_login(self.staff_user)
 
         high_ad = create_test_ad(
-            self.user, category, city, title="spam scam cheap fake counterfeit"
+            self.user,
+            category,
+            city,
+            title="spam scam cheap fake counterfeit",
+            status=AdStatus.ON_MODERATION,
         )
         PriorityService().calculate_and_save(high_ad)
 
-        low_ad = create_test_ad(self.user, category, city, title="Low priority ad")
+        low_ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Low priority ad",
+            status=AdStatus.ON_MODERATION,
+        )
         PriorityService().calculate_and_save(low_ad)
 
         response = client.get(f"{self.queue_url}?priority=bogus")
@@ -436,7 +501,7 @@ class TestModerationQueueView:
 
     def test_queue_shows_priority_counts(self, category, city) -> None:
         """Queue page displays priority counts in the filter links."""
-        ad = create_test_ad(self.user, category, city)
+        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
         PriorityService().calculate_and_save(ad)
 
         client = Client()
@@ -497,8 +562,16 @@ class TestBulkModerationActionView:
 
     def test_bulk_approve(self, category, city) -> None:
         """Bulk approve action approves all selected ads."""
-        ad1 = create_test_ad(self.user, category, city, title="Test Ad First")
-        ad2 = create_test_ad(self.user, category, city, title="Test Ad Second")
+        ad1 = create_test_ad(
+            self.user, category, city, title="Test Ad First", status=AdStatus.ON_MODERATION
+        )
+        ad2 = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Test Ad Second",
+            status=AdStatus.ON_MODERATION,
+        )
         AdImage.objects.create(ad=ad1, image="img1.jpg", position=0)
         AdImage.objects.create(ad=ad2, image="img2.jpg", position=0)
 
@@ -528,8 +601,12 @@ class TestBulkModerationActionView:
 
     def test_bulk_reject(self, category, city) -> None:
         """Bulk reject action rejects all selected ads with reason."""
-        ad1 = create_test_ad(self.user, category, city, title="Ad 1")
-        ad2 = create_test_ad(self.user, category, city, title="Ad 2")
+        ad1 = create_test_ad(
+            self.user, category, city, title="Ad 1", status=AdStatus.ON_MODERATION
+        )
+        ad2 = create_test_ad(
+            self.user, category, city, title="Ad 2", status=AdStatus.ON_MODERATION
+        )
 
         client = Client()
         client.force_login(self.staff_user)
@@ -558,7 +635,9 @@ class TestBulkModerationActionView:
 
     def test_bulk_flag(self, category, city) -> None:
         """Bulk flag action recalculates priority for selected ads."""
-        ad = create_test_ad(self.user, category, city, title="Flagged ad")
+        ad = create_test_ad(
+            self.user, category, city, title="Flagged ad", status=AdStatus.ON_MODERATION
+        )
 
         client = Client()
         client.force_login(self.staff_user)
@@ -617,7 +696,7 @@ class TestBulkModerationActionView:
 
     def test_approve_ad_get_returns_405(self, category, city) -> None:
         """GET to approve_ad endpoint returns 405 Method Not Allowed."""
-        ad = create_test_ad(self.user, category, city)
+        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(self.staff_user)

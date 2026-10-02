@@ -27,6 +27,7 @@ import threading
 import pytest
 from django.db import OperationalError, connection, transaction
 
+from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.integration]
@@ -70,7 +71,7 @@ class TestLockWaitIsBounded:
         deadline: against the pre-fix code (no bound) the waiter never returns,
         so the test fails on the deadline instead of hanging the suite.
         """
-        ad = create_test_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
         ad_id = ad.id
 
         started = threading.Event()

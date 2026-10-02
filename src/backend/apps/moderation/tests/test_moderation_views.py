@@ -66,10 +66,16 @@ def _create_ad_with_image(
     user: User,
     category: Category,
     city: City,
+    *,
+    status: AdStatus = AdStatus.ON_MODERATION,
     **kwargs,
 ) -> tuple[Ad, AdImage]:
-    """Create an ad with one image."""
-    ad = create_test_ad(user, category, city, **kwargs)
+    """Create an ad with one image.
+
+    ``status`` is explicit (not forwarded silently) so this wrapper cannot
+    fabricate a state production never holds.
+    """
+    ad = create_test_ad(user, category, city, status=status, **kwargs)
     ad_image = AdImage.objects.create(
         ad=ad,
         image="test-uuid-image-key.jpg",
