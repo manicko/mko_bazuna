@@ -3,10 +3,28 @@ Account state service for Mko Bazuna.
 
 Distinguishes ban vs delete vs publish-restriction. Three independent flags.
 Used by both web dashboard and bot for account state checking.
+
+This module is also the single home of the queryset-level account-state
+predicate, :func:`account_state_q` (finding ``06-PII-104``). It is a *pure
+function returning a* ``Q`` value: it is never installed on a manager, so it
+cannot silently filter ``User.objects``. That matters because
+``AccountStateMiddleware._resolve_user`` does ``User.objects.get(chat_id=...)``
+and treats a miss as an unregistered, fail-open identity — a default-manager
+filter would invert the deny gates this predicate exists to enforce.
+
+Import-cycle hazard (future): this module's transitive import closure already
+reaches ``apps.search.services.cache`` through
+``apps/users/services/__init__.py`` -> ``deletion`` ->
+``bump_search_cache_version``. The alert path (``apps.search``) consuming this
+declaration therefore depends on ``apps/search/services/__init__.py`` staying
+import-free; a submodule import added there would close the loop and break the
+whole alert path. A fresh-interpreter probe in the tests is the tripwire.
 """
 
 import logging
 from typing import NamedTuple
+
+from django.db.models import Q
 
 from apps.users.models import User
 
@@ -45,6 +63,34 @@ def get_account_state(user: User) -> AccountState:
         is_declined=user.is_declined,
         ads_auto_publish=user.ads_auto_publish,
         consent_revoked=user.consent_revoked_at is not None,
+    )
+
+
+def account_state_q(prefix: str = "") -> Q:
+    """The single account-state consent rule, as a filterable ``Q``.
+
+    ``prefix`` is the ORM lookup prefix from the calling queryset to ``User``:
+    ``""`` on a ``User`` queryset, ``"user__"`` on a model that reaches the
+    owner through its ``user`` FK (e.g. ``SavedSearch``, ``Ad``).
+
+    Returns a new ``Q`` value on every call. ``Q`` is immutable and
+    ``Q.__and__`` returns a new object, so callers may compose it with their
+    own filters without mutating the declaration or a sibling call's result.
+
+    Mirrors ``get_account_state()`` except for ``is_active`` — see the honest
+    limit documented on the queryset-level tests. The five conjuncts are
+    ``is_deleted``, ``consent_revoked_at``, ``is_declined``, ``is_banned`` and
+    ``is_active``; the full rationale is in the phase-06 plan, finding
+    ``06-PII-104``.
+    """
+    return Q(
+        **{
+            f"{prefix}is_deleted": False,
+            f"{prefix}is_declined": False,
+            f"{prefix}is_banned": False,
+            f"{prefix}consent_revoked_at__isnull": True,
+            f"{prefix}is_active": True,
+        }
     )
 
 
