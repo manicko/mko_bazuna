@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 # shell/entrypoint/compose-injected vars.
 # The reverse direction is asserted by
 # config/settings/tests/test_env_allowlist_reverse.py.
+# Consequence: a new setting backed by env()/os.getenv keeps working locally but
+# leaves the deployment contract, so the reverse AST gate fails until its
+# variable name is added to the allowlist.
 ALLOWED_ENV_VARS = frozenset({
     # --- Python-consumed (env()/env.*()/os.getenv in base.py, prod.py,
     #     apps/core/utils/migrate_locked.py) ---
@@ -157,8 +160,16 @@ LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]
 # Security settings (TLS/SSL ready)
 # The cookie-secure overrides in dev.py/test.py are development-only relaxations
 # of these production defaults.
+# Session cookie: sent only over HTTPS, so a network observer cannot read the
+# session id off the wire. Deliberate production default; the block header above
+# records the only relaxations.
 SESSION_COOKIE_SECURE = True
+# Session cookie: hidden from document.cookie, so an XSS payload cannot read the
+# session id through the DOM.
 SESSION_COOKIE_HTTPONLY = True
+# Session cookie: "Lax" withholds the cookie from cross-site subrequests (a CSRF
+# defence) while still allowing top-level navigations such as the Telegram login
+# return.
 SESSION_COOKIE_SAMESITE = "Lax"
 # Session lifetime and refresh policy, declared explicitly so the policy is
 # visible rather than implicit. 60 * 60 * 24 * 14 = 1209600 seconds (14 days),
@@ -183,8 +194,15 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # repository: changing the value is a product decision, not an engineering one.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 1209600 seconds (14 days)
 SESSION_SAVE_EVERY_REQUEST = False
+# CSRF token cookie: sent only over HTTPS, so the token cannot be replayed from
+# a plain-HTTP downgrade.
 CSRF_COOKIE_SECURE = True
+# CSRF token cookie: hidden from document.cookie; templates pass the token to
+# forms through {% csrf_token %} rather than client-side reads. Left this way
+# because CSRF_USE_SESSIONS is unset: the token stays a cookie, not session state.
 CSRF_COOKIE_HTTPONLY = True
+# CSRF token cookie: "Lax" allows the token on top-level cross-site navigations
+# and withholds it on cross-site subrequests.
 CSRF_COOKIE_SAMESITE = "Lax"
 # The login-binding cookie's ``__Host-`` prefix. This one setting resolves BOTH
 # the cookie's name and its ``Secure`` flag (see login_token.py): when True the
@@ -202,6 +220,13 @@ CSRF_COOKIE_SAMESITE = "Lax"
 # the prefix to off in production, which a fixed setting cannot do. On an
 # HTTP-only origin the prefix control is absent by design (there is no transport
 # security to anchor it to), not by oversight.
+#
+# Why the ``__Host-`` prefix matters: without it a sibling host on the same
+# registrable domain could set a ``Domain``-scoped cookie of the same name and
+# supply the client-chosen value the binding gate compares against. The prefix
+# restricts the cookie to a host-only, ``Secure``, ``Path=/`` origin, which the
+# full rationale in login_token.py documents; this setting is the single switch
+# that turns it on.
 LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX = True
 
 # Trusted origins for CSRF protection (Origin/Referer header validation).
@@ -547,6 +572,11 @@ CACHES = {
 # Production (prod.py) enforces EMAIL_HOST via a fail-fast guard. Dev and test
 # environments override EMAIL_BACKEND to console/locmem backends that do not
 # require SMTP connectivity (see dev.py and test.py).
+# The mail path serves exactly one purpose: the Telegram support-ticket
+# notification in telegram_bot/services/support_delivery_email.py, which is the
+# only send_mail call site in the codebase. There is no password-reset,
+# alert-notification or seller-confirmation flow, so do not build one assuming
+# this plumbing already exists.
 EMAIL_HOST = env("EMAIL_HOST", default="")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
