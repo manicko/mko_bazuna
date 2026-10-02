@@ -13,6 +13,10 @@ call to be *status-grounded* — it either passes a literal ``status=`` keyword,
 or forwards ``**kwargs`` from an enclosing function that declares a ``status``
 parameter or splats a dict containing a ``"status"`` key. A bare ``**``-splat
 from a function that never mentions ``status`` fails.
+
+:func:`test_factory_default_is_a_durably_committable_state` encodes the
+*reason*: the default of both factories must be a state ``auto_moderate`` can
+durably commit — i.e. explicitly not ``ON_MODERATION``.
 """
 
 from __future__ import annotations
@@ -20,6 +24,9 @@ from __future__ import annotations
 import ast
 
 from django.conf import settings
+
+from apps.core.enums import AdStatus
+from conftest import create_test_ad, create_test_ads_bulk
 
 _FACTORY_NAMES = frozenset({"create_test_ad", "create_test_ads_bulk"})
 _PROJECT_ROOT = settings.BASE_DIR.parent
@@ -165,3 +172,31 @@ def test_no_factory_call_relies_on_a_silent_default() -> None:
         "explicit status parameter / a splatted dict containing a 'status' "
         "key:\n  " + "\n  ".join(violations)
     )
+
+def _status_default(factory) -> AdStatus:
+    """Return the ``status`` default of *factory* (keyword-only or positional)."""
+    kwdefaults = getattr(factory, "__kwdefaults__", None) or {}
+    if "status" in kwdefaults:
+        return kwdefaults["status"]
+    return next(
+        value
+        for value in (factory.__defaults__ or ())
+        if isinstance(value, AdStatus)
+    )
+
+
+def test_factory_default_is_a_durably_committable_state() -> None:
+    """Both factories default to a state ``auto_moderate`` can durably commit.
+
+    ``auto_moderate`` never leaves a row in ``ON_MODERATION``: it resolves the
+    state in the same transaction (pass -> PUBLISHED, fail ->
+    ON_MODERATION_FAILED, raise -> rollback). A factory defaulting to
+    ``ON_MODERATION`` therefore fabricates a state production cannot hold.
+    """
+    for factory in (create_test_ad, create_test_ads_bulk):
+        default_status = _status_default(factory)
+        assert default_status != AdStatus.ON_MODERATION, (
+            f"{factory.__name__} defaults to ON_MODERATION, which auto_moderate "
+            "never commits durably; moderation-queue tests must pass status= "
+            "explicitly. Default it to PUBLISHED instead."
+        )

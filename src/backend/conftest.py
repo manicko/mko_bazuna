@@ -287,7 +287,7 @@ def create_test_ad(
     *,
     title: str = "Test Ad",
     description: str = "Test description",
-    status: AdStatus = AdStatus.ON_MODERATION,
+    status: AdStatus = AdStatus.PUBLISHED,
     price: int | Decimal = 100,
     price_currency: CurrencyCode | str = CurrencyCode.EUR,
     source: AdSource = AdSource.TELEGRAM,
@@ -299,6 +299,17 @@ def create_test_ad(
     ``moderation_failed_at``, or ``deleted_at`` based on the ``status``
     value, satisfying the strict database ``CheckConstraint`` rules on the
     ``Ad`` model. Callers can override any field via ``**kwargs``.
+
+    The default status is ``PUBLISHED``. ``ON_MODERATION`` is *not* a
+    durably committable state: ``auto_moderate`` resolves it in the same
+    transaction (pass -> ``PUBLISHED``, fail -> ``ON_MODERATION_FAILED``,
+    raise -> rollback), so a row only ever rests in it transiently. A test
+    that needs the moderation queue must therefore pass ``status=``
+    explicitly (``ON_MODERATION`` for an approve/reject *input*, or
+    ``ON_MODERATION_FAILED`` for a durably reachable queue entry) rather than
+    relying on this default. ``PUBLISHED`` is the safe default because such
+    a row is visible in listings, search, the dashboard and alerts, so a
+    forgotten ``status=`` fails loudly on an unrelated assertion.
 
     The ``price`` argument is the seller's original amount (in
     ``price_currency``, default EUR); the EUR-normalized value is set equal to
@@ -330,7 +341,7 @@ def create_test_ads_bulk(
     *,
     title_prefix: str = "Test Ad",
     description: str = "Test description",
-    status: AdStatus = AdStatus.ON_MODERATION,
+    status: AdStatus = AdStatus.PUBLISHED,
     price: int | Decimal = 100,
     price_currency: CurrencyCode | str = CurrencyCode.EUR,
     source: AdSource = AdSource.TELEGRAM,
@@ -343,6 +354,10 @@ def create_test_ads_bulk(
     the FTS trigger is row-level, so behavior is identical to individual
     inserts. Rows are titled ``f"{title_prefix} {i}"`` (numbering can be
     disabled by passing an explicit ``title`` via ``kwargs``).
+
+    The default status is ``PUBLISHED`` for the same reason as
+    ``create_test_ad`` (``ON_MODERATION`` is never durably committed by
+    ``auto_moderate``).
     """
     ads: list[Ad] = []
     for i in range(count):
