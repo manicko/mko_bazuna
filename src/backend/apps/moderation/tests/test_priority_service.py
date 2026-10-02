@@ -11,17 +11,23 @@ Tests cover:
 from __future__ import annotations
 
 import json
+import logging
+import threading
+import time
+from unittest.mock import patch
 
 import pytest
+from django.db import IntegrityError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
-from apps.ads.models import AdImage
+from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
 from apps.core.enums import (
     AdPriorityLevel,
     AdStatus,
     BulkModerationAction,
+    BulkModerationError,
     PriorityFilter,
 )
 from apps.locations.models import City
@@ -662,7 +668,12 @@ class TestBulkModerationActionView:
         assert hasattr(ad, "moderation_priority")
 
     def test_bulk_errors_reported(self, category, city) -> None:
-        """Errors for individual items are reported without failing the whole batch."""
+        """Errors for individual items are reported without failing the whole batch.
+
+        A missing id is a distinct, actionable failure class (05-AD-010): the
+        per-id error says the ad was not found rather than a cause-free generic
+        string. The response shape and HTTP 200 are unchanged.
+        """
         client = Client()
         client.force_login(self.staff_user)
         response = client.post(
@@ -681,6 +692,7 @@ class TestBulkModerationActionView:
         assert data["completed"] == 0
         assert len(data["errors"]) == 1
         assert data["errors"][0]["id"] == 99999
+        assert data["errors"][0]["error"] == BulkModerationError.AD_NOT_FOUND.value
 
     def test_unknown_action_returns_422(self) -> None:
         """Unknown action type is rejected with 422 before any item is processed."""
@@ -806,7 +818,12 @@ class TestBulkModerationActionView:
     # ── Finding 14: bulk API sanitizes error messages ──────────────────────
 
     def test_error_messages_sanitized(self) -> None:
-        """Error messages returned to client are sanitized, not raw exceptions."""
+        """Error messages returned to client are sanitized, not raw exceptions.
+
+        A missing ad yields the specific "not found" string (05-AD-010), which
+        still carries no driver text, table/constraint name, ``DETAIL`` or
+        ``CONTEXT``.
+        """
         client = Client()
         client.force_login(self.staff_user)
         response = client.post(
@@ -825,7 +842,10 @@ class TestBulkModerationActionView:
         assert data["completed"] == 0
         assert len(data["errors"]) == 1
         assert data["errors"][0]["id"] == 99999
-        assert data["errors"][0]["error"] == "Processing failed"
+        assert data["errors"][0]["error"] == BulkModerationError.AD_NOT_FOUND.value
+        lowered = data["errors"][0]["error"].lower()
+        for forbidden in ("detail", "context", "select", "insert", "constraint"):
+            assert forbidden not in lowered
 
     # ── Ext-003b: bulk API caps batch size at MAX_BULK_ACTIONS ────────────────
 
@@ -888,3 +908,316 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
         assert response.status_code == 404
+
+    # ── 05-AD-010 (Q11): per-ad transaction, row lock, honest errors ───────
+
+    def test_mixed_batch_partial_failure_contract(self, category, city) -> None:
+        """A valid id and an invalid-status id in one batch: the valid ad is
+        processed, the invalid one is reported with its own specific string,
+        and the response is still 200 with an honest ``completed`` count.
+
+        This is the test that proves the per-ad isolation: under a per-request
+        ``atomic()`` the rejection's ``ValueError`` would poison the batch
+        transaction and the next iteration would raise
+        ``TransactionManagementError`` (a 500). Under the shipped per-ad
+        ``atomic()`` both ids are handled independently.
+        """
+        valid_ad = create_test_ad(
+            self.user, category, city, status=AdStatus.ON_MODERATION
+        )
+        invalid_ad = create_test_ad(
+            self.user, category, city, status=AdStatus.ARCHIVED
+        )
+
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.REJECT.value,
+                    "selected_items": [valid_ad.id, invalid_ad.id],
+                    "reason": "policy violation",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 1
+        assert data["errors"] == [
+            {"id": invalid_ad.id, "error": BulkModerationError.INVALID_TRANSITION.value}
+        ]
+
+        valid_ad.refresh_from_db()
+        invalid_ad.refresh_from_db()
+        assert valid_ad.status == AdStatus.REJECTED
+        # The invalid ad was not touched by the refusal.
+        assert invalid_ad.status == AdStatus.ARCHIVED
+
+    def test_integrity_error_does_not_roll_back_prior_ads(self, category, city) -> None:
+        """An ``IntegrityError`` while processing ad k leaves ad k untouched and
+        does not roll back ads 1..k-1.
+
+        ``reject_ad`` is patched so the *real* transition commits inside the
+        per-ad ``atomic()``, then an ``IntegrityError`` is raised. The per-ad
+        savepoint rolls ad k back while ad 1 (processed first) stays committed.
+        Against the pre-fix loop (no per-ad transaction) ad k's transition
+        survives in autocommit, so this assertion is red before the fix.
+        """
+        ads = [
+            create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION),
+            create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION),
+            create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION),
+        ]
+        failing_ad = ads[1]
+
+        from apps.moderation.views.api_bulk import reject_ad as view_reject_ad
+
+        def _reject_then_fail(ad, moderator_id, reason):
+            view_reject_ad(ad, moderator_id, reason)
+            if ad.id == failing_ad.id:
+                raise IntegrityError("simulated mid-record failure")
+
+        client = Client()
+        client.force_login(self.staff_user)
+        with patch(
+            "apps.moderation.views.api_bulk.reject_ad", side_effect=_reject_then_fail
+        ):
+            response = client.post(
+                self.bulk_url,
+                data=json.dumps(
+                    {
+                        "action": BulkModerationAction.REJECT.value,
+                        "selected_items": [ads[0].id, failing_ad.id, ads[2].id],
+                        "reason": "policy violation",
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 2
+        assert data["errors"] == [
+            {"id": failing_ad.id, "error": BulkModerationError.PROCESSING_FAILED.value}
+        ]
+
+        ads[0].refresh_from_db()
+        failing_ad.refresh_from_db()
+        ads[2].refresh_from_db()
+        # Ads 1 and 3 (processed before/after the failure) committed.
+        assert ads[0].status == AdStatus.REJECTED
+        assert ads[2].status == AdStatus.REJECTED
+        # The failing ad was rolled back by its own per-ad transaction.
+        assert failing_ad.status == AdStatus.ON_MODERATION
+
+    def test_invalid_transition_not_error_and_not_cause_free(
+        self, category, city, caplog
+    ) -> None:
+        """A state-machine ``ValueError`` on ordinary user input is reported
+        with a specific string and logged at WARNING, never ERROR.
+
+        The returned string must not leak the exception text, the transition
+        pair, the table/constraint name, ``DETAIL`` or ``CONTEXT``.
+        """
+        invalid_ad = create_test_ad(
+            self.user, category, city, status=AdStatus.ARCHIVED
+        )
+
+        client = Client()
+        client.force_login(self.staff_user)
+        with caplog.at_level(logging.DEBUG):
+            response = client.post(
+                self.bulk_url,
+                data=json.dumps(
+                    {
+                        "action": BulkModerationAction.REJECT.value,
+                        "selected_items": [invalid_ad.id],
+                        "reason": "policy violation",
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 0
+        assert data["errors"] == [
+            {"id": invalid_ad.id, "error": BulkModerationError.INVALID_TRANSITION.value}
+        ]
+
+        message = data["errors"][0]["error"]
+        assert message == "Ad is not in a modifiable state"
+        for forbidden in (
+            "Invalid transition",
+            "archived",
+            "->",
+            "DETAIL",
+            "CONTEXT",
+            "ads_ad",
+            "constraint",
+        ):
+            assert forbidden not in message
+
+        bulk_records = [r for r in caplog.records if "Bulk moderation" in r.message]
+        assert bulk_records, "expected a WARNING log for the refused transition"
+        assert all(r.levelno < logging.ERROR for r in bulk_records)
+
+    def test_unexpected_exception_is_generic_and_loud(self, category, city, caplog) -> None:
+        """A genuinely unexpected exception still yields a generic, non-leaking
+        string AND an ERROR-level log — an infra failure is never a silent 200.
+        """
+        ad = create_test_ad(self.user, category, city, status=AdStatus.PUBLISHED)
+
+        client = Client()
+        client.force_login(self.staff_user)
+        with (
+            patch.object(
+                PriorityService,
+                "calculate_and_save",
+                side_effect=RuntimeError("boom: relation secrets_table does not exist"),
+            ),
+            caplog.at_level(logging.DEBUG),
+        ):
+            response = client.post(
+                self.bulk_url,
+                data=json.dumps(
+                    {
+                        "action": BulkModerationAction.FLAG.value,
+                        "selected_items": [ad.id],
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 0
+        assert data["errors"] == [
+            {"id": ad.id, "error": BulkModerationError.PROCESSING_FAILED.value}
+        ]
+        # The generic string must not carry the raw exception text.
+        assert "secrets_table" not in data["errors"][0]["error"]
+        assert "boom" not in data["errors"][0]["error"]
+
+        bulk_records = [r for r in caplog.records if "Bulk moderation" in r.message]
+        assert any(r.levelno >= logging.ERROR for r in bulk_records)
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.slow
+    @pytest.mark.concurrent
+    def test_row_lock_blocks_concurrent_writer(self, category, city) -> None:
+        """``select_for_update()`` is issued per ad: a concurrent writer holding
+        the row lock blocks the endpoint until the lock is released.
+
+        Behavioural assertion (not a source substring): the main thread holds a
+        ``FOR UPDATE`` lock on the target row; the endpoint POST must not
+        complete while the lock is held, and must complete once it is released.
+        """
+        ad = create_test_ad(self.user, category, city, status=AdStatus.ON_MODERATION)
+        ad_id = ad.id
+
+        started = threading.Event()
+        finished = threading.Event()
+        status_code: dict[str, int] = {}
+        errors: list[BaseException] = []
+
+        def _post_bulk() -> None:
+            started.set()
+            try:
+                thread_client = Client()
+                thread_client.force_login(self.staff_user)
+                resp = thread_client.post(
+                    self.bulk_url,
+                    data=json.dumps(
+                        {
+                            "action": BulkModerationAction.REJECT.value,
+                            "selected_items": [ad_id],
+                            "reason": "policy violation",
+                        }
+                    ),
+                    content_type="application/json",
+                )
+                status_code["value"] = resp.status_code
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+            finally:
+                finished.set()
+                connection.close()
+
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            locked = Ad.objects.select_for_update().get(pk=ad_id)
+            assert locked.id == ad_id
+
+            thread = threading.Thread(target=_post_bulk)
+            thread.start()
+            assert started.wait(timeout=5), "Background POST did not start"
+
+            # While the row lock is held the endpoint's FOR UPDATE must block.
+            time.sleep(1.0)
+            assert not finished.is_set(), (
+                "Bulk POST completed before the row lock was released — "
+                "select_for_update did not block the concurrent writer"
+            )
+
+        # Main transaction commits, releasing the lock; the POST must complete.
+        assert finished.wait(timeout=10), (
+            "Bulk POST did not complete after the lock was released"
+        )
+        thread.join(timeout=10)
+
+        assert not errors, f"Background thread raised: {errors}"
+        assert status_code.get("value") == 200
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.REJECTED
+
+    def test_flag_runs_inside_transaction_and_updates_priority(
+        self, category, city
+    ) -> None:
+        """The FLAG branch now runs ``calculate_and_save`` inside the per-ad
+        transaction, and still writes the priority record.
+
+        The transactional proof: a ``calculate_and_save`` that writes then
+        raises is rolled back by the per-ad ``atomic()`` — the record would
+        survive if FLAG ran outside a transaction.
+        """
+        ad = create_test_ad(self.user, category, city, status=AdStatus.PUBLISHED)
+
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {"action": BulkModerationAction.FLAG.value, "selected_items": [ad.id]}
+            ),
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+        assert response.json()["completed"] == 1
+        assert AdModerationPriority.objects.filter(ad_id=ad.id).exists()
+
+        # Transactional proof: write-then-raise must roll the write back.
+        other_ad = create_test_ad(self.user, category, city, status=AdStatus.PUBLISHED)
+        real_calculate = PriorityService.calculate_and_save
+
+        def _write_then_fail(self_service, target_ad):
+            real_calculate(self_service, target_ad)
+            raise RuntimeError("simulated failure after write")
+
+        with patch.object(PriorityService, "calculate_and_save", _write_then_fail):
+            failed = client.post(
+                self.bulk_url,
+                data=json.dumps(
+                    {
+                        "action": BulkModerationAction.FLAG.value,
+                        "selected_items": [other_ad.id],
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        assert failed.status_code == 200
+        assert failed.json()["completed"] == 0
+        assert not AdModerationPriority.objects.filter(ad_id=other_ad.id).exists()

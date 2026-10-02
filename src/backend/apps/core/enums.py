@@ -165,6 +165,24 @@ class BulkModerationAction(StrEnum):
     FLAG = "flag"
 
 
+class BulkModerationError(StrEnum):
+    """Per-id error strings for the bulk-moderation JSON API.
+
+    The endpoint's response shape
+    ``{"completed": N, "errors": [{"id": .., "error": ..}]}`` is a public
+    contract consumed outside this repository, so each failure class is a
+    stable string value rather than a new response field. The values are
+    deliberately free of driver/exception text (CWE-209 discipline).
+    """
+
+    CRITERIA_REJECTED = "Auto-moderation failed"
+    TRANSITION_REFUSED = "Transition refused by ad status"
+    AD_NOT_FOUND = "Ad not found"
+    MAX_ADS_EXCEEDED = "User has reached the maximum number of active ads"
+    INVALID_TRANSITION = "Ad is not in a modifiable state"
+    PROCESSING_FAILED = "Processing failed"
+
+
 class ApproveOutcome(StrEnum):
     """Result of a single ad approval attempt.
 
@@ -339,6 +357,7 @@ __all__ = [
     "TrustLevel",
     "ModeratorActionType",
     "BulkModerationAction",
+    "BulkModerationError",
     "ApproveOutcome",
     "CategoryRejectReason",
     "AdPriorityLevel",
